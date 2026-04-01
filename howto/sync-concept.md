@@ -11,8 +11,7 @@ Agenten-Dateien in einem Projekt sind **generierter Output** — kein manuell
 gepflegter Inhalt. Die einzige manuelle Datei ist die `CLAUDE.md` des Projekts.
 
 ```
-agent-meta (Release vX.Y.Z)
-    + agent-meta.config.json (im Projekt)
+agent-meta (Release vX.Y.Z)  +  agent-meta.config.json (im Projekt)
     = .claude/agents/*.md (generiert, nie manuell editieren)
 ```
 
@@ -39,15 +38,28 @@ agent-meta/
 
 ```
 <projekt>/
-  agent-meta.config.json   ← Sync-Konfiguration (manuell gepflegt, versioniert)
-  CLAUDE.md                ← beim --init generiert, danach manuell gepflegt
+  .agent-meta/               ← Git Submodule (agent-meta Repository)
+  agent-meta.config.json     ← Sync-Konfiguration (manuell gepflegt, versioniert)
+  CLAUDE.md                  ← bei --init generiert, danach manuell gepflegt
   .claude/
-    agents/                ← vollständig generiert, nie manuell editieren
+    agents/                  ← vollständig generiert, nie manuell editieren
       <project-short>.md
       <prefix>-developer.md
       <prefix>-tester.md
       ...
+  sync.log                   ← Protokoll des letzten Sync-Laufs (gitignore empfohlen)
 ```
+
+---
+
+## Entscheidungen
+
+| Thema | Entscheidung |
+|-------|-------------|
+| agent-meta Einbindung | **Git Submodule** unter `.agent-meta/` |
+| Script-Aufruf | Immer aus agent-meta: `python .agent-meta/scripts/sync.py` |
+| CLAUDE.md nach `--init` | Tabu für normale Syncs — nur `--only-variables` darf Platzhalter ersetzen |
+| Fehlende Variablen | **Warning + weitermachen** — Platzhalter bleibt sichtbar, Logfile fasst alles zusammen |
 
 ---
 
@@ -68,22 +80,22 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
   },
 
   "variables": {
-    "PROJECT_NAME":        "sharkord-vid-with-friends",
-    "PREFIX":              "vwf",
-    "PROJECT_SHORT":       "vid-with-friends",
-    "PLATFORM":            "Sharkord Plugin SDK v0.0.16",
-    "RUNTIME":             "Bun (NICHT Node.js)",
-    "KEY_DEPENDENCIES":    "@sharkord/plugin-sdk@0.0.16, mediasoup, tRPC, React, Zod",
-    "TARGET_PLATFORM":     "Sharkord Plugin SDK v0.0.16",
-    "BUILD_COMMAND":       "bun run build",
-    "TEST_COMMAND":        "bun test",
-    "SERVICE_NAME":        "sharkord",
-    "CONTAINER_NAME":      "sharkord-dev",
-    "PLUGIN_DIR_NAME":     "sharkord-vid-with-friends",
-    "SHARKORD_VERSION":    "v0.0.16",
-    "SHARKORD_URL":        "http://localhost:3000",
-    "WEB_PORT":            "3000",
-    "MEDIASOUP_PORT":      "40000",
+    "PROJECT_NAME":         "sharkord-vid-with-friends",
+    "PREFIX":               "vwf",
+    "PROJECT_SHORT":        "vid-with-friends",
+    "PLATFORM":             "Sharkord Plugin SDK v0.0.16",
+    "RUNTIME":              "Bun (NICHT Node.js)",
+    "KEY_DEPENDENCIES":     "@sharkord/plugin-sdk@0.0.16, mediasoup, tRPC, React, Zod",
+    "TARGET_PLATFORM":      "Sharkord Plugin SDK v0.0.16",
+    "BUILD_COMMAND":        "bun run build",
+    "TEST_COMMAND":         "bun test",
+    "SERVICE_NAME":         "sharkord",
+    "CONTAINER_NAME":       "sharkord-dev",
+    "PLUGIN_DIR_NAME":      "sharkord-vid-with-friends",
+    "SHARKORD_VERSION":     "v0.0.16",
+    "SHARKORD_URL":         "http://localhost:3000",
+    "WEB_PORT":             "3000",
+    "MEDIASOUP_PORT":       "40000",
     "SHARKORD_MIN_VERSION": "0.0.7"
   }
 }
@@ -93,12 +105,12 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
 | Feld | Bedeutung |
 |------|-----------|
-| `agent-meta-version` | Welches Release von `agent-meta` genutzt wird |
-| `platforms` | Liste aktiver Plattformen — bestimmt welche `2-platform/` Agenten einbezogen werden. Mehrere möglich: `["sharkord", "github-actions"]` |
+| `agent-meta-version` | Welches Release von agent-meta genutzt wird — zur Dokumentation und Validierung |
+| `platforms` | Liste aktiver Plattformen. Bestimmt welche `2-platform/<plattform>-*.md` einbezogen werden. Mehrere möglich: `["sharkord", "github-actions"]` |
 | `project.name` | Vollständiger Projektname |
-| `project.prefix` | Kurzpräfix für Agent-Dateinamen |
-| `project.short` | Kurzname für den Orchestrator-Dateinamen |
-| `variables` | Alle `{{PLATZHALTER}}` die in Agenten-Dateien und `CLAUDE.md` ersetzt werden |
+| `project.prefix` | Kurzpräfix für Agent-Dateinamen (`vwf-developer.md`) |
+| `project.short` | Kurzname für den Orchestrator-Dateinamen (`vid-with-friends.md`) |
+| `variables` | Alle `{{VARIABLE}}` die in Agenten-Dateien und CLAUDE.md ersetzt werden |
 
 ---
 
@@ -108,79 +120,127 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
 ```bash
 # Erstmalige Einrichtung — generiert CLAUDE.md + alle Agenten
-python sync.py --init --config agent-meta.config.json
+python .agent-meta/scripts/sync.py --init --config agent-meta.config.json
 
-# Normale Aktualisierung — überschreibt Agenten, befüllt Variablen in CLAUDE.md
-python sync.py --config agent-meta.config.json
+# Normale Aktualisierung — überschreibt Agenten, aktualisiert keine CLAUDE.md
+python .agent-meta/scripts/sync.py --config agent-meta.config.json
+
+# Nur Variablen in CLAUDE.md nachträglich befüllen (kein Agent-Sync)
+python .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
 
 # Vorschau ohne Schreiben
-python sync.py --config agent-meta.config.json --dry-run
+python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
 
-# Bestimmtes agent-meta Release verwenden (überschreibt config-Version)
-python sync.py --config agent-meta.config.json --version 1.3.0
+# Alle Modi erzeugen ein Logfile
+# → sync.log im Projekt-Root
 ```
 
 ### Schreibverhalten pro Schicht
 
 | Schicht | Verhalten |
 |---------|-----------|
-| `1-generic/` | **Immer überschreiben** — generierter Output, nie manuell editieren |
-| `2-platform/` | **Immer überschreiben** — für alle in `platforms` konfigurierten Plattformen |
-| `3-project/` | **Nur überschreiben wenn Datei in `3-project/` existiert** — ein projektspezifischer Override wird ersetzt, wenn agent-meta eine neuere Version hat |
-| `CLAUDE.md` | **Nur bei `--init`** — danach nie mehr angefasst |
+| `1-generic/` | **Immer überschreiben** — generierter Output |
+| `2-platform/` | **Immer überschreiben** — für alle konfigurierten Plattformen |
+| `3-project/` | **Überschreiben nur wenn Datei in `3-project/` existiert** |
+| `CLAUDE.md` | **Nur bei `--init`** generieren — bei `--only-variables` nur `{{PLATZHALTER}}` ersetzen |
 
 ### Plattform-Erkennung
 
 Das Script liest `platforms` aus der Config und sucht in `2-platform/` nach Dateien,
-deren Präfix mit einem der konfigurierten Plattform-Namen übereinstimmt:
+deren Dateiname mit `<plattform>-` beginnt:
 
 ```
 config: "platforms": ["sharkord"]
-→ verwendet:  2-platform/sharkord-docker.md
-              2-platform/sharkord-release.md
-              (alle Dateien mit Präfix "sharkord-")
+→ 2-platform/sharkord-docker.md   → .claude/agents/vwf-docker.md
+→ 2-platform/sharkord-release.md  → .claude/agents/vwf-release.md
 
 config: "platforms": ["sharkord", "github-actions"]
-→ verwendet:  2-platform/sharkord-docker.md
-              2-platform/sharkord-release.md
-              2-platform/github-actions-ci.md
-              (alle Dateien beider Präfixe)
+→ alle sharkord-* und github-actions-* Dateien werden einbezogen
 ```
 
-Wenn für eine Rolle ein Plattform-Agent existiert, **ersetzt** er den Generic-Agenten
-für diese Rolle. Wenn nicht, wird der Generic-Agent verwendet.
+Existiert für eine Rolle ein Plattform-Agent, **ersetzt** er den Generic-Agenten.
+Existiert kein Plattform-Agent für eine Rolle, gilt der Generic-Agent.
+
+### Dateinamen-Mapping
+
+Das Script baut die Ziel-Dateinamen aus Config-Werten:
+
+| Quell-Datei | Ziel-Datei |
+|-------------|------------|
+| `1-generic/orchestrator.md` | `.claude/agents/<project.short>.md` |
+| `1-generic/developer.md` | `.claude/agents/<prefix>-developer.md` |
+| `1-generic/tester.md` | `.claude/agents/<prefix>-tester.md` |
+| `1-generic/validator.md` | `.claude/agents/<prefix>-validator.md` |
+| `1-generic/requirements.md` | `.claude/agents/<prefix>-requirements.md` |
+| `1-generic/documenter.md` | `.claude/agents/<prefix>-documenter.md` |
+| `2-platform/sharkord-release.md` | `.claude/agents/<prefix>-release.md` |
+| `2-platform/sharkord-docker.md` | `.claude/agents/<prefix>-docker.md` |
+
+Die Rolle wird aus dem Dateinamen extrahiert (nach dem Plattform-Präfix bzw. direkt):
+`sharkord-release.md` → Rolle `release` → `<prefix>-release.md`
 
 ### Variablen-Befüllung
 
-Das Script ersetzt alle `{{VARIABLE}}` Vorkommen in jeder Agenten-Datei
-mit den Werten aus `variables` in der Config.
+Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ersetzt.
+Zusätzlich werden `{{PREFIX}}` und `{{PROJECT_SHORT}}` aus `project` befüllt.
 
-Bei `--init` zusätzlich in `CLAUDE.md` (einmalig).
+**Reihenfolge:** `variables` > `project.*` > interne Script-Werte
 
-Unbekannte Variablen (kein Wert in Config) → **Warning**, Platzhalter bleibt stehen.
+Unbekannte Variablen (kein Wert in Config):
+- Platzhalter bleibt unverändert sichtbar
+- Eintrag im Logfile unter `WARNINGS`
 
-### Ausgabe
+### Frontmatter-Generierung
+
+Das Script setzt `name` und `description` im Frontmatter jeder Agenten-Datei
+korrekt für das Projekt:
+
+```yaml
+# Aus 1-generic/developer.md wird in vwf-developer.md:
+---
+name: vwf-developer
+description: "Developer-Agent für sharkord-vid-with-friends."
+tools: [...]
+---
+```
+
+---
+
+## Logfile (sync.log)
+
+Nach jedem Lauf wird `sync.log` im Projekt-Root geschrieben (überschreibt den vorherigen).
 
 ```
-agent-meta sync v1.2.0
-Config:   agent-meta.config.json
-Source:   agent-meta v1.2.0
-Platform: sharkord
+=====================================
+agent-meta sync — 2026-04-01 14:32:11
+=====================================
+Config:    agent-meta.config.json
+Source:    .agent-meta/ (v1.2.0)
+Mode:      sync
+Platforms: sharkord
 
-[INIT]      CLAUDE.md                              (erstellt)
+ACTIONS
+-------
+[INIT]   CLAUDE.md                                     (howto/CLAUDE.project-template.md)
+[WRITE]  .claude/agents/vid-with-friends.md            (1-generic/orchestrator.md)
+[WRITE]  .claude/agents/vwf-developer.md               (1-generic/developer.md)
+[WRITE]  .claude/agents/vwf-tester.md                  (1-generic/tester.md)
+[WRITE]  .claude/agents/vwf-validator.md               (1-generic/validator.md)
+[WRITE]  .claude/agents/vwf-requirements.md            (1-generic/requirements.md)
+[WRITE]  .claude/agents/vwf-documenter.md              (1-generic/documenter.md)
+[WRITE]  .claude/agents/vwf-release.md                 (2-platform/sharkord-release.md)
+[WRITE]  .claude/agents/vwf-docker.md                  (2-platform/sharkord-docker.md)
+[SKIP]   .claude/agents/vwf-custom.md                  (kein 3-project/ Pendant)
 
-[WRITE]     .claude/agents/vid-with-friends.md     (1-generic/orchestrator.md)
-[WRITE]     .claude/agents/vwf-developer.md        (1-generic/developer.md)
-[WRITE]     .claude/agents/vwf-tester.md           (1-generic/tester.md)
-[WRITE]     .claude/agents/vwf-validator.md        (1-generic/validator.md)
-[WRITE]     .claude/agents/vwf-requirements.md     (1-generic/requirements.md)
-[WRITE]     .claude/agents/vwf-documenter.md       (1-generic/documenter.md)
-[WRITE]     .claude/agents/vwf-release.md          (2-platform/sharkord-release.md)
-[WRITE]     .claude/agents/vwf-docker.md           (2-platform/sharkord-docker.md)
+WARNINGS
+--------
+[WARN]   Variable EXTRA_STARTUP_INFO nicht in config — Platzhalter bleibt in:
+           .claude/agents/vwf-docker.md (Zeile 99)
 
-[WARN]      Variable EXTRA_STARTUP_INFO nicht in config — Platzhalter bleibt
-
-8 Agenten geschrieben. 1 Warnung.
+SUMMARY
+-------
+9 Agenten verarbeitet  |  1 übersprungen  |  1 Warnung
+Logfile: sync.log
 ```
 
 ---
@@ -189,27 +249,56 @@ Platform: sharkord
 
 ### Neues agent-meta Release einbinden
 
-1. `agent-meta-version` in `agent-meta.config.json` auf neue Version setzen
-2. Script erneut ausführen — alle Agenten werden überschrieben
-3. `CLAUDE.md` bleibt unverändert (manuell gepflegt)
-
 ```bash
+# 1. Submodule auf neue Version bringen
+cd .agent-meta && git fetch && git checkout v1.3.0 && cd ..
+git add .agent-meta
+git commit -m "chore: update agent-meta to v1.3.0"
+
+# 2. Version in Config aktualisieren
 # agent-meta.config.json: "agent-meta-version": "1.3.0"
-python sync.py --config agent-meta.config.json
+
+# 3. Sync ausführen — alle Agenten werden neu generiert
+python .agent-meta/scripts/sync.py --config agent-meta.config.json
+
+# 4. Ergebnis prüfen + committen
+git add .claude/ agent-meta.config.json sync.log
+git commit -m "chore: sync agents to agent-meta v1.3.0"
 ```
 
-### Neues Plattform-Modul einbinden
-
-1. Plattform-Name zu `platforms` in Config hinzufügen
-2. Neue Variablen in `variables` ergänzen
-3. Script ausführen — neue Plattform-Agenten werden hinzugefügt
-
-### Variable nachträglich befüllen
-
-Nur Variablen in `CLAUDE.md` aktualisieren (ohne Agenten neu zu schreiben):
+### Neue Variable in Config ergänzen und in CLAUDE.md nachträglich einsetzen
 
 ```bash
-python sync.py --config agent-meta.config.json --only-variables
+# 1. Variable in agent-meta.config.json ergänzen
+# 2. Nur Variablen in CLAUDE.md aktualisieren (kein Agenten-Sync)
+python .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
+```
+
+---
+
+## Erstmalige Projekt-Einrichtung
+
+```bash
+# 1. agent-meta als Git Submodule einbinden
+git submodule add https://github.com/<org>/agent-meta .agent-meta
+git submodule update --init --recursive
+
+# 2. Konfiguration anlegen (aus Beispiel)
+cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
+# → Config befüllen: version, platforms, project, variables
+
+# 3. Initiales Setup
+python .agent-meta/scripts/sync.py --init --config agent-meta.config.json
+
+# 4. Prüfen (sync.log lesen)
+cat sync.log
+
+# 5. Ergebnis committen
+git add .agent-meta .claude/ CLAUDE.md agent-meta.config.json sync.log
+git commit -m "chore: initialize agent-meta v1.2.0"
+
+# 6. sync.log in .gitignore (optional — oder bewusst versionieren)
+echo "sync.log" >> .gitignore
 ```
 
 ---
@@ -218,71 +307,15 @@ python sync.py --config agent-meta.config.json --only-variables
 
 ```
 .claude/agents/*.md    ← vollständig generiert
-                          Änderungen werden beim nächsten sync überschrieben
+                          Manuelle Änderungen werden beim nächsten sync überschrieben
 ```
 
-**Ausnahme:** Wenn ein echter projektspezifischer Override nötig ist →
-Datei in `agent-meta/agents/3-project/` anlegen, nicht direkt in `.claude/agents/`.
-
----
-
-## Versionierung
-
-Das Script `sync.py` ist Teil des `agent-meta` Repositories und wird mit ihm
-zusammen getaggt und released. Ein Projekt pinnt seine Version über:
-
-```json
-{ "agent-meta-version": "1.2.0" }
-```
-
-und kann damit jederzeit reproduzierbar regenerieren — auch auf einer alten Version.
+**Ausnahme:** Echter projektspezifischer Override →
+Datei in `agent-meta/agents/3-project/` im agent-meta Fork/Branch anlegen.
 
 ---
 
 ## Abhängigkeiten des Scripts
 
 - Python 3.8+
-- Keine externen Dependencies (nur stdlib: `json`, `pathlib`, `argparse`, `re`, `shutil`)
-- Optionaler Parameter `--agent-meta-path` falls agent-meta nicht als Git-Submodule
-  oder benachbartes Verzeichnis liegt
-
----
-
-## Empfohlene Projekt-Einrichtung
-
-```bash
-# 1. agent-meta als Git-Submodule einbinden (empfohlen)
-git submodule add https://github.com/<org>/agent-meta .agent-meta
-git submodule update --init
-
-# 2. Konfiguration anlegen
-cp .agent-meta/howto/CLAUDE.project-template.md agent-meta.config.json
-# → Config befüllen
-
-# 3. Initiales Setup
-python .agent-meta/scripts/sync.py --init --config agent-meta.config.json
-
-# 4. Generierte Dateien committen
-git add .claude/ CLAUDE.md agent-meta.config.json
-git commit -m "chore: initialize agent-meta v1.2.0"
-```
-
----
-
-## Offene Entscheidungen (Feedback erbeten)
-
-1. **Submodule vs. lokale Kopie vs. Download:**
-   Soll agent-meta als Git-Submodule, als lokale Kopie im Repo, oder
-   durch das Script automatisch heruntergeladen werden?
-
-2. **Wo liegt sync.py beim Aufruf:**
-   Im agent-meta Verzeichnis (`.agent-meta/scripts/sync.py`) oder
-   soll es ins Projekt-Root kopiert werden?
-
-3. **Variablen in CLAUDE.md beim Update:**
-   Bei `sync --only-variables` — soll das Script Variablen in der
-   bestehenden `CLAUDE.md` nachträglich ersetzen können, auch wenn
-   sie manuell erweitert wurde? Oder ist `CLAUDE.md` nach `--init` tabu?
-
-4. **Fehlende Variablen:**
-   Warning und weitermachen, oder Fehler und abbrechen?
+- Keine externen Dependencies (nur stdlib: `json`, `pathlib`, `argparse`, `re`, `shutil`, `datetime`)

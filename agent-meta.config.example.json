@@ -1,0 +1,56 @@
+{
+  "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
+
+  "agent-meta-version": "1.0.0",
+
+  "platforms": ["sharkord"],
+
+  "project": {
+    "name": "sharkord-mein-plugin",
+    "prefix": "mp",
+    "short": "mein-plugin"
+  },
+
+  "variables": {
+    "PROJECT_NAME":         "sharkord-mein-plugin",
+    "PREFIX":               "mp",
+    "PROJECT_SHORT":        "mein-plugin",
+    "PROJECT_DESCRIPTION":  "Kurzbeschreibung was das Plugin macht.",
+    "PLATFORM":             "Sharkord Plugin SDK v0.0.16",
+    "PLATFORM_LAYER":       "Sharkord",
+    "RUNTIME":              "Bun (NICHT Node.js)",
+    "KEY_DEPENDENCIES":     "@sharkord/plugin-sdk@0.0.16",
+    "TARGET_PLATFORM":      "Sharkord Plugin SDK v0.0.16",
+    "BUILD_COMMAND":        "bun run build",
+    "TEST_COMMAND":         "bun test",
+    "SERVICE_NAME":         "sharkord",
+    "CONTAINER_NAME":       "mein-plugin-dev",
+    "PLUGIN_DIR_NAME":      "sharkord-mein-plugin",
+    "SHARKORD_VERSION":     "v0.0.16",
+    "SHARKORD_URL":         "http://localhost:3000",
+    "WEB_PORT":             "3000",
+    "MEDIASOUP_PORT":       "40000",
+    "SHARKORD_MIN_VERSION": "0.0.16",
+
+    "PROJECT_CONTEXT":      "Projektbeschreibung für Agenten — Tech-Stack, Ziel, Besonderheiten.",
+    "ARCHITECTURE":         "src/\n  index.ts  # Entry-Point",
+    "CODE_CONVENTIONS":     "TypeScript ES6+, Named Exports, kein any, kein var",
+    "REQ_CATEGORIES":       "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen",
+    "BUILD_OUTPUT":         "- index.js  (minified ESM Bundle)\n- package.json",
+    "ARTIFACT_ZIP_CMD":     "powershell -Command \"Compress-Archive -Path 'dist/sharkord-mein-plugin' -DestinationPath 'dist/sharkord-mein-plugin.zip' -Force\"",
+    "ARTIFACT_TAR_CMD":     "cd dist && tar -czf sharkord-mein-plugin.tar.gz sharkord-mein-plugin/ && cd ..",
+    "GH_ASSETS":            "dist/sharkord-mein-plugin.zip dist/sharkord-mein-plugin.tar.gz",
+    "REQUIRED_BINARIES_SECTION": "Keine externen Binaries erforderlich.",
+    "BINARY_INSTALL_STEPS": "",
+    "REQUIRED_BINARY_NAMES": "(keine)",
+    "TECH_STACK":           "TypeScript, Bun, Sharkord Plugin SDK",
+    "BUILD_SYSTEM_NOTES":   "bun run build erzeugt dist/sharkord-mein-plugin/",
+    "VERSION_DIST_BEHAVIOUR": "build.ts kopiert package.json 1:1 ins Dist.",
+    "EXTRA_STARTUP_INFO":   "",
+    "DOCKER_STACKS_OVERVIEW": "| Dev-Stack | docker-compose.dev.yml | Lokales Testen |",
+    "SHARKORD_IMAGE":       "sharkord/sharkord:v0.0.16",
+    "EXTRA_VOLUMES":        "",
+    "EXTRA_ENV_VARS":       "",
+    "HOST_LAN_IP":          "192.168.1.100"
+  }
+}
