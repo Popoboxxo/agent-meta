@@ -2,6 +2,9 @@
 
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
+>
+> Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
+> Plattform-Layer: {{PLATFORM_LAYER}}
 
 ---
 
@@ -9,15 +12,15 @@
 
 **Name:** {{PROJECT_NAME}}
 **Präfix:** {{PREFIX}}
-**Plattform:** {{PLATFORM}}  <!-- z.B. Sharkord Plugin SDK v0.0.16 -->
+**Plattform:** {{PLATFORM}}
 **Beschreibung:** {{PROJECT_DESCRIPTION}}
 
 ---
 
 ## Tech-Stack
 
-- **Runtime:** {{RUNTIME}}  <!-- z.B. Bun (NICHT Node.js) -->
-- **Sprache:** TypeScript (ES6+, strict)
+- **Runtime:** {{RUNTIME}}
+- **Sprache:** {{LANGUAGE}}
 - **Key-Dependencies:** {{KEY_DEPENDENCIES}}
 - **Ziel-Plattform:** {{TARGET_PLATFORM}}
 
@@ -30,7 +33,7 @@
 ```
 
 **Entry-Point:**
-```typescript
+```
 {{ENTRY_POINT_PATTERN}}
 ```
 
@@ -41,19 +44,7 @@
 
 ## Code-Konventionen
 
-### TypeScript
-- **ES6+** — kein CommonJS, kein `require()`
-- **`const` / `let`** — NIEMALS `var`
-- **Kein `any`** — `unknown` + Type Guards verwenden
-- **Named Exports only** — KEINE Default-Exports
-- {{EXTRA_TS_RULES}}
-
-### Dateibenennung
-- kebab-case: `module-name.ts`
-- Tests: `<module>.test.ts`
-
-### Fehlerbehandlung
-{{ERROR_HANDLING_PATTERN}}
+{{CODE_CONVENTIONS}}
 
 ---
 
@@ -67,11 +58,10 @@
 {{TEST_COMMAND}}
 
 # Dev-Stack starten
-docker compose -f docker-compose.dev.yml up
+{{DEV_STACK_START}}
 
-# Nach Änderungen
-{{BUILD_COMMAND}}
-docker compose -f docker-compose.dev.yml restart {{SERVICE_NAME}}
+# Nach Änderungen neu laden
+{{DEV_STACK_RELOAD}}
 ```
 
 ---
@@ -86,19 +76,9 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 ## Agenten-Konfiguration
 
-**Plattform-Layer:** {{PLATFORM_LAYER}}
-<!-- z.B. "Sharkord" → verwendet 2-platform/sharkord-docker.md + sharkord-release.md -->
+<!-- Generiert durch sync.py anhand von platforms in agent-meta.config.json -->
 
-| Rolle | Datei in `.claude/agents/` | Basis |
-|-------|---------------------------|-------|
-| Orchestrator | `{{PROJECT_SHORT}}.md` | `1-generic/orchestrator.md` |
-| Developer | `{{PREFIX}}-developer.md` | `1-generic/developer.md` |
-| Tester | `{{PREFIX}}-tester.md` | `1-generic/tester.md` |
-| Validator | `{{PREFIX}}-validator.md` | `1-generic/validator.md` |
-| Requirements | `{{PREFIX}}-requirements.md` | `1-generic/requirements.md` |
-| Documenter | `{{PREFIX}}-documenter.md` | `1-generic/documenter.md` |
-| Release | `{{PREFIX}}-release.md` | `2-platform/sharkord-release.md` |
-| Docker | `{{PREFIX}}-docker.md` | `2-platform/sharkord-docker.md` |
+{{AGENT_TABLE}}
 
 ---
 
