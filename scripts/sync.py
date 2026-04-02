@@ -134,7 +134,31 @@ def read_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
-def build_variables(config: dict) -> dict:
+def build_agent_table(config: dict, agent_meta_root: Path) -> str:
+    """Generate markdown table of active agents for {{AGENT_TABLE}}."""
+    prefix = config["project"]["prefix"]
+    short = config["project"]["short"]
+    platforms = config.get("platforms", [])
+
+    sources = collect_sources(agent_meta_root, platforms)
+
+    rows = []
+    for role, source_path in sorted(sources.items()):
+        filename = target_filename(role, config)
+        if not filename:
+            continue
+        agent_name = Path(filename).stem
+        layer = source_path.parts[-2]  # e.g. "1-generic" or "2-platform"
+        rows.append(f"| `{agent_name}` | `{source_path.name}` | {layer} |")
+
+    header = (
+        "| Agent | Quelle | Layer |\n"
+        "|-------|--------|-------|"
+    )
+    return header + "\n" + "\n".join(rows)
+
+
+def build_variables(config: dict, agent_meta_root: Path) -> dict:
     """Merge all variable sources into one flat dict."""
     variables = {}
     # From project block
@@ -142,7 +166,11 @@ def build_variables(config: dict) -> dict:
     variables["PREFIX"] = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
     variables["PROJECT_NAME"] = project.get("name", "")
-    # From variables block (overrides project block)
+    # Auto-inject meta variables
+    variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
+    variables["AGENT_META_DATE"] = datetime.now().strftime("%Y-%m-%d")
+    variables["AGENT_TABLE"] = build_agent_table(config, agent_meta_root)
+    # From variables block (overrides project block, but not auto-injected meta vars)
     variables.update(config.get("variables", {}))
     return variables
 
@@ -363,7 +391,7 @@ def main():
     config_path = Path(args.config).resolve()
 
     config = load_config(config_path)
-    variables = build_variables(config)
+    variables = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
 

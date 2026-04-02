@@ -1,7 +1,7 @@
 {
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
 
-  "agent-meta-version": "1.0.0",
+  "agent-meta-version": "0.1.0",
 
   "platforms": ["sharkord"],
 
@@ -19,10 +19,14 @@
     "PLATFORM":             "Sharkord Plugin SDK v0.0.16",
     "PLATFORM_LAYER":       "Sharkord",
     "RUNTIME":              "Bun (NICHT Node.js)",
+    "LANGUAGE":             "TypeScript (ES6+, strict)",
     "KEY_DEPENDENCIES":     "@sharkord/plugin-sdk@0.0.16",
     "TARGET_PLATFORM":      "Sharkord Plugin SDK v0.0.16",
     "BUILD_COMMAND":        "bun run build",
     "TEST_COMMAND":         "bun test",
+    "DEV_STACK_START":      "docker compose -f docker-compose.dev.yml up -d",
+    "DEV_STACK_RELOAD":     "docker compose -f docker-compose.dev.yml restart",
+
     "SERVICE_NAME":         "sharkord",
     "CONTAINER_NAME":       "mein-plugin-dev",
     "PLUGIN_DIR_NAME":      "sharkord-mein-plugin",
@@ -34,7 +38,7 @@
 
     "PROJECT_CONTEXT":      "Projektbeschreibung für Agenten — Tech-Stack, Ziel, Besonderheiten.",
     "ARCHITECTURE":         "src/\n  index.ts  # Entry-Point",
-    "CODE_CONVENTIONS":     "TypeScript ES6+, Named Exports, kein any, kein var",
+    "CODE_CONVENTIONS":     "- TypeScript ES6+, kein `require`, kein `var`, kein `any`\n- Named Exports (kein default export)\n- kebab-case: `module-name.ts`, Tests: `<module>.test.ts`",
     "REQ_CATEGORIES":       "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen",
     "BUILD_OUTPUT":         "- index.js  (minified ESM Bundle)\n- package.json",
     "ARTIFACT_ZIP_CMD":     "powershell -Command \"Compress-Archive -Path 'dist/sharkord-mein-plugin' -DestinationPath 'dist/sharkord-mein-plugin.zip' -Force\"",
