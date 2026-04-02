@@ -50,6 +50,8 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 ```
 generierter Agent  +  .claude/3-project/<rolle>-ext.md  =  voller Agent-Kontext
 ```
+Extension-Dateien leben **ausschließlich im Zielprojekt** — sie werden von sync.py
+nie berührt. Erstellen, bearbeiten und versionieren liegt vollständig beim Projekt.
 
 ---
 
@@ -142,7 +144,9 @@ Was brauche ich?
 
 - Handgeschriebene Markdown-Datei im Zielprojekt
 - Wird vom generierten Agenten **beim Start automatisch gelesen** (Extension-Hook)
-- sync.py kopiert eine Vorlage einmalig aus `3-project/<rolle>-ext.md` im Meta-Repo — danach nie wieder überschrieben
+- Liegt **im Zielprojekt** unter `.claude/3-project/<rolle>-ext.md` — von sync.py nie berührt
+- Wird vom Entwickler selbst erstellt, bearbeitet und versioniert
+- Falls im Meta-Repo eine Vorlage unter `3-project/<rolle>-ext.md` existiert: sync.py loggt sie als Hinweis im `sync.log`, kopiert sie aber nicht
 - Enthält: SDK-spezifisches Wissen, projektspezifische Don'ts, manuelle Workflows, domänenspezifische Patterns
 
 **Extension-Hook** (in jedem generierten Agenten):

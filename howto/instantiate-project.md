@@ -116,13 +116,15 @@ Verfügbare Platzhalter:
 Für SDK-spezifische Patterns, manuelle Workflows, domänenspezifische Regeln:
 
 ```bash
-# Datei anlegen (wird beim nächsten sync einmalig als Vorlage kopiert,
-# falls im Meta-Repo eine 3-project/developer-ext.md existiert)
-# Oder direkt selbst erstellen:
 mkdir -p .claude/3-project
-# Datei schreiben:
-cat > .claude/3-project/developer-ext.md
+# Datei selbst erstellen und befüllen:
+# .claude/3-project/developer-ext.md
 ```
+
+sync.py berührt `.claude/3-project/` nie — die Extension-Dateien werden vollständig
+vom Entwickler erstellt, gepflegt und versioniert. Falls im Meta-Repo eine Vorlage
+unter `agents/3-project/developer-ext.md` existiert, wird sie im `sync.log` als
+Hinweis erwähnt.
 
 Format — einfaches Markdown, kein Frontmatter nötig:
 

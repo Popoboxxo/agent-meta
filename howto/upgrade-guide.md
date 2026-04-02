@@ -66,15 +66,16 @@ cat .agent-meta/agent-meta.config.example.json
 
 ## Upgrade mit Extension-Dateien
 
-Extensions (`.claude/3-project/*-ext.md`) werden bei Upgrades **nie überschrieben**.
+Extensions (`.claude/3-project/*-ext.md`) werden von sync.py **nie berührt**.
+Sie liegen vollständig im Zielprojekt und werden manuell gepflegt.
 
-Falls eine neue agent-meta Version eine verbesserte Vorlage für eine Extension mitbringt:
+Falls eine neue agent-meta Version eine verbesserte Vorlage für eine Extension mitbringt,
+erscheint sie im `sync.log` als Hinweis — aber sync.py kopiert nichts:
 
 ```bash
-# Vorlage aus dem Meta-Repo ansehen:
+# Vorlage aus dem Meta-Repo ansehen und manuell übernehmen was relevant ist:
 cat .agent-meta/agents/3-project/developer-ext.md
-
-# Manuell mit eigener Extension abgleichen und bei Bedarf ergänzen:
+# Eigene Extension anpassen:
 # .claude/3-project/developer-ext.md
 ```
 

@@ -29,7 +29,6 @@ GENERIC_DIR = "1-generic"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 CLAUDE_AGENTS_DIR = ".claude/agents"
-CLAUDE_PROJECT_DIR = ".claude/3-project"
 LOGFILE = "sync.log"
 
 # Maps generic agent filename (stem) to the output filename (no prefix — generic names).
@@ -45,7 +44,8 @@ ROLE_MAP = {
     "docker":       "docker",
 }
 
-# Extension suffix: 3-project/developer-ext.md → copied to .claude/3-project/, never overwritten
+# Extension suffix convention: 3-project/developer-ext.md is a project-owned extension.
+# sync.py does NOT touch .claude/3-project/ — extensions live exclusively in the project.
 EXT_SUFFIX = "-ext"
 
 
@@ -298,7 +298,6 @@ def sync_agents(
     platforms = config.get("platforms", [])
     overrides, extensions = collect_sources(agent_meta_root, platforms)
     target_dir = project_root / CLAUDE_AGENTS_DIR
-    ext_dir = project_root / CLAUDE_PROJECT_DIR
 
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -327,27 +326,14 @@ def sync_agents(
         if not dry_run:
             target_path.write_text(content, encoding="utf-8")
 
-    # --- Extension files (3-project/*-ext.md) — copy once, never overwrite ---
-    for role, source_path in extensions.items():
+    # --- Extensions (.claude/3-project/*-ext.md) live exclusively in the project ---
+    # sync.py does not touch them. Log any known extensions from meta-repo as info.
+    for role in extensions:
         ext_filename = f"{role}{EXT_SUFFIX}.md"
-        target_path = ext_dir / ext_filename
-
-        if target_path.exists():
-            log.skip(
-                str(target_path.relative_to(project_root)),
-                "Extension existiert bereits — nicht überschrieben",
-            )
-            continue
-
-        rel_source_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action("COPY", str(target_path.relative_to(project_root)), rel_source_label)
-
-        if not dry_run:
-            ext_dir.mkdir(parents=True, exist_ok=True)
-            content = source_path.read_text(encoding="utf-8")
-            rel_source = str(source_path.relative_to(agent_meta_root))
-            content = substitute(content, variables, rel_source, log)
-            target_path.write_text(content, encoding="utf-8")
+        log.skip(
+            f".claude/3-project/{ext_filename}",
+            f"Extension — liegt im Projekt, nicht in agent-meta (Vorlage: 3-project/{ext_filename})",
+        )
 
 
 def init_claude_md(
