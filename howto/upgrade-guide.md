@@ -66,18 +66,21 @@ cat .agent-meta/agent-meta.config.example.json
 
 ## Upgrade mit Extension-Dateien
 
-Extensions (`.claude/3-project/*-ext.md`) werden von sync.py **nie berührt**.
-Sie liegen vollständig im Zielprojekt und werden manuell gepflegt.
-
-Falls eine neue agent-meta Version eine verbesserte Vorlage für eine Extension mitbringt,
-erscheint sie im `sync.log` als Hinweis — aber sync.py kopiert nichts:
+Der **managed block** in jeder Extension-Datei enthält auto-generierten Kontext
+aus den config-Variablen. Er wird bei jedem `--update-ext` aktualisiert.
+Der handgeschriebene Projektbereich darunter bleibt immer erhalten.
 
 ```bash
-# Vorlage aus dem Meta-Repo ansehen und manuell übernehmen was relevant ist:
-cat .agent-meta/agents/3-project/developer-ext.md
-# Eigene Extension anpassen:
-# .claude/3-project/developer-ext.md
+# Nach einem Upgrade: managed blocks aktualisieren
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+
+# Ergebnis prüfen
+cat sync.log
 ```
+
+Falls eine neue agent-meta Version den `MANAGED_BLOCK_TEMPLATE` in `sync.py` ändert
+(neue Variablen, andere Struktur), werden alle Extensions beim nächsten `--update-ext`
+automatisch auf das neue Format gebracht.
 
 ---
 

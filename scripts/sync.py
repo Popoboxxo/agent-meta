@@ -3,18 +3,27 @@
 agent-meta sync.py
 ==================
 Generates .claude/agents/*.md for a project from agent-meta sources.
+Manages .claude/3-project/<prefix>-<role>-ext.md extension files.
 
 Usage:
   python .agent-meta/scripts/sync.py --config agent-meta.config.json
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --init
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
+  python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <role>
+  python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+
+Extension files (.claude/3-project/<prefix>-<role>-ext.md):
+  - Created by --create-ext <role> (or --create-ext all)
+  - Contain a managed block (<!-- agent-meta:managed-begin/end -->) with
+    auto-generated context from config variables — updated by --update-ext
+  - Contain a project section below the managed block — never touched
+  - The generated agent reads the extension file at startup via Extension-Hook
 """
 
 import argparse
 import json
 import re
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -29,10 +38,10 @@ GENERIC_DIR = "1-generic"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 CLAUDE_AGENTS_DIR = ".claude/agents"
+CLAUDE_EXT_DIR = ".claude/3-project"
 LOGFILE = "sync.log"
 
-# Maps generic agent filename (stem) to the output filename (no prefix — generic names).
-# All agents use their role name directly. One project per workspace.
+# Maps role name to the output filename in .claude/agents/ (no prefix)
 ROLE_MAP = {
     "orchestrator": "orchestrator",
     "developer":    "developer",
@@ -44,9 +53,30 @@ ROLE_MAP = {
     "docker":       "docker",
 }
 
-# Extension suffix convention: 3-project/developer-ext.md is a project-owned extension.
-# sync.py does NOT touch .claude/3-project/ — extensions live exclusively in the project.
 EXT_SUFFIX = "-ext"
+MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
+MANAGED_END   = "<!-- agent-meta:managed-end -->"
+
+# Managed block content template — uses {{PLATZHALTER}} from config variables
+# This is what gets updated on --update-ext. Keep it concise and useful.
+MANAGED_BLOCK_TEMPLATE = """\
+<!-- agent-meta:managed-begin -->
+<!-- Dieser Block wird von sync.py bei --update-ext automatisch aktualisiert. -->
+<!-- Projektspezifische Ergänzungen gehören in den Abschnitt UNTERHALB dieser Markierung. -->
+
+**Projekt:** {{PROJECT_NAME}} | **Plattform:** {{PLATFORM}} | **Runtime:** {{RUNTIME}}
+**Build:** `{{BUILD_COMMAND}}` | **Test:** `{{TEST_COMMAND}}`
+<!-- agent-meta:managed-end -->"""
+
+PROJECT_SECTION_STUB = """\
+
+---
+
+## Projektspezifische Erweiterungen
+
+<!-- Dieser Abschnitt wird von sync.py NIE verändert. -->
+<!-- Füge hier projektspezifisches Wissen, Regeln und Patterns hinzu. -->
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +91,7 @@ class SyncLog:
         self.start_time = datetime.now()
 
     def action(self, tag: str, target: str, source: str):
-        self.actions.append(f"[{tag:<6}]  {target:<50}  ({source})")
+        self.actions.append(f"[{tag:<8}]  {target:<50}  ({source})")
 
     def warn(self, message: str):
         self.warnings.append(f"[WARN]   {message}")
@@ -73,9 +103,9 @@ class SyncLog:
     def write(self, log_path: Path, config_path: str, source_version: str,
               mode: str, platforms: list[str], dry_run: bool):
         lines = [
-            "=" * 53,
+            "=" * 60,
             f"agent-meta sync — {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}",
-            "=" * 53,
+            "=" * 60,
             f"Config:    {config_path}",
             f"Source:    .agent-meta/ (v{source_version})",
             f"Mode:      {'DRY-RUN — ' if dry_run else ''}{mode}",
@@ -86,6 +116,7 @@ class SyncLog:
         ]
         lines += self.actions
         if self.skipped:
+            lines += ["", "SKIPPED", "-------"]
             lines += self.skipped
 
         if self.warnings:
@@ -94,14 +125,11 @@ class SyncLog:
         else:
             lines += ["", "WARNINGS", "--------", "(none)"]
 
-        total = len(self.actions)
-        skip_count = len(self.skipped)
-        warn_count = len(self.warnings)
         lines += [
             "",
             "SUMMARY",
             "-------",
-            f"{total} agent(s) processed  |  {skip_count} skipped  |  {warn_count} warning(s)",
+            f"{len(self.actions)} action(s)  |  {len(self.skipped)} skipped  |  {len(self.warnings)} warning(s)",
             f"Logfile: {log_path}",
         ]
 
@@ -125,80 +153,61 @@ def load_config(config_path: Path) -> dict:
 
 
 def find_agent_meta_root(script_path: Path) -> Path:
-    """agent-meta root is the parent of the scripts/ directory."""
     return script_path.parent.parent
 
 
 def read_version(agent_meta_root: Path) -> str:
-    """Read version from agent-meta's own package/version file if available."""
     version_file = agent_meta_root / "VERSION"
     if version_file.exists():
         return version_file.read_text(encoding="utf-8").strip()
-    # Fallback: read from config that was passed in
     return "unknown"
 
 
 def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[str]]:
-    """Generate markdown table of active agents for {{AGENT_TABLE}}.
-
-    Returns (table_markdown, list_of_unmapped_roles).
-    Unmapped roles are roles found in source dirs but missing from ROLE_MAP.
-    """
+    """Generate markdown table for {{AGENT_TABLE}}. Returns (table, unmapped_warnings)."""
     platforms = config.get("platforms", [])
-    overrides, extensions = collect_sources(agent_meta_root, platforms)
+    overrides, _ = collect_sources(agent_meta_root, platforms)
 
     rows = []
     unmapped = []
     for role, source_path in sorted(overrides.items()):
         filename = target_filename(role)
         if not filename:
-            unmapped.append(f"Rolle '{role}' ({source_path.name}) nicht in ROLE_MAP — in AGENT_TABLE übersprungen")
+            unmapped.append(
+                f"Rolle '{role}' ({source_path.name}) nicht in ROLE_MAP — in AGENT_TABLE übersprungen"
+            )
             continue
         agent_name = Path(filename).stem
-        layer = source_path.parts[-2]  # e.g. "1-generic" or "2-platform"
-        ext_marker = " ✚" if role in extensions else ""
-        rows.append(f"| `{agent_name}`{ext_marker} | `{source_path.name}` | {layer} |")
+        layer = source_path.parts[-2]
+        rows.append(f"| `{agent_name}` | `{source_path.name}` | {layer} |")
 
-    header = (
-        "| Agent | Quelle | Layer |\n"
-        "|-------|--------|-------|"
-    )
+    header = "| Agent | Quelle | Layer |\n|-------|--------|-------|"
     return header + "\n" + "\n".join(rows), unmapped
 
 
 def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str]]:
-    """Merge all variable sources into one flat dict.
-
-    Returns (variables, pre_warnings) where pre_warnings are issues found
-    before the SyncLog exists (e.g. unmapped roles in AGENT_TABLE).
-    """
+    """Returns (variables_dict, pre_warnings)."""
     variables = {}
-    # From project block
     project = config.get("project", {})
-    variables["PREFIX"] = project.get("prefix", "")
+    variables["PREFIX"]       = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
-    variables["PROJECT_NAME"] = project.get("name", "")
-    # Auto-inject meta variables
+    variables["PROJECT_NAME"]  = project.get("name", "")
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
-    variables["AGENT_META_DATE"] = datetime.now().strftime("%Y-%m-%d")
-    agent_table, unmapped_warnings = build_agent_table(config, agent_meta_root)
+    variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")
+    agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
-    # From variables block (overrides project block, but not auto-injected meta vars)
     variables.update(config.get("variables", {}))
-    return variables, unmapped_warnings
+    return variables, unmapped
 
 
 def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> str:
-    """Replace all {{VAR}} occurrences. Warn for missing variables."""
+    """Replace {{VAR}} occurrences. Warn for missing variables."""
     def replacer(match):
         key = match.group(1)
         if key in variables:
             return variables[key]
-        log.warn(
-            f"Variable {key} nicht in config — Platzhalter bleibt in: {source_label}"
-        )
-        return match.group(0)  # leave placeholder intact
-
+        log.warn(f"Variable {key} nicht in config — Platzhalter bleibt in: {source_label}")
+        return match.group(0)
     return re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
 
 
@@ -207,36 +216,56 @@ def build_frontmatter(content: str, name: str, description: str) -> str:
     content = re.sub(
         r"(^---\n.*?^name:\s*)(.+?)(\n)",
         lambda m: f"{m.group(1)}{name}{m.group(3)}",
-        content,
-        count=1,
-        flags=re.MULTILINE | re.DOTALL,
+        content, count=1, flags=re.MULTILINE | re.DOTALL,
     )
     content = re.sub(
         r"(^description:\s*\")(.+?)(\"\n)",
         lambda m: f'{m.group(1)}{description}{m.group(3)}',
-        content,
-        count=1,
-        flags=re.MULTILINE,
+        content, count=1, flags=re.MULTILINE,
     )
     return content
 
 
-def target_filename(role: str) -> str:
-    """Return output filename for a role, or None if not in ROLE_MAP."""
+def target_filename(role: str) -> str | None:
     name = ROLE_MAP.get(role)
-    if not name:
-        return None
-    return name + ".md"
+    return (name + ".md") if name else None
+
+
+def ext_target_filename(role: str, prefix: str) -> str:
+    """Extension file name: <prefix>-<role>-ext.md (or <role>-ext.md if no prefix)."""
+    if prefix:
+        return f"{prefix}-{role}{EXT_SUFFIX}.md"
+    return f"{role}{EXT_SUFFIX}.md"
 
 
 def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
-    """Extract role name from a platform file like 'sharkord-release.md' → 'release'."""
-    stem = Path(filename).stem  # e.g. "sharkord-release"
+    stem = Path(filename).stem
     for platform in platforms:
-        prefix = f"{platform}-"
-        if stem.startswith(prefix):
-            return stem[len(prefix):]  # e.g. "release"
+        if stem.startswith(f"{platform}-"):
+            return stem[len(platform) + 1:]
     return None
+
+
+# ---------------------------------------------------------------------------
+# Managed block helpers
+# ---------------------------------------------------------------------------
+
+def render_managed_block(variables: dict, source_label: str, log: SyncLog) -> str:
+    """Render the managed block content from config variables."""
+    content = substitute(MANAGED_BLOCK_TEMPLATE, variables, source_label, log)
+    return content
+
+
+def update_managed_block(existing: str, new_managed: str) -> str:
+    """Replace the managed block in an existing extension file."""
+    pattern = re.compile(
+        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+        re.DOTALL,
+    )
+    if pattern.search(existing):
+        return pattern.sub(new_managed, existing, count=1)
+    # No block found — prepend (should not happen in normal flow)
+    return new_managed + "\n\n" + existing
 
 
 # ---------------------------------------------------------------------------
@@ -245,25 +274,26 @@ def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
 
 def collect_sources(
     agent_meta_root: Path, platforms: list[str]
-) -> tuple[dict[str, Path], dict[str, Path]]:
+) -> tuple[dict[str, Path], set[str]]:
     """
-    Returns (overrides, extensions).
+    Returns (overrides, known_ext_roles).
 
-    overrides: role → source_path — agents that are fully generated into .claude/agents/
-      Layer priority: 1-generic < 2-platform < 3-project/<role>.md
+    overrides: role → source_path for generated agents (.claude/agents/)
+      Priority: 1-generic < 2-platform < 3-project/<role>.md (full override)
 
-    extensions: role → source_path — 3-project/<role>-ext.md files that are copied
-      once into .claude/3-project/ and never overwritten again.
+    known_ext_roles: roles that have a 3-project/<role>-ext.md in meta-repo.
+      These are NOT used as templates — just signals that the role supports extensions.
+      (Currently unused since 3-project/ in meta-repo has no templates by design.)
     """
     overrides: dict[str, Path] = {}
-    extensions: dict[str, Path] = {}
+    known_ext_roles: set[str] = set()
 
     # 1. Generic agents
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
         overrides[f.stem] = f
 
-    # 2. Platform agents — override generic if role matches
+    # 2. Platform agents
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
     for platform in platforms:
         for f in sorted(platform_dir.glob(f"{platform}-*.md")):
@@ -271,20 +301,17 @@ def collect_sources(
             if role:
                 overrides[role] = f
 
-    # 3. Project-level agents
+    # 3. Project-level agents (in meta-repo 3-project/)
     project_dir = agent_meta_root / AGENTS_DIR / PROJECT_DIR
     if project_dir.exists():
         for f in sorted(project_dir.glob("*.md")):
             stem = f.stem
             if stem.endswith(EXT_SUFFIX):
-                # e.g. developer-ext.md → extension, keyed by base role "developer"
-                role = stem[: -len(EXT_SUFFIX)]
-                extensions[role] = f
+                known_ext_roles.add(stem[: -len(EXT_SUFFIX)])
             else:
-                # Full override — replaces the generated agent entirely
                 overrides[stem] = f
 
-    return overrides, extensions
+    return overrides, known_ext_roles
 
 
 def sync_agents(
@@ -295,14 +322,14 @@ def sync_agents(
     log: SyncLog,
     dry_run: bool,
 ):
+    """Generate all .claude/agents/*.md files."""
     platforms = config.get("platforms", [])
-    overrides, extensions = collect_sources(agent_meta_root, platforms)
+    overrides, _ = collect_sources(agent_meta_root, platforms)
     target_dir = project_root / CLAUDE_AGENTS_DIR
 
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Generated agents (overrides) ---
     project_name = config["project"]["name"]
     for role, source_path in overrides.items():
         filename = target_filename(role)
@@ -312,28 +339,71 @@ def sync_agents(
 
         target_path = target_dir / filename
         content = source_path.read_text(encoding="utf-8")
-
         rel_source = str(source_path.relative_to(agent_meta_root))
         content = substitute(content, variables, rel_source, log)
-
         name = Path(filename).stem
-        description = f"Agent für {project_name}."
-        content = build_frontmatter(content, name, description)
+        content = build_frontmatter(content, name, f"Agent für {project_name}.")
 
-        rel_source_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action("WRITE", str(target_path.relative_to(project_root)), rel_source_label)
-
+        rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)
         if not dry_run:
             target_path.write_text(content, encoding="utf-8")
 
-    # --- Extensions (.claude/3-project/*-ext.md) live exclusively in the project ---
-    # sync.py does not touch them. Log any known extensions from meta-repo as info.
-    for role in extensions:
-        ext_filename = f"{role}{EXT_SUFFIX}.md"
-        log.skip(
-            f".claude/3-project/{ext_filename}",
-            f"Extension — liegt im Projekt, nicht in agent-meta (Vorlage: 3-project/{ext_filename})",
-        )
+
+def create_extension(
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    role: str,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Create .claude/3-project/<prefix>-<role>-ext.md if it does not exist yet."""
+    if role not in ROLE_MAP:
+        print(f"  ✗  Unbekannte Rolle '{role}'. Gültige Rollen: {', '.join(ROLE_MAP)}", file=sys.stderr)
+        return
+
+    prefix = config["project"].get("prefix", "")
+    filename = ext_target_filename(role, prefix)
+    target_path = project_root / CLAUDE_EXT_DIR / filename
+
+    if target_path.exists():
+        log.skip(str(target_path.relative_to(project_root)), "Extension existiert bereits — nutze --update-ext zum Aktualisieren")
+        return
+
+    managed = render_managed_block(variables, f"--create-ext {role}", log)
+    content = managed + PROJECT_SECTION_STUB
+
+    log.action("CREATE", str(target_path.relative_to(project_root)), f"generated for role '{role}'")
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+
+def update_extensions(
+    project_root: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Update the managed block in all existing extension files."""
+    ext_dir = project_root / CLAUDE_EXT_DIR
+    if not ext_dir.exists():
+        log.skip(CLAUDE_EXT_DIR, "Verzeichnis nicht vorhanden — keine Extensions zum Aktualisieren")
+        return
+
+    for ext_file in sorted(ext_dir.glob(f"*{EXT_SUFFIX}.md")):
+        existing = ext_file.read_text(encoding="utf-8")
+        new_managed = render_managed_block(variables, str(ext_file.name), log)
+        new_content = update_managed_block(existing, new_managed)
+
+        if new_content == existing:
+            log.skip(str(ext_file.relative_to(project_root)), "managed block unverändert")
+        else:
+            log.action("UPDATE", str(ext_file.relative_to(project_root)), "managed block")
+            if not dry_run:
+                ext_file.write_text(new_content, encoding="utf-8")
+            updated += 1
 
 
 def init_claude_md(
@@ -348,7 +418,7 @@ def init_claude_md(
     target_path = project_root / "CLAUDE.md"
 
     if target_path.exists():
-        print(f"  ℹ  CLAUDE.md existiert bereits — übersprungen (nutze --only-variables um Platzhalter zu ersetzen)")
+        print("  ℹ  CLAUDE.md existiert bereits — übersprungen (nutze --only-variables)")
         log.skip("CLAUDE.md", "existiert bereits")
         return
 
@@ -359,19 +429,16 @@ def init_claude_md(
     content = template_path.read_text(encoding="utf-8")
     content = substitute(content, variables, "CLAUDE.project-template.md", log)
     log.action("INIT", "CLAUDE.md", "howto/CLAUDE.project-template.md")
-
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 
 
 def only_variables(
     project_root: Path,
-    config: dict,
     variables: dict,
     log: SyncLog,
     dry_run: bool,
 ):
-    """Replace {{VARIABLE}} markers in existing CLAUDE.md only."""
     target_path = project_root / "CLAUDE.md"
     if not target_path.exists():
         print("  ✗  CLAUDE.md nicht gefunden — nutze --init für erstmalige Generierung")
@@ -396,26 +463,19 @@ def main():
     parser = argparse.ArgumentParser(
         description="Sync agent-meta agents into a project."
     )
-    parser.add_argument(
-        "--config",
-        required=True,
-        help="Path to agent-meta.config.json (relative to project root)",
-    )
-    parser.add_argument(
-        "--init",
-        action="store_true",
-        help="Also generate CLAUDE.md from template (only if it does not exist yet)",
-    )
-    parser.add_argument(
-        "--only-variables",
-        action="store_true",
-        help="Only substitute {{VARIABLE}} in existing CLAUDE.md — do not touch agents",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be done without writing any files",
-    )
+    parser.add_argument("--config", required=True,
+                        help="Path to agent-meta.config.json")
+    parser.add_argument("--init", action="store_true",
+                        help="Also generate CLAUDE.md from template (only if not present)")
+    parser.add_argument("--only-variables", action="store_true",
+                        help="Only substitute {{VARIABLE}} in existing CLAUDE.md")
+    parser.add_argument("--create-ext", metavar="ROLE",
+                        help="Create extension file for ROLE (or 'all'). "
+                             "Does not overwrite existing files.")
+    parser.add_argument("--update-ext", action="store_true",
+                        help="Update managed block in all existing extension files")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Show what would be done without writing files")
     args = parser.parse_args()
 
     script_path = Path(__file__).resolve()
@@ -437,7 +497,18 @@ def main():
 
     if args.only_variables:
         mode = "only-variables"
-        only_variables(project_root, config, variables, log, args.dry_run)
+        only_variables(project_root, variables, log, args.dry_run)
+
+    elif args.create_ext:
+        mode = f"create-ext:{args.create_ext}"
+        roles = list(ROLE_MAP.keys()) if args.create_ext == "all" else [args.create_ext]
+        for role in roles:
+            create_extension(project_root, config, variables, role, log, args.dry_run)
+
+    elif args.update_ext:
+        mode = "update-ext"
+        update_extensions(project_root, variables, log, args.dry_run)
+
     else:
         mode = "init" if args.init else "sync"
         if args.init:

@@ -144,15 +144,26 @@ Was brauche ich?
 
 - Handgeschriebene Markdown-Datei im Zielprojekt
 - Wird vom generierten Agenten **beim Start automatisch gelesen** (Extension-Hook)
-- Liegt **im Zielprojekt** unter `.claude/3-project/<rolle>-ext.md` — von sync.py nie berührt
-- Wird vom Entwickler selbst erstellt, bearbeitet und versioniert
-- Falls im Meta-Repo eine Vorlage unter `3-project/<rolle>-ext.md` existiert: sync.py loggt sie als Hinweis im `sync.log`, kopiert sie aber nicht
-- Enthält: SDK-spezifisches Wissen, projektspezifische Don'ts, manuelle Workflows, domänenspezifische Patterns
+- Liegt im Zielprojekt unter `.claude/3-project/<prefix>-<rolle>-ext.md`
+- Wird via `--create-ext <rolle>` (oder `--create-ext all`) erstellt
+- Enthält einen **managed block** (`<!-- agent-meta:managed-begin/end -->`) mit auto-generiertem Kontext aus config-Variablen — aktualisierbar via `--update-ext`
+- Darunter: handgeschriebener Projektbereich — von sync.py **nie angefasst**
+- Das Meta-Repo stellt **keine** Extension-Vorlagen bereit — alles Projektdomäne
 
 **Extension-Hook** (in jedem generierten Agenten):
 ```markdown
-Falls die Datei `.claude/3-project/<rolle>-ext.md` existiert:
+Falls die Datei `.claude/3-project/<prefix>-<rolle>-ext.md` existiert:
 Lies sie jetzt sofort mit dem Read-Tool und wende alle Regeln vollständig an.
+```
+
+**sync.py Extension-Kommandos:**
+```bash
+# Extension erstmalig anlegen (managed block + leerer Projektbereich)
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext developer
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
+
+# Managed block in allen bestehenden Extensions aktualisieren
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 ```
 
 ### Override: `.claude/3-project/<rolle>.md`

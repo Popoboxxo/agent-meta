@@ -116,15 +116,21 @@ Verfügbare Platzhalter:
 Für SDK-spezifische Patterns, manuelle Workflows, domänenspezifische Regeln:
 
 ```bash
-mkdir -p .claude/3-project
-# Datei selbst erstellen und befüllen:
-# .claude/3-project/developer-ext.md
+# Einzelne Extension anlegen:
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext developer
+
+# Alle Extensions auf einmal anlegen:
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
 ```
 
-sync.py berührt `.claude/3-project/` nie — die Extension-Dateien werden vollständig
-vom Entwickler erstellt, gepflegt und versioniert. Falls im Meta-Repo eine Vorlage
-unter `agents/3-project/developer-ext.md` existiert, wird sie im `sync.log` als
-Hinweis erwähnt.
+Die Extension-Datei wird in `.claude/3-project/<prefix>-<rolle>-ext.md` erstellt mit:
+- **managed block** — auto-generierter Kontext aus config-Variablen (aktualisierbar)
+- **Projektbereich** — handgeschrieben, von sync.py nie angefasst
+
+Managed block aktualisieren (z.B. nach config-Änderung):
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+```
 
 Format — einfaches Markdown, kein Frontmatter nötig:
 
