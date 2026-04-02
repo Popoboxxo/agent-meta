@@ -9,46 +9,47 @@ Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
 ## Kernprinzipien
 
-**1. `CLAUDE.md` eines Projekts ist die einzige Wahrheit.**
-Sie beschreibt das Projekt vollständig (Ziel, Tech-Stack, Architektur, Konventionen)
-und bestimmt, welche Agenten aktiv sind. Agenten lesen die `CLAUDE.md` und wissen
-damit alles Projektspezifische — sie enthalten **keinen** eigenen Kontext-Block mehr.
+**1. `CLAUDE.md` des Projekts ist die einzige Wahrheit.**
+Sie beschreibt das Projekt vollständig (Ziel, Tech-Stack, Architektur, Konventionen).
+Agenten lesen sie beim Start — sie enthalten keinen eigenen Kontext-Block.
 
 **2. `.claude/agents/` ist generierter Output — nie manuell bearbeiten.**
-Die Agenten-Dateien im Projekt werden von `sync.py` erzeugt. Manuelle Änderungen
-werden beim nächsten Sync überschrieben. Änderungen gehören in:
-- `agent-meta.config.json` (Variablen)
-- `1-generic/`, `2-platform/` oder `3-project/` (Agenten-Logik)
+Dateien werden von `sync.py` erzeugt und bei jedem Sync überschrieben.
+Änderungen gehören in `agent-meta.config.json` (Variablen) oder die Agent-Quelldateien.
 
-**3. Erweiterungen über `{{PLATZHALTER}}`, nicht über 3-project-Override.**
-Generische Agenten haben dedizierte Erweiterungspunkte. Projektspezifisches Wissen
-(z.B. SDK-Patterns, Extra-Don'ts, Plattform-spezifische Regeln) wird über Variablen
-in `agent-meta.config.json` injiziert — ohne den Agenten zu überschreiben.
+**3. Agenten haben generische Namen — kein Prefix.**
+Ein Projekt pro Workspace. Die Agenten heißen `developer.md`, `tester.md` etc.
+Kein `vwf-developer.md` oder `hi-tester.md` mehr.
+
+**4. Projektspezifische Erweiterungen gehören in `.claude/3-project/`.**
+Nicht in die generierten Agenten, nicht als Config-Variable.
+Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 
 ---
 
 ## Drei-Schichten-Modell
 
 ```
-1-generic/    Universell einsetzbar. Gilt für jedes Projekt ohne Anpassung.
-              Wird direkt verwendet, solange kein Plattform-Layer existiert.
+1-generic/    Universell. Gilt für jedes Projekt. Wird immer generiert,
+              solange kein Override in 2-platform oder 3-project existiert.
 
-2-platform/   Plattformspezifisch. Überschreibt/erweitert den generischen Agenten
-              für eine konkrete Plattform (z.B. Sharkord).
-              Wird verwendet, wenn das Projekt auf dieser Plattform läuft.
+2-platform/   Plattformspezifisch. Überschreibt den Generic-Agent für alle
+              Projekte auf dieser Plattform (z.B. alle Sharkord-Plugins).
 
-3-project/    Projektspezifisch. Überschreibt alles darüber.
-              Nur in Ausnahmefällen — wenn ein Projekt fundamental von
-              Plattform- und Generic-Agent abweicht.
+3-project/    Projektspezifisch. Zwei Arten:
+              - <rolle>.md      → Override: ersetzt den generierten Agenten komplett
+              - <rolle>-ext.md  → Extension: wird vom generierten Agenten additiv geladen
 ```
 
-**Überschreibungs-Reihenfolge:**
+**Override-Reihenfolge (für generierte Agenten):**
 ```
-generisch  ←  wird überschrieben durch  →  plattform  ←  wird überschrieben durch  →  projekt
+1-generic  ←  überschrieben durch  →  2-platform  ←  überschrieben durch  →  3-project/<rolle>.md
 ```
 
-Ein Agent existiert nur auf der niedrigsten Ebene, auf der er sich vom Generic unterscheidet.
-Gibt es keinen Plattform- oder Projekt-Agenten, gilt der Generic-Agent unverändert.
+**Extension (additiv, kein Override):**
+```
+generierter Agent  +  .claude/3-project/<rolle>-ext.md  =  voller Agent-Kontext
+```
 
 ---
 
@@ -71,109 +72,131 @@ agent-meta/
       sharkord-docker.md
       sharkord-release.md
 
-    3-project/          ← projektspezifisch (überschreibt alles, selten!)
-                           (Instanzen leben in den jeweiligen Repos)
+    3-project/          ← projektspezifisch (im Meta-Repo als Vorlage, selten)
+      developer-ext.md  ← Beispiel: Extension-Vorlage für developer
+                           Overrides: <rolle>.md (ersetzt komplett)
+                           Extensions: <rolle>-ext.md (additiv geladen)
 
   howto/
-    instantiate-project.md       ← Schritt-für-Schritt Anleitung
-    CLAUDE.project-template.md   ← Vorlage für Projekt-CLAUDE.md
-    template-gap-analysis.md     ← Analyse: Lücken zwischen Generic und Projekten
+    instantiate-project.md  ← Schritt-für-Schritt Einrichtung
+    upgrade-guide.md         ← Upgrade auf neue agent-meta Version
+    CLAUDE.project-template.md
+    sync-concept.md
+    template-gap-analysis.md
+
+  scripts/
+    sync.py              ← Agent-Generator
 ```
 
 ---
 
-## Die Rolle der CLAUDE.md im Projekt
+## Agenten im Zielprojekt
 
-Jedes Projekt hat eine `CLAUDE.md` im Repo-Root. Sie erfüllt drei Aufgaben:
+### Namensgebung
 
-### 1. Projekt vollständig beschreiben
-- Name, Ziel, Plattform
-- Tech-Stack (Runtime, Sprache, Key-Dependencies)
-- Architektur (Verzeichnisstruktur, Entry-Points, Key-Patterns)
-- Code-Konventionen (Sprachregeln, Namensgebung, Verbote)
-- Anforderungs-Kategorien
+Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 
-### 2. Agenten-Konfiguration definieren
-- Welche Agenten aktiv sind
-- Welcher Plattform-Layer gilt
-- Ob ein Projekt-Agenten-Override existiert (Ausnahmefall)
+| Rolle | Datei in `.claude/agents/` | Quelle |
+|-------|---------------------------|--------|
+| Orchestrator | `orchestrator.md` | 1-generic |
+| Developer | `developer.md` | 1-generic |
+| Tester | `tester.md` | 1-generic |
+| Validator | `validator.md` | 1-generic |
+| Requirements | `requirements.md` | 1-generic |
+| Documenter | `documenter.md` | 1-generic |
+| Release | `release.md` | 1-generic oder 2-platform |
+| Docker | `docker.md` | 1-generic oder 2-platform |
 
-### 3. Als Basis für die Agenten dienen
-Agenten lesen `CLAUDE.md` um den Projektkontext zu erhalten.
-Sie enthalten **keinen eigenen Kontext-Block** — stattdessen verweisen sie auf CLAUDE.md.
+### Update-Verhalten bei sync
 
-Vorlage: [howto/CLAUDE.project-template.md](howto/CLAUDE.project-template.md)
-
----
-
-## Agenten-Rollen-Übersicht
-
-| Rolle | Generic | Plattform (Sharkord) | Zweck |
-|-------|---------|---------------------|-------|
-| `orchestrator` | `1-generic/orchestrator.md` | — | Koordination aller Sub-Agenten |
-| `developer` | `1-generic/developer.md` | — | REQ-driven Implementierung |
-| `tester` | `1-generic/tester.md` | — | TDD, Test-Suite, Coverage |
-| `validator` | `1-generic/validator.md` | — | DoD-Check, Traceability, Code-Qualität |
-| `requirements` | `1-generic/requirements.md` | — | REQ-Aufnahme, REQUIREMENTS.md |
-| `documenter` | `1-generic/documenter.md` | — | Doku-Pflege, Erkenntnisse |
-| `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, Build, GitHub Release |
-| `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Test-Stack, Binaries |
-
-**Naming-Schema in Projekten:**
-
-| Rolle | Name in `.claude/agents/` | Beispiele |
-|-------|--------------------------|---------|
-| Orchestrator | `<project-short>` | `vid-with-friends`, `hero-introducer` |
-| Developer | `<prefix>-developer` | `vwf-developer`, `hi-developer` |
-| Tester | `<prefix>-tester` | `vwf-tester`, `hi-tester` |
-| Validator | `<prefix>-validator` | `vwf-validator`, `hi-validator` |
-| Requirements | `<prefix>-requirements` | `vwf-requirements`, `hi-requirements` |
-| Documenter | `<prefix>-documenter` | `vwf-documenter`, `hi-documenter` |
-| Release | `<prefix>-release` | `vwf-release`, `hi-release` |
-| Docker | `<prefix>-docker` | `vwf-docker`, `hi-docker` |
+| Datei | Wird bei sync überschrieben? | Bekommt generische Updates? |
+|-------|-----------------------------|-----------------------------|
+| `.claude/agents/*.md` (generiert) | ✅ Ja, immer | ✅ Ja |
+| `.claude/3-project/*-ext.md` (Extension) | ❌ Nein, nur einmalig kopiert | ❌ Manuell pflegen |
+| `.claude/3-project/*.md` (Override, falls vorhanden) | ❌ Wird nicht generiert — liegt im Projekt | ❌ Manuell pflegen |
 
 ---
 
-## Erweiterungspunkte in generischen Agenten
+## Projektspezifische Anpassungen
 
-Generische Agenten enthalten dedizierte `{{PLATZHALTER}}` für projektspezifische Inhalte.
-Diese werden via `agent-meta.config.json` befüllt — **kein Agent-Override nötig**.
+### Entscheidungsbaum
+
+```
+Was brauche ich?
+│
+├─ Einfacher Wert (Kommando, kurzer Text, Liste)?
+│   → Variable in agent-meta.config.json
+│   → Wird per {{PLATZHALTER}} in den Agenten injiziert
+│   → Beispiele: BUILD_COMMAND, CODE_CONVENTIONS, REQ_CATEGORIES
+│
+├─ Strukturiertes Zusatzwissen (SDK-Patterns, E2E-Workflow, Plattform-Regeln)?
+│  Gilt es für ALLE Projekte auf einer Plattform?
+│   → Ja → 2-platform/<plattform>-<rolle>.md (neuer/erweiterter Agent)
+│   → Nein (nur dieses Projekt) → .claude/3-project/<rolle>-ext.md  ← EXTENSION
+│
+└─ Fundamentaler Unterschied — anderer Workflow, andere Struktur, anderes Tooling?
+    → .claude/3-project/<rolle>.md  ← OVERRIDE (selten, gut begründen)
+```
+
+### Extension: `.claude/3-project/<rolle>-ext.md`
+
+- Handgeschriebene Markdown-Datei im Zielprojekt
+- Wird vom generierten Agenten **beim Start automatisch gelesen** (Extension-Hook)
+- sync.py kopiert eine Vorlage einmalig aus `3-project/<rolle>-ext.md` im Meta-Repo — danach nie wieder überschrieben
+- Enthält: SDK-spezifisches Wissen, projektspezifische Don'ts, manuelle Workflows, domänenspezifische Patterns
+
+**Extension-Hook** (in jedem generierten Agenten):
+```markdown
+Falls die Datei `.claude/3-project/<rolle>-ext.md` existiert:
+Lies sie jetzt sofort mit dem Read-Tool und wende alle Regeln vollständig an.
+```
+
+### Override: `.claude/3-project/<rolle>.md`
+
+- Liegt direkt im Zielprojekt (nicht von sync.py berührt)
+- Wenn vorhanden im Meta-Repo unter `3-project/<rolle>.md`: wird wie 1-generic/2-platform behandelt, aber mit höchster Priorität
+- Bekommt **keine automatischen Updates** — manuelle Pflege nötig
+- Nur wenn Extension nicht reicht
+
+---
+
+## Variablen und Platzhalter
+
+Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
+Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`.
 
 | Platzhalter | Agent | Zweck |
 |-------------|-------|-------|
-| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung (aus CLAUDE.md) |
-| `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln (z.B. TypeScript-Verbote) |
+| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung aus CLAUDE.md |
+| `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln |
 | `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
-| `{{DEV_COMMANDS}}` | developer | Build/Run-Kommandos |
-| `{{EXTRA_DONTS}}` | developer | Projektspezifische Verbote |
-| `{{EXTRA_ORCHESTRATOR_KNOWLEDGE}}` | orchestrator | Zusätzliche Workflows, Delegation-Regeln |
-| `{{EXTRA_TESTER_KNOWLEDGE}}` | tester | Manuelle E2E-Workflows, Test-Besonderheiten |
-| `{{EXTRA_DOCUMENTER_KNOWLEDGE}}` | documenter | Doku-Besonderheiten des Projekts |
-| `{{EXTRA_REQ_KNOWLEDGE}}` | requirements | Domänenspezifische Anforderungs-Regeln |
+| `{{DEV_COMMANDS}}` | developer, orchestrator | Build/Run-Kommandos |
+| `{{EXTRA_DONTS}}` | developer | Zusätzliche Verbote (kurze Liste) |
 | `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln, Quality-Gates |
-| `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien des Projekts |
+| `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
 | `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
-| `{{BUILD_COMMANDS}}` | release | Build-Schritte für das Release |
+| `{{BUILD_COMMANDS}}` | release | Build-Schritte |
 
-**Entscheidungsbaum: Wie erweitere ich einen Agenten?**
+---
 
-```
-Kleine Ergänzung (SDK-Wissen, Extra-Regeln, Kommandos)?
-  → Variable in agent-meta.config.json → bestehender {{PLATZHALTER}}
-  → Oder: neuen {{PLATZHALTER}} in 1-generic/ Agent einfügen
+## Agenten-Rollen
 
-Plattformspezifische Logik (anderer Workflow, andere Tools)?
-  → Neue Datei in 2-platform/<plattform>-<rolle>.md
-
-Fundamentaler Unterschied zum Generic (nur in 1 Projekt)?
-  → Datei in 3-project/<rolle>.md  ← selten, gut begründen
-```
+| Rolle | Generic | Plattform (Sharkord) | Zweck |
+|-------|---------|---------------------|-------|
+| `orchestrator` | `1-generic/orchestrator.md` | — | Koordination |
+| `developer` | `1-generic/developer.md` | — | REQ-driven Implementierung |
+| `tester` | `1-generic/tester.md` | — | TDD, Test-Suite, Coverage |
+| `validator` | `1-generic/validator.md` | — | DoD-Check, Traceability |
+| `requirements` | `1-generic/requirements.md` | — | REQ-Aufnahme, REQUIREMENTS.md |
+| `documenter` | `1-generic/documenter.md` | — | Doku-Pflege, Erkenntnisse |
+| `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, GitHub Release |
+| `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Binaries |
 
 ---
 
 ## Standard-Entwicklungsworkflows
 
-Diese Workflows sind in `1-generic/orchestrator.md` definiert und gelten projektübergreifend.
+Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 
 ### Workflow A: Neues Feature
 ```
@@ -262,46 +285,33 @@ Diese Workflows sind in `1-generic/orchestrator.md` definiert und gelten projekt
 
 ## Unterstützte Projekte
 
-| Repository | Präfix | Plattform | CLAUDE.md |
-|-----------|--------|-----------|-----------|
-| `sk_plugin` (sharkord-vid-with-friends) | `vwf` | Sharkord | `sk_plugin/CLAUDE.md` |
-| `sk_hero_introduce` (sharkord-hero-introducer) | `hi` | Sharkord | `sk_hero_introduce/sharkord-hero-introducer/CLAUDE.md` |
+| Repository | Plattform | CLAUDE.md |
+|-----------|-----------|-----------|
+| `sk_plugin` (sharkord-vid-with-friends) | Sharkord | `sk_plugin/CLAUDE.md` |
+| `sk_hero_introduce` (sharkord-hero-introducer) | Sharkord | `sk_hero_introduce/sharkord-hero-introducer/CLAUDE.md` |
 
 ---
 
-## Abhängigkeiten — PFLICHTLEKTÜRE bei Änderungen
-
-### Abhängigkeits-Karte
+## Abhängigkeits-Karte — PFLICHTLEKTÜRE bei Änderungen
 
 ```
 1-generic/docker.md
     └── 2-platform/sharkord-docker.md
-            ├── sk_plugin/.claude/agents/vwf-docker.md
-            └── sk_hero_introduce/.../.claude/agents/hi-docker.md
+            ├── sk_plugin/.claude/agents/docker.md
+            └── sk_hero_introduce/.../.claude/agents/docker.md
 
 1-generic/release.md
     └── 2-platform/sharkord-release.md
-            ├── sk_plugin/.claude/agents/vwf-release.md
-            └── sk_hero_introduce/.../.claude/agents/hi-release.md
+            ├── sk_plugin/.claude/agents/release.md
+            └── sk_hero_introduce/.../.claude/agents/release.md
 
-1-generic/orchestrator.md
-    ├── sk_plugin/.claude/agents/vid-with-friends.md
-    └── sk_hero_introduce/.../.claude/agents/hero-introducer.md
+1-generic/orchestrator.md  → sk_plugin/.claude/agents/orchestrator.md
+                           → sk_hero_introduce/.../.claude/agents/orchestrator.md
 
-1-generic/developer.md   → sk_plugin/.claude/agents/vwf-developer.md
-                         → sk_hero_introduce/.../.claude/agents/hi-developer.md
+1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
+                           → sk_hero_introduce/.../.claude/agents/developer.md
 
-1-generic/tester.md      → sk_plugin/.claude/agents/vwf-tester.md
-                         → sk_hero_introduce/.../.claude/agents/hi-tester.md
-
-1-generic/validator.md   → sk_plugin/.claude/agents/vwf-validator.md
-                         → sk_hero_introduce/.../.claude/agents/hi-validator.md
-
-1-generic/requirements.md → sk_plugin/.claude/agents/vwf-requirements.md
-                          → sk_hero_introduce/.../.claude/agents/hi-requirements.md
-
-1-generic/documenter.md  → sk_plugin/.claude/agents/vwf-documenter.md
-                         → sk_hero_introduce/.../.claude/agents/hi-documenter.md
+(analog für tester, validator, requirements, documenter)
 
 CLAUDE.md ← diese Datei
     └── referenziert: agents/**, howto/**, alle unterstützten Projekte
@@ -314,32 +324,31 @@ CLAUDE.md ← diese Datei
 | `1-generic/docker.md` | `2-platform/sharkord-docker.md` |
 | `1-generic/release.md` | `2-platform/sharkord-release.md` |
 | `1-generic/orchestrator.md` | Workflows-Abschnitt in dieser `CLAUDE.md` |
-| einen beliebigen `1-generic/` Agenten | alle Instanzen in den Projekt-Repos |
-| `2-platform/sharkord-docker.md` | `vwf-docker.md` + `hi-docker.md` in den Repos |
-| `2-platform/sharkord-release.md` | `vwf-release.md` + `hi-release.md` in den Repos |
-| `howto/instantiate-project.md` | Naming-Tabelle in dieser `CLAUDE.md` |
+| beliebigen `1-generic/` Agenten | Projekte neu syncen |
+| `2-platform/sharkord-*.md` | Projekte neu syncen |
+| `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
 
 ### Änderungs-Kategorien
 
-**Projektspezifisches Wissen ergänzen** (SDK-Patterns, Extra-Don'ts, Regeln):
-→ Variable in `agent-meta.config.json` → bestehender `{{PLATZHALTER}}` im Agenten.
-→ Wenn kein passender Platzhalter existiert: neuen `{{PLATZHALTER}}` in `1-generic/<rolle>.md` + `config.example.json` + `howto/instantiate-project.md` Tabelle.
+**Einfaches Projektspezifikum (Kommando, Text, Liste):**
+→ Variable in `agent-meta.config.json` → bestehender `{{PLATZHALTER}}`.
 
-**Generische Logik verbessern** (Workflows, Konventionen, Don'ts):
-→ In `1-generic/<rolle>.md` ändern → in alle Projekt-Instanzen propagieren (via sync).
+**Strukturiertes Projektwissen (nur dieses Projekt):**
+→ `.claude/3-project/<rolle>-ext.md` im Zielprojekt schreiben.
 
-**Plattformwissen aktualisieren** (neue Sharkord-Version, Pfadänderungen):
-→ In `2-platform/sharkord-*.md` ändern → in Projekt-Instanzen propagieren (via sync).
+**Plattformwissen verbessern (gilt für alle Projekte auf Plattform X):**
+→ `2-platform/<plattform>-<rolle>.md` ändern → Projekte neu syncen.
 
-**Neuen Plattform-Layer anlegen** (andere Plattform):
-→ Neue Datei in `2-platform/` + Eintrag in Rollen-Übersicht + Abhängigkeits-Karte hier.
-
-**Neue Agenten-Rolle hinzufügen**:
-→ `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Rollen-Übersicht in `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md` + Abhängigkeits-Karte.
+**Neue Agenten-Rolle hinzufügen:**
+→ `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
 
 ---
 
 ## Neue Projekte hinzufügen
 
 Siehe [howto/instantiate-project.md](howto/instantiate-project.md).
+
+## Upgrade auf neue Version
+
+Siehe [howto/upgrade-guide.md](howto/upgrade-guide.md).

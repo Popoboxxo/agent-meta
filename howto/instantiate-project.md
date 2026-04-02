@@ -4,15 +4,13 @@
 
 ## Konzept
 
-Agenten in `1-generic/` und `2-platform/` sind **fertige, sofort einsetzbare Rollen**.
-Sie werden vom `sync.py`-Script **automatisch generiert** — nicht manuell kopiert.
-
-Den Projektkontext liefert die `CLAUDE.md` des Projekts, die jeder Agent beim Start liest.
-Die Agenten-Dateien in `.claude/agents/` sind **generierter Output** und werden nie manuell bearbeitet.
+Agenten werden von `sync.py` **generiert** — nie manuell kopiert oder bearbeitet.
+Den Projektkontext liefert die `CLAUDE.md` des Projekts.
+Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 
 ---
 
-## Ersteinrichtung (neues Projekt)
+## Ersteinrichtung
 
 ### Schritt 1: agent-meta als Submodul einbinden
 
@@ -21,13 +19,13 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 cd .agent-meta && git checkout v0.1.0 && cd ..
 ```
 
-### Schritt 2: Config-Datei anlegen und befüllen
+### Schritt 2: Config anlegen und befüllen
 
 ```bash
 cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
 ```
 
-Pflichtfelder in `agent-meta.config.json`:
+Pflichtfelder:
 
 ```json
 {
@@ -35,15 +33,13 @@ Pflichtfelder in `agent-meta.config.json`:
   "platforms": ["sharkord"],
   "project": {
     "name": "sharkord-mein-plugin",
-    "prefix": "mp",
     "short": "mein-plugin"
   },
   "variables": { ... }
 }
 ```
 
-Alle `{{PLATZHALTER}}` die in `CLAUDE.md` und Agenten vorkommen, müssen im `variables`-Block
-stehen. Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
+Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
 
 ### Schritt 3: CLAUDE.md + Agenten generieren
 
@@ -51,10 +47,10 @@ stehen. Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtba
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
 ```
 
-Das Script:
-- Erzeugt `CLAUDE.md` aus `howto/CLAUDE.project-template.md` (nur wenn noch nicht vorhanden)
-- Erzeugt alle `.claude/agents/*.md` aus der Drei-Schichten-Hierarchie
-- Schreibt `sync.log` mit Zusammenfassung und Warnungen
+Das Script erzeugt:
+- `CLAUDE.md` aus Template (nur wenn noch nicht vorhanden)
+- `.claude/agents/*.md` — alle Agenten, generisch benannt
+- `sync.log` mit Zusammenfassung und Warnungen
 
 ### Schritt 4: sync.log prüfen
 
@@ -62,100 +58,110 @@ Das Script:
 cat sync.log
 ```
 
-Alle Warnungen (`[WARN]`) zeigen fehlende Variablen. In `agent-meta.config.json` ergänzen,
-dann erneut syncen:
+Alle `[WARN]` zeigen fehlende Variablen. In `agent-meta.config.json` ergänzen, dann erneut syncen:
 
 ```bash
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ```
 
-### Schritt 5: Alles committen
+### Schritt 5: Committen
 
 ```bash
-git add CLAUDE.md .claude/agents/ agent-meta.config.json .gitmodules .agent-meta
+git add CLAUDE.md .claude/ agent-meta.config.json .gitmodules .agent-meta
 git commit -m "chore: initialize agent-meta agents"
 ```
 
 ---
 
-## CLAUDE.md nach Erstanlage befüllen
+## Generierte Agent-Dateien
 
-Nach `--init` enthält `CLAUDE.md` noch offene Platzhalter (wenn nicht alle in der Config stehen).
-Diese manuell befüllen, dann `--only-variables` laufen lassen:
+Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 
-```bash
-# Nach manuellem Bearbeiten der CLAUDE.md:
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
-```
-
----
-
-## Agenten-Updates übernehmen (neue agent-meta Version)
-
-```bash
-# 1. Submodul auf neue Version ziehen
-cd .agent-meta && git checkout v0.2.0 && cd ..
-
-# 2. Versionsnummer in agent-meta.config.json aktualisieren
-#    "agent-meta-version": "0.2.0"
-
-# 3. Agenten neu generieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
-
-# 4. sync.log prüfen (neue Platzhalter?)
-cat sync.log
-
-# 5. Committen
-git add .claude/agents/ .agent-meta agent-meta.config.json
-git commit -m "chore: upgrade agent-meta to v0.2.0"
-```
-
-Da der Projektkontext in `CLAUDE.md` liegt und nicht in den Agenten,
-ist das Update ein einfaches Überschreiben — kein Merge nötig.
+| Agent-Datei | Quelle (Beispiel Sharkord) |
+|-------------|---------------------------|
+| `.claude/agents/orchestrator.md` | `1-generic/orchestrator.md` |
+| `.claude/agents/developer.md` | `1-generic/developer.md` |
+| `.claude/agents/tester.md` | `1-generic/tester.md` |
+| `.claude/agents/validator.md` | `1-generic/validator.md` |
+| `.claude/agents/requirements.md` | `1-generic/requirements.md` |
+| `.claude/agents/documenter.md` | `1-generic/documenter.md` |
+| `.claude/agents/release.md` | `2-platform/sharkord-release.md` |
+| `.claude/agents/docker.md` | `2-platform/sharkord-docker.md` |
 
 ---
 
-## Projektspezifische Erweiterungen
+## Projektspezifische Anpassungen
 
-Generische Agenten haben dedizierte Erweiterungspunkte via `{{PLATZHALTER}}`.
-Damit lassen sich plattform- oder projektspezifische Inhalte **hinzufügen,
-ohne den gesamten Agenten zu überschreiben**:
+### Einfache Werte → config.json
+
+Kurze Texte, Kommandos, Listen: in `agent-meta.config.json` unter `variables` eintragen.
+Sie werden per `{{PLATZHALTER}}` in den generierten Agenten injiziert.
+
+Verfügbare Platzhalter:
 
 | Platzhalter | Agent | Zweck |
 |-------------|-------|-------|
-| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung aus CLAUDE.md |
-| `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Code-Regeln |
-| `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
-| `{{DEV_COMMANDS}}` | developer | Build/Run-Kommandos |
-| `{{EXTRA_DONTS}}` | developer | Projektspezifische Verbote |
-| `{{EXTRA_ORCHESTRATOR_KNOWLEDGE}}` | orchestrator | Zusätzliche Workflows, Delegation-Regeln |
-| `{{EXTRA_TESTER_KNOWLEDGE}}` | tester | Manuelle E2E-Workflows, Test-Besonderheiten |
-| `{{EXTRA_DOCUMENTER_KNOWLEDGE}}` | documenter | Doku-Besonderheiten des Projekts |
-| `{{EXTRA_REQ_KNOWLEDGE}}` | requirements | Domänenspezifische Anforderungs-Regeln |
-| `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln, Quality-Gates |
+| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung |
+| `{{CODE_CONVENTIONS}}` | developer | Sprachregeln |
+| `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur |
+| `{{DEV_COMMANDS}}` | developer, orchestrator | Build/Run |
+| `{{EXTRA_DONTS}}` | developer | Zusätzliche Verbote |
+| `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln |
 | `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
-| `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
+| `{{TEST_COMMANDS}}` | tester | Test-Runner |
 | `{{BUILD_COMMANDS}}` | release | Build-Schritte |
 
-→ Alle Werte in `agent-meta.config.json` unter `variables` eintragen.
+### Strukturiertes Projektwissen → Extension
 
-Nur wenn ein Agent **fundamental** von Generic/Platform abweicht (sehr selten):
-Datei unter `3-project/<rolle>.md` anlegen — überschreibt alles.
+Für SDK-spezifische Patterns, manuelle Workflows, domänenspezifische Regeln:
+
+```bash
+# Datei anlegen (wird beim nächsten sync einmalig als Vorlage kopiert,
+# falls im Meta-Repo eine 3-project/developer-ext.md existiert)
+# Oder direkt selbst erstellen:
+mkdir -p .claude/3-project
+# Datei schreiben:
+cat > .claude/3-project/developer-ext.md
+```
+
+Format — einfaches Markdown, kein Frontmatter nötig:
+
+```markdown
+# Developer Extension — Sharkord Plugin SDK
+
+## Plugin-SDK Patterns
+
+- Alle Commands über `ctx.registerCommand()` registrieren
+- Mediasoup-Zugriff nur über ctx.mediasoup, nie direkt
+- ...
+
+## Projektspezifische Don'ts
+
+- KEIN direkter Zugriff auf window/document (kein Browser-API)
+- ...
+```
+
+Der generierte Agent liest diese Datei **beim Start automatisch** (Extension-Hook).
+
+### Kompletter Override → `.claude/3-project/<rolle>.md`
+
+Wenn Extension nicht reicht (anderer Workflow, andere Struktur):
+Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 
 ---
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
 - [ ] `.agent-meta/` Submodul auf gewünschter Version
-- [ ] `agent-meta.config.json` vollständig befüllt (alle Variablen)
+- [ ] `agent-meta.config.json` vollständig befüllt
 - [ ] `sync.log` ohne Warnungen
-- [ ] `CLAUDE.md` im Projekt-Root — vollständige Projektbeschreibung, keine offenen `{{...}}`
-- [ ] `.claude/agents/<project-short>.md` (Orchestrator)
-- [ ] `.claude/agents/<prefix>-developer.md`
-- [ ] `.claude/agents/<prefix>-tester.md`
-- [ ] `.claude/agents/<prefix>-validator.md`
-- [ ] `.claude/agents/<prefix>-requirements.md`
-- [ ] `.claude/agents/<prefix>-documenter.md`
-- [ ] `.claude/agents/<prefix>-release.md`
-- [ ] `.claude/agents/<prefix>-docker.md`
+- [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
+- [ ] `.claude/agents/orchestrator.md` vorhanden
+- [ ] `.claude/agents/developer.md` vorhanden
+- [ ] `.claude/agents/tester.md` vorhanden
+- [ ] `.claude/agents/validator.md` vorhanden
+- [ ] `.claude/agents/requirements.md` vorhanden
+- [ ] `.claude/agents/documenter.md` vorhanden
+- [ ] `.claude/agents/release.md` vorhanden
+- [ ] `.claude/agents/docker.md` vorhanden
 - [ ] `docs/REQUIREMENTS.md` initialisiert

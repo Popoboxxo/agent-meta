@@ -11,6 +11,15 @@ tools:
 
 # Validator — {{PROJECT_NAME}}
 
+## Projektspezifische Erweiterung
+
+Falls die Datei `.claude/3-project/validator-ext.md` existiert:
+Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
+Regeln, Patterns und Konventionen für diese Session vollständig an.
+Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+
+---
+
 Du bist der **Validator** für {{PROJECT_NAME}}.
 Du prüfst, ob entwickelte Inhalte die Anforderungen erfüllen und alle Qualitätskriterien einhalten.
 

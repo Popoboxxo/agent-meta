@@ -29,20 +29,24 @@ GENERIC_DIR = "1-generic"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 CLAUDE_AGENTS_DIR = ".claude/agents"
+CLAUDE_PROJECT_DIR = ".claude/3-project"
 LOGFILE = "sync.log"
 
-# Maps generic agent filename (stem) to the output filename pattern
-# orchestrator is special: uses project.short instead of prefix
+# Maps generic agent filename (stem) to the output filename (no prefix — generic names).
+# All agents use their role name directly. One project per workspace.
 ROLE_MAP = {
-    "orchestrator": "{short}",
-    "developer":    "{prefix}-developer",
-    "tester":       "{prefix}-tester",
-    "validator":    "{prefix}-validator",
-    "requirements": "{prefix}-requirements",
-    "documenter":   "{prefix}-documenter",
-    "release":      "{prefix}-release",
-    "docker":       "{prefix}-docker",
+    "orchestrator": "orchestrator",
+    "developer":    "developer",
+    "tester":       "tester",
+    "validator":    "validator",
+    "requirements": "requirements",
+    "documenter":   "documenter",
+    "release":      "release",
+    "docker":       "docker",
 }
+
+# Extension suffix: 3-project/developer-ext.md → copied to .claude/3-project/, never overwritten
+EXT_SUFFIX = "-ext"
 
 
 # ---------------------------------------------------------------------------
@@ -141,18 +145,19 @@ def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[st
     Unmapped roles are roles found in source dirs but missing from ROLE_MAP.
     """
     platforms = config.get("platforms", [])
-    sources = collect_sources(agent_meta_root, platforms)
+    overrides, extensions = collect_sources(agent_meta_root, platforms)
 
     rows = []
     unmapped = []
-    for role, source_path in sorted(sources.items()):
-        filename = target_filename(role, config)
+    for role, source_path in sorted(overrides.items()):
+        filename = target_filename(role)
         if not filename:
             unmapped.append(f"Rolle '{role}' ({source_path.name}) nicht in ROLE_MAP — in AGENT_TABLE übersprungen")
             continue
         agent_name = Path(filename).stem
         layer = source_path.parts[-2]  # e.g. "1-generic" or "2-platform"
-        rows.append(f"| `{agent_name}` | `{source_path.name}` | {layer} |")
+        ext_marker = " ✚" if role in extensions else ""
+        rows.append(f"| `{agent_name}`{ext_marker} | `{source_path.name}` | {layer} |")
 
     header = (
         "| Agent | Quelle | Layer |\n"
@@ -216,13 +221,12 @@ def build_frontmatter(content: str, name: str, description: str) -> str:
     return content
 
 
-def target_filename(role: str, config: dict) -> str:
-    prefix = config["project"]["prefix"]
-    short = config["project"]["short"]
-    pattern = ROLE_MAP.get(role)
-    if not pattern:
+def target_filename(role: str) -> str:
+    """Return output filename for a role, or None if not in ROLE_MAP."""
+    name = ROLE_MAP.get(role)
+    if not name:
         return None
-    return pattern.format(prefix=prefix, short=short) + ".md"
+    return name + ".md"
 
 
 def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
@@ -239,18 +243,25 @@ def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
 # Sync logic
 # ---------------------------------------------------------------------------
 
-def collect_sources(agent_meta_root: Path, platforms: list[str]) -> dict[str, Path]:
+def collect_sources(
+    agent_meta_root: Path, platforms: list[str]
+) -> tuple[dict[str, Path], dict[str, Path]]:
     """
-    Returns a dict: role → source_path
-    Platform agents override generic ones. Project agents override platform ones.
+    Returns (overrides, extensions).
+
+    overrides: role → source_path — agents that are fully generated into .claude/agents/
+      Layer priority: 1-generic < 2-platform < 3-project/<role>.md
+
+    extensions: role → source_path — 3-project/<role>-ext.md files that are copied
+      once into .claude/3-project/ and never overwritten again.
     """
-    sources: dict[str, Path] = {}
+    overrides: dict[str, Path] = {}
+    extensions: dict[str, Path] = {}
 
     # 1. Generic agents
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
-        role = f.stem
-        sources[role] = f
+        overrides[f.stem] = f
 
     # 2. Platform agents — override generic if role matches
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
@@ -258,16 +269,22 @@ def collect_sources(agent_meta_root: Path, platforms: list[str]) -> dict[str, Pa
         for f in sorted(platform_dir.glob(f"{platform}-*.md")):
             role = role_from_platform_file(f.name, platforms)
             if role:
-                sources[role] = f
+                overrides[role] = f
 
-    # 3. Project-level agents — override everything
+    # 3. Project-level agents
     project_dir = agent_meta_root / AGENTS_DIR / PROJECT_DIR
     if project_dir.exists():
         for f in sorted(project_dir.glob("*.md")):
-            role = f.stem
-            sources[role] = f
+            stem = f.stem
+            if stem.endswith(EXT_SUFFIX):
+                # e.g. developer-ext.md → extension, keyed by base role "developer"
+                role = stem[: -len(EXT_SUFFIX)]
+                extensions[role] = f
+            else:
+                # Full override — replaces the generated agent entirely
+                overrides[stem] = f
 
-    return sources
+    return overrides, extensions
 
 
 def sync_agents(
@@ -279,14 +296,17 @@ def sync_agents(
     dry_run: bool,
 ):
     platforms = config.get("platforms", [])
-    sources = collect_sources(agent_meta_root, platforms)
+    overrides, extensions = collect_sources(agent_meta_root, platforms)
     target_dir = project_root / CLAUDE_AGENTS_DIR
+    ext_dir = project_root / CLAUDE_PROJECT_DIR
 
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
-    for role, source_path in sources.items():
-        filename = target_filename(role, config)
+    # --- Generated agents (overrides) ---
+    project_name = config["project"]["name"]
+    for role, source_path in overrides.items():
+        filename = target_filename(role)
         if not filename:
             log.skip(str(source_path.name), "keine Rolle in ROLE_MAP")
             continue
@@ -294,13 +314,10 @@ def sync_agents(
         target_path = target_dir / filename
         content = source_path.read_text(encoding="utf-8")
 
-        # Substitute variables
         rel_source = str(source_path.relative_to(agent_meta_root))
         content = substitute(content, variables, rel_source, log)
 
-        # Fix frontmatter name + description
         name = Path(filename).stem
-        project_name = config["project"]["name"]
         description = f"Agent für {project_name}."
         content = build_frontmatter(content, name, description)
 
@@ -308,6 +325,28 @@ def sync_agents(
         log.action("WRITE", str(target_path.relative_to(project_root)), rel_source_label)
 
         if not dry_run:
+            target_path.write_text(content, encoding="utf-8")
+
+    # --- Extension files (3-project/*-ext.md) — copy once, never overwrite ---
+    for role, source_path in extensions.items():
+        ext_filename = f"{role}{EXT_SUFFIX}.md"
+        target_path = ext_dir / ext_filename
+
+        if target_path.exists():
+            log.skip(
+                str(target_path.relative_to(project_root)),
+                "Extension existiert bereits — nicht überschrieben",
+            )
+            continue
+
+        rel_source_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        log.action("COPY", str(target_path.relative_to(project_root)), rel_source_label)
+
+        if not dry_run:
+            ext_dir.mkdir(parents=True, exist_ok=True)
+            content = source_path.read_text(encoding="utf-8")
+            rel_source = str(source_path.relative_to(agent_meta_root))
+            content = substitute(content, variables, rel_source, log)
             target_path.write_text(content, encoding="utf-8")
 
 

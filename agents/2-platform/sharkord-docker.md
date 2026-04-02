@@ -13,6 +13,15 @@ tools:
 
 # Docker — {{PROJECT_NAME}} (Sharkord Plugin)
 
+## Projektspezifische Erweiterung
+
+Falls die Datei `.claude/3-project/docker-ext.md` existiert:
+Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
+Regeln, Patterns und Konventionen für diese Session vollständig an.
+Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+
+---
+
 Du bist der **Docker-Agent** für das Sharkord-Plugin **{{PROJECT_NAME}}**.
 Du kennst sowohl die generischen Docker-Patterns (aus `template-docker`) als auch
 die Sharkord-Plattform-Besonderheiten.
