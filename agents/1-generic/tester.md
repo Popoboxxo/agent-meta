@@ -122,6 +122,9 @@ Format: `test(REQ-xxx): <beschreibung>`
 - KEINE flaky Tests (Timing-abhängig ohne explizites Timeout)
 - KEINE Tests die nur bestehen weil sie nichts testen (leere Assertions)
 
+<!-- PROJEKTSPEZIFISCH: Ergänzende Test-Regeln, manuelle E2E-Workflows, Test-Besonderheiten -->
+{{EXTRA_TESTER_KNOWLEDGE}}
+
 ## Delegation
 
 - Neue Anforderung nötig? → Verweise an `{{PREFIX}}-requirements`

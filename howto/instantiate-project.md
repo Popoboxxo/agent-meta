@@ -5,98 +5,152 @@
 ## Konzept
 
 Agenten in `1-generic/` und `2-platform/` sind **fertige, sofort einsetzbare Rollen**.
-Sie enthalten keine Projekt-Platzhalter mehr — den Projektkontext liefert die `CLAUDE.md`
-des Projekts, die jeder Agent beim Start liest.
+Sie werden vom `sync.py`-Script **automatisch generiert** — nicht manuell kopiert.
 
-**Was du tust beim Einrichten:**
-1. `CLAUDE.md` für das Projekt anlegen — vollständige Projektbeschreibung
-2. Agenten-Dateien aus dem passenden Layer kopieren und nur Frontmatter anpassen
-3. Für Plattform-spezifische Agenten (Docker, Release): Plattform-Layer aus `2-platform/` verwenden
+Den Projektkontext liefert die `CLAUDE.md` des Projekts, die jeder Agent beim Start liest.
+Die Agenten-Dateien in `.claude/agents/` sind **generierter Output** und werden nie manuell bearbeitet.
 
 ---
 
-## Schritt-für-Schritt
+## Ersteinrichtung (neues Projekt)
 
-### Schritt 1: Projekt-Präfix festlegen
-
-Kurzer Präfix (2–4 Zeichen). Beispiele: `vwf`, `hi`
-
-### Schritt 2: CLAUDE.md anlegen
-
-Nutze [CLAUDE.project-template.md](CLAUDE.project-template.md) als Basis.
-Die CLAUDE.md ist die **einzige Stelle** für projektspezifische Informationen:
-Tech-Stack, Architektur, Code-Konventionen, Anforderungs-Kategorien, Plattform.
-
-### Schritt 3: `.claude/agents/` Verzeichnis anlegen
+### Schritt 1: agent-meta als Submodul einbinden
 
 ```bash
-mkdir -p <projekt-root>/.claude/agents
+git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
+cd .agent-meta && git checkout v0.1.0 && cd ..
 ```
 
-### Schritt 4: Agenten kopieren
-
-**Generische Rollen** (aus `1-generic/` — direkt verwendbar für alle Projekte):
+### Schritt 2: Config-Datei anlegen und befüllen
 
 ```bash
-cp agent-meta/agents/1-generic/orchestrator.md  .claude/agents/<project-name>.md
-cp agent-meta/agents/1-generic/developer.md     .claude/agents/<prefix>-developer.md
-cp agent-meta/agents/1-generic/tester.md        .claude/agents/<prefix>-tester.md
-cp agent-meta/agents/1-generic/validator.md     .claude/agents/<prefix>-validator.md
-cp agent-meta/agents/1-generic/requirements.md  .claude/agents/<prefix>-requirements.md
-cp agent-meta/agents/1-generic/documenter.md    .claude/agents/<prefix>-documenter.md
+cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
 ```
 
-**Plattform-Layer** (aus `2-platform/` — überschreibt den generischen Agenten):
+Pflichtfelder in `agent-meta.config.json`:
+
+```json
+{
+  "agent-meta-version": "0.1.0",
+  "platforms": ["sharkord"],
+  "project": {
+    "name": "sharkord-mein-plugin",
+    "prefix": "mp",
+    "short": "mein-plugin"
+  },
+  "variables": { ... }
+}
+```
+
+Alle `{{PLATZHALTER}}` die in `CLAUDE.md` und Agenten vorkommen, müssen im `variables`-Block
+stehen. Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
+
+### Schritt 3: CLAUDE.md + Agenten generieren
 
 ```bash
-# Sharkord-Projekte:
-cp agent-meta/agents/2-platform/sharkord-release.md  .claude/agents/<prefix>-release.md
-cp agent-meta/agents/2-platform/sharkord-docker.md   .claude/agents/<prefix>-docker.md
-
-# Andere Projekte: generischen Agenten verwenden
-# cp agent-meta/agents/1-generic/release.md  .claude/agents/<prefix>-release.md
-# cp agent-meta/agents/1-generic/docker.md   .claude/agents/<prefix>-docker.md
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
 ```
 
-### Schritt 5: Frontmatter in jeder kopierten Datei anpassen
+Das Script:
+- Erzeugt `CLAUDE.md` aus `howto/CLAUDE.project-template.md` (nur wenn noch nicht vorhanden)
+- Erzeugt alle `.claude/agents/*.md` aus der Drei-Schichten-Hierarchie
+- Schreibt `sync.log` mit Zusammenfassung und Warnungen
 
-Nur `name` und `description` ändern — der Rest bleibt unverändert:
+### Schritt 4: sync.log prüfen
 
-```yaml
+```bash
+cat sync.log
+```
+
+Alle Warnungen (`[WARN]`) zeigen fehlende Variablen. In `agent-meta.config.json` ergänzen,
+dann erneut syncen:
+
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+### Schritt 5: Alles committen
+
+```bash
+git add CLAUDE.md .claude/agents/ agent-meta.config.json .gitmodules .agent-meta
+git commit -m "chore: initialize agent-meta agents"
+```
+
 ---
-name: <prefix>-developer
-description: "Developer-Agent für <PROJECT_NAME>."
-tools: [...]
----
-```
 
-### Schritt 6: Projekt-spezifische Agenten (Ausnahmefall)
+## CLAUDE.md nach Erstanlage befüllen
 
-Nur wenn ein Agent **fundamental** vom Generic/Platform-Layer abweicht:
-Datei in `3-project/` anlegen (oder direkt im Repo in `.claude/agents/`),
-vollständig neu schreiben, auf `CLAUDE.md` als Kontext-Quelle verweisen.
-
----
-
-## Agenten-Updates übernehmen
-
-Wenn ein Agent in `1-generic/` oder `2-platform/` verbessert wurde:
+Nach `--init` enthält `CLAUDE.md` noch offene Platzhalter (wenn nicht alle in der Config stehen).
+Diese manuell befüllen, dann `--only-variables` laufen lassen:
 
 ```bash
-# Geänderten Agenten erneut ins Projekt kopieren
-cp agent-meta/agents/1-generic/developer.md .claude/agents/<prefix>-developer.md
-# Frontmatter (name, description) danach wieder anpassen
+# Nach manuellem Bearbeiten der CLAUDE.md:
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
 ```
 
-Da der Projektkontext in der `CLAUDE.md` liegt und nicht im Agenten selbst,
+---
+
+## Agenten-Updates übernehmen (neue agent-meta Version)
+
+```bash
+# 1. Submodul auf neue Version ziehen
+cd .agent-meta && git checkout v0.2.0 && cd ..
+
+# 2. Versionsnummer in agent-meta.config.json aktualisieren
+#    "agent-meta-version": "0.2.0"
+
+# 3. Agenten neu generieren
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+
+# 4. sync.log prüfen (neue Platzhalter?)
+cat sync.log
+
+# 5. Committen
+git add .claude/agents/ .agent-meta agent-meta.config.json
+git commit -m "chore: upgrade agent-meta to v0.2.0"
+```
+
+Da der Projektkontext in `CLAUDE.md` liegt und nicht in den Agenten,
 ist das Update ein einfaches Überschreiben — kein Merge nötig.
+
+---
+
+## Projektspezifische Erweiterungen
+
+Generische Agenten haben dedizierte Erweiterungspunkte via `{{PLATZHALTER}}`.
+Damit lassen sich plattform- oder projektspezifische Inhalte **hinzufügen,
+ohne den gesamten Agenten zu überschreiben**:
+
+| Platzhalter | Agent | Zweck |
+|-------------|-------|-------|
+| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung aus CLAUDE.md |
+| `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Code-Regeln |
+| `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
+| `{{DEV_COMMANDS}}` | developer | Build/Run-Kommandos |
+| `{{EXTRA_DONTS}}` | developer | Projektspezifische Verbote |
+| `{{EXTRA_ORCHESTRATOR_KNOWLEDGE}}` | orchestrator | Zusätzliche Workflows, Delegation-Regeln |
+| `{{EXTRA_TESTER_KNOWLEDGE}}` | tester | Manuelle E2E-Workflows, Test-Besonderheiten |
+| `{{EXTRA_DOCUMENTER_KNOWLEDGE}}` | documenter | Doku-Besonderheiten des Projekts |
+| `{{EXTRA_REQ_KNOWLEDGE}}` | requirements | Domänenspezifische Anforderungs-Regeln |
+| `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln, Quality-Gates |
+| `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
+| `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
+| `{{BUILD_COMMANDS}}` | release | Build-Schritte |
+
+→ Alle Werte in `agent-meta.config.json` unter `variables` eintragen.
+
+Nur wenn ein Agent **fundamental** von Generic/Platform abweicht (sehr selten):
+Datei unter `3-project/<rolle>.md` anlegen — überschreibt alles.
 
 ---
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
-- [ ] `CLAUDE.md` im Projekt-Root — vollständige Projektbeschreibung
-- [ ] `.claude/agents/<project-name>.md` (Orchestrator)
+- [ ] `.agent-meta/` Submodul auf gewünschter Version
+- [ ] `agent-meta.config.json` vollständig befüllt (alle Variablen)
+- [ ] `sync.log` ohne Warnungen
+- [ ] `CLAUDE.md` im Projekt-Root — vollständige Projektbeschreibung, keine offenen `{{...}}`
+- [ ] `.claude/agents/<project-short>.md` (Orchestrator)
 - [ ] `.claude/agents/<prefix>-developer.md`
 - [ ] `.claude/agents/<prefix>-tester.md`
 - [ ] `.claude/agents/<prefix>-validator.md`
@@ -104,7 +158,4 @@ ist das Update ein einfaches Überschreiben — kein Merge nötig.
 - [ ] `.claude/agents/<prefix>-documenter.md`
 - [ ] `.claude/agents/<prefix>-release.md`
 - [ ] `.claude/agents/<prefix>-docker.md`
-- [ ] Frontmatter (`name`, `description`) in allen Agenten angepasst
 - [ ] `docs/REQUIREMENTS.md` initialisiert
-- [ ] `docker-compose.dev.yml` angelegt (s. `2-platform/sharkord-docker.md` Abschnitt 5)
-- [ ] `tests/docker/` mit Dockerfile.test + docker-compose.yml (falls Docker-Tests)

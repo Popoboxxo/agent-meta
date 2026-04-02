@@ -134,18 +134,21 @@ def read_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
-def build_agent_table(config: dict, agent_meta_root: Path) -> str:
-    """Generate markdown table of active agents for {{AGENT_TABLE}}."""
-    prefix = config["project"]["prefix"]
-    short = config["project"]["short"]
-    platforms = config.get("platforms", [])
+def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[str]]:
+    """Generate markdown table of active agents for {{AGENT_TABLE}}.
 
+    Returns (table_markdown, list_of_unmapped_roles).
+    Unmapped roles are roles found in source dirs but missing from ROLE_MAP.
+    """
+    platforms = config.get("platforms", [])
     sources = collect_sources(agent_meta_root, platforms)
 
     rows = []
+    unmapped = []
     for role, source_path in sorted(sources.items()):
         filename = target_filename(role, config)
         if not filename:
+            unmapped.append(f"Rolle '{role}' ({source_path.name}) nicht in ROLE_MAP — in AGENT_TABLE übersprungen")
             continue
         agent_name = Path(filename).stem
         layer = source_path.parts[-2]  # e.g. "1-generic" or "2-platform"
@@ -155,11 +158,15 @@ def build_agent_table(config: dict, agent_meta_root: Path) -> str:
         "| Agent | Quelle | Layer |\n"
         "|-------|--------|-------|"
     )
-    return header + "\n" + "\n".join(rows)
+    return header + "\n" + "\n".join(rows), unmapped
 
 
-def build_variables(config: dict, agent_meta_root: Path) -> dict:
-    """Merge all variable sources into one flat dict."""
+def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str]]:
+    """Merge all variable sources into one flat dict.
+
+    Returns (variables, pre_warnings) where pre_warnings are issues found
+    before the SyncLog exists (e.g. unmapped roles in AGENT_TABLE).
+    """
     variables = {}
     # From project block
     project = config.get("project", {})
@@ -169,10 +176,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> dict:
     # Auto-inject meta variables
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"] = datetime.now().strftime("%Y-%m-%d")
-    variables["AGENT_TABLE"] = build_agent_table(config, agent_meta_root)
+    agent_table, unmapped_warnings = build_agent_table(config, agent_meta_root)
+    variables["AGENT_TABLE"] = agent_table
     # From variables block (overrides project block, but not auto-injected meta vars)
     variables.update(config.get("variables", {}))
-    return variables
+    return variables, unmapped_warnings
 
 
 def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> str:
@@ -391,11 +399,13 @@ def main():
     config_path = Path(args.config).resolve()
 
     config = load_config(config_path)
-    variables = build_variables(config, agent_meta_root)
+    variables, pre_warnings = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
 
     log = SyncLog()
+    for w in pre_warnings:
+        log.warn(w)
 
     if args.dry_run:
         print("DRY-RUN — keine Dateien werden geschrieben\n")

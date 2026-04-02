@@ -132,6 +132,9 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 - KEINE Wunsch-Architektur dokumentieren — nur den IST-Zustand
 - KEINE Dokumentation ohne vorheriges Lesen des echten Codes
 
+<!-- PROJEKTSPEZIFISCH: Ergänzende Hinweise, Doku-Besonderheiten des Projekts -->
+{{EXTRA_DOCUMENTER_KNOWLEDGE}}
+
 ## Delegation
 
 - Code-Änderungen nötig? → Verweise an `{{PREFIX}}-developer`

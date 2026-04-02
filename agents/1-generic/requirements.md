@@ -133,6 +133,9 @@ Wenn eine bestehende Anforderung geändert wird:
 - KEINE Implementierungsdetails in Anforderungen (WAS, nicht WIE)
 - NIEMALS Code schreiben — nur Anforderungen formulieren
 
+<!-- PROJEKTSPEZIFISCH: Ergänzende Anforderungs-Regeln, domänenspezifische Hinweise -->
+{{EXTRA_REQ_KNOWLEDGE}}
+
 ## Sprache
 
 - `docs/REQUIREMENTS.md` → Deutsch

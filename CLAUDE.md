@@ -7,13 +7,23 @@ Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
 ---
 
-## Kernprinzip
+## Kernprinzipien
 
-Die **`CLAUDE.md` eines Projekts ist die einzige Wahrheit.**
-
+**1. `CLAUDE.md` eines Projekts ist die einzige Wahrheit.**
 Sie beschreibt das Projekt vollständig (Ziel, Tech-Stack, Architektur, Konventionen)
 und bestimmt, welche Agenten aktiv sind. Agenten lesen die `CLAUDE.md` und wissen
 damit alles Projektspezifische — sie enthalten **keinen** eigenen Kontext-Block mehr.
+
+**2. `.claude/agents/` ist generierter Output — nie manuell bearbeiten.**
+Die Agenten-Dateien im Projekt werden von `sync.py` erzeugt. Manuelle Änderungen
+werden beim nächsten Sync überschrieben. Änderungen gehören in:
+- `agent-meta.config.json` (Variablen)
+- `1-generic/`, `2-platform/` oder `3-project/` (Agenten-Logik)
+
+**3. Erweiterungen über `{{PLATZHALTER}}`, nicht über 3-project-Override.**
+Generische Agenten haben dedizierte Erweiterungspunkte. Projektspezifisches Wissen
+(z.B. SDK-Patterns, Extra-Don'ts, Plattform-spezifische Regeln) wird über Variablen
+in `agent-meta.config.json` injiziert — ohne den Agenten zu überschreiben.
 
 ---
 
@@ -121,6 +131,43 @@ Vorlage: [howto/CLAUDE.project-template.md](howto/CLAUDE.project-template.md)
 | Documenter | `<prefix>-documenter` | `vwf-documenter`, `hi-documenter` |
 | Release | `<prefix>-release` | `vwf-release`, `hi-release` |
 | Docker | `<prefix>-docker` | `vwf-docker`, `hi-docker` |
+
+---
+
+## Erweiterungspunkte in generischen Agenten
+
+Generische Agenten enthalten dedizierte `{{PLATZHALTER}}` für projektspezifische Inhalte.
+Diese werden via `agent-meta.config.json` befüllt — **kein Agent-Override nötig**.
+
+| Platzhalter | Agent | Zweck |
+|-------------|-------|-------|
+| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung (aus CLAUDE.md) |
+| `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln (z.B. TypeScript-Verbote) |
+| `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
+| `{{DEV_COMMANDS}}` | developer | Build/Run-Kommandos |
+| `{{EXTRA_DONTS}}` | developer | Projektspezifische Verbote |
+| `{{EXTRA_ORCHESTRATOR_KNOWLEDGE}}` | orchestrator | Zusätzliche Workflows, Delegation-Regeln |
+| `{{EXTRA_TESTER_KNOWLEDGE}}` | tester | Manuelle E2E-Workflows, Test-Besonderheiten |
+| `{{EXTRA_DOCUMENTER_KNOWLEDGE}}` | documenter | Doku-Besonderheiten des Projekts |
+| `{{EXTRA_REQ_KNOWLEDGE}}` | requirements | Domänenspezifische Anforderungs-Regeln |
+| `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln, Quality-Gates |
+| `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien des Projekts |
+| `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
+| `{{BUILD_COMMANDS}}` | release | Build-Schritte für das Release |
+
+**Entscheidungsbaum: Wie erweitere ich einen Agenten?**
+
+```
+Kleine Ergänzung (SDK-Wissen, Extra-Regeln, Kommandos)?
+  → Variable in agent-meta.config.json → bestehender {{PLATZHALTER}}
+  → Oder: neuen {{PLATZHALTER}} in 1-generic/ Agent einfügen
+
+Plattformspezifische Logik (anderer Workflow, andere Tools)?
+  → Neue Datei in 2-platform/<plattform>-<rolle>.md
+
+Fundamentaler Unterschied zum Generic (nur in 1 Projekt)?
+  → Datei in 3-project/<rolle>.md  ← selten, gut begründen
+```
 
 ---
 
@@ -275,17 +322,21 @@ CLAUDE.md ← diese Datei
 
 ### Änderungs-Kategorien
 
+**Projektspezifisches Wissen ergänzen** (SDK-Patterns, Extra-Don'ts, Regeln):
+→ Variable in `agent-meta.config.json` → bestehender `{{PLATZHALTER}}` im Agenten.
+→ Wenn kein passender Platzhalter existiert: neuen `{{PLATZHALTER}}` in `1-generic/<rolle>.md` + `config.example.json` + `howto/instantiate-project.md` Tabelle.
+
 **Generische Logik verbessern** (Workflows, Konventionen, Don'ts):
-→ In `1-generic/<rolle>.md` ändern → in alle Projekt-Instanzen propagieren.
+→ In `1-generic/<rolle>.md` ändern → in alle Projekt-Instanzen propagieren (via sync).
 
 **Plattformwissen aktualisieren** (neue Sharkord-Version, Pfadänderungen):
-→ In `2-platform/sharkord-*.md` ändern → in Projekt-Instanzen propagieren.
+→ In `2-platform/sharkord-*.md` ändern → in Projekt-Instanzen propagieren (via sync).
 
 **Neuen Plattform-Layer anlegen** (andere Plattform):
 → Neue Datei in `2-platform/` + Eintrag in Rollen-Übersicht + Abhängigkeits-Karte hier.
 
 **Neue Agenten-Rolle hinzufügen**:
-→ `1-generic/<rolle>.md` + Rollen-Übersicht in `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md` + Abhängigkeits-Karte.
+→ `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Rollen-Übersicht in `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md` + Abhängigkeits-Karte.
 
 ---
 

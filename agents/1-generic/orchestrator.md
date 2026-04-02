@@ -173,6 +173,9 @@ alle DoD-Punkte erfüllt sind.
 - KEIN Abschluss ohne DoD-Check
 - KEINE Delegation an einen falschen Agenten
 
+<!-- PROJEKTSPEZIFISCH: Ergänzende Workflows, spezielle Delegation-Regeln, Projekt-spezifische Hinweise -->
+{{EXTRA_ORCHESTRATOR_KNOWLEDGE}}
+
 ## Sprache
 
 - **README.md** → **Englisch**
