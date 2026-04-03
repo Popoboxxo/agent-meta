@@ -454,23 +454,31 @@ Releases folgen [Semantic Versioning](https://semver.org/):
 ### Schritt-für-Schritt
 
 ```
-1. Änderungen committen (alle Agenten, Scripts, Doku)
+1. Agenten-Versionen prüfen und erhöhen:
+   - Welche Agent-Dateien wurden inhaltlich geändert?
+   - Für jede geänderte Datei: version: im Frontmatter erhöhen (Patch/Minor/Major)
+   - Bei 2-platform Agenten: based-on prüfen — zeigt es noch auf die richtige
+     Generic-Version? Ggf. aktualisieren.
+   - Bei Unsicherheit: Nutzer fragen welche Agenten-Version gesetzt werden soll
 
-2. CHANGELOG.md aktualisieren:
+2. Änderungen committen (alle Agenten, Scripts, Doku)
+
+3. CHANGELOG.md aktualisieren:
    - Neue Version [x.y.z] — <Datum> oben einfügen
    - Breaking Changes, Added, Changed, Removed dokumentieren
+   - Geänderte Agenten-Versionen im "Changed"-Abschnitt nennen
 
-3. VERSION aktualisieren:
-   - Inhalt auf neue Versionsnummer setzen (z.B. 0.9.1)
+4. VERSION aktualisieren:
+   - Inhalt auf neue Versionsnummer setzen (z.B. 0.10.2)
 
-4. README.md aktualisieren:
+5. README.md aktualisieren:
    - "Current version:" Badge/Zeile auf neue Version setzen
    - Quick-Start-Beispiel (`git checkout v<x.y.z>`) auf neue Version setzen
 
-5. Commit: git add VERSION CHANGELOG.md README.md
+6. Commit: git add VERSION CHANGELOG.md README.md
            git commit -m "chore: bump version to x.y.z"
 
-6. Tag setzen und pushen:
+7. Tag setzen und pushen:
    git tag vx.y.z
    git push origin main
    git push origin vx.y.z
@@ -478,6 +486,9 @@ Releases folgen [Semantic Versioning](https://semver.org/):
 
 ### Wichtig
 
+- **Agenten-Versionen zuerst** — vor dem Release-Commit prüfen, ob alle geänderten
+  Agent-Dateien eine aktualisierte `version:` im Frontmatter haben
+- Bei Unsicherheit über Agenten-Version oder Release-Tag: **Nutzer fragen**
 - README.md muss **vor dem Tag-Commit** die neue Version zeigen
 - CHANGELOG.md muss vollständig sein **bevor** der Tag gesetzt wird
 - Der Tag zeigt immer auf den Version-Bump-Commit — nie auf einen vorherigen Commit

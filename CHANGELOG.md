@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.2] — 2026-04-03
+
+### Fixed
+
+- `orchestrator.md` — version von `1.0.0` auf `1.1.0` hochgezogen (war bei 0.10.1 vergessen worden)
+
+### Changed
+
+- Release-Prozess in CLAUDE.md — Schritt 1 "Agenten-Versionen prüfen" explizit ergänzt; Regel: bei Unsicherheit Nutzer fragen
+
+---
+
 ## [0.10.1] — 2026-04-03
 
 ### Added
