@@ -1,0 +1,3 @@
+[submodule "external/neat-little-package"]
+	path = external/neat-little-package
+	url = https://github.com/racurry/neat-little-package

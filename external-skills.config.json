@@ -1,28 +1,31 @@
 {
   "_comment": "Zentrale Konfiguration für externe Skill-Pakete (Modell A — liegt in agent-meta).",
-  "_comment_submodules": "Submodule werden via 'git submodule add <repo> external/<name>' registriert.",
+  "_comment_submodules": "Submodule werden via 'git submodule add <repo> external/<name>' registriert, dann auf gewünschten Commit pinnen.",
   "_comment_skills": "Jeder Skill mit enabled:true wird beim sync als Wrapper-Agent generiert.",
 
   "submodules": {
     "_comment": "Bekannte externe Repos — korrespondieren mit .gitmodules Einträgen.",
-    "example-skills": {
-      "repo": "https://github.com/example/skill-repo",
-      "local_path": "external/example-skills"
+    "neat-little-package": {
+      "repo": "https://github.com/racurry/neat-little-package",
+      "local_path": "external/neat-little-package",
+      "_pinned_commit": "be411f313c9451b62024e91b3af972ee63cbc063"
     }
   },
 
   "skills": {
     "_comment": "Skill-Name → Konfiguration. enabled:true/false steuert ob Wrapper-Agent generiert wird.",
 
-    "example-skill": {
-      "enabled": false,
-      "submodule": "example-skills",
-      "source": "path/to/skill/within/repo",
+    "opengrid-openscad": {
+      "enabled": true,
+      "submodule": "neat-little-package",
+      "source": "plugins/spirograph/skills/opengrid-openscad",
       "entry": "SKILL.md",
-      "role": "example-specialist",
-      "name": "Example Specialist",
-      "description": "Beschreibung was dieser Agent kann und wann er eingesetzt wird.",
-      "additional_files": []
+      "role": "opengrid-designer",
+      "name": "OpenGrid OpenSCAD Designer",
+      "description": "Spezialist für OpenSCAD-Code-Generierung für wandmontierte OpenGrid/MultiConnect-Organizer (28mm Grid, QuackWorks-Patterns).",
+      "additional_files": [
+        "enhancements.md"
+      ]
     }
   }
 }
