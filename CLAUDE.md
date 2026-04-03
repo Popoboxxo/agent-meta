@@ -367,3 +367,43 @@ Siehe [howto/instantiate-project.md](howto/instantiate-project.md).
 ## Upgrade auf neue Version
 
 Siehe [howto/upgrade-guide.md](howto/upgrade-guide.md).
+
+---
+
+## Release-Prozess (agent-meta selbst)
+
+Releases folgen [Semantic Versioning](https://semver.org/):
+- **Patch** (`x.y.Z`) — Bugfixes, Doku, kleine Verbesserungen ohne Breaking Changes
+- **Minor** (`x.Y.0`) — Neue Features, neue Agenten-Rollen, neue Platzhalter (rückwärtskompatibel)
+- **Major** (`X.0.0`) — Breaking Changes (Umbenennungen, entfernte Variablen, geändertes Verhalten)
+
+### Schritt-für-Schritt
+
+```
+1. Änderungen committen (alle Agenten, Scripts, Doku)
+
+2. CHANGELOG.md aktualisieren:
+   - Neue Version [x.y.z] — <Datum> oben einfügen
+   - Breaking Changes, Added, Changed, Removed dokumentieren
+
+3. VERSION aktualisieren:
+   - Inhalt auf neue Versionsnummer setzen (z.B. 0.9.1)
+
+4. README.md aktualisieren:
+   - "Current version:" Badge/Zeile auf neue Version setzen
+   - Quick-Start-Beispiel (`git checkout v<x.y.z>`) auf neue Version setzen
+
+5. Commit: git add VERSION CHANGELOG.md README.md
+           git commit -m "chore: bump version to x.y.z"
+
+6. Tag setzen und pushen:
+   git tag vx.y.z
+   git push origin main
+   git push origin vx.y.z
+```
+
+### Wichtig
+
+- README.md muss **vor dem Tag-Commit** die neue Version zeigen
+- CHANGELOG.md muss vollständig sein **bevor** der Tag gesetzt wird
+- Der Tag zeigt immer auf den Version-Bump-Commit — nie auf einen vorherigen Commit
