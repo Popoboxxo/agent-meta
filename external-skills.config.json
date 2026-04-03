@@ -16,7 +16,7 @@
     "_comment": "Skill-Name → Konfiguration. enabled:true/false steuert ob Wrapper-Agent generiert wird.",
 
     "home-organization": {
-      "enabled": true,
+      "enabled": false,
       "submodule": "neat-little-package",
       "source": "plugins/spirograph/skills/home-organization",
       "entry": "SKILL.md",
@@ -36,7 +36,7 @@
     },
 
     "opengrid-openscad": {
-      "enabled": true,
+      "enabled": false,
       "submodule": "neat-little-package",
       "source": "plugins/spirograph/skills/opengrid-openscad",
       "entry": "SKILL.md",
