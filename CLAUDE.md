@@ -186,7 +186,12 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 
 | Platzhalter | Agent | Zweck |
 |-------------|-------|-------|
-| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung aus CLAUDE.md |
+| `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung |
+| `{{PROJECT_GOAL}}` | alle | Primäres Ziel des Projekts (für wen, was wird gelöst) |
+| `{{PROJECT_LANGUAGES}}` | alle | Verwendete Programmiersprachen |
+| `{{COMMUNICATION_LANGUAGE}}` | alle | Sprache für Nutzer-Kommunikation (z.B. `Deutsch`) |
+| `{{DOCS_LANGUAGE}}` | alle | Sprache für Dokumentationsdateien (z.B. `Englisch`) |
+| `{{AGENT_META_REPO}}` | meta-feedback | GitHub-Repo für Issues (z.B. `owner/agent-meta`) |
 | `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln |
 | `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
 | `{{DEV_COMMANDS}}` | developer, orchestrator | Build/Run-Kommandos |

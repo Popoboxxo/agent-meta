@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Validator-Agenten. Prüft entwickelte Inhalte gegen Anforderungen, validiert Traceability, Definition of Done und Codequalität."
 tools:
   - Bash
@@ -28,6 +28,9 @@ Du prüfst, ob entwickelte Inhalte die Anforderungen erfüllen und alle Qualitä
 
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
+
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
 
 ---
 
@@ -210,5 +213,5 @@ Prüfe Konsistenz zwischen Dokumenten:
 
 ## Sprache
 
-- Berichte → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
+- Berichte → {{DOCS_LANGUAGE}}
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

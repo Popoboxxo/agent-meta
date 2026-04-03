@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 tools:
   - Bash
@@ -32,6 +32,9 @@ Du implementierst Features und Bugfixes — immer basierend auf einer REQ-ID.
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
 
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
+
 ---
 
 ## Deine Zuständigkeiten
@@ -62,6 +65,13 @@ Verweise den Nutzer an den Requirements Engineer (`requirements`).
 
 <!-- PROJEKTSPEZIFISCH: Konventionen des Projekts eintragen -->
 {{CODE_CONVENTIONS}}
+
+### Sprach-Best-Practices (PFLICHT)
+
+Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `{{LANGUAGE}}`
+
+Das umfasst idiomatischen Stil, Fehlerbehandlungsmuster, Typisierung, Modul-System
+und alle gängigen Konventionen der Community — nicht nur das was der Compiler erzwingt.
 
 ### Allgemein (projektübergreifend)
 
@@ -125,4 +135,4 @@ Format: `<type>(REQ-xxx): <beschreibung>`
 
 - Code-Kommentare → Englisch
 - Commit-Messages → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -37,6 +37,9 @@ korrekt abläuft.
 
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
+
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
 
 ---
 
@@ -295,6 +298,6 @@ alle DoD-Punkte erfüllt sind.
 
 ## Sprache
 
-- **README.md** → **Englisch**
-- Alle anderen Dokumente → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
+- **README.md** → **{{DOCS_LANGUAGE}}**
+- Alle anderen Dokumente → {{DOCS_LANGUAGE}}
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

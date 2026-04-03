@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Release-Agenten. Verwaltet Versioning, Changelogs, Build-Prozesse und GitHub-Releases."
 tools:
   - Bash
@@ -30,6 +30,9 @@ Du koordinierst Versionierung, Changelogs, Build-Prozesse und GitHub-Releases.
 
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
+
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
 
 ---
 
@@ -135,5 +138,5 @@ Vor jedem Release:
 
 ## Sprache
 
-- CHANGELOG.md → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
+- CHANGELOG.md → {{DOCS_LANGUAGE}}
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

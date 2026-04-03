@@ -1,7 +1,7 @@
 {
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
 
-  "agent-meta-version": "0.9.4",
+  "agent-meta-version": "0.10.3",
 
   "platforms": ["sharkord"],
 
@@ -19,9 +19,19 @@
 
     "PROJECT_NAME":        "mein-projekt",
     "PROJECT_DESCRIPTION": "Kurzbeschreibung was das Projekt macht.",
+    "PROJECT_GOAL":        "Das primäre Ziel des Projekts — was soll es für wen lösen?",
     "PLATFORM":            "Sharkord Plugin SDK",
     "RUNTIME":             "Bun (NICHT Node.js)",
     "LANGUAGE":            "TypeScript (ES6+, strict)",
+    "PROJECT_LANGUAGES":   "TypeScript",
+
+    "_comment_lang": "Sprache für Kommunikation mit dem Nutzer (z.B. Deutsch, English)",
+    "COMMUNICATION_LANGUAGE": "Deutsch",
+    "_comment_docs_lang": "Sprache für Dokumentationsdateien (README, CHANGELOG etc.) (z.B. Englisch, English)",
+    "DOCS_LANGUAGE":       "Englisch",
+
+    "_comment_meta_repo": "GitHub-Repo für Meta-Feedback Issues (owner/repo)",
+    "AGENT_META_REPO":     "Popoboxxo/agent-meta",
 
     "_comment_deps": "Kern-Abhängigkeiten mit konkreter Version — eine pro Zeile als Markdown-Liste",
     "SYSTEM_DEPENDENCIES": "- @sharkord/plugin-sdk: `0.0.16`\n- bun: `>=1.0.0`",

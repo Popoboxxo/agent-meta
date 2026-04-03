@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Meta-Feedback-Agenten. Sammelt Verbesserungsvorschläge für das agent-meta-Framework aus laufenden Projektsessions und erstellt GitHub Issues im agent-meta-Repository."
 tools:
   - Bash
@@ -81,7 +81,7 @@ Issues werden im **agent-meta-Repository** erstellt:
 
 ```bash
 gh issue create \
-  --repo Popoboxxo/agent-meta \
+  --repo {{AGENT_META_REPO}} \
   --title "[Typ] Kurze Beschreibung" \
   --body "$(cat <<'EOF'
 ## Kontext
@@ -114,7 +114,7 @@ EOF
 
 ```bash
 # Mit Label:
-gh issue create --repo Popoboxxo/agent-meta --title "..." --body "..." --label "enhancement"
+gh issue create --repo {{AGENT_META_REPO}} --title "..." --body "..." --label "enhancement"
 ```
 
 ---
@@ -166,4 +166,4 @@ Ein gutes Issue:
 ## Sprache
 
 - GitHub Issues → **Englisch**
-- Kommunikation mit dem Nutzer → Deutsch
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

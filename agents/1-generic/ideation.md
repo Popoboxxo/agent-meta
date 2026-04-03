@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Ideation-Agenten. Unterstützt in der frühen Phase bei Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — für neue Projekte wie für Features. Stellt Fragen, schafft Anreize, denkt Ecken und übergibt reife Ideen an den Requirements-Agenten."
 tools:
   - Read
@@ -39,6 +39,9 @@ an den Requirements-Agenten vorzubereiten.
 
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
+
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
 
 ---
 
@@ -170,5 +173,5 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → Deutsch
-- Strukturierte Zusammenfassungen → Deutsch
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Strukturierte Zusammenfassungen → {{COMMUNICATION_LANGUAGE}}

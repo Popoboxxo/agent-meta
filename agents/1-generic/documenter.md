@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Dokumentations-Agenten. Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 tools:
   - Read
@@ -29,6 +29,9 @@ Du wachst über die Vollständigkeit und Aktualität aller Projektdokumentation.
 
 <!-- PROJEKTSPEZIFISCH: Dieser Block wird beim Instanziieren ersetzt -->
 {{PROJECT_CONTEXT}}
+
+**Ziel:** {{PROJECT_GOAL}}
+**Sprachen:** {{PROJECT_LANGUAGES}}
 
 ---
 
@@ -151,6 +154,6 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## Sprache
 
-- `README.md` → **Englisch**
-- Alle anderen Dokumente → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
+- `README.md` → **{{DOCS_LANGUAGE}}**
+- Alle anderen Dokumente → {{DOCS_LANGUAGE}}
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
