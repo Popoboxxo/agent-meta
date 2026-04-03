@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "1.3.0"
+version: "1.4.0"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 tools:
   - Bash
@@ -64,6 +64,8 @@ Verweise den Nutzer an den Requirements Engineer (`requirements`).
 ### Sprach-Best-Practices (PFLICHT)
 
 Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `{{LANGUAGE}}`
+
+Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt sofort mit dem Read-Tool und wende alle Code-Patterns an.
 
 ### Allgemein (projektübergreifend)
 

@@ -88,8 +88,11 @@ agent-meta/
 
   snippets/
     tester/
-      bun-typescript.md  ← Sprachspezifische Test-Snippets für TypeScript/Bun
-      pytest-python.md   ← Sprachspezifische Test-Snippets für Python/pytest
+      bun-typescript.md    ← Sprachspezifische Test-Snippets für TypeScript/Bun
+      pytest-python.md     ← Sprachspezifische Test-Snippets für Python/pytest
+    developer/
+      bun-typescript.md    ← Code-Patterns & Best Practices für TypeScript/Bun
+      pytest-python.md     ← Code-Patterns & Best Practices für Python
 
   scripts/
     sync.py              ← Agent-Generator
@@ -207,6 +210,7 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
 | `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
 | `{{TESTER_SNIPPETS_PATH}}` | tester | Pfad zur Snippet-Datei (relativ zu `snippets/`) |
+| `{{DEVELOPER_SNIPPETS_PATH}}` | developer | Pfad zur Snippet-Datei (relativ zu `snippets/`) |
 | `{{BUILD_COMMANDS}}` | release | Build-Schritte |
 
 ### Infrastruktur-Variablen — generisch (Docker, Ports)
@@ -274,6 +278,8 @@ runtime: "Bun"                   # Runtime / Test-Framework
 |-------|-------|-------------------|---------|
 | `snippets/tester/bun-typescript.md` | tester | TypeScript / Bun | 1.0.0 |
 | `snippets/tester/pytest-python.md` | tester | Python / pytest | 1.0.0 |
+| `snippets/developer/bun-typescript.md` | developer | TypeScript / Bun | 1.0.0 |
+| `snippets/developer/pytest-python.md` | developer | Python / pytest | 1.0.0 |
 
 ### Snippet hinzufügen
 

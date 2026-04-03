@@ -57,8 +57,9 @@
     "CODE_CONVENTIONS":    "- TypeScript ES6+, kein `require`, kein `var`, kein `any`\n- Named Exports (kein default export)\n- kebab-case: `module-name.ts`, Tests: `<module>.test.ts`",
     "EXTRA_DONTS":         "",
     "CODE_QUALITY_RULES":  "- Keine ungenutzten Imports\n- Keine impliziten `any`\n- Alle Funktionen typisiert",
-    "_comment_snippets": "Pfad zur sprachspezifischen Snippet-Datei für den Tester-Agenten (relativ zu snippets/)",
-    "TESTER_SNIPPETS_PATH": "tester/bun-typescript.md",
+    "_comment_snippets": "Pfad zu sprachspezifischen Snippet-Dateien (relativ zu snippets/)",
+    "TESTER_SNIPPETS_PATH":    "tester/bun-typescript.md",
+    "DEVELOPER_SNIPPETS_PATH": "developer/bun-typescript.md",
 
     "TEST_COMMANDS":       "bun test\nbun test --coverage",
     "BUILD_COMMANDS":      "bun run build",

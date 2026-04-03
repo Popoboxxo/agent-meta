@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.7] — 2026-04-03
+
+### Added
+
+- `snippets/developer/bun-typescript.md` (`1.0.0`) — Imports/Exports, Typisierung, Fehlerbehandlung, Dateistruktur, Async für TypeScript/Bun
+- `snippets/developer/pytest-python.md` (`1.0.0`) — Python-Äquivalente
+- **`{{DEVELOPER_SNIPPETS_PATH}}`** — neue Variable, zeigt auf Developer-Snippet-Datei
+
+### Changed
+
+- `developer.md` (`1.4.0`) — `DEVELOPER_SNIPPETS_PATH` Read-Instruktion in Sprach-Best-Practices eingebaut
+- CLAUDE.md — `DEVELOPER_SNIPPETS_PATH` in Variablen-Tabelle + Snippets-Tabelle + Verzeichnisstruktur
+- `agent-meta.config.example.json` — `DEVELOPER_SNIPPETS_PATH` hinzugefügt
+
+---
+
 ## [0.10.6] — 2026-04-03
 
 ### Added
