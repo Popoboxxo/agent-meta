@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.1] — 2026-04-03
+
+### Added
+
+- README with VibeCoding experiment warning, architecture overview, quick start,
+  extension system docs, upgrade instructions, and agent role reference
+
+### Changed
+
+- Orchestrator Workflow H2 now documents automatic platform layer selection:
+  sync.py reads `"platforms": [...]` from config and picks the correct
+  `2-platform/` agent automatically — no manual step required
+
+---
+
 ## [0.9.0] — 2026-04-03
 
 ### Breaking Changes
