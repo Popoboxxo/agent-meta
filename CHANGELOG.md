@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.9.0] — 2026-04-03
+
+### Breaking Changes
+
+- **Generic agent names** — agents in `.claude/agents/` no longer use a project
+  prefix. Files are now named `developer.md`, `tester.md` etc. instead of
+  `vwf-developer.md`. One project per workspace is the assumed model.
+- **`project.prefix` is now used for extensions only**, not for agent filenames.
+
+### Added
+
+**Extension system** (`.claude/3-project/<prefix>-<role>-ext.md`)
+- New `--create-ext <role|all>` — creates extension file with managed block +
+  empty project section; never overwrites an existing file
+- New `--update-ext` — updates the managed block in all existing extension files;
+  project section is never touched
+- Managed block (`<!-- agent-meta:managed-begin/end -->`) contains auto-generated
+  context from config variables — updated on every `--update-ext`
+- Meta-repo provides no extension templates — extensions are fully project-owned
+
+**Extension-Hook in all agents**
+- Every generated agent (1-generic + 2-platform) reads `.claude/3-project/<prefix>-<role>-ext.md`
+  at startup if it exists — additively, without overriding the agent
+
+**`howto/upgrade-guide.md`** — new: full upgrade workflow, `--update-ext` for
+extensions, rollback, breaking-change handling, checklist
+
+### Changed
+
+- `config.example.json` — restored `prefix` field, removed `EXTRA_*_KNOWLEDGE`
+  variables (replaced by extension system), added all missing variables
+- `instantiate-project.md` — rewritten for sync.py workflow (submodule + script)
+- `CLAUDE.md` — rewritten with 4 core principles, extension system docs,
+  update-behavior table, decision tree
+
+### Removed
+
+- `EXTRA_ORCHESTRATOR/TESTER/DOCUMENTER/REQ_KNOWLEDGE` placeholders from
+  1-generic agents (replaced by extension system)
+- Copy-once logic for extension files
+
+---
+
 ## [0.1.0] — 2026-04-01
 
 Initial release of agent-meta.
