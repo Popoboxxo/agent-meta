@@ -549,6 +549,9 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 
 CLAUDE.md ← diese Datei
     └── referenziert: agents/**, howto/**, alle unterstützten Projekte
+
+ARCHITECTURE.md ← grafische Übersicht (Mermaid)
+    └── wird bei jedem Major Release aktualisiert
 ```
 
 ### Regeln für Änderungen
@@ -657,10 +660,15 @@ Releases folgen [Semantic Versioning](https://semver.org/):
    - "Current version:" Badge/Zeile auf neue Version setzen
    - Quick-Start-Beispiel (`git checkout v<x.y.z>`) auf neue Version setzen
 
-6. Commit: git add VERSION CHANGELOG.md README.md
+6. Bei MAJOR Release: ARCHITECTURE.md aktualisieren:
+   - Version in der Überschrift anpassen
+   - Neue Agenten-Rollen, Schichten oder Submodule in die Diagramme einpflegen
+   - Bei Minor/Patch nur wenn sich Architektur strukturell ändert
+
+7. Commit: git add VERSION CHANGELOG.md README.md [ARCHITECTURE.md]
            git commit -m "chore: bump version to x.y.z"
 
-7. Tag setzen und pushen:
+8. Tag setzen und pushen:
    git tag vx.y.z
    git push origin main
    git push origin vx.y.z
