@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.2.0"
+version: "1.3.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -17,12 +17,7 @@ tools:
 
 # Orchestrator — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-orchestrator-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Workflows und Hinweise für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-orchestrator-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

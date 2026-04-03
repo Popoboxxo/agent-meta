@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.1.0"
+version: "1.2.0"
 description: "Vollständig generisches Template für den Docker-Agenten. Plattformunabhängige Patterns: Compose-Stacks, Binary-Management, Test-Umgebungen, Diagnose. Für plattformspezifische Erweiterungen siehe sharkord-docker.md."
 tools:
   - Bash
@@ -14,12 +14,7 @@ tools:
 
 # Docker — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

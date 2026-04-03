@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.4] — 2026-04-03
+
+### Changed
+
+- Alle Agenten — `## Projektspezifische Erweiterung`-Block von 8 auf 1 Zeile komprimiert (kein Inhaltsverlust, ~84 Zeilen gespart)
+- `tester.md` (`1.2.0`) — Don'ts-Sektion: Duplikate aus "Qualitätsprinzipien"-Abschnitt entfernt, durch Querverweis ersetzt
+- `developer.md` (`1.2.0`) — "Sprach-Best-Practices": erklärender Absatz entfernt, Regel auf eine Zeile
+- `orchestrator.md` (`1.3.0`) — Extension-Block komprimiert
+- Alle anderen 1-generic Agenten (`1.2.0`) — Extension-Block komprimiert
+- 2-platform Agenten (`1.1.0`) — Extension-Block komprimiert
+
+---
+
 ## [0.10.3] — 2026-04-03
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Meta-Feedback-Agenten. Sammelt Verbesserungsvorschläge für das agent-meta-Framework aus laufenden Projektsessions und erstellt GitHub Issues im agent-meta-Repository."
 tools:
   - Bash
@@ -13,12 +13,7 @@ tools:
 
 # Meta-Feedback — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-meta-feedback-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

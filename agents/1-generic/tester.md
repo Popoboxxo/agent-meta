@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Tester-Agenten. Schreibt Unit-/Integration-/E2E-Tests nach TDD-Workflow, führt Tests aus und stellt Testabdeckung pro REQ-ID sicher."
 tools:
   - Bash
@@ -15,12 +15,7 @@ tools:
 
 # Tester — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-tester-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-tester-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
@@ -188,9 +183,7 @@ er gibt falsches Vertrauen. Lieber **keinen Test** als einen der nichts beweist.
 - KEINE Tests die von externen Services abhängen — mocken!
 - KEIN `any` in Test-Code
 - KEINE flaky Tests (Timing-abhängig ohne explizites Timeout)
-- KEINE leeren oder bedeutungslosen Assertions (`expect(true).toBe(true)`)
-- KEINE Dummy-Daten die nicht der Realität entsprechen (`"foo"`, `"test"`, `123`)
-- KEIN Test der immer besteht unabhängig vom getesteten Verhalten
+- Keine Shortcuts bei Assertions oder Testdaten → siehe Abschnitt "Qualitätsprinzipien"
 
 ## Delegation
 

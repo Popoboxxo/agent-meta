@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 tools:
   - Bash
@@ -15,12 +15,7 @@ tools:
 
 # Developer — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-developer-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
@@ -69,9 +64,6 @@ Verweise den Nutzer an den Requirements Engineer (`requirements`).
 ### Sprach-Best-Practices (PFLICHT)
 
 Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `{{LANGUAGE}}`
-
-Das umfasst idiomatischen Stil, Fehlerbehandlungsmuster, Typisierung, Modul-System
-und alle gängigen Konventionen der Community — nicht nur das was der Compiler erzwingt.
 
 ### Allgemein (projektübergreifend)
 

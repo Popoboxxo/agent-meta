@@ -1,6 +1,6 @@
 ---
 name: sharkord-release
-version: "1.0.0"
+version: "1.1.0"
 based-on: "1-generic/release.md@1.0.0"
 description: "Sharkord-Plattform Release-Agent. Baut auf template-release auf. Konsolidiert alle Erfahrungen aus sharkord-vid-with-friends und sharkord-hero-introducer: Versionierung, Bun-Build, Artifact-Packaging, GitHub Release via gh CLI, Required Binaries, Windows PATH-Fix."
 tools:
@@ -15,12 +15,7 @@ tools:
 
 # Release Agent — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-release-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

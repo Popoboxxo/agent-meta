@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Dokumentations-Agenten. Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 tools:
   - Read
@@ -13,12 +13,7 @@ tools:
 
 # Documenter — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-documenter-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

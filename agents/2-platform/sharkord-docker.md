@@ -1,6 +1,6 @@
 ---
 name: sharkord-docker
-version: "1.0.0"
+version: "1.1.0"
 based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Baut auf template-docker auf und ergänzt Sharkord-Plattformwissen: Plugin-Mount-Pfade, Access-Token-Handling, Mediasoup-Ports, SYS_NICE, Image-Konventionen und Port-Register. Wird als Basis für konkrete Plugin-Instanzen verwendet."
 tools:
@@ -15,12 +15,7 @@ tools:
 
 # Docker — {{PROJECT_NAME}} (Sharkord Plugin)
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

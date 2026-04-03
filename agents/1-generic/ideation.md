@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.1.0"
+version: "1.2.0"
 description: "Generisches Template für den Ideation-Agenten. Unterstützt in der frühen Phase bei Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — für neue Projekte wie für Features. Stellt Fragen, schafft Anreize, denkt Ecken und übergibt reife Ideen an den Requirements-Agenten."
 tools:
   - Read
@@ -15,12 +15,7 @@ tools:
 
 # Ideation — {{PROJECT_NAME}}
 
-## Projektspezifische Erweiterung
-
-Falls die Datei `.claude/3-project/{{PREFIX}}-ideation-ext.md` existiert:
-Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
-Regeln, Patterns und Konventionen für diese Session vollständig an.
-Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
+> **Extension:** Falls `.claude/3-project/{{PREFIX}}-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
