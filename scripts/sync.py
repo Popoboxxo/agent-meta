@@ -4,6 +4,7 @@ agent-meta sync.py
 ==================
 Generates .claude/agents/*.md for a project from agent-meta sources.
 Manages .claude/3-project/<prefix>-<role>-ext.md extension files.
+Syncs snippets and external skill agents.
 
 Usage:
   python .agent-meta/scripts/sync.py --config agent-meta.config.json
@@ -12,18 +13,21 @@ Usage:
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <role>
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
   python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+  python .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name>
+                                      --source <path> --role <role> [--entry <file>]
 
-Extension files (.claude/3-project/<prefix>-<role>-ext.md):
-  - Created by --create-ext <role> (or --create-ext all)
-  - Contain a managed block (<!-- agent-meta:managed-begin/end -->) with
-    auto-generated context from config variables — updated by --update-ext
-  - Contain a project section below the managed block — never touched
-  - The generated agent reads the extension file at startup via Extension-Hook
+External skills (external-skills.config.json):
+  - Managed centrally in agent-meta (Modell A)
+  - Each enabled skill generates a wrapper agent in .claude/agents/<role>.md
+  - Skill files are copied to .claude/skills/<skill-name>/
+  - Use --add-skill to register a new submodule + skill entry
+  - Use enabled: true/false in external-skills.config.json to activate/deactivate
 """
 
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,9 +42,13 @@ GENERIC_DIR = "1-generic"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 SNIPPETS_DIR = "snippets"
+EXTERNAL_DIR = "0-external"
+SKILL_WRAPPER = "_skill-wrapper.md"
+EXTERNAL_SKILLS_CONFIG = "external-skills.config.json"
 CLAUDE_AGENTS_DIR = ".claude/agents"
 CLAUDE_EXT_DIR = ".claude/3-project"
 CLAUDE_SNIPPETS_DIR = ".claude/snippets"
+CLAUDE_SKILLS_DIR = ".claude/skills"
 LOGFILE = "sync.log"
 
 # Maps role name to the output filename in .claude/agents/ (no prefix)
@@ -437,6 +445,212 @@ def sync_snippets(
             target_path.write_text(source_content, encoding="utf-8")
 
 
+def load_external_skills_config(agent_meta_root: Path) -> dict:
+    """Load external-skills.config.json from agent-meta root. Returns empty structure if not found."""
+    config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
+    if not config_path.exists():
+        return {"submodules": {}, "skills": {}}
+    with config_path.open(encoding="utf-8") as f:
+        data = json.load(f)
+    # Strip _comment keys
+    return {
+        "submodules": {k: v for k, v in data.get("submodules", {}).items() if not k.startswith("_")},
+        "skills":     {k: v for k, v in data.get("skills", {}).items()     if not k.startswith("_")},
+    }
+
+
+def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
+    """Return short commit hash of a submodule. Falls back to 'unknown'."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(agent_meta_root / submodule_path),
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def build_additional_files_section(skill_name: str, additional_files: list[str]) -> str:
+    """Render the additional_files read-list for the wrapper template."""
+    if not additional_files:
+        return "_Keine weiteren Referenzdateien konfiguriert._"
+    lines = ["Falls du detaillierte Referenzen brauchst, lies mit dem Read-Tool:"]
+    for f in additional_files:
+        lines.append(f"- `.claude/skills/{skill_name}/{f}`")
+    return "\n".join(lines)
+
+
+def sync_external_skills(
+    agent_meta_root: Path,
+    project_root: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Generate .claude/agents/<role>.md wrapper agents for all enabled external skills."""
+    ext_config = load_external_skills_config(agent_meta_root)
+    skills = ext_config.get("skills", {})
+    submodules = ext_config.get("submodules", {})
+
+    wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
+    if not wrapper_path.exists():
+        log.warn(f"Skill-Wrapper-Template nicht gefunden: {wrapper_path}")
+        return
+
+    wrapper_template = wrapper_path.read_text(encoding="utf-8")
+    agents_dir = project_root / CLAUDE_AGENTS_DIR
+    skills_dir = project_root / CLAUDE_SKILLS_DIR
+
+    for skill_name, skill_cfg in skills.items():
+        if not skill_cfg.get("enabled", False):
+            log.skip(f".claude/agents/{skill_cfg.get('role', skill_name)}.md",
+                     f"skill '{skill_name}' disabled")
+            continue
+
+        submodule_key = skill_cfg.get("submodule", "")
+        submodule_cfg = submodules.get(submodule_key, {})
+        local_path    = submodule_cfg.get("local_path", f"external/{submodule_key}")
+        source_rel    = skill_cfg.get("source", "")
+        entry_file    = skill_cfg.get("entry", "SKILL.md")
+        role          = skill_cfg.get("role", skill_name)
+        display_name  = skill_cfg.get("name", skill_name)
+        description   = skill_cfg.get("description", "")
+        additional    = skill_cfg.get("additional_files", [])
+
+        skill_source_dir = agent_meta_root / local_path / source_rel
+        entry_path = skill_source_dir / entry_file
+
+        if not entry_path.exists():
+            log.warn(f"Skill entry nicht gefunden: {entry_path}")
+            continue
+
+        # Read + substitute SKILL_CONTENT
+        skill_content = entry_path.read_text(encoding="utf-8")
+        # Strip frontmatter from skill content if present
+        skill_content = re.sub(r"^---\n.*?\n---\n", "", skill_content,
+                               count=1, flags=re.DOTALL).lstrip()
+
+        commit = get_skill_commit(agent_meta_root, local_path)
+
+        # Build skill-specific variables (extend project variables)
+        skill_vars = dict(variables)
+        skill_vars["SKILL_NAME"]          = skill_name
+        skill_vars["SKILL_NAME_DISPLAY"]  = display_name
+        skill_vars["SKILL_ROLE"]          = role
+        skill_vars["SKILL_DESCRIPTION"]   = description
+        skill_vars["SKILL_COMMIT"]        = commit
+        skill_vars["SKILL_CONTENT"]       = skill_content
+        skill_vars["SKILL_ADDITIONAL_FILES_SECTION"] = build_additional_files_section(
+            skill_name, additional
+        )
+
+        # Generate wrapper agent
+        agent_content = substitute(wrapper_template, skill_vars,
+                                   f"0-external/{skill_name}", log)
+
+        agent_target = agents_dir / f"{role}.md"
+        log.action("WRITE", str(agent_target.relative_to(project_root)),
+                   f"0-external/{skill_name}@{commit}")
+
+        # Copy skill files to .claude/skills/<skill_name>/
+        skill_target_dir = skills_dir / skill_name
+        log.action("COPY", str((skill_target_dir / entry_file).relative_to(project_root)),
+                   f"{local_path}/{source_rel}/{entry_file}")
+        for af in additional:
+            af_source = skill_source_dir / af
+            if af_source.exists():
+                log.action("COPY", str((skill_target_dir / af).relative_to(project_root)),
+                           f"{local_path}/{source_rel}/{af}")
+            else:
+                log.warn(f"additional_file nicht gefunden: {af_source}")
+
+        if not dry_run:
+            agents_dir.mkdir(parents=True, exist_ok=True)
+            agent_target.write_text(agent_content, encoding="utf-8")
+            skill_target_dir.mkdir(parents=True, exist_ok=True)
+            (skill_target_dir / entry_file).write_text(
+                entry_path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            for af in additional:
+                af_source = skill_source_dir / af
+                if af_source.exists():
+                    (skill_target_dir / af).write_text(
+                        af_source.read_text(encoding="utf-8"), encoding="utf-8"
+                    )
+
+
+def add_skill(
+    agent_meta_root: Path,
+    repo_url: str,
+    skill_name: str,
+    source_path: str,
+    role: str,
+    entry: str,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Register a new submodule + skill entry in external-skills.config.json.
+
+    Runs: git submodule add <repo_url> external/<submodule_name>
+    Then updates external-skills.config.json with the new submodule + skill entry.
+    """
+    # Derive submodule name from repo URL (last path segment without .git)
+    submodule_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
+    local_path = f"external/{submodule_name}"
+
+    # Run git submodule add (skip if already exists)
+    submodule_target = agent_meta_root / local_path
+    if submodule_target.exists():
+        print(f"  ℹ  Submodule bereits vorhanden: {local_path}")
+    else:
+        print(f"  ↓  git submodule add {repo_url} {local_path}")
+        if not dry_run:
+            result = subprocess.run(
+                ["git", "submodule", "add", repo_url, local_path],
+                cwd=str(agent_meta_root),
+                capture_output=False,
+            )
+            if result.returncode != 0:
+                print(f"  ✗  git submodule add fehlgeschlagen", file=sys.stderr)
+                return
+
+    # Update external-skills.config.json
+    config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
+    if config_path.exists():
+        with config_path.open(encoding="utf-8") as f:
+            raw = json.load(f)
+    else:
+        raw = {"submodules": {}, "skills": {}}
+
+    raw.setdefault("submodules", {})[submodule_name] = {
+        "repo": repo_url,
+        "local_path": local_path,
+    }
+    raw.setdefault("skills", {})[skill_name] = {
+        "enabled": True,
+        "submodule": submodule_name,
+        "source": source_path,
+        "entry": entry,
+        "role": role,
+        "name": skill_name.replace("-", " ").title(),
+        "description": f"Spezialist für {skill_name}.",
+        "additional_files": [],
+    }
+
+    log.action("UPDATE", EXTERNAL_SKILLS_CONFIG,
+               f"added submodule '{submodule_name}', skill '{skill_name}'")
+    if not dry_run:
+        with config_path.open("w", encoding="utf-8") as f:
+            json.dump(raw, f, indent=2, ensure_ascii=False)
+        print(f"  ✓  {EXTERNAL_SKILLS_CONFIG} aktualisiert")
+        print(f"  ℹ  Skill '{skill_name}' (enabled: true) → role: '{role}'")
+        print(f"  ℹ  Zum Deaktivieren: enabled: false in {EXTERNAL_SKILLS_CONFIG} setzen")
+
+
 def create_extension(
     project_root: Path,
     config: dict,
@@ -549,8 +763,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Sync agent-meta agents into a project."
     )
-    parser.add_argument("--config", required=True,
-                        help="Path to agent-meta.config.json")
+    parser.add_argument("--config", required=False, default=None,
+                        help="Path to agent-meta.config.json (not required for --add-skill)")
     parser.add_argument("--init", action="store_true",
                         help="Also generate CLAUDE.md from template (only if not present)")
     parser.add_argument("--only-variables", action="store_true",
@@ -562,24 +776,57 @@ def main():
                         help="Update managed block in all existing extension files")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
+
+    # External skill management
+    parser.add_argument("--add-skill", metavar="REPO_URL",
+                        help="Register a new external skill: git submodule add + config entry")
+    parser.add_argument("--skill-name", metavar="NAME",
+                        help="Skill identifier (used in external-skills.config.json)")
+    parser.add_argument("--source", metavar="PATH",
+                        help="Path to skill directory within the submodule repo")
+    parser.add_argument("--role", metavar="ROLE",
+                        help="Agent role name for the generated wrapper agent")
+    parser.add_argument("--entry", metavar="FILE", default="SKILL.md",
+                        help="Entry file within the skill directory (default: SKILL.md)")
+
     args = parser.parse_args()
 
     script_path = Path(__file__).resolve()
     agent_meta_root = find_agent_meta_root(script_path)
+
+    log = SyncLog()
+
+    if args.dry_run:
+        print("DRY-RUN — keine Dateien werden geschrieben\n")
+
+    if args.add_skill:
+        mode = "add-skill"
+        for required, flag in [(args.skill_name, "--skill-name"),
+                               (args.source, "--source"),
+                               (args.role, "--role")]:
+            if not required:
+                print(f"  ✗  --add-skill erfordert {flag}", file=sys.stderr)
+                sys.exit(1)
+        add_skill(agent_meta_root, args.add_skill, args.skill_name,
+                  args.source, args.role, args.entry, log, args.dry_run)
+        log.write(agent_meta_root / LOGFILE, EXTERNAL_SKILLS_CONFIG,
+                  read_version(agent_meta_root), mode, [], args.dry_run)
+        return
+
+    # All other modes require --config
+    if not args.config:
+        print("  ✗  --config ist erforderlich (außer bei --add-skill)", file=sys.stderr)
+        sys.exit(1)
+
     project_root = Path(args.config).resolve().parent
     config_path = Path(args.config).resolve()
-
     config = load_config(config_path)
     variables, pre_warnings = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
 
-    log = SyncLog()
     for w in pre_warnings:
         log.warn(w)
-
-    if args.dry_run:
-        print("DRY-RUN — keine Dateien werden geschrieben\n")
 
     if args.only_variables:
         mode = "only-variables"
@@ -601,6 +848,7 @@ def main():
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
+        sync_external_skills(agent_meta_root, project_root, variables, log, args.dry_run)
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)

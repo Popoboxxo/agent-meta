@@ -27,9 +27,13 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 
 ---
 
-## Drei-Schichten-Modell
+## Schichten-Modell
 
 ```
+0-external/   Externe Skill-Agenten aus Drittrepos (via Git Submodule).
+              Höchste Priorität. Konfiguriert in external-skills.config.json.
+              enabled: true/false — binäre Aktivierung pro Skill.
+
 1-generic/    Universell. Gilt für jedes Projekt. Wird immer generiert,
               solange kein Override in 2-platform oder 3-project existiert.
 
@@ -43,7 +47,7 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 
 **Override-Reihenfolge (für generierte Agenten):**
 ```
-1-generic  ←  überschrieben durch  →  2-platform  ←  überschrieben durch  →  3-project/<rolle>.md
+1-generic  →  2-platform  →  3-project/<rolle>.md  →  0-external (eigenständige Rollen)
 ```
 
 **Extension (additiv, kein Override):**
@@ -78,6 +82,14 @@ agent-meta/
       developer-ext.md  ← Beispiel: Extension-Vorlage für developer
                            Overrides: <rolle>.md (ersetzt komplett)
                            Extensions: <rolle>-ext.md (additiv geladen)
+
+    0-external/         ← Wrapper-Template für externe Skill-Agenten
+      _skill-wrapper.md ← generisches Template (einmalig, nie manuell bearbeiten)
+
+  external/             ← Git Submodule (externe Skill-Repos, via --add-skill)
+    <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
+
+  external-skills.config.json  ← Zentrale Skill-Konfiguration (Modell A)
 
   howto/
     instantiate-project.md  ← Schritt-für-Schritt Einrichtung
@@ -296,6 +308,88 @@ runtime: "Bun"                   # Runtime / Test-Framework
 
 ---
 
+## External Skills (0-external Layer)
+
+Domänenspezifische Agenten aus Drittrepos — hochspezialisiertes Wissen das nicht in generischen
+Agenten gehört (z.B. 3D-Druck-Systeme, CAD-Workflows, spezifische Plattform-Expertise).
+
+### Konzept
+
+```
+external/<repo>/path/to/SKILL.md    ← Quelldatei im Submodule (gepinnter Commit)
+    ↓  sync.py substituiert SKILL_CONTENT in _skill-wrapper.md
+.claude/agents/<role>.md            ← generierter Wrapper-Agent im Zielprojekt
+.claude/skills/<skill-name>/        ← kopierte Skill-Dateien (für lazy Read-Zugriff)
+```
+
+### Konfiguration: `external-skills.config.json`
+
+Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
+
+```json
+{
+  "submodules": {
+    "my-skills-repo": {
+      "repo": "https://github.com/owner/my-skills-repo",
+      "local_path": "external/my-skills-repo"
+    }
+  },
+  "skills": {
+    "my-skill": {
+      "enabled": true,
+      "submodule": "my-skills-repo",
+      "source": "path/within/repo",
+      "entry": "SKILL.md",
+      "role": "my-specialist",
+      "name": "My Specialist",
+      "description": "Kurzbeschreibung der Spezialisierung.",
+      "additional_files": ["reference.md"]
+    }
+  }
+}
+```
+
+- **`enabled: true/false`** — binäre Aktivierung ohne Eintrag zu löschen
+- **`entry`** — Abstraktion über die Einstiegsdatei (egal wie sie im Fremdrepo heißt)
+- **`additional_files`** — weitere Dokumente, die der Agent lazy per Read-Tool laden kann
+
+### Skill hinzufügen
+
+```bash
+# Einmalig: Submodule registrieren + Config-Eintrag anlegen
+python .agent-meta/scripts/sync.py \
+  --add-skill https://github.com/owner/skill-repo \
+  --skill-name my-skill \
+  --source path/within/repo \
+  --role my-specialist
+
+# Danach normaler Sync generiert den Wrapper-Agenten
+python .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+### Wrapper-Agent
+
+`_skill-wrapper.md` ist das **einzige Template** für alle External Skills:
+- Header + Scope-Hinweis werden von agent-meta beigesteuert
+- `{{SKILL_CONTENT}}` wird mit dem vollständigen Inhalt der `entry`-Datei substituiert
+  (Frontmatter des Skill-Dokuments wird dabei entfernt)
+- `additional_files` bleiben als `.claude/skills/<skill>/` für lazy Read-Zugriff
+
+### Versionierung
+
+`sync.py` loggt beim Generieren den Submodule-Commit-Hash:
+`0-external/my-skill@a3f9c12`
+
+Um einen Skill auf einen neuen Stand zu bringen:
+```bash
+cd external/my-skills-repo && git pull
+cd ../.. && git add external/my-skills-repo
+git commit -m "chore: update my-skills-repo submodule"
+python .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+---
+
 ## Agenten-Rollen
 
 | Rolle | Generic | Plattform (Sharkord) | Zweck |
@@ -439,6 +533,11 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 
 (analog für tester, validator, requirements, ideation, documenter, meta-feedback)
 
+0-external/_skill-wrapper.md
+    └── external-skills.config.json (enabled skills)
+            └── .claude/agents/<role>.md (generiert)
+            └── .claude/skills/<skill-name>/ (kopiert)
+
 CLAUDE.md ← diese Datei
     └── referenziert: agents/**, howto/**, alle unterstützten Projekte
 ```
@@ -452,6 +551,8 @@ CLAUDE.md ← diese Datei
 | `1-generic/orchestrator.md` | Workflows-Abschnitt in dieser `CLAUDE.md` |
 | beliebigen `1-generic/` Agenten | Version in Template erhöhen + Projekte neu syncen |
 | `2-platform/sharkord-*.md` | Version in Template erhöhen + `based-on` aktuell halten + Projekte neu syncen |
+| `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
+| `external-skills.config.json` | Projekte neu syncen |
 | `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
 
@@ -465,6 +566,9 @@ CLAUDE.md ← diese Datei
 
 **Plattformwissen verbessern (gilt für alle Projekte auf Plattform X):**
 → `2-platform/<plattform>-<rolle>.md` ändern → Projekte neu syncen.
+
+**Neuen External Skill einbinden:**
+→ `--add-skill` ausführen → `external-skills.config.json` prüfen → Projekte neu syncen.
 
 **Neue Agenten-Rolle hinzufügen:**
 → `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.

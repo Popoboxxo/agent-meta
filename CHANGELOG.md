@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.0] — 2026-04-04
+
+### Added
+
+- **`0-external` Layer** — neuer Agenten-Layer für externe Skill-Pakete aus Drittrepos
+- `agents/0-external/_skill-wrapper.md` — generisches Wrapper-Template: Header + `{{SKILL_CONTENT}}` Substitution + lazy `additional_files`
+- `external-skills.config.json` — zentrale Skill-Konfiguration (Modell A): Submodule-URLs + Skill-Mapping + `enabled: true/false` Aktivierung
+- `sync.py` — `sync_external_skills()`: generiert `.claude/agents/<role>.md` + kopiert Skill-Dateien nach `.claude/skills/<skill-name>/`
+- `sync.py` — `--add-skill <repo-url> --skill-name --source --role [--entry]`: registriert Git Submodule + legt Config-Eintrag an
+- CLAUDE.md — vollständiger "External Skills (0-external Layer)"-Abschnitt mit Konzept, Konfigurationsformat, Workflow, Versionierung
+
+### Changed
+
+- CLAUDE.md — "Drei-Schichten-Modell" → "Schichten-Modell" (0-external ergänzt, Override-Reihenfolge aktualisiert)
+- CLAUDE.md — Verzeichnisstruktur: `0-external/`, `external/`, `external-skills.config.json` dokumentiert
+- CLAUDE.md — Abhängigkeits-Karte + Änderungs-Kategorien um External Skills ergänzt
+
+---
+
 ## [0.10.7] — 2026-04-03
 
 ### Added
