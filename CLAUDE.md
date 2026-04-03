@@ -108,6 +108,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | Documenter | `documenter.md` | 1-generic |
 | Release | `release.md` | 1-generic oder 2-platform |
 | Docker | `docker.md` | 1-generic oder 2-platform |
+| Meta-Feedback | `meta-feedback.md` | 1-generic |
 
 ### Update-Verhalten bei sync
 
@@ -204,8 +205,10 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `validator` | `1-generic/validator.md` | — | DoD-Check, Traceability |
 | `requirements` | `1-generic/requirements.md` | — | REQ-Aufnahme, REQUIREMENTS.md |
 | `documenter` | `1-generic/documenter.md` | — | Doku-Pflege, Erkenntnisse |
+| `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
 | `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, GitHub Release |
 | `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Binaries |
+| `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
 
 ---
 
@@ -326,7 +329,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, documenter)
+(analog für tester, validator, requirements, documenter, meta-feedback)
 
 CLAUDE.md ← diese Datei
     └── referenziert: agents/**, howto/**, alle unterstützten Projekte

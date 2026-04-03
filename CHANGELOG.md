@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.4] — 2026-04-03
+
+### Added
+
+- New agent role `meta-feedback` (`agents/1-generic/meta-feedback.md`):
+  collects improvement suggestions for the agent-meta framework and creates
+  GitHub Issues in the agent-meta repository
+- Orchestrator Workflow I: "Feedback an agent-meta geben" — delegates to
+  `meta-feedback`; orchestrator actively asks for feedback at session end
+- `meta-feedback` added to `ROLE_MAP` in `sync.py`
+
+### Changed
+
+- `CLAUDE.md` — agent roles table and dependency map updated with `meta-feedback`
+- `README.md` — agent roles table and supported platforms updated
+
+---
+
 ## [0.9.3] — 2026-04-03
 
 ### Added

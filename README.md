@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.9.3`
+**Current version:** `0.9.4`
 
 ---
 
@@ -60,7 +60,7 @@ generated agent  +  .claude/3-project/<prefix>-<role>-ext.md  =  full agent cont
 
 ```bash
 git submodule add <repo-url> .agent-meta
-cd .agent-meta && git checkout v0.9.3 && cd ..
+cd .agent-meta && git checkout v0.9.4 && cd ..
 ```
 
 ### 2. Create config
@@ -155,7 +155,7 @@ agent-meta/
 
 | Platform | Agents |
 |----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, release, docker |
+| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker |
 | Sharkord | sharkord-docker, sharkord-release |
 
 ---
@@ -170,5 +170,6 @@ agent-meta/
 | `validator` | DoD check, traceability audit, code quality |
 | `requirements` | Requirement intake, REQ-IDs, REQUIREMENTS.md |
 | `documenter` | CODEBASE_OVERVIEW, architecture docs, conclusions |
+| `meta-feedback` | Collect framework feedback, create GitHub Issues in agent-meta |
 | `release` | Versioning, changelog, GitHub release |
 | `docker` | Dev stack, test stack, binary management |

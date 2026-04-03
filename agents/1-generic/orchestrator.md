@@ -193,6 +193,21 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 ---
 
+### Workflow I: Feedback an agent-meta geben
+
+Wenn der Nutzer Feedback zum agent-meta-Framework hat, oder am **Ende einer Session**:
+
+```
+1. meta-feedback → Feedback aufbereiten und als GitHub Issue formulieren
+2. meta-feedback → Issue erstellen (nach Bestätigung durch Nutzer)
+```
+
+**Am Session-Ende aktiv nachfragen:**
+> "Gab es in dieser Session etwas, das im agent-meta-Framework fehlt,
+>  unklar war oder verbessert werden könnte?"
+
+---
+
 ## Direkte Orchestrator-Aufgaben
 
 Folgende Aufgaben führst du als Orchestrator SELBST aus (nicht delegieren):

@@ -43,14 +43,15 @@ LOGFILE = "sync.log"
 
 # Maps role name to the output filename in .claude/agents/ (no prefix)
 ROLE_MAP = {
-    "orchestrator": "orchestrator",
-    "developer":    "developer",
-    "tester":       "tester",
-    "validator":    "validator",
-    "requirements": "requirements",
-    "documenter":   "documenter",
-    "release":      "release",
-    "docker":       "docker",
+    "orchestrator":  "orchestrator",
+    "developer":     "developer",
+    "tester":        "tester",
+    "validator":     "validator",
+    "requirements":  "requirements",
+    "documenter":    "documenter",
+    "release":       "release",
+    "docker":        "docker",
+    "meta-feedback": "meta-feedback",
 }
 
 EXT_SUFFIX = "-ext"
