@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "1.2.0"
+version: "1.3.0"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 tools:
   - Bash
@@ -125,6 +125,6 @@ Format: `<type>(REQ-xxx): <beschreibung>`
 
 ## Sprache
 
-- Code-Kommentare → Englisch
-- Commit-Messages → Englisch
+- Code-Kommentare → {{CODE_LANGUAGE}}
+- Commit-Messages → {{CODE_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

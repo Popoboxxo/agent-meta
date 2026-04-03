@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.2.0"
+version: "1.3.0"
 description: "Generisches Template für den Requirements-Engineer-Agenten. Nimmt Anforderungen auf, analysiert sie, vergibt REQ-IDs, pflegt REQUIREMENTS.md und prüft Traceability."
 tools:
   - Read
@@ -143,5 +143,5 @@ Wenn eine bestehende Anforderung geändert wird:
 
 ## Sprache
 
-- `docs/REQUIREMENTS.md` → {{DOCS_LANGUAGE}}
+- `docs/REQUIREMENTS.md` → {{INTERNAL_DOCS_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

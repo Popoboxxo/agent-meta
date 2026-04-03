@@ -189,8 +189,10 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung |
 | `{{PROJECT_GOAL}}` | alle | Primäres Ziel des Projekts (für wen, was wird gelöst) |
 | `{{PROJECT_LANGUAGES}}` | alle | Verwendete Programmiersprachen |
-| `{{COMMUNICATION_LANGUAGE}}` | alle | Sprache für Nutzer-Kommunikation (z.B. `Deutsch`) |
-| `{{DOCS_LANGUAGE}}` | alle | Sprache für Dokumentationsdateien (z.B. `Englisch`) |
+| `{{COMMUNICATION_LANGUAGE}}` | alle | Sprache für Nutzer-Kommunikation (z.B. `Englisch`) |
+| `{{DOCS_LANGUAGE}}` | alle | Sprache für externe Doku: README, CHANGELOG, Release Notes, GitHub Issues |
+| `{{INTERNAL_DOCS_LANGUAGE}}` | alle | Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions |
+| `{{CODE_LANGUAGE}}` | alle | Sprache für code-nahe Artefakte: Kommentare, Commit-Messages, Test-Beschreibungen |
 | `{{AGENT_META_REPO}}` | meta-feedback | GitHub-Repo für Issues (z.B. `owner/agent-meta`) |
 | `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln |
 | `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |

@@ -26,9 +26,13 @@
     "PROJECT_LANGUAGES":   "TypeScript",
 
     "_comment_lang": "Sprache für Kommunikation mit dem Nutzer (z.B. Deutsch, English)",
-    "COMMUNICATION_LANGUAGE": "Deutsch",
-    "_comment_docs_lang": "Sprache für Dokumentationsdateien (README, CHANGELOG etc.) (z.B. Englisch, English)",
-    "DOCS_LANGUAGE":       "Englisch",
+    "COMMUNICATION_LANGUAGE":   "Englisch",
+    "_comment_docs_lang": "Sprache für öffentliche/externe Doku: README, CHANGELOG, Release Notes, GitHub Issues",
+    "DOCS_LANGUAGE":            "Englisch",
+    "_comment_internal_lang": "Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions",
+    "INTERNAL_DOCS_LANGUAGE":   "Deutsch",
+    "_comment_code_lang": "Sprache für code-nahe Artefakte: Code-Kommentare, Commit-Messages, Test-Beschreibungen",
+    "CODE_LANGUAGE":            "Englisch",
 
     "_comment_meta_repo": "GitHub-Repo für Meta-Feedback Issues (owner/repo)",
     "AGENT_META_REPO":     "Popoboxxo/agent-meta",

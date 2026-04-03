@@ -1,6 +1,6 @@
 ---
 name: sharkord-docker
-version: "1.1.0"
+version: "1.2.0"
 based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Baut auf template-docker auf und ergänzt Sharkord-Plattformwissen: Plugin-Mount-Pfade, Access-Token-Handling, Mediasoup-Ports, SYS_NICE, Image-Konventionen und Port-Register. Wird als Basis für konkrete Plugin-Instanzen verwendet."
 tools:
@@ -364,5 +364,5 @@ Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{PLATZHALTER}}` ausf�
 
 ## Sprache
 
-- `docker-compose.yml` Kommentare → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
+- `docker-compose.yml` Kommentare → {{CODE_LANGUAGE}}
+- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.2.0"
+version: "1.3.0"
 description: "Generisches Template für den Dokumentations-Agenten. Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 tools:
   - Read
@@ -36,10 +36,10 @@ Du wachst über die Vollständigkeit und Aktualität aller Projektdokumentation.
 
 | Datei | Zweck | Sprache |
 |-------|-------|---------|
-| `docs/CODEBASE_OVERVIEW.md` | Codegenaue Bestandsaufnahme aller `src/` Dateien | Deutsch |
-| `docs/ARCHITECTURE.md` | Architektur-Überblick, Diagramme, Modul-Beziehungen | Deutsch |
-| `README.md` | Projekt-Beschreibung, Setup, Commands | **Englisch** |
-| `docs/conclusions/conclusions-YYYY-MM-DD.md` | Tägliche Session-Erkenntnisse | Deutsch |
+| `docs/CODEBASE_OVERVIEW.md` | Codegenaue Bestandsaufnahme aller `src/` Dateien | {{INTERNAL_DOCS_LANGUAGE}} |
+| `docs/ARCHITECTURE.md` | Architektur-Überblick, Diagramme, Modul-Beziehungen | {{INTERNAL_DOCS_LANGUAGE}} |
+| `README.md` | Projekt-Beschreibung, Setup, Commands | **{{DOCS_LANGUAGE}}** |
+| `docs/conclusions/conclusions-YYYY-MM-DD.md` | Tägliche Session-Erkenntnisse | {{INTERNAL_DOCS_LANGUAGE}} |
 
 **WICHTIG:** `docs/REQUIREMENTS.md` gehört dem Requirements Engineer.
 Du darfst sie lesen, aber NICHT editieren.
@@ -128,7 +128,7 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## 4. README.md Pflege
 
-**WICHTIG:** README MUSS immer auf **Englisch** geschrieben werden.
+**WICHTIG:** README MUSS immer auf **{{DOCS_LANGUAGE}}** geschrieben werden.
 
 ---
 
@@ -150,5 +150,5 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 ## Sprache
 
 - `README.md` → **{{DOCS_LANGUAGE}}**
-- Alle anderen Dokumente → {{DOCS_LANGUAGE}}
+- Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → {{INTERNAL_DOCS_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}

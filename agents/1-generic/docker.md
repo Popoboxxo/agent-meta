@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.2.0"
+version: "1.3.0"
 description: "Vollständig generisches Template für den Docker-Agenten. Plattformunabhängige Patterns: Compose-Stacks, Binary-Management, Test-Umgebungen, Diagnose. Für plattformspezifische Erweiterungen siehe sharkord-docker.md."
 tools:
   - Bash
@@ -348,5 +348,5 @@ docker inspect {{CONTAINER_NAME}}
 
 ## Sprache
 
-- `docker-compose.yml` Kommentare → Englisch
+- `docker-compose.yml` Kommentare → {{CODE_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
