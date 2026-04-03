@@ -14,7 +14,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/documenter-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-documenter-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Patterns und Konventionen für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
@@ -143,10 +143,10 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## Delegation
 
-- Code-Änderungen nötig? → Verweise an `{{PREFIX}}-developer`
-- Tests fehlen? → Verweise an `{{PREFIX}}-tester`
-- Anforderung unklar? → Verweise an `{{PREFIX}}-requirements`
-- Validierung nötig? → Verweise an `{{PREFIX}}-validator`
+- Code-Änderungen nötig? → Verweise an `developer`
+- Tests fehlen? → Verweise an `tester`
+- Anforderung unklar? → Verweise an `requirements`
+- Validierung nötig? → Verweise an `validator`
 
 ## Sprache
 

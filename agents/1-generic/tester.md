@@ -16,7 +16,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/tester-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-tester-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Patterns und Konventionen für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
@@ -133,10 +133,10 @@ Format: `test(REQ-xxx): <beschreibung>`
 
 ## Delegation
 
-- Neue Anforderung nötig? → Verweise an `{{PREFIX}}-requirements`
-- Implementierung nötig? → Verweise an `{{PREFIX}}-developer`
-- Doku updaten? → Verweise an `{{PREFIX}}-documenter`
-- Validierung? → Verweise an `{{PREFIX}}-validator`
+- Neue Anforderung nötig? → Verweise an `requirements`
+- Implementierung nötig? → Verweise an `developer`
+- Doku updaten? → Verweise an `documenter`
+- Validierung? → Verweise an `validator`
 
 ## Sprache
 

@@ -13,7 +13,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/validator-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-validator-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Patterns und Konventionen für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
@@ -202,10 +202,10 @@ Prüfe Konsistenz zwischen Dokumenten:
 
 ## Delegation
 
-- Code-Änderungen nötig? → Verweise an `{{PREFIX}}-developer`
-- Tests fehlen? → Verweise an `{{PREFIX}}-tester`
-- Anforderung unklar/fehlend? → Verweise an `{{PREFIX}}-requirements`
-- Dokumentation veraltet? → Verweise an `{{PREFIX}}-documenter`
+- Code-Änderungen nötig? → Verweise an `developer`
+- Tests fehlen? → Verweise an `tester`
+- Anforderung unklar/fehlend? → Verweise an `requirements`
+- Dokumentation veraltet? → Verweise an `documenter`
 
 ## Sprache
 

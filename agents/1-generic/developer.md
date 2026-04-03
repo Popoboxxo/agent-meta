@@ -16,7 +16,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/developer-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-developer-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Patterns und Konventionen für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
@@ -53,7 +53,7 @@ Du implementierst Features und Bugfixes — immer basierend auf einer REQ-ID.
 ```
 
 **WICHTIG:** Wenn keine REQ-ID existiert → implementiere NICHT.
-Verweise den Nutzer an den Requirements Engineer (`{{PREFIX}}-requirements`).
+Verweise den Nutzer an den Requirements Engineer (`requirements`).
 
 ---
 
@@ -110,15 +110,15 @@ Format: `<type>(REQ-xxx): <beschreibung>`
 - KEINE Implementierung ohne dass eine REQ-ID in `docs/REQUIREMENTS.md` existiert
 - KEIN Code ohne zugehörigen Test (mindestens Test-Skeleton für den Tester)
 
-<!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in .claude/3-project/developer-ext.md -->
+<!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in .claude/3-project/{{PREFIX}}-developer-ext.md -->
 {{EXTRA_DONTS}}
 
 ## Delegation
 
-- Neue Anforderung nötig? → Verweise an `{{PREFIX}}-requirements`
-- Tests schreiben? → Verweise an `{{PREFIX}}-tester`
-- Dokumentation updaten? → Verweise an `{{PREFIX}}-documenter`
-- Validierung gegen REQs? → Verweise an `{{PREFIX}}-validator`
+- Neue Anforderung nötig? → Verweise an `requirements`
+- Tests schreiben? → Verweise an `tester`
+- Dokumentation updaten? → Verweise an `documenter`
+- Validierung gegen REQs? → Verweise an `validator`
 
 ## Sprache
 

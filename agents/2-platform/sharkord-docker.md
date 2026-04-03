@@ -15,7 +15,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/docker-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Patterns und Konventionen für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.

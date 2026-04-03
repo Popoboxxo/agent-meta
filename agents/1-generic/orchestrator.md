@@ -18,7 +18,7 @@ tools:
 
 ## Projektspezifische Erweiterung
 
-Falls die Datei `.claude/3-project/orchestrator-ext.md` existiert:
+Falls die Datei `.claude/3-project/{{PREFIX}}-orchestrator-ext.md` existiert:
 Lies sie **jetzt sofort** mit dem Read-Tool und wende alle dort definierten
 Regeln, Workflows und Hinweise für diese Session vollständig an.
 Sie ergänzt diesen Agenten — sie ersetzt ihn nicht.
@@ -43,12 +43,12 @@ korrekt abläuft.
 
 | Agent | Zuständigkeit | Wann delegieren? |
 |-------|--------------|-----------------|
-| `{{PREFIX}}-requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen, Traceability | Neue Features, Anforderungs-Analyse, Impact-Analyse |
-| `{{PREFIX}}-developer` | Code implementieren nach REQ-IDs, Code-Konventionen einhalten | Feature-Implementierung, Bugfixes, Refactoring |
-| `{{PREFIX}}-tester` | Tests schreiben (TDD), Test-Suite ausführen, Testabdeckung sichern | Tests schreiben, Test-Coverage prüfen, Docker-Testsystem |
-| `{{PREFIX}}-validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit | Nach Implementierung, vor Commit, Qualitäts-Checks |
-| `{{PREFIX}}-documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | Nach Code-Änderungen, Erkenntnisse speichern, Doku-Zyklus |
-| `{{PREFIX}}-docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen | Testsystem starten/stoppen, neue Docker-Configs, Binary-Setup |
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen, Traceability | Neue Features, Anforderungs-Analyse, Impact-Analyse |
+| `developer` | Code implementieren nach REQ-IDs, Code-Konventionen einhalten | Feature-Implementierung, Bugfixes, Refactoring |
+| `tester` | Tests schreiben (TDD), Test-Suite ausführen, Testabdeckung sichern | Tests schreiben, Test-Coverage prüfen, Docker-Testsystem |
+| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit | Nach Implementierung, vor Commit, Qualitäts-Checks |
+| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | Nach Code-Änderungen, Erkenntnisse speichern, Doku-Zyklus |
+| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen | Testsystem starten/stoppen, neue Docker-Configs, Binary-Setup |
 
 ---
 
@@ -57,47 +57,47 @@ korrekt abläuft.
 ### Workflow A: Neues Feature
 
 ```
-1. {{PREFIX}}-requirements  → Anforderung formulieren, REQ-ID vergeben
-2. {{PREFIX}}-tester        → Tests ZUERST schreiben (TDD Red Phase)
-3. {{PREFIX}}-developer     → Implementierung (TDD Green Phase)
-4. {{PREFIX}}-tester        → Tests ausführen, Regressions prüfen
-5. {{PREFIX}}-validator     → Code gegen REQ validieren, DoD-Check
-6. {{PREFIX}}-documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
+1. requirements  → Anforderung formulieren, REQ-ID vergeben
+2. tester        → Tests ZUERST schreiben (TDD Red Phase)
+3. developer     → Implementierung (TDD Green Phase)
+4. tester        → Tests ausführen, Regressions prüfen
+5. validator     → Code gegen REQ validieren, DoD-Check
+6. documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
 ```
 
 ### Workflow B: Bugfix
 
 ```
-1. {{PREFIX}}-requirements  → Bestehende REQ-ID identifizieren
-2. {{PREFIX}}-tester        → Reproduzierenden Test schreiben
-3. {{PREFIX}}-developer     → Fix implementieren
-4. {{PREFIX}}-tester        → Tests ausführen
-5. {{PREFIX}}-validator     → Quick-Check
-6. {{PREFIX}}-documenter    → Ggf. Doku updaten
+1. requirements  → Bestehende REQ-ID identifizieren
+2. tester        → Reproduzierenden Test schreiben
+3. developer     → Fix implementieren
+4. tester        → Tests ausführen
+5. validator     → Quick-Check
+6. documenter    → Ggf. Doku updaten
 ```
 
 ### Workflow C: Validierung / Audit
 
 ```
-1. {{PREFIX}}-validator     → Traceability-Audit (REQ → Code → Test)
-2. {{PREFIX}}-validator     → Code-Qualitäts-Scan
-3. {{PREFIX}}-validator     → Vollständiger Bericht
+1. validator     → Traceability-Audit (REQ → Code → Test)
+2. validator     → Code-Qualitäts-Scan
+3. validator     → Vollständiger Bericht
 ```
 
 ### Workflow D: Erkenntnisse speichern
 
 ```
-1. {{PREFIX}}-documenter    → Tages-Erkenntnisse in docs/conclusions/ speichern
+1. documenter    → Tages-Erkenntnisse in docs/conclusions/ speichern
 ```
 
 ### Workflow E: Refactoring
 
 ```
-1. {{PREFIX}}-requirements  → Betroffene REQ-IDs identifizieren
-2. {{PREFIX}}-developer     → Refactoring durchführen
-3. {{PREFIX}}-tester        → Alle betroffenen Tests ausführen
-4. {{PREFIX}}-validator     → Sicherstellen, dass kein Verhalten sich ändert
-5. {{PREFIX}}-documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
+1. requirements  → Betroffene REQ-IDs identifizieren
+2. developer     → Refactoring durchführen
+3. tester        → Alle betroffenen Tests ausführen
+4. validator     → Sicherstellen, dass kein Verhalten sich ändert
+5. documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
 ```
 
 ### Workflow F: Testsystem starten
@@ -105,17 +105,61 @@ korrekt abläuft.
 Wenn der Nutzer "Starte das Testsystem", "Starte Docker", "Starte den Stack" sagt:
 
 ```
-1. {{PREFIX}}-docker → Dev-Stack bauen + starten
-2. {{PREFIX}}-docker → Token extrahieren + Startup-Display ausgeben
+1. docker → Dev-Stack bauen + starten
+2. docker → Token extrahieren + Startup-Display ausgeben
 ```
 
 ### Workflow G: Neue Docker-Konfiguration
 
 ```
-1. {{PREFIX}}-docker → Anforderungen klären (Dev / Test / CI / Release)
-2. {{PREFIX}}-docker → Dockerfile + Compose-Datei erstellen
-3. {{PREFIX}}-tester → Test-Stack validieren
+1. docker → Anforderungen klären (Dev / Test / CI / Release)
+2. docker → Dockerfile + Compose-Datei erstellen
+3. tester → Test-Stack validieren
 ```
+
+### Workflow H: Agenten aktualisieren (agent-meta Upgrade)
+
+Wenn der Nutzer "Update die Agenten", "Upgrade agent-meta", "Neue agent-meta Version"
+oder ähnliches sagt:
+
+**H1 — Nur Agenten-Dateien neu generieren (gleiche Version):**
+```
+1. Führe aus: py .agent-meta/scripts/sync.py --config agent-meta.config.json
+2. Prüfe sync.log auf Warnungen
+3. Committe: git add .claude/agents/ && git commit -m "chore: regenerate agents"
+```
+
+**H2 — Auf neue agent-meta Version upgraden:**
+```
+1. Prüfe aktuelle Version: cat .agent-meta/VERSION
+2. Ziehe neue Version: cd .agent-meta && git fetch && git checkout v<neue-version> && cd ..
+3. Aktualisiere agent-meta-version in agent-meta.config.json
+4. Dry-Run: py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+5. Prüfe sync.log auf neue Warnungen (fehlende Variablen?)
+6. Ergänze fehlende Variablen in agent-meta.config.json
+7. Sync ausführen: py .agent-meta/scripts/sync.py --config agent-meta.config.json
+8. Extensions aktualisieren: py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+9. Committe: git add .claude/agents/ .agent-meta agent-meta.config.json && git commit -m "chore: upgrade agent-meta to v<neue-version>"
+```
+
+**H3 — Neue Extension erstellen:**
+```
+1. py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <rolle>
+   (oder --create-ext all für alle Rollen)
+2. Öffne .claude/3-project/{{PREFIX}}-<rolle>-ext.md
+3. Ergänze projektspezifisches Wissen im Projektbereich (unterhalb des managed blocks)
+```
+
+**H4 — Extension managed block aktualisieren** (nach config-Änderung):
+```
+1. py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+2. Prüfe sync.log
+```
+
+**Wichtig:**
+- `.claude/agents/` = generierter Output — nie manuell bearbeiten
+- `.claude/3-project/*-ext.md` = Projektdatei — managed block wird aktualisiert, Projektbereich nie
+- `agent-meta.config.json` = Projekt-Config — manuell pflegen
 
 ---
 
