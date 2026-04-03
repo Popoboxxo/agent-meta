@@ -101,6 +101,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | Rolle | Datei in `.claude/agents/` | Quelle |
 |-------|---------------------------|--------|
 | Orchestrator | `orchestrator.md` | 1-generic |
+| Ideation | `ideation.md` | 1-generic |
 | Developer | `developer.md` | 1-generic |
 | Tester | `tester.md` | 1-generic |
 | Validator | `validator.md` | 1-generic |
@@ -231,6 +232,7 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | Rolle | Generic | Plattform (Sharkord) | Zweck |
 |-------|---------|---------------------|-------|
 | `orchestrator` | `1-generic/orchestrator.md` | — | Koordination |
+| `ideation` | `1-generic/ideation.md` | — | Ideenfindung, Visions-Schärfung, Übergabe an Requirements |
 | `developer` | `1-generic/developer.md` | — | REQ-driven Implementierung |
 | `tester` | `1-generic/tester.md` | — | TDD, Test-Suite, Coverage |
 | `validator` | `1-generic/validator.md` | — | DoD-Check, Traceability |
@@ -239,7 +241,6 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
 | `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, GitHub Release |
 | `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Binaries |
-| `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
 
 ---
 
@@ -297,6 +298,13 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 ```
 1. docker        → Anforderungen klären, Dockerfile + Compose erstellen
 2. tester        → Test-Stack validieren
+```
+
+### Workflow H: Neue Idee / Vision erkunden
+```
+1. ideation      → Idee explorieren, Fragen stellen, Scope schärfen
+2. ideation      → Übergabe an requirements (wenn Idee reif)
+3. requirements  → Anforderungen formal aufnehmen, REQ-IDs vergeben
 ```
 
 ---
@@ -360,7 +368,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, documenter, meta-feedback)
+(analog für tester, validator, requirements, ideation, documenter, meta-feedback)
 
 CLAUDE.md ← diese Datei
     └── referenziert: agents/**, howto/**, alle unterstützten Projekte

@@ -44,6 +44,7 @@ korrekt abläuft.
 
 | Agent | Zuständigkeit | Wann delegieren? |
 |-------|--------------|-----------------|
+| `ideation` | Ideen erkunden, Visionen schärfen, Fragen stellen, Übergabe an Requirements | Neue Projektideen, Feature-Visionen, unscharfe Anforderungen in früher Phase |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen, Traceability | Neue Features, Anforderungs-Analyse, Impact-Analyse |
 | `developer` | Code implementieren nach REQ-IDs, Code-Konventionen einhalten | Feature-Implementierung, Bugfixes, Refactoring |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen, Testabdeckung sichern | Tests schreiben, Test-Coverage prüfen, Docker-Testsystem |
@@ -194,7 +195,27 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 ---
 
-### Workflow I: Feedback an agent-meta geben
+### Workflow I: Neue Idee / Vision erkunden
+
+Wenn der Nutzer eine unklare Idee, Vision oder "wäre cool wenn..."-Aussage einbringt,
+oder ein neues Projekt / Feature noch nicht konkret genug für Requirements ist:
+
+```
+1. ideation → Idee explorieren, Fragen stellen, Scope schärfen
+2. ideation → Übergabe an requirements (wenn Idee reif genug)
+3. requirements → Anforderungen formal aufnehmen, REQ-IDs vergeben
+```
+
+**Erkennungsmerkmale für diesen Workflow:**
+- "Ich habe eine Idee für..."
+- "Wäre es nicht cool wenn..."
+- "Ich stelle mir vor, dass..."
+- "Für ein neues Projekt..."
+- Idee klingt interessant, aber Scope / Ziel noch unklar
+
+---
+
+### Workflow K: Feedback an agent-meta geben
 
 Wenn der Nutzer Feedback zum agent-meta-Framework hat, oder am **Ende einer Session**:
 

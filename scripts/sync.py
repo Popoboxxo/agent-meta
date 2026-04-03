@@ -48,6 +48,7 @@ ROLE_MAP = {
     "tester":        "tester",
     "validator":     "validator",
     "requirements":  "requirements",
+    "ideation":      "ideation",
     "documenter":    "documenter",
     "release":       "release",
     "docker":        "docker",

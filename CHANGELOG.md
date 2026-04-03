@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.1] — 2026-04-03
+
+### Added
+
+- **Neuer Agent `ideation`** (`1-generic/ideation.md`) — Begleitet die frühe, unscharfe Phase bei neuen Projekten und Features: Ideen erkunden, Fragen stellen, Scope schärfen, externe Impulse geben, strukturierte Übergabe an den Requirements-Agenten
+- **Workflow I** im Orchestrator — "Neue Idee / Vision erkunden" mit Ideation → Requirements-Kette
+- **Workflow H** in CLAUDE.md — dokumentiert den neuen Ideation-Workflow
+
+### Changed
+
+- `orchestrator.md` — `ideation` in Agenten-Tabelle + Workflow I; bisheriger Workflow I (meta-feedback) → Workflow K
+- CLAUDE.md — `ideation` in Agenten-Rollen-Tabellen, Namenstabelle und Abhängigkeits-Karte
+- `sync.py` ROLE_MAP — `ideation` ergänzt
+
+---
+
 ## [0.10.0] — 2026-04-03
 
 ### Added
