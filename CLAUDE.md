@@ -86,6 +86,11 @@ agent-meta/
     sync-concept.md
     template-gap-analysis.md
 
+  snippets/
+    tester/
+      bun-typescript.md  ← Sprachspezifische Test-Snippets für TypeScript/Bun
+      pytest-python.md   ← Sprachspezifische Test-Snippets für Python/pytest
+
   scripts/
     sync.py              ← Agent-Generator
 ```
@@ -201,6 +206,7 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{CODE_QUALITY_RULES}}` | validator | Linting-Regeln, Quality-Gates |
 | `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
 | `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
+| `{{TESTER_SNIPPETS_PATH}}` | tester | Pfad zur Snippet-Datei (relativ zu `snippets/`) |
 | `{{BUILD_COMMANDS}}` | release | Build-Schritte |
 
 ### Infrastruktur-Variablen — generisch (Docker, Ports)
@@ -231,6 +237,56 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{GH_ASSETS}}` | Pfade der GitHub-Release-Assets | Leerzeichen-getrennt |
 | `{{BUILD_SYSTEM_NOTES}}` | Hinweise zum Build-System | Text |
 | `{{VERSION_DIST_BEHAVIOUR}}` | Wie landet die Version im Dist? | Text |
+
+---
+
+## Snippets
+
+Sprachspezifische Code-Beispiele, die Agenten zur Laufzeit lesen — sprachunabhängige Templates
+können so plattformspezifische Syntax einbinden, ohne sie im Agent-Template hart zu kodieren.
+
+### Konzept
+
+```
+agent-meta/snippets/<rolle>/<sprache-runtime>.md   ← versionierte Quelldateien
+    ↓  sync.py COPY
+.claude/snippets/<rolle>/<sprache-runtime>.md       ← im Zielprojekt (generiert)
+    ↓  Read-Tool zur Laufzeit
+Agent nutzt sprachspezifische Syntax
+```
+
+### Frontmatter
+
+Jede Snippet-Datei enthält YAML-Frontmatter:
+
+```yaml
+---
+snippet: <rolle>-syntax          # Eindeutiger Bezeichner
+version: "1.0.0"                 # Semver — erhöhen bei inhaltlichen Änderungen
+language: "TypeScript"           # Programmiersprache
+runtime: "Bun"                   # Runtime / Test-Framework
+---
+```
+
+### Verfügbare Snippets
+
+| Datei | Rolle | Sprache / Runtime | Version |
+|-------|-------|-------------------|---------|
+| `snippets/tester/bun-typescript.md` | tester | TypeScript / Bun | 1.0.0 |
+| `snippets/tester/pytest-python.md` | tester | Python / pytest | 1.0.0 |
+
+### Snippet hinzufügen
+
+1. Neue Datei in `snippets/<rolle>/` anlegen (mit Frontmatter)
+2. Variable `<ROLLE>_SNIPPETS_PATH` in `agent-meta.config.json` des Projekts setzen
+3. `sync.py` kopiert die Datei automatisch nach `.claude/snippets/`
+4. Agent-Template enthält Read-Instruktion: `Lies .claude/snippets/{{<ROLLE>_SNIPPETS_PATH}}`
+
+### Versionierung
+
+- Snippet-Version ist unabhängig von Agent- und Repo-Version
+- `sync.py` loggt die Version beim COPY: `snippets/tester/bun-typescript.md@1.0.0`
+- Bei inhaltlichen Änderungen: Patch oder Minor erhöhen
 
 ---
 

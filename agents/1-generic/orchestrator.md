@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.3.0"
+version: "1.4.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -124,7 +124,7 @@ oder ähnliches sagt:
 
 **H1 — Nur Agenten-Dateien neu generieren (gleiche Version):**
 ```
-1. Führe aus: py .agent-meta/scripts/sync.py --config agent-meta.config.json
+1. Führe aus: python .agent-meta/scripts/sync.py --config agent-meta.config.json
 2. Prüfe sync.log auf Warnungen
 3. Committe: git add .claude/agents/ && git commit -m "chore: regenerate agents"
 ```
@@ -146,20 +146,20 @@ oder ähnliches sagt:
    "agent-meta-version": "<neue-version>"
 
 5. Dry-Run — was ändert sich?
-   py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+   python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
    → sync.log prüfen: neue Warnungen = fehlende Variablen
 
 6. Fehlende Variablen in agent-meta.config.json ergänzen
    (Referenz: cat .agent-meta/agent-meta.config.example.json)
 
 7. Generische + Plattform-Agenten neu generieren:
-   py .agent-meta/scripts/sync.py --config agent-meta.config.json
+   python .agent-meta/scripts/sync.py --config agent-meta.config.json
    → sync.log prüfen
    → Welche Plattform-Agenten aktiv sind steht in config "platforms": [...]
    → sync.py wählt automatisch den richtigen 2-platform Layer
 
 8. Extensions aktualisieren (managed block):
-   py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+   python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 
 9. Committe:
    git add .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.json
@@ -174,7 +174,7 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H3 — Neue Extension erstellen:**
 ```
-1. py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <rolle>
+1. python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <rolle>
    (oder --create-ext all für alle Rollen)
 2. Öffne .claude/3-project/{{PREFIX}}-<rolle>-ext.md
 3. Ergänze projektspezifisches Wissen im Projektbereich (unterhalb des managed blocks)
@@ -182,7 +182,7 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H4 — Extension managed block aktualisieren** (nach config-Änderung):
 ```
-1. py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+1. python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 2. Prüfe sync.log
 ```
 

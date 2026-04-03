@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.3.0"
+version: "1.4.0"
 description: "Generisches Template für den Tester-Agenten. Schreibt Unit-/Integration-/E2E-Tests nach TDD-Workflow, führt Tests aus und stellt Testabdeckung pro REQ-ID sicher."
 tools:
   - Bash
@@ -47,12 +47,13 @@ Strikte Reihenfolge:
 
 Jeder Test MUSS seine REQ-ID im Namen tragen:
 
-```typescript
-describe("ModuleName", () => {
-  it("[REQ-004] should add a video to the queue", () => { ... });
-  it("[REQ-007] should remove a video by position", () => { ... });
-});
 ```
+describe / class / suite: ModuleName
+  test "[REQ-004] should add a video to the queue"
+  test "[REQ-007] should remove a video by position"
+```
+
+Sprachspezifische Syntax → siehe `{{TESTER_SNIPPETS_PATH}}`
 
 ### 3. Test-Dateien & Verzeichnisse
 
@@ -93,20 +94,19 @@ Auf Anfrage: Erstelle eine Coverage-Matrix:
 
 ## Test-Patterns & Best Practices
 
-### Test-Syntax (Bun)
+### Test-Syntax
 
-```typescript
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-
-describe("ModuleName", () => {
-  it("[REQ-xxx] should do something specific", () => {
-    // Arrange
-    // Act
-    // Assert
-    expect(result).toBe(expected);
-  });
-});
 ```
+// Arrange
+input = <realistischer Wert>
+// Act
+result = functionUnderTest(input)
+// Assert
+assert result == expectedValue
+```
+
+Lies jetzt `.claude/snippets/{{TESTER_SNIPPETS_PATH}}` mit dem Read-Tool für
+sprachspezifische Syntax, Import-Statements und Framework-Patterns.
 
 ### Test-Isolation
 
@@ -130,45 +130,37 @@ Tests müssen die Funktion wirklich validieren — nicht nur existieren.
 
 Jede Assertion muss das **tatsächliche Verhalten** prüfen:
 
-```typescript
+```
 // ❌ FALSCH — prüft nichts Sinnvolles
-it("[REQ-004] should add video", () => {
-  expect(true).toBe(true);
-});
+test "[REQ-004]": assert true
 
 // ❌ FALSCH — prüft nur dass kein Fehler geworfen wird
-it("[REQ-004] should add video", () => {
-  addVideo(item);
-  expect(1).toBe(1);
-});
+test "[REQ-004]": callFunction(); assert 1 == 1
 
 // ✅ RICHTIG — prüft das tatsächliche Ergebnis
-it("[REQ-004] should add a video to the queue", () => {
-  addVideo(item);
-  expect(queue.length).toBe(1);
-  expect(queue[0].id).toBe(item.id);
-});
+test "[REQ-004] should add a video to the queue":
+  addVideo(item)
+  assert queue.length == 1
+  assert queue[0].id == item.id
 ```
+
+Sprachspezifische Beispiele → `.claude/snippets/{{TESTER_SNIPPETS_PATH}}`
 
 ### Realitätsnahe Testdaten (PFLICHT)
 
 Dummy-Daten **müssen die Realität abbilden** — kein `"foo"`, `"test"`, `123` oder `"abc"`:
 
-```typescript
-// ❌ FALSCH — bedeutungslose Dummy-Daten
-const video = { id: "abc", title: "test", url: "foo" };
+```
+// ❌ FALSCH
+item = { id: "abc", name: "test", url: "foo" }
 
-// ✅ RICHTIG — realistische Daten die dem echten Use-Case entsprechen
-const video = {
-  id: "yt-dQw4w9WgXcQ",
-  title: "Rick Astley - Never Gonna Give You Up",
-  url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  duration: 213,
-};
+// ✅ RICHTIG — Wert wie er im echten Produktiv-Request aussähe
+item = { id: "yt-dQw4w9WgXcQ", name: "Rick Astley - Never Gonna Give You Up",
+         url: "https://...", duration: 213 }
 ```
 
 Frage dich: *Würde dieser Wert in einem echten Produktiv-Request so aussehen?*
-Wenn nein → Daten anpassen.
+Wenn nein → Daten anpassen. Sprachspezifische Beispiele → `.claude/snippets/{{TESTER_SNIPPETS_PATH}}`
 
 ### Kein Test um des Tests willen
 

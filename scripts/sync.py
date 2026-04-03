@@ -37,8 +37,10 @@ AGENTS_DIR = "agents"
 GENERIC_DIR = "1-generic"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
+SNIPPETS_DIR = "snippets"
 CLAUDE_AGENTS_DIR = ".claude/agents"
 CLAUDE_EXT_DIR = ".claude/3-project"
+CLAUDE_SNIPPETS_DIR = ".claude/snippets"
 LOGFILE = "sync.log"
 
 # Maps role name to the output filename in .claude/agents/ (no prefix)
@@ -385,6 +387,56 @@ def sync_agents(
             target_path.write_text(content, encoding="utf-8")
 
 
+def sync_snippets(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy snippet files from agent-meta/snippets/ to .claude/snippets/ in the project.
+
+    Only copies snippets referenced via TESTER_SNIPPETS_PATH (or similar *_SNIPPETS_PATH
+    variables) in the project config. Unknown snippet files are skipped.
+    All referenced paths are resolved relative to agent-meta/snippets/.
+    """
+    variables = config.get("variables", {})
+    snippets_root = agent_meta_root / SNIPPETS_DIR
+    target_root = project_root / CLAUDE_SNIPPETS_DIR
+
+    if not snippets_root.exists():
+        return
+
+    # Collect all *_SNIPPETS_PATH values from config variables
+    snippet_paths: list[str] = [
+        v for k, v in variables.items()
+        if k.endswith("_SNIPPETS_PATH") and v
+    ]
+
+    if not snippet_paths:
+        return
+
+    for rel_path in snippet_paths:
+        source_path = snippets_root / rel_path
+        if not source_path.exists():
+            log.warn(f"Snippet nicht gefunden: snippets/{rel_path}")
+            continue
+
+        target_path = target_root / rel_path
+        source_content = source_path.read_text(encoding="utf-8")
+        snippet_version = extract_frontmatter_field(source_content, "version")
+        version_label = f"@{snippet_version}" if snippet_version else ""
+
+        log.action(
+            "COPY",
+            str(target_path.relative_to(project_root)),
+            f"snippets/{rel_path}{version_label}",
+        )
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(source_content, encoding="utf-8")
+
+
 def create_extension(
     project_root: Path,
     config: dict,
@@ -548,6 +600,7 @@ def main():
         if args.init:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)
