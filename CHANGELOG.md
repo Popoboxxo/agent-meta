@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.3] — 2026-04-03
+
+### Added
+
+- Release process documented in `CLAUDE.md`: Semantic Versioning rules,
+  step-by-step workflow, rule that README must reflect the new version
+  before the tag commit
+
+### Changed
+
+- README version badge and Quick Start example now always reflect current
+  version before tagging
+
+---
+
 ## [0.9.1] — 2026-04-03
 
 ### Added
