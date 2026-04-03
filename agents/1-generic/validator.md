@@ -1,5 +1,6 @@
 ---
 name: template-validator
+version: "1.0.0"
 description: "Generisches Template für den Validator-Agenten. Prüft entwickelte Inhalte gegen Anforderungen, validiert Traceability, Definition of Done und Codequalität."
 tools:
   - Bash

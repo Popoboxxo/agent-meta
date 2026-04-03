@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.10.0] — 2026-04-03
+
+### Added
+
+- **Agent-Versionierung** — Jede Template-Datei trägt jetzt `version:` im Frontmatter
+- `based-on:` in 2-platform Agenten — dokumentiert die Generic-Basis mit Version (z.B. `1-generic/docker.md@1.0.0`)
+- `generated-from:` — wird von `sync.py` automatisch bei jedem Sync in generierte Agenten geschrieben
+- `extract_frontmatter_field()` in `sync.py` — liest beliebige YAML-Felder aus Templates
+- [howto/agent-versioning.md](howto/agent-versioning.md) — vollständige Dokumentation des Versioning-Konzepts
+
+### Changed
+
+- `build_frontmatter()` in `sync.py` — schreibt `generated-from:` ins generierte Frontmatter; `version` und `based-on` bleiben unverändert erhalten
+- `sync_agents()` in `sync.py` — liest `version` aus Quell-Template und befüllt `generated-from` automatisch
+- CLAUDE.md — neuer Abschnitt "Agent-Versionierung", Abhängigkeits-Tabelle um Versionshinweise erweitert
+- Alle 1-generic Agenten starten mit `version: "1.0.0"`
+- Alle 2-platform Agenten starten mit `version: "1.0.0"` und `based-on:`
+
+### Fixed
+
+- `update_extensions()` in `sync.py` — pre-existierender `updated += 1` Bug (nicht initialisierte Variable) entfernt
+
+---
+
 ## [0.9.5] — 2026-04-03
 
 ### Breaking Changes

@@ -1,5 +1,6 @@
 ---
 name: template-meta-feedback
+version: "1.0.0"
 description: "Generisches Template für den Meta-Feedback-Agenten. Sammelt Verbesserungsvorschläge für das agent-meta-Framework aus laufenden Projektsessions und erstellt GitHub Issues im agent-meta-Repository."
 tools:
   - Bash

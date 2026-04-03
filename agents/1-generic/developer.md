@@ -1,5 +1,6 @@
 ---
 name: template-developer
+version: "1.0.0"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 tools:
   - Bash

@@ -1,5 +1,6 @@
 ---
 name: template-release
+version: "1.0.0"
 description: "Generisches Template für den Release-Agenten. Verwaltet Versioning, Changelogs, Build-Prozesse und GitHub-Releases."
 tools:
   - Bash

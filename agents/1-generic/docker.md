@@ -1,5 +1,6 @@
 ---
 name: template-docker
+version: "1.0.0"
 description: "Vollständig generisches Template für den Docker-Agenten. Plattformunabhängige Patterns: Compose-Stacks, Binary-Management, Test-Umgebungen, Diagnose. Für plattformspezifische Erweiterungen siehe sharkord-docker.md."
 tools:
   - Bash

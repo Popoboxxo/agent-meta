@@ -1,5 +1,6 @@
 ---
 name: template-requirements
+version: "1.0.0"
 description: "Generisches Template für den Requirements-Engineer-Agenten. Nimmt Anforderungen auf, analysiert sie, vergibt REQ-IDs, pflegt REQUIREMENTS.md und prüft Traceability."
 tools:
   - Read

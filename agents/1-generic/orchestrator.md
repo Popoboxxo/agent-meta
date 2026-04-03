@@ -1,5 +1,6 @@
 ---
 name: template-orchestrator
+version: "1.0.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash

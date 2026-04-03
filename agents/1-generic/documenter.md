@@ -1,5 +1,6 @@
 ---
 name: template-documenter
+version: "1.0.0"
 description: "Generisches Template für den Dokumentations-Agenten. Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 tools:
   - Read

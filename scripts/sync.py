@@ -212,8 +212,22 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
     return re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
 
 
-def build_frontmatter(content: str, name: str, description: str) -> str:
-    """Replace name and description in YAML frontmatter."""
+def extract_frontmatter_field(content: str, field: str) -> str | None:
+    """Extract a single-line YAML frontmatter field value (unquoted or quoted)."""
+    match = re.search(
+        rf'^{re.escape(field)}:\s*"?([^"\n]+)"?\s*$',
+        content, flags=re.MULTILINE,
+    )
+    return match.group(1).strip() if match else None
+
+
+def build_frontmatter(content: str, name: str, description: str,
+                      generated_from: str | None = None) -> str:
+    """Replace name and description in YAML frontmatter.
+
+    Preserves existing version/based-on fields.
+    Inserts/updates generated-from when generated_from is provided.
+    """
     content = re.sub(
         r"(^---\n.*?^name:\s*)(.+?)(\n)",
         lambda m: f"{m.group(1)}{name}{m.group(3)}",
@@ -224,6 +238,20 @@ def build_frontmatter(content: str, name: str, description: str) -> str:
         lambda m: f'{m.group(1)}{description}{m.group(3)}',
         content, count=1, flags=re.MULTILINE,
     )
+    if generated_from is not None:
+        # Update existing generated-from field, or insert after description line
+        if re.search(r"^generated-from:", content, flags=re.MULTILINE):
+            content = re.sub(
+                r'^generated-from:.*$',
+                f'generated-from: "{generated_from}"',
+                content, count=1, flags=re.MULTILINE,
+            )
+        else:
+            content = re.sub(
+                r'(^description:.*\n)',
+                rf'\1generated-from: "{generated_from}"\n',
+                content, count=1, flags=re.MULTILINE,
+            )
     return content
 
 
@@ -341,9 +369,14 @@ def sync_agents(
         target_path = target_dir / filename
         content = source_path.read_text(encoding="utf-8")
         rel_source = str(source_path.relative_to(agent_meta_root))
+        source_version = extract_frontmatter_field(content, "version")
         content = substitute(content, variables, rel_source, log)
         name = Path(filename).stem
-        content = build_frontmatter(content, name, f"Agent für {project_name}.")
+        layer = source_path.parts[-2]  # "1-generic" or "2-platform"
+        source_label = f"{layer}/{source_path.name}"
+        generated_from = f"{source_label}@{source_version}" if source_version else source_label
+        content = build_frontmatter(content, name, f"Agent für {project_name}.",
+                                    generated_from=generated_from)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)
@@ -404,7 +437,6 @@ def update_extensions(
             log.action("UPDATE", str(ext_file.relative_to(project_root)), "managed block")
             if not dry_run:
                 ext_file.write_text(new_content, encoding="utf-8")
-            updated += 1
 
 
 def init_claude_md(

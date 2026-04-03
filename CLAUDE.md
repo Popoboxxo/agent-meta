@@ -373,8 +373,8 @@ CLAUDE.md ← diese Datei
 | `1-generic/docker.md` | `2-platform/sharkord-docker.md` |
 | `1-generic/release.md` | `2-platform/sharkord-release.md` |
 | `1-generic/orchestrator.md` | Workflows-Abschnitt in dieser `CLAUDE.md` |
-| beliebigen `1-generic/` Agenten | Projekte neu syncen |
-| `2-platform/sharkord-*.md` | Projekte neu syncen |
+| beliebigen `1-generic/` Agenten | Version in Template erhöhen + Projekte neu syncen |
+| `2-platform/sharkord-*.md` | Version in Template erhöhen + `based-on` aktuell halten + Projekte neu syncen |
 | `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
 
@@ -391,6 +391,38 @@ CLAUDE.md ← diese Datei
 
 **Neue Agenten-Rolle hinzufügen:**
 → `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
+
+---
+
+## Agent-Versionierung
+
+Jeder Agent-Template-Datei trägt eine eigene `version:` im Frontmatter.
+Plattform-Agenten dokumentieren zusätzlich ihre Generic-Basis via `based-on:`.
+Generierte Dateien erhalten automatisch `generated-from:` (gesetzt von `sync.py`).
+
+### Frontmatter-Übersicht
+
+| Feld | 1-generic | 2-platform | generiert in `.claude/agents/` |
+|------|-----------|------------|-------------------------------|
+| `version` | ✅ manuell pflegen | ✅ manuell pflegen | erhalten aus Template |
+| `based-on` | — | ✅ `<generic>@<version>` | erhalten aus Template |
+| `generated-from` | — | — | ✅ automatisch von sync.py |
+
+### Wann Version erhöhen?
+
+| Änderungstyp | Version |
+|---|---|
+| Umbenannte Variable, geändertes Verhalten, neue Pflichtsektion | **Major** (`X.0.0`) |
+| Neue optionale Sektion, erweiterter Scope | **Minor** (`x.Y.0`) |
+| Textverbesserung, Klarstellung | **Patch** (`x.y.Z`) |
+
+Agenten-Versionen sind **unabhängig** von der Repository-Version in `VERSION`.
+Nur geänderte Agenten bekommen eine neue Versionsnummer.
+
+Wenn eine `1-generic`-Datei versioniert wird und ein `2-platform`-Agent darauf basiert:
+→ `based-on` im Plattform-Agenten auf neue Generic-Version aktualisieren.
+
+Siehe [howto/agent-versioning.md](howto/agent-versioning.md) für Details.
 
 ---
 

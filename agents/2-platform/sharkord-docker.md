@@ -1,5 +1,7 @@
 ---
 name: sharkord-docker
+version: "1.0.0"
+based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Baut auf template-docker auf und ergänzt Sharkord-Plattformwissen: Plugin-Mount-Pfade, Access-Token-Handling, Mediasoup-Ports, SYS_NICE, Image-Konventionen und Port-Register. Wird als Basis für konkrete Plugin-Instanzen verwendet."
 tools:
   - Bash
