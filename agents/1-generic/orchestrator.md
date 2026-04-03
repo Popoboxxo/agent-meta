@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.4.0"
+version: "1.5.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -49,6 +49,7 @@ korrekt abläuft.
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit | Nach Implementierung, vor Commit, Qualitäts-Checks |
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | Nach Code-Änderungen, Erkenntnisse speichern, Doku-Zyklus |
 | `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen | Testsystem starten/stoppen, neue Docker-Configs, Binary-Setup |
+| `git` | Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages | Alle Git-Operationen nach Implementierung/Release/Upgrade |
 
 ---
 
@@ -63,6 +64,7 @@ korrekt abläuft.
 4. tester        → Tests ausführen, Regressions prüfen
 5. validator     → Code gegen REQ validieren, DoD-Check
 6. documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
+7. git           → Commit + Push
 ```
 
 ### Workflow B: Bugfix
@@ -74,6 +76,7 @@ korrekt abläuft.
 4. tester        → Tests ausführen
 5. validator     → Quick-Check
 6. documenter    → Ggf. Doku updaten
+7. git           → Commit + Push
 ```
 
 ### Workflow C: Validierung / Audit
@@ -98,6 +101,7 @@ korrekt abläuft.
 3. tester        → Alle betroffenen Tests ausführen
 4. validator     → Sicherstellen, dass kein Verhalten sich ändert
 5. documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
+6. git           → Commit + Push
 ```
 
 ### Workflow F: Testsystem starten
@@ -126,7 +130,7 @@ oder ähnliches sagt:
 ```
 1. Führe aus: python .agent-meta/scripts/sync.py --config agent-meta.config.json
 2. Prüfe sync.log auf Warnungen
-3. Committe: git add .claude/agents/ && git commit -m "chore: regenerate agents"
+3. git → Commit: "chore: regenerate agents"
 ```
 
 **H2 — Auf neue agent-meta Version upgraden:**
@@ -161,9 +165,9 @@ oder ähnliches sagt:
 8. Extensions aktualisieren (managed block):
    python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 
-9. Committe:
-   git add .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.json
-   git commit -m "chore: upgrade agent-meta to v<neue-version>"
+9. git → Commit + Push:
+   Dateien: .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.json
+   Message: "chore: upgrade agent-meta to v<neue-version>"
 ```
 
 **Hintergrund — Plattform-Layer:**
@@ -237,19 +241,6 @@ Folgende Aufgaben führst du als Orchestrator SELBST aus (nicht delegieren):
 <!-- PROJEKTSPEZIFISCH: Build- und Docker-Kommandos eintragen -->
 {{DEV_COMMANDS}}
 
-### Commit-Konventionen
-
-Format: `<type>(REQ-xxx): <beschreibung>`
-
-| Type | Verwendung | REQ-ID Pflicht? |
-|------|----------|----------------|
-| `feat` | Neues Feature | Ja |
-| `fix` | Bugfix | Ja |
-| `test` | Tests hinzufügen/ändern | Ja |
-| `refactor` | Refactoring ohne Verhaltensänderung | Ja |
-| `chore` | Build, Dependencies, Config | Ja |
-| `docs` | Dokumentation | **Nein** |
-
 ---
 
 ## Definition of Done (DoD) — Enforced by Orchestrator
@@ -263,7 +254,7 @@ Eine Aufgabe ist erst abgeschlossen, wenn:
 - [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md)
 - [ ] **CODEBASE_OVERVIEW.md** aktualisiert
 - [ ] **REQUIREMENTS.md** konsistent
-- [ ] **Commit-Message** im korrekten Format
+- [ ] **Commit** via `git`-Agent mit korrektem Format durchgeführt
 
 ### Enforcement
 

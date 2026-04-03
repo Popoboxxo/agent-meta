@@ -73,6 +73,7 @@ agent-meta/
       documenter.md
       release.md
       docker.md
+      git.md
 
     2-platform/         ← plattformspezifisch (überschreibt 1-generic)
       sharkord-docker.md
@@ -130,6 +131,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | Release | `release.md` | 1-generic oder 2-platform |
 | Docker | `docker.md` | 1-generic oder 2-platform |
 | Meta-Feedback | `meta-feedback.md` | 1-generic |
+| Git | `git.md` | 1-generic |
 
 ### Update-Verhalten bei sync
 
@@ -214,6 +216,9 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{INTERNAL_DOCS_LANGUAGE}}` | alle | Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions |
 | `{{CODE_LANGUAGE}}` | alle | Sprache für code-nahe Artefakte: Kommentare, Commit-Messages, Test-Beschreibungen |
 | `{{AGENT_META_REPO}}` | meta-feedback | GitHub-Repo für Issues (z.B. `owner/agent-meta`) |
+| `{{GIT_PLATFORM}}` | git | Plattform: `GitHub`, `GitLab` oder `Gitea` |
+| `{{GIT_REMOTE_URL}}` | git | Remote-URL des Repositories |
+| `{{GIT_MAIN_BRANCH}}` | git | Haupt-Branch (z.B. `main` oder `master`) |
 | `{{CODE_CONVENTIONS}}` | developer | Sprachspezifische Regeln |
 | `{{ARCHITECTURE}}` | developer | Verzeichnisstruktur, Entry-Points |
 | `{{DEV_COMMANDS}}` | developer, orchestrator | Build/Run-Kommandos |
@@ -402,6 +407,7 @@ python .agent-meta/scripts/sync.py --config agent-meta.config.json
 | `requirements` | `1-generic/requirements.md` | — | REQ-Aufnahme, REQUIREMENTS.md |
 | `documenter` | `1-generic/documenter.md` | — | Doku-Pflege, Erkenntnisse |
 | `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
+| `git` | `1-generic/git.md` | — | Commits, Branches, Merges, Tags, Push/Pull |
 | `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, GitHub Release |
 | `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Binaries |
 
@@ -419,6 +425,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 4. tester        → Tests ausführen, Regressions prüfen
 5. validator     → Code gegen REQ validieren, DoD-Check
 6. documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
+7. git           → Commit + Push
 ```
 
 ### Workflow B: Bugfix
@@ -429,6 +436,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 4. tester        → Tests ausführen
 5. validator     → Quick-Check
 6. documenter    → Ggf. Doku updaten
+7. git           → Commit + Push
 ```
 
 ### Workflow C: Validierung / Audit
@@ -450,6 +458,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 3. tester        → Alle betroffenen Tests ausführen
 4. validator     → Sicherstellen, dass kein Verhalten sich ändert
 5. documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
+6. git           → Commit + Push
 ```
 
 ### Workflow F: Testsystem starten

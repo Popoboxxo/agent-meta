@@ -1,7 +1,7 @@
 ---
 name: sharkord-release
-version: "1.2.0"
-based-on: "1-generic/release.md@1.0.0"
+version: "1.3.0"
+based-on: "1-generic/release.md@1.3.0"
 description: "Sharkord-Plattform Release-Agent. Baut auf template-release auf. Konsolidiert alle Erfahrungen aus sharkord-vid-with-friends und sharkord-hero-introducer: Versionierung, Bun-Build, Artifact-Packaging, GitHub Release via gh CLI, Required Binaries, Windows PATH-Fix."
 tools:
   - Bash
@@ -143,13 +143,13 @@ N. Sharkord neustarten
 
 ### 6. Commit + Tag + Push
 
-```bash
-git add package.json README.md
-git commit -m "chore: prepare vX.Y.Z release"
+Delegation an `git`-Agenten:
 
-git push origin main
-git tag -a vX.Y.Z -m "vX.Y.Z — [Release-Titel]"
-git push origin vX.Y.Z
+```
+Dateien:  package.json README.md
+Commit:   "chore: prepare vX.Y.Z release"
+Tag:      vX.Y.Z (annotated) — "vX.Y.Z — [Release-Titel]"
+Push:     origin main + origin vX.Y.Z
 ```
 
 ### 7. GitHub Release erstellen
@@ -228,7 +228,7 @@ cat dist/{{PLUGIN_DIR_NAME}}/package.json | grep version
 - [ ] `dist/{{PLUGIN_DIR_NAME}}/package.json` enthält neue Versionsnummer — prüfen!
 - [ ] ZIP + tar.gz erstellt, Dateiname exakt `{{PLUGIN_DIR_NAME}}.zip/.tar.gz`
 - [ ] Release Notes in `dist/RELEASE_NOTES.md` geschrieben
-- [ ] `git commit` + `git push` + `git tag` + `git push origin vX.Y.Z`
+- [ ] git-Agent: Commit + Tag + Push (main + vX.Y.Z)
 - [ ] `gh release create` ausgeführt
 - [ ] Release-URL im Browser geprüft
 

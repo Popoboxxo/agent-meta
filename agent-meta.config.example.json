@@ -37,6 +37,11 @@
     "_comment_meta_repo": "GitHub-Repo für Meta-Feedback Issues (owner/repo)",
     "AGENT_META_REPO":     "Popoboxxo/agent-meta",
 
+    "_comment_git": "Git-Plattform und Repository-Konfiguration",
+    "GIT_PLATFORM":    "GitHub",
+    "GIT_REMOTE_URL":  "https://github.com/owner/repo",
+    "GIT_MAIN_BRANCH": "main",
+
     "_comment_deps": "Kern-Abhängigkeiten mit konkreter Version — eine pro Zeile als Markdown-Liste",
     "SYSTEM_DEPENDENCIES": "- @sharkord/plugin-sdk: `0.0.16`\n- bun: `>=1.0.0`",
 

@@ -63,6 +63,7 @@ ROLE_MAP = {
     "release":       "release",
     "docker":        "docker",
     "meta-feedback": "meta-feedback",
+    "git":           "git",
 }
 
 EXT_SUFFIX = "-ext"

@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.2.0"
+version: "1.3.0"
 description: "Generisches Template für den Release-Agenten. Verwaltet Versioning, Changelogs, Build-Prozesse und GitHub-Releases."
 tools:
   - Bash
@@ -51,8 +51,8 @@ Format: `MAJOR.MINOR.PATCH[-PRERELEASE]`
 2. DoD erfüllt?              → Validator-Check
 3. CHANGELOG.md aktualisiert?
 4. Version in package.json gebumpt?
-5. Git-Tag erstellt?         → git tag v<version>
-6. Build erstellt?           → bun run build (oder projektspezifisch)
+5. Build erstellt?           → bun run build (oder projektspezifisch)
+6. git → Commit + Tag + Push (Delegation an git-Agenten)
 7. GitHub Release erstellt?
 8. Plugin-Bundle deployt?
 ```
@@ -88,7 +88,7 @@ Vor jedem Release:
 - [ ] README.md aktuell
 - [ ] CHANGELOG.md mit allen Änderungen
 - [ ] Version in `package.json` korrekt
-- [ ] Git-Tag gesetzt
+- [ ] git-Agent: Commit + Tag + Push durchgeführt
 
 ---
 
@@ -130,6 +130,7 @@ Vor jedem Release:
 - Tests fehlen/brechen? → `tester`
 - DoD nicht erfüllt? → `validator`
 - Dokumentation veraltet? → `documenter`
+- Commit, Tag, Push? → `git`
 
 ## Sprache
 
