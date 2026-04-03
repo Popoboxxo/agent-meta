@@ -15,6 +15,26 @@
   "skills": {
     "_comment": "Skill-Name → Konfiguration. enabled:true/false steuert ob Wrapper-Agent generiert wird.",
 
+    "home-organization": {
+      "enabled": true,
+      "submodule": "neat-little-package",
+      "source": "plugins/spirograph/skills/home-organization",
+      "entry": "SKILL.md",
+      "role": "home-organization-specialist",
+      "name": "Home Organization Specialist",
+      "description": "Spezialist für 3D-gedruckte Heimorganisationssysteme (Gridfinity, OpenGrid, NeoGrid, French Cleat, Underware, Deskware) — Auswahl, Kombination und Konfiguration.",
+      "additional_files": [
+        "cross-system-compatibility.md",
+        "deskware-reference.md",
+        "french-cleat-reference.md",
+        "frenchfinity-reference.md",
+        "gridfinity-reference.md",
+        "neogrid-reference.md",
+        "opengrid-reference.md",
+        "underware-reference.md"
+      ]
+    },
+
     "opengrid-openscad": {
       "enabled": true,
       "submodule": "neat-little-package",
