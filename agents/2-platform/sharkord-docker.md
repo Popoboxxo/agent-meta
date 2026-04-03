@@ -38,10 +38,13 @@ die Sharkord-Plattform-Besonderheiten.
 ### Image-Konvention
 
 ```yaml
-image: sharkord/sharkord:{{SHARKORD_VERSION}}  # z.B. v0.0.16
+image: sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}  # z.B. v0.0.16
 ```
 
-Die Sharkord-Version **muss** mit `peerDependencies` in `package.json` übereinstimmen.
+Der Image-Tag **muss** mit `peerDependencies` in `package.json` übereinstimmen.
+Aktuell verwendete Version und weitere Kern-Abhängigkeiten:
+
+{{SYSTEM_DEPENDENCIES}}
 
 ### Plugin-Mount-Pfad (KRITISCH)
 
@@ -92,7 +95,9 @@ Ports müssen projektweit eindeutig sein, wenn mehrere Plugins gleichzeitig lauf
 | sharkord-hero-introducer | 4991 | 40000/tcp | 40000/udp |
 | _(neues Projekt)_ | **freien Port wählen** | **freien Port wählen** | **freien Port wählen** |
 
-**Dieser Agent** verwendet Port `{{WEB_PORT}}` (Web) und `{{MEDIASOUP_PORT}}` (Mediasoup).
+**Dieser Agent** verwendet folgende Ports:
+
+{{EXTRA_PORTS}}
 
 ---
 
@@ -136,8 +141,8 @@ Bei jedem Neuaufsatz (besonders nach `down --volumes`) IMMER ausgeben:
 🔐 INITIAL ACCESS TOKEN (FRESH START):
    <UUID aus Docker Logs extrahieren — s. Befehl unten>
 
-🌐 Sharkord-URL:
-   {{SHARKORD_URL}}
+🌐 System-URLs:
+{{SYSTEM_URLS}}
 
 📋 Wichtige Hinweise:
    ⚠️ Bei 'docker compose down --volumes' → NEUEN Token extrahieren!
@@ -205,7 +210,7 @@ Wenn nur `ffmpeg` via apt ausreicht:
 
 ```dockerfile
 # Dockerfile.dev
-FROM sharkord/sharkord:{{SHARKORD_VERSION}}
+FROM sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
@@ -229,13 +234,12 @@ USER bun
 
 services:
   sharkord:
-    image: sharkord/sharkord:{{SHARKORD_VERSION}}
+    image: sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}
     # ODER: build: { context: ., dockerfile: Dockerfile.dev }  ← wenn Binaries via apt
     container_name: {{CONTAINER_NAME}}
     ports:
-      - "{{WEB_PORT}}:{{WEB_PORT}}/tcp"
-      - "{{MEDIASOUP_PORT}}:{{MEDIASOUP_PORT}}/tcp"
-      - "{{MEDIASOUP_PORT}}:{{MEDIASOUP_PORT}}/udp"
+      - "{{PRIMARY_PORT}}:{{PRIMARY_PORT}}/tcp"
+      # Weitere Ports aus EXTRA_PORTS (z.B. Mediasoup Signal/RTP) — projektspezifisch ergänzen
     volumes:
       # Plugin (gebaut) — Name muss exakt dem package.json "name" entsprechen!
       - ./dist/{{PLUGIN_DIR_NAME}}:/home/bun/.config/sharkord/plugins/{{PLUGIN_DIR_NAME}}
@@ -331,13 +335,14 @@ Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{PLATZHALTER}}` ausf�
 |-------------|-------------|---------|
 | `{{PROJECT_NAME}}` | Vollständiger Plugin-Name | `sharkord-vid-with-friends` |
 | `{{PREFIX}}` | Agent-Präfix | `vwf` |
-| `{{SHARKORD_VERSION}}` | Docker-Image-Tag | `v0.0.16` |
+| `{{PRIMARY_IMAGE_TAG}}` | Docker-Image-Tag des Kernsystems | `v0.0.16` |
+| `{{SYSTEM_DEPENDENCIES}}` | Kern-Abhängigkeiten mit Versionen (Markdown-Liste) | `- @sharkord/plugin-sdk: \`0.0.16\`` |
+| `{{SYSTEM_URLS}}` | System-URLs (Markdown-Liste) | `- Sharkord Web-UI: \`http://localhost:3000\`` |
 | `{{PLUGIN_DIR_NAME}}` | Verzeichnisname = `package.json` name | `sharkord-vid-with-friends` |
 | `{{CONTAINER_NAME}}` | Docker-Container-Name | `sharkord-dev` |
 | `{{SERVICE_NAME}}` | Compose-Service-Name | `sharkord` |
-| `{{WEB_PORT}}` | Sharkord Web-UI Port | `3000` |
-| `{{MEDIASOUP_PORT}}` | Mediasoup Port | `40000` |
-| `{{SHARKORD_URL}}` | URL der lokalen Instanz | `http://localhost:3000` |
+| `{{PRIMARY_PORT}}` | Haupt-Port (Web-UI) | `3000` |
+| `{{EXTRA_PORTS}}` | Weitere Ports (Markdown-Liste) | `- \`40000/tcp\` — Mediasoup Signal` |
 | `{{BUILD_COMMAND}}` | Build-Befehl | `bun run build` |
 | `{{HOST_LAN_IP}}` | LAN-IP des Entwicklungs-Rechners | `192.168.1.100` |
 | `{{EXTRA_VOLUMES}}` | Zusätzliche Volume-Mounts | Debug-Cache, Test-Musik |

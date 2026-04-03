@@ -181,6 +181,8 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
 Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`.
 
+### Generische Variablen (alle Projekte)
+
 | Platzhalter | Agent | Zweck |
 |-------------|-------|-------|
 | `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung aus CLAUDE.md |
@@ -192,6 +194,35 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{REQ_CATEGORIES}}` | requirements | Anforderungs-Kategorien |
 | `{{TEST_COMMANDS}}` | tester | Test-Runner-Kommandos |
 | `{{BUILD_COMMANDS}}` | release | Build-Schritte |
+
+### Infrastruktur-Variablen — generisch (Docker, Ports)
+
+| Platzhalter | Zweck | Format |
+|-------------|-------|--------|
+| `{{SYSTEM_DEPENDENCIES}}` | Kern-Abhängigkeiten mit konkreten Versionen | Markdown-Liste |
+| `{{SYSTEM_URLS}}` | Relevante System-URLs (Web-UI, APIs, Signaling) | Markdown-Liste |
+| `{{PRIMARY_PORT}}` | Haupt-Port der Anwendung | Einzelwert |
+| `{{EXTRA_PORTS}}` | Weitere benötigte Ports neben `PRIMARY_PORT` | Markdown-Liste |
+| `{{SERVICE_NAME}}` | Compose-Service-Name | Einzelwert |
+| `{{CONTAINER_NAME}}` | Docker-Container-Name | Einzelwert |
+
+### Plattform-Variablen — nur bei `"platforms": ["sharkord"]`
+
+| Platzhalter | Zweck | Format |
+|-------------|-------|--------|
+| `{{PRIMARY_IMAGE_TAG}}` | Docker-Image-Tag des Sharkord-Kernsystems | Einzelwert |
+| `{{PLUGIN_DIR_NAME}}` | Plugin-Verzeichnisname = `package.json` `name` | Einzelwert |
+
+### Projektspezifische Variablen — individuelle Werte pro Projekt
+
+| Platzhalter | Zweck | Format |
+|-------------|-------|--------|
+| `{{BUILD_OUTPUT}}` | Beschreibung der Build-Artefakte | Text |
+| `{{ARTIFACT_ZIP_CMD}}` | Befehl zum Erstellen des ZIP-Artifacts | Shell-Befehl |
+| `{{ARTIFACT_TAR_CMD}}` | Befehl zum Erstellen des TAR-Artifacts | Shell-Befehl |
+| `{{GH_ASSETS}}` | Pfade der GitHub-Release-Assets | Leerzeichen-getrennt |
+| `{{BUILD_SYSTEM_NOTES}}` | Hinweise zum Build-System | Text |
+| `{{VERSION_DIST_BEHAVIOUR}}` | Wie landet die Version im Dist? | Text |
 
 ---
 

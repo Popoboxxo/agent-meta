@@ -1,68 +1,96 @@
 {
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
 
-  "agent-meta-version": "0.1.0",
+  "agent-meta-version": "0.9.4",
 
   "platforms": ["sharkord"],
 
   "project": {
-    "name": "sharkord-mein-plugin",
+    "name":   "mein-projekt",
     "prefix": "mp",
-    "short": "mein-plugin"
+    "short":  "mein-projekt"
   },
 
   "variables": {
-    "PROJECT_NAME":         "sharkord-mein-plugin",
-    "PROJECT_DESCRIPTION":  "Kurzbeschreibung was das Plugin macht.",
-    "PLATFORM":             "Sharkord Plugin SDK v0.0.16",
-    "PLATFORM_LAYER":       "Sharkord",
-    "RUNTIME":              "Bun (NICHT Node.js)",
-    "LANGUAGE":             "TypeScript (ES6+, strict)",
-    "KEY_DEPENDENCIES":     "@sharkord/plugin-sdk@0.0.16",
-    "TARGET_PLATFORM":      "Sharkord Plugin SDK v0.0.16",
 
-    "BUILD_COMMAND":        "bun run build",
-    "TEST_COMMAND":         "bun test",
-    "DEV_COMMANDS":         "bun run build\nbun test",
-    "DEV_STACK_START":      "docker compose -f docker-compose.dev.yml up -d",
-    "DEV_STACK_RELOAD":     "docker compose -f docker-compose.dev.yml restart",
+    "_section_generic": "================================================================",
+    "_section_generic_desc": "GENERISCHE VARIABLEN — für jedes Projekt relevant",
+    "_section_generic_end": "================================================================",
 
-    "PROJECT_CONTEXT":      "Projektbeschreibung für Agenten — Tech-Stack, Ziel, Besonderheiten.",
-    "PROJECT_STRUCTURE":    "src/\n  index.ts       # Entry-Point\n  commands/      # Plugin-Kommandos\n  utils/         # Hilfsfunktionen",
-    "ENTRY_POINT_PATTERN":  "src/index.ts — Plugin-Entry-Point, exportiert registerPlugin()",
-    "KEY_PATTERNS":         "- Plugin registriert sich über registerPlugin()\n- Commands über ctx.registerCommand()",
-    "ARCHITECTURE":         "src/\n  index.ts  # Entry-Point",
-    "CODE_CONVENTIONS":     "- TypeScript ES6+, kein `require`, kein `var`, kein `any`\n- Named Exports (kein default export)\n- kebab-case: `module-name.ts`, Tests: `<module>.test.ts`",
-    "EXTRA_DONTS":          "",
-    "CODE_QUALITY_RULES":   "- Keine ungenutzten Imports\n- Keine impliziten `any`\n- Alle Funktionen typisiert",
-    "TEST_COMMANDS":        "bun test\nbun test --coverage",
-    "BUILD_COMMANDS":       "bun run build",
-    "REQ_CATEGORIES":       "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen",
-    "REQ_CATEGORIES_LIST":  "- **Kernfunktionalität** — Was das Plugin tut\n- **Lifecycle** — Startup, Shutdown, Fehlerbehandlung\n- **Nichtfunktionale Anforderungen** — Performance, Sicherheit",
+    "PROJECT_NAME":        "mein-projekt",
+    "PROJECT_DESCRIPTION": "Kurzbeschreibung was das Projekt macht.",
+    "PLATFORM":            "Sharkord Plugin SDK",
+    "RUNTIME":             "Bun (NICHT Node.js)",
+    "LANGUAGE":            "TypeScript (ES6+, strict)",
 
-    "SERVICE_NAME":         "sharkord",
-    "CONTAINER_NAME":       "mein-plugin-dev",
-    "PLUGIN_DIR_NAME":      "sharkord-mein-plugin",
-    "SHARKORD_VERSION":     "v0.0.16",
-    "SHARKORD_URL":         "http://localhost:3000",
-    "WEB_PORT":             "3000",
-    "MEDIASOUP_PORT":       "40000",
-    "SHARKORD_MIN_VERSION": "0.0.16",
-    "SHARKORD_IMAGE":       "sharkord/sharkord:v0.0.16",
+    "_comment_deps": "Kern-Abhängigkeiten mit konkreter Version — eine pro Zeile als Markdown-Liste",
+    "SYSTEM_DEPENDENCIES": "- @sharkord/plugin-sdk: `0.0.16`\n- bun: `>=1.0.0`",
 
-    "BUILD_OUTPUT":         "- index.js  (minified ESM Bundle)\n- package.json",
-    "ARTIFACT_ZIP_CMD":     "powershell -Command \"Compress-Archive -Path 'dist/sharkord-mein-plugin' -DestinationPath 'dist/sharkord-mein-plugin.zip' -Force\"",
-    "ARTIFACT_TAR_CMD":     "cd dist && tar -czf sharkord-mein-plugin.tar.gz sharkord-mein-plugin/ && cd ..",
-    "GH_ASSETS":            "dist/sharkord-mein-plugin.zip dist/sharkord-mein-plugin.tar.gz",
-    "REQUIRED_BINARIES_SECTION": "Keine externen Binaries erforderlich.",
-    "BINARY_INSTALL_STEPS": "",
-    "REQUIRED_BINARY_NAMES": "(keine)",
-    "BUILD_SYSTEM_NOTES":   "bun run build erzeugt dist/sharkord-mein-plugin/",
-    "VERSION_DIST_BEHAVIOUR": "build.ts kopiert package.json 1:1 ins Dist.",
-    "EXTRA_STARTUP_INFO":   "",
+    "_comment_urls": "Relevante System-URLs — eine pro Zeile als Markdown-Liste",
+    "SYSTEM_URLS":         "- Web-UI: `http://localhost:3000`",
+
+    "BUILD_COMMAND":       "bun run build",
+    "TEST_COMMAND":        "bun test",
+    "DEV_COMMANDS":        "bun run build\nbun test",
+    "DEV_STACK_START":     "docker compose -f docker-compose.dev.yml up -d",
+    "DEV_STACK_RELOAD":    "docker compose -f docker-compose.dev.yml restart",
+
+    "PROJECT_CONTEXT":     "Projektbeschreibung für Agenten — Tech-Stack, Ziel, Besonderheiten.",
+    "PROJECT_STRUCTURE":   "src/\n  index.ts       # Entry-Point\n  commands/      # Plugin-Kommandos\n  utils/         # Hilfsfunktionen",
+    "ENTRY_POINT_PATTERN": "src/index.ts — Entry-Point",
+    "KEY_PATTERNS":        "- Wichtige Muster des Projekts",
+    "ARCHITECTURE":        "src/\n  index.ts  # Entry-Point",
+    "CODE_CONVENTIONS":    "- TypeScript ES6+, kein `require`, kein `var`, kein `any`\n- Named Exports (kein default export)\n- kebab-case: `module-name.ts`, Tests: `<module>.test.ts`",
+    "EXTRA_DONTS":         "",
+    "CODE_QUALITY_RULES":  "- Keine ungenutzten Imports\n- Keine impliziten `any`\n- Alle Funktionen typisiert",
+    "TEST_COMMANDS":       "bun test\nbun test --coverage",
+    "BUILD_COMMANDS":      "bun run build",
+    "REQ_CATEGORIES":      "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen",
+    "REQ_CATEGORIES_LIST": "- **Kernfunktionalität** — Was das Projekt tut\n- **Lifecycle** — Startup, Shutdown, Fehlerbehandlung\n- **Nichtfunktionale Anforderungen** — Performance, Sicherheit",
+
+    "_section_infra": "================================================================",
+    "_section_infra_desc": "INFRASTRUKTUR-VARIABLEN — Docker, Ports, Container (generisch)",
+    "_section_infra_end": "================================================================",
+
+    "SERVICE_NAME":        "app",
+    "CONTAINER_NAME":      "mein-projekt-dev",
+
+    "_comment_primary_port": "Haupt-Port der Anwendung (Web-UI, HTTP-API etc.)",
+    "PRIMARY_PORT":        "3000",
+
+    "_comment_extra_ports": "Weitere benötigte Ports — eine pro Zeile als Markdown-Liste. Leer lassen wenn nicht benötigt.",
+    "EXTRA_PORTS":         "",
+
     "DOCKER_STACKS_OVERVIEW": "| Dev-Stack | docker-compose.dev.yml | Lokales Testen |",
-    "EXTRA_VOLUMES":        "",
-    "EXTRA_ENV_VARS":       "",
-    "HOST_LAN_IP":          "192.168.1.100"
+    "EXTRA_VOLUMES":           "",
+    "EXTRA_VOLUME_DEFINITIONS": "",
+    "EXTRA_ENV_VARS":          "",
+    "EXTRA_STARTUP_INFO":      "",
+    "HOST_LAN_IP":             "192.168.1.100",
+
+    "_section_platform": "================================================================",
+    "_section_platform_desc": "PLATTFORM-VARIABLEN — nur bei platforms: [\"sharkord\"] relevant",
+    "_section_platform_end": "================================================================",
+
+    "_comment_image_tag": "Docker-Image-Tag des Sharkord-Kernsystems — muss mit peerDependencies in package.json übereinstimmen",
+    "PRIMARY_IMAGE_TAG":   "v0.0.16",
+
+    "_comment_plugin_dir": "Verzeichnisname des Plugins = 'name'-Feld in package.json (Sharkord erkennt Plugin anhand dieses Namens)",
+    "PLUGIN_DIR_NAME":     "mein-projekt",
+
+    "_section_project": "================================================================",
+    "_section_project_desc": "PROJEKTSPEZIFISCHE VARIABLEN — individuelle Werte pro Projekt",
+    "_section_project_end": "================================================================",
+
+    "BUILD_OUTPUT":        "- index.js  (minified ESM Bundle)\n- package.json",
+    "ARTIFACT_ZIP_CMD":    "powershell -Command \"Compress-Archive -Path 'dist/mein-projekt' -DestinationPath 'dist/mein-projekt.zip' -Force\"",
+    "ARTIFACT_TAR_CMD":    "cd dist && tar -czf mein-projekt.tar.gz mein-projekt/ && cd ..",
+    "GH_ASSETS":           "dist/mein-projekt.zip dist/mein-projekt.tar.gz",
+    "REQUIRED_BINARIES_SECTION": "Keine externen Binaries erforderlich.",
+    "BINARY_INSTALL_STEPS":      "",
+    "REQUIRED_BINARY_NAMES":     "(keine)",
+    "BUILD_SYSTEM_NOTES":        "bun run build erzeugt dist/mein-projekt/",
+    "VERSION_DIST_BEHAVIOUR":    "build.ts kopiert package.json 1:1 ins Dist."
+
   }
 }

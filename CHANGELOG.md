@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.9.5] — 2026-04-03
+
+### Breaking Changes
+
+- **Variable renames** in `agent-meta.config.example.json`:
+  - `SHARKORD_VERSION` → `PRIMARY_IMAGE_TAG`
+  - `SHARKORD_URL` → part of `SYSTEM_URLS` (Markdown-Liste)
+  - `SHARKORD_MIN_VERSION`, `SHARKORD_IMAGE` → removed (redundant)
+  - `WEB_PORT` → `PRIMARY_PORT`
+  - `MEDIASOUP_PORT` → part of `EXTRA_PORTS` (Markdown-Liste)
+  - `KEY_DEPENDENCIES`, `TARGET_PLATFORM`, `PLATFORM_LAYER` → removed (redundant)
+- **`sharkord-docker.md`** updated to use new variable names
+
+### Added
+
+- `SYSTEM_DEPENDENCIES` — Markdown-Liste aller Kern-Abhängigkeiten mit Versionen
+- `SYSTEM_URLS` — Markdown-Liste aller relevanten System-URLs
+- `EXTRA_PORTS` — Markdown-Liste weiterer Ports neben `PRIMARY_PORT`
+- `config.example.json` in vier klare Sektionen gegliedert:
+  - **Generisch** — für jedes Projekt
+  - **Infrastruktur** — Docker, Ports, Container
+  - **Plattform** — nur bei `platforms: ["sharkord"]`
+  - **Projektspezifisch** — individuelle Werte pro Projekt
+- `CLAUDE.md` — Variablen-Tabelle nach denselben vier Sektionen strukturiert
+
+### Changed
+
+- `sharkord-docker.md` — Platzhalter-Dokumentation aktualisiert, Port-Vorlage generalisiert
+
+---
+
 ## [0.9.4] — 2026-04-03
 
 ### Added
