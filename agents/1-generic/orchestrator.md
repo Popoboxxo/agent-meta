@@ -131,16 +131,46 @@ oder ähnliches sagt:
 
 **H2 — Auf neue agent-meta Version upgraden:**
 ```
-1. Prüfe aktuelle Version: cat .agent-meta/VERSION
-2. Ziehe neue Version: cd .agent-meta && git fetch && git checkout v<neue-version> && cd ..
-3. Aktualisiere agent-meta-version in agent-meta.config.json
-4. Dry-Run: py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
-5. Prüfe sync.log auf neue Warnungen (fehlende Variablen?)
-6. Ergänze fehlende Variablen in agent-meta.config.json
-7. Sync ausführen: py .agent-meta/scripts/sync.py --config agent-meta.config.json
-8. Extensions aktualisieren: py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
-9. Committe: git add .claude/agents/ .agent-meta agent-meta.config.json && git commit -m "chore: upgrade agent-meta to v<neue-version>"
+1. Prüfe aktuelle Version:
+   cat .agent-meta/VERSION
+   cat agent-meta.config.json  # → "agent-meta-version"
+
+2. CHANGELOG der neuen Version lesen (Breaking Changes?):
+   cd .agent-meta && git fetch && git log --oneline HEAD..v<neue-version> && cd ..
+   cat .agent-meta/CHANGELOG.md  # nach Upgrade
+
+3. Submodul auf neue Version ziehen:
+   cd .agent-meta && git checkout v<neue-version> && cd ..
+
+4. agent-meta-version in agent-meta.config.json aktualisieren:
+   "agent-meta-version": "<neue-version>"
+
+5. Dry-Run — was ändert sich?
+   py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+   → sync.log prüfen: neue Warnungen = fehlende Variablen
+
+6. Fehlende Variablen in agent-meta.config.json ergänzen
+   (Referenz: cat .agent-meta/agent-meta.config.example.json)
+
+7. Generische + Plattform-Agenten neu generieren:
+   py .agent-meta/scripts/sync.py --config agent-meta.config.json
+   → sync.log prüfen
+   → Welche Plattform-Agenten aktiv sind steht in config "platforms": [...]
+   → sync.py wählt automatisch den richtigen 2-platform Layer
+
+8. Extensions aktualisieren (managed block):
+   py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+
+9. Committe:
+   git add .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.json
+   git commit -m "chore: upgrade agent-meta to v<neue-version>"
 ```
+
+**Hintergrund — Plattform-Layer:**
+sync.py liest `"platforms": [...]` aus der config und wählt automatisch den
+passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
+`sharkord-docker.md` überschreibt `docker.md`, `sharkord-release.md` überschreibt
+`release.md`. Kein manueller Eingriff nötig — alles automatisch durch den Sync.
 
 **H3 — Neue Extension erstellen:**
 ```
