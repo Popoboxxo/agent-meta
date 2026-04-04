@@ -1,8 +1,9 @@
 ---
 name: orchestrator
 version: "1.6.1"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 generated-from: "1-generic/orchestrator.md@1.6.1"
+hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
   - Read

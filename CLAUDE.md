@@ -139,12 +139,29 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.12.3 — `2026-04-04`
+Generiert von agent-meta v0.13.1 — `2026-04-04`
+
+## Verfügbare Agenten
+
+> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
+
+| Agent | Zuständigkeit |
+|-------|--------------|
+| `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs |
+| `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
+| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
+| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
+| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
+| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
+| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
+
+### Generierte Agenten (technische Übersicht)
 
 | Agent | Quelle | Layer |
 |-------|--------|-------|
 | `developer` | `developer.md` | 1-generic |
-| `docker` | `docker.md` | 1-generic |
 | `documenter` | `documenter.md` | 1-generic |
 | `git` | `git.md` | 1-generic |
 | `ideation` | `ideation.md` | 1-generic |
@@ -152,7 +169,6 @@ Generiert von agent-meta v0.12.3 — `2026-04-04`
 | `orchestrator` | `orchestrator.md` | 1-generic |
 | `release` | `release.md` | 1-generic |
 | `requirements` | `requirements.md` | 1-generic |
-| `tester` | `tester.md` | 1-generic |
 | `validator` | `validator.md` | 1-generic |
 <!-- agent-meta:managed-end -->
 

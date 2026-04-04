@@ -2,6 +2,7 @@
 name: template-developer
 version: "1.4.1"
 description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
+hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
   - Bash
   - Read

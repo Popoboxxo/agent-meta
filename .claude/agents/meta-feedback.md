@@ -1,8 +1,9 @@
 ---
 name: meta-feedback
 version: "1.3.2"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Meta-Feedback-Agenten. Sammelt Verbesserungsvorschläge für das agent-meta-Framework aus laufenden Projektsessions und erstellt GitHub Issues im agent-meta-Repository."
 generated-from: "1-generic/meta-feedback.md@1.3.2"
+hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
   - Bash
   - Read

@@ -1,8 +1,9 @@
 ---
 name: requirements
 version: "1.3.1"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Requirements-Engineer-Agenten. Nimmt Anforderungen auf, analysiert sie, vergibt REQ-IDs, pflegt REQUIREMENTS.md und prüft Traceability."
 generated-from: "1-generic/requirements.md@1.3.1"
+hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
   - Read
   - Write

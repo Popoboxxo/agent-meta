@@ -183,14 +183,61 @@ def read_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
-def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[str]]:
-    """Generate markdown table for {{AGENT_TABLE}}. Returns (table, unmapped_warnings)."""
+def build_agent_hints(config: dict, agent_meta_root: Path) -> str:
+    """Generate agent usage hints for {{AGENT_HINTS}}.
+
+    Reads hint (preferred) or description from each active agent's template frontmatter.
+    If orchestrator is active, adds a prominent start hint.
+    """
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
+    allowed_roles: set[str] | None = None
+    if "roles" in config:
+        allowed_roles = set(config["roles"])
+
+    lines = []
+    has_orchestrator = (
+        "orchestrator" in overrides
+        and (allowed_roles is None or "orchestrator" in allowed_roles)
+    )
+    if has_orchestrator:
+        lines.append(
+            "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben."
+        )
+        lines.append("")
+
+    lines.append("| Agent | Zuständigkeit |")
+    lines.append("|-------|--------------|")
+    for role, source_path in sorted(overrides.items()):
+        if allowed_roles is not None and role not in allowed_roles:
+            continue
+        if not target_filename(role):
+            continue
+        content = source_path.read_text(encoding="utf-8")
+        hint = extract_frontmatter_field(content, "hint") \
+            or extract_frontmatter_field(content, "description") \
+            or ""
+        lines.append(f"| `{role}` | {hint} |")
+
+    return "\n".join(lines)
+
+
+def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[str]]:
+    """Generate markdown table for {{AGENT_TABLE}}. Returns (table, unmapped_warnings).
+
+    Only includes roles present in config['roles'] whitelist (if set).
+    """
+    platforms = config.get("platforms", [])
+    overrides, _ = collect_sources(agent_meta_root, platforms)
+    allowed_roles: set[str] | None = None
+    if "roles" in config:
+        allowed_roles = set(config["roles"])
 
     rows = []
     unmapped = []
     for role, source_path in sorted(overrides.items()):
+        if allowed_roles is not None and role not in allowed_roles:
+            continue
         filename = target_filename(role)
         if not filename:
             unmapped.append(
@@ -216,6 +263,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
+    variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
     variables.update(config.get("variables", {}))
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
@@ -224,7 +272,13 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
 
 
 def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> str:
-    """Replace {{VAR}} occurrences. Warn for missing variables."""
+    """Replace {{VAR}} occurrences. Warn for missing variables.
+
+    Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
+    """
+    # First pass: resolve escaped literals {{% ... %}} → {{...}} (no substitution)
+    text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", r"{{\1}}", text)
+
     def replacer(match):
         key = match.group(1)
         if key in variables:
@@ -402,12 +456,16 @@ def sync_agents(
         content = source_path.read_text(encoding="utf-8")
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
+        # Preserve template description; interpolate {{PROJECT_NAME}} if present
+        template_description = extract_frontmatter_field(content, "description")
+        description = (template_description or f"Agent for {project_name}.")
+        description = description.replace("{{PROJECT_NAME}}", project_name)
         content = substitute(content, variables, rel_source, log)
         name = Path(filename).stem
         layer = source_path.parts[-2]  # "1-generic" or "2-platform"
         source_label = f"{layer}/{source_path.name}"
         generated_from = f"{source_label}@{source_version}" if source_version else source_label
-        content = build_frontmatter(content, name, f"Agent for {project_name}.",
+        content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
@@ -742,6 +800,12 @@ CLAUDE_MD_MANAGED_TEMPLATE = """\
 <!-- Manual changes here will be overwritten. -->
 
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
+
+## Verfügbare Agenten
+
+{{AGENT_HINTS}}
+
+### Generierte Agenten (technische Übersicht)
 
 {{AGENT_TABLE}}
 <!-- agent-meta:managed-end -->"""

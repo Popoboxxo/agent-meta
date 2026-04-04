@@ -3,6 +3,7 @@ name: sharkord-docker
 version: "1.2.1"
 based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Baut auf template-docker auf und ergänzt Sharkord-Plattformwissen: Plugin-Mount-Pfade, Access-Token-Handling, Mediasoup-Ports, SYS_NICE, Image-Konventionen und Port-Register. Wird als Basis für konkrete Plugin-Instanzen verwendet."
+hint: "Sharkord Dev-Stack: Plugin-Mount, Access-Token, Mediasoup-Ports, Compose"
 tools:
   - Bash
   - Read
@@ -326,7 +327,7 @@ docker inspect {{CONTAINER_NAME}}
 
 ## Instanziierung (für neue Sharkord-Plugins)
 
-Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{PLATZHALTER}}` ausfüllen:
+Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{%PLATZHALTER%}}` ausfüllen:
 
 | Platzhalter | Beschreibung | Beispiel |
 |-------------|-------------|---------|

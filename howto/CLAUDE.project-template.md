@@ -4,7 +4,6 @@
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
 > Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
-> Plattform-Layer: {{PLATFORM_LAYER}}
 
 ---
 
@@ -21,8 +20,7 @@
 
 - **Runtime:** {{RUNTIME}}
 - **Sprache:** {{LANGUAGE}}
-- **Key-Dependencies:** {{KEY_DEPENDENCIES}}
-- **Ziel-Plattform:** {{TARGET_PLATFORM}}
+- **Key-Dependencies:** {{SYSTEM_DEPENDENCIES}}
 
 ---
 
@@ -81,6 +79,12 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- Manuelle Änderungen hier werden überschrieben. -->
 
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
+
+## Verfügbare Agenten
+
+{{AGENT_HINTS}}
+
+### Generierte Agenten (technische Übersicht)
 
 {{AGENT_TABLE}}
 <!-- agent-meta:managed-end -->

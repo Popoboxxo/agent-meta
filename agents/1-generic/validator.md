@@ -2,6 +2,7 @@
 name: template-validator
 version: "1.3.1"
 description: "Generisches Template für den Validator-Agenten. Prüft entwickelte Inhalte gegen Anforderungen, validiert Traceability, Definition of Done und Codequalität."
+hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
   - Bash
   - Read

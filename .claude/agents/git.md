@@ -1,8 +1,9 @@
 ---
 name: git
 version: "1.1.1"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Git-Agenten. Verantwortlich für alle Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 generated-from: "1-generic/git.md@1.1.1"
+hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
   - Read

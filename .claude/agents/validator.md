@@ -1,8 +1,9 @@
 ---
 name: validator
 version: "1.3.1"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Validator-Agenten. Prüft entwickelte Inhalte gegen Anforderungen, validiert Traceability, Definition of Done und Codequalität."
 generated-from: "1-generic/validator.md@1.3.1"
+hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
   - Bash
   - Read

@@ -1,8 +1,9 @@
 ---
 name: release
 version: "1.3.1"
-description: "Agent for agent-meta."
+description: "Generisches Template für den Release-Agenten. Verwaltet Versioning, Changelogs, Build-Prozesse und GitHub-Releases."
 generated-from: "1-generic/release.md@1.3.1"
+hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
   - Bash
   - Read

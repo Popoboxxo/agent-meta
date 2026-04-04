@@ -2,6 +2,7 @@
 name: template-git
 version: "1.1.1"
 description: "Generisches Template für den Git-Agenten. Verantwortlich für alle Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
+hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
   - Read
