@@ -25,8 +25,10 @@
     "LANGUAGE":            "TypeScript (ES6+, strict)",
     "PROJECT_LANGUAGES":   "TypeScript",
 
-    "_comment_lang": "Sprache für Kommunikation mit dem Nutzer (z.B. Deutsch, English)",
+    "_comment_lang": "Sprache in der der Agent antwortet — End-User Output (z.B. Englisch, Deutsch)",
     "COMMUNICATION_LANGUAGE":   "Englisch",
+    "_comment_user_input_lang": "Sprache in der der Nutzer Anweisungen gibt — Agent-Input (z.B. Deutsch, English)",
+    "USER_INPUT_LANGUAGE":      "Deutsch",
     "_comment_docs_lang": "Sprache für öffentliche/externe Doku: README, CHANGELOG, Release Notes, GitHub Issues",
     "DOCS_LANGUAGE":            "Englisch",
     "_comment_internal_lang": "Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions",

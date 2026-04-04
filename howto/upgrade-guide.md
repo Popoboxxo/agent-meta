@@ -59,7 +59,7 @@ Wenn eine neue agent-meta Version neue `{{PLATZHALTER}}` einführt:
 
 ```bash
 # Alle aktuellen Variablen-Namen aus der Config-Vorlage der neuen Version sehen:
-cat .agent-meta/agent-meta.config.example.json
+cat .agent-meta/howto/agent-meta.config.example.json
 ```
 
 ---

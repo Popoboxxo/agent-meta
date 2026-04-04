@@ -284,7 +284,7 @@ git submodule add https://github.com/<org>/agent-meta .agent-meta
 git submodule update --init --recursive
 
 # 2. Konfiguration anlegen (aus Beispiel)
-cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
 # → Config befüllen: version, platforms, project, variables
 
 # 3. Initiales Setup

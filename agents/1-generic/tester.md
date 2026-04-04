@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.4.0"
+version: "1.4.1"
 description: "Generisches Template für den Tester-Agenten. Schreibt Unit-/Integration-/E2E-Tests nach TDD-Workflow, führt Tests aus und stellt Testabdeckung pro REQ-ID sicher."
 tools:
   - Bash
@@ -188,3 +188,4 @@ er gibt falsches Vertrauen. Lieber **keinen Test** als einen der nichts beweist.
 
 - Test-Beschreibungen (`it("...")`) → {{CODE_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

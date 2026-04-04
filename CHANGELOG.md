@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.2] — 2026-04-04
+
+### Added
+
+- Neue Variable `{{USER_INPUT_LANGUAGE}}` — Sprache in der der Nutzer Anweisungen gibt (Agent-Input), unabhängig von `COMMUNICATION_LANGUAGE` (Agent-Output)
+- `howto/agent-meta.config.example.json` — `USER_INPUT_LANGUAGE` mit Kommentar ergänzt
+
+### Changed
+
+- Alle 13 Agenten-Templates (`+0.0.1` Patch): `USER_INPUT_LANGUAGE` in `## Sprache`-Sektion ergänzt
+  - `1-generic`: orchestrator `1.6.1`, developer `1.4.1`, tester `1.4.1`, validator `1.3.1`, requirements `1.3.1`, documenter `1.3.1`, release `1.3.1`, docker `1.3.1`, git `1.1.1`, meta-feedback `1.3.1`, ideation `1.2.1`
+  - `2-platform`: sharkord-release `1.3.1`, sharkord-docker `1.2.1`
+  - `0-external`: _skill-wrapper `1.0.1`
+- `howto/agent-meta.config.example.json` nach `howto/` verschoben (war bisher im Repo-Root)
+- Alle Referenzen auf `agent-meta.config.example.json` aktualisiert: README, CLAUDE.md, ARCHITECTURE.md, howto/*, orchestrator.md
+- CLAUDE.md — `COMMUNICATION_LANGUAGE` Beschreibung präzisiert (End-User Output), `USER_INPUT_LANGUAGE` in Variablen-Tabelle ergänzt
+
+---
+
 ## [0.12.1] — 2026-04-04
 
 ### Added

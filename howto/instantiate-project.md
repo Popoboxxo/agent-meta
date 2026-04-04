@@ -22,7 +22,7 @@ cd .agent-meta && git checkout v0.1.0 && cd ..
 ### Schritt 2: Config anlegen und befüllen
 
 ```bash
-cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
 ```
 
 Pflichtfelder:

@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.6.0"
+version: "1.6.1"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -154,7 +154,7 @@ oder ähnliches sagt:
    → sync.log prüfen: neue Warnungen = fehlende Variablen
 
 6. Fehlende Variablen in agent-meta.config.json ergänzen
-   (Referenz: cat .agent-meta/agent-meta.config.example.json)
+   (Referenz: cat .agent-meta/howto/agent-meta.config.example.json)
 
 7. Generische + Plattform-Agenten neu generieren:
    python .agent-meta/scripts/sync.py --config agent-meta.config.json
@@ -321,3 +321,4 @@ alle DoD-Punkte erfüllt sind.
 - **README.md** → **{{DOCS_LANGUAGE}}**
 - Alle anderen Dokumente → {{DOCS_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

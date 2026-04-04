@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.3.0"
+version: "1.3.1"
 description: "Generisches Template für den Dokumentations-Agenten. Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 tools:
   - Read
@@ -152,3 +152,4 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 - `README.md` → **{{DOCS_LANGUAGE}}**
 - Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → {{INTERNAL_DOCS_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

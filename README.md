@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.12.1`
+**Current version:** `0.12.2`
 
 ---
 
@@ -66,7 +66,7 @@ cd .agent-meta && git checkout v0.10.5 && cd ..
 ### 2. Create config
 
 ```bash
-cp .agent-meta/agent-meta.config.example.json agent-meta.config.json
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
 # Fill in your project values
 ```
 
@@ -144,7 +144,8 @@ agent-meta/
     sync-concept.md
   scripts/
     sync.py           ← agent generator
-  agent-meta.config.example.json
+  howto/
+    agent-meta.config.example.json
   VERSION
   CHANGELOG.md
 ```

@@ -51,7 +51,8 @@ agent-meta/
 ├── docs/
 │   └── architecture/        ← Architektur-Diagramme (Mermaid)
 ├── external-skills.config.json  ← Skill-Aktivierung (enabled: true/false)
-├── agent-meta.config.example.json
+├── howto/
+│   ├── agent-meta.config.example.json
 ├── scripts/
 │   └── sync.py              ← Agent-Generator
 └── howto/

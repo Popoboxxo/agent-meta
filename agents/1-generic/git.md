@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.1.0"
+version: "1.1.1"
 description: "Generisches Template für den Git-Agenten. Verantwortlich für alle Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 tools:
   - Bash
@@ -334,3 +334,4 @@ git remote set-url origin https://gitea.example.com/owner/repo.git
 
 - Commit-Messages → {{CODE_LANGUAGE}}
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

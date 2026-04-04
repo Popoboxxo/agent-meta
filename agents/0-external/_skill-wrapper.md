@@ -1,6 +1,6 @@
 ---
 name: {{SKILL_ROLE}}
-version: "1.0.0"
+version: "1.0.1"
 description: "{{SKILL_DESCRIPTION}}"
 generated-from: "0-external/{{SKILL_NAME}}@{{SKILL_COMMIT}}"
 tools:
@@ -31,3 +31,4 @@ tools:
 ## Sprache
 
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
+- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

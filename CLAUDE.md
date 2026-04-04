@@ -211,7 +211,8 @@ Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`
 | `{{PROJECT_CONTEXT}}` | alle | Projektbeschreibung |
 | `{{PROJECT_GOAL}}` | alle | Primäres Ziel des Projekts (für wen, was wird gelöst) |
 | `{{PROJECT_LANGUAGES}}` | alle | Verwendete Programmiersprachen |
-| `{{COMMUNICATION_LANGUAGE}}` | alle | Sprache für Nutzer-Kommunikation (z.B. `Englisch`) |
+| `{{COMMUNICATION_LANGUAGE}}` | alle | Sprache für Nutzer-Kommunikation — Agent-Output (z.B. `Englisch`) |
+| `{{USER_INPUT_LANGUAGE}}` | alle | Sprache der Nutzer-Eingaben — Agent-Input (z.B. `Deutsch`) |
 | `{{DOCS_LANGUAGE}}` | alle | Sprache für externe Doku: README, CHANGELOG, Release Notes, GitHub Issues |
 | `{{INTERNAL_DOCS_LANGUAGE}}` | alle | Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions |
 | `{{CODE_LANGUAGE}}` | alle | Sprache für code-nahe Artefakte: Kommentare, Commit-Messages, Test-Beschreibungen |
