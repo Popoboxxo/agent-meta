@@ -1,7 +1,7 @@
 ---
 name: developer
 version: "1.4.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/developer.md@1.4.1"
 tools:
   - Bash

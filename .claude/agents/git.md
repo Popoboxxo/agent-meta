@@ -1,7 +1,7 @@
 ---
 name: git
 version: "1.1.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/git.md@1.1.1"
 tools:
   - Bash

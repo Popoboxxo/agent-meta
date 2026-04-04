@@ -1,7 +1,7 @@
 ---
 name: ideation
 version: "1.2.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/ideation.md@1.2.1"
 tools:
   - Read

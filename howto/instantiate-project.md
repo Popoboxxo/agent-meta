@@ -49,9 +49,13 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
 ```
 
 Das Script erzeugt:
-- `CLAUDE.md` aus Template (nur wenn noch nicht vorhanden)
+- `CLAUDE.md` aus Template (nur wenn noch nicht vorhanden) — enthält einen **managed block**
 - `.claude/agents/*.md` — alle Agenten, generisch benannt
 - `sync.log` mit Zusammenfassung und Warnungen
+
+> **managed block in CLAUDE.md:** Der Abschnitt zwischen `<!-- agent-meta:managed-begin -->` und
+> `<!-- agent-meta:managed-end -->` enthält die Agenten-Tabelle und wird bei **jedem normalen sync**
+> automatisch aktualisiert. Alles außerhalb dieses Blocks ist handgeschrieben und wird nie überschrieben.
 
 ### Schritt 4: sync.log prüfen
 

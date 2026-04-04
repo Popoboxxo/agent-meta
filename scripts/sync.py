@@ -74,8 +74,8 @@ MANAGED_END   = "<!-- agent-meta:managed-end -->"
 # This is what gets updated on --update-ext. Keep it concise and useful.
 MANAGED_BLOCK_TEMPLATE = """\
 <!-- agent-meta:managed-begin -->
-<!-- Dieser Block wird von sync.py bei --update-ext automatisch aktualisiert. -->
-<!-- Projektspezifische Ergänzungen gehören in den Abschnitt UNTERHALB dieser Markierung. -->
+<!-- This block is automatically updated by sync.py on --update-ext. -->
+<!-- Project-specific additions belong in the section BELOW this marker. -->
 
 **Projekt:** {{PROJECT_NAME}} | **Plattform:** {{PLATFORM}} | **Runtime:** {{RUNTIME}}
 **Build:** `{{BUILD_COMMAND}}` | **Test:** `{{TEST_COMMAND}}`
@@ -87,8 +87,8 @@ PROJECT_SECTION_STUB = """\
 
 ## Projektspezifische Erweiterungen
 
-<!-- Dieser Abschnitt wird von sync.py NIE verändert. -->
-<!-- Füge hier projektspezifisches Wissen, Regeln und Patterns hinzu. -->
+<!-- This section is NEVER modified by sync.py. -->
+<!-- Add project-specific knowledge, rules, and patterns here. -->
 """
 
 
@@ -166,7 +166,7 @@ class SyncLog:
 
 def load_config(config_path: Path) -> dict:
     if not config_path.exists():
-        print(f"ERROR: Config not found: {config_path}", file=sys.stderr)
+        print(f"ERROR: config not found: {config_path}", file=sys.stderr)
         sys.exit(1)
     with config_path.open(encoding="utf-8") as f:
         return json.load(f)
@@ -194,7 +194,7 @@ def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[st
         filename = target_filename(role)
         if not filename:
             unmapped.append(
-                f"Rolle '{role}' ({source_path.name}) nicht in ROLE_MAP — in AGENT_TABLE übersprungen"
+                f"Role '{role}' ({source_path.name}) not in ROLE_MAP — skipped in AGENT_TABLE"
             )
             continue
         agent_name = Path(filename).stem
@@ -226,7 +226,7 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
         key = match.group(1)
         if key in variables:
             return variables[key]
-        log.warn(f"Variable {key} nicht in config — Platzhalter bleibt in: {source_label}")
+        log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
     return re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
 
@@ -387,12 +387,12 @@ def sync_agents(
     for role, source_path in overrides.items():
         filename = target_filename(role)
         if not filename:
-            log.skip(str(source_path.name), "keine Rolle in ROLE_MAP")
+            log.skip(str(source_path.name), "role not in ROLE_MAP")
             continue
 
         if allowed_roles is not None and role not in allowed_roles:
             log.skip(str(target_dir / filename).replace(str(project_root) + "/", "").replace(str(project_root) + "\\", ""),
-                     f"Rolle '{role}' nicht in config['roles']")
+                     f"role '{role}' not in config['roles']")
             continue
 
         target_path = target_dir / filename
@@ -404,7 +404,7 @@ def sync_agents(
         layer = source_path.parts[-2]  # "1-generic" or "2-platform"
         source_label = f"{layer}/{source_path.name}"
         generated_from = f"{source_label}@{source_version}" if source_version else source_label
-        content = build_frontmatter(content, name, f"Agent für {project_name}.",
+        content = build_frontmatter(content, name, f"Agent for {project_name}.",
                                     generated_from=generated_from)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
@@ -445,7 +445,7 @@ def sync_snippets(
     for rel_path in snippet_paths:
         source_path = snippets_root / rel_path
         if not source_path.exists():
-            log.warn(f"Snippet nicht gefunden: snippets/{rel_path}")
+            log.warn(f"Snippet not found: snippets/{rel_path}")
             continue
 
         target_path = target_root / rel_path
@@ -516,7 +516,7 @@ def sync_external_skills(
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
-        log.warn(f"Skill-Wrapper-Template nicht gefunden: {wrapper_path}")
+        log.warn(f"Skill wrapper template not found: {wrapper_path}")
         return
 
     wrapper_template = wrapper_path.read_text(encoding="utf-8")
@@ -546,13 +546,13 @@ def sync_external_skills(
         submodule_dir = agent_meta_root / local_path
         if submodule_dir.exists() and not any(submodule_dir.iterdir()):
             log.warn(
-                f"Submodul '{local_path}' ist nicht initialisiert (leeres Verzeichnis) — "
-                f"bitte ausführen: git submodule update --init --recursive"
+                f"Submodule '{local_path}' is not initialized (empty directory) — "
+                f"please run: git submodule update --init --recursive"
             )
             continue
 
         if not entry_path.exists():
-            log.warn(f"Skill entry nicht gefunden: {entry_path}")
+            log.warn(f"Skill entry not found: {entry_path}")
             continue
 
         # Read + substitute SKILL_CONTENT
@@ -593,7 +593,7 @@ def sync_external_skills(
                 log.action("COPY", str((skill_target_dir / af).relative_to(project_root)),
                            f"{local_path}/{source_rel}/{af}")
             else:
-                log.warn(f"additional_file nicht gefunden: {af_source}")
+                log.warn(f"additional_file not found: {af_source}")
 
         if not dry_run:
             agents_dir.mkdir(parents=True, exist_ok=True)
@@ -632,7 +632,7 @@ def add_skill(
     # Run git submodule add (skip if already exists)
     submodule_target = agent_meta_root / local_path
     if submodule_target.exists():
-        print(f"  ℹ  Submodule bereits vorhanden: {local_path}")
+        print(f"  ℹ  Submodule already exists: {local_path}")
     else:
         print(f"  ↓  git submodule add {repo_url} {local_path}")
         if not dry_run:
@@ -642,7 +642,7 @@ def add_skill(
                 capture_output=False,
             )
             if result.returncode != 0:
-                print(f"  ✗  git submodule add fehlgeschlagen", file=sys.stderr)
+                print(f"  ✗  git submodule add failed", file=sys.stderr)
                 return
 
     # Update external-skills.config.json
@@ -664,7 +664,7 @@ def add_skill(
         "entry": entry,
         "role": role,
         "name": skill_name.replace("-", " ").title(),
-        "description": f"Spezialist für {skill_name}.",
+        "description": f"Specialist for {skill_name}.",
         "additional_files": [],
     }
 
@@ -673,9 +673,9 @@ def add_skill(
     if not dry_run:
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(raw, f, indent=2, ensure_ascii=False)
-        print(f"  ✓  {EXTERNAL_SKILLS_CONFIG} aktualisiert")
+        print(f"  ✓  {EXTERNAL_SKILLS_CONFIG} updated")
         print(f"  ℹ  Skill '{skill_name}' (enabled: true) → role: '{role}'")
-        print(f"  ℹ  Zum Deaktivieren: enabled: false in {EXTERNAL_SKILLS_CONFIG} setzen")
+        print(f"  ℹ  To disable: set enabled: false in {EXTERNAL_SKILLS_CONFIG}")
 
 
 def create_extension(
@@ -688,7 +688,7 @@ def create_extension(
 ):
     """Create .claude/3-project/<prefix>-<role>-ext.md if it does not exist yet."""
     if role not in ROLE_MAP:
-        print(f"  ✗  Unbekannte Rolle '{role}'. Gültige Rollen: {', '.join(ROLE_MAP)}", file=sys.stderr)
+        print(f"  ✗  Unknown role '{role}'. Valid roles: {', '.join(ROLE_MAP)}", file=sys.stderr)
         return
 
     prefix = config["project"].get("prefix", "")
@@ -696,7 +696,7 @@ def create_extension(
     target_path = project_root / CLAUDE_EXT_DIR / filename
 
     if target_path.exists():
-        log.skip(str(target_path.relative_to(project_root)), "Extension existiert bereits — nutze --update-ext zum Aktualisieren")
+        log.skip(str(target_path.relative_to(project_root)), "extension already exists — use --update-ext to update")
         return
 
     managed = render_managed_block(variables, f"--create-ext {role}", log)
@@ -717,7 +717,7 @@ def update_extensions(
     """Update the managed block in all existing extension files."""
     ext_dir = project_root / CLAUDE_EXT_DIR
     if not ext_dir.exists():
-        log.skip(CLAUDE_EXT_DIR, "Verzeichnis nicht vorhanden — keine Extensions zum Aktualisieren")
+        log.skip(CLAUDE_EXT_DIR, "directory not found — no extensions to update")
         return
 
     for ext_file in sorted(ext_dir.glob(f"*{EXT_SUFFIX}.md")):
@@ -726,11 +726,59 @@ def update_extensions(
         new_content = update_managed_block(existing, new_managed)
 
         if new_content == existing:
-            log.skip(str(ext_file.relative_to(project_root)), "managed block unverändert")
+            log.skip(str(ext_file.relative_to(project_root)), "managed block unchanged")
         else:
             log.action("UPDATE", str(ext_file.relative_to(project_root)), "managed block")
             if not dry_run:
                 ext_file.write_text(new_content, encoding="utf-8")
+
+
+CLAUDE_MD_MANAGED_TEMPLATE = """\
+<!-- agent-meta:managed-begin -->
+<!-- This block is automatically updated by sync.py on every sync. -->
+<!-- Manual changes here will be overwritten. -->
+
+Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
+
+{{AGENT_TABLE}}
+<!-- agent-meta:managed-end -->"""
+
+
+def sync_claude_md_managed(
+    project_root: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Update the managed block in CLAUDE.md if it exists and contains the marker."""
+    target_path = project_root / "CLAUDE.md"
+    if not target_path.exists():
+        return
+
+    existing = target_path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+        re.DOTALL,
+    )
+    if not pattern.search(existing):
+        log.warn(
+            "CLAUDE.md exists but has no managed block — "
+            "AGENT_TABLE will not be updated. "
+            "Add the following block at the desired location in CLAUDE.md:\n"
+            "  <!-- agent-meta:managed-begin -->\n"
+            "  <!-- agent-meta:managed-end -->"
+        )
+        return
+
+    new_managed = substitute(CLAUDE_MD_MANAGED_TEMPLATE, variables, "CLAUDE.md managed block", log)
+    new_content = pattern.sub(new_managed, existing, count=1)
+
+    if new_content == existing:
+        log.skip("CLAUDE.md", "managed block unchanged")
+    else:
+        log.action("UPDATE", "CLAUDE.md", "managed block (AGENT_TABLE + version)")
+        if not dry_run:
+            target_path.write_text(new_content, encoding="utf-8")
 
 
 def init_claude_md(
@@ -745,12 +793,12 @@ def init_claude_md(
     target_path = project_root / "CLAUDE.md"
 
     if target_path.exists():
-        print("  ℹ  CLAUDE.md existiert bereits — übersprungen (nutze --only-variables)")
-        log.skip("CLAUDE.md", "existiert bereits")
+        print("  ℹ  CLAUDE.md already exists — skipped (use --only-variables)")
+        log.skip("CLAUDE.md", "already exists")
         return
 
     if not template_path.exists():
-        log.warn(f"CLAUDE.project-template.md nicht gefunden in {template_path}")
+        log.warn(f"CLAUDE.project-template.md not found at {template_path}")
         return
 
     content = template_path.read_text(encoding="utf-8")
@@ -768,16 +816,16 @@ def only_variables(
 ):
     target_path = project_root / "CLAUDE.md"
     if not target_path.exists():
-        print("  ✗  CLAUDE.md nicht gefunden — nutze --init für erstmalige Generierung")
+        print("  ✗  CLAUDE.md not found — use --init to create it")
         sys.exit(1)
 
     content = target_path.read_text(encoding="utf-8")
     new_content = substitute(content, variables, "CLAUDE.md", log)
 
     if new_content == content:
-        log.action("SKIP", "CLAUDE.md", "keine offenen Platzhalter")
+        log.action("SKIP", "CLAUDE.md", "no open placeholders")
     else:
-        log.action("WRITE", "CLAUDE.md", "variables aus config")
+        log.action("WRITE", "CLAUDE.md", "variables from config")
         if not dry_run:
             target_path.write_text(new_content, encoding="utf-8")
 
@@ -824,7 +872,7 @@ def main():
     log = SyncLog()
 
     if args.dry_run:
-        print("DRY-RUN — keine Dateien werden geschrieben\n")
+        print("DRY-RUN — no files will be written\n")
 
     if args.add_skill:
         mode = "add-skill"
@@ -832,7 +880,7 @@ def main():
                                (args.source, "--source"),
                                (args.role, "--role")]:
             if not required:
-                print(f"  ✗  --add-skill erfordert {flag}", file=sys.stderr)
+                print(f"  ✗  --add-skill requires {flag}", file=sys.stderr)
                 sys.exit(1)
         add_skill(agent_meta_root, args.add_skill, args.skill_name,
                   args.source, args.role, args.entry, log, args.dry_run)
@@ -842,7 +890,7 @@ def main():
 
     # All other modes require --config
     if not args.config:
-        print("  ✗  --config ist erforderlich (außer bei --add-skill)", file=sys.stderr)
+        print("  ✗  --config is required (except for --add-skill)", file=sys.stderr)
         sys.exit(1)
 
     project_root = Path(args.config).resolve().parent
@@ -876,6 +924,7 @@ def main():
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         sync_external_skills(agent_meta_root, project_root, variables, log, args.dry_run)
+        sync_claude_md_managed(project_root, variables, log, args.dry_run)
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)

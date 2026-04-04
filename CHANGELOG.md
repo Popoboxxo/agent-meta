@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.13.0] — 2026-04-04
+
+### Added
+
+- `sync.py` — `CLAUDE.md` managed block support: `<!-- agent-meta:managed-begin/end -->` block in project `CLAUDE.md` is updated on every normal sync with current `AGENT_TABLE`, version, and date
+- `sync.py` — `sync_claude_md_managed()`: if `CLAUDE.md` exists but has no managed block, emits actionable `[WARN]` with copy-paste snippet to insert the block manually
+- `howto/CLAUDE.project-template.md` — agent table now wrapped in managed block so `--init` creates a sync-maintained section out of the box
+- `howto/instantiate-project.md` — note about managed block behavior added to Step 3
+- `CLAUDE.md` — "Update-Verhalten bei sync" table extended with `CLAUDE.md` managed block rows + explanation
+
+### Changed
+
+- `sync.py` — all log output (warnings, skip reasons, info messages, print statements) is now **English only**
+- `sync.py` — generated agent `description` field changed from `"Agent für …"` to `"Agent for …"`
+
+---
+
 ## [0.12.3] — 2026-04-04
 
 ### Added

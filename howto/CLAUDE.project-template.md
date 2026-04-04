@@ -76,9 +76,14 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 ## Agenten-Konfiguration
 
-<!-- Generiert durch sync.py anhand von platforms in agent-meta.config.json -->
+<!-- agent-meta:managed-begin -->
+<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
+<!-- Manuelle Änderungen hier werden überschrieben. -->
+
+Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
 {{AGENT_TABLE}}
+<!-- agent-meta:managed-end -->
 
 ---
 

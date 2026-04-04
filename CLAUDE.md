@@ -133,13 +133,45 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | Meta-Feedback | `meta-feedback.md` | 1-generic |
 | Git | `git.md` | 1-generic |
 
+### Generierte Agenten (Self-Hosting)
+
+<!-- agent-meta:managed-begin -->
+<!-- This block is automatically updated by sync.py on every sync. -->
+<!-- Manual changes here will be overwritten. -->
+
+Generiert von agent-meta v0.12.3 — `2026-04-04`
+
+| Agent | Quelle | Layer |
+|-------|--------|-------|
+| `developer` | `developer.md` | 1-generic |
+| `docker` | `docker.md` | 1-generic |
+| `documenter` | `documenter.md` | 1-generic |
+| `git` | `git.md` | 1-generic |
+| `ideation` | `ideation.md` | 1-generic |
+| `meta-feedback` | `meta-feedback.md` | 1-generic |
+| `orchestrator` | `orchestrator.md` | 1-generic |
+| `release` | `release.md` | 1-generic |
+| `requirements` | `requirements.md` | 1-generic |
+| `tester` | `tester.md` | 1-generic |
+| `validator` | `validator.md` | 1-generic |
+<!-- agent-meta:managed-end -->
+
 ### Update-Verhalten bei sync
 
 | Datei | Wird bei sync überschrieben? | Bekommt generische Updates? |
 |-------|-----------------------------|-----------------------------|
 | `.claude/agents/*.md` (generiert) | ✅ Ja, immer | ✅ Ja |
+| `CLAUDE.md` — managed block | ✅ Ja, managed block wird aktualisiert | ✅ Ja (AGENT_TABLE + Version) |
+| `CLAUDE.md` — Rest | ❌ Nein, handgeschrieben | ❌ Manuell pflegen |
 | `.claude/3-project/*-ext.md` (Extension) | ❌ Nein, nur einmalig kopiert | ❌ Manuell pflegen |
 | `.claude/3-project/*.md` (Override, falls vorhanden) | ❌ Wird nicht generiert — liegt im Projekt | ❌ Manuell pflegen |
+
+**CLAUDE.md managed block** — eingeleitet durch `<!-- agent-meta:managed-begin -->`:
+- Wird von `sync.py` bei **jedem normalen sync** automatisch aktualisiert
+- Enthält: Agenten-Tabelle (`AGENT_TABLE`) + agent-meta Version + Datum
+- Manuelle Änderungen innerhalb des Blocks werden überschrieben
+- Kein managed block in `CLAUDE.md` → sync gibt `[WARN]` aus mit Hinweis zum manuellen Einfügen
+- `--init` erstellt `CLAUDE.md` aus Template inkl. managed block (nur wenn nicht vorhanden)
 
 ---
 

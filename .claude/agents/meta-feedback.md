@@ -1,7 +1,7 @@
 ---
 name: meta-feedback
 version: "1.3.2"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/meta-feedback.md@1.3.2"
 tools:
   - Bash

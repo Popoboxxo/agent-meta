@@ -1,7 +1,7 @@
 ---
 name: validator
 version: "1.3.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/validator.md@1.3.1"
 tools:
   - Bash

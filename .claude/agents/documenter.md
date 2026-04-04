@@ -1,7 +1,7 @@
 ---
 name: documenter
 version: "1.3.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/documenter.md@1.3.1"
 tools:
   - Read

@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 version: "1.6.1"
-description: "Agent für agent-meta."
+description: "Agent for agent-meta."
 generated-from: "1-generic/orchestrator.md@1.6.1"
 tools:
   - Bash
