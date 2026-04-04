@@ -1,6 +1,6 @@
-# Development Workflow (Standard Feature)
+# Development Workflow
 
-> [← Back to Architecture Overview](../../ARCHITECTURE.md)
+> [Back to Architecture Overview](../../ARCHITECTURE.md)
 
 ```mermaid
 sequenceDiagram
@@ -13,20 +13,20 @@ sequenceDiagram
     participant DOC as documenter
     participant GIT as git
 
-    User->>ORC: Neues Feature
-    ORC->>REQ: REQ-ID vergeben
-    REQ-->>ORC: REQ-042 ✓
-    ORC->>TST: Tests schreiben (TDD Red)
-    TST-->>ORC: Tests geschrieben ✓
-    ORC->>DEV: Implementieren
-    DEV-->>ORC: Code fertig ✓
-    ORC->>TST: Tests ausführen
-    TST-->>ORC: Tests grün ✓
-    ORC->>VAL: DoD-Check
-    VAL-->>ORC: DoD erfüllt ✓
-    ORC->>DOC: Doku aktualisieren
-    DOC-->>ORC: Doku aktuell ✓
-    ORC->>GIT: Commit + Push
-    GIT-->>ORC: feat(REQ-042) ✓
-    ORC-->>User: Feature abgeschlossen ✓
+    User->>ORC: new feature request
+    ORC->>REQ: assign REQ-ID
+    REQ-->>ORC: REQ-042 done
+    ORC->>TST: write tests TDD red
+    TST-->>ORC: tests written
+    ORC->>DEV: implement
+    DEV-->>ORC: code done
+    ORC->>TST: run tests
+    TST-->>ORC: tests green
+    ORC->>VAL: DoD check
+    VAL-->>ORC: DoD passed
+    ORC->>DOC: update docs
+    DOC-->>ORC: docs updated
+    ORC->>GIT: commit and push
+    GIT-->>ORC: committed
+    ORC-->>User: feature complete
 ```

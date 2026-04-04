@@ -1,26 +1,26 @@
-# Sync Flow — agent-meta → Zielprojekt
+# Sync Flow
 
-> [← Back to Architecture Overview](../../ARCHITECTURE.md)
+> [Back to Architecture Overview](../../ARCHITECTURE.md)
 
 ```mermaid
 flowchart TD
-    CFG["agent-meta.config.json\nProjekt-Config"]
-    ECFG["external-skills.config.json\nSkill-Config"]
-    SYNC["sync.py"]
+    CFG[agent-meta.config.json]
+    ECFG[external-skills.config.json]
+    SYNC[sync.py]
 
-    subgraph SOURCES ["agent-meta Sources"]
-        G1["1-generic/*.md"]
-        G2["2-platform/*.md"]
-        SN["snippets/"]
-        EX["external/SKILL.md"]
-        WR["0-external/_skill-wrapper.md"]
+    subgraph sources [agent-meta]
+        G1[1-generic agents]
+        G2[2-platform agents]
+        SN[snippets]
+        EX[external SKILL.md]
+        WR[skill-wrapper template]
     end
 
-    subgraph TARGET [".claude/ im Zielprojekt"]
-        AG[".claude/agents/*.md\ngeneriert"]
-        SK[".claude/skills/"]
-        SNC[".claude/snippets/"]
-        EXT[".claude/3-project/*-ext.md\nExtension"]
+    subgraph target [.claude/ in target project]
+        AG[agents generated]
+        SK[skills copied]
+        SNC[snippets copied]
+        EXT[3-project ext created once]
     end
 
     CFG --> SYNC
@@ -31,8 +31,8 @@ flowchart TD
     EX --> SYNC
     WR --> SYNC
 
-    SYNC -->|"WRITE"| AG
-    SYNC -->|"COPY"| SNC
-    SYNC -->|"COPY"| SK
-    SYNC -->|"CREATE einmalig"| EXT
+    SYNC -->|WRITE| AG
+    SYNC -->|COPY| SNC
+    SYNC -->|COPY| SK
+    SYNC -->|CREATE| EXT
 ```
