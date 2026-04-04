@@ -2,7 +2,6 @@
 
 > [Back to Architecture Overview](../../ARCHITECTURE.md)
 
-```mermaid
 flowchart TD
     CFG[agent-meta.config.json]
     ECFG[external-skills.config.json]
