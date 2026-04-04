@@ -1,8 +1,8 @@
 ---
 name: meta-feedback
-version: "1.3.1"
+version: "1.3.2"
 description: "Agent für agent-meta."
-generated-from: "1-generic/meta-feedback.md@1.3.1"
+generated-from: "1-generic/meta-feedback.md@1.3.2"
 tools:
   - Bash
   - Read
@@ -158,9 +158,11 @@ Ein gutes Issue:
 - KEIN Issue ohne Bestätigung des Nutzers erstellen
 - KEINE vagen Titel ("Verbesserung", "Problem mit Agent")
 - NICHT mehrere unzusammenhängende Probleme in ein Issue packen
+- KEIN Issue-Titel in einer anderen Sprache als Englisch — auch wenn DOCS_LANGUAGE anders gesetzt ist
 
 ## Sprache
 
-- GitHub Issues → **Englisch**
+- GitHub Issue-Titel → **immer Englisch** (unabhängig von DOCS_LANGUAGE)
+- GitHub Issue-Body → **Englisch**
 - Kommunikation mit dem Nutzer → Deutsch
 - Nutzer-Eingaben verstehen in → Deutsch

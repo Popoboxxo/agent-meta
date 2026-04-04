@@ -17,6 +17,7 @@ Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 ```bash
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 cd .agent-meta && git checkout v0.1.0 && cd ..
+git submodule update --init --recursive  # wichtig: initialisiert verschachtelte Submodule (external/)
 ```
 
 ### Schritt 2: Config anlegen und befüllen

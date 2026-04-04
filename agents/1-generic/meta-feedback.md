@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "1.3.1"
+version: "1.3.2"
 description: "Generisches Template für den Meta-Feedback-Agenten. Sammelt Verbesserungsvorschläge für das agent-meta-Framework aus laufenden Projektsessions und erstellt GitHub Issues im agent-meta-Repository."
 tools:
   - Bash
@@ -157,9 +157,11 @@ Ein gutes Issue:
 - KEIN Issue ohne Bestätigung des Nutzers erstellen
 - KEINE vagen Titel ("Verbesserung", "Problem mit Agent")
 - NICHT mehrere unzusammenhängende Probleme in ein Issue packen
+- KEIN Issue-Titel in einer anderen Sprache als Englisch — auch wenn DOCS_LANGUAGE anders gesetzt ist
 
 ## Sprache
 
-- GitHub Issues → **{{DOCS_LANGUAGE}}**
+- GitHub Issue-Titel → **immer Englisch** (unabhängig von DOCS_LANGUAGE)
+- GitHub Issue-Body → **{{DOCS_LANGUAGE}}**
 - Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
 - Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

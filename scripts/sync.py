@@ -101,6 +101,7 @@ class SyncLog:
         self.actions: list[str] = []
         self.warnings: list[str] = []
         self.skipped: list[str] = []
+        self.infos: list[str] = []
         self.start_time = datetime.now()
 
     def action(self, tag: str, target: str, source: str):
@@ -112,6 +113,9 @@ class SyncLog:
 
     def skip(self, target: str, reason: str):
         self.skipped.append(f"[SKIP]   {target:<50}  ({reason})")
+
+    def info(self, target: str, reason: str):
+        self.infos.append(f"[INFO]   {target:<50}  ({reason})")
 
     def write(self, log_path: Path, config_path: str, source_version: str,
               mode: str, platforms: list[str], dry_run: bool):
@@ -131,6 +135,9 @@ class SyncLog:
         if self.skipped:
             lines += ["", "SKIPPED", "-------"]
             lines += self.skipped
+        if self.infos:
+            lines += ["", "INFO", "----"]
+            lines += self.infos
 
         if self.warnings:
             lines += ["", "WARNINGS", "--------"]
@@ -518,8 +525,8 @@ def sync_external_skills(
 
     for skill_name, skill_cfg in skills.items():
         if not skill_cfg.get("enabled", False):
-            log.skip(f".claude/agents/{skill_cfg.get('role', skill_name)}.md",
-                     f"skill '{skill_name}' disabled")
+            log.info(f".claude/agents/{skill_cfg.get('role', skill_name)}.md",
+                     f"skill '{skill_name}' disabled (enabled: false)")
             continue
 
         submodule_key = skill_cfg.get("submodule", "")
@@ -534,6 +541,15 @@ def sync_external_skills(
 
         skill_source_dir = agent_meta_root / local_path / source_rel
         entry_path = skill_source_dir / entry_file
+
+        # Detect uninitialized submodule (directory exists but is empty)
+        submodule_dir = agent_meta_root / local_path
+        if submodule_dir.exists() and not any(submodule_dir.iterdir()):
+            log.warn(
+                f"Submodul '{local_path}' ist nicht initialisiert (leeres Verzeichnis) — "
+                f"bitte ausführen: git submodule update --init --recursive"
+            )
+            continue
 
         if not entry_path.exists():
             log.warn(f"Skill entry nicht gefunden: {entry_path}")
