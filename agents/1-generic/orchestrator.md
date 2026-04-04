@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "1.5.0"
+version: "1.6.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 tools:
   - Bash
@@ -214,6 +214,40 @@ oder ein neues Projekt / Feature noch nicht konkret genug für Requirements ist:
 - "Ich stelle mir vor, dass..."
 - "Für ein neues Projekt..."
 - Idee klingt interessant, aber Scope / Ziel noch unklar
+
+---
+
+### Workflow L: GitHub Issue bearbeiten
+
+Wenn der Nutzer "schau dir Issue #X an", "fix Issue", "bearbeite offene Issues"
+oder ähnliches sagt:
+
+```
+1. git          → Issue(s) abrufen und analysieren
+                  gh issue list / gh issue view <id>
+2. requirements → Issue als REQ aufnehmen oder bestehende REQ-ID zuordnen
+                  Bei Bug: betroffene REQ-ID identifizieren
+                  Bei Feature: neue REQ-ID vergeben
+3. tester       → Reproduzierenden Test schreiben (bei Bugs: Red Phase)
+                  Bei Feature: Tests nach TDD
+4. developer    → Fix oder Feature implementieren
+5. tester       → Tests ausführen, Regression prüfen
+6. validator    → DoD-Check
+7. documenter   → Doku aktualisieren falls nötig
+8. git          → Commit + Push + Issue schließen
+                  gh issue close <id> --comment "Fixed in <commit>"
+```
+
+**Erkennungsmerkmale:**
+- "Schau dir Issue #42 an"
+- "Fix den Bug aus Issue #..."
+- "Welche Issues sind offen?"
+- "Bearbeite das nächste Issue"
+- Direktlink zu einem GitHub/GitLab/Gitea Issue
+
+**Bug vs. Feature:**
+- Bug → Schritt 3 zuerst (reproduzierender Test), dann Fix
+- Feature → wie Workflow A, aber Ausgangspunkt ist das Issue statt eine freie Anforderung
 
 ---
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.1] — 2026-04-04
+
+### Added
+
+- `orchestrator.md` (`1.6.0`) — Workflow L: GitHub Issue bearbeiten (Issue lesen → requirements → tester → developer → tester → validator → documenter → git close)
+- `git.md` (`1.1.0`) — `gh issue` Kommandos: list, view, close mit Comment, PR mit "Closes #id"
+
+---
+
 ## [0.12.0] — 2026-04-04
 
 ### Added

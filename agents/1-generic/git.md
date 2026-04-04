@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.0.0"
+version: "1.1.0"
 description: "Generisches Template für den Git-Agenten. Verantwortlich für alle Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 tools:
   - Bash
@@ -280,8 +280,17 @@ git commit -m "chore: upgrade agent-meta to v<neue-version>"
 # CLI-Auth prüfen
 gh auth status
 
+# Issues lesen
+gh issue list                        # alle offenen Issues
+gh issue list --label bug            # gefiltert nach Label
+gh issue view <id>                   # Issue-Details + Body
+gh issue view <id> --comments        # inkl. Kommentare
+
+# Issue schließen nach Fix
+gh issue close <id> --comment "Fixed in <commit-hash>"
+
 # PR erstellen (nach Feature-Branch-Push)
-gh pr create --title "feat(REQ-042): queue persistence" --body "..."
+gh pr create --title "fix(REQ-042): ..." --body "Closes #<id>"
 
 # Release erstellen → Delegation an release-Agent
 ```
