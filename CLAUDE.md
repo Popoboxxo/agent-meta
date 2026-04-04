@@ -233,6 +233,23 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 
 ## Config-Felder
 
+### `ai-provider` — AI Provider (optional, empfohlen)
+
+```json
+"ai-provider": "Claude"
+```
+
+Steuert provider-spezifisches Verhalten von `sync.py`:
+
+| Wert | Verhalten |
+|------|-----------|
+| `"Claude"` | `CLAUDE.md` wird automatisch erstellt (wenn nicht vorhanden) + managed block bei jedem sync aktualisiert |
+| Anderer Wert / fehlt | Kein `CLAUDE.md`-Handling — weder Erstellen noch Update |
+
+Verfügbare Werte: `Claude`, `GitHub` (weitere folgen bei Bedarf)
+
+---
+
 ### `roles` — Agenten-Whitelist (optional)
 
 ```json
@@ -249,7 +266,7 @@ Verfügbare Rollen: `orchestrator`, `developer`, `tester`, `validator`, `require
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
-Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`.
+Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AI_PROVIDER`.
 
 ### Generische Variablen (alle Projekte)
 

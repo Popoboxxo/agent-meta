@@ -1,7 +1,9 @@
 {
   "_comment": "agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.",
 
-  "agent-meta-version": "0.12.2",
+  "agent-meta-version": "0.13.0",
+
+  "ai-provider": "Claude",
 
   "platforms": [],
 

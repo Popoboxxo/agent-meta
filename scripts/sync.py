@@ -109,7 +109,7 @@ class SyncLog:
 
     def warn(self, message: str):
         self.warnings.append(f"[WARN]   {message}")
-        print(f"  ⚠  {message}", file=sys.stderr)
+        print(f"  !  {message}", file=sys.stderr)
 
     def skip(self, target: str, reason: str):
         self.skipped.append(f"[SKIP]   {target:<50}  ({reason})")
@@ -217,6 +217,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables.update(config.get("variables", {}))
+    # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
+    if "AI_PROVIDER" not in variables:
+        variables["AI_PROVIDER"] = config.get("ai-provider", "")
     return variables, unmapped
 
 
@@ -632,9 +635,9 @@ def add_skill(
     # Run git submodule add (skip if already exists)
     submodule_target = agent_meta_root / local_path
     if submodule_target.exists():
-        print(f"  ℹ  Submodule already exists: {local_path}")
+        print(f"  i  Submodule already exists: {local_path}")
     else:
-        print(f"  ↓  git submodule add {repo_url} {local_path}")
+        print(f"  >  git submodule add {repo_url} {local_path}")
         if not dry_run:
             result = subprocess.run(
                 ["git", "submodule", "add", repo_url, local_path],
@@ -642,7 +645,7 @@ def add_skill(
                 capture_output=False,
             )
             if result.returncode != 0:
-                print(f"  ✗  git submodule add failed", file=sys.stderr)
+                print(f"  !  git submodule add failed", file=sys.stderr)
                 return
 
     # Update external-skills.config.json
@@ -673,9 +676,9 @@ def add_skill(
     if not dry_run:
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(raw, f, indent=2, ensure_ascii=False)
-        print(f"  ✓  {EXTERNAL_SKILLS_CONFIG} updated")
-        print(f"  ℹ  Skill '{skill_name}' (enabled: true) → role: '{role}'")
-        print(f"  ℹ  To disable: set enabled: false in {EXTERNAL_SKILLS_CONFIG}")
+        print(f"  +  {EXTERNAL_SKILLS_CONFIG} updated")
+        print(f"  i  Skill '{skill_name}' (enabled: true) → role: '{role}'")
+        print(f"  i  To disable: set enabled: false in {EXTERNAL_SKILLS_CONFIG}")
 
 
 def create_extension(
@@ -688,7 +691,7 @@ def create_extension(
 ):
     """Create .claude/3-project/<prefix>-<role>-ext.md if it does not exist yet."""
     if role not in ROLE_MAP:
-        print(f"  ✗  Unknown role '{role}'. Valid roles: {', '.join(ROLE_MAP)}", file=sys.stderr)
+        print(f"  !  Unknown role '{role}'. Valid roles: {', '.join(ROLE_MAP)}", file=sys.stderr)
         return
 
     prefix = config["project"].get("prefix", "")
@@ -793,7 +796,7 @@ def init_claude_md(
     target_path = project_root / "CLAUDE.md"
 
     if target_path.exists():
-        print("  ℹ  CLAUDE.md already exists — skipped (use --only-variables)")
+        print("  i  CLAUDE.md already exists — skipped (use --only-variables)")
         log.skip("CLAUDE.md", "already exists")
         return
 
@@ -816,7 +819,7 @@ def only_variables(
 ):
     target_path = project_root / "CLAUDE.md"
     if not target_path.exists():
-        print("  ✗  CLAUDE.md not found — use --init to create it")
+        print("  !  CLAUDE.md not found — use --init to create it")
         sys.exit(1)
 
     content = target_path.read_text(encoding="utf-8")
@@ -880,7 +883,7 @@ def main():
                                (args.source, "--source"),
                                (args.role, "--role")]:
             if not required:
-                print(f"  ✗  --add-skill requires {flag}", file=sys.stderr)
+                print(f"  !  --add-skill requires {flag}", file=sys.stderr)
                 sys.exit(1)
         add_skill(agent_meta_root, args.add_skill, args.skill_name,
                   args.source, args.role, args.entry, log, args.dry_run)
@@ -890,7 +893,7 @@ def main():
 
     # All other modes require --config
     if not args.config:
-        print("  ✗  --config is required (except for --add-skill)", file=sys.stderr)
+        print("  !  --config is required (except for --add-skill)", file=sys.stderr)
         sys.exit(1)
 
     project_root = Path(args.config).resolve().parent
@@ -918,13 +921,17 @@ def main():
         update_extensions(project_root, variables, log, args.dry_run)
 
     else:
+        is_claude = variables.get("AI_PROVIDER", "").strip().lower() == "claude"
         mode = "init" if args.init else "sync"
-        if args.init:
+        if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         sync_external_skills(agent_meta_root, project_root, variables, log, args.dry_run)
-        sync_claude_md_managed(project_root, variables, log, args.dry_run)
+        if is_claude:
+            sync_claude_md_managed(project_root, variables, log, args.dry_run)
+        elif (project_root / "CLAUDE.md").exists():
+            log.info("CLAUDE.md", f"managed block update skipped (ai-provider: '{variables.get('AI_PROVIDER', '')}')")
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)
