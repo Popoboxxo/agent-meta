@@ -5,6 +5,21 @@
 
   "platforms": ["sharkord"],
 
+  "_comment_roles": "Optional: Whitelist der zu generierenden Rollen. Fehlt dieser Key → alle Rollen werden generiert.",
+  "roles": [
+    "orchestrator",
+    "developer",
+    "tester",
+    "validator",
+    "requirements",
+    "ideation",
+    "documenter",
+    "release",
+    "docker",
+    "meta-feedback",
+    "git"
+  ],
+
   "project": {
     "name":   "mein-projekt",
     "prefix": "mp",

@@ -5,6 +5,18 @@
 
   "platforms": [],
 
+  "roles": [
+    "orchestrator",
+    "developer",
+    "requirements",
+    "validator",
+    "documenter",
+    "git",
+    "release",
+    "meta-feedback",
+    "ideation"
+  ],
+
   "project": {
     "name":   "agent-meta",
     "prefix": "am",

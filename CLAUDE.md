@@ -199,6 +199,21 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 
 ---
 
+## Config-Felder
+
+### `roles` — Agenten-Whitelist (optional)
+
+```json
+"roles": ["orchestrator", "developer", "tester", ...]
+```
+
+Fehlt der Key → alle Rollen aus `1-generic/` + aktiven `2-platform/`-Overrides werden generiert (Rückwärtskompatibel).
+Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle anderen werden mit `[SKIP]` im Log übersprungen.
+
+Verfügbare Rollen: `orchestrator`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`
+
+---
+
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.

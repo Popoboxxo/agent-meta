@@ -368,6 +368,11 @@ def sync_agents(
     overrides, _ = collect_sources(agent_meta_root, platforms)
     target_dir = project_root / CLAUDE_AGENTS_DIR
 
+    # Optional role whitelist — if "roles" key is absent, all roles are generated
+    allowed_roles: set[str] | None = None
+    if "roles" in config:
+        allowed_roles = set(config["roles"])
+
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -376,6 +381,11 @@ def sync_agents(
         filename = target_filename(role)
         if not filename:
             log.skip(str(source_path.name), "keine Rolle in ROLE_MAP")
+            continue
+
+        if allowed_roles is not None and role not in allowed_roles:
+            log.skip(str(target_dir / filename).replace(str(project_root) + "/", "").replace(str(project_root) + "\\", ""),
+                     f"Rolle '{role}' nicht in config['roles']")
             continue
 
         target_path = target_dir / filename
