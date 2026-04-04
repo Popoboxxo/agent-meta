@@ -1,0 +1,19 @@
+{
+  "_comment": "Catalog of known/recommended external skill repositories for agent-meta.",
+  "_comment_usage": "The agent-meta-manager agent reads this file to help users discover and add external skills via --add-skill.",
+
+  "skills": {
+    "_comment_example": "Each entry describes a known skill repo. 'verified' means tested with agent-meta.",
+    "example-skill": {
+      "_comment": "This is a placeholder entry — replace with real skills as they become available.",
+      "repo": "https://github.com/owner/skill-repo",
+      "source": "path/within/repo",
+      "entry": "SKILL.md",
+      "role": "example-specialist",
+      "name": "Example Specialist",
+      "description": "Example skill entry — replace with real skills.",
+      "tags": ["example"],
+      "verified": false
+    }
+  }
+}

@@ -62,8 +62,10 @@ ROLE_MAP = {
     "documenter":    "documenter",
     "release":       "release",
     "docker":        "docker",
-    "meta-feedback": "meta-feedback",
-    "git":           "git",
+    "meta-feedback":       "meta-feedback",
+    "git":                 "git",
+    "agent-meta-manager":  "agent-meta-manager",
+    "feature":             "feature",
 }
 
 EXT_SUFFIX = "-ext"
@@ -801,13 +803,7 @@ CLAUDE_MD_MANAGED_TEMPLATE = """\
 
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
-## Verfügbare Agenten
-
 {{AGENT_HINTS}}
-
-### Generierte Agenten (technische Übersicht)
-
-{{AGENT_TABLE}}
 <!-- agent-meta:managed-end -->"""
 
 

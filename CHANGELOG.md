@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0] — 2026-04-04
+
+### Added
+
+- `agents/1-generic/agent-meta-manager.md` — new agent for managing agent-meta in a target project: upgrade, sync, feedback delegation, project-specific agent creation, external skill discovery
+- `agents/1-generic/feature.md` — new workflow agent for full feature lifecycle (Branch → REQ → TDD → Dev → Validate → PR) via sub-agent delegation; does not implement anything itself
+- `external-skills.catalog.json` — catalog of known/recommended external skill repositories; read by `agent-meta-manager` to help users discover available skills
+- `scripts/sync.py` — `ROLE_MAP`: added `agent-meta-manager` and `feature` roles
+- `howto/instantiate-project.md` — `feature` and `agent-meta-manager` added to generated agents table
+
+---
+
 ## [0.13.2] — 2026-04-04
 
 ### Added

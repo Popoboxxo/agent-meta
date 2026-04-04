@@ -92,6 +92,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/documenter.md` | `1-generic/documenter.md` |
 | `.claude/agents/release.md` | `2-platform/sharkord-release.md` |
 | `.claude/agents/docker.md` | `2-platform/sharkord-docker.md` |
+| `.claude/agents/feature.md` | `1-generic/feature.md` |
+| `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 
 ---
 

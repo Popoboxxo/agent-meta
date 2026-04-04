@@ -80,13 +80,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
-## Verfügbare Agenten
-
 {{AGENT_HINTS}}
-
-### Generierte Agenten (technische Übersicht)
-
-{{AGENT_TABLE}}
 <!-- agent-meta:managed-end -->
 
 ---

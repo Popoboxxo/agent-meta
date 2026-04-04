@@ -16,7 +16,9 @@
     "git",
     "release",
     "meta-feedback",
-    "ideation"
+    "ideation",
+    "agent-meta-manager",
+    "feature"
   ],
 
   "project": {

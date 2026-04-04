@@ -91,6 +91,7 @@ agent-meta/
     <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
 
   external-skills.config.json  ← Zentrale Skill-Konfiguration (Modell A)
+  external-skills.catalog.json ← Katalog bekannter/empfohlener Skill-Repos (für agent-meta-manager)
 
   howto/
     instantiate-project.md  ← Schritt-für-Schritt Einrichtung
@@ -115,40 +116,22 @@ agent-meta/
 
 ## Agenten im Zielprojekt
 
-### Namensgebung
-
-Alle Agenten heißen **generisch** — kein Projekt-Prefix:
-
-| Rolle | Datei in `.claude/agents/` | Quelle |
-|-------|---------------------------|--------|
-| Orchestrator | `orchestrator.md` | 1-generic |
-| Ideation | `ideation.md` | 1-generic |
-| Developer | `developer.md` | 1-generic |
-| Tester | `tester.md` | 1-generic |
-| Validator | `validator.md` | 1-generic |
-| Requirements | `requirements.md` | 1-generic |
-| Documenter | `documenter.md` | 1-generic |
-| Release | `release.md` | 1-generic oder 2-platform |
-| Docker | `docker.md` | 1-generic oder 2-platform |
-| Meta-Feedback | `meta-feedback.md` | 1-generic |
-| Git | `git.md` | 1-generic |
-
 ### Generierte Agenten (Self-Hosting)
 
 <!-- agent-meta:managed-begin -->
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.13.1 — `2026-04-04`
-
-## Verfügbare Agenten
+Generiert von agent-meta v0.14.0 — `2026-04-04`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
 | Agent | Zuständigkeit |
 |-------|--------------|
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
+| `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
@@ -156,20 +139,6 @@ Generiert von agent-meta v0.13.1 — `2026-04-04`
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
-
-### Generierte Agenten (technische Übersicht)
-
-| Agent | Quelle | Layer |
-|-------|--------|-------|
-| `developer` | `developer.md` | 1-generic |
-| `documenter` | `documenter.md` | 1-generic |
-| `git` | `git.md` | 1-generic |
-| `ideation` | `ideation.md` | 1-generic |
-| `meta-feedback` | `meta-feedback.md` | 1-generic |
-| `orchestrator` | `orchestrator.md` | 1-generic |
-| `release` | `release.md` | 1-generic |
-| `requirements` | `requirements.md` | 1-generic |
-| `validator` | `validator.md` | 1-generic |
 <!-- agent-meta:managed-end -->
 
 ### Update-Verhalten bei sync
@@ -177,14 +146,14 @@ Generiert von agent-meta v0.13.1 — `2026-04-04`
 | Datei | Wird bei sync überschrieben? | Bekommt generische Updates? |
 |-------|-----------------------------|-----------------------------|
 | `.claude/agents/*.md` (generiert) | ✅ Ja, immer | ✅ Ja |
-| `CLAUDE.md` — managed block | ✅ Ja, managed block wird aktualisiert | ✅ Ja (AGENT_TABLE + Version) |
+| `CLAUDE.md` — managed block | ✅ Ja, managed block wird aktualisiert | ✅ Ja (AGENT_HINTS + Version) |
 | `CLAUDE.md` — Rest | ❌ Nein, handgeschrieben | ❌ Manuell pflegen |
 | `.claude/3-project/*-ext.md` (Extension) | ❌ Nein, nur einmalig kopiert | ❌ Manuell pflegen |
 | `.claude/3-project/*.md` (Override, falls vorhanden) | ❌ Wird nicht generiert — liegt im Projekt | ❌ Manuell pflegen |
 
 **CLAUDE.md managed block** — eingeleitet durch `<!-- agent-meta:managed-begin -->`:
 - Wird von `sync.py` bei **jedem normalen sync** automatisch aktualisiert
-- Enthält: Agenten-Tabelle (`AGENT_TABLE`) + agent-meta Version + Datum
+- Enthält: Agenten-Hints-Tabelle (`AGENT_HINTS`) mit Orchestrator-Einstiegspunkt + agent-meta Version + Datum
 - Manuelle Änderungen innerhalb des Blocks werden überschrieben
 - Kein managed block in `CLAUDE.md` → sync gibt `[WARN]` aus mit Hinweis zum manuellen Einfügen
 - `--init` erstellt `CLAUDE.md` aus Template inkl. managed block (nur wenn nicht vorhanden)
@@ -275,14 +244,14 @@ Verfügbare Werte: `Claude`, `GitHub` (weitere folgen bei Bedarf)
 Fehlt der Key → alle Rollen aus `1-generic/` + aktiven `2-platform/`-Overrides werden generiert (Rückwärtskompatibel).
 Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle anderen werden mit `[SKIP]` im Log übersprungen.
 
-Verfügbare Rollen: `orchestrator`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`
+Verfügbare Rollen: `orchestrator`, `feature`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`, `agent-meta-manager`
 
 ---
 
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
-Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AI_PROVIDER`.
+Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`.
 
 ### Generische Variablen (alle Projekte)
 
@@ -476,24 +445,6 @@ python .agent-meta/scripts/sync.py --config agent-meta.config.json
 
 ---
 
-## Agenten-Rollen
-
-| Rolle | Generic | Plattform (Sharkord) | Zweck |
-|-------|---------|---------------------|-------|
-| `orchestrator` | `1-generic/orchestrator.md` | — | Koordination |
-| `ideation` | `1-generic/ideation.md` | — | Ideenfindung, Visions-Schärfung, Übergabe an Requirements |
-| `developer` | `1-generic/developer.md` | — | REQ-driven Implementierung |
-| `tester` | `1-generic/tester.md` | — | TDD, Test-Suite, Coverage |
-| `validator` | `1-generic/validator.md` | — | DoD-Check, Traceability |
-| `requirements` | `1-generic/requirements.md` | — | REQ-Aufnahme, REQUIREMENTS.md |
-| `documenter` | `1-generic/documenter.md` | — | Doku-Pflege, Erkenntnisse |
-| `meta-feedback` | `1-generic/meta-feedback.md` | — | Feedback an agent-meta, GitHub Issues |
-| `git` | `1-generic/git.md` | — | Commits, Branches, Merges, Tags, Push/Pull |
-| `release` | `1-generic/release.md` | `2-platform/sharkord-release.md` | Versioning, GitHub Release |
-| `docker` | `1-generic/docker.md` | `2-platform/sharkord-docker.md` | Dev-Stack, Binaries |
-
----
-
 ## Standard-Entwicklungsworkflows
 
 Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
@@ -621,7 +572,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, ideation, documenter, meta-feedback)
+(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature)
 
 0-external/_skill-wrapper.md
     └── external-skills.config.json (enabled skills)
@@ -647,6 +598,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
 | `external-skills.config.json` | Projekte neu syncen |
 | `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
+| `hint:` Feld in einem Agenten-Template | Projekte neu syncen (AGENT_HINTS wird neu generiert) |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
 
 ### Änderungs-Kategorien
@@ -679,6 +631,7 @@ Generierte Dateien erhalten automatisch `generated-from:` (gesetzt von `sync.py`
 | Feld | 1-generic | 2-platform | generiert in `.claude/agents/` |
 |------|-----------|------------|-------------------------------|
 | `version` | ✅ manuell pflegen | ✅ manuell pflegen | erhalten aus Template |
+| `hint` | ✅ manuell pflegen | ✅ manuell pflegen | erhalten aus Template — erscheint in `AGENT_HINTS` in `CLAUDE.md` |
 | `based-on` | — | ✅ `<generic>@<version>` | erhalten aus Template |
 | `generated-from` | — | — | ✅ automatisch von sync.py |
 
