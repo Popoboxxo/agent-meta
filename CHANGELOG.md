@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.12.3] — 2026-04-04
+
+### Added
+
+- `sync.py` — optional `"roles"` whitelist in config: only listed roles are generated; absent key = all roles (backwards-compatible). Skipped roles logged as `[SKIP]`.
+- `sync.py` — `log.info()` method: disabled external skills now logged as `[INFO]` (always visible, not mixed with `[SKIP]`)
+- `sync.py` — uninitialized submodule detection: if `external/<name>` dir is empty, emits actionable `[WARN]` with `git submodule update --init --recursive` hint
+- `CLAUDE.md` — new "Config-Felder" section documenting `roles` whitelist
+
+### Fixed
+
+- **#1** `howto/agent-meta.config.example.json` — `_comment_snippets` now explicitly states path is relative to `.agent-meta/snippets/` (not `.claude/snippets/`)
+- **#2** `meta-feedback.md` (`1.3.2`) — issue titles always in English regardless of `DOCS_LANGUAGE`; rule added to Don'ts and Sprache section
+- **#3** `howto/instantiate-project.md` — `git submodule update --init --recursive` added to setup instructions
+
+### Changed
+
+- `agent-meta.config.json` (self-hosting) — `roles` whitelist added, excludes `docker` + `tester` → 0 warnings on sync
+- `agent-meta.config.example.json` — `roles` field documented with comment
+
+---
+
 ## [0.12.2] — 2026-04-04
 
 ### Added
