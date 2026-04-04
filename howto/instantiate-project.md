@@ -16,7 +16,7 @@ Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 
 ```bash
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.1.0 && cd ..
+cd .agent-meta && git checkout v0.14.0 && cd ..
 git submodule update --init --recursive  # wichtig: initialisiert verschachtelte Submodule (external/)
 ```
 
@@ -30,10 +30,15 @@ Pflichtfelder:
 
 ```json
 {
-  "agent-meta-version": "0.1.0",
+  "agent-meta-version": "0.14.0",
+  "ai-provider": "Claude",
   "platforms": ["sharkord"],
+  "roles": ["orchestrator", "developer", "tester", "validator",
+            "requirements", "documenter", "git", "release", "docker",
+            "ideation", "meta-feedback", "feature", "agent-meta-manager"],
   "project": {
     "name": "sharkord-mein-plugin",
+    "prefix": "mpl",
     "short": "mein-plugin"
   },
   "variables": { ... }
@@ -49,8 +54,9 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ```
 
 Das Script erzeugt:
-- `CLAUDE.md` aus Template — **automatisch**, wenn `"ai-provider": "Claude"` in der Config gesetzt ist und die Datei noch nicht existiert
+- `CLAUDE.md` — **automatisch**, wenn `"ai-provider": "Claude"` in der Config gesetzt ist und die Datei noch nicht existiert
 - `.claude/agents/*.md` — alle Agenten, generisch benannt
+- `CLAUDE.md` managed block — wird bei jedem sync automatisch aktualisiert
 - `sync.log` mit Zusammenfassung und Warnungen
 
 > **managed block in CLAUDE.md:** Der Abschnitt zwischen `<!-- agent-meta:managed-begin -->` und
@@ -167,9 +173,10 @@ Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
-- [ ] `.agent-meta/` Submodul auf gewünschter Version
-- [ ] `agent-meta.config.json` vollständig befüllt
+- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.14.0` oder neuer)
+- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-provider: Claude`)
 - [ ] `sync.log` ohne Warnungen
+- [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
 - [ ] `.claude/agents/orchestrator.md` vorhanden
 - [ ] `.claude/agents/developer.md` vorhanden
@@ -179,4 +186,6 @@ Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 - [ ] `.claude/agents/documenter.md` vorhanden
 - [ ] `.claude/agents/release.md` vorhanden
 - [ ] `.claude/agents/docker.md` vorhanden
+- [ ] `.claude/agents/feature.md` vorhanden
+- [ ] `.claude/agents/agent-meta-manager.md` vorhanden
 - [ ] `docs/REQUIREMENTS.md` initialisiert
