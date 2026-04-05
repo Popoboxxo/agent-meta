@@ -6,14 +6,20 @@
 
 | Datei | Verhalten |
 |-------|-----------|
-| `.claude/agents/*.md` | Werden **überschrieben** — neue Version aus Meta-Repo |
-| `CLAUDE.md` | Wird **nicht** angefasst (außer `--only-variables`) |
+| `.claude/agents/*.md` (aktive Rollen) | Werden **überschrieben** — neue Version aus Meta-Repo |
+| `.claude/agents/*.md` (entfernte Rollen) | Werden **gelöscht** — Cleanup bei jedem Sync |
+| `CLAUDE.md` — managed block | Wird **automatisch aktualisiert** bei `ai-provider: Claude` |
+| `CLAUDE.md` — Rest | Wird **nicht** angefasst |
+| `CLAUDE.personal.md` | Wird **nicht** angefasst |
+| `.claude/settings.json` | Wird **nicht** angefasst |
+| `.gitignore` | Fehlende Einträge werden **ergänzt** |
 | `.claude/3-project/*-ext.md` | Werden **nicht** überschrieben — bleiben erhalten |
 | `.claude/3-project/*.md` (Override) | Werden **nicht** angefasst |
 | `agent-meta.config.json` | Wird **nicht** angefasst — manuell prüfen |
 
 **Kernregel:** Alles in `.claude/agents/` wird bei jedem Sync neu generiert.
-Eigene Anpassungen dort gehen verloren. Alles in `.claude/3-project/` ist sicher.
+Rollen die aus `config['roles']` entfernt wurden, werden automatisch gelöscht.
+Alles in `.claude/3-project/` ist sicher — wird nie überschrieben.
 
 ---
 
