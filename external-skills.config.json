@@ -13,10 +13,10 @@
   },
 
   "skills": {
-    "_comment": "Skill-Name → Konfiguration. enabled:true/false steuert ob Wrapper-Agent generiert wird.",
+    "_comment": "Skill-Name → Konfiguration. approved:true = vom Meta-Maintainer freigegeben (Quality Gate). Projekte aktivieren Skills über 'external-skills' in agent-meta.config.json.",
 
     "home-organization": {
-      "enabled": false,
+      "approved": true,
       "submodule": "neat-little-package",
       "source": "plugins/spirograph/skills/home-organization",
       "entry": "SKILL.md",
@@ -36,7 +36,7 @@
     },
 
     "opengrid-openscad": {
-      "enabled": false,
+      "approved": true,
       "submodule": "neat-little-package",
       "source": "plugins/spirograph/skills/opengrid-openscad",
       "entry": "SKILL.md",

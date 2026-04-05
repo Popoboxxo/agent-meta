@@ -481,8 +481,9 @@ def sync_agents(
 
     # Also track external skill agent filenames (they are not in overrides)
     ext_config = load_external_skills_config(agent_meta_root)
+    project_skills = config.get("external-skills", {})
     for skill_name, skill_cfg in ext_config.get("skills", {}).items():
-        if skill_cfg.get("enabled", False):
+        if _skill_is_active(skill_name, skill_cfg, project_skills):
             role = skill_cfg.get("role", skill_name)
             expected_filenames.add(f"{role}.md")
 
@@ -546,6 +547,21 @@ def sync_snippets(
             target_path.write_text(source_content, encoding="utf-8")
 
 
+def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
+    """Return True if a skill should be generated for the current project.
+
+    Two-gate check:
+    1. approved: true in external-skills.config.json  (meta-maintainer quality gate)
+    2. enabled:  true in agent-meta.config.json        (project opt-in)
+
+    If project has no "external-skills" block at all, no skill is generated.
+    """
+    return (
+        skill_cfg.get("approved", False)
+        and project_skills.get(skill_name, {}).get("enabled", False)
+    )
+
+
 def load_external_skills_config(agent_meta_root: Path) -> dict:
     """Load external-skills.config.json from agent-meta root. Returns empty structure if not found."""
     config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
@@ -588,14 +604,21 @@ def build_additional_files_section(skill_name: str, additional_files: list[str])
 def sync_external_skills(
     agent_meta_root: Path,
     project_root: Path,
+    config: dict,
     variables: dict,
     log: SyncLog,
     dry_run: bool,
 ):
-    """Generate .claude/agents/<role>.md wrapper agents for all enabled external skills."""
+    """Generate .claude/agents/<role>.md wrapper agents for approved + project-enabled skills.
+
+    Two-gate check per skill:
+    1. approved: true in external-skills.config.json  (meta-maintainer quality gate)
+    2. enabled:  true in agent-meta.config.json        (project opt-in)
+    """
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
     submodules = ext_config.get("submodules", {})
+    project_skills = config.get("external-skills", {})
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
@@ -607,10 +630,16 @@ def sync_external_skills(
     skills_dir = project_root / CLAUDE_SKILLS_DIR
 
     for skill_name, skill_cfg in skills.items():
-        if not skill_cfg.get("enabled", False):
-            log.info(f".claude/agents/{skill_cfg.get('role', skill_name)}.md",
-                     f"skill '{skill_name}' disabled (enabled: false)")
+        role_label = f".claude/agents/{skill_cfg.get('role', skill_name)}.md"
+        if not skill_cfg.get("approved", False):
+            log.info(role_label, f"skill '{skill_name}' not approved — skipping")
             continue
+        project_skill_cfg = project_skills.get(skill_name, {})
+        if not project_skill_cfg.get("enabled", False):
+            log.info(role_label, f"skill '{skill_name}' not enabled in agent-meta.config.json — skipping")
+            continue
+        # Warn if project tries to enable an unknown skill
+        # (already handled above: unknown skills simply won't appear in ext_config)
 
         submodule_key = skill_cfg.get("submodule", "")
         submodule_cfg = submodules.get(submodule_key, {})
@@ -741,7 +770,7 @@ def add_skill(
         "local_path": local_path,
     }
     raw.setdefault("skills", {})[skill_name] = {
-        "enabled": True,
+        "approved": False,
         "submodule": submodule_name,
         "source": source_path,
         "entry": entry,
@@ -757,8 +786,9 @@ def add_skill(
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(raw, f, indent=2, ensure_ascii=False)
         print(f"  +  {EXTERNAL_SKILLS_CONFIG} updated")
-        print(f"  i  Skill '{skill_name}' (enabled: true) → role: '{role}'")
-        print(f"  i  To disable: set enabled: false in {EXTERNAL_SKILLS_CONFIG}")
+        print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
+        print(f"  i  To activate: set approved: true in {EXTERNAL_SKILLS_CONFIG},")
+        print(f"     then add to agent-meta.config.json: \"external-skills\": {{\"{skill_name}\": {{\"enabled\": true}}}}")
 
 
 def create_extension(
@@ -1079,7 +1109,16 @@ def main():
             ensure_gitignore_entries(project_root, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
-        sync_external_skills(agent_meta_root, project_root, variables, log, args.dry_run)
+        # Warn for unknown skills referenced in project config
+        if "external-skills" in config:
+            ext_config = load_external_skills_config(agent_meta_root)
+            known_skills = set(ext_config.get("skills", {}).keys())
+            for skill_name in config["external-skills"]:
+                if skill_name not in known_skills:
+                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json — skipping")
+                elif not ext_config["skills"][skill_name].get("approved", False):
+                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer — skipping")
+        sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
         if is_claude:
             sync_claude_md_managed(project_root, variables, log, args.dry_run)
         elif (project_root / "CLAUDE.md").exists():

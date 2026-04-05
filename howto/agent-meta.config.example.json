@@ -31,6 +31,13 @@
     "short":  "mein-projekt"
   },
 
+  "_comment_external_skills": "Optional: Externe Skills aktivieren. Nur Skills mit approved:true in external-skills.config.json können aktiviert werden.",
+  "external-skills": {
+    "_comment": "skill-name → { enabled: true/false }. Skill muss in external-skills.config.json approved:true haben.",
+    "home-organization": { "enabled": false },
+    "opengrid-openscad": { "enabled": false }
+  },
+
   "variables": {
 
     "_section_generic": "================================================================",
