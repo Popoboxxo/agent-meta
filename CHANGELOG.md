@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.15.0] — 2026-04-05
+
+### Breaking Changes
+
+- `external-skills.config.json`: `"submodules"` renamed to `"repos"` — update existing configs
+- `external-skills.config.json`: `"enabled"` renamed to `"approved"` (meta-maintainer quality gate)
+- `external-skills.config.json`: skill key `"submodule"` renamed to `"repo"`
+- `external-skills.catalog.json`: removed — content merged into `external-skills.config.json`
+- Projects must now opt-in to external skills via `"external-skills"` block in `agent-meta.config.json`
+
+### Added
+
+- **Two-gate system for external skills:** `approved: true` (meta-maintainer) + `enabled: true` in project config both required
+- **`repos` section** in `external-skills.config.json`: 1:n relationship to skills, with `pinned_commit` for deterministic versioning
+- **`pinned_commit` enforcement:** `sync.py` warns on every sync if submodule deviates from pinned commit
+- **`add_skill()`** now auto-pins current commit to `pinned_commit` on registration
+- **Project opt-in:** new `"external-skills"` block in `agent-meta.config.json` activates approved skills per project
+- **`[WARN]`** for unknown or non-approved skills referenced in project config
+- **`howto/external-skills.md`**: comprehensive howto with ASCII diagrams, full lifecycle (Skill-Autor → Meta-Maintainer → Projekt-Entwickler), `--add-skill` parameter reference, log output guide, troubleshooting, versioning strategy
+- **`howto/first-steps.md`**: guided AI-assisted setup for first-time config
+
+### Changed
+
+- `sync.py` — `check_pinned_commits()`: new function, runs on every sync
+- `sync.py` — `_skill_is_active()`: centralized two-gate check helper
+- `sync.py` — `add_skill()`: writes `approved: false` as default, prints activation instructions
+- `agents/1-generic/agent-meta-manager.md`: fixed skill deactivation instructions (was pointing to wrong config level)
+- `howto/upgrade-guide.md`: migration guide for Breaking Changes
+- `howto/instantiate-project.md`: external skills section updated, links to new howto
+- `README.md`, `CLAUDE.md`: updated references, split `&&`-chained commands into individual blocks
+
+### Migration from 0.14.x
+
+See [howto/upgrade-guide.md](howto/upgrade-guide.md) — section "Breaking Change: v0.14.4 → approved".
+
+In `external-skills.config.json`:
+- Rename `"submodules"` → `"repos"`, add `"pinned_commit"` to each repo entry
+- Rename `"enabled"` → `"approved"` in each skill entry
+- Rename `"submodule"` → `"repo"` in each skill entry
+
+In each project's `agent-meta.config.json`:
+- Add `"external-skills": { "skill-name": { "enabled": true } }` for each desired skill
+
+---
+
 ## [0.14.4] — 2026-04-05
 
 ### Added
