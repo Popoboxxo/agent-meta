@@ -150,3 +150,32 @@ sie ergänzen ihn mit eigenem Wissen. Dadurch sind Konflikte selten.
 - [ ] `sync.log` ohne neue Warnungen
 - [ ] Extensions bei Bedarf manuell geprüft
 - [ ] Committed
+
+---
+
+## Breaking Change: v0.14.4 → `enabled` → `approved` in external-skills.config.json
+
+Ab v0.14.4 gilt für External Skills ein **Two-Gate-System**:
+
+- `external-skills.config.json`: `enabled` wurde in `approved` umbenannt — Meta-Maintainer-Freigabe
+- `agent-meta.config.json`: neuer `"external-skills"` Block für projektlokale Aktivierung
+
+**Migration:**
+
+In `external-skills.config.json` — alle `"enabled"` umbenennen:
+```json
+// vorher
+"enabled": true
+
+// nachher
+"approved": true
+```
+
+In `agent-meta.config.json` des Projekts — neuen Block ergänzen für jeden gewünschten Skill:
+```json
+"external-skills": {
+  "my-skill": { "enabled": true }
+}
+```
+
+Ohne diesen Block werden **keine** externen Skills generiert (sicheres Default).
