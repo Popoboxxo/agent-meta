@@ -1,10 +1,24 @@
 # Changelog
 
+## [0.14.2] — 2026-04-05
+
+### Added
+
+- `howto/CLAUDE.personal-template.md`: template for personal Claude preferences (gitignored, never committed)
+- `sync.py` — `init_claude_personal()`: copies `CLAUDE.personal-template.md` to `CLAUDE.personal.md` in target project on first sync (only when `ai-provider: Claude`); idempotent
+
+### Changed
+
+- `sync.py` — `.gitignore` entries are ensured on every sync (not just once) — missing entries are appended; existing entries untouched
+- `CLAUDE.md` — update-behavior table revised: added `CLAUDE.personal.md`, `.claude/settings.json`, `.gitignore` rows with committed/gitignored column
+- `howto/sync-concept.md` — sync behavior table expanded; Team vs. Persönlich table updated with "Angelegt von" column
+- `howto/instantiate-project.md` — commit command includes `.gitignore`; checklist expanded
+
 ## [0.14.1] — 2026-04-05
 
 ### Added
 
-- `sync.py` — `init_settings_json()`: creates `.claude/settings.json` (team permissions skeleton) in target project on every sync if not present (only when `ai-provider: Claude`)
+- `sync.py` — `init_settings_json()`: creates `.claude/settings.json` (team permissions skeleton) in target project if not present (only when `ai-provider: Claude`)
 - `sync.py` — `ensure_gitignore_entries()`: ensures `.claude/settings.local.json`, `CLAUDE.personal.md`, and `sync.log` are in `.gitignore`; creates `.gitignore` if absent (only when `ai-provider: Claude`)
 
 ---

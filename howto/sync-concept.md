@@ -69,12 +69,14 @@ agent-meta/
 
 ### Team vs. Persönlich
 
-| Datei | Committed? | Zweck |
-|-------|------------|-------|
-| `CLAUDE.md` | Ja | Projektregeln für alle |
-| `CLAUDE.personal.md` | Nein (gitignored) | Persönliche Präferenzen |
-| `.claude/settings.json` | Ja | Team-Permissions |
-| `.claude/settings.local.json` | Nein (gitignored) | Persönliche Permissions |
+| Datei | Committed? | Angelegt von | Zweck |
+|-------|------------|--------------|-------|
+| `CLAUDE.md` | Ja | sync.py (einmalig) | Projektregeln für alle |
+| `CLAUDE.personal.md` | Nein (gitignored) | sync.py (einmalig) | Persönliche Präferenzen |
+| `.claude/settings.json` | Ja | sync.py (einmalig) | Team-Permissions |
+| `.claude/settings.local.json` | Nein (gitignored) | Manuell | Persönliche Permissions |
+
+`CLAUDE.personal.md` wird einmalig aus `howto/CLAUDE.personal-template.md` kopiert und danach nie wieder von sync.py angefasst. Jeder Entwickler füllt sie für sich aus.
 
 ---
 
@@ -128,7 +130,7 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 | Feld | Bedeutung |
 |------|-----------|
 | `agent-meta-version` | Welches Release von agent-meta genutzt wird |
-| `ai-provider` | AI-Provider: `"Claude"` aktiviert CLAUDE.md auto-init + managed block |
+| `ai-provider` | AI-Provider: `"Claude"` aktiviert CLAUDE.md auto-init, managed block, settings.json + .gitignore |
 | `platforms` | Aktive Plattformen — bestimmt welche `2-platform/<plattform>-*.md` einbezogen werden |
 | `roles` | Whitelist der zu generierenden Rollen — fehlt der Key, werden alle Rollen generiert |
 | `project.name` | Vollständiger Projektname |
@@ -160,16 +162,21 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --source <path> --role <role>
 ```
 
-### Schreibverhalten pro Schicht
+### Schreibverhalten pro Schicht / Datei
 
-| Schicht | Verhalten |
-|---------|-----------|
-| `1-generic/` | **Immer überschreiben** — generierter Output |
-| `2-platform/` | **Immer überschreiben** — für alle konfigurierten Plattformen |
-| `3-project/` in Meta-Repo | **Überschreiben wenn Datei existiert** |
-| `CLAUDE.md` | **Auto-erstellen** wenn `ai-provider: Claude` + nicht vorhanden |
-| `CLAUDE.md` managed block | **Immer aktualisieren** bei `ai-provider: Claude` |
-| `.claude/3-project/*-ext.md` | **Einmalig anlegen** via `--create-ext` — nie überschreiben |
+| Datei / Schicht | Verhalten | Wann |
+|-----------------|-----------|------|
+| `.claude/agents/*.md` (`1-generic/`) | **Immer überschreiben** | Jeder Sync |
+| `.claude/agents/*.md` (`2-platform/`) | **Immer überschreiben** | Jeder Sync |
+| `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `CLAUDE.md` managed block | **Immer aktualisieren** | Jeder Sync |
+| `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `.claude/settings.json` | **Einmalig anlegen** (Skeleton) | Einmalig, wenn nicht vorhanden |
+| `.gitignore` | **Fehlende Einträge ergänzen** | Jeder Sync |
+| `.claude/3-project/*-ext.md` | **Einmalig anlegen** via `--create-ext` | Manuell angefordert |
+| `CLAUDE.personal.md`, `settings.local.json`, `sync.log` | **Nie anfassen** — gitignored | — |
+
+> Alle einmaligen Aktionen (`INIT`) sind nur bei `ai-provider: Claude` aktiv.
 
 ### CLAUDE.md managed block
 

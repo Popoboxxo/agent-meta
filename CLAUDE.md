@@ -94,9 +94,10 @@ agent-meta/
   external-skills.catalog.json ← Katalog bekannter/empfohlener Skill-Repos (für agent-meta-manager)
 
   howto/
-    instantiate-project.md  ← Schritt-für-Schritt Einrichtung
-    upgrade-guide.md         ← Upgrade auf neue agent-meta Version
-    CLAUDE.project-template.md
+    instantiate-project.md       ← Schritt-für-Schritt Einrichtung
+    upgrade-guide.md              ← Upgrade auf neue agent-meta Version
+    CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
+    CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)
     sync-concept.md
     template-gap-analysis.md
 
@@ -122,7 +123,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.14.0 — `2026-04-04`
+Generiert von agent-meta v0.14.1 — `2026-04-05`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
@@ -143,13 +144,17 @@ Generiert von agent-meta v0.14.0 — `2026-04-04`
 
 ### Update-Verhalten bei sync
 
-| Datei | Wird bei sync überschrieben? | Bekommt generische Updates? |
-|-------|-----------------------------|-----------------------------|
-| `.claude/agents/*.md` (generiert) | ✅ Ja, immer | ✅ Ja |
-| `CLAUDE.md` — managed block | ✅ Ja, managed block wird aktualisiert | ✅ Ja (AGENT_HINTS + Version) |
-| `CLAUDE.md` — Rest | ❌ Nein, handgeschrieben | ❌ Manuell pflegen |
-| `.claude/3-project/*-ext.md` (Extension) | ❌ Nein, nur einmalig kopiert | ❌ Manuell pflegen |
-| `.claude/3-project/*.md` (Override, falls vorhanden) | ❌ Wird nicht generiert — liegt im Projekt | ❌ Manuell pflegen |
+| Datei | Sync-Verhalten | Committed? |
+|-------|---------------|------------|
+| `.claude/agents/*.md` (generiert) | ✅ Immer überschrieben | Ja |
+| `CLAUDE.md` — managed block | ✅ Immer aktualisiert | Ja |
+| `CLAUDE.md` — Rest | ❌ Einmalig angelegt, dann manuell | Ja |
+| `CLAUDE.personal.md` | ❌ Einmalig angelegt aus Template | Nein (gitignored) |
+| `.claude/settings.json` | ❌ Einmalig angelegt (Skeleton) | Ja |
+| `.gitignore` | ✅ Fehlende Einträge werden ergänzt | Ja |
+| `.claude/3-project/*-ext.md` (Extension) | ❌ Einmalig via `--create-ext` | Ja |
+| `.claude/3-project/*.md` (Override) | ❌ Nicht von sync.py berührt | Ja |
+| `.claude/settings.local.json` | ❌ Nie angefasst | Nein (gitignored) |
 
 **CLAUDE.md managed block** — eingeleitet durch `<!-- agent-meta:managed-begin -->`:
 - Wird von `sync.py` bei **jedem normalen sync** automatisch aktualisiert

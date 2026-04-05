@@ -53,8 +53,11 @@ Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ```
 
-Das Script erzeugt:
-- `CLAUDE.md` — **automatisch**, wenn `"ai-provider": "Claude"` in der Config gesetzt ist und die Datei noch nicht existiert
+Das Script erzeugt beim ersten Aufruf (nur bei `ai-provider: Claude`):
+- `CLAUDE.md` — aus Template, wenn noch nicht vorhanden
+- `CLAUDE.personal.md` — persönliche Präferenzen-Template (gitignored, einmalig)
+- `.claude/settings.json` — Team-Permissions Skeleton (einmalig)
+- `.gitignore` — fehlende Einträge werden ergänzt (bei jedem Sync)
 - `.claude/agents/*.md` — alle Agenten, generisch benannt
 - `CLAUDE.md` managed block — wird bei jedem sync automatisch aktualisiert
 - `sync.log` mit Zusammenfassung und Warnungen
@@ -78,11 +81,12 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ### Schritt 5: Committen
 
 ```bash
-git add CLAUDE.md .claude/settings.json .claude/agents/ agent-meta.config.json .gitmodules .agent-meta
+git add CLAUDE.md .claude/settings.json .claude/agents/ .gitignore agent-meta.config.json .gitmodules .agent-meta
 git commit -m "chore: initialize agent-meta agents"
 ```
 
-> `CLAUDE.personal.md` und `.claude/settings.local.json` sind in `.gitignore` — nie committen.
+> `CLAUDE.personal.md` und `.claude/settings.local.json` sind gitignored — nie committen.
+> Jeder Entwickler im Team erhält `CLAUDE.personal.md` beim ersten `sync` automatisch.
 
 ---
 
@@ -180,6 +184,9 @@ Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
+- [ ] `CLAUDE.personal.md` vorhanden (gitignored, persönlich befüllen)
+- [ ] `.claude/settings.json` vorhanden und committed
+- [ ] `.gitignore` enthält `CLAUDE.personal.md`, `.claude/settings.local.json`, `sync.log`
 - [ ] `.claude/agents/orchestrator.md` vorhanden
 - [ ] `.claude/agents/developer.md` vorhanden
 - [ ] `.claude/agents/tester.md` vorhanden

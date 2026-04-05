@@ -844,6 +844,30 @@ def sync_claude_md_managed(
             target_path.write_text(new_content, encoding="utf-8")
 
 
+def init_claude_personal(
+    agent_meta_root: Path,
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy CLAUDE.personal-template.md to CLAUDE.personal.md if not present yet."""
+    template_path = agent_meta_root / "howto" / "CLAUDE.personal-template.md"
+    target_path = project_root / "CLAUDE.personal.md"
+
+    if target_path.exists():
+        log.skip("CLAUDE.personal.md", "already exists")
+        return
+
+    if not template_path.exists():
+        log.warn("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
+        return
+
+    content = template_path.read_text(encoding="utf-8")
+    log.action("INIT", "CLAUDE.personal.md", "howto/CLAUDE.personal-template.md")
+    if not dry_run:
+        target_path.write_text(content, encoding="utf-8")
+
+
 def init_settings_json(
     project_root: Path,
     log: SyncLog,
@@ -1030,6 +1054,7 @@ def main():
         mode = "init" if args.init else "sync"
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
             ensure_gitignore_entries(project_root, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
