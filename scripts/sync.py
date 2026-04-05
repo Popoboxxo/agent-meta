@@ -844,6 +844,51 @@ def sync_claude_md_managed(
             target_path.write_text(new_content, encoding="utf-8")
 
 
+def init_settings_json(
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Create .claude/settings.json if it does not exist yet."""
+    target_path = project_root / ".claude" / "settings.json"
+    if target_path.exists():
+        log.skip(".claude/settings.json", "already exists")
+        return
+
+    content = '{\n  "permissions": {\n    "allow": [],\n    "deny": []\n  }\n}\n'
+    log.action("INIT", ".claude/settings.json", "team permissions skeleton")
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+
+GITIGNORE_ENTRIES = [
+    ".claude/settings.local.json",
+    "CLAUDE.personal.md",
+    "sync.log",
+]
+
+
+def ensure_gitignore_entries(
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Ensure required entries exist in .gitignore. Creates .gitignore if absent."""
+    gitignore_path = project_root / ".gitignore"
+    existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+
+    missing = [e for e in GITIGNORE_ENTRIES if e not in existing]
+    if not missing:
+        log.skip(".gitignore", "all required entries already present")
+        return
+
+    new_content = existing.rstrip("\n") + "\n" + "\n".join(missing) + "\n"
+    log.action("UPDATE", ".gitignore", f"added: {', '.join(missing)}")
+    if not dry_run:
+        gitignore_path.write_text(new_content, encoding="utf-8")
+
+
 def init_claude_md(
     agent_meta_root: Path,
     project_root: Path,
@@ -985,6 +1030,8 @@ def main():
         mode = "init" if args.init else "sync"
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            init_settings_json(project_root, log, args.dry_run)
+            ensure_gitignore_entries(project_root, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         sync_external_skills(agent_meta_root, project_root, variables, log, args.dry_run)

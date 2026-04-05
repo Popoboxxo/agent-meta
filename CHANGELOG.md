@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.14.1] — 2026-04-05
+
+### Added
+
+- `sync.py` — `init_settings_json()`: creates `.claude/settings.json` (team permissions skeleton) in target project on every sync if not present (only when `ai-provider: Claude`)
+- `sync.py` — `ensure_gitignore_entries()`: ensures `.claude/settings.local.json`, `CLAUDE.personal.md`, and `sync.log` are in `.gitignore`; creates `.gitignore` if absent (only when `ai-provider: Claude`)
+
+---
+
 ## [0.14.0] — 2026-04-04
 
 ### Added
