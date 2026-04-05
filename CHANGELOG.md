@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.16.0] — 2026-04-06
+
+### Added
+
+- **Agent Composition System** (`extends:` + `patches:` in frontmatter): 2-platform and 3-project
+  override agents can now compose from a base template instead of maintaining full copies.
+  sync.py resolves composition at build time — the generated `.claude/agents/<role>.md` is a
+  fully assembled document with no composition metadata.
+- **Four patch operations:**
+  - `append-after`: insert content after a named section
+  - `replace`: replace a complete section (heading + body)
+  - `delete`: remove a section entirely
+  - `append`: append content at end of document
+- **Section-aware Markdown parsing** in `sync.py`: `_find_section_bounds()` identifies sections
+  by heading level, enabling precise patch targeting
+- **`compose_agent()`** in `sync.py`: loads base template, applies patches, merges frontmatter;
+  `extends:` and `patches:` keys are stripped from the generated output
+- **`howto/agent-composition.md`**: full documentation — concept, patch ops, anchor reference,
+  frontmatter-merge rules, debugging guide, 3-project compatibility
+- **`agents/2-platform/sharkord-developer.md`** rebuilt as composition agent (v2.0.0):
+  no longer a full copy of `1-generic/developer.md` — uses `extends:` + 3 patches
+
+### Changed
+
+- `sync.py`: `sync_agents()` detects `extends:` in frontmatter and invokes `compose_agent()`
+  before variable substitution — full-replacement mode (no `extends:`) is unchanged
+- `sync.py`: new import `pyyaml` (optional; warns gracefully if not installed)
+- `agents/2-platform/sharkord-developer.md`: version bumped to 2.0.0, rebuilt as composition file
+- `CLAUDE.md`: Schichten-Modell section updated — two modes for 2-platform, composition syntax,
+  Entscheidungsbaum updated, howto reference added
+
+### Notes
+
+- **Backwards compatible:** existing platform agents without `extends:` continue to work unchanged
+- **Requires PyYAML:** `pip install pyyaml` — sync.py warns and falls back to full-replacement
+  if PyYAML is not available
+
+---
+
 ## [0.15.1] — 2026-04-05
 
 ### Changed

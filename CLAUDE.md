@@ -40,9 +40,14 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 
 2-platform/   Plattformspezifisch. Überschreibt den Generic-Agent für alle
               Projekte auf dieser Plattform (z.B. alle Sharkord-Plugins).
+              Zwei Modi:
+              - Full-replacement (kein extends: im Frontmatter): Datei wird 1:1 verwendet
+              - Composition (extends: + patches: im Frontmatter): sync.py komponiert
+                aus Base + Patches. Sections können ergänzt, ersetzt oder gelöscht werden.
 
 3-project/    Projektspezifisch. Zwei Arten:
               - <rolle>.md      → Override: ersetzt den generierten Agenten komplett
+                                  Unterstützt ebenfalls extends:/patches: (Composition)
               - <rolle>-ext.md  → Extension: wird vom generierten Agenten additiv geladen
 ```
 
@@ -50,6 +55,27 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 ```
 1-generic  →  2-platform  →  3-project/<rolle>.md  →  0-external (eigenständige Rollen)
 ```
+
+**Composition (2-platform und 3-project Overrides):**
+```
+extends: "1-generic/<rolle>.md"   ← Base-Template
+patches:                          ← Operationen auf Markdown-Sections
+  - op: append-after              ← nach Section einfügen
+    anchor: "## Section Name"
+    content: |
+      ## Neuer Abschnitt ...
+  - op: replace                   ← Section vollständig ersetzen
+    anchor: "## Section Name"
+    content: |
+      ## Section Name (neu) ...
+  - op: delete                    ← Section entfernen
+    anchor: "## Section Name"
+  - op: append                    ← ans Dateiende anhängen
+    content: |
+      ## Anhang ...
+```
+Composition wird von sync.py zur Build-Zeit aufgelöst — das generierte `.claude/agents/<rolle>.md`
+enthält das vollständige, fertig zusammengesetzte Dokument. Kein `extends:` im Output.
 
 **Extension (additiv, kein Override):**
 ```
@@ -99,6 +125,7 @@ agent-meta/
     first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
     instantiate-project.md       ← Schritt-für-Schritt Einrichtung
     external-skills.md           ← External Skills: vollständige Anleitung (Lifecycle, Troubleshooting)
+    agent-composition.md         ← Composition-System: extends/patches, Patch-Ops, Beispiele
     upgrade-guide.md              ← Upgrade auf neue agent-meta Version
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
     CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)
@@ -127,7 +154,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.14.3 — `2026-04-05`
+Generiert von agent-meta v0.15.1 — `2026-04-05`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
@@ -183,11 +210,14 @@ Was brauche ich?
 │
 ├─ Strukturiertes Zusatzwissen (SDK-Patterns, E2E-Workflow, Plattform-Regeln)?
 │  Gilt es für ALLE Projekte auf einer Plattform?
-│   → Ja → 2-platform/<plattform>-<rolle>.md (neuer/erweiterter Agent)
+│   → Ja → 2-platform/<plattform>-<rolle>.md
+│           - Additive Sections / Section-Ersatz: extends: + patches:  ← COMPOSITION
+│           - Komplett anderer Aufbau: kein extends: (Full-replacement)
 │   → Nein (nur dieses Projekt) → .claude/3-project/<rolle>-ext.md  ← EXTENSION
 │
 └─ Fundamentaler Unterschied — anderer Workflow, andere Struktur, anderes Tooling?
-    → .claude/3-project/<rolle>.md  ← OVERRIDE (selten, gut begründen)
+    → .claude/3-project/<rolle>.md  ← OVERRIDE
+       Tipp: Auch hier ist extends: + patches: möglich statt Vollkopie!
 ```
 
 ### Extension: `.claude/3-project/<rolle>-ext.md`
@@ -643,6 +673,8 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 
 **Plattformwissen verbessern (gilt für alle Projekte auf Plattform X):**
 → `2-platform/<plattform>-<rolle>.md` ändern → Projekte neu syncen.
+→ Composition-Modus: `extends: "1-generic/<rolle>.md"` + `patches:` im Frontmatter nutzen statt Vollkopie.
+→ Siehe [howto/agent-composition.md](howto/agent-composition.md) für Details.
 
 **Neuen External Skill einbinden:**
 → `--add-skill` ausführen → `external-skills.config.json` prüfen → Projekte neu syncen.

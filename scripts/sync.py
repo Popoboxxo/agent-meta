@@ -32,6 +32,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+try:
+    import yaml as _yaml
+    _YAML_AVAILABLE = True
+except ImportError:
+    _YAML_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -376,6 +382,204 @@ def update_managed_block(existing: str, new_managed: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Composition engine (extends: / patches: system)
+# ---------------------------------------------------------------------------
+
+def _split_frontmatter(content: str) -> tuple[str, str]:
+    """Split content into (frontmatter_block, body).
+
+    Returns ('', content) if no frontmatter found.
+    frontmatter_block includes the surrounding '---' delimiters.
+    """
+    if not content.startswith("---"):
+        return "", content
+    end = content.find("\n---", 3)
+    if end == -1:
+        return "", content
+    fm_block = content[: end + 4]   # includes closing ---
+    body = content[end + 4:]        # everything after closing ---
+    return fm_block, body
+
+
+def _parse_frontmatter_yaml(content: str) -> dict:
+    """Parse YAML frontmatter into a dict. Returns {} on failure or missing yaml."""
+    if not _YAML_AVAILABLE:
+        return {}
+    fm_block, _ = _split_frontmatter(content)
+    if not fm_block:
+        return {}
+    # Strip the --- delimiters for yaml.safe_load
+    inner = re.sub(r"^---\n?", "", fm_block)
+    inner = re.sub(r"\n?---\s*$", "", inner)
+    try:
+        result = _yaml.safe_load(inner)
+        return result if isinstance(result, dict) else {}
+    except Exception:
+        return {}
+
+
+def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | None:
+    """Find (start, end) line indices for a Markdown section.
+
+    anchor must match the heading line exactly (e.g. '## Don\\'ts').
+    start is inclusive (the heading line).
+    end is exclusive (first line of next section at same or higher level, or len(lines)).
+    """
+    anchor_stripped = anchor.strip()
+    anchor_level = len(anchor_stripped) - len(anchor_stripped.lstrip("#"))
+
+    start_idx = None
+    for i, line in enumerate(lines):
+        if line.rstrip() == anchor_stripped:
+            start_idx = i
+            break
+
+    if start_idx is None:
+        return None
+
+    for i in range(start_idx + 1, len(lines)):
+        line = lines[i]
+        if line.startswith("#"):
+            level = len(line) - len(line.lstrip("#"))
+            if level <= anchor_level:
+                return (start_idx, i)
+
+    return (start_idx, len(lines))
+
+
+def _patch_append_after(content: str, anchor: str, patch_content: str,
+                        log: SyncLog, source_label: str) -> str:
+    """Insert patch_content after the section identified by anchor."""
+    lines = content.splitlines(keepends=True)
+    bounds = _find_section_bounds(lines, anchor)
+    if bounds is None:
+        log.warn(f"Composition patch 'append-after': anchor '{anchor}' not found in {source_label}")
+        return content
+    _, end_idx = bounds
+    # Trim trailing blank lines before the insertion point
+    insert_at = end_idx
+    patch_lines = ("\n\n" + patch_content.rstrip("\n") + "\n\n").splitlines(keepends=True)
+    result_lines = lines[:insert_at] + patch_lines + lines[insert_at:]
+    return "".join(result_lines)
+
+
+def _patch_replace(content: str, anchor: str, patch_content: str,
+                   log: SyncLog, source_label: str) -> str:
+    """Replace the entire section identified by anchor with patch_content."""
+    lines = content.splitlines(keepends=True)
+    bounds = _find_section_bounds(lines, anchor)
+    if bounds is None:
+        log.warn(f"Composition patch 'replace': anchor '{anchor}' not found in {source_label}")
+        return content
+    start_idx, end_idx = bounds
+    patch_lines = (patch_content.rstrip("\n") + "\n").splitlines(keepends=True)
+    result_lines = lines[:start_idx] + patch_lines + lines[end_idx:]
+    return "".join(result_lines)
+
+
+def _patch_delete(content: str, anchor: str, log: SyncLog, source_label: str) -> str:
+    """Delete the entire section identified by anchor."""
+    lines = content.splitlines(keepends=True)
+    bounds = _find_section_bounds(lines, anchor)
+    if bounds is None:
+        log.warn(f"Composition patch 'delete': anchor '{anchor}' not found in {source_label}")
+        return content
+    start_idx, end_idx = bounds
+    # Also remove leading blank line before section if present
+    trim_start = start_idx
+    if trim_start > 0 and lines[trim_start - 1].strip() == "":
+        trim_start -= 1
+    result_lines = lines[:trim_start] + lines[end_idx:]
+    return "".join(result_lines)
+
+
+def apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) -> str:
+    """Apply a single composition patch to content."""
+    op = patch.get("op", "")
+    anchor = patch.get("anchor", "")
+    patch_content = patch.get("content", "")
+
+    if op == "append":
+        return content.rstrip("\n") + "\n\n" + patch_content.rstrip("\n") + "\n"
+    elif op == "append-after":
+        return _patch_append_after(content, anchor, patch_content, log, source_label)
+    elif op == "replace":
+        return _patch_replace(content, anchor, patch_content, log, source_label)
+    elif op == "delete":
+        return _patch_delete(content, anchor, log, source_label)
+    else:
+        log.warn(f"Composition: unknown patch op '{op}' in {source_label}")
+        return content
+
+
+def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
+    """Replace the frontmatter block in base_content with values from override_fm.
+
+    Fields 'extends' and 'patches' are stripped (composition metadata).
+    All other override fields (name, version, description, hint, tools, based-on) win.
+    """
+    fm_block, body = _split_frontmatter(base_content)
+    if not _YAML_AVAILABLE:
+        return base_content  # Cannot merge without yaml — return base unchanged
+
+    # Parse base frontmatter
+    base_fm = _parse_frontmatter_yaml(base_content)
+
+    # Merge: base first, then override wins
+    merged = {**base_fm, **override_fm}
+
+    # Strip composition-only keys from the output frontmatter
+    for key in ("extends", "patches"):
+        merged.pop(key, None)
+
+    # Serialize back to YAML
+    try:
+        new_fm_inner = _yaml.dump(merged, allow_unicode=True, default_flow_style=False,
+                                  sort_keys=False).rstrip("\n")
+    except Exception:
+        return base_content
+
+    new_fm_block = f"---\n{new_fm_inner}\n---"
+    return new_fm_block + body
+
+
+def compose_agent(
+    base_path: Path,
+    override_content: str,
+    log: SyncLog,
+) -> str:
+    """Load base template, apply patches from override frontmatter, merge frontmatter.
+
+    Returns the composed document ready for variable substitution.
+    """
+    if not _YAML_AVAILABLE:
+        log.warn(
+            "PyYAML not available — composition skipped. "
+            "Install it with: pip install pyyaml"
+        )
+        return override_content
+
+    if not base_path.exists():
+        log.warn(f"Composition: base template not found: {base_path}")
+        return override_content
+
+    base_content = base_path.read_text(encoding="utf-8")
+    override_fm = _parse_frontmatter_yaml(override_content)
+    patches = override_fm.get("patches") or []
+
+    # Start from base, apply each patch
+    result = base_content
+    source_label = base_path.name
+    for patch in patches:
+        result = apply_patch(result, patch, log, source_label)
+
+    # Merge frontmatter: override fields win over base fields
+    result = _merge_frontmatter(result, override_fm)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Sync logic
 # ---------------------------------------------------------------------------
 
@@ -460,6 +664,17 @@ def sync_agents(
         expected_filenames.add(filename)
         target_path = target_dir / filename
         content = source_path.read_text(encoding="utf-8")
+
+        # Composition mode: if 'extends:' present in frontmatter, compose from base
+        extends_base = extract_frontmatter_field(content, "extends")
+        if extends_base:
+            base_path = agent_meta_root / AGENTS_DIR / extends_base
+            content = compose_agent(base_path, content, log)
+            log.info(
+                str(target_path.relative_to(project_root)),
+                f"composed from {extends_base} + {source_path.name}",
+            )
+
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
         # Preserve template description; interpolate {{PROJECT_NAME}} if present
