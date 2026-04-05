@@ -78,9 +78,11 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ### Schritt 5: Committen
 
 ```bash
-git add CLAUDE.md .claude/ agent-meta.config.json .gitmodules .agent-meta
+git add CLAUDE.md .claude/settings.json .claude/agents/ agent-meta.config.json .gitmodules .agent-meta
 git commit -m "chore: initialize agent-meta agents"
 ```
+
+> `CLAUDE.personal.md` und `.claude/settings.local.json` sind in `.gitignore` — nie committen.
 
 ---
 

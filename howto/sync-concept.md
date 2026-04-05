@@ -48,7 +48,10 @@ agent-meta/
   CLAUDE.md                  ← bei ai-provider: Claude automatisch erstellt, danach manuell gepflegt
                                ├─ managed block (auto-aktualisiert bei jedem sync)
                                └─ handgeschriebener Rest (nie überschrieben)
+  CLAUDE.personal.md         ← persönliche Präferenzen (gitignored, nie committen)
   .claude/
+    settings.json            ← Team-Permissions (committed ins Repo)
+    settings.local.json      ← persönliche Permissions (gitignored, nie committen)
     agents/                  ← vollständig generiert, nie manuell editieren
       orchestrator.md
       developer.md
@@ -63,6 +66,15 @@ agent-meta/
       <rolle>.md               ← Override (ersetzt Agenten komplett)
   sync.log                   ← Protokoll des letzten Sync-Laufs (gitignore empfohlen)
 ```
+
+### Team vs. Persönlich
+
+| Datei | Committed? | Zweck |
+|-------|------------|-------|
+| `CLAUDE.md` | Ja | Projektregeln für alle |
+| `CLAUDE.personal.md` | Nein (gitignored) | Persönliche Präferenzen |
+| `.claude/settings.json` | Ja | Team-Permissions |
+| `.claude/settings.local.json` | Nein (gitignored) | Persönliche Permissions |
 
 ---
 
