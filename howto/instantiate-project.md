@@ -189,6 +189,26 @@ Der generierte Agent liest diese Datei **beim Start automatisch** (Extension-Hoo
 Wenn Extension nicht reicht (anderer Workflow, andere Struktur):
 Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 
+### Externe Skills aktivieren
+
+External Skills sind spezialisierte Agenten aus Drittrepos (z.B. 3D-Druck, CAD).
+Welche Skills verfügbar sind, steht in `.agent-meta/external-skills.config.json` (`approved: true`).
+
+Skills werden **pro Projekt** aktiviert — in `agent-meta.config.json`:
+
+```json
+"external-skills": {
+  "home-organization": { "enabled": true },
+  "opengrid-openscad": { "enabled": true }
+}
+```
+
+**Two-Gate-Regel:** Ein Skill wird nur generiert wenn:
+1. Er in `external-skills.config.json` mit `approved: true` steht (Meta-Freigabe)
+2. Er im Projekt mit `enabled: true` aktiviert ist (Projekt-Opt-in)
+
+Nach dem nächsten Sync liegt der Skill-Agent in `.claude/agents/<role>.md`.
+
 ---
 
 ## Checkliste: Projekt vollständig eingerichtet?

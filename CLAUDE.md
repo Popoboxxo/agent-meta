@@ -32,7 +32,8 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 ```
 0-external/   Externe Skill-Agenten aus Drittrepos (via Git Submodule).
               Höchste Priorität. Konfiguriert in external-skills.config.json.
-              enabled: true/false — binäre Aktivierung pro Skill.
+              approved: true/false — Meta-Maintainer Quality Gate.
+              Projekte aktivieren Skills via "external-skills" in agent-meta.config.json.
 
 1-generic/    Universell. Gilt für jedes Projekt. Wird immer generiert,
               solange kein Override in 2-platform oder 3-project existiert.
@@ -91,6 +92,7 @@ agent-meta/
     <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
 
   external-skills.config.json  ← Zentrale Skill-Konfiguration (Modell A)
+                                  approved:true/false = Meta-Maintainer Quality Gate
   external-skills.catalog.json ← Katalog bekannter/empfohlener Skill-Repos (für agent-meta-manager)
 
   howto/
@@ -397,7 +399,7 @@ Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
   },
   "skills": {
     "my-skill": {
-      "enabled": true,
+      "approved": true,
       "submodule": "my-skills-repo",
       "source": "path/within/repo",
       "entry": "SKILL.md",
@@ -410,9 +412,28 @@ Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
 }
 ```
 
-- **`enabled: true/false`** — binäre Aktivierung ohne Eintrag zu löschen
+- **`approved: true/false`** — Meta-Maintainer Quality Gate: Skill ist geprüft und für Projekte nutzbar
 - **`entry`** — Abstraktion über die Einstiegsdatei (egal wie sie im Fremdrepo heißt)
 - **`additional_files`** — weitere Dokumente, die der Agent lazy per Read-Tool laden kann
+
+### Projektlokale Aktivierung: `agent-meta.config.json`
+
+Projekte aktivieren freigegebene Skills über einen eigenen Block in `agent-meta.config.json`:
+
+```json
+{
+  "external-skills": {
+    "my-skill": { "enabled": true }
+  }
+}
+```
+
+**Two-Gate-Regel:** Ein Skill wird nur generiert wenn **beide** Bedingungen erfüllt sind:
+1. `approved: true` in `external-skills.config.json` (Meta-Maintainer-Freigabe)
+2. `enabled: true` in `agent-meta.config.json` des Projekts (Projekt-Opt-in)
+
+Fehlt der `external-skills`-Block komplett → kein externer Skill wird generiert (sicheres Default).
+Referenziert ein Projekt einen unbekannten oder nicht-approved Skill → `[WARN]` im sync.log.
 
 ### Skill hinzufügen
 

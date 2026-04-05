@@ -104,6 +104,20 @@ cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
 - **`variables.ARCHITECTURE`** — Verzeichnisstruktur und Entry-Points
 - **`variables.CODE_CONVENTIONS`** — Coding-Regeln (Sprache, Namenskonventionen, Verbote)
 
+### Externe Skills (optional)
+
+Falls das Projekt spezialisierte externe Skill-Agenten benötigt (z.B. 3D-Druck, CAD):
+
+**AI-Assistent:** Lies `.agent-meta/external-skills.config.json` und zeige dem User
+welche Skills mit `approved: true` verfügbar sind. Frage ob er welche aktivieren möchte.
+
+Aktivierung in `agent-meta.config.json`:
+```json
+"external-skills": {
+  "skill-name": { "enabled": true }
+}
+```
+
 ---
 
 ## Schritt 4: Rollen auswählen
