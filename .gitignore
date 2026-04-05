@@ -3,3 +3,9 @@ __pycache__/
 .claude/settings.local.json
 CLAUDE.personal.md
 sync.log
+
+# --- agent-meta managed (do not edit) ---
+.claude/settings.local.json
+CLAUDE.personal.md
+sync.log
+# --- end agent-meta managed ---

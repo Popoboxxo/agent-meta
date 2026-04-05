@@ -993,23 +993,58 @@ GITIGNORE_ENTRIES = [
     "sync.log",
 ]
 
+GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
+GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
+
 
 def ensure_gitignore_entries(
     project_root: Path,
     log: SyncLog,
     dry_run: bool,
 ):
-    """Ensure required entries exist in .gitignore. Creates .gitignore if absent."""
+    """Ensure required entries exist in a managed block in .gitignore.
+
+    Writes a clearly marked block so users know the entries are managed by
+    agent-meta and should not be removed manually.
+    If the block already exists, it is updated in-place (entries added, never removed).
+    Entries that already exist outside the block are not duplicated.
+    """
     gitignore_path = project_root / ".gitignore"
     existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
 
-    missing = [e for e in GITIGNORE_ENTRIES if e not in existing]
+    # Extract current block content if present
+    block_pattern = re.compile(
+        re.escape(GITIGNORE_BLOCK_BEGIN) + r"(.*?)" + re.escape(GITIGNORE_BLOCK_END),
+        re.DOTALL,
+    )
+    block_match = block_pattern.search(existing)
+    block_entries: set[str] = set()
+    if block_match:
+        block_entries = {
+            line.strip() for line in block_match.group(1).splitlines() if line.strip()
+        }
+
+    # Entries already present anywhere in the file (outside block too)
+    all_present = {line.strip() for line in existing.splitlines() if line.strip() and not line.startswith("#")}
+
+    missing = [e for e in GITIGNORE_ENTRIES if e not in block_entries]
     if not missing:
         log.skip(".gitignore", "all required entries already present")
         return
 
-    new_content = existing.rstrip("\n") + "\n" + "\n".join(missing) + "\n"
-    log.action("UPDATE", ".gitignore", f"added: {', '.join(missing)}")
+    new_block_entries = sorted(block_entries | set(missing))
+    new_block = (
+        GITIGNORE_BLOCK_BEGIN + "\n"
+        + "\n".join(new_block_entries) + "\n"
+        + GITIGNORE_BLOCK_END
+    )
+
+    if block_match:
+        new_content = block_pattern.sub(new_block, existing)
+    else:
+        new_content = existing.rstrip("\n") + "\n\n" + new_block + "\n"
+
+    log.action("UPDATE", ".gitignore", f"added to managed block: {', '.join(missing)}")
     if not dry_run:
         gitignore_path.write_text(new_content, encoding="utf-8")
 
