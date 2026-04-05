@@ -1,7 +1,7 @@
 {
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
 
-  "agent-meta-version": "0.13.0",
+  "agent-meta-version": "0.14.2",
 
   "_comment_provider": "AI provider: 'Claude' enables automatic CLAUDE.md generation and managed block updates. Other values (e.g. 'GitHub') disable CLAUDE.md handling.",
   "ai-provider": "Claude",
@@ -20,7 +20,9 @@
     "release",
     "docker",
     "meta-feedback",
-    "git"
+    "git",
+    "feature",
+    "agent-meta-manager"
   ],
 
   "project": {
