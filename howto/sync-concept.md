@@ -32,8 +32,7 @@ agent-meta/
     sync.py          ← das Sync-Script (versioniert mit agent-meta)
   snippets/          ← sprachspezifische Code-Snippets
   external/          ← Git Submodule (externe Skill-Repos via --add-skill)
-  external-skills.config.json   ← aktive Skill-Konfiguration
-  external-skills.catalog.json  ← Katalog bekannter Skill-Repos (für agent-meta-manager)
+  external-skills.config.json   ← Skill-Konfiguration: repos (mit pinned_commit) + skills (mit approved)
   howto/
     sync-concept.md  ← dieses Dokument
     CLAUDE.project-template.md

@@ -1,23 +1,21 @@
 {
   "_comment": "Zentrale Konfiguration für externe Skill-Pakete (Modell A — liegt in agent-meta).",
-  "_comment_submodules": "Submodule werden via 'git submodule add <repo> external/<name>' registriert, dann auf gewünschten Commit pinnen.",
-  "_comment_skills": "Jeder Skill mit enabled:true wird beim sync als Wrapper-Agent generiert.",
+  "_comment_repos": "repos: bekannte externe Repos — korrespondieren mit .gitmodules Einträgen. pinned_commit wird von sync.py gegen den tatsächlichen Submodul-Commit geprüft.",
+  "_comment_skills": "skills: 1:n zu repos. approved:true = vom Meta-Maintainer freigegeben. Projekte aktivieren via 'external-skills' in agent-meta.config.json.",
 
-  "submodules": {
-    "_comment": "Bekannte externe Repos — korrespondieren mit .gitmodules Einträgen.",
+  "repos": {
     "neat-little-package": {
       "repo": "https://github.com/racurry/neat-little-package",
       "local_path": "external/neat-little-package",
-      "_pinned_commit": "be411f313c9451b62024e91b3af972ee63cbc063"
+      "pinned_commit": "be411f313c9451b62024e91b3af972ee63cbc063"
     }
   },
 
   "skills": {
-    "_comment": "Skill-Name → Konfiguration. approved:true = vom Meta-Maintainer freigegeben (Quality Gate). Projekte aktivieren Skills über 'external-skills' in agent-meta.config.json.",
 
     "home-organization": {
       "approved": true,
-      "submodule": "neat-little-package",
+      "repo": "neat-little-package",
       "source": "plugins/spirograph/skills/home-organization",
       "entry": "SKILL.md",
       "role": "home-organization-specialist",
@@ -37,7 +35,7 @@
 
     "opengrid-openscad": {
       "approved": true,
-      "submodule": "neat-little-package",
+      "repo": "neat-little-package",
       "source": "plugins/spirograph/skills/opengrid-openscad",
       "entry": "SKILL.md",
       "role": "opengrid-designer",
@@ -47,5 +45,6 @@
         "enhancements.md"
       ]
     }
+
   }
 }

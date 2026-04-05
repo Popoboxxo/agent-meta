@@ -246,25 +246,36 @@ Wenn du merkst dass viele Projekte ähnliche Extensions haben → Feedback an ag
 
 ---
 
-## 7. External Skills entdecken und hinzufügen
+## 7. External Skills entdecken und aktivieren
 
-### Catalog lesen
+### Verfügbare Skills anzeigen
 
-Lies den Skill-Catalog aus dem agent-meta Submodul:
+Lies die Skill-Konfiguration aus dem agent-meta Submodul:
 
 ```
-.agent-meta/external-skills.catalog.json
+.agent-meta/external-skills.config.json
 ```
 
-Zeige dem User eine übersichtliche Liste der verfügbaren Skills:
+Zeige dem User alle Skills mit `approved: true` als übersichtliche Liste:
 - Name + Beschreibung
-- Tags
-- Ob bereits verifiziert (`verified: true/false`)
+- Repo + gepinnter Commit (`pinned_commit`)
+- Ob im Projekt bereits aktiviert (in `agent-meta.config.json` unter `external-skills`)
 
-### Prüfen ob bereits installiert
+### Skill aktivieren
 
-Lies `external-skills.config.json` im agent-meta Submodul und prüfe welche Skills
-bereits als Submodule registriert sind. Markiere diese in der Anzeige als "bereits vorhanden".
+Um einen approved Skill im Projekt zu aktivieren, ergänze in `agent-meta.config.json`:
+
+```json
+"external-skills": {
+  "skill-name": { "enabled": true }
+}
+```
+
+Dann sync ausführen:
+
+```
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
 
 ### Skill hinzufügen
 
