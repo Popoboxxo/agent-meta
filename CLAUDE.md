@@ -98,6 +98,7 @@ agent-meta/
   howto/
     first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
     instantiate-project.md       ← Schritt-für-Schritt Einrichtung
+    external-skills.md           ← External Skills: vollständige Anleitung (Lifecycle, Troubleshooting)
     upgrade-guide.md              ← Upgrade auf neue agent-meta Version
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
     CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)

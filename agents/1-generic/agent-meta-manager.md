@@ -307,8 +307,16 @@ Danach sync ausführen — der `[WARN]` für leere Submodule sollte verschwinden
 
 ### Skill deaktivieren (ohne Entfernen)
 
-In `.agent-meta/external-skills.config.json` den Eintrag auf `"enabled": false` setzen.
+In `agent-meta.config.json` des Projekts den Skill auf `enabled: false` setzen (oder den Eintrag entfernen):
+
+```json
+"external-skills": {
+  "opengrid-openscad": { "enabled": false }
+}
+```
+
 Beim nächsten sync erscheint der Agent unter `[INFO]` statt unter `[WRITE]`.
+Die vorhandene `.claude/agents/<role>.md` wird beim nächsten sync gelöscht (stale cleanup).
 
 ---
 
