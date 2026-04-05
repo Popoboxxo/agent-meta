@@ -1,6 +1,6 @@
 ---
 name: {{SKILL_ROLE}}
-version: "1.0.1"
+version: "1.1.0"
 description: "{{SKILL_DESCRIPTION}}"
 generated-from: "0-external/{{SKILL_NAME}}@{{SKILL_COMMIT}}"
 tools:
@@ -20,13 +20,19 @@ tools:
 
 ---
 
-{{SKILL_CONTENT}}
+## Skill laden
 
----
+Lies jetzt sofort die Skill-Einstiegsdatei mit dem Read-Tool:
 
-## Zusätzliche Referenzen
+```
+{{SKILL_ENTRY_PATH}}
+```
+
+Alle Referenzdokumente liegen unter `{{SKILL_BASE_PATH}}` und werden dort per Read-Tool bei Bedarf geladen.
 
 {{SKILL_ADDITIONAL_FILES_SECTION}}
+
+---
 
 ## Sprache
 

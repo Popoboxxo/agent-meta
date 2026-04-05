@@ -619,6 +619,32 @@ def build_additional_files_section(skill_name: str, additional_files: list[str])
     return "\n".join(lines)
 
 
+def normalize_skill_paths(content: str, skill_base_path: str) -> str:
+    """Replace relative ./file references in skill content with absolute .claude/skills/... paths.
+
+    Handles patterns like:
+      - ./reference.md
+      - **./reference.md**
+      - [text](./reference.md)
+
+    This allows SKILL.md files from external repos to use relative paths
+    without knowing the agent-meta directory structure.
+    """
+    # Replace markdown link targets: (./file) → (skill_base_path/file)
+    content = re.sub(
+        r'\(\./([^)]+)\)',
+        lambda m: f"({skill_base_path}/{m.group(1)})",
+        content
+    )
+    # Replace bare ./file references (bold, plain, list items)
+    content = re.sub(
+        r'(?<!\()\.\/([^\s\)]+\.md)',
+        lambda m: f"{skill_base_path}/{m.group(1)}",
+        content
+    )
+    return content
+
+
 def sync_external_skills(
     agent_meta_root: Path,
     project_root: Path,
@@ -683,13 +709,11 @@ def sync_external_skills(
             log.warn(f"Skill entry not found: {entry_path}")
             continue
 
-        # Read + substitute SKILL_CONTENT
-        skill_content = entry_path.read_text(encoding="utf-8")
-        # Strip frontmatter from skill content if present
-        skill_content = re.sub(r"^---\n.*?\n---\n", "", skill_content,
-                               count=1, flags=re.DOTALL).lstrip()
-
         commit = get_skill_commit(agent_meta_root, local_path)
+
+        # Canonical paths in the target project
+        skill_base_path  = f".claude/skills/{skill_name}"
+        skill_entry_path = f"{skill_base_path}/{entry_file}"
 
         # Build skill-specific variables (extend project variables)
         skill_vars = dict(variables)
@@ -698,12 +722,13 @@ def sync_external_skills(
         skill_vars["SKILL_ROLE"]          = role
         skill_vars["SKILL_DESCRIPTION"]   = description
         skill_vars["SKILL_COMMIT"]        = commit
-        skill_vars["SKILL_CONTENT"]       = skill_content
+        skill_vars["SKILL_ENTRY_PATH"]    = skill_entry_path
+        skill_vars["SKILL_BASE_PATH"]     = skill_base_path
         skill_vars["SKILL_ADDITIONAL_FILES_SECTION"] = build_additional_files_section(
             skill_name, additional
         )
 
-        # Generate wrapper agent
+        # Generate thin wrapper agent (no inline skill content)
         agent_content = substitute(wrapper_template, skill_vars,
                                    f"0-external/{skill_name}", log)
 
@@ -711,8 +736,10 @@ def sync_external_skills(
         log.action("WRITE", str(agent_target.relative_to(project_root)),
                    f"0-external/{skill_name}@{commit}")
 
-        # Copy skill files to .claude/skills/<skill_name>/
+        # Copy + normalize skill files to .claude/skills/<skill_name>/
         skill_target_dir = skills_dir / skill_name
+
+        # Entry file: copy and normalize relative paths
         log.action("COPY", str((skill_target_dir / entry_file).relative_to(project_root)),
                    f"{local_path}/{source_rel}/{entry_file}")
         for af in additional:
@@ -727,9 +754,12 @@ def sync_external_skills(
             agents_dir.mkdir(parents=True, exist_ok=True)
             agent_target.write_text(agent_content, encoding="utf-8")
             skill_target_dir.mkdir(parents=True, exist_ok=True)
-            (skill_target_dir / entry_file).write_text(
-                entry_path.read_text(encoding="utf-8"), encoding="utf-8"
-            )
+
+            # Normalize ./ref paths in entry file → .claude/skills/<skill>/ref
+            entry_content = entry_path.read_text(encoding="utf-8")
+            entry_content = normalize_skill_paths(entry_content, skill_base_path)
+            (skill_target_dir / entry_file).write_text(entry_content, encoding="utf-8")
+
             for af in additional:
                 af_source = skill_source_dir / af
                 if af_source.exists():
