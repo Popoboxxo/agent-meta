@@ -94,6 +94,7 @@ agent-meta/
   external-skills.catalog.json ← Katalog bekannter/empfohlener Skill-Repos (für agent-meta-manager)
 
   howto/
+    first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
     instantiate-project.md       ← Schritt-für-Schritt Einrichtung
     upgrade-guide.md              ← Upgrade auf neue agent-meta Version
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt

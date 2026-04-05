@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.14.3`
+**Current version:** `0.14.4`
 
 ---
 
@@ -56,24 +56,42 @@ generated agent  +  .claude/3-project/<prefix>-<role>-ext.md  =  full agent cont
 
 ## Quick Start
 
+> **First time setup?** Use [howto/first-steps.md](howto/first-steps.md) — hand it to your AI assistant
+> and say: "Help me set up agent-meta in this project." The assistant will guide you interactively.
+
 ### 1. Add as submodule
 
 ```bash
 git submodule add <repo-url> .agent-meta
-cd .agent-meta && git checkout v0.13.0 && cd ..
+```
+
+```bash
+cd .agent-meta && git checkout v0.14.3
+```
+
+```bash
+cd ..
+```
+
+```bash
+git submodule update --init --recursive
 ```
 
 ### 2. Create config
 
 ```bash
 cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
-# Fill in your project values
 ```
+
+Fill in your project values — see [howto/first-steps.md](howto/first-steps.md) for a guided walkthrough.
 
 ### 3. Generate agents
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
+```
+
+```bash
 cat sync.log
 ```
 
@@ -106,22 +124,28 @@ Extensions live in `.claude/3-project/<prefix>-<role>-ext.md` in your project �
 ## Upgrading
 
 ```bash
-# Check current version
 cat .agent-meta/VERSION
+```
 
-# Pull new version
-cd .agent-meta && git checkout v<new-version> && cd ..
+```bash
+cd .agent-meta && git checkout v<new-version>
+```
 
-# Update config version field
-# "agent-meta-version": "<new-version>"
+```bash
+cd ..
+```
 
-# Dry-run to check for missing variables
+Update config version field: `"agent-meta-version": "<new-version>"`
+
+```bash
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+```
 
-# Regenerate agents
+```bash
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
 
-# Update extension managed blocks
+```bash
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 ```
 

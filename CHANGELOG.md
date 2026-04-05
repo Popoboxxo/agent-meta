@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.14.4] — 2026-04-05
+
+### Added
+
+- `howto/first-steps.md`: AI-assisted guided setup — hand this file to any AI assistant before the first sync for an interactive, step-by-step config walkthrough
+
+### Changed
+
+- `README.md` — Quick Start and Upgrading sections: split `&&`-chained commands into individual code blocks for granular review; added `first-steps.md` hint
+- `howto/instantiate-project.md` — Step 1: split `&&`-chained commands; added tip box linking to `first-steps.md`
+- `howto/agent-meta.config.example.json` — `_comment` references `first-steps.md`
+- `CLAUDE.md` — directory structure updated to include `first-steps.md`
+
+---
+
 ## [0.14.3] — 2026-04-05
 
 ### Fixed

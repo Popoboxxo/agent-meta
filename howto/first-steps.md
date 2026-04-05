@@ -1,0 +1,213 @@
+# First Steps — agent-meta einrichten
+
+> Gib diese Datei deinem AI-Assistenten (Claude Code, Cursor, Copilot etc.) und sage:
+> **"Hilf mir, agent-meta in diesem Projekt einzurichten."**
+>
+> Der Assistent liest dann diese Anleitung und führt dich interaktiv durch die Einrichtung.
+
+---
+
+## Für den AI-Assistenten: Deine Aufgabe
+
+Du hilfst dem User dabei, `agent-meta` in seinem Projekt einzurichten.
+Die Schritte sind unten beschrieben. Führe sie **nicht automatisch durch** —
+erkläre jeden Schritt, frage nach fehlenden Werten und warte auf Bestätigung.
+
+Die Config-Datei `agent-meta.config.json` ist das Herzstück — sie steuert welche
+Agenten generiert werden und mit welchem Kontext. Hilf dem User, alle relevanten
+Felder sinnvoll zu befüllen.
+
+---
+
+## Schritt 1: Submodul prüfen
+
+Stelle sicher dass `.agent-meta/` im Projekt-Root existiert:
+
+```bash
+ls .agent-meta/
+```
+
+Wenn nicht vorhanden:
+
+```bash
+git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
+```
+
+```bash
+git checkout v0.14.3
+```
+
+```bash
+cd ..
+```
+
+```bash
+git submodule update --init --recursive
+```
+
+---
+
+## Schritt 2: Example-Config kopieren
+
+```bash
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
+```
+
+> **AI-Assistent:** Lies jetzt `agent-meta.config.json` und stelle dem User
+> die folgenden Fragen, um alle Pflichtfelder zu befüllen.
+
+---
+
+## Schritt 3: Config befüllen — Pflichtfelder
+
+**AI-Assistent: Stelle diese Fragen und trage die Antworten in die Config ein.**
+
+### Projektidentität
+
+- **`project.name`** — Vollständiger Projektname (z.B. `sharkord-mein-plugin`)
+- **`project.prefix`** — Kürzel für Extension-Dateien, max 5 Zeichen (z.B. `mpl` für mein-plugin)
+- **`project.short`** — Kurzname ohne Plattform-Prefix (z.B. `mein-plugin`)
+- **`variables.PROJECT_NAME`** — gleich wie `project.name`
+- **`variables.PROJECT_DESCRIPTION`** — Ein Satz: Was macht das Projekt?
+- **`variables.PROJECT_GOAL`** — Für wen und was wird gelöst?
+
+### Plattform & Technologie
+
+- **`platforms`** — Welche Plattform? `["sharkord"]` oder `[]` für generisch
+- **`variables.PROJECT_LANGUAGES`** — z.B. `TypeScript`, `Python`, `Go`
+- **`variables.PLATFORM`** — z.B. `Sharkord Plugin SDK`, `Python CLI`
+- **`variables.RUNTIME`** — z.B. `Bun (NICHT Node.js)`, `Python 3.x`
+
+### Sprachen
+
+- **`variables.COMMUNICATION_LANGUAGE`** — In welcher Sprache soll der Agent antworten? (Standard: `Deutsch`)
+- **`variables.USER_INPUT_LANGUAGE`** — In welcher Sprache gibt der User Anweisungen? (Standard: `Deutsch`)
+- **`variables.DOCS_LANGUAGE`** — Sprache für README, CHANGELOG, GitHub Issues (Standard: `Englisch`)
+- **`variables.INTERNAL_DOCS_LANGUAGE`** — Sprache für interne Doku wie REQUIREMENTS.md (Standard: `Deutsch`)
+- **`variables.CODE_LANGUAGE`** — Sprache für Kommentare & Commit-Messages (Standard: `Englisch`)
+
+### Git
+
+- **`variables.GIT_PLATFORM`** — `GitHub`, `GitLab` oder `Gitea`
+- **`variables.GIT_REMOTE_URL`** — Remote-URL des Repositories
+- **`variables.GIT_MAIN_BRANCH`** — Haupt-Branch (Standard: `main`)
+
+### Commands
+
+- **`variables.BUILD_COMMAND`** — z.B. `bun run build`
+- **`variables.TEST_COMMAND`** — z.B. `bun test`
+- **`variables.DEV_COMMANDS`** — Build- und Run-Kommandos für den Developer-Agenten
+
+### Projektkontext
+
+- **`variables.PROJECT_CONTEXT`** — Längere Beschreibung: Tech-Stack, Besonderheiten, Ziel
+- **`variables.ARCHITECTURE`** — Verzeichnisstruktur und Entry-Points
+- **`variables.CODE_CONVENTIONS`** — Coding-Regeln (Sprache, Namenskonventionen, Verbote)
+
+---
+
+## Schritt 4: Rollen auswählen
+
+Standard-Rollen (alle generisch):
+
+```json
+"roles": [
+  "orchestrator", "developer", "requirements", "validator",
+  "documenter", "git", "release", "ideation",
+  "meta-feedback", "feature", "agent-meta-manager"
+]
+```
+
+Für Sharkord-Projekte zusätzlich `"docker"` und `"tester"` ergänzen.
+
+**AI-Assistent:** Frage ob alle Rollen benötigt werden oder ob einige weggelassen werden sollen.
+
+---
+
+## Schritt 5: Dry-Run
+
+Bevor echte Dateien geschrieben werden — prüfen ob die Config stimmt:
+
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+```
+
+**AI-Assistent:** Zeige dem User die Ausgabe. Erkläre `[WARN]`-Meldungen
+(fehlende Variablen) und hilf sie zu beheben.
+
+---
+
+## Schritt 6: Ersten Sync ausführen
+
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
+```
+
+Das erzeugt:
+- `CLAUDE.md` — Projekt-Kontext für den AI-Assistenten
+- `CLAUDE.personal.md` — Persönliche Präferenzen (gitignored)
+- `.claude/settings.json` — Team-Permissions Skeleton
+- `.claude/agents/*.md` — Alle generierten Agenten
+- `.gitignore` — Fehlende Einträge werden ergänzt
+
+---
+
+## Schritt 7: sync.log prüfen
+
+```bash
+cat sync.log
+```
+
+Alle `[WARN]` zeigen fehlende Variablen. In `agent-meta.config.json` ergänzen, dann erneut syncen:
+
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+---
+
+## Schritt 8: Committen
+
+```bash
+git add CLAUDE.md
+```
+
+```bash
+git add .claude/settings.json .claude/agents/ .gitignore
+```
+
+```bash
+git add agent-meta.config.json .gitmodules .agent-meta
+```
+
+```bash
+git commit -m "chore: initialize agent-meta agents"
+```
+
+> `CLAUDE.personal.md` und `.claude/settings.local.json` sind gitignored — nie committen.
+
+---
+
+## Schritt 9: CLAUDE.md vervollständigen
+
+Öffne `CLAUDE.md` und fülle die handgeschriebenen Abschnitte aus — der managed block
+(zwischen den `<!-- agent-meta:managed-begin/end -->` Kommentaren) wird automatisch
+von `sync.py` befüllt und darf nicht manuell bearbeitet werden.
+
+---
+
+## Fertig?
+
+Checkliste:
+
+- [ ] `.agent-meta/` Submodul auf gewünschter Version
+- [ ] `agent-meta.config.json` vollständig befüllt
+- [ ] `sync.log` ohne Warnungen
+- [ ] `CLAUDE.md` vorhanden mit managed block
+- [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
+- [ ] `.claude/agents/orchestrator.md` vorhanden
+- [ ] `.claude/agents/developer.md` vorhanden
+- [ ] Committed
+
+**Nächster Schritt:** Starte mit dem `orchestrator`-Agenten in Claude Code:
+`> Use orchestrator`

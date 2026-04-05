@@ -1,5 +1,5 @@
 {
-  "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte.",
+  "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte. Tipp: Gib howto/first-steps.md deinem AI-Assistenten für eine geführte Einrichtung.",
 
   "agent-meta-version": "0.14.2",
 

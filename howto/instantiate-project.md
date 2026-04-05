@@ -12,12 +12,26 @@ Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 
 ## Ersteinrichtung
 
+> **Tipp:** Für eine geführte Einrichtung mit einem AI-Assistenten nutze
+> [howto/first-steps.md](first-steps.md) — gib die Datei deinem AI-Tool
+> und sage: "Hilf mir, agent-meta einzurichten."
+
 ### Schritt 1: agent-meta als Submodul einbinden
 
 ```bash
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.14.0 && cd ..
-git submodule update --init --recursive  # wichtig: initialisiert verschachtelte Submodule (external/)
+```
+
+```bash
+cd .agent-meta && git checkout v0.14.0
+```
+
+```bash
+cd ..
+```
+
+```bash
+git submodule update --init --recursive
 ```
 
 ### Schritt 2: Config anlegen und befüllen
