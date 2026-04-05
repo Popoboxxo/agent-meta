@@ -192,7 +192,6 @@ Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 ### Externe Skills aktivieren
 
 External Skills sind spezialisierte Agenten aus Drittrepos (z.B. 3D-Druck, CAD).
-Welche Skills verfügbar sind, steht in `.agent-meta/external-skills.config.json` (`approved: true`).
 
 Skills werden **pro Projekt** aktiviert — in `agent-meta.config.json`:
 
@@ -203,11 +202,10 @@ Skills werden **pro Projekt** aktiviert — in `agent-meta.config.json`:
 }
 ```
 
-**Two-Gate-Regel:** Ein Skill wird nur generiert wenn:
-1. Er in `external-skills.config.json` mit `approved: true` steht (Meta-Freigabe)
-2. Er im Projekt mit `enabled: true` aktiviert ist (Projekt-Opt-in)
+Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skills.config.json`
 
-Nach dem nächsten Sync liegt der Skill-Agent in `.claude/agents/<role>.md`.
+> **Vollständige Anleitung:** [howto/external-skills.md](external-skills.md) —
+> Lifecycle, Troubleshooting, Meta-Maintainer-Workflow, Versionierung.
 
 ---
 

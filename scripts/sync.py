@@ -487,6 +487,7 @@ def sync_agents(
             role = skill_cfg.get("role", skill_name)
             expected_filenames.add(f"{role}.md")
 
+
     # Remove stale agent files that are no longer in the active role set
     if target_dir.exists():
         for existing_file in sorted(target_dir.glob("*.md")):
@@ -566,14 +567,31 @@ def load_external_skills_config(agent_meta_root: Path) -> dict:
     """Load external-skills.config.json from agent-meta root. Returns empty structure if not found."""
     config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
     if not config_path.exists():
-        return {"submodules": {}, "skills": {}}
+        return {"repos": {}, "skills": {}}
     with config_path.open(encoding="utf-8") as f:
         data = json.load(f)
     # Strip _comment keys
     return {
-        "submodules": {k: v for k, v in data.get("submodules", {}).items() if not k.startswith("_")},
-        "skills":     {k: v for k, v in data.get("skills", {}).items()     if not k.startswith("_")},
+        "repos":   {k: v for k, v in data.get("repos", {}).items()   if not k.startswith("_")},
+        "skills":  {k: v for k, v in data.get("skills", {}).items()  if not k.startswith("_")},
     }
+
+
+def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) -> None:
+    """Warn if any repo submodule is not at its pinned_commit."""
+    for repo_name, repo_cfg in ext_config.get("repos", {}).items():
+        pinned = repo_cfg.get("pinned_commit", "")
+        if not pinned:
+            continue
+        local_path = repo_cfg.get("local_path", f"external/{repo_name}")
+        actual = get_skill_commit(agent_meta_root, local_path)
+        # get_skill_commit returns short hash — compare prefix
+        if actual != "unknown" and not pinned.startswith(actual):
+            log.warn(
+                f"repo '{repo_name}': submodule is at {actual}, "
+                f"expected pinned_commit {pinned[:8]} — "
+                f"run: cd {local_path} && git checkout {pinned[:8]}"
+            )
 
 
 def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
@@ -617,7 +635,7 @@ def sync_external_skills(
     """
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
-    submodules = ext_config.get("submodules", {})
+    repos = ext_config.get("repos", {})
     project_skills = config.get("external-skills", {})
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
@@ -638,12 +656,10 @@ def sync_external_skills(
         if not project_skill_cfg.get("enabled", False):
             log.info(role_label, f"skill '{skill_name}' not enabled in agent-meta.config.json — skipping")
             continue
-        # Warn if project tries to enable an unknown skill
-        # (already handled above: unknown skills simply won't appear in ext_config)
 
-        submodule_key = skill_cfg.get("submodule", "")
-        submodule_cfg = submodules.get(submodule_key, {})
-        local_path    = submodule_cfg.get("local_path", f"external/{submodule_key}")
+        repo_key   = skill_cfg.get("repo", "")
+        repo_cfg   = repos.get(repo_key, {})
+        local_path = repo_cfg.get("local_path", f"external/{repo_key}")
         source_rel    = skill_cfg.get("source", "")
         entry_file    = skill_cfg.get("entry", "SKILL.md")
         role          = skill_cfg.get("role", skill_name)
@@ -763,15 +779,19 @@ def add_skill(
         with config_path.open(encoding="utf-8") as f:
             raw = json.load(f)
     else:
-        raw = {"submodules": {}, "skills": {}}
+        raw = {"repos": {}, "skills": {}}
 
-    raw.setdefault("submodules", {})[submodule_name] = {
+    # Capture current commit for pinning
+    actual_commit = get_skill_commit(agent_meta_root, local_path)
+
+    raw.setdefault("repos", {})[submodule_name] = {
         "repo": repo_url,
         "local_path": local_path,
+        "pinned_commit": actual_commit,
     }
     raw.setdefault("skills", {})[skill_name] = {
         "approved": False,
-        "submodule": submodule_name,
+        "repo": submodule_name,
         "source": source_path,
         "entry": entry,
         "role": role,
@@ -781,11 +801,12 @@ def add_skill(
     }
 
     log.action("UPDATE", EXTERNAL_SKILLS_CONFIG,
-               f"added submodule '{submodule_name}', skill '{skill_name}'")
+               f"added repo '{submodule_name}' @{actual_commit[:8]}, skill '{skill_name}'")
     if not dry_run:
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(raw, f, indent=2, ensure_ascii=False)
         print(f"  +  {EXTERNAL_SKILLS_CONFIG} updated")
+        print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
         print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
         print(f"  i  To activate: set approved: true in {EXTERNAL_SKILLS_CONFIG},")
         print(f"     then add to agent-meta.config.json: \"external-skills\": {{\"{skill_name}\": {{\"enabled\": true}}}}")
@@ -1109,9 +1130,10 @@ def main():
             ensure_gitignore_entries(project_root, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
-        # Warn for unknown skills referenced in project config
+        # Check pinned commits + warn for unknown/unapproved skills in project config
+        ext_config = load_external_skills_config(agent_meta_root)
+        check_pinned_commits(ext_config, agent_meta_root, log)
         if "external-skills" in config:
-            ext_config = load_external_skills_config(agent_meta_root)
             known_skills = set(ext_config.get("skills", {}).keys())
             for skill_name in config["external-skills"]:
                 if skill_name not in known_skills:

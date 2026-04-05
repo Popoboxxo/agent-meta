@@ -92,12 +92,13 @@ agent-meta/
     <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
 
   external-skills.config.json  ← Zentrale Skill-Konfiguration (Modell A)
-                                  approved:true/false = Meta-Maintainer Quality Gate
-  external-skills.catalog.json ← Katalog bekannter/empfohlener Skill-Repos (für agent-meta-manager)
+                                  repos: Repo-Definitionen mit pinned_commit (1:n zu skills)
+                                  skills: Skill-Einträge mit approved:true/false
 
   howto/
     first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
     instantiate-project.md       ← Schritt-für-Schritt Einrichtung
+    external-skills.md           ← External Skills: vollständige Anleitung (Lifecycle, Troubleshooting)
     upgrade-guide.md              ← Upgrade auf neue agent-meta Version
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
     CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)
@@ -391,16 +392,17 @@ Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
 
 ```json
 {
-  "submodules": {
+  "repos": {
     "my-skills-repo": {
       "repo": "https://github.com/owner/my-skills-repo",
-      "local_path": "external/my-skills-repo"
+      "local_path": "external/my-skills-repo",
+      "pinned_commit": "abc1234"
     }
   },
   "skills": {
     "my-skill": {
       "approved": true,
-      "submodule": "my-skills-repo",
+      "repo": "my-skills-repo",
       "source": "path/within/repo",
       "entry": "SKILL.md",
       "role": "my-specialist",
@@ -412,7 +414,10 @@ Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
 }
 ```
 
+- **`repos`** — Repo-Definitionen (1:n zu skills): URL, `local_path`, `pinned_commit`
+- **`pinned_commit`** — Vollständiger Commit-Hash; sync.py warnt bei Abweichung des Submodul-Stands
 - **`approved: true/false`** — Meta-Maintainer Quality Gate: Skill ist geprüft und für Projekte nutzbar
+- **`repo`** — Referenz auf einen Eintrag in `repos` (statt `submodule`)
 - **`entry`** — Abstraktion über die Einstiegsdatei (egal wie sie im Fremdrepo heißt)
 - **`additional_files`** — weitere Dokumente, die der Agent lazy per Read-Tool laden kann
 
