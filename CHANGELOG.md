@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.3] — 2026-04-05
+
+### Fixed
+
+- `sync.py` — stale agent cleanup: generated agents that are no longer in the active role set (removed from `config['roles']` or role no longer in ROLE_MAP) are now automatically deleted from `.claude/agents/` on every sync (`[DELETE]` in log). External skill agents are excluded from cleanup. Works in `--dry-run` mode.
+
+---
+
 ## [0.14.2] — 2026-04-05
 
 ### Added

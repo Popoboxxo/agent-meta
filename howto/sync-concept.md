@@ -166,8 +166,8 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 
 | Datei / Schicht | Verhalten | Wann |
 |-----------------|-----------|------|
-| `.claude/agents/*.md` (`1-generic/`) | **Immer überschreiben** | Jeder Sync |
-| `.claude/agents/*.md` (`2-platform/`) | **Immer überschreiben** | Jeder Sync |
+| `.claude/agents/*.md` (`1-generic/`) | **Immer überschreiben** + veraltete löschen | Jeder Sync |
+| `.claude/agents/*.md` (`2-platform/`) | **Immer überschreiben** + veraltete löschen | Jeder Sync |
 | `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
 | `CLAUDE.md` managed block | **Immer aktualisieren** | Jeder Sync |
 | `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
@@ -281,11 +281,24 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 
 ---
 
+## Stale Agent Cleanup
+
+Wenn eine Rolle aus `config['roles']` entfernt wird, löscht sync.py die zugehörige Datei beim nächsten Sync automatisch:
+
+```
+[DELETE  ]  .claude/agents/docker.md    (role removed from config)
+```
+
+Das gilt für alle generisch generierten Agenten. **Externe Skill-Agenten** (`.claude/agents/<role>.md` aus `0-external/`) werden nicht gelöscht — sie werden nur über `enabled: false` in `external-skills.config.json` deaktiviert.
+
+---
+
 ## Was NIEMALS manuell editiert wird
 
 ```
 .claude/agents/*.md    ← vollständig generiert
                           Manuelle Änderungen werden beim nächsten sync überschrieben
+                          Nicht mehr benötigte Dateien werden automatisch gelöscht
 ```
 
 Projektspezifisches Wissen gehört in:

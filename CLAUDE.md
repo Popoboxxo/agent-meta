@@ -123,7 +123,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.14.1 — `2026-04-05`
+Generiert von agent-meta v0.14.2 — `2026-04-05`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
@@ -146,7 +146,7 @@ Generiert von agent-meta v0.14.1 — `2026-04-05`
 
 | Datei | Sync-Verhalten | Committed? |
 |-------|---------------|------------|
-| `.claude/agents/*.md` (generiert) | ✅ Immer überschrieben | Ja |
+| `.claude/agents/*.md` (generiert) | ✅ Immer überschrieben; veraltete Dateien werden gelöscht | Ja |
 | `CLAUDE.md` — managed block | ✅ Immer aktualisiert | Ja |
 | `CLAUDE.md` — Rest | ❌ Einmalig angelegt, dann manuell | Ja |
 | `CLAUDE.personal.md` | ❌ Einmalig angelegt aus Template | Nein (gitignored) |

@@ -442,6 +442,9 @@ def sync_agents(
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Track which filenames will be written in this sync
+    expected_filenames: set[str] = set()
+
     project_name = config["project"]["name"]
     for role, source_path in overrides.items():
         filename = target_filename(role)
@@ -454,6 +457,7 @@ def sync_agents(
                      f"role '{role}' not in config['roles']")
             continue
 
+        expected_filenames.add(filename)
         target_path = target_dir / filename
         content = source_path.read_text(encoding="utf-8")
         rel_source = str(source_path.relative_to(agent_meta_root))
@@ -474,6 +478,22 @@ def sync_agents(
         log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)
         if not dry_run:
             target_path.write_text(content, encoding="utf-8")
+
+    # Also track external skill agent filenames (they are not in overrides)
+    ext_config = load_external_skills_config(agent_meta_root)
+    for skill_name, skill_cfg in ext_config.get("skills", {}).items():
+        if skill_cfg.get("enabled", False):
+            role = skill_cfg.get("role", skill_name)
+            expected_filenames.add(f"{role}.md")
+
+    # Remove stale agent files that are no longer in the active role set
+    if target_dir.exists():
+        for existing_file in sorted(target_dir.glob("*.md")):
+            if existing_file.name not in expected_filenames:
+                log.action("DELETE", str(existing_file.relative_to(project_root)),
+                           "role removed from config")
+                if not dry_run:
+                    existing_file.unlink()
 
 
 def sync_snippets(
