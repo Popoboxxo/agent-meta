@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.1] — 2026-04-05
+
+### Changed
+
+- `agents/0-external/_skill-wrapper.md` (v1.1.0): replaced `{{SKILL_CONTENT}}` inline embedding
+  with lazy Read-Instruktion — agent reads `.claude/skills/<skill>/SKILL.md` on demand
+- `sync.py` — `normalize_skill_paths()`: rewrites `./ref.md` paths in copied SKILL.md to
+  `.claude/skills/<skill>/ref.md` — consistent paths regardless of source repo structure
+- `sync.py` — new template variables `SKILL_ENTRY_PATH` + `SKILL_BASE_PATH`; `SKILL_CONTENT` removed
+
+---
+
 ## [0.15.0] — 2026-04-05
 
 ### Breaking Changes
