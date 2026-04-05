@@ -1,19 +1,32 @@
 {
   "_comment": "Catalog of known/recommended external skill repositories for agent-meta.",
-  "_comment_usage": "The agent-meta-manager agent reads this file to help users discover and add external skills via --add-skill.",
+  "_comment_usage": "The agent-meta-manager agent reads this file to help users discover and add external skills via --add-skill. Entries here are NOT yet registered as submodules — use --add-skill to register them. Skills already registered live in external-skills.config.json.",
 
   "skills": {
-    "_comment_example": "Each entry describes a known skill repo. 'verified' means tested with agent-meta.",
-    "example-skill": {
-      "_comment": "This is a placeholder entry — replace with real skills as they become available.",
-      "repo": "https://github.com/owner/skill-repo",
-      "source": "path/within/repo",
+
+    "home-organization": {
+      "repo": "https://github.com/racurry/neat-little-package",
+      "source": "plugins/spirograph/skills/home-organization",
       "entry": "SKILL.md",
-      "role": "example-specialist",
-      "name": "Example Specialist",
-      "description": "Example skill entry — replace with real skills.",
-      "tags": ["example"],
-      "verified": false
+      "role": "home-organization-specialist",
+      "name": "Home Organization Specialist",
+      "description": "Spezialist für 3D-gedruckte Heimorganisationssysteme — Gridfinity, OpenGrid, NeoGrid, French Cleat, Underware, Deskware. Hilft bei Auswahl, Kombination und Konfiguration passender Systeme.",
+      "tags": ["3d-printing", "home-organization", "gridfinity", "opengrid"],
+      "verified": true,
+      "_note": "Already registered in external-skills.config.json (submodule: neat-little-package)"
+    },
+
+    "opengrid-openscad": {
+      "repo": "https://github.com/racurry/neat-little-package",
+      "source": "plugins/spirograph/skills/opengrid-openscad",
+      "entry": "SKILL.md",
+      "role": "opengrid-designer",
+      "name": "OpenGrid OpenSCAD Designer",
+      "description": "Spezialist für OpenSCAD-Code-Generierung für wandmontierte OpenGrid/MultiConnect-Organizer (28mm Grid, QuackWorks-Patterns). Generiert parametrischen SCAD-Code für Halter, Körbe und Organizer.",
+      "tags": ["3d-printing", "openscad", "opengrid", "cad"],
+      "verified": true,
+      "_note": "Already registered in external-skills.config.json (submodule: neat-little-package)"
     }
+
   }
 }
