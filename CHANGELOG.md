@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.16.2] — 2026-04-06
+
+### Added
+
+- **Zentrales Modell-Mapping** (`DEFAULT_MODEL_MAP` in `sync.py`): Meta-Maintainer pflegt
+  empfohlene Claude-Modelle pro Rolle. `sync.py` injiziert `model:`-Feld beim Generieren.
+- **`model-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen überschreiben.
+  Precedence: Projekt-Override > Meta-Default > kein Feld (erbt vom Parent).
+- **`resolve_model()`** + **`inject_model_field()`** in `sync.py`: neue Hilfsfunktionen.
+  `inject_model_field()` fügt `model:` nach `name:` ein, überschreibt bestehende Werte,
+  oder entfernt das Feld wenn kein Modell konfiguriert (sauberer Output).
+- **`[INFO]`-Log** in `sync.log` bei Model-Injection: zeigt gesetztes Modell + Quelle
+  (`meta default` vs. `project override`).
+- **`agents/1-generic/security-auditor.md`** (v1.0.0-beta): neuer generischer Agent für
+  statische Sicherheitsanalyse — OWASP Top 10, Secrets, Dependencies, Supply Chain, Crypto.
+  Read-only (kein Write/Edit), kein Alarm-Fanatismus, klare Abgrenzung zu `validator`/`tester`.
+
+### Changed
+
+- `scripts/sync.py`: `DEFAULT_MODEL_MAP` Konstante + `resolve_model()` + `inject_model_field()`
+- `scripts/sync.py`: `sync_agents()` ruft Model-Injection nach `build_frontmatter()` auf
+- `CLAUDE.md`: neuer Abschnitt `model-overrides` mit vollständiger Defaults-Tabelle
+- `CLAUDE.md`: `roles`-Whitelist um `agent-meta-scout` und `security-auditor` ergänzt
+
+### Meta-Defaults (injiziert wenn kein Projekt-Override)
+
+| Modell | Rollen |
+|--------|--------|
+| `haiku` | `git`, `meta-feedback`, `docker` |
+| `sonnet` | `tester`, `validator`, `documenter`, `security-auditor`, `agent-meta-scout`, `agent-meta-manager`, `release` |
+| *(leer)* | `orchestrator`, `developer`, `requirements`, `ideation`, `feature` |
+
+---
+
 ## [0.16.1] — 2026-04-06
 
 ### Added

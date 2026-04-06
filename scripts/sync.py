@@ -73,9 +73,32 @@ ROLE_MAP = {
     "agent-meta-manager":  "agent-meta-manager",
     "feature":             "feature",
     "agent-meta-scout":    "agent-meta-scout",
+    "security-auditor":    "security-auditor",
 }
 
 EXT_SUFFIX = "-ext"
+
+# Default model assignments per role.
+# Meta-maintainer curates these — projects can override via "model-overrides" in agent-meta.config.json.
+# Empty string means: no model: field injected → agent inherits model from parent context.
+# Valid values: "haiku", "sonnet", "opus" (or any claude model alias Claude Code accepts)
+DEFAULT_MODEL_MAP: dict[str, str] = {
+    "orchestrator":       "",        # Full capacity — routing needs context
+    "developer":          "",        # Full capacity — complex implementation
+    "requirements":       "",        # Full capacity — nuanced requirement analysis
+    "ideation":           "",        # Full capacity — creative exploration
+    "feature":            "",        # Full capacity — end-to-end workflow
+    "tester":             "sonnet",  # Test writing needs precision, not just speed
+    "validator":          "sonnet",  # Traceability audit needs careful reasoning
+    "documenter":         "sonnet",  # Documentation needs quality output
+    "security-auditor":   "sonnet",  # Security analysis needs careful reasoning
+    "agent-meta-scout":   "sonnet",  # Web research + evaluation needs quality
+    "agent-meta-manager": "sonnet",  # Framework management needs precision
+    "release":            "sonnet",  # Changelog + versioning needs careful output
+    "git":                "haiku",   # Shell ops, no deep reasoning needed
+    "meta-feedback":      "haiku",   # Issue formatting, lightweight task
+    "docker":             "haiku",   # Docker commands, straightforward ops
+}
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 
@@ -338,6 +361,47 @@ def build_frontmatter(content: str, name: str, description: str,
                 content, count=1, flags=re.MULTILINE,
             )
     return content
+
+
+def resolve_model(role: str, config: dict) -> str:
+    """Resolve the model for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: config["model-overrides"][role]
+    2. Meta default:     DEFAULT_MODEL_MAP[role]
+    3. Empty string:     no model: field injected (agent inherits from parent)
+    """
+    project_overrides = config.get("model-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    return DEFAULT_MODEL_MAP.get(role, "")
+
+
+def inject_model_field(content: str, model: str) -> str:
+    """Insert or update the model: field in YAML frontmatter.
+
+    If model is empty, removes any existing model: field (clean slate).
+    If model is set, inserts/updates after the name: line.
+    """
+    if not model:
+        # Remove existing model: field if present
+        content = re.sub(r"^model:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+
+    # Update existing model: field
+    if re.search(r"^model:", content, flags=re.MULTILINE):
+        return re.sub(
+            r"^model:.*$",
+            f"model: {model}",
+            content, count=1, flags=re.MULTILINE,
+        )
+
+    # Insert after name: line
+    return re.sub(
+        r"(^name:.*\n)",
+        rf"\1model: {model}\n",
+        content, count=1, flags=re.MULTILINE,
+    )
 
 
 def target_filename(role: str) -> str | None:
@@ -689,6 +753,15 @@ def sync_agents(
         generated_from = f"{source_label}@{source_version}" if source_version else source_label
         content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
+
+        # Inject model: field (meta default or project override)
+        model = resolve_model(role, config)
+        content = inject_model_field(content, model)
+        if model:
+            log.info(
+                str(target_path.relative_to(project_root)),
+                f"model: {model} (from {'project override' if role in config.get('model-overrides', {}) else 'meta default'})",
+            )
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)

@@ -154,14 +154,14 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.15.1 — `2026-04-05`
+Generiert von agent-meta v0.16.1 — `2026-04-06`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
 | Agent | Zuständigkeit |
 |-------|--------------|
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules entdecken und bewerten — **nur auf explizite Anfrage** |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
 | `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
@@ -284,7 +284,48 @@ Verfügbare Werte: `Claude`, `GitHub` (weitere folgen bei Bedarf)
 Fehlt der Key → alle Rollen aus `1-generic/` + aktiven `2-platform/`-Overrides werden generiert (Rückwärtskompatibel).
 Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle anderen werden mit `[SKIP]` im Log übersprungen.
 
-Verfügbare Rollen: `orchestrator`, `feature`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`, `agent-meta-manager`
+Verfügbare Rollen: `orchestrator`, `feature`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`, `agent-meta-manager`, `agent-meta-scout`, `security-auditor`
+
+---
+
+### `model-overrides` — Modell-Zuweisung pro Rolle (optional)
+
+```json
+"model-overrides": {
+  "git":       "haiku",
+  "developer": "opus"
+}
+```
+
+Überschreibt das von agent-meta empfohlene Modell für einzelne Rollen.
+`sync.py` injiziert das `model:`-Feld beim Generieren der Agenten-Datei.
+
+**Precedence (höchste zuerst):**
+1. Projekt-Override (`model-overrides` in `agent-meta.config.json`)
+2. Meta-Default (`DEFAULT_MODEL_MAP` in `sync.py` — vom Meta-Maintainer gepflegt)
+3. Kein Eintrag → kein `model:`-Feld → Agent erbt das Modell vom Parent-Kontext
+
+**Meta-Defaults (Stand v0.16.2):**
+
+| Rolle | Default | Begründung |
+|-------|---------|------------|
+| `orchestrator` | *(leer)* | Volle Kapazität — Routing braucht Kontext |
+| `developer` | *(leer)* | Volle Kapazität — komplexe Implementierung |
+| `requirements` | *(leer)* | Volle Kapazität — nuancierte Anforderungsanalyse |
+| `ideation` | *(leer)* | Volle Kapazität — kreative Exploration |
+| `feature` | *(leer)* | Volle Kapazität — End-to-End-Workflow |
+| `tester` | `sonnet` | Test-Schreiben braucht Präzision |
+| `validator` | `sonnet` | Traceability-Audit braucht sorgfältiges Reasoning |
+| `documenter` | `sonnet` | Dokumentationsqualität |
+| `security-auditor` | `sonnet` | Sicherheitsanalyse braucht Sorgfalt |
+| `agent-meta-scout` | `sonnet` | Web-Research + Evaluation |
+| `agent-meta-manager` | `sonnet` | Framework-Management |
+| `release` | `sonnet` | Changelog + Versioning |
+| `git` | `haiku` | Shell-Operationen, kein Deep-Reasoning |
+| `meta-feedback` | `haiku` | Issue-Formatierung, leichtgewichtig |
+| `docker` | `haiku` | Docker-Kommandos, straightforward |
+
+Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 
 ---
 
@@ -635,7 +676,7 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature, agent-meta-scout)
+(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature, agent-meta-scout, security-auditor)
 
 1-generic/agent-meta-scout.md  → .claude/agents/agent-meta-scout.md (generiert)
     └── liest zur Laufzeit:

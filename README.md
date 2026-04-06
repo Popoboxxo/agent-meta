@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.16.1`
+**Current version:** `0.16.2`
 
 ---
 
@@ -66,7 +66,7 @@ git submodule add <repo-url> .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.16.1
+cd .agent-meta && git checkout v0.16.2
 ```
 
 ```bash
@@ -158,18 +158,26 @@ See [howto/upgrade-guide.md](howto/upgrade-guide.md) for details.
 ```
 agent-meta/
   agents/
+    0-external/       ← wrapper template for external skill agents
     1-generic/        ← universal agent templates
     2-platform/       ← platform-specific overrides (e.g. sharkord-docker.md)
     3-project/        ← intentionally empty (extensions live in your project)
+  external/           ← Git submodules for external skill repos (pinned commits)
+  snippets/
+    tester/           ← language-specific test snippets (bun-typescript, pytest-python)
+    developer/        ← language-specific code pattern snippets
   howto/
+    first-steps.md
     instantiate-project.md
+    agent-composition.md
+    external-skills.md
     upgrade-guide.md
     CLAUDE.project-template.md
     sync-concept.md
+    agent-meta.config.example.json
   scripts/
     sync.py           ← agent generator
-  howto/
-    agent-meta.config.example.json
+  external-skills.config.json  ← central skill registry (approved/pinned)
   VERSION
   CHANGELOG.md
 ```
@@ -180,7 +188,7 @@ agent-meta/
 
 | Platform | Agents |
 |----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker |
+| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout |
 | Sharkord | sharkord-docker, sharkord-release |
 
 ---
@@ -198,3 +206,8 @@ agent-meta/
 | `meta-feedback` | Collect framework feedback, create GitHub Issues in agent-meta |
 | `release` | Versioning, changelog, GitHub release |
 | `docker` | Dev stack, test stack, binary management |
+| `git` | Commits, branches, tags, push/pull and all Git operations |
+| `ideation` | Explore new ideas, sharpen vision, hand off to requirements |
+| `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
+| `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
+| `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
