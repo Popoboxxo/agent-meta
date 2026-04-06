@@ -134,8 +134,15 @@ agent-meta/
     upgrade-guide.md              ← Upgrade auf neue agent-meta Version
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
     CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)
+    rules.md                          ← Rules-System: Schichten, Sync, create-rule
     sync-concept.md
     template-gap-analysis.md
+
+  rules/
+    0-external/         ← Rules aus externen Skill-Repos
+    1-generic/          ← universelle Regeln, gelten für alle Projekte
+    2-platform/         ← plattformspezifisch (überschreibt 1-generic bei gleichem Namen)
+                          Naming: <platform>-<thema>.md → <thema>.md im Output
 
   snippets/
     tester/
@@ -191,6 +198,8 @@ Generiert von agent-meta v0.16.1 — `2026-04-06`
 | `.gitignore` | ✅ Fehlende Einträge werden ergänzt | Ja |
 | `.claude/3-project/*-ext.md` (Extension) | ❌ Einmalig via `--create-ext` | Ja |
 | `.claude/3-project/*.md` (Override) | ❌ Nicht von sync.py berührt | Ja |
+| `.claude/rules/*.md` (Rules, agent-meta-verwaltet) | ✅ Immer überschrieben; Stale-Rules werden gelöscht | Ja |
+| `.claude/rules/*.md` (Projekt-eigene Rules) | ❌ Nie angefasst (nicht in `.agent-meta-managed`) | Ja |
 | `.claude/settings.local.json` | ❌ Nie angefasst | Nein (gitignored) |
 
 **CLAUDE.md managed block** — eingeleitet durch `<!-- agent-meta:managed-begin -->`:
@@ -486,6 +495,46 @@ runtime: "Bun"                   # Runtime / Test-Framework
 - Snippet-Version ist unabhängig von Agent- und Repo-Version
 - `sync.py` loggt die Version beim COPY: `snippets/tester/bun-typescript.md@1.0.0`
 - Bei inhaltlichen Änderungen: Patch oder Minor erhöhen
+
+---
+
+## Rules (`.claude/rules/` Layer)
+
+Projekt-globale Regeln die **automatisch** in jeden Agenten-Kontext geladen werden —
+kein Read-Tool nötig. Ideal für Security-Policies, Coding-Konventionen, Plattform-Constraints.
+
+### Vier-Schichten-Modell
+
+```
+rules/
+  0-external/     ← aus externen Skill-Repos
+  1-generic/      ← universell, für alle Projekte
+  2-platform/     ← plattformspezifisch (überschreibt 1-generic bei gleichem Dateinamen)
+  ← 3-project: .claude/rules/ im Zielprojekt — nie von sync.py berührt
+```
+
+**Naming für 2-platform:** `<platform>-<thema>.md` → Output: `<thema>.md`
+
+### Sync-Verhalten
+
+`sync.py` kopiert Rules automatisch bei jedem normalen Sync. Stale-Tracking via
+`.claude/rules/.agent-meta-managed` — nur dort gelistete Dateien werden entfernt,
+wenn sie aus den agent-meta-Quellen verschwinden.
+
+```bash
+# Projekt-eigene Rule anlegen (nie überschrieben)
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule security-policy
+```
+
+### Abgrenzung zu Extensions
+
+| | Extensions (`.claude/3-project/*-ext.md`) | Rules (`.claude/rules/`) |
+|---|---|---|
+| Scope | Ein Agenten-Typ | **Alle Agenten** |
+| Laden | Explizit per Read-Hook | **Automatisch** |
+| Quelle | Projekt schreibt selbst | Alle 4 Schichten |
+
+Siehe [howto/rules.md](howto/rules.md) für vollständige Dokumentation.
 
 ---
 

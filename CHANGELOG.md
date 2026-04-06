@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.16.5] — 2026-04-06
+
+### Added
+
+- **Rules-Schichten-System** (`rules/`): Vier-Schichten-Modell analog zu Agenten.
+  `sync.py` kopiert Rules aus `0-external/`, `1-generic/`, `2-platform/` nach `.claude/rules/`.
+  Platform-Rules (`<platform>-<name>.md`) überschreiben gleichnamige Generic-Rules.
+  Stale-Tracking via `.claude/rules/.agent-meta-managed` — entfernt veraltete Managed-Rules.
+- **`--create-rule <name>`** in `sync.py`: Erstellt `.claude/rules/<name>.md` als leeres Template.
+  Überschreibt nie bestehende Dateien.
+- **`howto/rules.md`** (neu): Vollständige Dokumentation des Rules-Systems —
+  Schichten, Sync-Verhalten, Naming-Konvention, Abgrenzung zu Extensions.
+- **`CLAUDE.md`**: Rules-Abschnitt ergänzt (Vier-Schichten-Modell, Sync-Verhalten,
+  Abgrenzung zu Extensions), Update-Verhalten-Tabelle um Rules-Zeilen erweitert,
+  Verzeichnisstruktur um `rules/` ergänzt.
+
+### Migration von v0.16.4
+
+Keine Breaking Changes. `sync.py` läuft silent durch wenn `rules/1-generic/` leer ist —
+kein Log-Eintrag, kein Warning.
+
+---
+
 ## [0.16.4] — 2026-04-06
 
 ### Added

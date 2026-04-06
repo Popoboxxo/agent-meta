@@ -55,6 +55,8 @@ CLAUDE_AGENTS_DIR = ".claude/agents"
 CLAUDE_EXT_DIR = ".claude/3-project"
 CLAUDE_SNIPPETS_DIR = ".claude/snippets"
 CLAUDE_SKILLS_DIR = ".claude/skills"
+CLAUDE_RULES_DIR = ".claude/rules"
+RULES_DIR = "rules"
 LOGFILE = "sync.log"
 
 # Maps role name to the output filename in .claude/agents/ (no prefix)
@@ -880,6 +882,133 @@ def sync_snippets(
             target_path.write_text(source_content, encoding="utf-8")
 
 
+def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
+    """Collect rule files from 0-external, 1-generic and 2-platform layers.
+
+    Returns list of (source_path, output_filename) tuples.
+    Later entries override earlier ones with the same output filename —
+    platform rules override generic rules of the same name.
+    """
+    # Use dict to track filename → source_path (last writer wins = platform > generic > external)
+    seen: dict[str, Path] = {}
+
+    # 0-external: rules from external skill repos (registered in external-skills.config.json)
+    ext_rules_dir = agent_meta_root / RULES_DIR / "0-external"
+    if ext_rules_dir.exists():
+        for f in sorted(ext_rules_dir.glob("*.md")):
+            seen[f.name] = f
+
+    # 1-generic
+    generic_dir = agent_meta_root / RULES_DIR / "1-generic"
+    if generic_dir.exists():
+        for f in sorted(generic_dir.glob("*.md")):
+            seen[f.name] = f
+
+    # 2-platform (platform-prefixed, e.g. sharkord-security.md → security.md)
+    platform_dir = agent_meta_root / RULES_DIR / "2-platform"
+    if platform_dir.exists():
+        for platform in platforms:
+            for f in sorted(platform_dir.glob(f"{platform}-*.md")):
+                # Strip platform prefix from output filename
+                output_name = f.name[len(platform) + 1:]
+                seen[output_name] = f
+
+    return [(src, name) for name, src in seen.items()]
+
+
+def sync_rules(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy rule files from agent-meta/rules/ layers to .claude/rules/ in the project.
+
+    Layer priority (highest wins for same output filename):
+      2-platform  >  1-generic  >  0-external
+
+    Project rules in .claude/rules/ that are NOT from agent-meta are never touched.
+    Stale agent-meta-managed rules (tracked in .claude/rules/.agent-meta-managed) are removed.
+    """
+    platforms = config.get("platforms", [])
+    sources = collect_rule_sources(agent_meta_root, platforms)
+
+    if not sources:
+        return
+
+    target_dir = project_root / CLAUDE_RULES_DIR
+    managed_index_path = target_dir / ".agent-meta-managed"
+
+    # Load previously managed filenames so we can clean up stale ones
+    previously_managed: set[str] = set()
+    if managed_index_path.exists():
+        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                previously_managed.add(line)
+
+    now_managed: set[str] = set()
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    for source_path, output_name in sources:
+        target_path = target_dir / output_name
+        source_content = source_path.read_text(encoding="utf-8")
+        layer = source_path.parts[-2]  # "1-generic", "2-platform", "0-external"
+
+        log.action("COPY", str(target_path.relative_to(project_root)),
+                   f"rules/{layer}/{source_path.name}")
+        now_managed.add(output_name)
+
+        if not dry_run:
+            target_path.write_text(source_content, encoding="utf-8")
+
+    # Remove stale managed rules no longer in current sources
+    for stale_name in sorted(previously_managed - now_managed):
+        stale_path = target_dir / stale_name
+        if stale_path.exists():
+            log.action("DELETE", str(stale_path.relative_to(project_root)),
+                       "rule removed from agent-meta sources")
+            if not dry_run:
+                stale_path.unlink()
+
+    # Update managed index
+    if not dry_run and now_managed:
+        managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+
+
+def create_rule(
+    project_root: Path,
+    name: str,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Create .claude/rules/<name>.md as an empty template (never overwrites)."""
+    if not name.endswith(".md"):
+        name = f"{name}.md"
+    target_path = project_root / CLAUDE_RULES_DIR / name
+
+    if target_path.exists():
+        log.skip(str(target_path.relative_to(project_root)),
+                 "rule already exists — edit it manually")
+        return
+
+    content = f"""\
+# {Path(name).stem.replace('-', ' ').replace('_', ' ').title()}
+
+<!-- This file lives in .claude/rules/ and is automatically loaded into every agent context. -->
+<!-- Add project-specific rules, policies, and conventions here. -->
+
+"""
+    log.action("CREATE", str(target_path.relative_to(project_root)),
+               f"--create-rule {name}")
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+
 def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
     """Return True if a skill should be generated for the current project.
 
@@ -1449,6 +1578,8 @@ def main():
                              "Does not overwrite existing files.")
     parser.add_argument("--update-ext", action="store_true",
                         help="Update managed block in all existing extension files")
+    parser.add_argument("--create-rule", metavar="NAME",
+                        help="Create .claude/rules/<NAME>.md template (never overwrites)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
 
@@ -1517,6 +1648,10 @@ def main():
         mode = "update-ext"
         update_extensions(project_root, variables, log, args.dry_run)
 
+    elif args.create_rule:
+        mode = f"create-rule:{args.create_rule}"
+        create_rule(project_root, args.create_rule, log, args.dry_run)
+
     else:
         is_claude = variables.get("AI_PROVIDER", "").strip().lower() == "claude"
         mode = "init" if args.init else "sync"
@@ -1526,6 +1661,7 @@ def main():
             init_settings_json(project_root, log, args.dry_run)
             ensure_gitignore_entries(project_root, log, args.dry_run)
         sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)
