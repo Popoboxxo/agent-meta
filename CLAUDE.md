@@ -334,6 +334,46 @@ Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 
 ---
 
+### `memory-overrides` — Persistentes Gedächtnis pro Rolle (optional)
+
+```json
+"memory-overrides": {
+  "validator": "local",
+  "developer": "project"
+}
+```
+
+Überschreibt den von agent-meta empfohlenen Memory-Scope für einzelne Rollen.
+`sync.py` injiziert das `memory:`-Feld beim Generieren der Agenten-Datei.
+
+**Precedence (höchste zuerst):**
+1. Projekt-Override (`memory-overrides` in `agent-meta.config.json`)
+2. Meta-Default (`roles.config.json` — vom Meta-Maintainer gepflegt)
+3. Kein Eintrag → kein `memory:`-Feld → Agent hat kein persistentes Gedächtnis
+
+**Memory-Scopes:**
+
+| Scope | Speicherort | In Git? | Wann nutzen |
+|-------|------------|---------|-------------|
+| `project` | `.claude/agent-memory/<name>/` | ✅ ja | Projekt-Wissen mit Team teilen |
+| `local` | `.claude/agent-memory-local/<name>/` | ❌ gitignored | Projekt-Wissen, nicht committen |
+| `user` | `~/.claude/agent-memory/<name>/` | ❌ lokal | Projektübergreifendes Wissen |
+
+**Meta-Defaults (Stand v0.16.4):**
+
+| Rolle | Memory | Was akkumuliert wird |
+|-------|--------|---------------------|
+| `validator` | `project` | REQ-Muster, bekannte Traceability-Lücken |
+| `documenter` | `project` | Architektur-Entscheidungen, Doku-Konventionen |
+| `requirements` | `project` | REQ-Kategorien, bekannte Anforderungs-Muster |
+| `security-auditor` | `project` | Findings aus vorherigen Audits |
+| `agent-meta-scout` | `local` | Bewertete Repos, entdeckte Skills (nicht in git) |
+| alle anderen | *(leer)* | Kein persistentes Gedächtnis |
+
+Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokumentation.
+
+---
+
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.

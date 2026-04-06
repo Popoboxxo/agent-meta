@@ -285,6 +285,10 @@ patches:
 ---
 ```
 
+**Wichtig:** Wie bei 2-platform Composition-Dateien gilt auch hier — **kein Datei-Body
+außerhalb des Frontmatter-Blocks.** Der gesamte Inhalt kommt aus dem Base-Template plus
+den Patches. Text außerhalb des `---`-Blocks wird ignoriert.
+
 **Hinweis:** Für rein additive Erweiterungen empfehlen wir weiterhin `-ext.md` Extensions
 (kein sync.py-Involvement nötig). Overrides mit `extends:` eignen sich wenn Sections aus
 dem Base-Template entfernt oder ersetzt werden sollen.

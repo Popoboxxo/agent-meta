@@ -23,7 +23,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.14.0
+cd .agent-meta && git checkout v0.16.1
 ```
 
 ```bash
@@ -44,12 +44,13 @@ Pflichtfelder:
 
 ```json
 {
-  "agent-meta-version": "0.14.0",
+  "agent-meta-version": "0.16.1",
   "ai-provider": "Claude",
   "platforms": ["sharkord"],
   "roles": ["orchestrator", "developer", "tester", "validator",
             "requirements", "documenter", "git", "release", "docker",
-            "ideation", "meta-feedback", "feature", "agent-meta-manager"],
+            "ideation", "meta-feedback", "feature", "agent-meta-manager",
+            "agent-meta-scout"],
   "project": {
     "name": "sharkord-mein-plugin",
     "prefix": "mpl",
@@ -120,6 +121,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/docker.md` | `2-platform/sharkord-docker.md` |
 | `.claude/agents/feature.md` | `1-generic/feature.md` |
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
+| `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
 
 ---
 
@@ -189,6 +191,26 @@ Der generierte Agent liest diese Datei **beim Start automatisch** (Extension-Hoo
 Wenn Extension nicht reicht (anderer Workflow, andere Struktur):
 Datei direkt im Projekt anlegen — wird von sync.py nie berührt.
 
+Auch Overrides unterstützen das **Composition-System** (`extends: + patches:`) —
+statt einer Vollkopie können gezielt einzelne Sections ersetzt oder ergänzt werden:
+
+```yaml
+# .claude/3-project/myproject-developer.md
+---
+name: myproject-developer
+extends: "1-generic/developer.md"
+patches:
+  - op: append-after
+    anchor: "## Don'ts"
+    content: |
+      ### Projektspezifische Don'ts
+      - Kein direkter DB-Zugriff außerhalb von `src/db/`
+---
+```
+
+> **Vollständige Anleitung:** [howto/agent-composition.md](agent-composition.md) —
+> alle Patch-Operationen (`append-after`, `replace`, `delete`, `append`), Anchor-Syntax, Beispiele.
+
 ### Externe Skills aktivieren
 
 External Skills sind spezialisierte Agenten aus Drittrepos (z.B. 3D-Druck, CAD).
@@ -211,7 +233,7 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
-- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.14.0` oder neuer)
+- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.16.1` oder neuer)
 - [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-provider: Claude`)
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
@@ -229,4 +251,5 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 - [ ] `.claude/agents/docker.md` vorhanden
 - [ ] `.claude/agents/feature.md` vorhanden
 - [ ] `.claude/agents/agent-meta-manager.md` vorhanden
+- [ ] `.claude/agents/agent-meta-scout.md` vorhanden
 - [ ] `docs/REQUIREMENTS.md` initialisiert

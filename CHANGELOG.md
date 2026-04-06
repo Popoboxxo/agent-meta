@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.16.4] — 2026-04-06
+
+### Added
+
+- **`howto/agent-memory.md`** (neu): Vollständige Dokumentation des Agent-Memory-Systems —
+  drei Scopes (`project`, `local`, `user`), Konfiguration via `roles.config.json` +
+  `memory-overrides`, MEMORY.md-Struktur-Empfehlungen, `.gitignore`-Verhalten.
+- **`memory:`-Injection in `sync.py`**: `resolve_memory()` + `inject_memory_field()` —
+  liest Memory-Scope aus `roles.config.json` (Meta-Default) oder `memory-overrides` in
+  `agent-meta.config.json` (Projekt-Override). Wird nach `model:` in den Frontmatter injiziert.
+- **`memory`-Feld in `roles.config.json`**: Memory-Scope-Defaults für alle Rollen.
+  `validator`, `documenter`, `requirements`, `security-auditor` → `project`;
+  `agent-meta-scout` → `local`; alle anderen → leer (kein Gedächtnis).
+- **`memory-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen
+  überschreiben. Precedence: Projekt-Override > Meta-Default > kein Feld.
+- **`CLAUDE.md`**: `memory-overrides`-Abschnitt mit Scopes-Tabelle und Defaults ergänzt.
+
+### Migration von v0.16.3
+
+Keine Breaking Changes — generierte Agenten bekommen ggf. ein neues `memory:`-Feld,
+wenn `roles.config.json` einen Default definiert. Wer das nicht möchte: `"memory-overrides": { "<rolle>": "" }` im Projekt setzen.
+
+---
+
 ## [0.16.3] — 2026-04-06
 
 ### Changed

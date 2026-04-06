@@ -34,7 +34,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-git checkout v0.14.3
+git checkout v0.16.1
 ```
 
 ```bash
@@ -128,11 +128,14 @@ Standard-Rollen (alle generisch):
 "roles": [
   "orchestrator", "developer", "requirements", "validator",
   "documenter", "git", "release", "ideation",
-  "meta-feedback", "feature", "agent-meta-manager"
+  "meta-feedback", "feature", "agent-meta-manager", "agent-meta-scout"
 ]
 ```
 
 Für Sharkord-Projekte zusätzlich `"docker"` und `"tester"` ergänzen.
+
+> **`agent-meta-scout`** scoutet das Claude-Ökosystem auf neue Skills, Agenten-Rollen und
+> Patterns — wird nur auf explizite Anfrage aktiv, nie vom Orchestrator automatisch gestartet.
 
 **AI-Assistent:** Frage ob alle Rollen benötigt werden oder ob einige weggelassen werden sollen.
 

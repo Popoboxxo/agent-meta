@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "1.6.1"
+version: "1.7.0"
 description: "Generisches Template für den Orchestrator-Agenten. Koordiniert spezialisierte Sub-Agenten durch den gesamten Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@1.6.1"
+generated-from: "1-generic/orchestrator.md@1.7.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -52,6 +52,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | Nach Code-Änderungen, Erkenntnisse speichern, Doku-Zyklus |
 | `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen | Testsystem starten/stoppen, neue Docker-Configs, Binary-Setup |
 | `git` | Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages | Alle Git-Operationen nach Implementierung/Release/Upgrade |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules entdecken und bewerten | **Nur auf explizite Anfrage** — niemals automatisch |
 
 ---
 
@@ -250,6 +251,27 @@ oder ähnliches sagt:
 **Bug vs. Feature:**
 - Bug → Schritt 3 zuerst (reproduzierender Test), dann Fix
 - Feature → wie Workflow A, aber Ausgangspunkt ist das Issue statt eine freie Anforderung
+
+---
+
+### Workflow M: Claude-Ökosystem scouten
+
+**Nur auf explizite Nutzer-Anfrage** — NIEMALS automatisch starten.
+
+Erkennungsmerkmale (Nutzer muss eines davon sagen):
+- "Scout neue Skills"
+- "Was gibt es Neues im Claude-Ökosystem?"
+- "Entdecke neue Agenten / Rules / Patterns"
+- "Bewerte <Repo-URL>"
+- "Suche Skills für <Thema>"
+- Direkte Erwähnung von `agent-meta-scout`
+
+```
+1. agent-meta-scout → Scouting, Evaluation und Empfehlungs-Bericht
+```
+
+**Ergebnis:** Strukturierter Bericht mit bewerteten Kandidaten und
+konkreten Einbindungsvorschlägen für agent-meta.
 
 ---
 

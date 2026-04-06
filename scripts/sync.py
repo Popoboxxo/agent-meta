@@ -367,6 +367,48 @@ def resolve_model(role: str, project_config: dict, agent_meta_root: Path) -> str
     return roles_cfg["roles"].get(role, {}).get("model", "")
 
 
+def resolve_memory(role: str, project_config: dict, agent_meta_root: Path) -> str:
+    """Resolve the memory scope for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: project_config["memory-overrides"][role]
+    2. Meta default:     roles.config.json roles[role].memory
+    3. Empty string:     no memory: field injected
+    """
+    project_overrides = project_config.get("memory-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    roles_cfg = load_roles_config(agent_meta_root)
+    return roles_cfg["roles"].get(role, {}).get("memory", "")
+
+
+def inject_memory_field(content: str, memory: str) -> str:
+    """Insert or update the memory: field in YAML frontmatter.
+
+    If memory is empty, removes any existing memory: field.
+    If memory is set, inserts/updates after the model: line (or name: if no model:).
+    """
+    if not memory:
+        content = re.sub(r"^memory:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+
+    # Update existing memory: field
+    if re.search(r"^memory:", content, flags=re.MULTILINE):
+        return re.sub(
+            r"^memory:.*$",
+            f"memory: {memory}",
+            content, count=1, flags=re.MULTILINE,
+        )
+
+    # Insert after model: if present, else after name:
+    anchor = r"^model:.*$" if re.search(r"^model:", content, flags=re.MULTILINE) else r"^name:.*$"
+    return re.sub(
+        rf"({anchor}\n)",
+        rf"\1memory: {memory}\n",
+        content, count=1, flags=re.MULTILINE,
+    )
+
+
 def inject_model_field(content: str, model: str) -> str:
     """Insert or update the model: field in YAML frontmatter.
 
@@ -748,9 +790,20 @@ def sync_agents(
         model = resolve_model(role, config, agent_meta_root)
         content = inject_model_field(content, model)
         if model:
+            model_src = "project override" if role in config.get("model-overrides", {}) else "meta default"
             log.info(
                 str(target_path.relative_to(project_root)),
-                f"model: {model} (from {'project override' if role in config.get('model-overrides', {}) else 'meta default'})",
+                f"model: {model} (from {model_src})",
+            )
+
+        # Inject memory: field (meta default from roles.config.json or project override)
+        memory = resolve_memory(role, config, agent_meta_root)
+        content = inject_memory_field(content, memory)
+        if memory:
+            memory_src = "project override" if role in config.get("memory-overrides", {}) else "meta default"
+            log.info(
+                str(target_path.relative_to(project_root)),
+                f"memory: {memory} (from {memory_src})",
             )
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
