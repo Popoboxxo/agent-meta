@@ -1,3 +1,6 @@
 [submodule "external/neat-little-package"]
 	path = external/neat-little-package
 	url = https://github.com/racurry/neat-little-package
+[submodule "external/awesome-claude-code"]
+	path = external/awesome-claude-code
+	url = https://github.com/hesreallyhim/awesome-claude-code

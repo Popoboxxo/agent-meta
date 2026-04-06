@@ -8,6 +8,12 @@
       "repo": "https://github.com/racurry/neat-little-package",
       "local_path": "external/neat-little-package",
       "pinned_commit": "be411f313c9451b62024e91b3af972ee63cbc063"
+    },
+    "awesome-claude-code": {
+      "repo": "https://github.com/hesreallyhim/awesome-claude-code",
+      "local_path": "external/awesome-claude-code",
+      "pinned_commit": "3d8bde25f70bb296267b393890e3f111ef725fb8",
+      "_comment": "Meta-Repo (kuratierter Claude-Ökosystem-Index). Kein Skill-Eintrag — wird vom agent-meta-scout Agenten (1-generic) direkt per Read-Tool referenziert."
     }
   },
 

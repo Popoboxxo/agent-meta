@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.16.1] — 2026-04-06
+
+### Added
+
+- **`agents/1-generic/agent-meta-scout.md`** (v1.0.0): neuer generischer Agent — scoutet das
+  Claude Code Ökosystem auf neue Skills, Agenten-Rollen, Rules und Workflow-Patterns.
+  Liest `evaluate-repository.md` aus dem `awesome-claude-code` Submodule als Evaluation-Framework.
+  Wird **ausschließlich auf explizite Nutzer-Anfrage** gestartet (kein Auto-Trigger).
+- **`external/awesome-claude-code`**: neues Git Submodule (Meta-Repo mit kuratierten Claude-Skills).
+  Gepinnt auf `3d8bde25`. Kein Skill-Wrapper — wird direkt vom `agent-meta-scout` per Read-Tool genutzt.
+- **`external-skills.config.json`**: neuer `repos`-Eintrag für `awesome-claude-code`.
+- **Orchestrator Workflow M**: "Claude-Ökosystem scouten" — explizite Trigger-Liste,
+  `agent-meta-scout` in Agenten-Tabelle eingetragen.
+
+### Changed
+
+- `scripts/sync.py`: `ROLE_MAP` um `agent-meta-scout` erweitert
+- `agents/1-generic/orchestrator.md` (v1.6.1 → v1.7.0): Agenten-Tabelle + Workflow M ergänzt
+- `CLAUDE.md`: Agenten-Tabelle + Abhängigkeitskarte um `agent-meta-scout` erweitert
+
+---
+
 ## [0.16.0] — 2026-04-06
 
 ### Added

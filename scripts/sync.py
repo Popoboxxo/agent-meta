@@ -72,6 +72,7 @@ ROLE_MAP = {
     "git":                 "git",
     "agent-meta-manager":  "agent-meta-manager",
     "feature":             "feature",
+    "agent-meta-scout":    "agent-meta-scout",
 }
 
 EXT_SUFFIX = "-ext"

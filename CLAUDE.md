@@ -161,6 +161,7 @@ Generiert von agent-meta v0.15.1 — `2026-04-05`
 | Agent | Zuständigkeit |
 |-------|--------------|
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules entdecken und bewerten — **nur auf explizite Anfrage** |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
 | `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
@@ -634,7 +635,11 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature)
+(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature, agent-meta-scout)
+
+1-generic/agent-meta-scout.md  → .claude/agents/agent-meta-scout.md (generiert)
+    └── liest zur Laufzeit:
+        .agent-meta/external/awesome-claude-code/.claude/commands/evaluate-repository.md
 
 0-external/_skill-wrapper.md
     └── external-skills.config.json (enabled skills)
