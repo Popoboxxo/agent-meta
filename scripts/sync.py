@@ -77,28 +77,7 @@ ROLE_MAP = {
 }
 
 EXT_SUFFIX = "-ext"
-
-# Default model assignments per role.
-# Meta-maintainer curates these — projects can override via "model-overrides" in agent-meta.config.json.
-# Empty string means: no model: field injected → agent inherits model from parent context.
-# Valid values: "haiku", "sonnet", "opus" (or any claude model alias Claude Code accepts)
-DEFAULT_MODEL_MAP: dict[str, str] = {
-    "orchestrator":       "",        # Full capacity — routing needs context
-    "developer":          "",        # Full capacity — complex implementation
-    "requirements":       "",        # Full capacity — nuanced requirement analysis
-    "ideation":           "",        # Full capacity — creative exploration
-    "feature":            "",        # Full capacity — end-to-end workflow
-    "tester":             "sonnet",  # Test writing needs precision, not just speed
-    "validator":          "sonnet",  # Traceability audit needs careful reasoning
-    "documenter":         "sonnet",  # Documentation needs quality output
-    "security-auditor":   "sonnet",  # Security analysis needs careful reasoning
-    "agent-meta-scout":   "sonnet",  # Web research + evaluation needs quality
-    "agent-meta-manager": "sonnet",  # Framework management needs precision
-    "release":            "sonnet",  # Changelog + versioning needs careful output
-    "git":                "haiku",   # Shell ops, no deep reasoning needed
-    "meta-feedback":      "haiku",   # Issue formatting, lightweight task
-    "docker":             "haiku",   # Docker commands, straightforward ops
-}
+ROLES_CONFIG = "roles.config.json"
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 
@@ -363,18 +342,29 @@ def build_frontmatter(content: str, name: str, description: str,
     return content
 
 
-def resolve_model(role: str, config: dict) -> str:
+def load_roles_config(agent_meta_root: Path) -> dict:
+    """Load roles.config.json from agent-meta root. Returns empty structure if not found."""
+    config_path = agent_meta_root / ROLES_CONFIG
+    if not config_path.exists():
+        return {"roles": {}}
+    with config_path.open(encoding="utf-8") as f:
+        data = json.load(f)
+    return {"roles": {k: v for k, v in data.get("roles", {}).items() if not k.startswith("_")}}
+
+
+def resolve_model(role: str, project_config: dict, agent_meta_root: Path) -> str:
     """Resolve the model for a role.
 
     Precedence (highest to lowest):
-    1. Project override: config["model-overrides"][role]
-    2. Meta default:     DEFAULT_MODEL_MAP[role]
+    1. Project override: project_config["model-overrides"][role]
+    2. Meta default:     roles.config.json roles[role].model
     3. Empty string:     no model: field injected (agent inherits from parent)
     """
-    project_overrides = config.get("model-overrides", {})
+    project_overrides = project_config.get("model-overrides", {})
     if role in project_overrides:
         return str(project_overrides[role])
-    return DEFAULT_MODEL_MAP.get(role, "")
+    roles_cfg = load_roles_config(agent_meta_root)
+    return roles_cfg["roles"].get(role, {}).get("model", "")
 
 
 def inject_model_field(content: str, model: str) -> str:
@@ -754,8 +744,8 @@ def sync_agents(
         content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
 
-        # Inject model: field (meta default or project override)
-        model = resolve_model(role, config)
+        # Inject model: field (meta default from roles.config.json or project override)
+        model = resolve_model(role, config, agent_meta_root)
         content = inject_model_field(content, model)
         if model:
             log.info(

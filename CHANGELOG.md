@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.16.3] — 2026-04-06
+
+### Changed
+
+- **`roles.config.json`** (neu): Modell-Defaults aus `sync.py` ausgelagert —
+  Meta-Maintainer pflegt Rollen + empfohlene Modelle + Beschreibungen zentral in dieser Datei.
+  `sync.py` liest Defaults von dort statt aus einer hardkodierten Konstante.
+- **`sync.py`**: `DEFAULT_MODEL_MAP`-Konstante entfernt → `load_roles_config()` liest
+  `roles.config.json`; `resolve_model()` nimmt `agent_meta_root` als Parameter.
+- **`CLAUDE.md`**: `model-overrides`-Abschnitt zeigt auf `roles.config.json` statt sync.py;
+  Verzeichnisbaum um `roles.config.json` ergänzt.
+
+### Migration von v0.16.2
+
+Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
+`roles.config.json` statt in `sync.py`.
+
+---
+
 ## [0.16.2] — 2026-04-06
 
 ### Added

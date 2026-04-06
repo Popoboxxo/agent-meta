@@ -121,6 +121,11 @@ agent-meta/
                                   repos: Repo-Definitionen mit pinned_commit (1:n zu skills)
                                   skills: Skill-Einträge mit approved:true/false
 
+  roles.config.json            ← Zentrale Rollen-Konfiguration
+                                  roles: Rollen-Definitionen mit model + description
+                                  Wird von sync.py als Modell-Default gelesen
+                                  Projekte überschreiben via model-overrides in agent-meta.config.json
+
   howto/
     first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
     instantiate-project.md       ← Schritt-für-Schritt Einrichtung
@@ -302,7 +307,7 @@ Verfügbare Rollen: `orchestrator`, `feature`, `developer`, `tester`, `validator
 
 **Precedence (höchste zuerst):**
 1. Projekt-Override (`model-overrides` in `agent-meta.config.json`)
-2. Meta-Default (`DEFAULT_MODEL_MAP` in `sync.py` — vom Meta-Maintainer gepflegt)
+2. Meta-Default (`roles.config.json` im agent-meta Root — vom Meta-Maintainer gepflegt)
 3. Kein Eintrag → kein `model:`-Feld → Agent erbt das Modell vom Parent-Kontext
 
 **Meta-Defaults (Stand v0.16.2):**
