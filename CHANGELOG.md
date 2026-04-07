@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.19.0] — 2026-04-07
+
+### Added
+
+- **OpenSCAD Developer Agent** (`1-generic/openscad-developer.md` v1.0.0):
+  Specialized developer role for parametric 3D model generation in OpenSCAD.
+  - Render-Inspect-Refine Loop as core workflow (visual feedback via MCP)
+  - Mandatory gates: `validate_scad` before render, `analyze_model` before export
+  - MCP-agnostic: works without MCP server (writes .scad directly), full loop with openscad-mcp
+  - Print optimization knowledge: tolerances, overhangs, wall thickness, `$fn` guidelines, hole correction formula
+  - Parametric-by-default: all dimensions as named variables, parameter table as standard output
+  - Skill-aware: discovers opengrid-openscad and home-organization skills at runtime
+  - BOSL2-aware: checks via `get_libraries`, uses library features when available
+  - Versioned iteration: `model_v01.scad` → `model_v02.scad` — never overwrites previous state
+- New role in `roles.config.json`: tier `optional`, model `sonnet`, memory `local`
+- New role in `agent-meta.schema.json` roles enum
+- ROLE_MAP entry in `sync.py`
+
+### Changed
+
+- **CLAUDE.md**: Role classification, model defaults, memory defaults, dependency map updated
+- **README.md**: Supported Platforms and Agent Roles tables updated
+
+### Fixed
+
+- **`.gitignore` missing `agent-memory-local/`**: Local agent memory directories were not
+  gitignored. Added `.claude/agent-memory-local/` to `GITIGNORE_ENTRIES` in `sync.py`
+  and to the managed .gitignore block.
+
 ## [0.18.0] — 2026-04-07
 
 ### Added

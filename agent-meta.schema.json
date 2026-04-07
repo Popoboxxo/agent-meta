@@ -40,7 +40,8 @@
           "orchestrator", "developer", "tester", "validator",
           "requirements", "ideation", "documenter", "release",
           "docker", "meta-feedback", "git", "agent-meta-manager",
-          "feature", "agent-meta-scout", "security-auditor"
+          "feature", "agent-meta-scout", "security-auditor",
+          "openscad-developer"
         ]
       },
       "uniqueItems": true

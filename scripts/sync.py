@@ -86,6 +86,7 @@ ROLE_MAP = {
     "feature":             "feature",
     "agent-meta-scout":    "agent-meta-scout",
     "security-auditor":    "security-auditor",
+    "openscad-developer":  "openscad-developer",
 }
 
 EXT_SUFFIX = "-ext"
@@ -1889,6 +1890,7 @@ def init_settings_local_json(
 
 GITIGNORE_ENTRIES = [
     ".claude/settings.local.json",
+    ".claude/agent-memory-local/",
     "CLAUDE.personal.md",
     "sync.log",
 ]

@@ -112,6 +112,13 @@
       "memory": "",
       "tier": "optional",
       "description": "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
+    },
+
+    "openscad-developer": {
+      "model": "sonnet",
+      "memory": "local",
+      "tier": "optional",
+      "description": "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
     }
 
   }

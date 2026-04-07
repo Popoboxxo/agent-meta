@@ -316,7 +316,7 @@ Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle ander
 |-------|--------|-----------|
 | **Pflicht** | `orchestrator`, `developer`, `git` | Ohne diese funktioniert kein Workflow |
 | **Empfohlen** | `tester`, `validator`, `documenter`, `requirements`, `feature` | Standard-Qualitäts-Workflow |
-| **Optional** | `ideation`, `release`, `docker`, `security-auditor`, `meta-feedback`, `agent-meta-manager`, `agent-meta-scout` | Bei Bedarf aktivieren |
+| **Optional** | `ideation`, `release`, `docker`, `security-auditor`, `meta-feedback`, `agent-meta-manager`, `agent-meta-scout`, `openscad-developer` | Bei Bedarf aktivieren |
 
 Die Klassifizierung ist eine **Empfehlung** — per Default werden alle Rollen generiert.
 Der User steuert über `roles` welche tatsächlich angelegt werden.
@@ -359,6 +359,7 @@ Der User steuert über `roles` welche tatsächlich angelegt werden.
 | `git` | `haiku` | Shell-Operationen, kein Deep-Reasoning |
 | `meta-feedback` | `haiku` | Issue-Formatierung, leichtgewichtig |
 | `docker` | `haiku` | Docker-Kommandos, straightforward |
+| `openscad-developer` | `sonnet` | 3D-Modellierung braucht Präzision + Render-Feedback |
 
 Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 
@@ -398,6 +399,7 @@ Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 | `requirements` | `project` | REQ-Kategorien, bekannte Anforderungs-Muster |
 | `security-auditor` | `project` | Findings aus vorherigen Audits |
 | `agent-meta-scout` | `local` | Bewertete Repos, entdeckte Skills (nicht in git) |
+| `openscad-developer` | `local` | Gelernte Toleranzen, Drucker-Profile, bewährte Patterns |
 | alle anderen | *(leer)* | Kein persistentes Gedächtnis |
 
 Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokumentation.
@@ -1007,7 +1009,7 @@ Immer aktiv — unabhängig von DoD-Konfiguration.
 1-generic/developer.md     → sk_plugin/.claude/agents/developer.md
                            → sk_hero_introduce/.../.claude/agents/developer.md
 
-(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature, agent-meta-scout, security-auditor)
+(analog für tester, validator, requirements, ideation, documenter, meta-feedback, git, agent-meta-manager, feature, agent-meta-scout, security-auditor, openscad-developer)
 
 1-generic/agent-meta-scout.md  → .claude/agents/agent-meta-scout.md (generiert)
     └── liest zur Laufzeit:

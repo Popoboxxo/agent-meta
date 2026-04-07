@@ -6,6 +6,7 @@ sync.log
 
 # --- agent-meta managed (do not edit) ---
 .claude/settings.local.json
+.claude/agent-memory-local/
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---

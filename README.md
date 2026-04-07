@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.18.0`
+**Current version:** `0.19.0`
 
 ---
 
@@ -66,7 +66,7 @@ git submodule add <repo-url> .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.18.0
+cd .agent-meta && git checkout v0.19.0
 ```
 
 ```bash
@@ -188,7 +188,7 @@ agent-meta/
 
 | Platform | Agents |
 |----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout |
+| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout, openscad-developer |
 | Sharkord | sharkord-docker, sharkord-release |
 
 ---
@@ -211,3 +211,4 @@ agent-meta/
 | `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
 | `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
 | `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
+| `openscad-developer` | Parametric 3D models in OpenSCAD, render-inspect-refine via MCP, print optimization |
