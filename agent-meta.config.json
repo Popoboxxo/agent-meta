@@ -30,6 +30,10 @@
     "short":  "agent-meta"
   },
 
+  "hooks": {
+    "dod-push-check": { "enabled": true }
+  },
+
   "variables": {
 
     "PROJECT_NAME":        "agent-meta",
