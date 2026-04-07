@@ -175,7 +175,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.18.0 — `2026-04-07`
+Generiert von agent-meta v0.19.0 — `2026-04-07`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
@@ -189,6 +189,7 @@ Generiert von agent-meta v0.18.0 — `2026-04-07`
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
+| `openscad-developer` | OpenSCAD-Code generieren: parametrische 3D-Modelle, Render-Feedback, STL-Export, Druck-Optimierung |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
