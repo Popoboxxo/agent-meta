@@ -153,6 +153,73 @@ sie ergänzen ihn mit eigenem Wissen. Dadurch sind Konflikte selten.
 
 ---
 
+## Migration: v0.16.x → v0.17.0
+
+v0.17.0 führt drei neue Systeme ein: **Hooks**, **Rules** und **JSON Schema**.
+Alle Änderungen sind rückwärtskompatibel — keine Breaking Changes.
+
+### 1. JSON Schema hinzufügen (empfohlen)
+
+In `agent-meta.config.json` oben ergänzen:
+```json
+{
+  "$schema": ".agent-meta/agent-meta.schema.json",
+  ...
+}
+```
+
+Aktiviert IDE-Autovervollständigung und Validierung in VS Code und anderen Editoren.
+
+### 2. Nach dem Upgrade syncen
+
+```bash
+cd .agent-meta && git checkout v0.17.0 && cd ..
+# agent-meta.config.json: "agent-meta-version": "0.17.0"
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+Nach dem Sync sind neu vorhanden:
+- `.claude/rules/issue-lifecycle.md` — automatisch in alle Agenten geladen
+- `.claude/rules/.agent-meta-managed` — Stale-Tracking für verwaltete Rules
+- `.claude/hooks/dod-push-check.sh` — DoD-Push-Check (noch inaktiv bis aktiviert)
+- `.claude/hooks/.agent-meta-managed` — Stale-Tracking für verwaltete Hooks
+- `.claude/settings.local.json` — persönliches Skeleton (gitignored, einmalig angelegt)
+
+### 3. DoD-Push-Check aktivieren (optional)
+
+Falls TEST_COMMAND in der Config gesetzt ist und automatische Push-Blockierung gewünscht:
+
+```json
+"hooks": {
+  "dod-push-check": { "enabled": true }
+}
+```
+
+Dann erneut syncen — der Hook wird in `.claude/settings.json` registriert.
+
+Vollständige Dokumentation: `.agent-meta/howto/hooks.md`
+
+### 4. permissionMode-Overrides (optional)
+
+`validator` und `security-auditor` bekommen jetzt automatisch `permissionMode: plan`.
+Falls ein anderes Verhalten gewünscht:
+
+```json
+"permission-mode-overrides": {
+  "validator": "default"
+}
+```
+
+### 5. Committen
+
+```bash
+git add .claude/ agent-meta.config.json .agent-meta
+git commit -m "chore: upgrade agent-meta to v0.17.0"
+```
+
+---
+
 ## Breaking Change: v0.14.4 → `enabled` → `approved` in external-skills.config.json
 
 Ab v0.14.4 gilt für External Skills ein **Two-Gate-System**:

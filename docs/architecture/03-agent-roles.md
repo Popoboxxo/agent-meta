@@ -17,6 +17,8 @@ graph TD
     ORC --> DOK[docker]
     ORC --> MFB[meta-feedback]
     ORC --> AMM[agent-meta-manager]
+    ORC --> AMS[agent-meta-scout]
+    ORC --> SEC[security-auditor]
     ORC --> EXT[0-external skills]
     FEA --> GIT
     FEA --> REQ
@@ -28,22 +30,24 @@ graph TD
 
 ## Rollen-Übersicht
 
-| Agent | Zuständigkeit | Einstieg |
-|-------|--------------|---------|
-| `orchestrator` | Einstiegspunkt — koordiniert alle anderen Agenten | Alle Entwicklungsaufgaben |
-| `feature` | Vollständiger Feature-Lifecycle via Sub-Agent-Delegation | "Ich will ein neues Feature bauen" |
-| `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs | Implementierungsaufgaben |
-| `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase |
-| `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR |
-| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben | Neue Anforderungen |
-| `ideation` | Neue Ideen explorieren, Vision schärfen | Ideen-Phase |
-| `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README | Nach Implementierung |
-| `git` | Commits, Branches, Tags, Push/Pull | Git-Operationen |
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release | Release-Prozess |
-| `docker` | Docker-Stack bauen, starten, verwalten | Infrastruktur |
-| `meta-feedback` | Verbesserungsvorschläge als GitHub Issues einreichen | Framework-Feedback |
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projekt-Agenten | Meta-Management |
-| `0-external skills` | Domänenspezifische Agenten aus Drittrepos | Spezialwissen |
+| Agent | Zuständigkeit | Einstieg | Modell |
+|-------|--------------|---------|--------|
+| `orchestrator` | Einstiegspunkt — koordiniert alle anderen Agenten | Alle Entwicklungsaufgaben | *(voll)* |
+| `feature` | Vollständiger Feature-Lifecycle via Sub-Agent-Delegation | "Ich will ein neues Feature bauen" | *(voll)* |
+| `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs | Implementierungsaufgaben | *(voll)* |
+| `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase | sonnet |
+| `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR | sonnet |
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben | Neue Anforderungen | *(voll)* |
+| `ideation` | Neue Ideen explorieren, Vision schärfen | Ideen-Phase | *(voll)* |
+| `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README | Nach Implementierung | sonnet |
+| `git` | Commits, Branches, Tags, Push/Pull | Git-Operationen | haiku |
+| `release` | Versioning, Changelog, Build-Artifact, GitHub Release | Release-Prozess | sonnet |
+| `docker` | Docker-Stack bauen, starten, verwalten | Infrastruktur | haiku |
+| `meta-feedback` | Verbesserungsvorschläge als GitHub Issues einreichen | Framework-Feedback | haiku |
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projekt-Agenten | Meta-Management | sonnet |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns | Ökosystem-Erkundung | sonnet |
+| `security-auditor` | Sicherheitsanalyse: OWASP, Secrets, Dependency-Audit | Security-Reviews | sonnet |
+| `0-external skills` | Domänenspezifische Agenten aus Drittrepos | Spezialwissen | variiert |
 
 ## feature vs. orchestrator
 

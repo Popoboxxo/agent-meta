@@ -6,6 +6,7 @@
 flowchart TD
     CFG[agent-meta.config.json]
     ECFG[external-skills.config.json]
+    RCFG[roles.config.json]
     SYNC[sync.py]
 
     subgraph sources [agent-meta]
@@ -14,30 +15,53 @@ flowchart TD
         SN[snippets]
         EX[external SKILL.md]
         WR[skill-wrapper template]
+        RL[rules/1-generic + 2-platform]
+        HK[hooks/1-generic + 2-platform]
     end
 
     subgraph target [target project]
         AG[.claude/agents/ generated]
         SK[.claude/skills/ copied]
         SNC[.claude/snippets/ copied]
+        RLO[.claude/rules/ copied]
+        HKO[.claude/hooks/ copied]
         EXT[.claude/3-project/ ext created once]
         CLA[CLAUDE.md managed block updated]
+        SET[.claude/settings.json hooks merged]
+        SETL[.claude/settings.local.json created once]
     end
 
     CFG --> SYNC
     ECFG --> SYNC
+    RCFG --> SYNC
     G1 --> SYNC
     G2 --> SYNC
     SN --> SYNC
     EX --> SYNC
     WR --> SYNC
+    RL --> SYNC
+    HK --> SYNC
 
     SYNC -->|WRITE| AG
     SYNC -->|COPY| SNC
     SYNC -->|COPY| SK
+    SYNC -->|COPY| RLO
+    SYNC -->|COPY| HKO
     SYNC -->|CREATE once| EXT
     SYNC -->|UPDATE managed block| CLA
+    SYNC -->|MERGE hooks| SET
+    SYNC -->|CREATE once| SETL
 ```
+
+## Neue Features in v0.17.0
+
+| Feature | Was sync.py tut |
+|---------|----------------|
+| **Rules** | `rules/1-generic/` + `rules/2-platform/` → `COPY` → `.claude/rules/` (Stale-Tracking via `.agent-meta-managed`) |
+| **Hooks** | `hooks/1-generic/` + `hooks/2-platform/` → `COPY` → `.claude/hooks/` + `MERGE` in `.claude/settings.json` |
+| **settings.local.json** | Einmalig angelegt als persönliches Skeleton (gitignored) |
+| **permissionMode** | Aus `roles.config.json` + `permission-mode-overrides` → injiziert in Agenten-Frontmatter |
+| **JSON Schema** | `agent-meta.schema.json` für Validation von `agent-meta.config.json` |
 
 ## CLAUDE.md managed block
 

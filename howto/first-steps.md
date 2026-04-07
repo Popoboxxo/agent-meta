@@ -34,7 +34,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-git checkout v0.16.1
+git checkout v0.17.0
 ```
 
 ```bash
@@ -164,7 +164,10 @@ Das erzeugt:
 - `CLAUDE.md` — Projekt-Kontext für den AI-Assistenten
 - `CLAUDE.personal.md` — Persönliche Präferenzen (gitignored)
 - `.claude/settings.json` — Team-Permissions Skeleton
+- `.claude/settings.local.json` — Persönliche Permissions (gitignored)
 - `.claude/agents/*.md` — Alle generierten Agenten
+- `.claude/rules/*.md` — Projekt-globale Regeln (auto-loaded)
+- `.claude/hooks/*.sh` — Hook-Scripts (opt-in über config)
 - `.gitignore` — Fehlende Einträge werden ergänzt
 
 ---

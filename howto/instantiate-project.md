@@ -23,7 +23,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.16.1
+cd .agent-meta && git checkout v0.17.0
 ```
 
 ```bash
@@ -72,9 +72,12 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 Das Script erzeugt beim ersten Aufruf (nur bei `ai-provider: Claude`):
 - `CLAUDE.md` — aus Template, wenn noch nicht vorhanden
 - `CLAUDE.personal.md` — persönliche Präferenzen-Template (gitignored, einmalig)
-- `.claude/settings.json` — Team-Permissions Skeleton (einmalig)
+- `.claude/settings.json` — Team-Permissions Skeleton (einmalig, Hooks werden bei jedem sync gemergt)
+- `.claude/settings.local.json` — persönliches Skeleton (gitignored, einmalig)
 - `.gitignore` — fehlende Einträge werden ergänzt (bei jedem Sync)
 - `.claude/agents/*.md` — alle Agenten, generisch benannt
+- `.claude/rules/*.md` — Projekt-globale Regeln aus agent-meta (bei jedem Sync aktualisiert)
+- `.claude/hooks/*.sh` — Hook-Scripts aus agent-meta (bei jedem Sync aktualisiert)
 - `CLAUDE.md` managed block — wird bei jedem sync automatisch aktualisiert
 - `sync.log` mit Zusammenfassung und Warnungen
 
@@ -234,13 +237,15 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
-- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.16.1` oder neuer)
-- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-provider: Claude`)
+- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.17.0` oder neuer)
+- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-provider: Claude`, `$schema`)
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
 - [ ] `CLAUDE.personal.md` vorhanden (gitignored, persönlich befüllen)
 - [ ] `.claude/settings.json` vorhanden und committed
+- [ ] `.claude/settings.local.json` vorhanden (gitignored)
+- [ ] `.claude/rules/` vorhanden mit `issue-lifecycle.md`
 - [ ] `.gitignore` enthält `CLAUDE.personal.md`, `.claude/settings.local.json`, `sync.log`
 - [ ] `.claude/agents/orchestrator.md` vorhanden
 - [ ] `.claude/agents/developer.md` vorhanden

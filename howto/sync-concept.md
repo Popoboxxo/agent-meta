@@ -33,6 +33,8 @@ agent-meta/
   snippets/          ← sprachspezifische Code-Snippets
   external/          ← Git Submodule (externe Skill-Repos via --add-skill)
   external-skills.config.json   ← Skill-Konfiguration: repos (mit pinned_commit) + skills (mit approved)
+  roles.config.json             ← Rollen-Konfiguration: model + permissionMode pro Rolle
+  agent-meta.schema.json        ← JSON Schema für agent-meta.config.json (Draft-07)
   howto/
     sync-concept.md  ← dieses Dokument
     CLAUDE.project-template.md
@@ -60,6 +62,8 @@ agent-meta/
       ...
     snippets/                ← kopiert aus agent-meta/snippets/
     skills/                  ← kopiert aus external/ Submodulen
+    rules/                   ← kopiert aus agent-meta/rules/ (auto-loaded in alle Agenten)
+    hooks/                   ← kopiert aus agent-meta/hooks/ + in settings.json registriert
     3-project/               ← handgeschrieben, nie von sync.py überschrieben
       <prefix>-<rolle>-ext.md  ← Extension (additiv geladen)
       <rolle>.md               ← Override (ersetzt Agenten komplett)
@@ -72,8 +76,8 @@ agent-meta/
 |-------|------------|--------------|-------|
 | `CLAUDE.md` | Ja | sync.py (einmalig) | Projektregeln für alle |
 | `CLAUDE.personal.md` | Nein (gitignored) | sync.py (einmalig) | Persönliche Präferenzen |
-| `.claude/settings.json` | Ja | sync.py (einmalig) | Team-Permissions |
-| `.claude/settings.local.json` | Nein (gitignored) | Manuell | Persönliche Permissions |
+| `.claude/settings.json` | Ja | sync.py (einmalig Skeleton + Hooks-Merge) | Team-Permissions + Hooks |
+| `.claude/settings.local.json` | Nein (gitignored) | sync.py (einmalig) | Persönliche Permissions |
 
 `CLAUDE.personal.md` wird einmalig aus `howto/CLAUDE.personal-template.md` kopiert und danach nie wieder von sync.py angefasst. Jeder Entwickler füllt sie für sich aus.
 
@@ -98,7 +102,8 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
 ```json
 {
-  "agent-meta-version": "0.14.0",
+  "$schema": ".agent-meta/agent-meta.schema.json",
+  "agent-meta-version": "0.17.0",
 
   "ai-provider": "Claude",
 
@@ -106,7 +111,8 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
   "roles": ["orchestrator", "developer", "tester", "validator",
             "requirements", "documenter", "git", "release", "docker",
-            "ideation", "meta-feedback", "feature", "agent-meta-manager"],
+            "ideation", "meta-feedback", "feature", "agent-meta-manager",
+            "agent-meta-scout"],
 
   "project": {
     "name": "sharkord-vid-with-friends",
@@ -128,6 +134,7 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
 | Feld | Bedeutung |
 |------|-----------|
+| `$schema` | Pfad zu `agent-meta.schema.json` — aktiviert IDE-Validierung (empfohlen) |
 | `agent-meta-version` | Welches Release von agent-meta genutzt wird |
 | `ai-provider` | AI-Provider: `"Claude"` aktiviert CLAUDE.md auto-init, managed block, settings.json + .gitignore |
 | `platforms` | Aktive Plattformen — bestimmt welche `2-platform/<plattform>-*.md` einbezogen werden |
@@ -135,6 +142,11 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 | `project.name` | Vollständiger Projektname |
 | `project.prefix` | Kurzpräfix für Extension-Dateinamen (`vwf-developer-ext.md`) |
 | `project.short` | Kurzname (informativ) |
+| `model-overrides` | Modell pro Rolle überschreiben (z.B. `"git": "haiku"`) |
+| `permission-mode-overrides` | permissionMode pro Rolle überschreiben (z.B. `"validator": "default"`) |
+| `memory-overrides` | Memory-Scope pro Rolle überschreiben (z.B. `"validator": "local"`) |
+| `hooks` | Hooks aktivieren — `"dod-push-check": { "enabled": true }` |
+| `external-skills` | Externe Skills aktivieren — `"my-skill": { "enabled": true }` |
 | `variables` | Alle `{{VARIABLE}}` die in Agenten und CLAUDE.md ersetzt werden |
 
 ---
@@ -144,8 +156,11 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 ### Aufruf-Modi
 
 ```bash
-# Normaler Sync — generiert alle Agenten + aktualisiert CLAUDE.md managed block
+# Normaler Sync — generiert Agenten, Rules, Hooks, aktualisiert CLAUDE.md managed block
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
+
+# Erst-Einrichtung — erzeugt auch CLAUDE.md, settings.json, settings.local.json, .gitignore
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
 
 # Vorschau ohne Schreiben
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
@@ -157,6 +172,12 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
 # Managed block in bestehenden Extensions aktualisieren
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
 
+# Projekt-eigene Rule anlegen (nie von sync.py überschrieben)
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule security-policy
+
+# Projekt-eigenen Hook anlegen (Vorlage)
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook my-hook
+
 # Externen Skill als Submodul registrieren + config-Eintrag anlegen
 py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --source <path> --role <role>
 ```
@@ -165,17 +186,21 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 
 | Datei / Schicht | Verhalten | Wann |
 |-----------------|-----------|------|
-| `.claude/agents/*.md` (`1-generic/`) | **Immer überschreiben** + veraltete löschen | Jeder Sync |
-| `.claude/agents/*.md` (`2-platform/`) | **Immer überschreiben** + veraltete löschen | Jeder Sync |
-| `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `.claude/agents/*.md` | **Immer überschreiben** + veraltete löschen | Jeder Sync |
+| `.claude/rules/*.md` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync |
+| `.claude/hooks/*.sh` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync |
+| `.claude/settings.json` (Hooks) | **Hooks mergen** — managed Hooks aktualisieren | Jeder Sync |
 | `CLAUDE.md` managed block | **Immer aktualisieren** | Jeder Sync |
-| `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
-| `.claude/settings.json` | **Einmalig anlegen** (Skeleton) | Einmalig, wenn nicht vorhanden |
 | `.gitignore` | **Fehlende Einträge ergänzen** | Jeder Sync |
+| `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `.claude/settings.json` (Skeleton) | **Einmalig anlegen** | Einmalig, wenn nicht vorhanden |
+| `.claude/settings.local.json` | **Einmalig anlegen** (Skeleton, gitignored) | Einmalig, wenn nicht vorhanden |
 | `.claude/3-project/*-ext.md` | **Einmalig anlegen** via `--create-ext` | Manuell angefordert |
-| `CLAUDE.personal.md`, `settings.local.json`, `sync.log` | **Nie anfassen** — gitignored | — |
+| `.claude/rules/*.md` (projekt-eigen) | **Nie anfassen** — nicht in `.agent-meta-managed` | — |
+| `sync.log` | Überschreiben | Jeder Lauf |
 
-> Alle einmaligen Aktionen (`INIT`) sind nur bei `ai-provider: Claude` aktiv.
+> Einmalige Aktionen (CLAUDE.md, settings.json, settings.local.json, CLAUDE.personal.md) sind nur bei `ai-provider: Claude` aktiv.
 
 ### CLAUDE.md managed block
 
@@ -213,10 +238,10 @@ Nach jedem Lauf wird `sync.log` im Projekt-Root geschrieben (überschreibt den v
 
 ```
 ============================================================
-agent-meta sync — 2026-04-05 10:00:00
+agent-meta sync — 2026-04-07 10:00:00
 ============================================================
 Config:    agent-meta.config.json
-Source:    .agent-meta/ (v0.14.0)
+Source:    .agent-meta/ (v0.17.0)
 Mode:      sync
 Platforms: sharkord
 
@@ -228,15 +253,19 @@ ACTIONS
 [WRITE   ]  .claude/agents/agent-meta-manager.md           (1-generic/agent-meta-manager.md)
 [WRITE   ]  .claude/agents/release.md                      (2-platform/sharkord-release.md)
 [WRITE   ]  .claude/agents/docker.md                       (2-platform/sharkord-docker.md)
+[COPY    ]  .claude/rules/issue-lifecycle.md               (rules/1-generic/issue-lifecycle.md)
+[COPY    ]  .claude/hooks/dod-push-check.sh                (hooks/1-generic/dod-push-check.sh)
 [UPDATE  ]  CLAUDE.md                                      (managed block)
 
 SKIPPED
 -------
 [SKIP]   CLAUDE.md                                         (already exists)
+[SKIP]   .claude/settings.local.json                       (already exists)
 
 INFO
 ----
 [INFO]   .claude/agents/home-organization-specialist.md    (skill disabled)
+[INFO]   dod-push-check hook                               (not enabled in config)
 
 WARNINGS
 --------
@@ -244,7 +273,7 @@ WARNINGS
 
 SUMMARY
 -------
-7 action(s)  |  2 skipped  |  0 warning(s)
+9 action(s)  |  2 skipped  |  0 warning(s)
 Logfile: sync.log
 ```
 
@@ -256,18 +285,18 @@ Logfile: sync.log
 
 ```bash
 # 1. Submodul auf neue Version bringen
-cd .agent-meta && git fetch && git checkout v0.14.0 && cd ..
+cd .agent-meta && git fetch && git checkout v0.17.0 && cd ..
 git add .agent-meta
 
 # 2. Version in Config aktualisieren
-# agent-meta.config.json: "agent-meta-version": "0.14.0"
+# agent-meta.config.json: "agent-meta-version": "0.17.0"
 
-# 3. Sync ausführen — alle Agenten werden neu generiert
+# 3. Sync ausführen — alle Agenten, Rules und Hooks werden neu generiert
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
 
 # 4. Ergebnis prüfen + committen
 git add .claude/ agent-meta.config.json CLAUDE.md
-git commit -m "chore: upgrade agent-meta to v0.14.0"
+git commit -m "chore: upgrade agent-meta to v0.17.0"
 ```
 
 ### Neue Variable ergänzen
@@ -309,4 +338,5 @@ Projektspezifisches Wissen gehört in:
 ## Abhängigkeiten des Scripts
 
 - Python 3.8+
-- Keine externen Dependencies (nur stdlib: `json`, `pathlib`, `argparse`, `re`, `shutil`, `datetime`)
+- Pflicht: nur stdlib (`json`, `pathlib`, `argparse`, `re`, `shutil`, `datetime`)
+- Optional: `jsonschema` — wenn installiert, wird `agent-meta.config.json` gegen `agent-meta.schema.json` validiert
