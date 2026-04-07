@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "1.7.0"
+version: "2.0.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@1.7.0"
+generated-from: "1-generic/orchestrator.md@2.0.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -38,6 +38,18 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 **Sprachen:** Python, Markdown, JSON
 
+### Aktive DoD-Features
+
+| Feature | Status |
+|---------|--------|
+| REQ-Traceability | true |
+| Tests erforderlich | true |
+| CODEBASE_OVERVIEW | true |
+| Security-Audit | false |
+
+Schritte in Workflows die mit `?` markiert sind werden **nur** ausgeführt wenn das
+zugehörige DoD-Feature `true` ist.
+
 ---
 
 ## Spezialisierte Agenten
@@ -56,30 +68,90 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 ---
 
+## Parallelitäts-Steuerung
+
+**Max. parallele Agenten:** 2
+
+### Wann parallel delegieren?
+
+Verwende `run_in_background: true` beim Agent-Tool um Agenten parallel zu starten.
+Beachte dabei:
+
+1. **Maximal 2 Agenten gleichzeitig** — nie mehr
+2. **Nur unabhängige Schritte parallelisieren** — markiert mit `∥` in den Workflows
+3. **Ergebnisse abwarten** bevor abhängige Schritte starten
+4. **Modell-Kosten beachten** — zwei Opus-Agenten parallel = doppelter Verbrauch
+
+### Parallelisierbare Muster
+
+| Muster | Agenten | Bedingung |
+|--------|---------|-----------|
+| Validierung + Dokumentation | `validator` ∥ `documenter` | Beide lesen nach Implementierung, kein Write-Konflikt |
+| Test-Ausführung + Doku | `tester` ∥ `documenter` | Nur wenn Tests unabhängig von Doku |
+| Scout + Feedback | `agent-meta-scout` ∥ `meta-feedback` | Verschiedene Aktionen |
+
+### Nicht parallelisierbar
+
+- `tester` → `developer` (TDD: Test muss vor Implementierung stehen)
+- `developer` → `tester` (Code muss vor Test-Ausführung fertig sein)
+- `validator` → `git` (Validierung muss vor Commit abgeschlossen sein)
+- `requirements` → `tester` (REQ-ID muss vor Test-Schreiben existieren)
+
+---
+
 ## Orchestrierungs-Workflows
+
+> Schritte mit `∥` können parallel laufen (bis max. 2 gleichzeitig).
+> Verwende `run_in_background: true` für den zweiten Agenten im parallelen Paar.
+
+### Branch-Guard (Schritt 0 für Workflows A, B, E)
+
+Vor jedem Code-ändernden Workflow **immer zuerst** den Branch prüfen:
+
+```
+0.   git           → Branch-Guard:
+                      Aktuellen Branch ermitteln (git branch --show-current).
+                      Auf main/master? → Feature-Branch anlegen:
+                        - Workflow A: feat/<thema>
+                        - Workflow B: fix/<thema>
+                        - Workflow E: refactor/<thema>
+                      Bereits auf passendem Feature-Branch? → Weiter.
+```
+
+**Wichtig:** Schritt 0 ist **Pflicht** — niemals Workflow A/B/E ohne Branch-Guard starten.
+Commits direkt auf main/master sind nur erlaubt für:
+- Workflow H (agent-meta Upgrade — `chore:` Commits)
+- Workflow D (Erkenntnisse — `docs:` Commits)
+- Einzeilige Fixes mit expliziter User-Bestätigung
+
+---
 
 ### Workflow A: Neues Feature
 
+Schritte mit `?` werden nur ausgeführt wenn das DoD-Feature aktiv ist.
+
 ```
-1. requirements  → Anforderung formulieren, REQ-ID vergeben
-2. tester        → Tests ZUERST schreiben (TDD Red Phase)
-3. developer     → Implementierung (TDD Green Phase)
-4. tester        → Tests ausführen, Regressions prüfen
-5. validator     → Code gegen REQ validieren, DoD-Check
-6. documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
-7. git           → Commit + Push
+0.    git           → Branch-Guard (→ feat/<thema>)
+1.  ? requirements  → Anforderung formulieren, REQ-ID vergeben     [req-traceability]
+2.  ? tester        → Tests ZUERST schreiben (TDD Red Phase)       [tests-required]
+3.    developer     → Implementierung (TDD Green Phase)
+4.  ? tester        → Tests ausführen, Regressions prüfen          [tests-required]
+5∥6.  validator     → Code gegen REQ validieren, DoD-Check
+  ∥ ? documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten     [codebase-overview]
+7.    git           → Commit + Push  (erst wenn 5+6 beide fertig)
 ```
 
 ### Workflow B: Bugfix
 
 ```
-1. requirements  → Bestehende REQ-ID identifizieren
-2. tester        → Reproduzierenden Test schreiben
-3. developer     → Fix implementieren
-4. tester        → Tests ausführen
-5. validator     → Quick-Check
-6. documenter    → Ggf. Doku updaten
-7. git           → Commit + Push
+0.    git           → Branch-Guard (→ fix/<thema>)
+1.  ? requirements  → Bestehende REQ-ID identifizieren             [req-traceability]
+2.  ? tester        → Reproduzierenden Test schreiben               [tests-required]
+3.    developer     → Fix implementieren
+4.  ? tester        → Tests ausführen                               [tests-required]
+5∥6.  validator     → Quick-Check
+  ∥ ? documenter    → Ggf. Doku updaten                            [codebase-overview]
+7.    git           → Commit + Push  (erst wenn 5+6 beide fertig)
 ```
 
 ### Workflow C: Validierung / Audit
@@ -99,12 +171,13 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 ### Workflow E: Refactoring
 
 ```
-1. requirements  → Betroffene REQ-IDs identifizieren
-2. developer     → Refactoring durchführen
-3. tester        → Alle betroffenen Tests ausführen
-4. validator     → Sicherstellen, dass kein Verhalten sich ändert
-5. documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
-6. git           → Commit + Push
+0.    git           → Branch-Guard (→ refactor/<thema>)
+1.  ? requirements  → Betroffene REQ-IDs identifizieren            [req-traceability]
+2.    developer     → Refactoring durchführen
+3.  ? tester        → Alle betroffenen Tests ausführen              [tests-required]
+4∥5.  validator     → Sicherstellen, dass kein Verhalten sich ändert
+  ∥ ? documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten [codebase-overview]
+6.    git           → Commit + Push  (erst wenn 4+5 beide fertig)
 ```
 
 ### Workflow F: Testsystem starten
@@ -226,8 +299,9 @@ Wenn der Nutzer "schau dir Issue #X an", "fix Issue", "bearbeite offene Issues"
 oder ähnliches sagt:
 
 ```
-1. git          → Issue(s) abrufen und analysieren
+0. git          → Issue(s) abrufen und analysieren
                   gh issue list / gh issue view <id>
+1. git          → Branch-Guard (→ fix/<issue> oder feat/<issue>)
 2. requirements → Issue als REQ aufnehmen oder bestehende REQ-ID zuordnen
                   Bei Bug: betroffene REQ-ID identifizieren
                   Bei Feature: neue REQ-ID vergeben
@@ -275,6 +349,45 @@ konkreten Einbindungsvorschlägen für agent-meta.
 
 ---
 
+### Workflow N: Externes Skill-Repo vorgeschlagen
+
+Wenn der Nutzer ein externes Repository als potentiellen Skill vorschlägt,
+eine URL teilt, oder sagt "das könnte man einbinden":
+
+**Erkennungsmerkmale:**
+- "Schau dir dieses Repo an: <URL>"
+- "Könnte man das als Skill einbinden?"
+- "Ich habe ein nützliches Repo gefunden für <Thema>"
+- "Gibt es Skills für <Domäne>?"
+- User teilt einen GitHub-Link zu einem spezialisierten Repo
+
+```
+1. agent-meta-scout  → Repo evaluieren (Qualität, Scope, SKILL.md vorhanden?)
+                       Ergebnis: Bewertung + Empfehlung (Skill / Rule / Extension / ablehnen)
+
+2. Entscheidung basierend auf Scout-Empfehlung:
+
+   ├─ Empfehlung: External Skill
+   │   → agent-meta-manager → --add-skill ausführen (Submodule + Config)
+   │   → agent-meta-manager → Skill im Projekt aktivieren
+   │   → git → Commit: "feat: add external skill <name>"
+   │
+   ├─ Empfehlung: Besser als Rule / Extension
+   │   → User informieren warum kein Skill
+   │   → Ggf. agent-meta-manager → Rule/Extension anlegen
+   │
+   └─ Empfehlung: Nicht geeignet
+       → User informieren mit Begründung des Scouts
+       → Ggf. meta-feedback → Feedback als Issue (falls Verbesserungspotential)
+```
+
+**Wichtig:**
+- **Immer erst evaluieren** (Scout), dann entscheiden — nie blind `--add-skill` ausführen
+- Neuer Skill startet mit `approved: false` — User muss Freigabe explizit bestätigen
+- Two-Gate-Prinzip: `approved: true` (Meta) + `enabled: true` (Projekt)
+
+---
+
 ### Workflow K: Feedback an agent-meta geben
 
 Wenn der Nutzer Feedback zum agent-meta-Framework hat, oder am **Ende einer Session**:
@@ -304,23 +417,50 @@ python scripts/sync.py --config agent-meta.config.json --dry-run
 
 ## Definition of Done (DoD) — Enforced by Orchestrator
 
-Eine Aufgabe ist erst abgeschlossen, wenn:
+Die DoD-Kriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Fehlende Einträge verwenden die unten angegebenen Defaults.
+
+Eine Aufgabe ist erst abgeschlossen, wenn **alle aktiven** Kriterien erfüllt sind:
+
+### Immer aktiv (Pflicht)
+
+- [ ] **Code** implementiert die Aufgabe vollständig
+- [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md)
+- [ ] **Commit** via `git`-Agent mit korrektem Conventional-Commits-Format
+
+### Aktiv wenn `req-traceability: true` (Default: true)
 
 - [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
-- [ ] **Code** implementiert die REQ vollständig
-- [ ] **Test** vorhanden mit `[REQ-xxx]` im Namen
-- [ ] **Tests grün** — Test-Suite bestanden
-- [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md)
-- [ ] **CODEBASE_OVERVIEW.md** aktualisiert
 - [ ] **REQUIREMENTS.md** konsistent
-- [ ] **Commit** via `git`-Agent mit korrektem Format durchgeführt
+- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
+
+Wenn `req-traceability: false`: Keine REQ-ID nötig. Commit-Format: `<type>: <beschreibung>`.
+Workflow-Schritte mit `requirements`-Agent werden übersprungen.
+
+### Aktiv wenn `tests-required: true` (Default: true)
+
+- [ ] **Test** vorhanden (mit `[REQ-xxx]` im Namen wenn req-traceability aktiv)
+- [ ] **Tests grün** — Test-Suite bestanden
+
+Wenn `tests-required: false`: Kein Test als DoD-Kriterium.
+Workflow-Schritte mit `tester`-Agent werden übersprungen.
+
+### Aktiv wenn `codebase-overview: true` (Default: true)
+
+- [ ] **CODEBASE_OVERVIEW.md** aktualisiert
+
+Wenn `codebase-overview: false`: Kein Doku-Update als DoD-Kriterium.
+Workflow-Schritte mit `documenter`-Agent werden übersprungen.
+
+### Aktiv wenn `security-audit: true` (Default: false)
+
+- [ ] **Security-Audit** vor Release durchgeführt (via `security-auditor`-Agent)
 
 ### Enforcement
 
-- **Keine finale Antwort** ohne dass alle DoD-Punkte geprüft sind
-- **Keine Commit-Empfehlung** ohne vorherige Doku-Aktualisierung
-- Bei Code-Änderungen IMMER den Dokumentationszyklus auslösen
-- Bei Unsicherheit: Default = Validierung + Doku-Update
+- **Keine finale Antwort** ohne dass alle **aktiven** DoD-Punkte geprüft sind
+- **Keine Commit-Empfehlung** ohne vorherige Prüfung aller aktiven Kriterien
+- Bei Unsicherheit: Default = Validierung durchführen
 
 ---
 
@@ -335,11 +475,11 @@ alle DoD-Punkte erfüllt sind.
 
 ## Don'ts
 
-- KEINE Feature ohne REQ-ID
-- KEIN Code ohne Tests
 - KEINE Secrets / API-Keys im Code
-- KEIN Abschluss ohne DoD-Check
+- KEIN Abschluss ohne DoD-Check (nur aktive Kriterien)
 - KEINE Delegation an einen falschen Agenten
+- KEINE Feature ohne REQ-ID **(nur wenn `req-traceability: true`)**
+- KEIN Code ohne Tests **(nur wenn `tests-required: true`)**
 
 ## Sprache
 

@@ -175,7 +175,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.17.0 — `2026-04-07`
+Generiert von agent-meta v0.18.0 — `2026-04-07`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 

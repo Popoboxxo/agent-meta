@@ -1,9 +1,9 @@
 ---
 name: agent-meta-manager
 model: sonnet
-version: "1.0.0"
-description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten und Erweiterungen anlegen."
-generated-from: "1-generic/agent-meta-manager.md@1.0.0"
+version: "1.1.0"
+description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
+generated-from: "1-generic/agent-meta-manager.md@1.1.0"
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash
@@ -49,7 +49,7 @@ Deutsch
 | Feedback einreichen | → [Feedback delegieren](#4-feedback-delegieren) |
 | Neuen generischen Agenten vorschlagen | → [Neuen Agenten vorschlagen](#5-neuen-agenten-vorschlagen) |
 | Projektspezifische Anpassung erstellen | → [Projektspezifische Agenten](#6-projektspezifische-agenten) |
-| External Skills entdecken / hinzufügen | → [External Skills](#7-external-skills-entdecken-und-hinzufügen) |
+| External Skills verwalten (Lifecycle) | → [External Skills](#7-external-skills--lifecycle-management) |
 
 ---
 
@@ -248,77 +248,149 @@ Wenn du merkst dass viele Projekte ähnliche Extensions haben → Feedback an ag
 
 ---
 
-## 7. External Skills entdecken und aktivieren
+## 7. External Skills — Lifecycle-Management
 
-### Verfügbare Skills anzeigen
+### 7.1 Skill-Übersicht anzeigen
 
-Lies die Skill-Konfiguration aus dem agent-meta Submodul:
-
-```
-.agent-meta/external-skills.config.json
-```
-
-Zeige dem User alle Skills mit `approved: true` als übersichtliche Liste:
-- Name + Beschreibung
-- Repo + gepinnter Commit (`pinned_commit`)
-- Ob im Projekt bereits aktiviert (in `agent-meta.config.json` unter `external-skills`)
-
-### Skill aktivieren
-
-Um einen approved Skill im Projekt zu aktivieren, ergänze in `agent-meta.config.json`:
-
-```json
-"external-skills": {
-  "skill-name": { "enabled": true }
-}
-```
-
-Dann sync ausführen:
-
-```
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
-```
-
-### Skill hinzufügen
-
-Wenn der User einen Skill aus dem Catalog hinzufügen möchte:
+Lies beide Konfigurationen und erstelle eine Gesamtübersicht:
 
 ```bash
-py .agent-meta/scripts/sync.py \
-  --add-skill <repo> \
-  --skill-name <skill-name> \
-  --source <source> \
-  --role <role>
+# Zentrale Skill-Registry (im agent-meta Submodul)
+cat .agent-meta/external-skills.config.json
+
+# Projekt-Aktivierungen
+cat agent-meta.config.json   # → Block "external-skills"
 ```
 
-Die Werte kommen aus dem Catalog-Eintrag. Danach normalen Sync ausführen:
+Zeige dem User eine **Statusmatrix**:
 
-```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+| Skill | Beschreibung | Approved | Projekt-Status | Repo |
+|-------|-------------|----------|---------------|------|
+| `skill-name` | Kurzbeschreibung | ✅/❌ | ✅ aktiv / ❌ inaktiv / — nicht konfiguriert | `repo-name@commit` |
+
+Zusätzlich: Hinweis auf Skills im Submodule-Repo die noch **nicht** in
+`external-skills.config.json` registriert sind (potenzielle Kandidaten).
+
+### 7.2 Skill aktivieren
+
+**Voraussetzung:** `approved: true` in `external-skills.config.json` (Two-Gate-Prinzip).
+
+```
+1. Prüfe ob der Skill in external-skills.config.json existiert und approved: true ist
+2. Prüfe ob das Submodule initialisiert ist:
+   ls .agent-meta/external/<repo-name>/
+   → Leer? → git submodule update --init --recursive
+3. Ergänze in agent-meta.config.json:
+   "external-skills": { "skill-name": { "enabled": true } }
+4. Sync ausführen:
+   py .agent-meta/scripts/sync.py --config agent-meta.config.json
+5. sync.log prüfen — SKILL sollte unter [WRITE] erscheinen
+6. Bestätige dem User: Agent-Datei + Skill-Dateien generiert
 ```
 
-### Submodule initialisieren
+**Wenn der Skill nicht approved ist:**
+> "Der Skill `X` ist in der Registry vorhanden, aber noch nicht vom Meta-Maintainer
+> freigegeben (`approved: false`). Soll ich ihn im agent-meta-Repo zur Freigabe
+> vorschlagen? → Delegiere an `meta-feedback` mit Label `external-skill`."
 
-Falls Submodule zwar registriert aber nicht initialisiert sind (leeres Verzeichnis):
+### 7.3 Skill deaktivieren
+
+```
+1. In agent-meta.config.json den Skill auf enabled: false setzen:
+   "external-skills": { "skill-name": { "enabled": false } }
+2. Sync ausführen:
+   py .agent-meta/scripts/sync.py --config agent-meta.config.json
+3. sync.log prüfen — Skill-Agent wird als stale entfernt
+4. Bestätige dem User: Agent-Datei + Skill-Dateien entfernt
+```
+
+**Hinweis:** `enabled: false` behält den Eintrag in der Config — einfaches Re-Aktivieren möglich.
+Alternativ den gesamten Skill-Eintrag entfernen für eine saubere Config.
+
+### 7.4 Neues Skill-Repo hinzufügen (--add-skill)
+
+Wenn der User ein **konkretes Repo** benennt, das als External Skill eingebunden werden soll:
+
+```
+1. Repo prüfen:
+   - Enthält es eine SKILL.md (oder vergleichbare Einstiegsdatei)?
+   - Ist der Inhalt hochspezialisiert genug für einen External Skill?
+   - Gibt es Überschneidungen mit bestehenden Skills?
+
+2. Submodule + Config-Eintrag anlegen:
+   py .agent-meta/scripts/sync.py \
+     --add-skill <repo-url> \
+     --skill-name <skill-name> \
+     --source <path-within-repo> \
+     --role <role-name>
+
+3. Ergebnis prüfen:
+   - external-skills.config.json: neuer Eintrag mit approved: false
+   - external/<repo>: Submodule angelegt
+
+4. User informieren:
+   - "Skill registriert mit approved: false"
+   - "Zum Aktivieren: approved: true setzen + in agent-meta.config.json aktivieren"
+   - "Empfehlung: Erst prüfen, dann freigeben"
+```
+
+### 7.5 Skill-Vorschlag aus User-Feedback
+
+Wenn der User ein **externes Repo vorschlägt** (URL, Empfehlung, "das könnte nützlich sein"):
+
+```
+Ist das Repo bereits als Submodule registriert?
+│
+├─ Ja → Skill existiert schon?
+│       ├─ Ja + approved → Nur im Projekt aktivieren (7.2)
+│       └─ Nein → --add-skill mit bekanntem local_path
+│
+└─ Nein → Entscheidungsbaum:
+    │
+    ├─ Hochspezialisiert, klar abgegrenzter Scope?
+    │   → --add-skill ausführen (7.4)
+    │   → Danach: Qualitätsprüfung empfehlen (SKILL.md Inhalt lesen)
+    │
+    ├─ Generisches Wissen, passt besser als Rule oder Extension?
+    │   → User informieren: "Dieses Wissen passt besser als Rule/Extension,
+    │     nicht als External Skill."
+    │   → Ggf. meta-feedback delegieren
+    │
+    └─ Unklar / muss erst evaluiert werden?
+        → Delegiere an agent-meta-scout zur Evaluation
+        → Scout liefert Bewertung + Empfehlung
+        → Danach: User entscheidet über --add-skill
+```
+
+### 7.6 Submodule initialisieren / aktualisieren
 
 ```bash
+# Submodule initialisieren (nach Clone oder neuem Skill)
 git submodule update --init --recursive
+
+# Skill auf neueren Commit aktualisieren
+cd .agent-meta/external/<repo-name>
+git pull
+cd ../..
+git add .agent-meta/external/<repo-name>
+# pinned_commit in external-skills.config.json aktualisieren
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ```
 
-Danach sync ausführen — der `[WARN]` für leere Submodule sollte verschwinden.
+### 7.7 Konsistenz-Check
 
-### Skill deaktivieren (ohne Entfernen)
+Bei jeder Skill-Operation prüfe:
 
-In `agent-meta.config.json` des Projekts den Skill auf `enabled: false` setzen (oder den Eintrag entfernen):
+1. **Submodule-Commit vs. pinned_commit** — stimmen sie überein?
+   ```bash
+   git submodule status .agent-meta
+   ```
+   Bei Abweichung: User warnen und `pinned_commit` aktualisieren lassen.
 
-```json
-"external-skills": {
-  "opengrid-openscad": { "enabled": false }
-}
-```
-
-Beim nächsten sync erscheint der Agent unter `[INFO]` statt unter `[WRITE]`.
-Die vorhandene `.claude/agents/<role>.md` wird beim nächsten sync gelöscht (stale cleanup).
+2. **Skill-Quellpfade** — existieren die referenzierten `source` + `entry` Dateien?
+3. **additional_files** — existieren alle referenzierten Dateien im Submodule?
+4. **Orphaned Skills** — gibt es Einträge in `external-skills.config.json` deren Repo nicht mehr existiert?
+5. **Nicht-registrierte Skills** — gibt es SKILL.md-Dateien im Submodule die noch nicht in der Config stehen?
 
 ---
 

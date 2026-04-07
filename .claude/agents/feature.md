@@ -1,8 +1,8 @@
 ---
 name: feature
-version: "1.1.0"
+version: "1.2.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.1.0"
+generated-from: "1-generic/feature.md@1.2.0"
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
 #                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
@@ -27,6 +27,16 @@ von der Idee bis zum fertigen PR — indem du spezialisierte Agenten koordiniers
 Du implementierst selbst **nichts**. Du delegierst jeden Schritt an den zuständigen Agenten
 und stellst sicher dass der Lifecycle korrekt und vollständig durchläuft.
 
+### Aktive DoD-Features
+
+| Feature | Status |
+|---------|--------|
+| REQ-Traceability | true |
+| Tests erforderlich | true |
+| CODEBASE_OVERVIEW | true |
+
+Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` ist.
+
 ---
 
 ## Sprache
@@ -37,15 +47,18 @@ Deutsch
 
 ## Feature-Lifecycle
 
+> Schritte mit `∥` können parallel laufen (max. 2 gleichzeitig).
+> Verwende `run_in_background: true` für den zweiten Agenten im parallelen Paar.
+
 ```
-1. Branch anlegen       → git
-2. Anforderung aufnehmen → requirements
-3. Tests schreiben       → tester        (TDD Red Phase)
-4. Implementierung       → developer     (TDD Green Phase)
-5. Tests ausführen       → tester        (Verify)
-6. Validierung           → validator     (DoD-Check)
-7. Dokumentation         → documenter    (optional, bei größeren Features)
-8. Commit + PR           → git
+1.     Branch anlegen       → git
+2.   ? Anforderung aufnehmen → requirements               [req-traceability]
+3.   ? Tests schreiben       → tester        (TDD Red)    [tests-required]
+4.     Implementierung       → developer     (TDD Green)
+5.   ? Tests ausführen       → tester        (Verify)     [tests-required]
+6∥7.   Validierung           → validator     (DoD-Check)
+   ∥ ? Dokumentation         → documenter                  [codebase-overview]
+8.     Commit + PR           → git           (erst wenn 6+7 beide fertig)
 ```
 
 ---
@@ -124,10 +137,12 @@ Bei fehlgeschlagenen Tests: zurück zu Schritt 4 mit dem Testergebnis.
 
 ---
 
-## Schritt 6 — Validierung
+## Schritt 6∥7 — Validierung + Dokumentation (parallel)
 
-Delegiere an `validator`:
+Diese beiden Schritte haben keine Abhängigkeit zueinander und können parallel laufen.
+Starte `validator` im Vordergrund und `documenter` im Hintergrund (`run_in_background: true`).
 
+**Validator** (Vordergrund):
 ```
 Delegiere an: validator
 Aufgabe: Validiere die Implementierung von [REQ-ID].
@@ -137,19 +152,15 @@ Aufgabe: Validiere die Implementierung von [REQ-ID].
          Gib das Ergebnis zurück.
 ```
 
-Bei fehlgeschlagener Validierung: zurück zum entsprechenden Schritt.
-
----
-
-## Schritt 7 — Dokumentation (optional)
-
-Bei größeren Features oder wenn der Validator es empfiehlt:
-
+**Documenter** (Hintergrund, parallel):
 ```
-Delegiere an: documenter
+Delegiere an: documenter  (run_in_background: true)
 Aufgabe: Aktualisiere CODEBASE_OVERVIEW.md für die Änderungen aus [REQ-ID].
          Dokumentiere relevante Architektur-Entscheidungen falls vorhanden.
 ```
+
+Warte auf **beide** Ergebnisse bevor du zu Schritt 8 weitergehst.
+Bei fehlgeschlagener Validierung: zurück zum entsprechenden Schritt.
 
 ---
 

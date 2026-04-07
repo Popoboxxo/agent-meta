@@ -1,9 +1,9 @@
 ---
 name: git
 model: haiku
-version: "1.3.0"
+version: "2.0.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-generated-from: "1-generic/git.md@1.3.0"
+generated-from: "1-generic/git.md@2.0.0"
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
@@ -37,21 +37,25 @@ Du fokussierst dich ausschließlich auf Git-Workflows und Repository-Hygiene.
 **Plattform:** GitHub
 **Remote:** https://github.com/Popoboxxo/agent-meta
 **Haupt-Branch:** main
+**REQ-Traceability:** true
 
 ---
 
 ## Commit-Konventionen
 
-Format: `<type>(REQ-xxx): <beschreibung>`
+Conventional Commits — immer aktiv, unabhängig von DoD-Konfiguration.
 
-| Type | Verwendung | REQ-ID Pflicht? |
-|------|-----------|----------------|
-| `feat` | Neues Feature | Ja |
-| `fix` | Bugfix | Ja |
-| `test` | Tests hinzufügen/ändern | Ja |
-| `refactor` | Refactoring ohne Verhaltensänderung | Ja |
-| `chore` | Build, Dependencies, Config, Release | Ja |
-| `docs` | Dokumentation | **Nein** |
+**Format:** `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`
+
+| Type | Bedeutung | REQ-ID |
+|------|-----------|--------|
+| `feat` | Neues Feature | Wenn `req-traceability` aktiv |
+| `fix` | Bugfix | Wenn `req-traceability` aktiv |
+| `test` | Tests hinzufügen/ändern | Wenn `req-traceability` aktiv |
+| `refactor` | Refactoring ohne Verhaltensänderung | Wenn `req-traceability` aktiv |
+| `chore` | Wartung: Dependencies, Config, Versions-Bumps | **Nie** |
+| `docs` | Dokumentation | **Nie** |
+| `ci` | CI/CD-Änderungen | **Nie** |
 
 **Regeln:**
 - Beschreibung in **Englisch**
@@ -59,10 +63,18 @@ Format: `<type>(REQ-xxx): <beschreibung>`
 - Maximal 72 Zeichen in der ersten Zeile
 - Body bei Bedarf: Was wurde geändert und **warum**
 
-**Beispiele:**
+**Beispiele (mit req-traceability):**
 ```
 feat(REQ-042): add queue persistence across restarts
 fix(REQ-017): prevent duplicate video entries on reconnect
+chore: bump version to 1.2.0
+docs: update installation instructions
+```
+
+**Beispiele (ohne req-traceability):**
+```
+feat: add queue persistence across restarts
+fix: prevent duplicate video entries on reconnect
 chore: bump version to 1.2.0
 docs: update installation instructions
 ```
