@@ -2,6 +2,7 @@
   "_comment": "Zentrale Rollen-Konfiguration für agent-meta. Definiert alle bekannten Rollen, empfohlene Modelle, Memory-Scopes und Kurzbeschreibungen. Wird von sync.py beim Generieren gelesen.",
   "_comment_model": "model: empfohlenes Claude-Modell für diese Rolle. Leer = erbt vom Parent-Kontext. Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs. Projekte überschreiben via 'model-overrides' in agent-meta.config.json.",
   "_comment_memory": "memory: persistentes Agenten-Gedächtnis über Sessions hinweg. Leer = kein Gedächtnis. Gültige Werte: 'project' (.claude/agent-memory/<name>/, in git), 'local' (.claude/agent-memory-local/<name>/, gitignored), 'user' (~/.claude/agent-memory/<name>/, maschinenlokal). Projekte überschreiben via 'memory-overrides' in agent-meta.config.json.",
+  "_comment_permission_mode": "permission_mode: Claude Code Berechtigungsmodus für diesen Agenten. Leer = Standard (kein Frontmatter-Feld). Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only). Projekte überschreiben via 'permission-mode-overrides' in agent-meta.config.json.",
 
   "roles": {
 
@@ -44,6 +45,7 @@
     "validator": {
       "model": "sonnet",
       "memory": "project",
+      "permission_mode": "plan",
       "description": "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
     },
 
@@ -56,6 +58,7 @@
     "security-auditor": {
       "model": "sonnet",
       "memory": "project",
+      "permission_mode": "plan",
       "description": "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
     },
 

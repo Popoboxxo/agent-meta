@@ -1,7 +1,7 @@
 ---
 name: template-git
-version: "1.1.1"
-description: "Generisches Template für den Git-Agenten. Verantwortlich für alle Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
+version: "1.3.0"
+description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
@@ -271,6 +271,57 @@ cd .agent-meta && git checkout v<neue-version> && cd ..
 git add .agent-meta
 git commit -m "chore: upgrade agent-meta to v<neue-version>"
 ```
+
+---
+
+### Workflow 7: GitHub Issue schließen nach erledigter Arbeit
+
+```bash
+# Issue mit Kommentar schließen (empfohlen — alles in einem Schritt)
+gh issue close <number> --comment "Implemented in <commit-hash>: <one-line summary>."
+
+# Ausführlicherer Kommentar, dann schließen
+gh issue comment <number> --body "$(cat <<'EOF'
+## Umgesetzt
+
+- Was wurde implementiert (Stichpunkte)
+- Betroffene Dateien / Commits
+
+Closes #<number>
+EOF
+)"
+gh issue close <number>
+```
+
+**Wann:** Nach jedem abgeschlossenen Feature, Fix oder Task der einem Issue zugeordnet ist —
+auch bei direkten Commits ohne PR.
+
+---
+
+## DoD-Hooks (Opt-in)
+
+Agent-meta kann einen `dod-push-check`-Hook bereitstellen, der `git push` automatisch
+blockiert wenn Tests nicht grün sind. Der Hook wird von Claude Code als `PreToolUse`-Hook
+ausgeführt — kein manueller Schritt nötig.
+
+**Aktivierung via `agent-meta.config.json`:**
+```json
+"hooks": {
+  "dod-push-check": { "enabled": true }
+}
+```
+
+Nach dem nächsten Sync (`sync.py --config ...`) ist der Hook aktiv:
+- Skript liegt in `.claude/hooks/dod-push-check.sh`
+- Eintrag in `.claude/settings.json` unter `hooks.PreToolUse`
+- Voraussetzung: `variables.TEST_COMMAND` muss in der Config gesetzt sein
+
+**Eigene Hooks anlegen:**
+```bash
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook <name>
+```
+
+Vollständige Dokumentation: `.agent-meta/howto/hooks.md`
 
 ---
 

@@ -1,4 +1,5 @@
 {
+  "$schema": "./agent-meta.schema.json",
   "_comment": "agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.",
 
   "agent-meta-version": "0.16.1",

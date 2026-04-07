@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.17.0] — 2026-04-07
+
+### Added
+
+- **Hooks-Schichten-System** (`hooks/`): Vier-Schichten-Modell analog zu Rules und Agents.
+  `sync.py` kopiert Hook-Skripte aus `0-external/`, `1-generic/`, `2-platform/` nach `.claude/hooks/`.
+  Stale-Tracking via `.claude/hooks/.agent-meta-managed`.
+  Registrierung in `.claude/settings.json` nur bei Opt-in: `"hooks": {"<name>": {"enabled": true}}`.
+  Settings.json wird bei jedem Sync gemergt (Hooks-Section) — nicht mehr nur einmalig angelegt.
+- **`dod-push-check.sh`** (`hooks/1-generic/`): Blockiert `git push` wenn Tests nicht grün sind.
+  Liest `TEST_COMMAND` aus `agent-meta.config.json` oder `$AGENT_META_TEST_COMMAND`.
+- **`--create-hook <name>`** in `sync.py`: Erstellt `.claude/hooks/<name>.sh` als Template.
+  Projekt-eigene Hooks — nie von sync.py überschrieben.
+- **`init_settings_local_json()`** in `sync.py`: Erstellt `.claude/settings.local.json` Skeleton
+  beim ersten Claude-Sync (`--init` oder `ai-provider: Claude`). Einmalig, nie überschrieben.
+- **`howto/hooks.md`** (neu): Vollständige Dokumentation des Hooks-Systems —
+  Schichten, Sync-Verhalten, dod-push-check Konfiguration, Abgrenzung zu Rules.
+- **`permissionMode`-Injection** in `sync.py`: `resolve_permission_mode()` +
+  `inject_permission_mode_field()` — analog zu `model` und `memory`.
+  Liest aus `roles.config.json` (Meta-Default) oder `permission-mode-overrides` in
+  `agent-meta.config.json` (Projekt-Override).
+- **`permission_mode`-Feld in `roles.config.json`**: `validator` → `plan`,
+  `security-auditor` → `plan`. Alle anderen Rollen leer (Standard-Verhalten).
+- **`permission-mode-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen
+  überschreiben. Gültige Werte: `plan`, `acceptEdits`, `bypassPermissions`, `default`.
+- **`agent-meta.schema.json`** (neu): Vollständiges JSON Schema Draft-07 für
+  `agent-meta.config.json`. Validiert alle Top-Level-Keys, Enum-Werte für
+  `model-overrides` (haiku/sonnet/opus), `memory-overrides` (project/local/user),
+  `permission-mode-overrides` (plan/acceptEdits/bypassPermissions/default), Hooks, External Skills.
+- **Optionale Schema-Validierung** in `sync.py`: Wenn `jsonschema` installiert ist,
+  werden Config-Fehler als Warnings ausgegeben (graceful fallback wenn nicht installiert).
+- **`howto/agent-isolation.md`** (neu): Dokumentation für `isolation: worktree` —
+  Wann sinnvoll, bekannte Fallstricke (Submodule, Merge-Konflikte, Windows), Konfiguration.
+- **`rules/1-generic/issue-lifecycle.md`** (neu): Erste generische Rule.
+  Erinnert alle Agenten daran, GitHub Issues nach Abschluss zu kommentieren und zu schließen.
+
+### Changed
+
+- **Agent-Descriptions bereinigt**: Alle `1-generic/*.md` Templates hatten
+  „Generisches Template für den X-Agenten." in der `description:` — entfernt.
+  Ersetzt durch prägnante, einzeilige Beschreibungen ohne interne Implementierungsdetails.
+  Wirkt sich sofort auf den Claude Code Agent-Picker aus (nach nächstem Sync).
+- **`git.md`** v1.2.0 → v1.3.0: DoD-Hooks-Sektion + Workflow 7 (Issue schließen nach Arbeit).
+- **`feature.md`** v1.0.0 → v1.1.0: Frontmatter-Kommentar mit `isolation: worktree` Opt-in-Hinweis.
+- **`CLAUDE.md`**: Hooks-System, permissionMode-Overrides, JSON-Schema, settings.json-Verhalten,
+  settings.local.json-Init, agent-isolation.md — alle neuen Konzepte vollständig dokumentiert.
+- **`howto/instantiate-project.md`**: `$schema`-Zeile im Config-Template ergänzt.
+- **`agent-meta.config.json`** (self-hosting): `$schema`-Referenz ergänzt.
+
+### Migration von v0.16.5
+
+Keine Breaking Changes.
+
+- Neue Dateien in `.claude/hooks/` werden automatisch angelegt — kein Opt-in nötig.
+- `.claude/settings.json` wird bei aktivierten Hooks gemergt. Bestehende Dateien ohne
+  Hooks-Section bleiben unverändert bis ein Hook aktiviert wird.
+- `.claude/settings.local.json` wird beim nächsten Sync (wenn nicht vorhanden) erstellt.
+- `validator` und `security-auditor` erhalten `permissionMode: plan` im generierten Agent.
+  Falls das für ein Projekt nicht gewünscht ist:
+  `"permission-mode-overrides": {"validator": "default"}` in `agent-meta.config.json`.
+
+---
+
 ## [0.16.5] — 2026-04-06
 
 ### Added

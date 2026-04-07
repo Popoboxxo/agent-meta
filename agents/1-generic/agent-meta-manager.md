@@ -1,7 +1,7 @@
 ---
 name: template-agent-meta-manager
 version: "1.0.0"
-description: "Generisches Template für den Agent-Meta-Manager. Steuert das agent-meta-Framework im Zielprojekt: Upgrades, Sync, Feedback-Delegation, Vorschläge für neue generische Agenten und Erstellung projektspezifischer Erweiterungen."
+description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash

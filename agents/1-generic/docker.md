@@ -1,7 +1,7 @@
 ---
 name: template-docker
 version: "1.3.1"
-description: "Vollständig generisches Template für den Docker-Agenten. Plattformunabhängige Patterns: Compose-Stacks, Binary-Management, Test-Umgebungen, Diagnose. Für plattformspezifische Erweiterungen siehe sharkord-docker.md."
+description: "Docker-Operationen: Compose-Stacks, Binary-Management, Test-Umgebungen und Diagnose — plattformunabhängig."
 hint: "Dev-Stack starten/stoppen, Dockerfiles, Binary-Management"
 tools:
   - Bash

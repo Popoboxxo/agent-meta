@@ -1,7 +1,7 @@
 ---
 name: template-ideation
 version: "1.2.1"
-description: "Generisches Template für den Ideation-Agenten. Unterstützt in der frühen Phase bei Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — für neue Projekte wie für Features. Stellt Fragen, schafft Anreize, denkt Ecken und übergibt reife Ideen an den Requirements-Agenten."
+description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
   - Read

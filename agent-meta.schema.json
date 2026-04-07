@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Popoboxxo/agent-meta/agent-meta.schema.json",
+  "title": "agent-meta.config.json",
+  "description": "Project configuration for agent-meta sync.py. Controls which agents are generated, which models and memory scopes are used, and how hooks and external skills are activated.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference — enables IDE autocomplete and validation."
+    },
+    "_comment": {
+      "type": "string",
+      "description": "Optional free-text comment, ignored by sync.py."
+    },
+    "agent-meta-version": {
+      "type": "string",
+      "description": "The agent-meta version this project was last synced with (e.g. '0.16.5').",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "ai-provider": {
+      "type": "string",
+      "description": "AI provider. 'Claude' enables CLAUDE.md management and settings.json creation.",
+      "enum": ["Claude", "GitHub"]
+    },
+    "platforms": {
+      "type": "array",
+      "description": "Active platform layers. Agents in agents/2-platform/<platform>-*.md override the generic agents.",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "roles": {
+      "type": "array",
+      "description": "Whitelist of roles to generate. If absent, all known roles are generated.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "orchestrator", "developer", "tester", "validator",
+          "requirements", "ideation", "documenter", "release",
+          "docker", "meta-feedback", "git", "agent-meta-manager",
+          "feature", "agent-meta-scout", "security-auditor"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "project": {
+      "type": "object",
+      "description": "Project identity — used in agent filenames and managed blocks.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full project name (e.g. 'my-plugin')."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Short prefix for extension filenames (e.g. 'mpl' → mpl-developer-ext.md)."
+        },
+        "short": {
+          "type": "string",
+          "description": "Short project name for display (e.g. 'my-plugin')."
+        }
+      },
+      "required": ["name", "prefix", "short"],
+      "additionalProperties": false
+    },
+    "variables": {
+      "type": "object",
+      "description": "Template variables substituted as {{KEY}} in agent templates.",
+      "properties": {
+        "PROJECT_CONTEXT":          { "type": "string" },
+        "PROJECT_GOAL":             { "type": "string" },
+        "PROJECT_LANGUAGES":        { "type": "string" },
+        "COMMUNICATION_LANGUAGE":   { "type": "string" },
+        "USER_INPUT_LANGUAGE":      { "type": "string" },
+        "DOCS_LANGUAGE":            { "type": "string" },
+        "INTERNAL_DOCS_LANGUAGE":   { "type": "string" },
+        "CODE_LANGUAGE":            { "type": "string" },
+        "AGENT_META_REPO":          { "type": "string" },
+        "GIT_PLATFORM":             { "type": "string", "enum": ["GitHub", "GitLab", "Gitea"] },
+        "GIT_REMOTE_URL":           { "type": "string" },
+        "GIT_MAIN_BRANCH":          { "type": "string" },
+        "CODE_CONVENTIONS":         { "type": "string" },
+        "ARCHITECTURE":             { "type": "string" },
+        "DEV_COMMANDS":             { "type": "string" },
+        "BUILD_COMMAND":            { "type": "string" },
+        "TEST_COMMAND":             { "type": "string" },
+        "EXTRA_DONTS":              { "type": "string" },
+        "CODE_QUALITY_RULES":       { "type": "string" },
+        "REQ_CATEGORIES":           { "type": "string" },
+        "TEST_COMMANDS":            { "type": "string" },
+        "TESTER_SNIPPETS_PATH":     { "type": "string" },
+        "DEVELOPER_SNIPPETS_PATH":  { "type": "string" },
+        "BUILD_COMMANDS":           { "type": "string" },
+        "SYSTEM_DEPENDENCIES":      { "type": "string" },
+        "SYSTEM_URLS":              { "type": "string" },
+        "PRIMARY_PORT":             { "type": "string" },
+        "EXTRA_PORTS":              { "type": "string" },
+        "SERVICE_NAME":             { "type": "string" },
+        "CONTAINER_NAME":           { "type": "string" },
+        "PRIMARY_IMAGE_TAG":        { "type": "string" },
+        "PLUGIN_DIR_NAME":          { "type": "string" },
+        "BUILD_OUTPUT":             { "type": "string" },
+        "ARTIFACT_ZIP_CMD":         { "type": "string" },
+        "ARTIFACT_TAR_CMD":         { "type": "string" },
+        "GH_ASSETS":                { "type": "string" },
+        "BUILD_SYSTEM_NOTES":       { "type": "string" },
+        "VERSION_DIST_BEHAVIOUR":   { "type": "string" }
+      },
+      "additionalProperties": { "type": "string" }
+    },
+    "model-overrides": {
+      "type": "object",
+      "description": "Override the default model per role. Precedence: this > roles.config.json > (none).",
+      "additionalProperties": {
+        "type": "string",
+        "anyOf": [
+          { "enum": ["haiku", "sonnet", "opus"] },
+          { "pattern": "^claude-" }
+        ]
+      }
+    },
+    "memory-overrides": {
+      "type": "object",
+      "description": "Override the default memory scope per role. Precedence: this > roles.config.json > (none).",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["project", "local", "user"]
+      }
+    },
+    "permission-mode-overrides": {
+      "type": "object",
+      "description": "Override the default permissionMode per role. Precedence: this > roles.config.json > (none).",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["default", "acceptEdits", "bypassPermissions", "plan"]
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Opt-in hook activation. Scripts are always synced; registration in settings.json requires enabled: true.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Register this hook in .claude/settings.json (Two-Gate: script must exist in hooks/ layer)."
+          }
+        },
+        "required": ["enabled"],
+        "additionalProperties": false
+      }
+    },
+    "external-skills": {
+      "type": "object",
+      "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Generate wrapper agent for this skill."
+          }
+        },
+        "required": ["enabled"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["project"],
+  "additionalProperties": true
+}

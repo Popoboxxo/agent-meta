@@ -135,6 +135,8 @@ agent-meta/
     CLAUDE.project-template.md    ← Template für CLAUDE.md im Zielprojekt
     CLAUDE.personal-template.md   ← Template für CLAUDE.personal.md (gitignored, persönlich)
     rules.md                          ← Rules-System: Schichten, Sync, create-rule
+    hooks.md                          ← Hooks-System: Schichten, Sync, create-hook, dod-push-check
+    agent-isolation.md                ← isolation: worktree — Konfiguration, Fallstricke, Feature-Agent
     sync-concept.md
     template-gap-analysis.md
 
@@ -143,6 +145,12 @@ agent-meta/
     1-generic/          ← universelle Regeln, gelten für alle Projekte
     2-platform/         ← plattformspezifisch (überschreibt 1-generic bei gleichem Namen)
                           Naming: <platform>-<thema>.md → <thema>.md im Output
+
+  hooks/
+    0-external/         ← Hooks aus externen Skill-Repos
+    1-generic/          ← universelle Hooks, gelten für alle Projekte
+    2-platform/         ← plattformspezifisch (überschreibt 1-generic bei gleichem Namen)
+                          Naming: <platform>-<thema>.sh → <thema>.sh im Output
 
   snippets/
     tester/
@@ -166,7 +174,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.16.1 — `2026-04-06`
+Generiert von agent-meta v0.17.0 — `2026-04-07`
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
 
@@ -194,13 +202,16 @@ Generiert von agent-meta v0.16.1 — `2026-04-06`
 | `CLAUDE.md` — managed block | ✅ Immer aktualisiert | Ja |
 | `CLAUDE.md` — Rest | ❌ Einmalig angelegt, dann manuell | Ja |
 | `CLAUDE.personal.md` | ❌ Einmalig angelegt aus Template | Nein (gitignored) |
-| `.claude/settings.json` | ❌ Einmalig angelegt (Skeleton) | Ja |
+| `.claude/settings.json` (Skeleton) | ❌ Einmalig angelegt; danach manuell verwaltet | Ja |
+| `.claude/settings.json` — `hooks`-Section | ✅ Bei jedem sync gemergt (aktivierte Hooks) | Ja |
+| `.claude/settings.local.json` | ❌ Einmalig via `--init` angelegt | Nein (gitignored) |
 | `.gitignore` | ✅ Fehlende Einträge werden ergänzt | Ja |
 | `.claude/3-project/*-ext.md` (Extension) | ❌ Einmalig via `--create-ext` | Ja |
 | `.claude/3-project/*.md` (Override) | ❌ Nicht von sync.py berührt | Ja |
 | `.claude/rules/*.md` (Rules, agent-meta-verwaltet) | ✅ Immer überschrieben; Stale-Rules werden gelöscht | Ja |
 | `.claude/rules/*.md` (Projekt-eigene Rules) | ❌ Nie angefasst (nicht in `.agent-meta-managed`) | Ja |
-| `.claude/settings.local.json` | ❌ Nie angefasst | Nein (gitignored) |
+| `.claude/hooks/*.sh` (Hooks, agent-meta-verwaltet) | ✅ Immer überschrieben; Stale-Hooks werden gelöscht | Ja |
+| `.claude/hooks/*.sh` (Projekt-eigene Hooks) | ❌ Nie angefasst (nicht in `.agent-meta-managed`) | Ja |
 
 **CLAUDE.md managed block** — eingeleitet durch `<!-- agent-meta:managed-begin -->`:
 - Wird von `sync.py` bei **jedem normalen sync** automatisch aktualisiert
@@ -383,6 +394,71 @@ Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokument
 
 ---
 
+### `permission-mode-overrides` — Berechtigungsmodus pro Rolle (optional)
+
+```json
+"permission-mode-overrides": {
+  "validator": "plan",
+  "developer": "acceptEdits"
+}
+```
+
+Überschreibt den von agent-meta empfohlenen Berechtigungsmodus für einzelne Rollen.
+`sync.py` injiziert das `permissionMode:`-Feld beim Generieren der Agenten-Datei.
+
+**Precedence (höchste zuerst):**
+1. Projekt-Override (`permission-mode-overrides` in `agent-meta.config.json`)
+2. Meta-Default (`roles.config.json` — vom Meta-Maintainer gepflegt)
+3. Kein Eintrag → kein `permissionMode:`-Feld → Agent erbt den Modus vom Parent-Kontext
+
+**Gültige Werte:**
+
+| Wert | Verhalten |
+|------|-----------|
+| `plan` | Read-only — Agent kann keine Dateien schreiben oder Befehle ausführen |
+| `acceptEdits` | Datei-Edits automatisch akzeptieren, Ausführung manuell bestätigen |
+| `bypassPermissions` | Alle Berechtigungen automatisch akzeptiert (nur für vertrauenswürdige Umgebungen) |
+| `default` | Normales interaktives Verhalten |
+
+**Meta-Defaults:**
+
+| Rolle | permissionMode | Grund |
+|-------|---------------|-------|
+| `validator` | `plan` | Reiner Auditor — darf niemals Dateien ändern |
+| `security-auditor` | `plan` | Statische Analyse — kein Write-Zugriff nötig |
+| alle anderen | *(leer)* | Standard-Verhalten |
+
+---
+
+### `hooks` — Hook-Aktivierung pro Projekt (optional)
+
+```json
+"hooks": {
+  "dod-push-check": { "enabled": true }
+}
+```
+
+Steuert welche agent-meta-verwalteten Hooks in `.claude/settings.json` registriert werden.
+
+**Two-Gate-Prinzip:** Ein Hook wird nur registriert wenn:
+1. Das Skript in `hooks/1-generic/` (oder `2-platform/`, `0-external/`) existiert
+2. `enabled: true` in `agent-meta.config.json` des Projekts gesetzt ist
+
+Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
+Skripte werden unabhängig von `enabled` immer nach `.claude/hooks/` kopiert.
+
+**Verfügbare Hooks:**
+
+| Hook | Event | Beschreibung |
+|------|-------|-------------|
+| `dod-push-check` | `PreToolUse` | Blockiert `git push` wenn Tests nicht grün sind |
+
+Projekt-eigene Hooks anlegen: `--create-hook <name>` (nie von sync.py überschrieben).
+
+Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
+
+---
+
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
@@ -535,6 +611,54 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule sec
 | Quelle | Projekt schreibt selbst | Alle 4 Schichten |
 
 Siehe [howto/rules.md](howto/rules.md) für vollständige Dokumentation.
+
+---
+
+## Hooks (`.claude/hooks/` Layer)
+
+Shell-Skripte die Claude Code automatisch vor/nach Tool-Aufrufen ausführt —
+ideal für DoD-Enforcement, Pre-Push-Checks, Audit-Logging.
+
+### Vier-Schichten-Modell
+
+```
+hooks/
+  0-external/     ← Hooks aus externen Skill-Repos
+  1-generic/      ← universell, für alle Projekte
+  2-platform/     ← plattformspezifisch (überschreibt 1-generic bei gleichem Dateinamen)
+  ← 3-project: .claude/hooks/ im Zielprojekt — Projekt-eigene Hooks (nie überschrieben)
+```
+
+**Naming für 2-platform:** `<platform>-<thema>.sh` → Output: `<thema>.sh`
+
+### Sync-Verhalten
+
+- Skripte werden **immer kopiert** (wie Rules) — unabhängig von `enabled`
+- **Registrierung in `.claude/settings.json`** nur wenn Projekt den Hook aktiviert:
+
+```json
+"hooks": {
+  "dod-push-check": { "enabled": true }
+}
+```
+
+- Stale-Tracking via `.claude/hooks/.agent-meta-managed`
+
+```bash
+# Projekt-eigenen Hook anlegen (nie überschrieben)
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook mein-hook
+```
+
+### Abgrenzung zu Rules
+
+| | Rules (`.claude/rules/`) | Hooks (`.claude/hooks/`) |
+|---|---|---|
+| Format | Markdown | Shell-Skript |
+| Laden | Automatisch in Agent-Kontext | Claude Code führt aus (settings.json) |
+| Scope | Kontext für Agenten | Automatisierung / Enforcement |
+| Aktivierung | Immer aktiv | Opt-in via `agent-meta.config.json` |
+
+Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 
 ---
 

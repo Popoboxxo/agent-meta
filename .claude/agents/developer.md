@@ -1,7 +1,7 @@
 ---
 name: developer
 version: "1.4.1"
-description: "Generisches Template für den Developer-Agenten. Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
+description: "Implementiert Features und Bugfixes nach REQ-IDs mit strikten Code-Konventionen und TDD-Workflow."
 generated-from: "1-generic/developer.md@1.4.1"
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:

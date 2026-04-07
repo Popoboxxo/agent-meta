@@ -44,6 +44,7 @@ Pflichtfelder:
 
 ```json
 {
+  "$schema": ".agent-meta/agent-meta.schema.json",
   "agent-meta-version": "0.16.1",
   "ai-provider": "Claude",
   "platforms": ["sharkord"],

@@ -1,7 +1,8 @@
 ---
 name: release
+model: sonnet
 version: "1.3.1"
-description: "Generisches Template für den Release-Agenten. Verwaltet Versioning, Changelogs, Build-Prozesse und GitHub-Releases."
+description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 generated-from: "1-generic/release.md@1.3.1"
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:

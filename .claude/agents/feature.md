@@ -1,9 +1,12 @@
 ---
 name: feature
-version: "1.0.0"
-description: "Generisches Template für den Feature-Agenten. Führt den vollständigen Feature-Lifecycle durch: Branch anlegen, Requirements, TDD, Implementierung, Validierung, Commit und PR — vollständig delegiert an spezialisierte Sub-Agenten."
-generated-from: "1-generic/feature.md@1.0.0"
+version: "1.1.0"
+description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
+generated-from: "1-generic/feature.md@1.1.0"
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
+# isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
+#                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
+#                          Aktivierung: isolation: worktree als Aufruf-Parameter oder in 3-project/feature.md
 tools:
   - Bash
   - Read

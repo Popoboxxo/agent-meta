@@ -1,7 +1,7 @@
 ---
 name: template-tester
 version: "1.4.1"
-description: "Generisches Template für den Tester-Agenten. Schreibt Unit-/Integration-/E2E-Tests nach TDD-Workflow, führt Tests aus und stellt Testabdeckung pro REQ-ID sicher."
+description: "Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
   - Bash
