@@ -137,6 +137,40 @@
         "enum": ["default", "acceptEdits", "bypassPermissions", "plan"]
       }
     },
+    "dod": {
+      "type": "object",
+      "description": "Definition of Done — toggle individual quality criteria per project. Missing key = default applies.",
+      "properties": {
+        "req-traceability": {
+          "type": "boolean",
+          "description": "Require REQ-IDs in REQUIREMENTS.md, REQ-ID in commit messages, traceability audit. Default: true.",
+          "default": true
+        },
+        "tests-required": {
+          "type": "boolean",
+          "description": "Require tests for every code change, TDD workflow steps. Default: true.",
+          "default": true
+        },
+        "codebase-overview": {
+          "type": "boolean",
+          "description": "Require CODEBASE_OVERVIEW.md updates after code changes. Default: true.",
+          "default": true
+        },
+        "security-audit": {
+          "type": "boolean",
+          "description": "Require security audit before release. Default: false.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "max-parallel-agents": {
+      "type": "integer",
+      "description": "Maximum number of agents that a coordinator (orchestrator, feature) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 2
+    },
     "hooks": {
       "type": "object",
       "description": "Opt-in hook activation. Scripts are always synced; registration in settings.json requires enabled: true.",

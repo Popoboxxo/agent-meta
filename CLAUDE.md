@@ -137,6 +137,7 @@ agent-meta/
     rules.md                          ← Rules-System: Schichten, Sync, create-rule
     hooks.md                          ← Hooks-System: Schichten, Sync, create-hook, dod-push-check
     agent-isolation.md                ← isolation: worktree — Konfiguration, Fallstricke, Feature-Agent
+    agent-delegation-map.md           ← Delegations-Matrix: wer delegiert an wen, parallelisierbare Schritte
     sync-concept.md
     template-gap-analysis.md
 
@@ -309,7 +310,16 @@ Verfügbare Werte: `Claude`, `GitHub` (weitere folgen bei Bedarf)
 Fehlt der Key → alle Rollen aus `1-generic/` + aktiven `2-platform/`-Overrides werden generiert (Rückwärtskompatibel).
 Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle anderen werden mit `[SKIP]` im Log übersprungen.
 
-Verfügbare Rollen: `orchestrator`, `feature`, `developer`, `tester`, `validator`, `requirements`, `ideation`, `documenter`, `release`, `docker`, `meta-feedback`, `git`, `agent-meta-manager`, `agent-meta-scout`, `security-auditor`
+**Rollen-Klassifizierung (Empfehlung — gesteuert via `tier` in `roles.config.json`):**
+
+| Stufe | Rollen | Bedeutung |
+|-------|--------|-----------|
+| **Pflicht** | `orchestrator`, `developer`, `git` | Ohne diese funktioniert kein Workflow |
+| **Empfohlen** | `tester`, `validator`, `documenter`, `requirements`, `feature` | Standard-Qualitäts-Workflow |
+| **Optional** | `ideation`, `release`, `docker`, `security-auditor`, `meta-feedback`, `agent-meta-manager`, `agent-meta-scout` | Bei Bedarf aktivieren |
+
+Die Klassifizierung ist eine **Empfehlung** — per Default werden alle Rollen generiert.
+Der User steuert über `roles` welche tatsächlich angelegt werden.
 
 ---
 
@@ -430,6 +440,76 @@ Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokument
 
 ---
 
+### `max-parallel-agents` — Maximale parallele Agenten (optional)
+
+```json
+"max-parallel-agents": 2
+```
+
+Steuert wie viele Agenten ein Koordinator (orchestrator, feature) gleichzeitig
+via `run_in_background: true` starten darf.
+
+| Wert | Verhalten |
+|------|-----------|
+| `1` | Sequentiell — keine Parallelisierung (sicherstes Default) |
+| `2` | **Default** — ein Agent im Vordergrund, einer im Hintergrund |
+| `3`–`5` | Mehrere Background-Agenten — nur für leistungsstarke Setups |
+
+`sync.py` injiziert den Wert als `{{MAX_PARALLEL_AGENTS}}` in die Orchestrator- und Feature-Templates.
+Dort steuert er welche Workflow-Schritte (markiert mit `∥`) parallel ausgeführt werden.
+
+**Modell-Kosten beachten:** Zwei `opus`-Agenten parallel = doppelter Token-Verbrauch.
+Bei knappem Budget `1` setzen oder teure Rollen via `model-overrides` auf `sonnet` herabstufen.
+
+Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vollständige
+Delegations-Matrix und parallelisierbare Workflow-Schritte.
+
+---
+
+### `dod` — Definition of Done Konfiguration (optional)
+
+```json
+"dod": {
+  "req-traceability": true,
+  "tests-required": true,
+  "codebase-overview": true,
+  "security-audit": false
+}
+```
+
+Steuert welche Qualitätskriterien in der Definition of Done aktiv sind.
+Fehlt der `dod`-Block → alle Defaults gelten (rückwärtskompatibel).
+
+| Feature | Default | Steuert |
+|---------|---------|---------|
+| `req-traceability` | `true` | REQ-IDs, REQUIREMENTS.md, REQ-ID in Commits, Traceability-Audit |
+| `tests-required` | `true` | Tests als DoD-Kriterium, TDD-Workflow-Schritte |
+| `codebase-overview` | `true` | CODEBASE_OVERVIEW.md als DoD-Kriterium |
+| `security-audit` | `false` | Security-Audit vor Release |
+
+`sync.py` injiziert die Werte als `{{DOD_REQ_TRACEABILITY}}`, `{{DOD_TESTS_REQUIRED}}`,
+`{{DOD_CODEBASE_OVERVIEW}}`, `{{DOD_SECURITY_AUDIT}}` (`"true"`/`"false"`).
+
+**Auswirkung auf Agenten und Workflows:**
+
+| Wenn deaktiviert | Orchestrator | Developer | Validator | Git |
+|-----------------|-------------|-----------|-----------|-----|
+| `req-traceability: false` | `requirements`-Schritte übersprungen | Keine REQ-ID-Pflicht | Kein Traceability-Audit | Commit ohne REQ-ID |
+| `tests-required: false` | `tester`-Schritte übersprungen | Kein "Code ohne Tests"-Verbot | Test-Kriterium entfällt | — |
+| `codebase-overview: false` | `documenter`-Schritte übersprungen | — | Doku-Kriterium entfällt | — |
+
+**Beispiel: Leichtgewichtiges Projekt ohne REQ-System:**
+```json
+"dod": {
+  "req-traceability": false,
+  "codebase-overview": false
+}
+```
+→ Commits werden `<type>: <beschreibung>` (ohne REQ-ID).
+→ Workflows A/B/E überspringen `requirements`- und `documenter`-Schritte.
+
+---
+
 ### `hooks` — Hook-Aktivierung pro Projekt (optional)
 
 ```json
@@ -462,7 +542,7 @@ Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
-Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`.
+Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`.
 
 ### Generische Variablen (alle Projekte)
 
@@ -770,27 +850,37 @@ python .agent-meta/scripts/sync.py --config agent-meta.config.json
 ## Standard-Entwicklungsworkflows
 
 Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
+Schritte mit `∥` können parallel laufen (gesteuert via `max-parallel-agents`).
+Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vollständige Delegations-Matrix.
+
+### Branch-Guard (Schritt 0 für Workflows A, B, E, L)
+```
+0.   git           → Branch prüfen. Auf main/master? → Feature-Branch anlegen.
+                      Bereits auf Feature-Branch? → Weiter.
+```
 
 ### Workflow A: Neues Feature
 ```
-1. requirements  → Anforderung formulieren, REQ-ID vergeben
-2. tester        → Tests ZUERST schreiben (TDD Red Phase)
-3. developer     → Implementierung (TDD Green Phase)
-4. tester        → Tests ausführen, Regressions prüfen
-5. validator     → Code gegen REQ validieren, DoD-Check
-6. documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
-7. git           → Commit + Push
+0.   git           → Branch-Guard (→ feat/<thema>)
+1.   requirements  → Anforderung formulieren, REQ-ID vergeben
+2.   tester        → Tests ZUERST schreiben (TDD Red Phase)
+3.   developer     → Implementierung (TDD Green Phase)
+4.   tester        → Tests ausführen, Regressions prüfen
+5∥6. validator     → Code gegen REQ validieren, DoD-Check
+ ∥   documenter    → CODEBASE_OVERVIEW + Erkenntnisse updaten
+7.   git           → Commit + Push
 ```
 
 ### Workflow B: Bugfix
 ```
-1. requirements  → Bestehende REQ-ID identifizieren
-2. tester        → Reproduzierenden Test schreiben
-3. developer     → Fix implementieren
-4. tester        → Tests ausführen
-5. validator     → Quick-Check
-6. documenter    → Ggf. Doku updaten
-7. git           → Commit + Push
+0.   git           → Branch-Guard (→ fix/<thema>)
+1.   requirements  → Bestehende REQ-ID identifizieren
+2.   tester        → Reproduzierenden Test schreiben
+3.   developer     → Fix implementieren
+4.   tester        → Tests ausführen
+5∥6. validator     → Quick-Check
+ ∥   documenter    → Ggf. Doku updaten
+7.   git           → Commit + Push
 ```
 
 ### Workflow C: Validierung / Audit
@@ -807,12 +897,13 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 
 ### Workflow E: Refactoring
 ```
-1. requirements  → Betroffene REQ-IDs identifizieren
-2. developer     → Refactoring durchführen
-3. tester        → Alle betroffenen Tests ausführen
-4. validator     → Sicherstellen, dass kein Verhalten sich ändert
-5. documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
-6. git           → Commit + Push
+0.   git           → Branch-Guard (→ refactor/<thema>)
+1.   requirements  → Betroffene REQ-IDs identifizieren
+2.   developer     → Refactoring durchführen
+3.   tester        → Alle betroffenen Tests ausführen
+4∥5. validator     → Sicherstellen, dass kein Verhalten sich ändert
+ ∥   documenter    → Signaturen/Flows in CODEBASE_OVERVIEW updaten
+6.   git           → Commit + Push
 ```
 
 ### Workflow F: Testsystem starten
@@ -839,24 +930,46 @@ Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 
 ### Definition of Done (DoD)
 
-- [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
-- [ ] **Code** implementiert die REQ vollständig
-- [ ] **Test** vorhanden mit `[REQ-xxx]` im Namen
-- [ ] **Tests grün**
+Konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Fehlende Einträge verwenden die Defaults.
+
+**Immer aktiv (Pflicht):**
+- [ ] **Code** implementiert die Aufgabe vollständig
 - [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md des Projekts)
-- [ ] **CODEBASE_OVERVIEW.md** aktualisiert
+- [ ] **Commit-Message** im korrekten Conventional-Commits-Format
+
+**Wenn `req-traceability: true` (Default):**
+- [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
 - [ ] **REQUIREMENTS.md** konsistent
-- [ ] **Commit-Message** im korrekten Format
 
-### Commit-Format
+**Wenn `tests-required: true` (Default):**
+- [ ] **Test** vorhanden
+- [ ] **Tests grün**
+
+**Wenn `codebase-overview: true` (Default):**
+- [ ] **CODEBASE_OVERVIEW.md** aktualisiert
+
+**Wenn `security-audit: true` (Default: false):**
+- [ ] **Security-Audit** vor Release durchgeführt
+
+### Commit-Format (Conventional Commits)
+
+Immer aktiv — unabhängig von DoD-Konfiguration.
+
 ```
-<type>(REQ-xxx): <beschreibung>
+<type>(REQ-xxx): <beschreibung>    ← mit req-traceability
+<type>: <beschreibung>             ← ohne req-traceability
 ```
 
-| Type | REQ-ID Pflicht? |
-|------|----------------|
-| `feat`, `fix`, `test`, `refactor`, `chore` | Ja |
-| `docs` | Nein |
+| Type | Bedeutung | REQ-ID |
+|------|-----------|--------|
+| `feat` | Neues Feature | Wenn `req-traceability` aktiv |
+| `fix` | Bugfix | Wenn `req-traceability` aktiv |
+| `test` | Tests hinzufügen/ändern | Wenn `req-traceability` aktiv |
+| `refactor` | Refactoring ohne Verhaltensänderung | Wenn `req-traceability` aktiv |
+| `chore` | Wartung: Dependencies, Config, Versions-Bumps | **Nie** |
+| `docs` | Dokumentation | **Nie** |
+| `ci` | CI/CD-Änderungen | **Nie** |
 
 ### Sprachregeln
 - `README.md` → **Englisch**

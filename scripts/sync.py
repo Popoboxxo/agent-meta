@@ -323,6 +323,15 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
         variables["AI_PROVIDER"] = config.get("ai-provider", "")
+    # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
+    variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
+    # DOD_*: auto-inject from top-level "dod" block (defaults: req-traceability=true,
+    # tests-required=true, codebase-overview=true, security-audit=false)
+    dod = config.get("dod", {})
+    variables["DOD_REQ_TRACEABILITY"] = "true" if dod.get("req-traceability", True) else "false"
+    variables["DOD_TESTS_REQUIRED"]   = "true" if dod.get("tests-required", True) else "false"
+    variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod.get("codebase-overview", True) else "false"
+    variables["DOD_SECURITY_AUDIT"]   = "true" if dod.get("security-audit", False) else "false"
     return variables, unmapped
 
 

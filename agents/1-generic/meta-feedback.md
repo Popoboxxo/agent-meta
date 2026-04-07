@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "1.3.2"
+version: "1.4.0"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
@@ -37,6 +37,7 @@ Du sammelst Feedback zu:
 | **Bug / Inkonsistenz** | Platzhalter wird nicht ersetzt, Agent-Delegation falsch |
 | **Doku-Lücke** | Fehlende Erklärung, veraltetes Howto |
 | **Konzept-Feedback** | Strukturelles Problem im Drei-Schichten-Modell |
+| **External Skill** | Neues Skill-Repo vorschlagen, Skill-Freigabe anfragen |
 
 ### 2. Feedback aufbereiten
 
@@ -107,6 +108,7 @@ EOF
 | Bug / Inkonsistenz | `bug` |
 | Doku-Lücke | `documentation` |
 | Konzept-Feedback | `design` |
+| External Skill Vorschlag | `external-skill` |
 
 ```bash
 # Mit Label:

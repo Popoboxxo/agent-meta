@@ -3,42 +3,49 @@
   "_comment_model": "model: empfohlenes Claude-Modell für diese Rolle. Leer = erbt vom Parent-Kontext. Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs. Projekte überschreiben via 'model-overrides' in agent-meta.config.json.",
   "_comment_memory": "memory: persistentes Agenten-Gedächtnis über Sessions hinweg. Leer = kein Gedächtnis. Gültige Werte: 'project' (.claude/agent-memory/<name>/, in git), 'local' (.claude/agent-memory-local/<name>/, gitignored), 'user' (~/.claude/agent-memory/<name>/, maschinenlokal). Projekte überschreiben via 'memory-overrides' in agent-meta.config.json.",
   "_comment_permission_mode": "permission_mode: Claude Code Berechtigungsmodus für diesen Agenten. Leer = Standard (kein Frontmatter-Feld). Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only). Projekte überschreiben via 'permission-mode-overrides' in agent-meta.config.json.",
+  "_comment_tier": "tier: Empfehlungsstufe der Rolle. 'required' = ohne diese funktioniert kein Workflow; 'recommended' = Standard-Qualitäts-Workflow, sollte aktiviert bleiben; 'optional' = bei Bedarf aktivieren. Alle Rollen werden per Default generiert — tier ist eine Empfehlung, kein Filter. User steuert via 'roles' in agent-meta.config.json.",
 
   "roles": {
 
     "orchestrator": {
       "model": "",
       "memory": "",
+      "tier": "required",
       "description": "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
     },
 
     "developer": {
       "model": "",
       "memory": "",
-      "description": "Feature-Implementierung und Bugfixes nach REQ-IDs"
+      "tier": "required",
+      "description": "Feature-Implementierung und Bugfixes"
     },
 
     "requirements": {
       "model": "",
       "memory": "project",
+      "tier": "recommended",
       "description": "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
     },
 
     "ideation": {
       "model": "",
       "memory": "",
+      "tier": "optional",
       "description": "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
     },
 
     "feature": {
       "model": "",
       "memory": "",
+      "tier": "recommended",
       "description": "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"
     },
 
     "tester": {
       "model": "sonnet",
       "memory": "",
+      "tier": "recommended",
       "description": "TDD, Test-Suite ausführen, Testabdeckung sichern"
     },
 
@@ -46,12 +53,14 @@
       "model": "sonnet",
       "memory": "project",
       "permission_mode": "plan",
+      "tier": "recommended",
       "description": "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
     },
 
     "documenter": {
       "model": "sonnet",
       "memory": "project",
+      "tier": "recommended",
       "description": "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
     },
 
@@ -59,42 +68,49 @@
       "model": "sonnet",
       "memory": "project",
       "permission_mode": "plan",
+      "tier": "optional",
       "description": "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
     },
 
     "agent-meta-scout": {
       "model": "sonnet",
       "memory": "local",
+      "tier": "optional",
       "description": "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
     },
 
     "agent-meta-manager": {
       "model": "sonnet",
       "memory": "",
+      "tier": "optional",
       "description": "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
     },
 
     "release": {
       "model": "sonnet",
       "memory": "",
+      "tier": "optional",
       "description": "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
     },
 
     "git": {
       "model": "haiku",
       "memory": "",
+      "tier": "required",
       "description": "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
     },
 
     "meta-feedback": {
       "model": "haiku",
       "memory": "",
+      "tier": "optional",
       "description": "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
     },
 
     "docker": {
       "model": "haiku",
       "memory": "",
+      "tier": "optional",
       "description": "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
     }
 
