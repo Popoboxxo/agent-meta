@@ -469,29 +469,55 @@ Delegations-Matrix und parallelisierbare Workflow-Schritte.
 
 ---
 
-### `dod` — Definition of Done Konfiguration (optional)
+### `dod-preset` — DoD-Qualitätsprofil (optional)
 
 ```json
+"dod-preset": "rapid-prototyping"
+```
+
+Wählt ein vordefiniertes Qualitätsprofil. Einzelne Kriterien können via `dod` überschrieben werden.
+Presets sind in `dod-presets.config.json` definiert (im agent-meta Root).
+
+| Preset | req-traceability | tests-required | codebase-overview | security-audit |
+|--------|:---------------:|:--------------:|:-----------------:|:--------------:|
+| `full` (Default) | true | true | true | false |
+| `standard` | false | true | false | false |
+| `rapid-prototyping` | false | false | false | false |
+
+**Precedence:** `dod` (Projekt-Override) > `dod-preset` > `full` (impliziter Default).
+
+**Neue Presets hinzufügen:** Neuen Eintrag in `dod-presets.config.json` unter `presets` anlegen +
+Enum in `agent-meta.schema.json` erweitern.
+
+**Neue DoD-Spalten hinzufügen:**
+1. Feld in `dod-presets.config.json` (in jedem Preset) + `DOD_DEFAULTS` in `sync.py` definieren
+2. In `sync.py` als `DOD_<NAME>` auto-injizieren
+3. In Agent-Templates via `{{DOD_<NAME>}}` referenzieren
+4. Schema in `agent-meta.schema.json` im `dod`-Block erweitern
+
+---
+
+### `dod` — Definition of Done Overrides (optional)
+
+```json
+"dod-preset": "standard",
 "dod": {
-  "req-traceability": true,
-  "tests-required": true,
-  "codebase-overview": true,
-  "security-audit": false
+  "security-audit": true
 }
 ```
 
-Steuert welche Qualitätskriterien in der Definition of Done aktiv sind.
-Fehlt der `dod`-Block → alle Defaults gelten (rückwärtskompatibel).
+Überschreibt einzelne Kriterien des gewählten Presets. Fehlt `dod-preset` → Basis ist `full`.
 
-| Feature | Default | Steuert |
-|---------|---------|---------|
+| Feature | Default (`full`) | Steuert |
+|---------|:----------------:|---------|
 | `req-traceability` | `true` | REQ-IDs, REQUIREMENTS.md, REQ-ID in Commits, Traceability-Audit |
 | `tests-required` | `true` | Tests als DoD-Kriterium, TDD-Workflow-Schritte |
 | `codebase-overview` | `true` | CODEBASE_OVERVIEW.md als DoD-Kriterium |
 | `security-audit` | `false` | Security-Audit vor Release |
 
-`sync.py` injiziert die Werte als `{{DOD_REQ_TRACEABILITY}}`, `{{DOD_TESTS_REQUIRED}}`,
-`{{DOD_CODEBASE_OVERVIEW}}`, `{{DOD_SECURITY_AUDIT}}` (`"true"`/`"false"`).
+`sync.py` injiziert die aufgelösten Werte als `{{DOD_REQ_TRACEABILITY}}`, `{{DOD_TESTS_REQUIRED}}`,
+`{{DOD_CODEBASE_OVERVIEW}}`, `{{DOD_SECURITY_AUDIT}}`, `{{DOD_PRESET}}` (`"true"`/`"false"` bzw. Preset-Name).
+Die aufgelösten Werte erscheinen auch im **CLAUDE.md managed block** des Zielprojekts.
 
 **Auswirkung auf Agenten und Workflows:**
 
@@ -501,15 +527,14 @@ Fehlt der `dod`-Block → alle Defaults gelten (rückwärtskompatibel).
 | `tests-required: false` | `tester`-Schritte übersprungen | Kein "Code ohne Tests"-Verbot | Test-Kriterium entfällt | — |
 | `codebase-overview: false` | `documenter`-Schritte übersprungen | — | Doku-Kriterium entfällt | — |
 
-**Beispiel: Leichtgewichtiges Projekt ohne REQ-System:**
+**Beispiel: Rapid-Prototyping mit Tests:**
 ```json
+"dod-preset": "rapid-prototyping",
 "dod": {
-  "req-traceability": false,
-  "codebase-overview": false
+  "tests-required": true
 }
 ```
-→ Commits werden `<type>: <beschreibung>` (ohne REQ-ID).
-→ Workflows A/B/E überspringen `requirements`- und `documenter`-Schritte.
+→ Kein REQ-System, kein CODEBASE_OVERVIEW, aber Tests bleiben Pflicht.
 
 ---
 
@@ -545,7 +570,7 @@ Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 ## Variablen und Platzhalter
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
-Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`.
+Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`, `DOD_PRESET`.
 
 ### Generische Variablen (alle Projekte)
 

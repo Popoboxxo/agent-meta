@@ -8,6 +8,9 @@
 
   "platforms": ["sharkord"],
 
+  "_comment_dod_preset": "DoD-Qualitätsprofil: 'full' (alle Checks), 'standard' (Tests ja, REQ-IDs nein), 'rapid-prototyping' (alles aus). Einzelne Overrides via 'dod' Block.",
+  "dod-preset": "full",
+
   "_comment_roles": "Optional: Whitelist der zu generierenden Rollen. Fehlt dieser Key → alle Rollen werden generiert.",
   "roles": [
     "orchestrator",
