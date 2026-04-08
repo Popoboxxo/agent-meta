@@ -138,9 +138,15 @@
         "enum": ["default", "acceptEdits", "bypassPermissions", "plan"]
       }
     },
+    "dod-preset": {
+      "type": "string",
+      "description": "DoD quality profile. Sets defaults for all dod criteria. Individual overrides via 'dod' block. Presets defined in dod-presets.config.json.",
+      "enum": ["full", "standard", "rapid-prototyping"],
+      "default": "full"
+    },
     "dod": {
       "type": "object",
-      "description": "Definition of Done — toggle individual quality criteria per project. Missing key = default applies.",
+      "description": "Definition of Done — override individual criteria from the preset. Precedence: dod > dod-preset > full.",
       "properties": {
         "req-traceability": {
           "type": "boolean",

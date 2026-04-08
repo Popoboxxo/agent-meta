@@ -326,13 +326,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         variables["AI_PROVIDER"] = config.get("ai-provider", "")
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
-    # DOD_*: auto-inject from top-level "dod" block (defaults: req-traceability=true,
-    # tests-required=true, codebase-overview=true, security-audit=false)
-    dod = config.get("dod", {})
-    variables["DOD_REQ_TRACEABILITY"] = "true" if dod.get("req-traceability", True) else "false"
-    variables["DOD_TESTS_REQUIRED"]   = "true" if dod.get("tests-required", True) else "false"
-    variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod.get("codebase-overview", True) else "false"
-    variables["DOD_SECURITY_AUDIT"]   = "true" if dod.get("security-audit", False) else "false"
+    # DOD_*: resolve from dod-preset (base) + dod (overrides).
+    # Precedence: dod (project override) > dod-preset > "full" (implicit default).
+    dod_resolved = resolve_dod(config, agent_meta_root)
+    variables["DOD_REQ_TRACEABILITY"] = "true" if dod_resolved.get("req-traceability", True) else "false"
+    variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
+    variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
+    variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
+    variables["DOD_PRESET"]           = config.get("dod-preset", "full")
     return variables, unmapped
 
 
@@ -394,6 +395,57 @@ def build_frontmatter(content: str, name: str, description: str,
                 content, count=1, flags=re.MULTILINE,
             )
     return content
+
+
+DOD_PRESETS_CONFIG = "dod-presets.config.json"
+
+# Default DoD values (= "full" preset) — used as ultimate fallback
+DOD_DEFAULTS = {
+    "req-traceability": True,
+    "tests-required": True,
+    "codebase-overview": True,
+    "security-audit": False,
+}
+
+
+def load_dod_presets(agent_meta_root: Path) -> dict:
+    """Load dod-presets.config.json from agent-meta root. Returns empty dict if not found."""
+    config_path = agent_meta_root / DOD_PRESETS_CONFIG
+    if not config_path.exists():
+        return {}
+    with config_path.open(encoding="utf-8") as f:
+        data = json.load(f)
+    presets = data.get("presets", {})
+    # Strip comments
+    return {k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")}
+            for k, v in presets.items() if not k.startswith("_")}
+
+
+def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
+    """Resolve effective DoD values from preset + overrides.
+
+    Precedence (highest to lowest):
+    1. Project override:  config["dod"][key]
+    2. Preset default:    dod-presets.config.json[preset][key]
+    3. Global default:    DOD_DEFAULTS[key]
+    """
+    presets = load_dod_presets(agent_meta_root)
+    preset_name = config.get("dod-preset", "full")
+    preset_values = presets.get(preset_name, {})
+    if preset_name not in presets and preset_name != "full":
+        print(f"  !  Unknown dod-preset '{preset_name}' — falling back to 'full'",
+              file=sys.stderr)
+    dod_overrides = config.get("dod", {})
+
+    resolved = {}
+    for key, default_val in DOD_DEFAULTS.items():
+        if key in dod_overrides:
+            resolved[key] = dod_overrides[key]
+        elif key in preset_values:
+            resolved[key] = preset_values[key]
+        else:
+            resolved[key] = default_val
+    return resolved
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
@@ -1770,6 +1822,7 @@ CLAUDE_MD_MANAGED_TEMPLATE = """\
 <!-- Manual changes here will be overwritten. -->
 
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
+DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | Tests: {{DOD_TESTS_REQUIRED}} | Codebase-Overview: {{DOD_CODEBASE_OVERVIEW}} | Security-Audit: {{DOD_SECURITY_AUDIT}}
 
 {{AGENT_HINTS}}
 <!-- agent-meta:managed-end -->"""
@@ -2104,6 +2157,11 @@ def main():
     else:
         is_claude = variables.get("AI_PROVIDER", "").strip().lower() == "claude"
         mode = "init" if args.init else "sync"
+        # Log resolved DoD
+        preset_name = config.get("dod-preset", "full")
+        dod_resolved = resolve_dod(config, agent_meta_root)
+        dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
+        log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)

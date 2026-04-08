@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.20.0] — 2026-04-08
+
+### Added
+
+- **DoD-Presets** (`dod-preset` in `agent-meta.config.json`):
+  Predefined quality profiles that set defaults for all DoD criteria.
+  Three built-in presets: `full` (all checks, default), `standard` (tests yes, REQ-IDs no),
+  `rapid-prototyping` (all off — max speed). Individual overrides via `dod` block.
+  Precedence: `dod` override > `dod-preset` > `full`.
+- **`dod-presets.config.json`**: New config file defining presets. Meta-maintainer managed.
+  Easy to extend: add a new preset entry, update schema enum.
+- **DoD visibility**: Resolved DoD values now appear in CLAUDE.md managed block
+  (preset name + all criteria). sync.log shows `[INFO] DoD preset '...' -> ...`.
+- **`DOD_PRESET` template variable**: Auto-injected by sync.py, available in agent templates.
+- **`dod-push-check` hook v1.1.0**: Now includes Branch-Guard — blocks `git push` on
+  main/master. TEST_COMMAND missing = skip test gate (was: hard block).
+
+### Changed
+
+- **CLAUDE.md**: DoD section restructured — `dod-preset` as primary entry, `dod` as override.
+  Added "how to add new presets" and "how to add new columns" instructions.
+- **agent-meta.schema.json**: New `dod-preset` field (enum: full, standard, rapid-prototyping).
+  `dod` description updated (override semantics).
+- **Example config** (`howto/agent-meta.config.example.json`): Added `dod-preset` field.
+
+### Migration from v0.19.0
+
+No breaking changes — fully backward-compatible.
+
+- `dod-preset` is optional. If absent, `full` is used (same behavior as before).
+- Existing `dod` blocks continue to work as overrides on top of the preset.
+- The `dod-push-check` hook is opt-in (requires `"hooks": {"dod-push-check": {"enabled": true}}`).
+
 ## [0.19.0] — 2026-04-07
 
 ### Added
