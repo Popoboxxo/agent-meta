@@ -220,6 +220,58 @@ git commit -m "chore: upgrade agent-meta to v0.17.0"
 
 ---
 
+## Migration: v0.20.x → v0.21.0 (Multi-Provider)
+
+v0.21.0 führt Multi-Provider-Support ein: Claude, Gemini und Continue können gleichzeitig
+Agenten-Dateien erhalten. Alle Änderungen sind **rückwärtskompatibel** — kein Breaking Change.
+
+### 1. Neues Feld `ai-providers` (Array)
+
+Das neue Array-Feld ersetzt das alte String-Feld:
+
+```json
+// Neu (empfohlen)
+"ai-providers": ["Claude"]
+
+// Legacy (weiterhin unterstützt — kein Update nötig)
+"ai-provider": "Claude"
+```
+
+Das String-Feld `ai-provider` wird weiterhin erkannt und verarbeitet.
+Ein Upgrade ist optional — wer kein Gemini oder Continue nutzt, muss nichts ändern.
+
+### 2. Weitere Provider hinzufügen (optional)
+
+Um Gemini oder Continue zusätzlich zu aktivieren, `ai-providers` anpassen:
+
+```json
+"ai-providers": ["Claude", "Continue"]
+```
+
+Beim nächsten Sync legt `sync.py` automatisch die neuen Verzeichnisse an:
+- `"Gemini"` → `.gemini/GEMINI.md` + `.gemini/agents/` + `.gemini/settings.json`
+- `"Continue"` → `.continue/rules/project-context.md` + `.continue/agents/` + `.continue/config.yaml`
+
+### 3. Sync ausführen
+
+```bash
+cd .agent-meta && git checkout v0.21.1-beta && cd ..
+# agent-meta.config.json: "agent-meta-version": "0.21.1-beta"
+py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.json
+```
+
+### 4. Committen
+
+```bash
+git add .claude/ .gemini/ .continue/ agent-meta.config.json .agent-meta
+git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
+```
+
+> **Vollständige Dokumentation:** [howto/multi-provider.md](multi-provider.md)
+
+---
+
 ## Breaking Change: v0.14.4 → `enabled` → `approved` in external-skills.config.json
 
 Ab v0.14.4 gilt für External Skills ein **Two-Gate-System**:
