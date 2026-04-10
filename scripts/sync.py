@@ -123,8 +123,8 @@ PROVIDER_CONFIG = {
     "Continue": {
         "agents_dir":        ".continue/rules",
         "agent_ext":         ".md",
-        "context_file":      None,
-        "context_template":  None,
+        "context_file":      ".continue/rules/project-context.md",
+        "context_template":  "howto/CONTINUE.project-template.md",
         "has_rules":         False,
         "has_hooks":         False,
         "has_settings":      True,
@@ -2164,23 +2164,65 @@ def sync_context_for_provider(
                     log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
 
     elif provider == "Continue":
+        # 1. .continue/rules/project-context.md — created once from template; managed block updated
+        context_file = pc["context_file"]
+        if context_file:
+            ctx_path = project_root / context_file
+            template_path = agent_meta_root / pc["context_template"]
+            if not ctx_path.exists():
+                if template_path.exists():
+                    ccontent = substitute(
+                        template_path.read_text(encoding="utf-8"),
+                        variables, pc["context_template"], log,
+                    )
+                else:
+                    ccontent = (
+                        f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"
+                        f"{variables.get('PROJECT_CONTEXT', '')}\n\n"
+                        "<!-- agent-meta:managed-begin -->\n"
+                        "<!-- agent-meta:managed-end -->\n\n"
+                        "## Agent Rules\n\n"
+                        "Agent context files are in `.continue/rules/`.\n"
+                        "Continue loads all Markdown files in this directory automatically as context.\n"
+                    )
+                    log.action("INIT", str(ctx_path.relative_to(project_root)),
+                               "minimal fallback (CONTINUE.project-template.md not found)")
+                log.action("INIT", str(ctx_path.relative_to(project_root)),
+                           pc["context_template"])
+                if not dry_run:
+                    ctx_path.parent.mkdir(parents=True, exist_ok=True)
+                    ctx_path.write_text(ccontent, encoding="utf-8")
+            else:
+                # Update managed block on every sync
+                existing = ctx_path.read_text(encoding="utf-8")
+                new_managed = render_managed_block(variables, context_file, log)
+                updated = update_managed_block(existing, new_managed)
+                if updated != existing:
+                    log.action("UPDATE", str(ctx_path.relative_to(project_root)),
+                               "managed block refreshed")
+                    if not dry_run:
+                        ctx_path.write_text(updated, encoding="utf-8")
+                else:
+                    log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
+
+        # 2. .continue/config.yaml — skeleton, created once (never overwritten)
         settings_file = pc["settings_file"]
-        target_path = project_root / settings_file
-        if target_path.exists():
-            log.skip(str(target_path.relative_to(project_root)),
+        settings_path = project_root / settings_file
+        if settings_path.exists():
+            log.skip(str(settings_path.relative_to(project_root)),
                      "already exists - skeleton not overwritten")
         else:
-            ccontent = (
+            yaml_skeleton = (
                 "# Continue configuration\n"
                 "# See https://docs.continue.dev for full documentation\n"
                 "\n"
                 "# Agent rules are in .continue/rules/ - managed by agent-meta\n"
             )
-            log.action("INIT", str(target_path.relative_to(project_root)),
+            log.action("INIT", str(settings_path.relative_to(project_root)),
                        "Continue config skeleton")
             if not dry_run:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(ccontent, encoding="utf-8")
+                settings_path.parent.mkdir(parents=True, exist_ok=True)
+                settings_path.write_text(yaml_skeleton, encoding="utf-8")
 
 def init_claude_personal(
     agent_meta_root: Path,
