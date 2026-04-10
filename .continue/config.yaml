@@ -1,0 +1,4 @@
+# Continue configuration
+# See https://docs.continue.dev for full documentation
+
+# Agent rules are in .continue/rules/ - managed by agent-meta

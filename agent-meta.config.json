@@ -2,9 +2,9 @@
   "$schema": "./agent-meta.schema.json",
   "_comment": "agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.",
 
-  "agent-meta-version": "0.20.0",
+  "agent-meta-version": "0.21.1-beta",
 
-  "ai-provider": "Claude",
+  "ai-providers": ["Claude", "Continue"],
 
   "dod-preset": "rapid-prototyping",
 

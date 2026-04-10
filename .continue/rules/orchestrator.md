@@ -1,22 +1,3 @@
----
-name: orchestrator
-version: "2.0.0"
-description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.0.0"
-hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - WebFetch
-  - WebSearch
-  - Agent
-  - TodoWrite
----
-
 # Orchestrator — agent-meta
 
 > **Extension:** Falls `.claude/3-project/am-orchestrator-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
