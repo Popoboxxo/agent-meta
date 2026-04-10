@@ -25,7 +25,7 @@ Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin u
 |----------|--------------------|-------------|---------------|-------------|
 | `Claude` | `.claude/agents/` | `.md` | `CLAUDE.md` | Vollständig (`model`, `memory`, `permissionMode`, …) |
 | `Gemini` | `.gemini/agents/` | `.md` | `.gemini/GEMINI.md` | Reduziert (`model` only, kein `memory`/`permissionMode`) |
-| `Continue` | `.continue/rules/` | `.md` | `.continue/rules/project-context.md` | Kein Frontmatter (plain Markdown) |
+| `Continue` | `.continue/agents/` | `.md` | `.continue/rules/project-context.md` | Minimal (`name`, `description`, `alwaysApply: false`) |
 
 ### Claude Code
 
@@ -50,13 +50,24 @@ Gemini hat kein Rules- oder Hooks-System:
 
 ### Continue
 
-Continue hat kein eigenes Agent-System — Agenten werden als **Rules** exportiert:
-- `.continue/rules/<rolle>.md` — Agenten als plain Markdown (kein Frontmatter)
-- `.continue/rules/project-context.md` — Kontext-Datei aus Template, managed block wird bei jedem sync aktualisiert
+Continue unterscheidet klar zwischen **Agents** und **Rules**:
+
+- `.continue/agents/<rolle>.md` — Custom Agents mit minimalem Frontmatter (`name`, `description`, `alwaysApply: false`)
+- `.continue/rules/project-context.md` — Projekt-Kontext als Rule (`alwaysApply: true`), immer geladen
 - `.continue/config.yaml` — Skeleton (nur einmalig angelegt, nicht überschrieben)
 
-Continue lädt alle `.md`-Dateien aus `.continue/rules/` automatisch als Kontext —
-kein explizites `@agent-name` nötig. Der gesamte Agenten-Kontext wird im Hintergrund bereitgestellt.
+**Agents** (`alwaysApply: false`) werden explizit per Name aufgerufen.
+**Rules** (`alwaysApply: true`) werden automatisch in jeden Kontext geladen.
+
+Das Continue-Frontmatter-Schema für Agents/Rules:
+```yaml
+---
+name: developer           # Anzeigename
+description: "..."        # Beschreibung (für Agent-Auswahl durch das Modell)
+alwaysApply: false        # false = explizit aufrufen; true = immer geladen
+# globs: ["**/*.ts"]     # optional: nur bei passenden Dateien aktivieren
+---
+```
 
 ---
 

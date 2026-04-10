@@ -121,7 +121,7 @@ PROVIDER_CONFIG = {
         "settings_file":     ".gemini/settings.json",
     },
     "Continue": {
-        "agents_dir":        ".continue/rules",
+        "agents_dir":        ".continue/agents",
         "agent_ext":         ".md",
         "context_file":      ".continue/rules/project-context.md",
         "context_template":  "howto/CONTINUE.project-template.md",
@@ -1092,9 +1092,9 @@ def sync_agents_for_provider(
 ):
     """Generate agent files for a specific provider.
 
-    Claude:    .claude/agents/<role>.md  — full frontmatter, all fields
-    Gemini:    .gemini/agents/<role>.md  — frontmatter without permissionMode/memory
-    Continue:  .continue/rules/<role>.md — plain Markdown, no frontmatter
+    Claude:    .claude/agents/<role>.md   — full frontmatter, all fields
+    Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
+    Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
     """
     pc = PROVIDER_CONFIG.get(provider)
     if not pc:
@@ -1155,8 +1155,11 @@ def sync_agents_for_provider(
         generated_from = f'{source_label}@{source_version}' if source_version else source_label
 
         if provider == 'Continue':
-            # Continue: plain Markdown body — no frontmatter
-            content = _strip_frontmatter(content)
+            # Continue agents: minimal frontmatter (name + description only)
+            # alwaysApply: false — agent is invoked by name, not auto-loaded
+            fm = f"---\nname: {name}\ndescription: \"{description}\"\nalwaysApply: false\n---\n"
+            body = _strip_frontmatter(content)
+            content = fm + body
         else:
             content = build_frontmatter(content, name, description, generated_from=generated_from)
 
@@ -2216,7 +2219,8 @@ def sync_context_for_provider(
                 "# Continue configuration\n"
                 "# See https://docs.continue.dev for full documentation\n"
                 "\n"
-                "# Agent rules are in .continue/rules/ - managed by agent-meta\n"
+                "# Agents are in .continue/agents/ - managed by agent-meta\n"
+                "# Project rules are in .continue/rules/ - managed by agent-meta\n"
             )
             log.action("INIT", str(settings_path.relative_to(project_root)),
                        "Continue config skeleton")

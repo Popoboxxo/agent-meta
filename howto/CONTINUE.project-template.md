@@ -1,3 +1,9 @@
+---
+name: Project Context
+description: "Project context and agent overview for {{PROJECT_NAME}}"
+alwaysApply: true
+---
+
 # {{PROJECT_NAME}} — Project Context
 
 {{PROJECT_CONTEXT}}
@@ -19,7 +25,6 @@ DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | Te
 - **Platform:** {{PLATFORM}}
 - **Runtime:** {{RUNTIME}}
 
-## Agent Rules
+## Agents
 
-Agent context files are in `.continue/rules/`.
-Continue loads all Markdown files in this directory automatically as context.
+Custom agents are in `.continue/agents/` — invoke them by name in Continue.
