@@ -94,6 +94,44 @@ ROLES_CONFIG = "roles.config.json"
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 
+
+# ---------------------------------------------------------------------------
+# Provider configuration
+# ---------------------------------------------------------------------------
+
+PROVIDER_CONFIG = {
+    "Claude": {
+        "agents_dir":        ".claude/agents",
+        "agent_ext":         ".md",
+        "context_file":      "CLAUDE.md",
+        "context_template":  "howto/CLAUDE.project-template.md",
+        "has_rules":         True,
+        "has_hooks":         True,
+        "has_settings":      True,
+        "settings_file":     ".claude/settings.json",
+    },
+    "Gemini": {
+        "agents_dir":        ".gemini/agents",
+        "agent_ext":         ".md",
+        "context_file":      ".gemini/GEMINI.md",
+        "context_template":  "howto/GEMINI.project-template.md",
+        "has_rules":         False,
+        "has_hooks":         False,
+        "has_settings":      True,
+        "settings_file":     ".gemini/settings.json",
+    },
+    "Continue": {
+        "agents_dir":        ".continue/rules",
+        "agent_ext":         ".md",
+        "context_file":      None,
+        "context_template":  None,
+        "has_rules":         False,
+        "has_hooks":         False,
+        "has_settings":      True,
+        "settings_file":     ".continue/config.yaml",
+    },
+}
+
 # Managed block content template — uses {{PLATZHALTER}} from config variables
 # This is what gets updated on --update-ext. Keep it concise and useful.
 MANAGED_BLOCK_TEMPLATE = """\
@@ -140,6 +178,12 @@ class SyncLog:
 
     def info(self, target: str, reason: str):
         self.infos.append(f"[INFO]   {target:<50}  ({reason})")
+
+
+    def provider_header(self, provider: str):
+        self.infos.append("")
+        self.infos.append(f"[PROVIDER] {provider}")
+        self.infos.append(f"{'~' * (len(provider) + 11)}")
 
     def write(self, log_path: Path, config_path: str, source_version: str,
               mode: str, platforms: list[str], dry_run: bool):
@@ -323,7 +367,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables.update(config.get("variables", {}))
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
-        variables["AI_PROVIDER"] = config.get("ai-provider", "")
+        variables["AI_PROVIDER"] = config.get("ai-provider", "") or ", ".join(resolve_providers(config))
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
@@ -446,6 +490,29 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
         else:
             resolved[key] = default_val
     return resolved
+
+
+
+def resolve_providers(config: dict) -> list:
+    """Resolve active AI providers from config.
+
+    Supports:
+    - "ai-providers": ["Claude", "Gemini"]  (new multi-provider)
+    - "ai-provider":  "Claude"               (legacy, backward-compat)
+
+    Falls back to ["Claude"] if neither key is set.
+    """
+    if "ai-providers" in config:
+        providers = config["ai-providers"]
+        if isinstance(providers, list):
+            return [p for p in providers if p in PROVIDER_CONFIG]
+        if isinstance(providers, str) and providers in PROVIDER_CONFIG:
+            return [providers]
+    if "ai-provider" in config:
+        p = config["ai-provider"]
+        if isinstance(p, str) and p in PROVIDER_CONFIG:
+            return [p]
+    return ["Claude"]
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
@@ -991,6 +1058,168 @@ def sync_agents(
                            "role removed from config")
                 if not dry_run:
                     existing_file.unlink()
+
+
+
+def _strip_frontmatter(content: str) -> str:
+    """Remove the YAML frontmatter block from content entirely."""
+    if not content.startswith('---'):
+        return content
+    end = content.find('\n---', 3)
+    if end == -1:
+        return content
+    return content[end + 4:].lstrip('\n')
+
+
+def _remove_frontmatter_fields(content: str, fields: list) -> str:
+    """Remove specific fields from YAML frontmatter."""
+    import re as _re
+    for field in fields:
+        content = _re.sub(
+            rf'^{_re.escape(field)}:.*\n', '', content, count=1, flags=_re.MULTILINE,
+        )
+    return content
+
+
+def sync_agents_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+):
+    """Generate agent files for a specific provider.
+
+    Claude:    .claude/agents/<role>.md  — full frontmatter, all fields
+    Gemini:    .gemini/agents/<role>.md  — frontmatter without permissionMode/memory
+    Continue:  .continue/rules/<role>.md — plain Markdown, no frontmatter
+    """
+    pc = PROVIDER_CONFIG.get(provider)
+    if not pc:
+        log.warn(f"Unknown provider '{provider}' — skipping agent sync")
+        return
+
+    platforms = config.get('platforms', [])
+    overrides, _ = collect_sources(agent_meta_root, platforms)
+    target_dir = project_root / pc['agents_dir']
+
+    allowed_roles = set(config['roles']) if 'roles' in config else None
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    expected_filenames: set = set()
+    project_name = config['project']['name']
+
+    for role, source_path in overrides.items():
+        filename = target_filename(role)
+        if not filename:
+            if provider == 'Claude':
+                log.skip(str(source_path.name), 'role not in ROLE_MAP')
+            continue
+
+        if allowed_roles is not None and role not in allowed_roles:
+            if provider == 'Claude':
+                rel = (str(target_dir / filename)
+                       .replace(str(project_root) + '/', '')
+                       .replace(str(project_root) + chr(92), ""))
+                log.skip(rel, f"role '{role}' not in config['roles']")
+            continue
+
+        expected_filenames.add(filename)
+        target_path = target_dir / filename
+        content = source_path.read_text(encoding='utf-8')
+
+        # Composition mode
+        extends_base = extract_frontmatter_field(content, 'extends')
+        if extends_base:
+            base_path = agent_meta_root / AGENTS_DIR / extends_base
+            content = compose_agent(base_path, content, log)
+            if provider == 'Claude':
+                log.info(
+                    str(target_path.relative_to(project_root)),
+                    f'composed from {extends_base} + {source_path.name}',
+                )
+
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        source_version = extract_frontmatter_field(content, 'version')
+        template_description = extract_frontmatter_field(content, 'description')
+        description = (template_description or f'Agent for {project_name}.')
+        description = description.replace('{{PROJECT_NAME}}', project_name)
+        content = substitute(content, variables, rel_source, log)
+        name = Path(filename).stem
+        layer = source_path.parts[-2]
+        source_label = f'{layer}/{source_path.name}'
+        generated_from = f'{source_label}@{source_version}' if source_version else source_label
+
+        if provider == 'Continue':
+            # Continue: plain Markdown body — no frontmatter
+            content = _strip_frontmatter(content)
+        else:
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
+
+            if provider == 'Claude':
+                model = resolve_model(role, config, agent_meta_root)
+                content = inject_model_field(content, model)
+                if model:
+                    src = 'project override' if role in config.get('model-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+
+                memory = resolve_memory(role, config, agent_meta_root)
+                content = inject_memory_field(content, memory)
+                if memory:
+                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+
+                permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+                content = inject_permission_mode_field(content, permission_mode)
+                if permission_mode:
+                    src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+
+            elif provider == 'Gemini':
+                # Gemini: model only; strip memory and permissionMode
+                model = resolve_model(role, config, agent_meta_root)
+                content = inject_model_field(content, model)
+                content = _remove_frontmatter_fields(content, ['memory', 'permissionMode'])
+
+        rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)
+        if not dry_run:
+            target_path.write_text(content, encoding='utf-8')
+
+    # External skill filenames are always in .claude/agents/ (Claude only)
+    if provider == 'Claude':
+        ext_config = load_external_skills_config(agent_meta_root)
+        project_skills = config.get('external-skills', {})
+        for skill_name, skill_cfg in ext_config.get('skills', {}).items():
+            if _skill_is_active(skill_name, skill_cfg, project_skills):
+                ext_role = skill_cfg.get('role', skill_name)
+                expected_filenames.add(f'{ext_role}.md')
+
+    # Remove stale agent files
+    if target_dir.exists():
+        managed_index = target_dir / '.agent-meta-managed'
+        previously_managed: set = set()
+        if managed_index.exists():
+            for line in managed_index.read_text(encoding='utf-8').splitlines():
+                if line.strip():
+                    previously_managed.add(line.strip())
+
+        for existing_file in sorted(target_dir.glob('*.md')):
+            if existing_file.name not in expected_filenames:
+                if not managed_index.exists() or existing_file.name in previously_managed:
+                    log.action('DELETE', str(existing_file.relative_to(project_root)),
+                               'role removed from config')
+                    if not dry_run:
+                        existing_file.unlink()
+
+        if not dry_run and expected_filenames:
+            managed_index.write_text(
+                '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
+            )
 
 
 def sync_snippets(
@@ -1865,6 +2094,94 @@ def sync_claude_md_managed(
             target_path.write_text(new_content, encoding="utf-8")
 
 
+
+def sync_context_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+):
+    """Create or update the context file for a given provider.
+
+    Claude:   CLAUDE.md - managed block updated on every sync
+    Gemini:   .gemini/GEMINI.md - created once from template; managed block updated
+    Continue: .continue/config.yaml - skeleton, created once (never overwritten)
+    """
+    pc = PROVIDER_CONFIG.get(provider)
+    if not pc:
+        return
+
+    if provider == "Claude":
+        sync_claude_md_managed(project_root, variables, log, dry_run)
+
+    elif provider == "Gemini":
+        context_file = pc["context_file"]
+        if context_file is None:
+            return
+        target_path = project_root / context_file
+        template_name = pc["context_template"]
+        template_path = agent_meta_root / template_name if template_name else None
+
+        if not target_path.exists():
+            if template_path and template_path.exists():
+                gcontent = template_path.read_text(encoding="utf-8")
+                gcontent = substitute(gcontent, variables, template_name, log)
+                log.action("INIT", str(target_path.relative_to(project_root)), template_name)
+            else:
+                project_name = config["project"]["name"]
+                gcontent = (
+                    f"# {project_name}\n\n"
+                    "<!-- agent-meta:managed-begin -->\n"
+                    "<!-- agent-meta:managed-end -->\n\n"
+                    "## Agents\n\n"
+                    f"Agent files are in .gemini/agents/ (use @agent-name).\n"
+                )
+                log.action("INIT", str(target_path.relative_to(project_root)),
+                           "minimal fallback (GEMINI.project-template.md not found)")
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(gcontent, encoding="utf-8")
+        else:
+            existing = target_path.read_text(encoding="utf-8")
+            managed_pattern = re.compile(
+                r"<!--\s*agent-meta:managed-begin\s*-->"
+                r".*?<!--\s*agent-meta:managed-end\s*-->",
+                re.DOTALL,
+            )
+            if managed_pattern.search(existing):
+                new_managed = substitute(CLAUDE_MD_MANAGED_TEMPLATE, variables,
+                                         str(target_path.relative_to(project_root)), log)
+                new_content = managed_pattern.sub(new_managed, existing, count=1)
+                if new_content != existing:
+                    log.action("UPDATE", str(target_path.relative_to(project_root)),
+                               "managed block")
+                    if not dry_run:
+                        target_path.write_text(new_content, encoding="utf-8")
+                else:
+                    log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
+
+    elif provider == "Continue":
+        settings_file = pc["settings_file"]
+        target_path = project_root / settings_file
+        if target_path.exists():
+            log.skip(str(target_path.relative_to(project_root)),
+                     "already exists - skeleton not overwritten")
+        else:
+            ccontent = (
+                "# Continue configuration\n"
+                "# See https://docs.continue.dev for full documentation\n"
+                "\n"
+                "# Agent rules are in .continue/rules/ - managed by agent-meta\n"
+            )
+            log.action("INIT", str(target_path.relative_to(project_root)),
+                       "Continue config skeleton")
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(ccontent, encoding="utf-8")
+
 def init_claude_personal(
     agent_meta_root: Path,
     project_root: Path,
@@ -2155,22 +2472,33 @@ def main():
         create_hook(project_root, args.create_hook, log, args.dry_run)
 
     else:
-        is_claude = variables.get("AI_PROVIDER", "").strip().lower() == "claude"
+        providers = resolve_providers(config)
         mode = "init" if args.init else "sync"
+        log.info("providers", "active: " + ", ".join(providers))
         # Log resolved DoD
         preset_name = config.get("dod-preset", "full")
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+        is_claude = "Claude" in providers
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
             ensure_gitignore_entries(project_root, log, args.dry_run)
-        sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
-        sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
-        sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
+        # Per-provider sync
+        for provider in providers:
+            pc = PROVIDER_CONFIG[provider]
+            log.provider_header(provider)
+            sync_agents_for_provider(agent_meta_root, project_root, config, variables,
+                                     log, args.dry_run, provider)
+            sync_context_for_provider(agent_meta_root, project_root, config, variables,
+                                      log, args.dry_run, provider)
+            if pc["has_rules"] and provider == "Claude":
+                sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
+            if pc["has_hooks"] and provider == "Claude":
+                sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)
@@ -2179,14 +2507,10 @@ def main():
             known_skills = set(ext_config.get("skills", {}).keys())
             for skill_name in config["external-skills"]:
                 if skill_name not in known_skills:
-                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json — skipping")
+                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
-                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer — skipping")
+                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
-        if is_claude:
-            sync_claude_md_managed(project_root, variables, log, args.dry_run)
-        elif (project_root / "CLAUDE.md").exists():
-            log.info("CLAUDE.md", f"managed block update skipped (ai-provider: '{variables.get('AI_PROVIDER', '')}')")
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)

@@ -1,15 +1,18 @@
 {
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte. Tipp: Gib howto/first-steps.md deinem AI-Assistenten für eine geführte Einrichtung.",
 
-  "agent-meta-version": "0.14.2",
+  "agent-meta-version": "0.20.0",
 
   "_comment_provider": "AI provider: 'Claude' enables automatic CLAUDE.md generation and managed block updates. Other values (e.g. 'GitHub') disable CLAUDE.md handling.",
+  "_comment_providers": "Multi-Provider: Mehrere AI-Assistenten gleichzeitig. Legacy: 'ai-provider' (String) weiterhin unterstuetzt.",
+  "ai-providers": ["Claude"],
+  "_comment_ai_provider_legacy": "Deprecated: Verwende ai-providers (Array). Weiterhin unterstuetzt fuer Backward-Compatibility.",
   "ai-provider": "Claude",
 
   "platforms": ["sharkord"],
 
   "_comment_dod_preset": "DoD-Qualitätsprofil: 'full' (alle Checks), 'standard' (Tests ja, REQ-IDs nein), 'rapid-prototyping' (alles aus). Einzelne Overrides via 'dod' Block.",
-  "dod-preset": "full",
+  "dod-preset": "standard",
 
   "_comment_roles": "Optional: Whitelist der zu generierenden Rollen. Fehlt dieser Key → alle Rollen werden generiert.",
   "roles": [
