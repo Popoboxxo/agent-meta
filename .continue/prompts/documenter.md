@@ -5,7 +5,6 @@ invokable: true
 ---
 # Documenter — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

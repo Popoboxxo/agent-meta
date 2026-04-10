@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Agent-Meta-Manager — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-agent-meta-manager-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

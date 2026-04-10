@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Ideation — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

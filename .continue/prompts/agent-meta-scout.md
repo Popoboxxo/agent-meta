@@ -5,7 +5,6 @@ invokable: true
 ---
 # Agent-Meta Scout — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-agent-meta-scout-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Feature — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-feature-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -1176,6 +1176,7 @@ def sync_agents_for_provider(
             # alwaysApply: false — agent is invoked by name, not auto-loaded
             fm = f"---\nname: {name}\ndescription: \"{description}\"\nalwaysApply: false\n---\n"
             body = _strip_frontmatter(content)
+            body = _strip_claude_specific_lines(body)
             content = fm + body
         else:
             content = build_frontmatter(content, name, description, generated_from=generated_from)
@@ -1240,6 +1241,23 @@ def sync_agents_for_provider(
             managed_index.write_text(
                 '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
             )
+
+
+def _strip_claude_specific_lines(content: str) -> str:
+    """Remove Claude Code-specific lines that are meaningless in other providers.
+
+    Currently strips:
+    - Extension-Hook lines: > **Extension:** Falls `.claude/3-project/...` existiert → ...
+    - Read-Tool instructions referencing .claude/ paths
+    """
+    lines = content.splitlines(keepends=True)
+    out = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("> **Extension:**") and ".claude/3-project/" in stripped:
+            continue
+        out.append(line)
+    return "".join(out)
 
 
 def _make_slim_body(content: str) -> str:
@@ -1345,6 +1363,7 @@ def sync_prompts_for_continue(
 
         # Strip original frontmatter, optionally slim the body
         body = _strip_frontmatter(content)
+        body = _strip_claude_specific_lines(body)
         if prompt_mode == "slim":
             body = _make_slim_body(body)
 

@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Release Manager — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

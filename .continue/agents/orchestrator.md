@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Orchestrator — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-orchestrator-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

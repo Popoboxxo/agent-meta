@@ -5,7 +5,6 @@ invokable: true
 ---
 # Developer — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

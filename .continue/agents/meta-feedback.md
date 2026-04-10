@@ -5,7 +5,6 @@ alwaysApply: false
 ---
 # Meta-Feedback — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
