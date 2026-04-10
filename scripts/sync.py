@@ -129,6 +129,7 @@ PROVIDER_CONFIG = {
         "has_hooks":         False,
         "has_settings":      True,
         "settings_file":     ".continue/config.yaml",
+        "settings_template": "howto/CONTINUE.config-template.yaml",
     },
 }
 
@@ -2213,20 +2214,33 @@ def sync_context_for_provider(
         settings_path = project_root / settings_file
         if settings_path.exists():
             log.skip(str(settings_path.relative_to(project_root)),
-                     "already exists - skeleton not overwritten")
+                     "already exists - not overwritten")
         else:
-            yaml_skeleton = (
-                "# Continue configuration\n"
-                "# See https://docs.continue.dev for full documentation\n"
-                "\n"
-                "# Agents are in .continue/agents/ - managed by agent-meta\n"
-                "# Project rules are in .continue/rules/ - managed by agent-meta\n"
-            )
+            settings_template_rel = pc.get("settings_template")
+            if settings_template_rel:
+                settings_template_path = agent_meta_root / settings_template_rel
+            else:
+                settings_template_path = None
+
+            if settings_template_path and settings_template_path.exists():
+                yaml_content = settings_template_path.read_text(encoding="utf-8")
+                source_label = settings_template_rel
+            else:
+                yaml_content = (
+                    "# Continue configuration\n"
+                    "# See https://docs.continue.dev for full documentation\n"
+                    "\n"
+                    "# Agents are in .continue/agents/ - managed by agent-meta\n"
+                    "# Project rules are in .continue/rules/ - managed by agent-meta\n"
+                )
+                source_label = "minimal fallback"
+                if settings_template_rel:
+                    log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
             log.action("INIT", str(settings_path.relative_to(project_root)),
-                       "Continue config skeleton")
+                       source_label)
             if not dry_run:
                 settings_path.parent.mkdir(parents=True, exist_ok=True)
-                settings_path.write_text(yaml_skeleton, encoding="utf-8")
+                settings_path.write_text(yaml_content, encoding="utf-8")
 
 def init_claude_personal(
     agent_meta_root: Path,
