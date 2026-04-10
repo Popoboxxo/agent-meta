@@ -494,6 +494,22 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
 
 
 
+def resolve_provider_options(config: dict, provider: str) -> dict:
+    """Return provider-specific options from config["provider-options"][provider].
+
+    Falls back to empty dict — all options are optional.
+
+    Example config:
+        "provider-options": {
+            "Continue": {
+                "generate-prompts": true,
+                "prompt-mode": "full"   # "full" | "slim"
+            }
+        }
+    """
+    return config.get("provider-options", {}).get(provider, {})
+
+
 def resolve_providers(config: dict) -> list:
     """Resolve active AI providers from config.
 
@@ -1224,6 +1240,149 @@ def sync_agents_for_provider(
             managed_index.write_text(
                 '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
             )
+
+
+def _make_slim_body(content: str) -> str:
+    """Reduce agent body to a compact prompt-friendly version.
+
+    Keeps: role description, active DoD table, core workflow steps, Don'ts.
+    Strips: extension hooks, verbose sub-sections, examples.
+    """
+    lines = content.splitlines()
+    out = []
+    skip_section = False
+    slim_stop_anchors = {
+        "## Workflow",
+        "## Workflows",
+        "## Schritt-für-Schritt",
+        "## Beispiele",
+        "## Beispiel",
+        "## Anhang",
+    }
+    keep_sections = {
+        "## Don'ts",
+        "## Donts",
+        "## Don",
+        "## Kernregeln",
+        "## Aktive DoD",
+        "## DoD",
+    }
+
+    for line in lines:
+        stripped = line.strip()
+        # Skip extension-hook lines (Claude-specific)
+        if stripped.startswith("> **Extension:**"):
+            continue
+        # Detect section changes
+        if stripped.startswith("## "):
+            skip_section = stripped in slim_stop_anchors
+        if not skip_section:
+            out.append(line)
+
+    # Cap at ~80 lines for slim mode
+    if len(out) > 80:
+        out = out[:80]
+        out.append("\n\n*[Prompt truncated — use agent mode for full context]*")
+
+    return "\n".join(out)
+
+
+def sync_prompts_for_continue(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Generate .continue/prompts/<role>.md as invokable slash-commands.
+
+    Controlled by provider-options.Continue:
+        generate-prompts: true          # enable (default: false)
+        prompt-mode: "full" | "slim"    # full = complete agent body (default)
+                                        # slim = compact role + core rules only
+
+    Works with any local LLM — no tool calling required.
+    Slash-commands: /developer, /git, /orchestrator, ...
+    """
+    opts = resolve_provider_options(config, "Continue")
+    if not opts.get("generate-prompts", False):
+        return
+
+    prompt_mode = opts.get("prompt-mode", "full")
+    platforms = config.get("platforms", [])
+    overrides, _ = collect_sources(agent_meta_root, platforms)
+    allowed_roles: set | None = set(config["roles"]) if "roles" in config else None
+
+    prompts_dir = project_root / ".continue" / "prompts"
+    if not dry_run:
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+
+    expected: set[str] = set()
+
+    for role, source_path in overrides.items():
+        filename = target_filename(role)
+        if not filename:
+            continue
+        if allowed_roles is not None and role not in allowed_roles:
+            continue
+
+        expected.add(filename)
+        target_path = prompts_dir / filename
+        content = source_path.read_text(encoding="utf-8")
+
+        # Composition
+        extends_base = extract_frontmatter_field(content, "extends")
+        if extends_base:
+            base_path = agent_meta_root / AGENTS_DIR / extends_base
+            content = compose_agent(base_path, content, log)
+
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        content = substitute(content, variables, rel_source, log)
+
+        template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
+        template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
+
+        # Strip original frontmatter, optionally slim the body
+        body = _strip_frontmatter(content)
+        if prompt_mode == "slim":
+            body = _make_slim_body(body)
+
+        # Build Continue prompt frontmatter
+        fm = (
+            f"---\n"
+            f"name: {role}\n"
+            f'description: "{template_description}"\n'
+            f"invokable: true\n"
+            f"---\n"
+        )
+        final = fm + body
+
+        layer = source_path.parts[-2]
+        log.action("WRITE", str(target_path.relative_to(project_root)),
+                   f"{layer}/{source_path.name} [prompt/{prompt_mode}]")
+        if not dry_run:
+            target_path.write_text(final, encoding="utf-8")
+
+    # Stale cleanup
+    managed_index = prompts_dir / ".agent-meta-managed"
+    previously_managed: set[str] = set()
+    if managed_index.exists():
+        for line in managed_index.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                previously_managed.add(line.strip())
+
+    if prompts_dir.exists():
+        for existing_file in sorted(prompts_dir.glob("*.md")):
+            if existing_file.name not in expected:
+                if not managed_index.exists() or existing_file.name in previously_managed:
+                    log.action("DELETE", str(existing_file.relative_to(project_root)),
+                               "role removed from config")
+                    if not dry_run:
+                        existing_file.unlink()
+
+    if not dry_run and expected:
+        managed_index.write_text("\n".join(sorted(expected)) + "\n", encoding="utf-8")
 
 
 def sync_snippets(
@@ -2555,6 +2714,9 @@ def main():
                                      log, args.dry_run, provider)
             sync_context_for_provider(agent_meta_root, project_root, config, variables,
                                       log, args.dry_run, provider)
+            if provider == "Continue":
+                sync_prompts_for_continue(agent_meta_root, project_root, config,
+                                          variables, log, args.dry_run)
             if pc["has_rules"] and provider == "Claude":
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":

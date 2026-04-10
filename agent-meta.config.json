@@ -22,8 +22,7 @@
     "ideation",
     "agent-meta-manager",
     "feature",
-    "agent-meta-scout",
-    "openscad-developer"
+    "agent-meta-scout"
   ],
 
   "project": {
@@ -34,6 +33,16 @@
 
   "hooks": {
     "dod-push-check": { "enabled": true }
+  },
+
+  "_comment_provider_options": "Provider-spezifische Optionen — pro Provider konfigurierbar",
+  "provider-options": {
+    "Claude": {},
+    "Gemini": {},
+    "Continue": {
+      "generate-prompts": true,
+      "prompt-mode": "full"
+    }
   },
 
   "variables": {

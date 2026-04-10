@@ -37,6 +37,18 @@
     "short":  "mein-projekt"
   },
 
+  "_comment_provider_options": "Optional: Provider-spezifische Optionen. Jeder Key ist ein Provider-Name (Claude, Gemini, Continue).",
+  "provider-options": {
+    "Claude": {},
+    "Gemini": {},
+    "Continue": {
+      "_comment": "generate-prompts: Slash-Commands (.continue/prompts/) generieren — funktioniert mit jedem lokalen LLM ohne Tool Calling.",
+      "generate-prompts": false,
+      "_comment_mode": "prompt-mode: 'full' = vollstaendiger Agent-Body | 'slim' = kompakte Kurzversion (~80 Zeilen)",
+      "prompt-mode": "full"
+    }
+  },
+
   "_comment_external_skills": "Optional: Externe Skills aktivieren. Nur Skills mit approved:true in external-skills.config.json können aktiviert werden.",
   "external-skills": {
     "_comment": "skill-name → { enabled: true/false }. Skill muss in external-skills.config.json approved:true haben.",

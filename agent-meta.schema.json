@@ -332,6 +332,42 @@
         "additionalProperties": false
       }
     },
+    "provider-options": {
+      "type": "object",
+      "description": "Provider-specific options. Each key is a provider name (Claude, Gemini, Continue).",
+      "properties": {
+        "Claude": {
+          "type": "object",
+          "description": "Options for the Claude provider.",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "Gemini": {
+          "type": "object",
+          "description": "Options for the Gemini provider.",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "Continue": {
+          "type": "object",
+          "description": "Options for the Continue provider.",
+          "additionalProperties": false,
+          "properties": {
+            "generate-prompts": {
+              "type": "boolean",
+              "description": "Generate .continue/prompts/<role>.md as invokable slash-commands. Works with any local LLM — no tool calling required."
+            },
+            "prompt-mode": {
+              "type": "string",
+              "description": "Content mode for generated prompts. 'full' = complete agent body. 'slim' = compact role + core rules only (~80 lines).",
+              "enum": ["full", "slim"],
+              "default": "full"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "external-skills": {
       "type": "object",
       "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",
