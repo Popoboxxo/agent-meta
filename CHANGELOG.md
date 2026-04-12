@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.21.0] — 2026-04-12
+
+### Added
+
+- **Multi-Provider Support** (`ai-providers` array in `agent-meta.config.json`):
+  Projects can now target Claude, Gemini, and Continue simultaneously.
+  Backward-compatible: legacy `ai-provider` string field still works.
+- **Continue integration**: sync.py generates `.continue/agents/`, `.continue/prompts/`,
+  and `.continue/rules/` for use with local LLMs (Ollama, ROCm, etc.) via Continue IDE extension.
+  Controlled by `provider-options.Continue.generate-prompts` and `prompt-mode` (`full` | `slim`).
+- **`provider-options` config block**: Per-provider options with schema validation.
+  Currently active: `Continue.generate-prompts`, `Continue.prompt-mode`.
+- **`speech-mode`** — Configurable agent communication style:
+  Generates `.claude/rules/speech-mode.md` (auto-loaded by Claude Code into all agent contexts).
+  Modes: `full` (default, no rule), `short` (facts only, no filler), `childish` (playful,
+  animal/toy analogies, emojis), `caveman` (brutally short, cave-speak).
+  No agent template changes needed — purely via the Rules layer.
+- **`speech/` directory**: Mode definition files (`short.md`, `childish.md`, `caveman.md`, `full.md`).
+  Add new modes by dropping a file here and extending the schema enum.
+- **Howto files**: `howto/multi-provider.md`, `howto/CONTINUE.config-template.yaml`,
+  `howto/CONTINUE.project-template.md`, `howto/GEMINI.project-template.md`.
+
+### Changed
+
+- **`agent-meta.schema.json`**: Added `ai-providers` (array), `provider-options` (object),
+  `speech-mode` (enum) fields with full validation.
+- **`sync.py`**: `sync_speech_mode()` function — copies speech rule on sync, removes it on `full`.
+  `resolve_provider_options()`, `resolve_providers()` for multi-provider resolution.
+  Continue prompt generation (`sync_prompts_for_continue()`).
+- **CLAUDE.md**: `speech-mode` config section, `speech/` in directory structure,
+  updated `provider-options` documentation.
+- **`howto/agent-meta.config.example.json`**: Added `speech-mode`, `provider-options` examples.
+
+### Migration from v0.20.0
+
+No breaking changes — fully backward-compatible.
+
+- `speech-mode` is optional. If absent (or `"full"`), no rule is generated — behavior unchanged.
+- `ai-provider` (string) still works. `ai-providers` (array) is the new preferred form.
+- `provider-options` is optional. Omitting it keeps all existing behavior intact.
+
 ## [0.20.0] — 2026-04-08
 
 ### Added
