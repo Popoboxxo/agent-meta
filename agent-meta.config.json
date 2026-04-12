@@ -2,7 +2,7 @@
   "$schema": "./agent-meta.schema.json",
   "_comment": "agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.",
 
-  "agent-meta-version": "0.21.1-beta",
+  "agent-meta-version": "v0.21.0",
 
   "ai-providers": ["Claude", "Continue"],
 
@@ -44,6 +44,9 @@
       "prompt-mode": "full"
     }
   },
+
+  "_comment_speech_mode": "Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman'",
+  "speech-mode": "full",
 
   "variables": {
 
