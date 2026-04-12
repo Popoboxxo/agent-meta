@@ -1,22 +1,10 @@
 ---
 name: feature
-version: "1.2.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.2.0"
-hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
-# isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
-#                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
-#                          Aktivierung: isolation: worktree als Aufruf-Parameter oder in 3-project/feature.md
-tools:
-  - Bash
-  - Read
-  - Agent
-  - TodoWrite
+alwaysApply: false
 ---
-
 # Feature — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-feature-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

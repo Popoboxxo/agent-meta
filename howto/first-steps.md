@@ -34,7 +34,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-git checkout v0.17.0
+git checkout v0.21.1-beta
 ```
 
 ```bash
@@ -141,6 +141,34 @@ Für Sharkord-Projekte zusätzlich `"docker"` und `"tester"` ergänzen.
 
 ---
 
+## Schritt 4b: Provider wählen (optional)
+
+Seit v0.21.0 unterstützt agent-meta mehrere AI-Provider gleichzeitig.
+Standardmäßig wird nur Claude aktiviert — weitere Provider sind optional.
+
+```json
+"ai-providers": ["Claude"]
+```
+
+Mehrere Provider gleichzeitig (z.B. Claude + Continue):
+
+```json
+"ai-providers": ["Claude", "Continue"]
+```
+
+| Provider | Erzeugt | Wann sinnvoll |
+|----------|---------|---------------|
+| `Claude` | `.claude/agents/`, `CLAUDE.md`, Rules, Hooks | Standard — immer empfohlen |
+| `Gemini` | `.gemini/agents/`, `.gemini/GEMINI.md` | Wenn Gemini CLI im Team eingesetzt wird |
+| `Continue` | `.continue/agents/`, `.continue/rules/project-context.md` | Wenn Continue im Team eingesetzt wird |
+
+> Backward-Compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
+> Vollständige Dokumentation: [howto/multi-provider.md](multi-provider.md)
+
+**AI-Assistent:** Frage ob neben Claude noch weitere Provider (Gemini, Continue) genutzt werden sollen.
+
+---
+
 ## Schritt 5: Dry-Run
 
 Bevor echte Dateien geschrieben werden — prüfen ob die Config stimmt:
@@ -160,7 +188,7 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
 py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
 ```
 
-Das erzeugt:
+Das erzeugt (bei aktivem `"Claude"` Provider):
 - `CLAUDE.md` — Projekt-Kontext für den AI-Assistenten
 - `CLAUDE.personal.md` — Persönliche Präferenzen (gitignored)
 - `.claude/settings.json` — Team-Permissions Skeleton
@@ -169,6 +197,10 @@ Das erzeugt:
 - `.claude/rules/*.md` — Projekt-globale Regeln (auto-loaded)
 - `.claude/hooks/*.sh` — Hook-Scripts (opt-in über config)
 - `.gitignore` — Fehlende Einträge werden ergänzt
+
+Zusätzlich wenn weitere Provider aktiv sind:
+- `.gemini/GEMINI.md` + `.gemini/agents/*.md` — bei aktivem `"Gemini"` Provider
+- `.continue/rules/project-context.md` + `.continue/agents/*.md` + `.continue/config.yaml` — bei aktivem `"Continue"` Provider
 
 ---
 
@@ -221,12 +253,14 @@ von `sync.py` befüllt und darf nicht manuell bearbeitet werden.
 Checkliste:
 
 - [ ] `.agent-meta/` Submodul auf gewünschter Version
-- [ ] `agent-meta.config.json` vollständig befüllt
+- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-providers`)
 - [ ] `sync.log` ohne Warnungen
-- [ ] `CLAUDE.md` vorhanden mit managed block
+- [ ] `CLAUDE.md` vorhanden mit managed block (wenn `"Claude"` in `ai-providers`)
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
 - [ ] `.claude/agents/orchestrator.md` vorhanden
 - [ ] `.claude/agents/developer.md` vorhanden
+- [ ] Bei `"Gemini"`: `.gemini/GEMINI.md` vorhanden
+- [ ] Bei `"Continue"`: `.continue/rules/project-context.md` vorhanden
 - [ ] Committed
 
 **Nächster Schritt:** Starte mit dem `orchestrator`-Agenten in Claude Code:

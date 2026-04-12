@@ -2,9 +2,9 @@
   "$schema": "./agent-meta.schema.json",
   "_comment": "agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.",
 
-  "agent-meta-version": "0.20.0",
+  "agent-meta-version": "0.21.1-beta",
 
-  "ai-provider": "Claude",
+  "ai-providers": ["Claude", "Continue"],
 
   "dod-preset": "rapid-prototyping",
 
@@ -22,8 +22,7 @@
     "ideation",
     "agent-meta-manager",
     "feature",
-    "agent-meta-scout",
-    "openscad-developer"
+    "agent-meta-scout"
   ],
 
   "project": {
@@ -34,6 +33,16 @@
 
   "hooks": {
     "dod-push-check": { "enabled": true }
+  },
+
+  "_comment_provider_options": "Provider-spezifische Optionen — pro Provider konfigurierbar",
+  "provider-options": {
+    "Claude": {},
+    "Gemini": {},
+    "Continue": {
+      "generate-prompts": true,
+      "prompt-mode": "full"
+    }
   },
 
   "variables": {

@@ -94,6 +94,45 @@ ROLES_CONFIG = "roles.config.json"
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 
+
+# ---------------------------------------------------------------------------
+# Provider configuration
+# ---------------------------------------------------------------------------
+
+PROVIDER_CONFIG = {
+    "Claude": {
+        "agents_dir":        ".claude/agents",
+        "agent_ext":         ".md",
+        "context_file":      "CLAUDE.md",
+        "context_template":  "howto/CLAUDE.project-template.md",
+        "has_rules":         True,
+        "has_hooks":         True,
+        "has_settings":      True,
+        "settings_file":     ".claude/settings.json",
+    },
+    "Gemini": {
+        "agents_dir":        ".gemini/agents",
+        "agent_ext":         ".md",
+        "context_file":      ".gemini/GEMINI.md",
+        "context_template":  "howto/GEMINI.project-template.md",
+        "has_rules":         False,
+        "has_hooks":         False,
+        "has_settings":      True,
+        "settings_file":     ".gemini/settings.json",
+    },
+    "Continue": {
+        "agents_dir":        ".continue/agents",
+        "agent_ext":         ".md",
+        "context_file":      ".continue/rules/project-context.md",
+        "context_template":  "howto/CONTINUE.project-template.md",
+        "has_rules":         False,
+        "has_hooks":         False,
+        "has_settings":      True,
+        "settings_file":     ".continue/config.yaml",
+        "settings_template": "howto/CONTINUE.config-template.yaml",
+    },
+}
+
 # Managed block content template — uses {{PLATZHALTER}} from config variables
 # This is what gets updated on --update-ext. Keep it concise and useful.
 MANAGED_BLOCK_TEMPLATE = """\
@@ -140,6 +179,12 @@ class SyncLog:
 
     def info(self, target: str, reason: str):
         self.infos.append(f"[INFO]   {target:<50}  ({reason})")
+
+
+    def provider_header(self, provider: str):
+        self.infos.append("")
+        self.infos.append(f"[PROVIDER] {provider}")
+        self.infos.append(f"{'~' * (len(provider) + 11)}")
 
     def write(self, log_path: Path, config_path: str, source_version: str,
               mode: str, platforms: list[str], dry_run: bool):
@@ -323,7 +368,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables.update(config.get("variables", {}))
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
-        variables["AI_PROVIDER"] = config.get("ai-provider", "")
+        variables["AI_PROVIDER"] = config.get("ai-provider", "") or ", ".join(resolve_providers(config))
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
@@ -446,6 +491,45 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
         else:
             resolved[key] = default_val
     return resolved
+
+
+
+def resolve_provider_options(config: dict, provider: str) -> dict:
+    """Return provider-specific options from config["provider-options"][provider].
+
+    Falls back to empty dict — all options are optional.
+
+    Example config:
+        "provider-options": {
+            "Continue": {
+                "generate-prompts": true,
+                "prompt-mode": "full"   # "full" | "slim"
+            }
+        }
+    """
+    return config.get("provider-options", {}).get(provider, {})
+
+
+def resolve_providers(config: dict) -> list:
+    """Resolve active AI providers from config.
+
+    Supports:
+    - "ai-providers": ["Claude", "Gemini"]  (new multi-provider)
+    - "ai-provider":  "Claude"               (legacy, backward-compat)
+
+    Falls back to ["Claude"] if neither key is set.
+    """
+    if "ai-providers" in config:
+        providers = config["ai-providers"]
+        if isinstance(providers, list):
+            return [p for p in providers if p in PROVIDER_CONFIG]
+        if isinstance(providers, str) and providers in PROVIDER_CONFIG:
+            return [providers]
+    if "ai-provider" in config:
+        p = config["ai-provider"]
+        if isinstance(p, str) and p in PROVIDER_CONFIG:
+            return [p]
+    return ["Claude"]
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
@@ -993,6 +1077,333 @@ def sync_agents(
                     existing_file.unlink()
 
 
+
+def _strip_frontmatter(content: str) -> str:
+    """Remove the YAML frontmatter block from content entirely."""
+    if not content.startswith('---'):
+        return content
+    end = content.find('\n---', 3)
+    if end == -1:
+        return content
+    return content[end + 4:].lstrip('\n')
+
+
+def _remove_frontmatter_fields(content: str, fields: list) -> str:
+    """Remove specific fields from YAML frontmatter."""
+    import re as _re
+    for field in fields:
+        content = _re.sub(
+            rf'^{_re.escape(field)}:.*\n', '', content, count=1, flags=_re.MULTILINE,
+        )
+    return content
+
+
+def sync_agents_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+):
+    """Generate agent files for a specific provider.
+
+    Claude:    .claude/agents/<role>.md   — full frontmatter, all fields
+    Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
+    Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
+    """
+    pc = PROVIDER_CONFIG.get(provider)
+    if not pc:
+        log.warn(f"Unknown provider '{provider}' — skipping agent sync")
+        return
+
+    platforms = config.get('platforms', [])
+    overrides, _ = collect_sources(agent_meta_root, platforms)
+    target_dir = project_root / pc['agents_dir']
+
+    allowed_roles = set(config['roles']) if 'roles' in config else None
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    expected_filenames: set = set()
+    project_name = config['project']['name']
+
+    for role, source_path in overrides.items():
+        filename = target_filename(role)
+        if not filename:
+            if provider == 'Claude':
+                log.skip(str(source_path.name), 'role not in ROLE_MAP')
+            continue
+
+        if allowed_roles is not None and role not in allowed_roles:
+            if provider == 'Claude':
+                rel = (str(target_dir / filename)
+                       .replace(str(project_root) + '/', '')
+                       .replace(str(project_root) + chr(92), ""))
+                log.skip(rel, f"role '{role}' not in config['roles']")
+            continue
+
+        expected_filenames.add(filename)
+        target_path = target_dir / filename
+        content = source_path.read_text(encoding='utf-8')
+
+        # Composition mode
+        extends_base = extract_frontmatter_field(content, 'extends')
+        if extends_base:
+            base_path = agent_meta_root / AGENTS_DIR / extends_base
+            content = compose_agent(base_path, content, log)
+            if provider == 'Claude':
+                log.info(
+                    str(target_path.relative_to(project_root)),
+                    f'composed from {extends_base} + {source_path.name}',
+                )
+
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        source_version = extract_frontmatter_field(content, 'version')
+        template_description = extract_frontmatter_field(content, 'description')
+        description = (template_description or f'Agent for {project_name}.')
+        description = description.replace('{{PROJECT_NAME}}', project_name)
+        content = substitute(content, variables, rel_source, log)
+        name = Path(filename).stem
+        layer = source_path.parts[-2]
+        source_label = f'{layer}/{source_path.name}'
+        generated_from = f'{source_label}@{source_version}' if source_version else source_label
+
+        if provider == 'Continue':
+            # Continue agents: minimal frontmatter (name + description only)
+            # alwaysApply: false — agent is invoked by name, not auto-loaded
+            fm = f"---\nname: {name}\ndescription: \"{description}\"\nalwaysApply: false\n---\n"
+            body = _strip_frontmatter(content)
+            body = _strip_claude_specific_lines(body)
+            content = fm + body
+        else:
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
+
+            if provider == 'Claude':
+                model = resolve_model(role, config, agent_meta_root)
+                content = inject_model_field(content, model)
+                if model:
+                    src = 'project override' if role in config.get('model-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+
+                memory = resolve_memory(role, config, agent_meta_root)
+                content = inject_memory_field(content, memory)
+                if memory:
+                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+
+                permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+                content = inject_permission_mode_field(content, permission_mode)
+                if permission_mode:
+                    src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+
+            elif provider == 'Gemini':
+                # Gemini: model only; strip memory and permissionMode
+                model = resolve_model(role, config, agent_meta_root)
+                content = inject_model_field(content, model)
+                content = _remove_frontmatter_fields(content, ['memory', 'permissionMode'])
+
+        rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)
+        if not dry_run:
+            target_path.write_text(content, encoding='utf-8')
+
+    # External skill filenames are always in .claude/agents/ (Claude only)
+    if provider == 'Claude':
+        ext_config = load_external_skills_config(agent_meta_root)
+        project_skills = config.get('external-skills', {})
+        for skill_name, skill_cfg in ext_config.get('skills', {}).items():
+            if _skill_is_active(skill_name, skill_cfg, project_skills):
+                ext_role = skill_cfg.get('role', skill_name)
+                expected_filenames.add(f'{ext_role}.md')
+
+    # Remove stale agent files
+    if target_dir.exists():
+        managed_index = target_dir / '.agent-meta-managed'
+        previously_managed: set = set()
+        if managed_index.exists():
+            for line in managed_index.read_text(encoding='utf-8').splitlines():
+                if line.strip():
+                    previously_managed.add(line.strip())
+
+        for existing_file in sorted(target_dir.glob('*.md')):
+            if existing_file.name not in expected_filenames:
+                if not managed_index.exists() or existing_file.name in previously_managed:
+                    log.action('DELETE', str(existing_file.relative_to(project_root)),
+                               'role removed from config')
+                    if not dry_run:
+                        existing_file.unlink()
+
+        if not dry_run and expected_filenames:
+            managed_index.write_text(
+                '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
+            )
+
+
+def _strip_claude_specific_lines(content: str) -> str:
+    """Remove Claude Code-specific lines that are meaningless in other providers.
+
+    Currently strips:
+    - Extension-Hook lines: > **Extension:** Falls `.claude/3-project/...` existiert → ...
+    - Read-Tool instructions referencing .claude/ paths
+    """
+    lines = content.splitlines(keepends=True)
+    out = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("> **Extension:**") and ".claude/3-project/" in stripped:
+            continue
+        out.append(line)
+    return "".join(out)
+
+
+def _make_slim_body(content: str) -> str:
+    """Reduce agent body to a compact prompt-friendly version.
+
+    Keeps: role description, active DoD table, core workflow steps, Don'ts.
+    Strips: extension hooks, verbose sub-sections, examples.
+    """
+    lines = content.splitlines()
+    out = []
+    skip_section = False
+    slim_stop_anchors = {
+        "## Workflow",
+        "## Workflows",
+        "## Schritt-für-Schritt",
+        "## Beispiele",
+        "## Beispiel",
+        "## Anhang",
+    }
+    keep_sections = {
+        "## Don'ts",
+        "## Donts",
+        "## Don",
+        "## Kernregeln",
+        "## Aktive DoD",
+        "## DoD",
+    }
+
+    for line in lines:
+        stripped = line.strip()
+        # Skip extension-hook lines (Claude-specific)
+        if stripped.startswith("> **Extension:**"):
+            continue
+        # Detect section changes
+        if stripped.startswith("## "):
+            skip_section = stripped in slim_stop_anchors
+        if not skip_section:
+            out.append(line)
+
+    # Cap at ~80 lines for slim mode
+    if len(out) > 80:
+        out = out[:80]
+        out.append("\n\n*[Prompt truncated — use agent mode for full context]*")
+
+    return "\n".join(out)
+
+
+def sync_prompts_for_continue(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Generate .continue/prompts/<role>.md as invokable slash-commands.
+
+    Controlled by provider-options.Continue:
+        generate-prompts: true          # enable (default: false)
+        prompt-mode: "full" | "slim"    # full = complete agent body (default)
+                                        # slim = compact role + core rules only
+
+    Works with any local LLM — no tool calling required.
+    Slash-commands: /developer, /git, /orchestrator, ...
+    """
+    opts = resolve_provider_options(config, "Continue")
+    if not opts.get("generate-prompts", False):
+        return
+
+    prompt_mode = opts.get("prompt-mode", "full")
+    platforms = config.get("platforms", [])
+    overrides, _ = collect_sources(agent_meta_root, platforms)
+    allowed_roles: set | None = set(config["roles"]) if "roles" in config else None
+
+    prompts_dir = project_root / ".continue" / "prompts"
+    if not dry_run:
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+
+    expected: set[str] = set()
+
+    for role, source_path in overrides.items():
+        filename = target_filename(role)
+        if not filename:
+            continue
+        if allowed_roles is not None and role not in allowed_roles:
+            continue
+
+        expected.add(filename)
+        target_path = prompts_dir / filename
+        content = source_path.read_text(encoding="utf-8")
+
+        # Composition
+        extends_base = extract_frontmatter_field(content, "extends")
+        if extends_base:
+            base_path = agent_meta_root / AGENTS_DIR / extends_base
+            content = compose_agent(base_path, content, log)
+
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        content = substitute(content, variables, rel_source, log)
+
+        template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
+        template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
+
+        # Strip original frontmatter, optionally slim the body
+        body = _strip_frontmatter(content)
+        body = _strip_claude_specific_lines(body)
+        if prompt_mode == "slim":
+            body = _make_slim_body(body)
+
+        # Build Continue prompt frontmatter
+        fm = (
+            f"---\n"
+            f"name: {role}\n"
+            f'description: "{template_description}"\n'
+            f"invokable: true\n"
+            f"---\n"
+        )
+        final = fm + body
+
+        layer = source_path.parts[-2]
+        log.action("WRITE", str(target_path.relative_to(project_root)),
+                   f"{layer}/{source_path.name} [prompt/{prompt_mode}]")
+        if not dry_run:
+            target_path.write_text(final, encoding="utf-8")
+
+    # Stale cleanup
+    managed_index = prompts_dir / ".agent-meta-managed"
+    previously_managed: set[str] = set()
+    if managed_index.exists():
+        for line in managed_index.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                previously_managed.add(line.strip())
+
+    if prompts_dir.exists():
+        for existing_file in sorted(prompts_dir.glob("*.md")):
+            if existing_file.name not in expected:
+                if not managed_index.exists() or existing_file.name in previously_managed:
+                    log.action("DELETE", str(existing_file.relative_to(project_root)),
+                               "role removed from config")
+                    if not dry_run:
+                        existing_file.unlink()
+
+    if not dry_run and expected:
+        managed_index.write_text("\n".join(sorted(expected)) + "\n", encoding="utf-8")
+
+
 def sync_snippets(
     agent_meta_root: Path,
     project_root: Path,
@@ -1138,6 +1549,73 @@ def sync_rules(
     # Update managed index
     if not dry_run and now_managed:
         managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+
+
+SPEECH_RULE_FILENAME = "speech-mode.md"
+SPEECH_DIR = "speech"
+
+
+def sync_speech_mode(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy speech/<mode>.md to .claude/rules/speech-mode.md.
+
+    - 'full' (default): removes any existing speech-mode rule (no rule = default behavior).
+    - Any other mode: copies speech/<mode>.md as .claude/rules/speech-mode.md.
+
+    The rule is tracked in .claude/rules/.agent-meta-managed so stale entries are
+    cleaned up by sync_rules on the next run. We also handle it directly here for
+    the 'full' -> 'full' no-op and 'full' -> remove transition.
+    """
+    mode = config.get("speech-mode", "full")
+    target_dir = project_root / CLAUDE_RULES_DIR
+    target_path = target_dir / SPEECH_RULE_FILENAME
+    managed_index_path = target_dir / ".agent-meta-managed"
+
+    if mode == "full":
+        # Remove any previously generated speech-mode rule
+        if target_path.exists():
+            log.action("DELETE", str(target_path.relative_to(project_root)),
+                       "speech-mode is 'full' — no rule needed")
+            if not dry_run:
+                target_path.unlink()
+        else:
+            log.skip(str(target_path.relative_to(project_root)),
+                     "speech-mode is 'full' — no rule needed")
+        # Remove from managed index if present
+        if not dry_run and managed_index_path.exists():
+            lines = [l for l in managed_index_path.read_text(encoding="utf-8").splitlines()
+                     if l.strip() and l.strip() != SPEECH_RULE_FILENAME]
+            managed_index_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+        return
+
+    source_path = agent_meta_root / SPEECH_DIR / f"{mode}.md"
+    if not source_path.exists():
+        log.warn(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
+        return
+
+    source_content = source_path.read_text(encoding="utf-8")
+    log.action("COPY", str(target_path.relative_to(project_root)),
+               f"speech/{mode}.md")
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(source_content, encoding="utf-8")
+
+        # Add to managed index so sync_rules stale-cleanup knows about it
+        currently_managed: list[str] = []
+        if managed_index_path.exists():
+            currently_managed = [l.strip() for l in
+                                  managed_index_path.read_text(encoding="utf-8").splitlines()
+                                  if l.strip()]
+        if SPEECH_RULE_FILENAME not in currently_managed:
+            currently_managed.append(SPEECH_RULE_FILENAME)
+            managed_index_path.write_text("\n".join(sorted(currently_managed)) + "\n",
+                                          encoding="utf-8")
 
 
 def create_rule(
@@ -1865,6 +2343,150 @@ def sync_claude_md_managed(
             target_path.write_text(new_content, encoding="utf-8")
 
 
+
+def sync_context_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+):
+    """Create or update the context file for a given provider.
+
+    Claude:   CLAUDE.md - managed block updated on every sync
+    Gemini:   .gemini/GEMINI.md - created once from template; managed block updated
+    Continue: .continue/config.yaml - skeleton, created once (never overwritten)
+    """
+    pc = PROVIDER_CONFIG.get(provider)
+    if not pc:
+        return
+
+    if provider == "Claude":
+        sync_claude_md_managed(project_root, variables, log, dry_run)
+
+    elif provider == "Gemini":
+        context_file = pc["context_file"]
+        if context_file is None:
+            return
+        target_path = project_root / context_file
+        template_name = pc["context_template"]
+        template_path = agent_meta_root / template_name if template_name else None
+
+        if not target_path.exists():
+            if template_path and template_path.exists():
+                gcontent = template_path.read_text(encoding="utf-8")
+                gcontent = substitute(gcontent, variables, template_name, log)
+                log.action("INIT", str(target_path.relative_to(project_root)), template_name)
+            else:
+                project_name = config["project"]["name"]
+                gcontent = (
+                    f"# {project_name}\n\n"
+                    "<!-- agent-meta:managed-begin -->\n"
+                    "<!-- agent-meta:managed-end -->\n\n"
+                    "## Agents\n\n"
+                    f"Agent files are in .gemini/agents/ (use @agent-name).\n"
+                )
+                log.action("INIT", str(target_path.relative_to(project_root)),
+                           "minimal fallback (GEMINI.project-template.md not found)")
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(gcontent, encoding="utf-8")
+        else:
+            existing = target_path.read_text(encoding="utf-8")
+            managed_pattern = re.compile(
+                r"<!--\s*agent-meta:managed-begin\s*-->"
+                r".*?<!--\s*agent-meta:managed-end\s*-->",
+                re.DOTALL,
+            )
+            if managed_pattern.search(existing):
+                new_managed = substitute(CLAUDE_MD_MANAGED_TEMPLATE, variables,
+                                         str(target_path.relative_to(project_root)), log)
+                new_content = managed_pattern.sub(new_managed, existing, count=1)
+                if new_content != existing:
+                    log.action("UPDATE", str(target_path.relative_to(project_root)),
+                               "managed block")
+                    if not dry_run:
+                        target_path.write_text(new_content, encoding="utf-8")
+                else:
+                    log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
+
+    elif provider == "Continue":
+        # 1. .continue/rules/project-context.md — created once from template; managed block updated
+        context_file = pc["context_file"]
+        if context_file:
+            ctx_path = project_root / context_file
+            template_path = agent_meta_root / pc["context_template"]
+            if not ctx_path.exists():
+                if template_path.exists():
+                    ccontent = substitute(
+                        template_path.read_text(encoding="utf-8"),
+                        variables, pc["context_template"], log,
+                    )
+                else:
+                    ccontent = (
+                        f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"
+                        f"{variables.get('PROJECT_CONTEXT', '')}\n\n"
+                        "<!-- agent-meta:managed-begin -->\n"
+                        "<!-- agent-meta:managed-end -->\n\n"
+                        "## Agent Rules\n\n"
+                        "Agent context files are in `.continue/rules/`.\n"
+                        "Continue loads all Markdown files in this directory automatically as context.\n"
+                    )
+                    log.action("INIT", str(ctx_path.relative_to(project_root)),
+                               "minimal fallback (CONTINUE.project-template.md not found)")
+                log.action("INIT", str(ctx_path.relative_to(project_root)),
+                           pc["context_template"])
+                if not dry_run:
+                    ctx_path.parent.mkdir(parents=True, exist_ok=True)
+                    ctx_path.write_text(ccontent, encoding="utf-8")
+            else:
+                # Update managed block on every sync
+                existing = ctx_path.read_text(encoding="utf-8")
+                new_managed = render_managed_block(variables, context_file, log)
+                updated = update_managed_block(existing, new_managed)
+                if updated != existing:
+                    log.action("UPDATE", str(ctx_path.relative_to(project_root)),
+                               "managed block refreshed")
+                    if not dry_run:
+                        ctx_path.write_text(updated, encoding="utf-8")
+                else:
+                    log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
+
+        # 2. .continue/config.yaml — skeleton, created once (never overwritten)
+        settings_file = pc["settings_file"]
+        settings_path = project_root / settings_file
+        if settings_path.exists():
+            log.skip(str(settings_path.relative_to(project_root)),
+                     "already exists - not overwritten")
+        else:
+            settings_template_rel = pc.get("settings_template")
+            if settings_template_rel:
+                settings_template_path = agent_meta_root / settings_template_rel
+            else:
+                settings_template_path = None
+
+            if settings_template_path and settings_template_path.exists():
+                yaml_content = settings_template_path.read_text(encoding="utf-8")
+                source_label = settings_template_rel
+            else:
+                yaml_content = (
+                    "# Continue configuration\n"
+                    "# See https://docs.continue.dev for full documentation\n"
+                    "\n"
+                    "# Agents are in .continue/agents/ - managed by agent-meta\n"
+                    "# Project rules are in .continue/rules/ - managed by agent-meta\n"
+                )
+                source_label = "minimal fallback"
+                if settings_template_rel:
+                    log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+            log.action("INIT", str(settings_path.relative_to(project_root)),
+                       source_label)
+            if not dry_run:
+                settings_path.parent.mkdir(parents=True, exist_ok=True)
+                settings_path.write_text(yaml_content, encoding="utf-8")
+
 def init_claude_personal(
     agent_meta_root: Path,
     project_root: Path,
@@ -2155,22 +2777,37 @@ def main():
         create_hook(project_root, args.create_hook, log, args.dry_run)
 
     else:
-        is_claude = variables.get("AI_PROVIDER", "").strip().lower() == "claude"
+        providers = resolve_providers(config)
         mode = "init" if args.init else "sync"
+        log.info("providers", "active: " + ", ".join(providers))
         # Log resolved DoD
         preset_name = config.get("dod-preset", "full")
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+        is_claude = "Claude" in providers
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
             ensure_gitignore_entries(project_root, log, args.dry_run)
-        sync_agents(agent_meta_root, project_root, config, variables, log, args.dry_run)
-        sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
-        sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
+        # Per-provider sync
+        for provider in providers:
+            pc = PROVIDER_CONFIG[provider]
+            log.provider_header(provider)
+            sync_agents_for_provider(agent_meta_root, project_root, config, variables,
+                                     log, args.dry_run, provider)
+            sync_context_for_provider(agent_meta_root, project_root, config, variables,
+                                      log, args.dry_run, provider)
+            if provider == "Continue":
+                sync_prompts_for_continue(agent_meta_root, project_root, config,
+                                          variables, log, args.dry_run)
+            if pc["has_rules"] and provider == "Claude":
+                sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
+                sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
+            if pc["has_hooks"] and provider == "Claude":
+                sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)
@@ -2179,14 +2816,10 @@ def main():
             known_skills = set(ext_config.get("skills", {}).keys())
             for skill_name in config["external-skills"]:
                 if skill_name not in known_skills:
-                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json — skipping")
+                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
-                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer — skipping")
+                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
-        if is_claude:
-            sync_claude_md_managed(project_root, variables, log, args.dry_run)
-        elif (project_root / "CLAUDE.md").exists():
-            log.info("CLAUDE.md", f"managed block update skipped (ai-provider: '{variables.get('AI_PROVIDER', '')}')")
 
     log_path = project_root / LOGFILE
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)

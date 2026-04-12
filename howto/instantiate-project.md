@@ -23,7 +23,7 @@ git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.17.0
+cd .agent-meta && git checkout v0.21.1-beta
 ```
 
 ```bash
@@ -45,8 +45,8 @@ Pflichtfelder:
 ```json
 {
   "$schema": ".agent-meta/agent-meta.schema.json",
-  "agent-meta-version": "0.16.1",
-  "ai-provider": "Claude",
+  "agent-meta-version": "0.21.1-beta",
+  "ai-providers": ["Claude"],
   "platforms": ["sharkord"],
   "roles": ["orchestrator", "developer", "tester", "validator",
             "requirements", "documenter", "git", "release", "docker",
@@ -69,7 +69,7 @@ Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
 ```
 
-Das Script erzeugt beim ersten Aufruf (nur bei `ai-provider: Claude`):
+Das Script erzeugt beim ersten Aufruf (bei aktivem `"Claude"` in `ai-providers`):
 - `CLAUDE.md` — aus Template, wenn noch nicht vorhanden
 - `CLAUDE.personal.md` — persönliche Präferenzen-Template (gitignored, einmalig)
 - `.claude/settings.json` — Team-Permissions Skeleton (einmalig, Hooks werden bei jedem sync gemergt)
@@ -81,9 +81,13 @@ Das Script erzeugt beim ersten Aufruf (nur bei `ai-provider: Claude`):
 - `CLAUDE.md` managed block — wird bei jedem sync automatisch aktualisiert
 - `sync.log` mit Zusammenfassung und Warnungen
 
+Zusätzlich bei weiteren Providern (ohne `--init` nötig — beim ersten normalen sync):
+- `.gemini/GEMINI.md` + `.gemini/agents/*.md` — bei aktivem `"Gemini"` Provider
+- `.continue/rules/project-context.md` + `.continue/agents/*.md` + `.continue/config.yaml` — bei aktivem `"Continue"` Provider
+
 > **managed block in CLAUDE.md:** Der Abschnitt zwischen `<!-- agent-meta:managed-begin -->` und
 > `<!-- agent-meta:managed-end -->` enthält die Agenten-Tabelle und wird bei **jedem normalen sync**
-> automatisch aktualisiert (nur bei `ai-provider: Claude`). Alles außerhalb ist handgeschrieben und wird nie überschrieben.
+> automatisch aktualisiert (nur wenn `"Claude"` in `ai-providers`). Alles außerhalb ist handgeschrieben und wird nie überschrieben.
 
 ### Schritt 4: sync.log prüfen
 
@@ -126,6 +130,28 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/feature.md` | `1-generic/feature.md` |
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
+
+---
+
+## Multi-Provider
+
+Seit v0.21.0 kann `sync.py` gleichzeitig Agenten-Dateien für mehrere AI-Provider erzeugen.
+Konfiguration in `agent-meta.config.json`:
+
+```json
+"ai-providers": ["Claude", "Continue"]
+```
+
+| Provider | Agents-Verzeichnis | Kontext-Datei |
+|----------|--------------------|---------------|
+| `Claude` | `.claude/agents/` | `CLAUDE.md` |
+| `Gemini` | `.gemini/agents/` | `.gemini/GEMINI.md` |
+| `Continue` | `.continue/agents/` | `.continue/rules/project-context.md` |
+
+Das Legacy-Feld `"ai-provider": "Claude"` (String) wird weiterhin unterstützt — kein Breaking Change.
+
+> **Vollständige Dokumentation:** [howto/multi-provider.md](multi-provider.md) — Provider-Details,
+> Frontmatter-Unterschiede, Sync-Verhalten, Continue Best Practices, Troubleshooting.
 
 ---
 
@@ -237,8 +263,8 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 
 ## Checkliste: Projekt vollständig eingerichtet?
 
-- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.17.0` oder neuer)
-- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-provider: Claude`, `$schema`)
+- [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.21.1-beta` oder neuer)
+- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-providers`, `$schema`)
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
@@ -258,4 +284,6 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 - [ ] `.claude/agents/feature.md` vorhanden
 - [ ] `.claude/agents/agent-meta-manager.md` vorhanden
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
+- [ ] Bei `"Gemini"` in `ai-providers`: `.gemini/GEMINI.md` vorhanden, `.gemini/agents/` befüllt
+- [ ] Bei `"Continue"` in `ai-providers`: `.continue/rules/project-context.md` vorhanden, `.continue/agents/` befüllt
 - [ ] `docs/REQUIREMENTS.md` initialisiert

@@ -46,11 +46,11 @@ agent-meta/
 <projekt>/
   .agent-meta/               ← Git Submodule (agent-meta Repository)
   agent-meta.config.json     ← Sync-Konfiguration (manuell gepflegt, versioniert)
-  CLAUDE.md                  ← bei ai-provider: Claude automatisch erstellt, danach manuell gepflegt
+  CLAUDE.md                  ← bei "Claude" in ai-providers automatisch erstellt, danach manuell gepflegt
                                ├─ managed block (auto-aktualisiert bei jedem sync)
                                └─ handgeschriebener Rest (nie überschrieben)
   CLAUDE.personal.md         ← persönliche Präferenzen (gitignored, nie committen)
-  .claude/
+  .claude/                   ← Claude Code (immer wenn "Claude" in ai-providers)
     settings.json            ← Team-Permissions (committed ins Repo)
     settings.local.json      ← persönliche Permissions (gitignored, nie committen)
     agents/                  ← vollständig generiert, nie manuell editieren
@@ -67,6 +67,15 @@ agent-meta/
     3-project/               ← handgeschrieben, nie von sync.py überschrieben
       <prefix>-<rolle>-ext.md  ← Extension (additiv geladen)
       <rolle>.md               ← Override (ersetzt Agenten komplett)
+  .gemini/                   ← Gemini CLI (nur wenn "Gemini" in ai-providers)
+    GEMINI.md                ← Kontext-Datei mit managed block
+    agents/                  ← generierte Agenten (kein permissionMode/memory)
+    settings.json            ← Skeleton (einmalig angelegt)
+  .continue/                 ← Continue (nur wenn "Continue" in ai-providers)
+    rules/
+      project-context.md     ← Projekt-Kontext als Rule (alwaysApply: true, managed block)
+    agents/                  ← Custom Agents (alwaysApply: false, explizit aufgerufen)
+    config.yaml              ← Skeleton (einmalig angelegt, nie überschrieben)
   sync.log                   ← Protokoll des letzten Sync-Laufs (gitignore empfohlen)
 ```
 
@@ -89,8 +98,8 @@ agent-meta/
 |-------|-------------|
 | agent-meta Einbindung | **Git Submodule** unter `.agent-meta/` |
 | Script-Aufruf | Immer aus agent-meta: `py .agent-meta/scripts/sync.py` |
-| CLAUDE.md Erstellung | Automatisch wenn `ai-provider: Claude` und Datei fehlt |
-| CLAUDE.md managed block | Automatisch bei jedem sync aktualisiert (nur bei `ai-provider: Claude`) |
+| CLAUDE.md Erstellung | Automatisch wenn `"Claude"` in `ai-providers` und Datei fehlt |
+| CLAUDE.md managed block | Automatisch bei jedem sync aktualisiert (nur wenn `"Claude"` in `ai-providers`) |
 | Fehlende Variablen | **Warning + weitermachen** — Platzhalter bleibt sichtbar |
 | Agenten-Dateinamen | **Generisch** — kein Projekt-Prefix: `developer.md`, `tester.md` |
 
@@ -105,7 +114,7 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
   "$schema": ".agent-meta/agent-meta.schema.json",
   "agent-meta-version": "0.17.0",
 
-  "ai-provider": "Claude",
+  "ai-providers": ["Claude"],
 
   "platforms": ["sharkord"],
 
@@ -136,7 +145,8 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 |------|-----------|
 | `$schema` | Pfad zu `agent-meta.schema.json` — aktiviert IDE-Validierung (empfohlen) |
 | `agent-meta-version` | Welches Release von agent-meta genutzt wird |
-| `ai-provider` | AI-Provider: `"Claude"` aktiviert CLAUDE.md auto-init, managed block, settings.json + .gitignore |
+| `ai-providers` | Array der aktiven Provider: `["Claude"]`, `["Claude", "Gemini", "Continue"]` etc. |
+| `ai-provider` | Legacy (String) — weiterhin unterstützt; `"Claude"` aktiviert CLAUDE.md auto-init, managed block, settings.json + .gitignore |
 | `platforms` | Aktive Plattformen — bestimmt welche `2-platform/<plattform>-*.md` einbezogen werden |
 | `roles` | Whitelist der zu generierenden Rollen — fehlt der Key, werden alle Rollen generiert |
 | `project.name` | Vollständiger Projektname |
@@ -186,21 +196,30 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 
 | Datei / Schicht | Verhalten | Wann |
 |-----------------|-----------|------|
-| `.claude/agents/*.md` | **Immer überschreiben** + veraltete löschen | Jeder Sync |
-| `.claude/rules/*.md` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync |
-| `.claude/hooks/*.sh` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync |
-| `.claude/settings.json` (Hooks) | **Hooks mergen** — managed Hooks aktualisieren | Jeder Sync |
-| `CLAUDE.md` managed block | **Immer aktualisieren** | Jeder Sync |
+| `.claude/agents/*.md` | **Immer überschreiben** + veraltete löschen | Jeder Sync (wenn "Claude" aktiv) |
+| `.claude/rules/*.md` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync (wenn "Claude" aktiv) |
+| `.claude/hooks/*.sh` (verwaltet) | **Immer überschreiben** + stale löschen | Jeder Sync (wenn "Claude" aktiv) |
+| `.claude/settings.json` (Hooks) | **Hooks mergen** — managed Hooks aktualisieren | Jeder Sync (wenn "Claude" aktiv) |
+| `CLAUDE.md` managed block | **Immer aktualisieren** | Jeder Sync (wenn "Claude" aktiv) |
+| `.gemini/agents/*.md` | **Immer überschreiben** + veraltete löschen | Jeder Sync (wenn "Gemini" aktiv) |
+| `.gemini/GEMINI.md` managed block | **Immer aktualisieren** | Jeder Sync (wenn "Gemini" aktiv) |
+| `.continue/agents/*.md` | **Immer überschreiben** + veraltete löschen | Jeder Sync (wenn "Continue" aktiv) |
+| `.continue/rules/project-context.md` managed block | **Immer aktualisieren** | Jeder Sync (wenn "Continue" aktiv) |
 | `.gitignore` | **Fehlende Einträge ergänzen** | Jeder Sync |
 | `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
 | `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
 | `.claude/settings.json` (Skeleton) | **Einmalig anlegen** | Einmalig, wenn nicht vorhanden |
 | `.claude/settings.local.json` | **Einmalig anlegen** (Skeleton, gitignored) | Einmalig, wenn nicht vorhanden |
+| `.gemini/GEMINI.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `.gemini/settings.json` | **Einmalig anlegen** (Skeleton) | Einmalig, wenn nicht vorhanden |
+| `.continue/rules/project-context.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `.continue/config.yaml` | **Einmalig anlegen** (Skeleton) | Einmalig, wenn nicht vorhanden |
 | `.claude/3-project/*-ext.md` | **Einmalig anlegen** via `--create-ext` | Manuell angefordert |
 | `.claude/rules/*.md` (projekt-eigen) | **Nie anfassen** — nicht in `.agent-meta-managed` | — |
 | `sync.log` | Überschreiben | Jeder Lauf |
 
-> Einmalige Aktionen (CLAUDE.md, settings.json, settings.local.json, CLAUDE.personal.md) sind nur bei `ai-provider: Claude` aktiv.
+> Einmalige Aktionen für Claude (CLAUDE.md, settings.json, CLAUDE.personal.md) sind nur aktiv wenn `"Claude"` in `ai-providers` steht.
+> Für Gemini und Continue: Kontext-Datei + Settings werden beim ersten sync ohne `--init` angelegt.
 
 ### CLAUDE.md managed block
 
@@ -221,7 +240,7 @@ Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ers
 | `{{AGENT_META_VERSION}}` | Version aus `VERSION`-Datei |
 | `{{AGENT_META_DATE}}` | Aktuelles Datum |
 | `{{AGENT_HINTS}}` | Agenten-Tabelle aus `hint`-Feldern der Templates |
-| `{{AI_PROVIDER}}` | Wert aus `ai-provider` config-Feld |
+| `{{AI_PROVIDER}}` | Aktive Provider aus `ai-providers` (kommagetrennt) |
 | `{{PREFIX}}` | Aus `project.prefix` |
 
 Unbekannte Variablen (kein Wert in Config):
@@ -241,12 +260,13 @@ Nach jedem Lauf wird `sync.log` im Projekt-Root geschrieben (überschreibt den v
 agent-meta sync — 2026-04-07 10:00:00
 ============================================================
 Config:    agent-meta.config.json
-Source:    .agent-meta/ (v0.17.0)
+Source:    .agent-meta/ (v0.21.1-beta)
 Mode:      sync
 Platforms: sharkord
 
 ACTIONS
 -------
+[PROVIDER] Claude
 [WRITE   ]  .claude/agents/orchestrator.md                 (1-generic/orchestrator.md)
 [WRITE   ]  .claude/agents/developer.md                    (1-generic/developer.md)
 [WRITE   ]  .claude/agents/feature.md                      (1-generic/feature.md)
@@ -256,6 +276,11 @@ ACTIONS
 [COPY    ]  .claude/rules/issue-lifecycle.md               (rules/1-generic/issue-lifecycle.md)
 [COPY    ]  .claude/hooks/dod-push-check.sh                (hooks/1-generic/dod-push-check.sh)
 [UPDATE  ]  CLAUDE.md                                      (managed block)
+
+[PROVIDER] Continue
+[WRITE   ]  .continue/agents/orchestrator.md               (1-generic/orchestrator.md)
+[WRITE   ]  .continue/agents/developer.md                  (1-generic/developer.md)
+[UPDATE  ]  .continue/rules/project-context.md             (managed block)
 
 SKIPPED
 -------
@@ -273,9 +298,12 @@ WARNINGS
 
 SUMMARY
 -------
-9 action(s)  |  2 skipped  |  0 warning(s)
+12 action(s)  |  2 skipped  |  0 warning(s)
 Logfile: sync.log
 ```
+
+> **Multi-Provider Dokumentation:** [howto/multi-provider.md](multi-provider.md) — vollständige Beschreibung
+> aller Provider (Claude, Gemini, Continue), Frontmatter-Unterschiede, Stale-Tracking, Troubleshooting.
 
 ---
 
@@ -285,18 +313,18 @@ Logfile: sync.log
 
 ```bash
 # 1. Submodul auf neue Version bringen
-cd .agent-meta && git fetch && git checkout v0.17.0 && cd ..
+cd .agent-meta && git fetch && git checkout v0.21.1-beta && cd ..
 git add .agent-meta
 
 # 2. Version in Config aktualisieren
-# agent-meta.config.json: "agent-meta-version": "0.17.0"
+# agent-meta.config.json: "agent-meta-version": "0.21.1-beta"
 
 # 3. Sync ausführen — alle Agenten, Rules und Hooks werden neu generiert
 py .agent-meta/scripts/sync.py --config agent-meta.config.json
 
 # 4. Ergebnis prüfen + committen
-git add .claude/ agent-meta.config.json CLAUDE.md
-git commit -m "chore: upgrade agent-meta to v0.17.0"
+git add .claude/ .gemini/ .continue/ agent-meta.config.json CLAUDE.md
+git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 ```
 
 ### Neue Variable ergänzen

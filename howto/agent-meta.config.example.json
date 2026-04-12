@@ -1,15 +1,27 @@
 {
+  "$schema": "../agent-meta.schema.json",
   "_comment": "Kopiere diese Datei als agent-meta.config.json ins Projekt-Root und befülle alle Werte. Tipp: Gib howto/first-steps.md deinem AI-Assistenten für eine geführte Einrichtung.",
 
-  "agent-meta-version": "0.14.2",
+  "agent-meta-version": "0.20.0",
 
-  "_comment_provider": "AI provider: 'Claude' enables automatic CLAUDE.md generation and managed block updates. Other values (e.g. 'GitHub') disable CLAUDE.md handling.",
+  "_comment_providers": "Multi-Provider: Mehrere AI-Assistenten gleichzeitig. Unterstützt Claude, Gemini, Continue.",
+  "ai-providers": ["Claude"],
+
+  "_comment_ai_provider_legacy": "Deprecated: Verwende ai-providers (Array). Weiterhin unterstützt für Backward-Compatibility.",
   "ai-provider": "Claude",
 
   "platforms": ["sharkord"],
 
   "_comment_dod_preset": "DoD-Qualitätsprofil: 'full' (alle Checks), 'standard' (Tests ja, REQ-IDs nein), 'rapid-prototyping' (alles aus). Einzelne Overrides via 'dod' Block.",
-  "dod-preset": "full",
+  "dod-preset": "standard",
+
+  "_comment_dod": "Optional: Einzelne DoD-Kriterien überschreiben. Fehlende Keys erben vom dod-preset.",
+  "dod": {
+    "req-traceability": false,
+    "tests-required":   true,
+    "codebase-overview": false,
+    "security-audit":   false
+  },
 
   "_comment_roles": "Optional: Whitelist der zu generierenden Rollen. Fehlt dieser Key → alle Rollen werden generiert.",
   "roles": [
@@ -28,15 +40,54 @@
     "agent-meta-manager"
   ],
 
+  "_comment_model_overrides": "Optional: Modell pro Rolle überschreiben. Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs (z.B. 'claude-opus-4-6').",
+  "model-overrides": {
+    "git":           "haiku",
+    "meta-feedback": "haiku",
+    "developer":     "sonnet"
+  },
+
+  "_comment_memory_overrides": "Optional: Memory-Scope pro Rolle überschreiben. Scopes: 'project' (in Git), 'local' (gitignored), 'user' (global).",
+  "memory-overrides": {
+    "validator":  "project",
+    "documenter": "project"
+  },
+
+  "_comment_permission_mode_overrides": "Optional: Berechtigungsmodus pro Rolle überschreiben. Modi: 'default', 'acceptEdits', 'bypassPermissions', 'plan'.",
+  "permission-mode-overrides": {
+    "validator": "plan"
+  },
+
+  "_comment_max_parallel_agents": "Optional: Maximale Anzahl parallel laufender Agenten (1–5). Default: 2.",
+  "max-parallel-agents": 2,
+
+  "_comment_speech_mode": "Optional: Kommunikationsstil aller Agenten. Wird als .claude/rules/speech-mode.md generiert. 'full' (Default) = kein Output. 'short' = Fakten only. 'childish' = kindgerecht. 'caveman' = Höhlenmensch.",
+  "speech-mode": "full",
+
+  "_comment_hooks": "Optional: Hooks aktivieren. Two-Gate: Script muss existieren UND enabled:true gesetzt sein.",
+  "hooks": {
+    "dod-push-check": { "enabled": false }
+  },
+
   "project": {
     "name":   "mein-projekt",
     "prefix": "mp",
     "short":  "mein-projekt"
   },
 
+  "_comment_provider_options": "Optional: Provider-spezifische Optionen. Jeder Key ist ein Provider-Name (Claude, Gemini, Continue).",
+  "provider-options": {
+    "Claude": {},
+    "Gemini": {},
+    "Continue": {
+      "generate-prompts": false,
+      "prompt-mode": "full"
+    }
+  },
+
   "_comment_external_skills": "Optional: Externe Skills aktivieren. Nur Skills mit approved:true in external-skills.config.json können aktiviert werden.",
+  "_comment_external_skills_usage": "skill-name → { enabled: true/false }. Skill muss in external-skills.config.json approved:true haben.",
   "external-skills": {
-    "_comment": "skill-name → { enabled: true/false }. Skill muss in external-skills.config.json approved:true haben.",
     "home-organization": { "enabled": false },
     "opengrid-openscad": { "enabled": false }
   },

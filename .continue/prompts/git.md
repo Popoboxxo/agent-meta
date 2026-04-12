@@ -1,22 +1,10 @@
 ---
 name: git
-model: haiku
-version: "2.0.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-generated-from: "1-generic/git.md@2.0.0"
-hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
-tools:
-  - Bash
-  - Read
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+invokable: true
 ---
-
 # Git Agent — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-git-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

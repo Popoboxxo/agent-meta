@@ -1,23 +1,10 @@
 ---
 name: developer
-version: "2.0.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
-generated-from: "1-generic/developer.md@2.0.0"
-hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - Agent
-  - TodoWrite
+alwaysApply: false
 ---
-
 # Developer — agent-meta
 
-> **Extension:** Falls `.claude/3-project/am-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
