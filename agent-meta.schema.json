@@ -315,6 +315,12 @@
       "maximum": 5,
       "default": 2
     },
+    "speech-mode": {
+      "type": "string",
+      "description": "Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech.",
+      "enum": ["full", "short", "childish", "caveman"],
+      "default": "full"
+    },
     "hooks": {
       "type": "object",
       "description": "Opt-in hook activation. Scripts are always synced; registration in settings.json requires enabled: true.",

@@ -1551,6 +1551,73 @@ def sync_rules(
         managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
 
 
+SPEECH_RULE_FILENAME = "speech-mode.md"
+SPEECH_DIR = "speech"
+
+
+def sync_speech_mode(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy speech/<mode>.md to .claude/rules/speech-mode.md.
+
+    - 'full' (default): removes any existing speech-mode rule (no rule = default behavior).
+    - Any other mode: copies speech/<mode>.md as .claude/rules/speech-mode.md.
+
+    The rule is tracked in .claude/rules/.agent-meta-managed so stale entries are
+    cleaned up by sync_rules on the next run. We also handle it directly here for
+    the 'full' -> 'full' no-op and 'full' -> remove transition.
+    """
+    mode = config.get("speech-mode", "full")
+    target_dir = project_root / CLAUDE_RULES_DIR
+    target_path = target_dir / SPEECH_RULE_FILENAME
+    managed_index_path = target_dir / ".agent-meta-managed"
+
+    if mode == "full":
+        # Remove any previously generated speech-mode rule
+        if target_path.exists():
+            log.action("DELETE", str(target_path.relative_to(project_root)),
+                       "speech-mode is 'full' — no rule needed")
+            if not dry_run:
+                target_path.unlink()
+        else:
+            log.skip(str(target_path.relative_to(project_root)),
+                     "speech-mode is 'full' — no rule needed")
+        # Remove from managed index if present
+        if not dry_run and managed_index_path.exists():
+            lines = [l for l in managed_index_path.read_text(encoding="utf-8").splitlines()
+                     if l.strip() and l.strip() != SPEECH_RULE_FILENAME]
+            managed_index_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+        return
+
+    source_path = agent_meta_root / SPEECH_DIR / f"{mode}.md"
+    if not source_path.exists():
+        log.warn(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
+        return
+
+    source_content = source_path.read_text(encoding="utf-8")
+    log.action("COPY", str(target_path.relative_to(project_root)),
+               f"speech/{mode}.md")
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(source_content, encoding="utf-8")
+
+        # Add to managed index so sync_rules stale-cleanup knows about it
+        currently_managed: list[str] = []
+        if managed_index_path.exists():
+            currently_managed = [l.strip() for l in
+                                  managed_index_path.read_text(encoding="utf-8").splitlines()
+                                  if l.strip()]
+        if SPEECH_RULE_FILENAME not in currently_managed:
+            currently_managed.append(SPEECH_RULE_FILENAME)
+            managed_index_path.write_text("\n".join(sorted(currently_managed)) + "\n",
+                                          encoding="utf-8")
+
+
 def create_rule(
     project_root: Path,
     name: str,
@@ -2738,6 +2805,7 @@ def main():
                                           variables, log, args.dry_run)
             if pc["has_rules"] and provider == "Claude":
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
+                sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)

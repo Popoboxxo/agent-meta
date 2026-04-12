@@ -161,6 +161,12 @@ agent-meta/
       bun-typescript.md    ← Code-Patterns & Best Practices für TypeScript/Bun
       pytest-python.md     ← Code-Patterns & Best Practices für Python
 
+  speech/
+    full.md              ← Placeholder (kein Output — Default-Verhalten)
+    short.md             ← Fakten-Stil: kein Filler, nur Ergebnisse
+    childish.md          ← Kindgerechter Stil: spielerisch, Tier-/Spielzeug-Analogien
+    caveman.md           ← Höhlenmensch-Stil: kurz, direkt, abgehakt
+
   scripts/
     sync.py              ← Agent-Generator
 ```
@@ -466,6 +472,32 @@ Bei knappem Budget `1` setzen oder teure Rollen via `model-overrides` auf `sonne
 
 Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vollständige
 Delegations-Matrix und parallelisierbare Workflow-Schritte.
+
+---
+
+### `speech-mode` — Kommunikationsstil aller Agenten (optional)
+
+```json
+"speech-mode": "short"
+```
+
+Steuert den Kommunikationsstil aller Agenten. `sync.py` kopiert `speech/<mode>.md` nach
+`.claude/rules/speech-mode.md` — Claude Code lädt diese Rule automatisch in jeden Agenten-Kontext.
+
+| Wert | Verhalten |
+|------|-----------|
+| `"full"` | **Default** — Normales Verhalten, keine Rule wird generiert |
+| `"short"` | Nur Fakten, keine Floskeln, keine Begrüßung/Zusammenfassung, Erklärungen nur auf Nachfrage |
+| `"childish"` | Kindgerecht, spielerisch, Beispiele aus Tierwelt/Spielzeug, Emojis erlaubt |
+| `"caveman"` | Höhlenmensch-Stil: kurz, direkt, abgehakt, keine Konjunktionen |
+
+**Technisch:**
+- `"full"` → keine Rule-Datei (Verhalten unverändert); vorhandene `speech-mode.md` wird entfernt
+- Alle anderen → `speech/<mode>.md` → `.claude/rules/speech-mode.md`
+- Die Rule überschreibt alle anderen Stil-Anweisungen in den Agenten-Templates
+- Gilt automatisch für **alle** Agenten und den Hauptchat — keine Template-Änderungen nötig
+
+**Neue Modi hinzufügen:** Neue Datei `speech/<name>.md` anlegen → Enum in `agent-meta.schema.json` ergänzen.
 
 ---
 
