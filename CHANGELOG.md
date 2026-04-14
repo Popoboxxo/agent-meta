@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0] — 2026-04-14
+
+### Added
+
+- **`--fill-defaults`** — New `sync.py` parameter that writes missing structural config fields
+  (`dod-preset`, `max-parallel-agents`, `speech-mode`, `dod.*`) with their schema defaults
+  into `agent-meta.config.json`. Missing `variables.*` keys are reported as `[WARN]` only —
+  no empty strings written (no sensible default exists for project-specific variables).
+  Supports `--dry-run`. Useful for onboarding new projects or auditing existing configs.
+
+---
+
 ## [0.21.0] — 2026-04-12
 
 ### Added
