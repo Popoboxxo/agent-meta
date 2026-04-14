@@ -187,7 +187,9 @@ class SyncLog:
         self.infos.append(f"{'~' * (len(provider) + 11)}")
 
     def write(self, log_path: Path, config_path: str, source_version: str,
-              mode: str, platforms: list[str], dry_run: bool):
+              mode: str, platforms: list[str], dry_run: bool,
+              providers: list[str] | None = None,
+              speech_mode: str = "full"):
         lines = [
             "=" * 60,
             f"agent-meta sync — {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}",
@@ -196,6 +198,8 @@ class SyncLog:
             f"Source:    .agent-meta/ (v{source_version})",
             f"Mode:      {'DRY-RUN — ' if dry_run else ''}{mode}",
             f"Platforms: {', '.join(platforms) if platforms else '(none)'}",
+            f"Providers: {', '.join(providers) if providers else '(none)'}",
+            f"Speech:    {speech_mode}",
             "",
             "ACTIONS",
             "-------",
@@ -275,6 +279,99 @@ def _validate_config(config: dict, config_path: Path) -> None:
 
 def find_agent_meta_root(script_path: Path) -> Path:
     return script_path.parent.parent
+
+
+# ---------------------------------------------------------------------------
+# fill_defaults — write missing config fields with their schema defaults
+# ---------------------------------------------------------------------------
+
+# Top-level fields with a meaningful default value.
+# dod sub-fields are handled separately via DOD_DEFAULTS.
+_CONFIG_FIELD_DEFAULTS: dict = {
+    "dod-preset": "full",
+    "max-parallel-agents": 2,
+    "speech-mode": "full",
+}
+
+# dod sub-fields with defaults (mirrors DOD_DEFAULTS defined later in the file)
+_DOD_FIELD_DEFAULTS: dict = {
+    "req-traceability": True,
+    "tests-required": True,
+    "codebase-overview": True,
+    "security-audit": False,
+}
+
+
+def _load_schema_variable_keys(agent_meta_root: Path) -> list[str]:
+    """Return the list of known variable keys from agent-meta.schema.json."""
+    schema_path = agent_meta_root / "agent-meta.schema.json"
+    if not schema_path.exists():
+        return []
+    try:
+        with schema_path.open(encoding="utf-8") as f:
+            schema = json.load(f)
+        props = schema.get("properties", {}).get("variables", {}).get("properties", {})
+        return list(props.keys())
+    except Exception:
+        return []
+
+
+def fill_defaults(
+    config_path: Path,
+    agent_meta_root: Path,
+    log: "SyncLog",
+    dry_run: bool,
+) -> None:
+    """Write missing config fields with their default values into agent-meta.config.json.
+
+    Structural fields (dod-preset, max-parallel-agents, speech-mode, dod.*):
+      Written into the config file when absent.
+
+    Variable fields (variables.*):
+      Only reported as [WARN] — no empty strings written (no sensible default).
+    """
+    config = load_config(config_path)
+    changed = False
+    added: list[str] = []
+
+    # --- Top-level structural fields ---
+    for field, default in _CONFIG_FIELD_DEFAULTS.items():
+        if field not in config:
+            config[field] = default
+            added.append(f"{field} = {json.dumps(default)}")
+            changed = True
+
+    # --- dod sub-fields ---
+    dod_block = config.get("dod", {})
+    dod_additions: list[str] = []
+    for field, default in _DOD_FIELD_DEFAULTS.items():
+        if field not in dod_block:
+            dod_block[field] = default
+            dod_additions.append(f"dod.{field} = {json.dumps(default)}")
+            changed = True
+    if dod_additions:
+        config["dod"] = dod_block
+        added.extend(dod_additions)
+
+    # --- Write back if changed ---
+    if changed and not dry_run:
+        with config_path.open("w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+
+    for entry in added:
+        action = "FILL" if not dry_run else "FILL(dry)"
+        log.action(action, str(config_path.name), entry)
+
+    if not changed:
+        log.info("fill-defaults", "all structural fields already set — nothing to write")
+
+    # --- Warn about missing variable keys ---
+    known_vars = _load_schema_variable_keys(agent_meta_root)
+    set_vars = set(config.get("variables", {}).keys())
+    missing_vars = [v for v in known_vars if v not in set_vars]
+    for var in missing_vars:
+        log.warn(f"Variable not set in config: variables.{var}")
 
 
 def read_version(agent_meta_root: Path) -> str:
@@ -2700,6 +2797,11 @@ def main():
                         help="Create .claude/hooks/<NAME>.sh template (never overwrites). "
                              "Enable via agent-meta.config.json: "
                              "\"hooks\": {\"<NAME>\": {\"enabled\": true}}")
+    parser.add_argument("--fill-defaults", action="store_true",
+                        help="Write missing config fields with their default values into "
+                             "agent-meta.config.json. Structural fields (dod-preset, "
+                             "max-parallel-agents, speech-mode, dod.*) are written when absent. "
+                             "Missing variable keys are reported as warnings only.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
 
@@ -2754,7 +2856,11 @@ def main():
     for w in pre_warnings:
         log.warn(w)
 
-    if args.only_variables:
+    if args.fill_defaults:
+        mode = "fill-defaults"
+        fill_defaults(config_path, agent_meta_root, log, args.dry_run)
+
+    elif args.only_variables:
         mode = "only-variables"
         only_variables(project_root, variables, log, args.dry_run)
 
@@ -2822,7 +2928,10 @@ def main():
         sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
 
     log_path = project_root / LOGFILE
-    log.write(log_path, args.config, source_version, mode, platforms, args.dry_run)
+    _providers = resolve_providers(config) if config else []
+    _speech = config.get("speech-mode", "full") if config else "full"
+    log.write(log_path, args.config, source_version, mode, platforms, args.dry_run,
+              providers=_providers, speech_mode=_speech)
 
 
 if __name__ == "__main__":

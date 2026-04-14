@@ -46,7 +46,7 @@
   },
 
   "_comment_speech_mode": "Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman'",
-  "speech-mode": "full",
+  "speech-mode": "caveman",
 
   "variables": {
 
