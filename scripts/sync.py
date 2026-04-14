@@ -342,16 +342,23 @@ def fill_defaults(
             changed = True
 
     # --- dod sub-fields ---
-    dod_block = config.get("dod", {})
-    dod_additions: list[str] = []
-    for field, default in _DOD_FIELD_DEFAULTS.items():
-        if field not in dod_block:
-            dod_block[field] = default
-            dod_additions.append(f"dod.{field} = {json.dumps(default)}")
-            changed = True
-    if dod_additions:
-        config["dod"] = dod_block
-        added.extend(dod_additions)
+    # Only fill dod.* fields when no preset is set (or preset is "full").
+    # A non-full preset already defines its own defaults — writing "full" defaults
+    # on top would silently override the preset and create an inconsistent config.
+    active_preset = config.get("dod-preset", "full")
+    if active_preset == "full":
+        dod_block = config.get("dod", {})
+        dod_additions: list[str] = []
+        for field, default in _DOD_FIELD_DEFAULTS.items():
+            if field not in dod_block:
+                dod_block[field] = default
+                dod_additions.append(f"dod.{field} = {json.dumps(default)}")
+                changed = True
+        if dod_additions:
+            config["dod"] = dod_block
+            added.extend(dod_additions)
+    else:
+        log.info("fill-defaults", f"dod.* skipped — preset '{active_preset}' defines its own defaults")
 
     # --- Write back if changed ---
     if changed and not dry_run:
