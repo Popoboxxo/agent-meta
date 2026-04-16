@@ -36,7 +36,7 @@ die Sharkord-Plattform-Besonderheiten.
 ### Image-Konvention
 
 ```yaml
-image: sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}  # z.B. v0.0.16
+image: sharkord/sharkord:{{platform.sharkord.image_tag}}  # z.B. v0.0.16
 ```
 
 Der Image-Tag **muss** mit `peerDependencies` in `package.json` übereinstimmen.
@@ -208,7 +208,7 @@ Wenn nur `ffmpeg` via apt ausreicht:
 
 ```dockerfile
 # Dockerfile.dev
-FROM sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}
+FROM sharkord/sharkord:{{platform.sharkord.image_tag}}
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
@@ -232,7 +232,7 @@ USER bun
 
 services:
   sharkord:
-    image: sharkord/sharkord:{{PRIMARY_IMAGE_TAG}}
+    image: sharkord/sharkord:{{platform.sharkord.image_tag}}
     # ODER: build: { context: ., dockerfile: Dockerfile.dev }  ← wenn Binaries via apt
     container_name: {{CONTAINER_NAME}}
     ports:
@@ -280,7 +280,7 @@ docker logs {{CONTAINER_NAME}} 2>&1 | grep -i token | head -3
 ```yaml
 environment:
   # LAN-IP des Host-Rechners eintragen (NICHT localhost/127.0.0.1)
-  - SHARKORD_WEBRTC_ANNOUNCED_ADDRESS={{HOST_LAN_IP}}  # z.B. 192.168.1.100
+  - SHARKORD_WEBRTC_ANNOUNCED_ADDRESS={{platform.sharkord.host_lan_ip}}  # z.B. 192.168.1.100
 ports:
   - "40000-40100:40000-40100/udp"  # UDP-Range für RTP Media
 ```
@@ -333,7 +333,7 @@ Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{%PLATZHALTER%}}` aus
 |-------------|-------------|---------|
 | `{{PROJECT_NAME}}` | Vollständiger Plugin-Name | `sharkord-vid-with-friends` |
 | `{{PREFIX}}` | Agent-Präfix | `vwf` |
-| `{{PRIMARY_IMAGE_TAG}}` | Docker-Image-Tag des Kernsystems | `v0.0.16` |
+| `{{platform.sharkord.image_tag}}` | Docker-Image-Tag des Kernsystems | `v0.0.16` |
 | `{{SYSTEM_DEPENDENCIES}}` | Kern-Abhängigkeiten mit Versionen (Markdown-Liste) | `- @sharkord/plugin-sdk: \`0.0.16\`` |
 | `{{SYSTEM_URLS}}` | System-URLs (Markdown-Liste) | `- Sharkord Web-UI: \`http://localhost:3000\`` |
 | `{{PLUGIN_DIR_NAME}}` | Verzeichnisname = `package.json` name | `sharkord-vid-with-friends` |
@@ -342,7 +342,7 @@ Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{%PLATZHALTER%}}` aus
 | `{{PRIMARY_PORT}}` | Haupt-Port (Web-UI) | `3000` |
 | `{{EXTRA_PORTS}}` | Weitere Ports (Markdown-Liste) | `- \`40000/tcp\` — Mediasoup Signal` |
 | `{{BUILD_COMMAND}}` | Build-Befehl | `bun run build` |
-| `{{HOST_LAN_IP}}` | LAN-IP des Entwicklungs-Rechners | `192.168.1.100` |
+| `{{platform.sharkord.host_lan_ip}}` | LAN-IP des Entwicklungs-Rechners | `192.168.1.100` |
 | `{{EXTRA_VOLUMES}}` | Zusätzliche Volume-Mounts | Debug-Cache, Test-Musik |
 | `{{EXTRA_STARTUP_INFO}}` | Infos in Startup-Box | Debug-Cache-Pfad |
 

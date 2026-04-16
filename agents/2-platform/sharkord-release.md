@@ -136,7 +136,7 @@ Erstelle `dist/RELEASE_NOTES.md`:
 N. Sharkord neustarten
 
 ### Requirements
-- **Sharkord** >= {{SHARKORD_MIN_VERSION}}
+- **Sharkord** >= {{platform.sharkord.min_version}}
 
 ### Tech Stack
 {{TECH_STACK}}
@@ -266,6 +266,6 @@ cat dist/{{PLUGIN_DIR_NAME}}/package.json | grep version
 | `{{REQUIRED_BINARIES_SECTION}}` | Binaries-Block in Release Notes | ffmpeg + yt-dlp Tabelle | ffmpeg Tabelle |
 | `{{BINARY_INSTALL_STEPS}}` | Installationsschritte für Binaries | `3. ffmpeg in bin/ legen` + `4. yt-dlp in bin/ legen` | `3. ffmpeg in bin/ legen` |
 | `{{REQUIRED_BINARY_NAMES}}` | Binary-Namen für Don'ts | `ffmpeg, yt-dlp` | `ffmpeg` |
-| `{{SHARKORD_MIN_VERSION}}` | Mindest-Sharkord-Version | `0.0.7` | `0.0.15` |
+| `{{platform.sharkord.min_version}}` | Mindest-Sharkord-Version | `0.0.7` | `0.0.15` |
 | `{{TECH_STACK}}` | Tech Stack in Release Notes | `TypeScript, Bun, Mediasoup, tRPC, React, Zod` | `TypeScript, Bun, Mediasoup, ffmpeg` |
 | `{{BUILD_SYSTEM_NOTES}}` | Build-Besonderheiten | `scripts/write-dist-package.ts` liest Version, fügt Timestamp hinzu | `build.ts` kopiert `package.json` 1:1, kein Timestamp |

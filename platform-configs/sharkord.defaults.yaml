@@ -1,0 +1,53 @@
+# platform-configs/sharkord.defaults.yaml
+# =============================================================================
+# Default configuration for the "sharkord" platform.
+#
+# These values are injected into rules/2-platform/sharkord-*.md and
+# agents/2-platform/sharkord-*.md as {{platform.sharkord.*}} placeholders
+# during sync.
+#
+# OVERRIDE in your project by creating .claude/platform-config.yaml:
+#
+#   platform:
+#     sharkord:
+#       image_tag: "v0.1.0"
+#       min_version: "0.1.0"
+#
+# Empty string ("") = required field — sync.py emits [WARN] if not overridden.
+# Non-empty value   = sensible default that works out of the box.
+# =============================================================================
+
+platform:
+  sharkord:
+
+    # -------------------------------------------------------------------------
+    # Docker image
+    # -------------------------------------------------------------------------
+
+    # Docker image tag — must match peerDependencies in package.json
+    # Example: "v0.0.16"
+    image_tag: "v0.0.16"
+
+    # -------------------------------------------------------------------------
+    # Release notes
+    # -------------------------------------------------------------------------
+
+    # Minimum Sharkord version required by this plugin (for release notes)
+    # Example: "0.0.16"
+    min_version: "0.0.16"
+
+    # -------------------------------------------------------------------------
+    # Docker Compose
+    # -------------------------------------------------------------------------
+
+    # Compose service name — identical across all Sharkord projects
+    service_name: "sharkord"
+
+    # -------------------------------------------------------------------------
+    # WebRTC / Mediasoup
+    # -------------------------------------------------------------------------
+
+    # LAN IP for SHARKORD_WEBRTC_ANNOUNCED_ADDRESS
+    # Override with your actual LAN IP for WebRTC to work on the local network
+    # Example: "192.168.1.100"
+    host_lan_ip: "127.0.0.1"
