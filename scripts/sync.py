@@ -71,6 +71,8 @@ PLATFORM_CONFIGS_DIR = "platform-configs"
 CLAUDE_PLATFORM_CONFIG = ".claude/platform-config.yaml"
 LOGFILE = "sync.log"
 
+_PLATFORM_VAR_RE = re.compile(r'\{\{(platform\.[^}]+)\}\}')
+
 # Maps role name to the output filename in .claude/agents/ (no prefix)
 ROLE_MAP = {
     "orchestrator":  "orchestrator",
@@ -652,6 +654,16 @@ def load_platform_config(
 
     merged_flat: dict = {}
 
+    # Load project overrides once — shared across all platforms
+    project_config_path = project_root / CLAUDE_PLATFORM_CONFIG
+    overrides_flat: dict = {}
+    if project_config_path.exists():
+        try:
+            with project_config_path.open(encoding='utf-8') as f:
+                overrides_flat = _flatten_yaml_dict(_yaml.safe_load(f) or {})
+        except Exception as e:
+            log.warn(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
+
     for platform in platforms:
         defaults_path = agent_meta_root / PLATFORM_CONFIGS_DIR / f'{platform}.defaults.yaml'
         if not defaults_path.exists():
@@ -665,28 +677,15 @@ def load_platform_config(
             log.warn(f'platform-config: failed to load {defaults_path.name}: {e}')
             continue
 
-        defaults_flat = _flatten_yaml_dict(defaults_raw)
-
-        # Load project-level overrides from .claude/platform-config.yaml (optional)
-        project_config_path = project_root / CLAUDE_PLATFORM_CONFIG
-        overrides_flat: dict = {}
-        if project_config_path.exists():
-            try:
-                with project_config_path.open(encoding='utf-8') as f:
-                    overrides_raw = _yaml.safe_load(f) or {}
-                overrides_flat = _flatten_yaml_dict(overrides_raw)
-            except Exception as e:
-                log.warn(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
-
         # Merge: defaults first, then overrides win
-        platform_flat = {**defaults_flat, **overrides_flat}
+        platform_flat = {**_flatten_yaml_dict(defaults_raw), **overrides_flat}
 
         # Warn for required fields (empty-string default) that are still empty
         for key, val in platform_flat.items():
             if key.startswith(f'platform.{platform}.') and val == '':
                 log.warn(
-                    'platform-config: required field {{platform.' + key[len('platform.'):] + '}} '
-                    'is empty -- add it to .claude/platform-config.yaml'
+                    f'platform-config: required field {{{{platform.{key[len("platform."):]}}}}}'
+                    f' is empty -- add it to .claude/platform-config.yaml'
                 )
 
         merged_flat.update(platform_flat)
@@ -713,12 +712,12 @@ def substitute_platform(
         if raw_key in platform_vars:
             return str(platform_vars[raw_key])
         log.warn(
-            f'platform-config: placeholder {{{{' + raw_key + '}}}} not found in platform defaults '
+            f'platform-config: placeholder {{{{{raw_key}}}}} not found in platform defaults '
             f'or project overrides — placeholder remains in: {source_label}'
         )
         return match.group(0)
 
-    return re.sub(r'\{\{(platform\.[^}]+)\}\}', replacer, text)
+    return _PLATFORM_VAR_RE.sub(replacer, text)
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:
@@ -1395,7 +1394,7 @@ def sync_agents_for_provider(
         description = description.replace('{{PROJECT_NAME}}', project_name)
         content = substitute(content, variables, rel_source, log)
         # Apply platform-config substitution ({{platform.*}} placeholders)
-        if platform_vars:
+        if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)
         name = Path(filename).stem
         layer = source_path.parts[-2]
@@ -1763,7 +1762,7 @@ def sync_rules(
         layer = source_path.parts[-2]  # "1-generic", "2-platform", "0-external"
 
         # Apply platform-config substitution ({{platform.*}} placeholders)
-        if platform_vars:
+        if platform_vars is not None:
             rel_source = f"rules/{layer}/{source_path.name}"
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)
 
@@ -3033,7 +3032,7 @@ def main():
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
         # Load platform-config variables ({{platform.*}} placeholders)
         platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
-        if platform_vars:
+        if platform_vars is not None:
             log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
         is_claude = "Claude" in providers
         if args.init or is_claude:
