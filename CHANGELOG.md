@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.23.0] — 2026-04-16
+
+### Added
+
+- **Platform Config Instantiation** — `sync.py` now reads `platform-configs/<platform>.defaults.yaml`
+  and merges platform-level defaults into the project config before generating agents.
+  Projects using a platform get sensible variable defaults without manual repetition.
+  Supports `variables`, `dod`, `model-overrides`, `memory-overrides`, `permission-mode-overrides`.
+- **HomeAssistant platform** (`platform-configs/homeassistant.defaults.yaml`) — Platform defaults
+  for Home Assistant Python integrations (Python language, German docs, YAML conventions).
+- **Sharkord platform config** (`platform-configs/sharkord.defaults.yaml`) — Extracted shared
+  Sharkord defaults (Bun/TypeScript, plugin structure, build commands) into platform config.
+- **HomeAssistant agents** (`agents/2-platform/`):
+  - `homeassistant-developer.md` — HA-specific developer with Python/HACS conventions
+  - `homeassistant-documenter.md` — HA-specific documenter
+- **HomeAssistant rules** (`rules/2-platform/`):
+  - `homeassistant-energy-abstraction.md` — Energy platform integration patterns
+  - `homeassistant-entity-data.md` — Entity state/attribute data conventions
+  - `homeassistant-mcp-integration.md` — MCP server integration guide
+  - `homeassistant-notifications.md` — Persistent notification patterns
+  - `homeassistant-package-structure.md` — HACS package layout conventions
+  - `homeassistant-yaml-conventions.md` — HA YAML configuration patterns
+- **Sharkord rules** (`rules/2-platform/`):
+  - `sharkord-docker-ops.md` — Docker operations for Sharkord plugins
+  - `sharkord-sdk.md` — Sharkord SDK usage patterns
+- **`howto/platform-config.md`** — Full documentation for the platform config system.
+
+### Changed
+
+- **`sharkord-developer.md`**: Reduced to platform-specific overrides only; shared content
+  moved to `sharkord.defaults.yaml` and rules files.
+- **`sharkord-docker.md`**, **`sharkord-release.md`**: Minor updates aligned with platform config.
+- **`sync.py`**: Added `load_platform_defaults()` and `merge_platform_defaults()` functions.
+  Platform defaults are merged at sync start — project config values always win.
+
+---
+
 ## [0.22.0] — 2026-04-14
 
 ### Added
