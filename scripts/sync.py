@@ -67,6 +67,8 @@ CLAUDE_RULES_DIR = ".claude/rules"
 RULES_DIR = "rules"
 CLAUDE_HOOKS_DIR = ".claude/hooks"
 HOOKS_DIR = "hooks"
+PLATFORM_CONFIGS_DIR = "platform-configs"
+CLAUDE_PLATFORM_CONFIG = ".claude/platform-config.yaml"
 LOGFILE = "sync.log"
 
 # Maps role name to the output filename in .claude/agents/ (no prefix)
@@ -342,16 +344,23 @@ def fill_defaults(
             changed = True
 
     # --- dod sub-fields ---
-    dod_block = config.get("dod", {})
-    dod_additions: list[str] = []
-    for field, default in _DOD_FIELD_DEFAULTS.items():
-        if field not in dod_block:
-            dod_block[field] = default
-            dod_additions.append(f"dod.{field} = {json.dumps(default)}")
-            changed = True
-    if dod_additions:
-        config["dod"] = dod_block
-        added.extend(dod_additions)
+    # Only fill dod.* fields when no preset is set (or preset is "full").
+    # A non-full preset already defines its own defaults — writing "full" defaults
+    # on top would silently override the preset and create an inconsistent config.
+    active_preset = config.get("dod-preset", "full")
+    if active_preset == "full":
+        dod_block = config.get("dod", {})
+        dod_additions: list[str] = []
+        for field, default in _DOD_FIELD_DEFAULTS.items():
+            if field not in dod_block:
+                dod_block[field] = default
+                dod_additions.append(f"dod.{field} = {json.dumps(default)}")
+                changed = True
+        if dod_additions:
+            config["dod"] = dod_block
+            added.extend(dod_additions)
+    else:
+        log.info("fill-defaults", f"dod.* skipped — preset '{active_preset}' defines its own defaults")
 
     # --- Write back if changed ---
     if changed and not dry_run:
@@ -589,6 +598,127 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
             resolved[key] = default_val
     return resolved
 
+
+
+
+# ---------------------------------------------------------------------------
+# Platform config (platform-configs/<platform>.defaults.yaml + .claude/platform-config.yaml)
+# ---------------------------------------------------------------------------
+
+def _flatten_yaml_dict(d: dict, prefix: str = '') -> dict:
+    """Flatten a nested dict into dot-notation keys.
+
+    Example:
+        {'platform': {'homeassistant': {'notify_group': 'all'}}}
+        -> {'platform.homeassistant.notify_group': 'all'}
+    """
+    result = {}
+    for k, v in d.items():
+        key = f'{prefix}.{k}' if prefix else k
+        if isinstance(v, dict):
+            result.update(_flatten_yaml_dict(v, key))
+        else:
+            result[key] = v
+    return result
+
+
+def load_platform_config(
+    agent_meta_root: Path,
+    project_root: Path,
+    platforms: list[str],
+    log: 'SyncLog',
+) -> dict:
+    """Load and merge platform-config for all active platforms.
+
+    For each platform in platforms:
+      1. Load agent-meta/platform-configs/<platform>.defaults.yaml   (defaults)
+      2. Load .claude/platform-config.yaml from project root          (overrides, optional)
+      3. Merge: project overrides win over defaults
+      4. Flatten nested YAML keys to dot-notation
+
+    Returns a flat dict: {'platform.homeassistant.notify_group': 'all', ...}
+
+    Emits [WARN] for:
+      - Required fields (empty-string default) not overridden by project
+      - {{platform.*}} placeholders in source files without a matching config entry
+        (checked externally via warn_unresolved_platform_vars)
+    """
+    if not _YAML_AVAILABLE:
+        log.warn(
+            'PyYAML not available — platform-config substitution skipped. '
+            'Install it with: pip install pyyaml'
+        )
+        return {}
+
+    merged_flat: dict = {}
+
+    for platform in platforms:
+        defaults_path = agent_meta_root / PLATFORM_CONFIGS_DIR / f'{platform}.defaults.yaml'
+        if not defaults_path.exists():
+            # No defaults file for this platform — skip silently (not all platforms need one)
+            continue
+
+        try:
+            with defaults_path.open(encoding='utf-8') as f:
+                defaults_raw = _yaml.safe_load(f) or {}
+        except Exception as e:
+            log.warn(f'platform-config: failed to load {defaults_path.name}: {e}')
+            continue
+
+        defaults_flat = _flatten_yaml_dict(defaults_raw)
+
+        # Load project-level overrides from .claude/platform-config.yaml (optional)
+        project_config_path = project_root / CLAUDE_PLATFORM_CONFIG
+        overrides_flat: dict = {}
+        if project_config_path.exists():
+            try:
+                with project_config_path.open(encoding='utf-8') as f:
+                    overrides_raw = _yaml.safe_load(f) or {}
+                overrides_flat = _flatten_yaml_dict(overrides_raw)
+            except Exception as e:
+                log.warn(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
+
+        # Merge: defaults first, then overrides win
+        platform_flat = {**defaults_flat, **overrides_flat}
+
+        # Warn for required fields (empty-string default) that are still empty
+        for key, val in platform_flat.items():
+            if key.startswith(f'platform.{platform}.') and val == '':
+                log.warn(
+                    'platform-config: required field {{platform.' + key[len('platform.'):] + '}} '
+                    'is empty -- add it to .claude/platform-config.yaml'
+                )
+
+        merged_flat.update(platform_flat)
+
+    return merged_flat
+
+
+def substitute_platform(
+    text: str,
+    platform_vars: dict,
+    source_label: str,
+    log: 'SyncLog',
+) -> str:
+    """Replace {{platform.*}} occurrences using platform_vars dict.
+
+    Keys in platform_vars use dot-notation (e.g. 'platform.homeassistant.notify_group').
+    Placeholders in text look like {{platform.homeassistant.notify_group}}.
+
+    Warns for any {{platform.*}} placeholder that has no matching key in platform_vars.
+    Does NOT touch {{UPPERCASE}} placeholders — those are handled by substitute().
+    """
+    def replacer(match):
+        raw_key = match.group(1)   # e.g. 'platform.homeassistant.notify_group'
+        if raw_key in platform_vars:
+            return str(platform_vars[raw_key])
+        log.warn(
+            f'platform-config: placeholder {{{{' + raw_key + '}}}} not found in platform defaults '
+            f'or project overrides — placeholder remains in: {source_label}'
+        )
+        return match.group(0)
+
+    return re.sub(r'\{\{(platform\.[^}]+)\}\}', replacer, text)
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:
@@ -1203,6 +1333,7 @@ def sync_agents_for_provider(
     log: SyncLog,
     dry_run: bool,
     provider: str,
+    platform_vars: dict | None = None,
 ):
     """Generate agent files for a specific provider.
 
@@ -1263,6 +1394,9 @@ def sync_agents_for_provider(
         description = (template_description or f'Agent for {project_name}.')
         description = description.replace('{{PROJECT_NAME}}', project_name)
         content = substitute(content, variables, rel_source, log)
+        # Apply platform-config substitution ({{platform.*}} placeholders)
+        if platform_vars:
+            content = substitute_platform(content, platform_vars, rel_source, log)
         name = Path(filename).stem
         layer = source_path.parts[-2]
         source_label = f'{layer}/{source_path.name}'
@@ -1591,6 +1725,7 @@ def sync_rules(
     config: dict,
     log: SyncLog,
     dry_run: bool,
+    platform_vars: dict | None = None,
 ):
     """Copy rule files from agent-meta/rules/ layers to .claude/rules/ in the project.
 
@@ -1626,6 +1761,11 @@ def sync_rules(
         target_path = target_dir / output_name
         source_content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]  # "1-generic", "2-platform", "0-external"
+
+        # Apply platform-config substitution ({{platform.*}} placeholders)
+        if platform_vars:
+            rel_source = f"rules/{layer}/{source_path.name}"
+            source_content = substitute_platform(source_content, platform_vars, rel_source, log)
 
         log.action("COPY", str(target_path.relative_to(project_root)),
                    f"rules/{layer}/{source_path.name}")
@@ -2891,6 +3031,10 @@ def main():
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+        # Load platform-config variables ({{platform.*}} placeholders)
+        platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
+        if platform_vars:
+            log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
         is_claude = "Claude" in providers
         if args.init or is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
@@ -2903,14 +3047,14 @@ def main():
             pc = PROVIDER_CONFIG[provider]
             log.provider_header(provider)
             sync_agents_for_provider(agent_meta_root, project_root, config, variables,
-                                     log, args.dry_run, provider)
+                                     log, args.dry_run, provider, platform_vars=platform_vars)
             sync_context_for_provider(agent_meta_root, project_root, config, variables,
                                       log, args.dry_run, provider)
             if provider == "Continue":
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run)
             if pc["has_rules"] and provider == "Claude":
-                sync_rules(agent_meta_root, project_root, config, log, args.dry_run)
+                sync_rules(agent_meta_root, project_root, config, log, args.dry_run, platform_vars=platform_vars)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)

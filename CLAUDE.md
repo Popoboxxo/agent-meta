@@ -138,6 +138,7 @@ agent-meta/
     hooks.md                          ← Hooks-System: Schichten, Sync, create-hook, dod-push-check
     agent-isolation.md                ← isolation: worktree — Konfiguration, Fallstricke, Feature-Agent
     agent-delegation-map.md           ← Delegations-Matrix: wer delegiert an wen, parallelisierbare Schritte
+    platform-config.md                ← Platform Config Instantiation: {{platform.*}}-Platzhalter, Defaults, Overrides
     sync-concept.md
     template-gap-analysis.md
 
@@ -167,6 +168,11 @@ agent-meta/
     childish.md          ← Kindgerechter Stil: spielerisch, Tier-/Spielzeug-Analogien
     caveman.md           ← Höhlenmensch-Stil: kurz, direkt, abgehakt
 
+  platform-configs/
+    homeassistant.defaults.yaml  ← Default-Werte für {{platform.homeassistant.*}}-Platzhalter
+                                    Leerer String = Pflichtfeld (User muss überschreiben)
+                                    Nicht-leerer Wert = sinnvoller Default
+
   scripts/
     sync.py              ← Agent-Generator
 ```
@@ -181,7 +187,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.21.0 — `2026-04-14`
+Generiert von agent-meta v0.22.0 — `2026-04-14`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -603,6 +609,9 @@ Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 
 Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
 Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`, `DOD_PRESET`.
+
+**Platform-Config-Platzhalter** (`{{platform.*}}`) werden separat via `platform-configs/<platform>.defaults.yaml` + `.claude/platform-config.yaml` befüllt.
+Siehe [howto/platform-config.md](howto/platform-config.md) für Details.
 
 ### Generische Variablen (alle Projekte)
 

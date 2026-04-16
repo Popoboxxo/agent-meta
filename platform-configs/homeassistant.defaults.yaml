@@ -1,0 +1,67 @@
+# platform-configs/homeassistant.defaults.yaml
+# =============================================================================
+# Default configuration for the "homeassistant" platform.
+#
+# These values are injected into rules/2-platform/homeassistant-*.md and
+# agents/2-platform/homeassistant-*.md as {{platform.homeassistant.*}} placeholders
+# during sync.
+#
+# OVERRIDE in your project by creating .claude/platform-config.yaml:
+#
+#   platform:
+#     homeassistant:
+#       notify_group: "my_mobile_app"
+#       notify_admin_group: "my_admin_group"
+#
+# Empty string ("") = required field — sync.py emits [WARN] if not overridden.
+# Non-empty value   = sensible default that works out of the box.
+# =============================================================================
+
+platform:
+  homeassistant:
+
+    # -------------------------------------------------------------------------
+    # Notification groups (notify.<group>)
+    # -------------------------------------------------------------------------
+
+    # Standard notification group for all residents
+    # Example: "mobile_app_all" → notify.mobile_app_all
+    notify_group: ""
+
+    # Admin/debug notification group for administrative messages
+    # Example: "admin_group" → notify.admin_group
+    notify_admin_group: ""
+
+    # -------------------------------------------------------------------------
+    # Debug sensor
+    # -------------------------------------------------------------------------
+
+    # Entity ID of the debug toggle boolean
+    # Used in automation debug conditions: state: 'on' sends intermediate messages
+    debug_sensor: "input_boolean.automation_debugger"
+
+    # -------------------------------------------------------------------------
+    # Home Assistant instance
+    # -------------------------------------------------------------------------
+
+    # Base URL of the Home Assistant instance (without trailing slash)
+    ha_url: "http://homeassistant.local:8123"
+
+    # -------------------------------------------------------------------------
+    # InfluxDB integration
+    # -------------------------------------------------------------------------
+
+    # InfluxDB bucket name where Home Assistant sensor data is stored
+    # Example: "homeassistant" or "ha_prod"
+    influxdb_bucket: ""
+
+    # InfluxDB organization name
+    influxdb_org: ""
+
+    # -------------------------------------------------------------------------
+    # Entity data / CSV export
+    # -------------------------------------------------------------------------
+
+    # Path to the hass_entities.csv export file (relative to project root or absolute)
+    # Used as secondary data source when MCP is unavailable
+    entities_csv_path: "hass_entities.csv"
