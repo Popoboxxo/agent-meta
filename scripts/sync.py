@@ -7,23 +7,26 @@ Manages .claude/3-project/<prefix>-<role>-ext.md extension files.
 Syncs snippets, rules, hooks and external skill agents.
 
 Usage:
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --init
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --only-variables
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <role>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule <name>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook <name>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --only-variables
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <role>
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-rule <name>
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook <name>
+  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
   python .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name>
                                       --source <path> --role <role> [--entry <file>]
 
-External skills (external-skills.config.json):
+Config format: YAML preferred (.yaml). JSON still supported for backward compatibility.
+  Passing --config agent-meta.config.json automatically redirects to .yaml if it exists.
+
+External skills (external-skills.config.yaml):
   - Managed centrally in agent-meta (Modell A)
   - Each enabled skill generates a wrapper agent in .claude/agents/<role>.md
   - Skill files are copied to .claude/skills/<skill-name>/
   - Use --add-skill to register a new submodule + skill entry
-  - Use enabled: true/false in external-skills.config.json to activate/deactivate
+  - Use enabled: true/false in external-skills.config.yaml to activate/deactivate
 """
 
 import argparse
@@ -39,6 +42,28 @@ try:
     _YAML_AVAILABLE = True
 except ImportError:
     _YAML_AVAILABLE = False
+
+
+def _load_yaml_or_json(path_yaml: Path, path_json: Path) -> tuple[dict, Path]:
+    """Load YAML file if it exists, else fall back to JSON. Returns (data, used_path)."""
+    if path_yaml.exists():
+        if not _YAML_AVAILABLE:
+            print(f"ERROR: PyYAML not installed but {path_yaml.name} requires it. "
+                  f"Run: pip install pyyaml", file=sys.stderr)
+            sys.exit(1)
+        with path_yaml.open(encoding="utf-8") as f:
+            return _yaml.safe_load(f) or {}, path_yaml
+    if path_json.exists():
+        with path_json.open(encoding="utf-8") as f:
+            return json.load(f), path_json
+    return {}, path_yaml  # neither exists — return empty + preferred path
+
+
+def _write_yaml(path: Path, data: dict) -> None:
+    """Write data as YAML with consistent formatting."""
+    with path.open("w", encoding="utf-8") as f:
+        _yaml.dump(data, f, allow_unicode=True, default_flow_style=False,
+                   sort_keys=False, indent=2)
 
 try:
     import jsonschema as _jsonschema
@@ -58,7 +83,8 @@ PROJECT_DIR = "3-project"
 SNIPPETS_DIR = "snippets"
 EXTERNAL_DIR = "0-external"
 SKILL_WRAPPER = "_skill-wrapper.md"
-EXTERNAL_SKILLS_CONFIG = "external-skills.config.json"
+EXTERNAL_SKILLS_CONFIG = "external-skills.config.yaml"
+_EXTERNAL_SKILLS_CONFIG_JSON = "external-skills.config.json"  # legacy fallback
 CLAUDE_AGENTS_DIR = ".claude/agents"
 CLAUDE_EXT_DIR = ".claude/3-project"
 CLAUDE_SNIPPETS_DIR = ".claude/snippets"
@@ -94,7 +120,10 @@ ROLE_MAP = {
 }
 
 EXT_SUFFIX = "-ext"
-ROLES_CONFIG = "roles.config.json"
+ROLES_CONFIG = "roles.config.yaml"
+_ROLES_CONFIG_JSON = "roles.config.json"  # legacy fallback
+DOD_PRESETS_CONFIG_YAML = "dod-presets.config.yaml"
+_DOD_PRESETS_CONFIG_JSON = "dod-presets.config.json"  # legacy fallback
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 
@@ -242,11 +271,36 @@ class SyncLog:
 # ---------------------------------------------------------------------------
 
 def load_config(config_path: Path) -> dict:
+    """Load agent-meta.config.yaml or agent-meta.config.json.
+
+    If the provided path ends in .json but a sibling .yaml file exists,
+    the YAML file is preferred (migration path: old --config still works).
+    """
     if not config_path.exists():
-        print(f"ERROR: config not found: {config_path}", file=sys.stderr)
-        sys.exit(1)
-    with config_path.open(encoding="utf-8") as f:
-        config = json.load(f)
+        # Try YAML counterpart if a .json path was given
+        if config_path.suffix == ".json":
+            yaml_path = config_path.with_suffix(".yaml")
+            if yaml_path.exists():
+                config_path = yaml_path
+            else:
+                print(f"ERROR: config not found: {config_path}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(f"ERROR: config not found: {config_path}", file=sys.stderr)
+            sys.exit(1)
+
+    suffix = config_path.suffix.lower()
+    if suffix in (".yaml", ".yml"):
+        if not _YAML_AVAILABLE:
+            print(f"ERROR: PyYAML not installed but {config_path.name} requires it. "
+                  f"Run: pip install pyyaml", file=sys.stderr)
+            sys.exit(1)
+        with config_path.open(encoding="utf-8") as f:
+            config = _yaml.safe_load(f) or {}
+    else:
+        with config_path.open(encoding="utf-8") as f:
+            config = json.load(f)
+
     _validate_config(config, config_path)
     return config
 
@@ -366,9 +420,12 @@ def fill_defaults(
 
     # --- Write back if changed ---
     if changed and not dry_run:
-        with config_path.open("w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-            f.write("\n")
+        if config_path.suffix.lower() in (".yaml", ".yml"):
+            _write_yaml(config_path, config)
+        else:
+            with config_path.open("w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.write("\n")
 
     for entry in added:
         action = "FILL" if not dry_run else "FILL(dry)"
@@ -550,7 +607,7 @@ def build_frontmatter(content: str, name: str, description: str,
     return content
 
 
-DOD_PRESETS_CONFIG = "dod-presets.config.json"
+DOD_PRESETS_CONFIG = DOD_PRESETS_CONFIG_YAML  # kept for backward compat references
 
 # Default DoD values (= "full" preset) — used as ultimate fallback
 DOD_DEFAULTS = {
@@ -562,14 +619,15 @@ DOD_DEFAULTS = {
 
 
 def load_dod_presets(agent_meta_root: Path) -> dict:
-    """Load dod-presets.config.json from agent-meta root. Returns empty dict if not found."""
-    config_path = agent_meta_root / DOD_PRESETS_CONFIG
-    if not config_path.exists():
+    """Load dod-presets.config.yaml (or .json fallback) from agent-meta root."""
+    data, _ = _load_yaml_or_json(
+        agent_meta_root / DOD_PRESETS_CONFIG_YAML,
+        agent_meta_root / _DOD_PRESETS_CONFIG_JSON,
+    )
+    if not data:
         return {}
-    with config_path.open(encoding="utf-8") as f:
-        data = json.load(f)
     presets = data.get("presets", {})
-    # Strip comments
+    # Strip comment keys (JSON legacy: keys starting with "_")
     return {k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")}
             for k, v in presets.items() if not k.startswith("_")}
 
@@ -759,12 +817,13 @@ def resolve_providers(config: dict) -> list:
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
-    """Load roles.config.json from agent-meta root. Returns empty structure if not found."""
-    config_path = agent_meta_root / ROLES_CONFIG
-    if not config_path.exists():
+    """Load roles.config.yaml (or .json fallback) from agent-meta root."""
+    data, _ = _load_yaml_or_json(
+        agent_meta_root / ROLES_CONFIG,
+        agent_meta_root / _ROLES_CONFIG_JSON,
+    )
+    if not data:
         return {"roles": {}}
-    with config_path.open(encoding="utf-8") as f:
-        data = json.load(f)
     return {"roles": {k: v for k, v in data.get("roles", {}).items() if not k.startswith("_")}}
 
 
@@ -2197,13 +2256,14 @@ def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> 
 
 
 def load_external_skills_config(agent_meta_root: Path) -> dict:
-    """Load external-skills.config.json from agent-meta root. Returns empty structure if not found."""
-    config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
-    if not config_path.exists():
+    """Load external-skills.config.yaml (or .json fallback) from agent-meta root."""
+    data, _ = _load_yaml_or_json(
+        agent_meta_root / EXTERNAL_SKILLS_CONFIG,
+        agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON,
+    )
+    if not data:
         return {"repos": {}, "skills": {}}
-    with config_path.open(encoding="utf-8") as f:
-        data = json.load(f)
-    # Strip _comment keys
+    # Strip _comment keys (JSON legacy)
     return {
         "repos":   {k: v for k, v in data.get("repos", {}).items()   if not k.startswith("_")},
         "skills":  {k: v for k, v in data.get("skills", {}).items()  if not k.startswith("_")},
@@ -2411,10 +2471,10 @@ def add_skill(
     log: SyncLog,
     dry_run: bool,
 ):
-    """Register a new submodule + skill entry in external-skills.config.json.
+    """Register a new submodule + skill entry in external-skills.config.yaml.
 
     Runs: git submodule add <repo_url> external/<submodule_name>
-    Then updates external-skills.config.json with the new submodule + skill entry.
+    Then updates external-skills.config.yaml (or .json fallback) with the new entry.
     """
     # Derive submodule name from repo URL (last path segment without .git)
     submodule_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
@@ -2436,12 +2496,19 @@ def add_skill(
                 print(f"  !  git submodule add failed", file=sys.stderr)
                 return
 
-    # Update external-skills.config.json
-    config_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
-    if config_path.exists():
+    # Update external-skills.config.yaml (or .json fallback)
+    yaml_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
+    json_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON
+    if yaml_path.exists():
+        config_path = yaml_path
+        with config_path.open(encoding="utf-8") as f:
+            raw = _yaml.safe_load(f) or {}
+    elif json_path.exists():
+        config_path = json_path
         with config_path.open(encoding="utf-8") as f:
             raw = json.load(f)
     else:
+        config_path = yaml_path
         raw = {"repos": {}, "skills": {}}
 
     # Capture current commit for pinning
@@ -2466,13 +2533,16 @@ def add_skill(
     log.action("UPDATE", EXTERNAL_SKILLS_CONFIG,
                f"added repo '{submodule_name}' @{actual_commit[:8]}, skill '{skill_name}'")
     if not dry_run:
-        with config_path.open("w", encoding="utf-8") as f:
-            json.dump(raw, f, indent=2, ensure_ascii=False)
-        print(f"  +  {EXTERNAL_SKILLS_CONFIG} updated")
+        if config_path.suffix.lower() in (".yaml", ".yml"):
+            _write_yaml(config_path, raw)
+        else:
+            with config_path.open("w", encoding="utf-8") as f:
+                json.dump(raw, f, indent=2, ensure_ascii=False)
+        print(f"  +  {config_path.name} updated")
         print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
         print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
-        print(f"  i  To activate: set approved: true in {EXTERNAL_SKILLS_CONFIG},")
-        print(f"     then add to agent-meta.config.json: \"external-skills\": {{\"{skill_name}\": {{\"enabled\": true}}}}")
+        print(f"  i  To activate: set approved: true in {config_path.name},")
+        print(f"     then add to agent-meta.config.yaml: external-skills: {skill_name}: enabled: true")
 
 
 def create_extension(
@@ -2920,7 +2990,7 @@ def main():
         description="Sync agent-meta agents into a project."
     )
     parser.add_argument("--config", required=False, default=None,
-                        help="Path to agent-meta.config.json (not required for --add-skill)")
+                        help="Path to agent-meta.config.yaml (or .json; not required for --add-skill)")
     parser.add_argument("--init", action="store_true",
                         help="Also generate CLAUDE.md from template (only if not present)")
     parser.add_argument("--only-variables", action="store_true",
@@ -2934,11 +3004,11 @@ def main():
                         help="Create .claude/rules/<NAME>.md template (never overwrites)")
     parser.add_argument("--create-hook", metavar="NAME",
                         help="Create .claude/hooks/<NAME>.sh template (never overwrites). "
-                             "Enable via agent-meta.config.json: "
-                             "\"hooks\": {\"<NAME>\": {\"enabled\": true}}")
+                             "Enable via agent-meta.config.yaml: "
+                             "hooks: <NAME>: enabled: true")
     parser.add_argument("--fill-defaults", action="store_true",
                         help="Write missing config fields with their default values into "
-                             "agent-meta.config.json. Structural fields (dod-preset, "
+                             "agent-meta.config.yaml (or .json). Structural fields (dod-preset, "
                              "max-parallel-agents, speech-mode, dod.*) are written when absent. "
                              "Missing variable keys are reported as warnings only.")
     parser.add_argument("--dry-run", action="store_true",

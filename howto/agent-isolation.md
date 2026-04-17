@@ -95,7 +95,7 @@ git submodule update --init --recursive
 **Empfehlung:** In `.claude/3-project/feature-ext.md` einen Hinweis hinterlegen,
 dass der Feature-Agent als erstes `git submodule update --init --recursive` ausführt.
 
-### 2. `agent-meta.config.json` nicht gefunden
+### 2. `agent-meta.config.yaml` nicht gefunden
 
 `sync.py` erwartet die Config-Datei relativ zum Projektroot. Im Worktree ist der
 Projektroot korrekt gesetzt — das sollte funktionieren. Aber Hooks (z.B. `dod-push-check`)

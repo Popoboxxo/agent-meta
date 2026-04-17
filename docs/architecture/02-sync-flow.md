@@ -4,9 +4,9 @@
 
 ```mermaid
 flowchart TD
-    CFG[agent-meta.config.json]
-    ECFG[external-skills.config.json]
-    RCFG[roles.config.json]
+    CFG[agent-meta.config.yaml]
+    ECFG[external-skills.config.yaml]
+    RCFG[roles.config.yaml]
     SYNC[sync.py]
 
     subgraph sources [agent-meta]
@@ -60,8 +60,8 @@ flowchart TD
 | **Rules** | `rules/1-generic/` + `rules/2-platform/` → `COPY` → `.claude/rules/` (Stale-Tracking via `.agent-meta-managed`) |
 | **Hooks** | `hooks/1-generic/` + `hooks/2-platform/` → `COPY` → `.claude/hooks/` + `MERGE` in `.claude/settings.json` |
 | **settings.local.json** | Einmalig angelegt als persönliches Skeleton (gitignored) |
-| **permissionMode** | Aus `roles.config.json` + `permission-mode-overrides` → injiziert in Agenten-Frontmatter |
-| **JSON Schema** | `agent-meta.schema.json` für Validation von `agent-meta.config.json` |
+| **permissionMode** | Aus `roles.config.yaml` + `permission-mode-overrides` → injiziert in Agenten-Frontmatter |
+| **JSON Schema** | `agent-meta.schema.json` für Validation von `agent-meta.config.yaml` |
 
 ## CLAUDE.md managed block
 

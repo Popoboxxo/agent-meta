@@ -8,7 +8,7 @@ flowchart LR
         NLP[neat-little-package]
     end
 
-    subgraph cfg [external-skills.config.json]
+    subgraph cfg [external-skills.config.yaml]
         S1[home-organization enabled false]
         S2[opengrid-openscad enabled false]
     end

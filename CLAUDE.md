@@ -15,7 +15,7 @@ Agenten lesen sie beim Start — sie enthalten keinen eigenen Kontext-Block.
 
 **2. `.claude/agents/` ist generierter Output — nie manuell bearbeiten.**
 Dateien werden von `sync.py` erzeugt und bei jedem Sync überschrieben.
-Änderungen gehören in `agent-meta.config.json` (Variablen) oder die Agent-Quelldateien.
+Änderungen gehören in `agent-meta.config.yaml` (Variablen) oder die Agent-Quelldateien.
 
 **3. Agenten haben generische Namen — kein Prefix.**
 Ein Projekt pro Workspace. Die Agenten heißen `developer.md`, `tester.md` etc.
@@ -31,9 +31,9 @@ Der generierte Agent liest die Erweiterungsdatei selbst zur Laufzeit.
 
 ```
 0-external/   Externe Skill-Agenten aus Drittrepos (via Git Submodule).
-              Höchste Priorität. Konfiguriert in external-skills.config.json.
+              Höchste Priorität. Konfiguriert in external-skills.config.yaml.
               approved: true/false — Meta-Maintainer Quality Gate.
-              Projekte aktivieren Skills via "external-skills" in agent-meta.config.json.
+              Projekte aktivieren Skills via "external-skills" in agent-meta.config.yaml.
 
 1-generic/    Universell. Gilt für jedes Projekt. Wird immer generiert,
               solange kein Override in 2-platform oder 3-project existiert.
@@ -117,14 +117,14 @@ agent-meta/
   external/             ← Git Submodule (externe Skill-Repos, via --add-skill)
     <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
 
-  external-skills.config.json  ← Zentrale Skill-Konfiguration (Modell A)
+  external-skills.config.yaml  ← Zentrale Skill-Konfiguration (Modell A)
                                   repos: Repo-Definitionen mit pinned_commit (1:n zu skills)
                                   skills: Skill-Einträge mit approved:true/false
 
-  roles.config.json            ← Zentrale Rollen-Konfiguration
+  roles.config.yaml            ← Zentrale Rollen-Konfiguration
                                   roles: Rollen-Definitionen mit model + description
                                   Wird von sync.py als Modell-Default gelesen
-                                  Projekte überschreiben via model-overrides in agent-meta.config.json
+                                  Projekte überschreiben via model-overrides in agent-meta.config.yaml
 
   howto/
     first-steps.md               ← Geführte Ersteinrichtung via AI-Assistent (vor erstem Sync)
@@ -244,7 +244,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 Was brauche ich?
 │
 ├─ Einfacher Wert (Kommando, kurzer Text, Liste)?
-│   → Variable in agent-meta.config.json
+│   → Variable in agent-meta.config.yaml
 │   → Wird per {{PLATZHALTER}} in den Agenten injiziert
 │   → Beispiele: BUILD_COMMAND, CODE_CONVENTIONS, REQ_CATEGORIES
 │
@@ -279,11 +279,11 @@ Lies sie jetzt sofort mit dem Read-Tool und wende alle Regeln vollständig an.
 **sync.py Extension-Kommandos:**
 ```bash
 # Extension erstmalig anlegen (managed block + leerer Projektbereich)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext developer
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext developer
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext all
 
 # Managed block in allen bestehenden Extensions aktualisieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 ```
 
 ### Override: `.claude/3-project/<rolle>.md`
@@ -323,7 +323,7 @@ Verfügbare Werte: `Claude`, `GitHub` (weitere folgen bei Bedarf)
 Fehlt der Key → alle Rollen aus `1-generic/` + aktiven `2-platform/`-Overrides werden generiert (Rückwärtskompatibel).
 Ist der Key vorhanden → nur die gelisteten Rollen werden generiert. Alle anderen werden mit `[SKIP]` im Log übersprungen.
 
-**Rollen-Klassifizierung (Empfehlung — gesteuert via `tier` in `roles.config.json`):**
+**Rollen-Klassifizierung (Empfehlung — gesteuert via `tier` in `roles.config.yaml`):**
 
 | Stufe | Rollen | Bedeutung |
 |-------|--------|-----------|
@@ -349,8 +349,8 @@ Der User steuert über `roles` welche tatsächlich angelegt werden.
 `sync.py` injiziert das `model:`-Feld beim Generieren der Agenten-Datei.
 
 **Precedence (höchste zuerst):**
-1. Projekt-Override (`model-overrides` in `agent-meta.config.json`)
-2. Meta-Default (`roles.config.json` im agent-meta Root — vom Meta-Maintainer gepflegt)
+1. Projekt-Override (`model-overrides` in `agent-meta.config.yaml`)
+2. Meta-Default (`roles.config.yaml` im agent-meta Root — vom Meta-Maintainer gepflegt)
 3. Kein Eintrag → kein `model:`-Feld → Agent erbt das Modell vom Parent-Kontext
 
 **Meta-Defaults (Stand v0.16.2):**
@@ -391,8 +391,8 @@ Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 `sync.py` injiziert das `memory:`-Feld beim Generieren der Agenten-Datei.
 
 **Precedence (höchste zuerst):**
-1. Projekt-Override (`memory-overrides` in `agent-meta.config.json`)
-2. Meta-Default (`roles.config.json` — vom Meta-Maintainer gepflegt)
+1. Projekt-Override (`memory-overrides` in `agent-meta.config.yaml`)
+2. Meta-Default (`roles.config.yaml` — vom Meta-Maintainer gepflegt)
 3. Kein Eintrag → kein `memory:`-Feld → Agent hat kein persistentes Gedächtnis
 
 **Memory-Scopes:**
@@ -432,8 +432,8 @@ Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokument
 `sync.py` injiziert das `permissionMode:`-Feld beim Generieren der Agenten-Datei.
 
 **Precedence (höchste zuerst):**
-1. Projekt-Override (`permission-mode-overrides` in `agent-meta.config.json`)
-2. Meta-Default (`roles.config.json` — vom Meta-Maintainer gepflegt)
+1. Projekt-Override (`permission-mode-overrides` in `agent-meta.config.yaml`)
+2. Meta-Default (`roles.config.yaml` — vom Meta-Maintainer gepflegt)
 3. Kein Eintrag → kein `permissionMode:`-Feld → Agent erbt den Modus vom Parent-Kontext
 
 **Gültige Werte:**
@@ -514,7 +514,7 @@ Steuert den Kommunikationsstil aller Agenten. `sync.py` kopiert `speech/<mode>.m
 ```
 
 Wählt ein vordefiniertes Qualitätsprofil. Einzelne Kriterien können via `dod` überschrieben werden.
-Presets sind in `dod-presets.config.json` definiert (im agent-meta Root).
+Presets sind in `dod-presets.config.yaml` definiert (im agent-meta Root).
 
 | Preset | req-traceability | tests-required | codebase-overview | security-audit |
 |--------|:---------------:|:--------------:|:-----------------:|:--------------:|
@@ -524,11 +524,11 @@ Presets sind in `dod-presets.config.json` definiert (im agent-meta Root).
 
 **Precedence:** `dod` (Projekt-Override) > `dod-preset` > `full` (impliziter Default).
 
-**Neue Presets hinzufügen:** Neuen Eintrag in `dod-presets.config.json` unter `presets` anlegen +
+**Neue Presets hinzufügen:** Neuen Eintrag in `dod-presets.config.yaml` unter `presets` anlegen +
 Enum in `agent-meta.schema.json` erweitern.
 
 **Neue DoD-Spalten hinzufügen:**
-1. Feld in `dod-presets.config.json` (in jedem Preset) + `DOD_DEFAULTS` in `sync.py` definieren
+1. Feld in `dod-presets.config.yaml` (in jedem Preset) + `DOD_DEFAULTS` in `sync.py` definieren
 2. In `sync.py` als `DOD_<NAME>` auto-injizieren
 3. In Agent-Templates via `{{DOD_<NAME>}}` referenzieren
 4. Schema in `agent-meta.schema.json` im `dod`-Block erweitern
@@ -588,7 +588,7 @@ Steuert welche agent-meta-verwalteten Hooks in `.claude/settings.json` registrie
 
 **Two-Gate-Prinzip:** Ein Hook wird nur registriert wenn:
 1. Das Skript in `hooks/1-generic/` (oder `2-platform/`, `0-external/`) existiert
-2. `enabled: true` in `agent-meta.config.json` des Projekts gesetzt ist
+2. `enabled: true` in `agent-meta.config.yaml` des Projekts gesetzt ist
 
 Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
 Skripte werden unabhängig von `enabled` immer nach `.claude/hooks/` kopiert.
@@ -607,7 +607,7 @@ Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 
 ## Variablen und Platzhalter
 
-Alle `{{PLATZHALTER}}` werden via `agent-meta.config.json` befüllt.
+Alle `{{PLATZHALTER}}` werden via `agent-meta.config.yaml` befüllt.
 Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`, `DOD_PRESET`.
 
 **Platform-Config-Platzhalter** (`{{platform.*}}`) werden separat via `platform-configs/<platform>.defaults.yaml` + `.claude/platform-config.yaml` befüllt.
@@ -711,7 +711,7 @@ runtime: "Bun"                   # Runtime / Test-Framework
 ### Snippet hinzufügen
 
 1. Neue Datei in `snippets/<rolle>/` anlegen (mit Frontmatter)
-2. Variable `<ROLLE>_SNIPPETS_PATH` in `agent-meta.config.json` des Projekts setzen
+2. Variable `<ROLLE>_SNIPPETS_PATH` in `agent-meta.config.yaml` des Projekts setzen
 3. `sync.py` kopiert die Datei automatisch nach `.claude/snippets/`
 4. Agent-Template enthält Read-Instruktion: `Lies .claude/snippets/{{<ROLLE>_SNIPPETS_PATH}}`
 
@@ -748,7 +748,7 @@ wenn sie aus den agent-meta-Quellen verschwinden.
 
 ```bash
 # Projekt-eigene Rule anlegen (nie überschrieben)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule security-policy
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-rule security-policy
 ```
 
 ### Abgrenzung zu Extensions
@@ -795,7 +795,7 @@ hooks/
 
 ```bash
 # Projekt-eigenen Hook anlegen (nie überschrieben)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook mein-hook
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook mein-hook
 ```
 
 ### Abgrenzung zu Rules
@@ -805,7 +805,7 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook mei
 | Format | Markdown | Shell-Skript |
 | Laden | Automatisch in Agent-Kontext | Claude Code führt aus (settings.json) |
 | Scope | Kontext für Agenten | Automatisierung / Enforcement |
-| Aktivierung | Immer aktiv | Opt-in via `agent-meta.config.json` |
+| Aktivierung | Immer aktiv | Opt-in via `agent-meta.config.yaml` |
 
 Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
 
@@ -825,7 +825,7 @@ external/<repo>/path/to/SKILL.md    ← Quelldatei im Submodule (gepinnter Commi
 .claude/skills/<skill-name>/        ← kopierte Skill-Dateien (für lazy Read-Zugriff)
 ```
 
-### Konfiguration: `external-skills.config.json`
+### Konfiguration: `external-skills.config.yaml`
 
 Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
 
@@ -860,9 +860,9 @@ Liegt **zentral in agent-meta** (Modell A) — ein Eintrag pro Skill:
 - **`entry`** — Abstraktion über die Einstiegsdatei (egal wie sie im Fremdrepo heißt)
 - **`additional_files`** — weitere Dokumente, die der Agent lazy per Read-Tool laden kann
 
-### Projektlokale Aktivierung: `agent-meta.config.json`
+### Projektlokale Aktivierung: `agent-meta.config.yaml`
 
-Projekte aktivieren freigegebene Skills über einen eigenen Block in `agent-meta.config.json`:
+Projekte aktivieren freigegebene Skills über einen eigenen Block in `agent-meta.config.yaml`:
 
 ```json
 {
@@ -873,8 +873,8 @@ Projekte aktivieren freigegebene Skills über einen eigenen Block in `agent-meta
 ```
 
 **Two-Gate-Regel:** Ein Skill wird nur generiert wenn **beide** Bedingungen erfüllt sind:
-1. `approved: true` in `external-skills.config.json` (Meta-Maintainer-Freigabe)
-2. `enabled: true` in `agent-meta.config.json` des Projekts (Projekt-Opt-in)
+1. `approved: true` in `external-skills.config.yaml` (Meta-Maintainer-Freigabe)
+2. `enabled: true` in `agent-meta.config.yaml` des Projekts (Projekt-Opt-in)
 
 Fehlt der `external-skills`-Block komplett → kein externer Skill wird generiert (sicheres Default).
 Referenziert ein Projekt einen unbekannten oder nicht-approved Skill → `[WARN]` im sync.log.
@@ -890,7 +890,7 @@ python .agent-meta/scripts/sync.py \
   --role my-specialist
 
 # Danach normaler Sync generiert den Wrapper-Agenten
-python .agent-meta/scripts/sync.py --config agent-meta.config.json
+python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 ### Wrapper-Agent
@@ -911,7 +911,7 @@ Um einen Skill auf einen neuen Stand zu bringen:
 cd external/my-skills-repo && git pull
 cd ../.. && git add external/my-skills-repo
 git commit -m "chore: update my-skills-repo submodule"
-python .agent-meta/scripts/sync.py --config agent-meta.config.json
+python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 ---
@@ -999,7 +999,7 @@ Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vo
 
 ### Definition of Done (DoD)
 
-Konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
 Fehlende Einträge verwenden die Defaults.
 
 **Immer aktiv (Pflicht):**
@@ -1083,7 +1083,7 @@ Immer aktiv — unabhängig von DoD-Konfiguration.
         .agent-meta/external/awesome-claude-code/.claude/commands/evaluate-repository.md
 
 0-external/_skill-wrapper.md
-    └── external-skills.config.json (enabled skills)
+    └── external-skills.config.yaml (enabled skills)
             └── .claude/agents/<role>.md (generiert)
             └── .claude/skills/<skill-name>/ (kopiert)
 
@@ -1104,7 +1104,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 | beliebigen `1-generic/` Agenten | Version in Template erhöhen + Projekte neu syncen |
 | `2-platform/sharkord-*.md` | Version in Template erhöhen + `based-on` aktuell halten + Projekte neu syncen |
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
-| `external-skills.config.json` | Projekte neu syncen |
+| `external-skills.config.yaml` | Projekte neu syncen |
 | `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
 | `hint:` Feld in einem Agenten-Template | Projekte neu syncen (AGENT_HINTS wird neu generiert) |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
@@ -1112,7 +1112,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 ### Änderungs-Kategorien
 
 **Einfaches Projektspezifikum (Kommando, Text, Liste):**
-→ Variable in `agent-meta.config.json` → bestehender `{{PLATZHALTER}}`.
+→ Variable in `agent-meta.config.yaml` → bestehender `{{PLATZHALTER}}`.
 
 **Strukturiertes Projektwissen (nur dieses Projekt):**
 → `.claude/3-project/<rolle>-ext.md` im Zielprojekt schreiben.
@@ -1123,7 +1123,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 → Siehe [howto/agent-composition.md](howto/agent-composition.md) für Details.
 
 **Neuen External Skill einbinden:**
-→ `--add-skill` ausführen → `external-skills.config.json` prüfen → Projekte neu syncen.
+→ `--add-skill` ausführen → `external-skills.config.yaml` prüfen → Projekte neu syncen.
 
 **Neue Agenten-Rolle hinzufügen:**
 → `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.

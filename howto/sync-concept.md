@@ -11,7 +11,7 @@ Agenten-Dateien in einem Projekt sind **generierter Output** — kein manuell
 gepflegter Inhalt. Den Projektkontext liefert die `CLAUDE.md` des Projekts.
 
 ```
-agent-meta (Release vX.Y.Z)  +  agent-meta.config.json (im Projekt)
+agent-meta (Release vX.Y.Z)  +  agent-meta.config.yaml (im Projekt)
     = .claude/agents/*.md (generiert, nie manuell editieren)
 ```
 
@@ -32,9 +32,9 @@ agent-meta/
     sync.py          ← das Sync-Script (versioniert mit agent-meta)
   snippets/          ← sprachspezifische Code-Snippets
   external/          ← Git Submodule (externe Skill-Repos via --add-skill)
-  external-skills.config.json   ← Skill-Konfiguration: repos (mit pinned_commit) + skills (mit approved)
-  roles.config.json             ← Rollen-Konfiguration: model + permissionMode pro Rolle
-  agent-meta.schema.json        ← JSON Schema für agent-meta.config.json (Draft-07)
+  external-skills.config.yaml   ← Skill-Konfiguration: repos (mit pinned_commit) + skills (mit approved)
+  roles.config.yaml             ← Rollen-Konfiguration: model + permissionMode pro Rolle
+  agent-meta.schema.json        ← JSON Schema für agent-meta.config.yaml (Draft-07)
   howto/
     sync-concept.md  ← dieses Dokument
     CLAUDE.project-template.md
@@ -45,7 +45,7 @@ agent-meta/
 ```
 <projekt>/
   .agent-meta/               ← Git Submodule (agent-meta Repository)
-  agent-meta.config.json     ← Sync-Konfiguration (manuell gepflegt, versioniert)
+  agent-meta.config.yaml     ← Sync-Konfiguration (manuell gepflegt, versioniert)
   CLAUDE.md                  ← bei "Claude" in ai-providers automatisch erstellt, danach manuell gepflegt
                                ├─ managed block (auto-aktualisiert bei jedem sync)
                                └─ handgeschriebener Rest (nie überschrieben)
@@ -105,7 +105,7 @@ agent-meta/
 
 ---
 
-## agent-meta.config.json
+## agent-meta.config.yaml
 
 Die einzige Konfigurationsdatei die das Projekt pflegt.
 
@@ -167,26 +167,26 @@ Die einzige Konfigurationsdatei die das Projekt pflegt.
 
 ```bash
 # Normaler Sync — generiert Agenten, Rules, Hooks, aktualisiert CLAUDE.md managed block
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 
 # Erst-Einrichtung — erzeugt auch CLAUDE.md, settings.json, settings.local.json, .gitignore
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
 
 # Vorschau ohne Schreiben
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
 
 # Extension erstmalig anlegen
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext developer
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext developer
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext all
 
 # Managed block in bestehenden Extensions aktualisieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 
 # Projekt-eigene Rule anlegen (nie von sync.py überschrieben)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule security-policy
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-rule security-policy
 
 # Projekt-eigenen Hook anlegen (Vorlage)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook my-hook
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook my-hook
 
 # Externen Skill als Submodul registrieren + config-Eintrag anlegen
 py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --source <path> --role <role>
@@ -259,7 +259,7 @@ Nach jedem Lauf wird `sync.log` im Projekt-Root geschrieben (überschreibt den v
 ============================================================
 agent-meta sync — 2026-04-07 10:00:00
 ============================================================
-Config:    agent-meta.config.json
+Config:    agent-meta.config.yaml
 Source:    .agent-meta/ (v0.21.1-beta)
 Mode:      sync
 Platforms: sharkord
@@ -317,22 +317,22 @@ cd .agent-meta && git fetch && git checkout v0.21.1-beta && cd ..
 git add .agent-meta
 
 # 2. Version in Config aktualisieren
-# agent-meta.config.json: "agent-meta-version": "0.21.1-beta"
+# agent-meta.config.yaml: "agent-meta-version": "0.21.1-beta"
 
 # 3. Sync ausführen — alle Agenten, Rules und Hooks werden neu generiert
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 
 # 4. Ergebnis prüfen + committen
-git add .claude/ .gemini/ .continue/ agent-meta.config.json CLAUDE.md
+git add .claude/ .gemini/ .continue/ agent-meta.config.yaml CLAUDE.md
 git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 ```
 
 ### Neue Variable ergänzen
 
 ```bash
-# 1. Variable in agent-meta.config.json ergänzen
+# 1. Variable in agent-meta.config.yaml ergänzen
 # 2. Sync ausführen — befüllt alle Agenten + CLAUDE.md managed block
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 ---
@@ -345,7 +345,7 @@ Wenn eine Rolle aus `config['roles']` entfernt wird, löscht sync.py die zugehö
 [DELETE  ]  .claude/agents/docker.md    (role removed from config)
 ```
 
-Das gilt für alle generisch generierten Agenten. **Externe Skill-Agenten** (`.claude/agents/<role>.md` aus `0-external/`) werden nicht gelöscht — sie werden nur über `enabled: false` in `external-skills.config.json` deaktiviert.
+Das gilt für alle generisch generierten Agenten. **Externe Skill-Agenten** (`.claude/agents/<role>.md` aus `0-external/`) werden nicht gelöscht — sie werden nur über `enabled: false` in `external-skills.config.yaml` deaktiviert.
 
 ---
 
@@ -367,4 +367,4 @@ Projektspezifisches Wissen gehört in:
 
 - Python 3.8+
 - Pflicht: nur stdlib (`json`, `pathlib`, `argparse`, `re`, `shutil`, `datetime`)
-- Optional: `jsonschema` — wenn installiert, wird `agent-meta.config.json` gegen `agent-meta.schema.json` validiert
+- Optional: `jsonschema` — wenn installiert, wird `agent-meta.config.yaml` gegen `agent-meta.schema.json` validiert

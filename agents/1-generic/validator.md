@@ -32,7 +32,7 @@ Du prüfst, ob entwickelte Inhalte die Aufgabenstellung erfüllen und alle aktiv
 
 ## DoD-Konfiguration
 
-Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
 Prüfe nur **aktive** Kriterien. Fehlende Einträge = Default.
 
 | Feature | Default | Steuert |

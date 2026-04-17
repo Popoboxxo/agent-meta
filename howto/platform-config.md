@@ -38,7 +38,7 @@ Beispiele:
 | Typ | Syntax | Quelle | Scope |
 |-----|--------|--------|-------|
 | Platform-Config | `{{platform.*}}` | `platform-configs/*.defaults.yaml` + `.claude/platform-config.yaml` | Nur für Plattform-Templates |
-| Agent-Variables | `{{GROSS_MIT_UNTERSTRICH}}` | `agent-meta.config.json` → `variables` | Alle Templates |
+| Agent-Variables | `{{GROSS_MIT_UNTERSTRICH}}` | `agent-meta.config.yaml` → `variables` | Alle Templates |
 
 Die beiden Namespaces überschneiden sich nie.
 
@@ -92,7 +92,7 @@ Die Datei ist **nicht von sync.py verwaltet** — sie liegt vollständig in der 
 
 `sync.py` führt bei jedem normalen Sync folgende Schritte für Platform-Configs aus:
 
-1. Für jede aktive Plattform (aus `platforms` in `agent-meta.config.json`):
+1. Für jede aktive Plattform (aus `platforms` in `agent-meta.config.yaml`):
    - Lade `platform-configs/<platform>.defaults.yaml` aus dem Meta-Repo
    - Lade `.claude/platform-config.yaml` aus dem Zielprojekt (optional)
    - Merge: Projekt-Overrides überschreiben Defaults
@@ -101,7 +101,7 @@ Die Datei ist **nicht von sync.py verwaltet** — sie liegt vollständig in der 
    - `.claude/agents/*.md` (Platform-Agenten)
 3. Emittiere `[WARN]` wenn ein Pflichtfeld (leerer Default) nicht überschrieben wurde
 
-**Kein Breaking Change:** Bestehende `{{GROSS}}`-Platzhalter aus `agent-meta.config.json` bleiben unverändert.
+**Kein Breaking Change:** Bestehende `{{GROSS}}`-Platzhalter aus `agent-meta.config.yaml` bleiben unverändert.
 
 ---
 
@@ -158,13 +158,13 @@ Ein Template enthält `{{platform.*}}` für einen Key der nicht in den Defaults 
 3. In der Dokumentation (diese Datei) die neue Tabelle ergänzen
 
 Keine Änderung an `sync.py` nötig — das System arbeitet automatisch für jede Plattform
-die in `agent-meta.config.json` → `platforms` aktiv ist und eine Defaults-Datei hat.
+die in `agent-meta.config.yaml` → `platforms` aktiv ist und eine Defaults-Datei hat.
 
 ---
 
 ## Beispiel: Vollständige Einrichtung
 
-**Schritt 1: Zielprojekt konfigurieren** (`agent-meta.config.json`):
+**Schritt 1: Zielprojekt konfigurieren** (`agent-meta.config.yaml`):
 ```json
 {
   "platforms": ["homeassistant"],
@@ -184,7 +184,7 @@ platform:
 
 **Schritt 3: Sync ausführen**:
 ```bash
-python .agent-meta/scripts/sync.py --config agent-meta.config.json
+python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 **Ergebnis:** Alle `{{platform.homeassistant.*}}`-Platzhalter in generierten Rules und

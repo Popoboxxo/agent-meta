@@ -1,0 +1,38 @@
+# DoD-Presets — vordefinierte Qualitäts-Profile.
+# Projekte wählen via 'dod-preset' in agent-meta.config.yaml.
+# Einzelne Werte können via 'dod' Block überschrieben werden.
+# Precedence: dod (Projekt-Override) > dod-preset > full (impliziter Default).
+#
+# Neue Spalten hinzufügen:
+#   1. Feld hier in jedem Preset definieren.
+#   2. Default in 'full' setzen.
+#   3. In sync.py als DOD_<NAME> auto-injizieren.
+#   4. In Agent-Templates via {{DOD_<NAME>}} referenzieren.
+#   5. Schema in agent-meta.schema.json erweitern.
+
+presets:
+
+  # Volle Qualität — Enterprise, regulierte Projekte.
+  # Impliziter Default wenn kein Preset gewählt.
+  full:
+    req-traceability: true
+    tests-required: true
+    codebase-overview: true
+    security-audit: false
+
+  # Goldener Mittelweg — Tests ja, aber keine REQ-IDs und kein CODEBASE_OVERVIEW.
+  # Guter Start für die meisten Projekte.
+  standard:
+    req-traceability: false
+    tests-required: true
+    codebase-overview: false
+    security-audit: false
+
+  # Maximale Geschwindigkeit — kein formaler Overhead.
+  # Doku und Tests entstehen erst auf Anforderung.
+  # Ideal für Maker-Projekte, Experimente, Hackathons.
+  rapid-prototyping:
+    req-traceability: false
+    tests-required: false
+    codebase-overview: false
+    security-audit: false

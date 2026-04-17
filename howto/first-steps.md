@@ -13,7 +13,7 @@ Du hilfst dem User dabei, `agent-meta` in seinem Projekt einzurichten.
 Die Schritte sind unten beschrieben. Führe sie **nicht automatisch durch** —
 erkläre jeden Schritt, frage nach fehlenden Werten und warte auf Bestätigung.
 
-Die Config-Datei `agent-meta.config.json` ist das Herzstück — sie steuert welche
+Die Config-Datei `agent-meta.config.yaml` ist das Herzstück — sie steuert welche
 Agenten generiert werden und mit welchem Kontext. Hilf dem User, alle relevanten
 Felder sinnvoll zu befüllen.
 
@@ -50,10 +50,10 @@ git submodule update --init --recursive
 ## Schritt 2: Example-Config kopieren
 
 ```bash
-cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.yaml
 ```
 
-> **AI-Assistent:** Lies jetzt `agent-meta.config.json` und stelle dem User
+> **AI-Assistent:** Lies jetzt `agent-meta.config.yaml` und stelle dem User
 > die folgenden Fragen, um alle Pflichtfelder zu befüllen.
 
 ---
@@ -108,10 +108,10 @@ cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
 
 Falls das Projekt spezialisierte externe Skill-Agenten benötigt (z.B. 3D-Druck, CAD):
 
-**AI-Assistent:** Lies `.agent-meta/external-skills.config.json` und zeige dem User
+**AI-Assistent:** Lies `.agent-meta/external-skills.config.yaml` und zeige dem User
 welche Skills mit `approved: true` verfügbar sind. Frage ob er welche aktivieren möchte.
 
-Aktivierung in `agent-meta.config.json`:
+Aktivierung in `agent-meta.config.yaml`:
 ```json
 "external-skills": {
   "skill-name": { "enabled": true }
@@ -174,7 +174,7 @@ Mehrere Provider gleichzeitig (z.B. Claude + Continue):
 Bevor echte Dateien geschrieben werden — prüfen ob die Config stimmt:
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
 ```
 
 **AI-Assistent:** Zeige dem User die Ausgabe. Erkläre `[WARN]`-Meldungen
@@ -185,7 +185,7 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
 ## Schritt 6: Ersten Sync ausführen
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
 ```
 
 Das erzeugt (bei aktivem `"Claude"` Provider):
@@ -210,10 +210,10 @@ Zusätzlich wenn weitere Provider aktiv sind:
 cat sync.log
 ```
 
-Alle `[WARN]` zeigen fehlende Variablen. In `agent-meta.config.json` ergänzen, dann erneut syncen:
+Alle `[WARN]` zeigen fehlende Variablen. In `agent-meta.config.yaml` ergänzen, dann erneut syncen:
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 ---
@@ -229,7 +229,7 @@ git add .claude/settings.json .claude/agents/ .gitignore
 ```
 
 ```bash
-git add agent-meta.config.json .gitmodules .agent-meta
+git add agent-meta.config.yaml .gitmodules .agent-meta
 ```
 
 ```bash
@@ -253,7 +253,7 @@ von `sync.py` befüllt und darf nicht manuell bearbeitet werden.
 Checkliste:
 
 - [ ] `.agent-meta/` Submodul auf gewünschter Version
-- [ ] `agent-meta.config.json` vollständig befüllt (inkl. `ai-providers`)
+- [ ] `agent-meta.config.yaml` vollständig befüllt (inkl. `ai-providers`)
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block (wenn `"Claude"` in `ai-providers`)
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter

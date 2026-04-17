@@ -78,7 +78,7 @@ Jedes Hook-Skript beginnt mit Metadaten-Kommentaren:
 
 ## Hook aktivieren (Projekt Opt-in)
 
-In `agent-meta.config.json`:
+In `agent-meta.config.yaml`:
 
 ```json
 {
@@ -106,7 +106,7 @@ Nach dem nächsten Sync ist der Hook in `.claude/settings.json` registriert:
 
 **Two-Gate-Prinzip:** Ein Hook wird nur registriert wenn:
 1. Das Skript in `hooks/1-generic/` (oder 2-platform/0-external) existiert
-2. `enabled: true` in `agent-meta.config.json` gesetzt ist
+2. `enabled: true` in `agent-meta.config.yaml` gesetzt ist
 
 Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
 
@@ -124,7 +124,7 @@ Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
 
 ```bash
 # Erstellt .claude/hooks/<name>.sh aus Template (nie überschrieben)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-hook mein-hook
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook mein-hook
 ```
 
 Das erzeugte Skript liegt in `.claude/hooks/mein-hook.sh` und wird von sync.py **nie überschrieben**
@@ -168,7 +168,7 @@ Claude Code führt Hooks als Shell-Befehle aus. Das Skript:
 Der `dod-push-check`-Hook liest den Test-Command aus:
 
 1. **Umgebungsvariable** `AGENT_META_TEST_COMMAND` (höchste Priorität)
-2. **`variables.TEST_COMMAND`** in `agent-meta.config.json`
+2. **`variables.TEST_COMMAND`** in `agent-meta.config.yaml`
 3. Falls keines gesetzt: Push wird blockiert mit Hinweis zur Konfiguration
 
 ```json
@@ -191,7 +191,7 @@ Der `dod-push-check`-Hook liest den Test-Command aus:
 | Format | Markdown | Shell-Skript |
 | Laden | Automatisch in Agent-Kontext | Claude Code führt aus (settings.json) |
 | Scope | Kontext für Agenten | Automatisierung / Enforcement |
-| Aktivierung | Immer aktiv | Opt-in via `agent-meta.config.json` |
+| Aktivierung | Immer aktiv | Opt-in via `agent-meta.config.yaml` |
 | Stale-Cleanup | `.agent-meta-managed` | `.agent-meta-managed` |
 
 ---
@@ -199,8 +199,8 @@ Der `dod-push-check`-Hook liest den Test-Command aus:
 ## Troubleshooting
 
 **Hook wird nicht ausgeführt:**
-- `enabled: true` in `agent-meta.config.json` gesetzt?
-- Sync laufen lassen: `py .agent-meta/scripts/sync.py --config agent-meta.config.json`
+- `enabled: true` in `agent-meta.config.yaml` gesetzt?
+- Sync laufen lassen: `py .agent-meta/scripts/sync.py --config agent-meta.config.yaml`
 - Eintrag in `.claude/settings.json` unter `hooks.PreToolUse` prüfen
 
 **Hook blockiert fälschlicherweise:**
@@ -208,5 +208,5 @@ Der `dod-push-check`-Hook liest den Test-Command aus:
 - Oder Skript direkt editieren: `.claude/hooks/dod-push-check.sh`
 
 **TEST_COMMAND nicht gefunden:**
-- `variables.TEST_COMMAND` in `agent-meta.config.json` setzen
+- `variables.TEST_COMMAND` in `agent-meta.config.yaml` setzen
 - Oder `export AGENT_META_TEST_COMMAND='bun test'` in Shell-Profil

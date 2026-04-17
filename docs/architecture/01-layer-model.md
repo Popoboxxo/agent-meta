@@ -39,7 +39,7 @@ graph LR
     SJ -->|triggers| CL[Claude Code PreToolUse/PostToolUse]
 ```
 
-Hooks werden **immer kopiert**, aber nur ausgeführt wenn `enabled: true` in `agent-meta.config.json`:
+Hooks werden **immer kopiert**, aber nur ausgeführt wenn `enabled: true` in `agent-meta.config.yaml`:
 ```json
 "hooks": {
   "dod-push-check": { "enabled": true }

@@ -1,0 +1,152 @@
+# agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.
+# Schema-Validierung: agent-meta.schema.json (JSON Schema bleibt JSON — IDE-Standard)
+
+agent-meta-version: 0.24.0
+
+ai-providers:
+  - Claude
+  - Continue
+
+dod-preset: rapid-prototyping
+
+platforms: []
+
+roles:
+  - orchestrator
+  - developer
+  - requirements
+  - validator
+  - documenter
+  - git
+  - release
+  - meta-feedback
+  - ideation
+  - agent-meta-manager
+  - feature
+  - agent-meta-scout
+
+project:
+  name: agent-meta
+  prefix: am
+  short: agent-meta
+
+hooks:
+  dod-push-check:
+    enabled: true
+
+# Provider-spezifische Optionen — pro Provider konfigurierbar
+provider-options:
+  Claude: {}
+  Gemini: {}
+  Continue:
+    generate-prompts: true
+    prompt-mode: full
+
+# Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman'
+speech-mode: caveman
+
+variables:
+  PROJECT_NAME: agent-meta
+  PROJECT_DESCRIPTION: >-
+    Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von
+    Claude-Agenten-Rollen über alle Projekte hinweg.
+  PROJECT_GOAL: >-
+    Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden.
+    Einmal definieren, überall nutzen.
+  PLATFORM: Python CLI (sync.py)
+  RUNTIME: Python 3.x
+  LANGUAGE: "Python 3, Markdown, YAML"
+  PROJECT_LANGUAGES: "Python, Markdown, YAML"
+  COMMUNICATION_LANGUAGE: Deutsch
+  USER_INPUT_LANGUAGE: Deutsch
+  DOCS_LANGUAGE: Englisch
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  CODE_LANGUAGE: Englisch
+  AGENT_META_REPO: Popoboxxo/agent-meta
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/Popoboxxo/agent-meta
+  GIT_MAIN_BRANCH: main
+  SYSTEM_DEPENDENCIES: "- Python: `>=3.8`"
+  SYSTEM_URLS: ""
+  BUILD_COMMAND: python scripts/sync.py --config agent-meta.config.yaml
+  TEST_COMMAND: "(kein automatisiertes Test-System — manuelle Verifikation via --dry-run)"
+  DEV_COMMANDS: |
+    python scripts/sync.py --config agent-meta.config.yaml
+    python scripts/sync.py --config agent-meta.config.yaml --dry-run
+  DEV_STACK_START: "(kein Dev-Stack)"
+  DEV_STACK_RELOAD: "(kein Dev-Stack)"
+  PROJECT_CONTEXT: >-
+    agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
+    Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external)
+    und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/.
+    Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die
+    Weiterentwicklung von agent-meta.
+  PROJECT_STRUCTURE: |
+    agents/
+      0-external/       # Wrapper-Template für externe Skills
+      1-generic/        # Universelle Agent-Templates
+      2-platform/       # Plattform-Overrides (z.B. sharkord)
+    scripts/
+      sync.py           # Agent-Generator
+    snippets/           # Sprachspezifische Code-Snippets
+    external/           # Git Submodule (externe Skill-Repos)
+    howto/              # Anleitungen und Beispiel-Config
+    docs/architecture/  # Architektur-Diagramme (Mermaid)
+  ENTRY_POINT_PATTERN: "scripts/sync.py — Haupt-CLI für Agent-Generierung"
+  KEY_PATTERNS: |
+    - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
+    - Platzhalter {{VARIABLE}} werden von sync.py substituiert
+    - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
+    - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
+  ARCHITECTURE: |
+    agents/
+      0-external/  1-generic/  2-platform/
+    scripts/sync.py
+    snippets/tester/ snippets/developer/
+    external/<repo>/
+  CODE_CONVENTIONS: |
+    - Python: PEP 8, snake_case, klare Funktionsnamen
+    - Keine externen Python-Dependencies außer Stdlib
+    - Markdown-Dateien: GitHub Flavored Markdown
+    - YAML Frontmatter in allen Agent-Templates
+    - Platzhalter immer {{GROSS_MIT_UNTERSTRICH}}
+    - Versionen in Frontmatter bei jeder inhaltlichen Änderung erhöhen
+  EXTRA_DONTS: |
+    - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
+    - KEINE Breaking Changes ohne Major-Version-Bump
+    - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+  CODE_QUALITY_RULES: |
+    - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
+    - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
+    - Agent-Versionen müssen bei inhaltlichen Änderungen erhöht werden
+  TESTER_SNIPPETS_PATH: ""
+  DEVELOPER_SNIPPETS_PATH: ""
+  TEST_COMMANDS: python scripts/sync.py --config agent-meta.config.yaml --dry-run
+  BUILD_COMMANDS: python scripts/sync.py --config agent-meta.config.yaml
+  REQ_CATEGORIES: |
+    - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
+    - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
+    - Entwickler-Experience (Howto, Beispiele, Doku)
+  SERVICE_NAME: "(kein Service)"
+  CONTAINER_NAME: "(kein Container)"
+  PRIMARY_PORT: ""
+  EXTRA_PORTS: ""
+  DOCKER_STACKS_OVERVIEW: "(kein Docker-Stack)"
+  EXTRA_VOLUMES: ""
+  EXTRA_VOLUME_DEFINITIONS: ""
+  EXTRA_ENV_VARS: ""
+  EXTRA_STARTUP_INFO: ""
+  HOST_LAN_IP: ""
+  BUILD_OUTPUT: "(kein Build-Artifact — generierter Output liegt im Zielprojekt)"
+  ARTIFACT_ZIP_CMD: ""
+  ARTIFACT_TAR_CMD: ""
+  GH_ASSETS: ""
+  REQUIRED_BINARIES_SECTION: Keine externen Binaries erforderlich.
+  BINARY_INSTALL_STEPS: ""
+  REQUIRED_BINARY_NAMES: "(keine)"
+  BUILD_SYSTEM_NOTES: >-
+    sync.py generiert .claude/agents/ im Zielprojekt —
+    kein Build-Artifact im Meta-Repo selbst.
+  VERSION_DIST_BEHAVIOUR: Keine Dist. Releases sind Git-Tags auf main.
+
+max-parallel-agents: 2

@@ -20,7 +20,7 @@ External Skills sind spezialisierte Agenten aus Drittrepos — hochspezialisiert
 │                   ▼                                                 │
 │   agent-meta/                                                       │
 │   ├── external/my-skills-repo/  ← gepinnter Commit                 │
-│   └── external-skills.config.json                                  │
+│   └── external-skills.config.yaml                                  │
 │         ├── repos: { my-skills-repo: { pinned_commit } }           │
 │         └── skills: { my-skill: { approved: true/false } }         │
 │                   │                                                 │
@@ -39,7 +39,7 @@ External Skills sind spezialisierte Agenten aus Drittrepos — hochspezialisiert
 ### Zwei-Gate-Prinzip
 
 ```
-external-skills.config.json          agent-meta.config.json
+external-skills.config.yaml          agent-meta.config.yaml
 ────────────────────────────         ──────────────────────────────
 approved: true                  UND  "external-skills": {
   ↑                                    "my-skill": { "enabled": true }
@@ -59,7 +59,7 @@ approved: true                  UND  "external-skills": {
 |-------|---------|
 | **Skill-Autor** | Erstellt Skill-Repo + SKILL.md, stellt es öffentlich bereit |
 | **Meta-Maintainer** | Registriert Skill via `--add-skill`, prüft Qualität, setzt `approved: true` |
-| **Projekt-Entwickler** | Aktiviert gewünschte Skills in `agent-meta.config.json` |
+| **Projekt-Entwickler** | Aktiviert gewünschte Skills in `agent-meta.config.yaml` |
 
 ---
 
@@ -80,7 +80,7 @@ approved: true                  UND  "external-skills": {
       │                        │                               │
       │                        │  ──────────────────────────▶  │
       │                        │  Skill ist verfügbar          │
-      │                        │                               │  agent-meta.config.json:
+      │                        │                               │  agent-meta.config.yaml:
       │                        │                               │  "external-skills": {
       │                        │                               │    "my-skill": { "enabled": true }
       │                        │                               │  }
@@ -97,7 +97,7 @@ approved: true                  UND  "external-skills": {
 Welche Skills im gebundenen agent-meta verfügbar und freigegeben sind:
 
 ```bash
-cat .agent-meta/external-skills.config.json
+cat .agent-meta/external-skills.config.yaml
 ```
 
 Alle Einträge mit `"approved": true` können im Projekt aktiviert werden.
@@ -111,7 +111,7 @@ Alle Einträge mit `"approved": true` können im Projekt aktiviert werden.
 
 ## Schritt 2: Skill im Projekt aktivieren
 
-In `agent-meta.config.json` des Projekts ergänzen:
+In `agent-meta.config.yaml` des Projekts ergänzen:
 
 ```json
 {
@@ -125,7 +125,7 @@ In `agent-meta.config.json` des Projekts ergänzen:
 Dann sync ausführen:
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 **Ergebnis:**
@@ -135,7 +135,7 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.json
 **Skill-Dateien committen:**
 
 ```bash
-git add .claude/agents/ .claude/skills/ agent-meta.config.json
+git add .claude/agents/ .claude/skills/ agent-meta.config.yaml
 ```
 
 ```bash
@@ -202,7 +202,7 @@ py .agent-meta/scripts/sync.py \
 **Was `--add-skill` tut:**
 1. Führt `git submodule add <repo-url> external/<repo-name>` aus
 2. Pinnt den aktuellen Commit automatisch in `pinned_commit`
-3. Schreibt Eintrag in `external-skills.config.json` mit `approved: false`
+3. Schreibt Eintrag in `external-skills.config.yaml` mit `approved: false`
 
 **Danach manuell:**
 
@@ -248,7 +248,7 @@ cd ../../..
 git add .agent-meta/external/neat-little-package
 ```
 
-`pinned_commit` in `external-skills.config.json` manuell aktualisieren:
+`pinned_commit` in `external-skills.config.yaml` manuell aktualisieren:
 
 ```json
 "neat-little-package": {
@@ -259,7 +259,7 @@ git add .agent-meta/external/neat-little-package
 ```
 
 ```bash
-git add .agent-meta/external-skills.config.json
+git add .agent-meta/external-skills.config.yaml
 ```
 
 ```bash
@@ -282,11 +282,11 @@ Dann Projekte auf die neue agent-meta Version updaten lassen.
 [INFO]   .claude/agents/opengrid-designer.md              (skill 'opengrid-openscad' not approved — skipping)
          ↑ Gate 1 nicht erfüllt: Meta-Maintainer hat noch nicht approved.
 
-[INFO]   .claude/agents/opengrid-designer.md              (skill 'opengrid-openscad' not enabled in agent-meta.config.json — skipping)
+[INFO]   .claude/agents/opengrid-designer.md              (skill 'opengrid-openscad' not enabled in agent-meta.config.yaml — skipping)
          ↑ Gate 2 nicht erfüllt: Projekt hat den Skill nicht aktiviert.
 
-[WARN]   external-skills: 'unknown-skill' not found in external-skills.config.json — skipping
-         ↑ Projekt referenziert unbekannten Skill → Tippfehler in agent-meta.config.json?
+[WARN]   external-skills: 'unknown-skill' not found in external-skills.config.yaml — skipping
+         ↑ Projekt referenziert unbekannten Skill → Tippfehler in agent-meta.config.yaml?
 
 [WARN]   external-skills: 'my-skill' is not approved by meta-maintainer — skipping
          ↑ Skill existiert, aber approved: false → Meta-Maintainer muss freigeben.
@@ -305,9 +305,9 @@ Dann Projekte auf die neue agent-meta Version updaten lassen.
 ### Skill wird nicht generiert
 
 1. Prüfe `sync.log` — unter welchem Tag erscheint der Skill? `[INFO]`, `[WARN]` oder gar nicht?
-2. `[INFO] not approved` → `approved: true` in `.agent-meta/external-skills.config.json` fehlt
-3. `[INFO] not enabled` → `"external-skills": { "skill-name": { "enabled": true } }` in `agent-meta.config.json` fehlt
-4. `[WARN] not found` → Skill-Name Tippfehler in `agent-meta.config.json`
+2. `[INFO] not approved` → `approved: true` in `.agent-meta/external-skills.config.yaml` fehlt
+3. `[INFO] not enabled` → `"external-skills": { "skill-name": { "enabled": true } }` in `agent-meta.config.yaml` fehlt
+4. `[WARN] not found` → Skill-Name Tippfehler in `agent-meta.config.yaml`
 5. `[WARN] submodule not initialized` → `git submodule update --init --recursive` ausführen
 
 ### Pinned-Commit-Warning
@@ -350,7 +350,7 @@ git submodule update --init --recursive
 
 ```
 Zielprojekt/
-├── agent-meta.config.json
+├── agent-meta.config.yaml
 │     └── "external-skills": { "home-organization": { "enabled": true } }
 │
 ├── .agent-meta/                          ← agent-meta Submodul
@@ -360,7 +360,7 @@ Zielprojekt/
 │   │           └── home-organization/
 │   │               ├── SKILL.md
 │   │               └── cross-system-compatibility.md
-│   └── external-skills.config.json
+│   └── external-skills.config.yaml
 │         ├── repos: { neat-little-package: { pinned_commit: "be411f3..." } }
 │         └── skills: { home-organization: { approved: true, repo: "neat-little-package" } }
 │
@@ -378,7 +378,7 @@ Zielprojekt/
 ## Versionierungs-Strategie
 
 ```
-agent-meta Version  →  pinned_commit in external-skills.config.json
+agent-meta Version  →  pinned_commit in external-skills.config.yaml
                                ↓
                     Skill-Stand ist deterministisch:
                     Gleiche agent-meta Version = Gleicher Skill-Stand
@@ -403,7 +403,7 @@ agent-meta Version  →  pinned_commit in external-skills.config.json
 - [ ] Committed + gepusht
 
 **Projekt-Entwickler:**
-- [ ] `"external-skills"` Block in `agent-meta.config.json` vorhanden
+- [ ] `"external-skills"` Block in `agent-meta.config.yaml` vorhanden
 - [ ] Skill mit `"enabled": true` aktiviert
 - [ ] `git submodule update --init --recursive` ausgeführt
 - [ ] Sync ausgeführt, `sync.log` ohne Warnings

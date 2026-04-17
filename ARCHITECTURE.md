@@ -63,9 +63,9 @@ agent-meta/
 ├── external/                ← Git Submodule (externe Skill-Repos)
 ├── docs/
 │   └── architecture/        ← Architektur-Diagramme (Mermaid)
-├── agent-meta.schema.json   ← JSON Schema für agent-meta.config.json (Draft-07)
-├── external-skills.config.json  ← Skill-Konfiguration (approved: true/false)
-├── roles.config.json        ← Zentrale Rollen-Konfiguration (model, permissionMode)
+├── agent-meta.schema.json   ← JSON Schema für agent-meta.config.yaml (Draft-07)
+├── external-skills.config.yaml  ← Skill-Konfiguration (approved: true/false)
+├── roles.config.yaml        ← Zentrale Rollen-Konfiguration (model, permissionMode)
 ├── scripts/
 │   └── sync.py              ← Agent-Generator
 └── howto/

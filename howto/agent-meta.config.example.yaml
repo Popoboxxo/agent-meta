@@ -1,0 +1,223 @@
+# agent-meta.config.yaml — Projekt-Konfiguration
+# Kopiere diese Datei als agent-meta.config.yaml ins Projekt-Root und befülle alle Werte.
+# Tipp: Gib howto/first-steps.md deinem AI-Assistenten für eine geführte Einrichtung.
+
+agent-meta-version: 0.24.0
+
+# Multi-Provider: Mehrere AI-Assistenten gleichzeitig. Unterstützt Claude, Gemini, Continue.
+ai-providers:
+  - Claude
+
+# Aktive Plattform-Layer (z.B. ["sharkord"] aktiviert agents/2-platform/sharkord-*.md)
+platforms:
+  - sharkord
+
+# DoD-Qualitätsprofil: 'full' (alle Checks), 'standard' (Tests ja, REQ-IDs nein),
+# 'rapid-prototyping' (alles aus). Einzelne Overrides via 'dod' Block.
+dod-preset: standard
+
+# Optional: Einzelne DoD-Kriterien überschreiben. Fehlende Keys erben vom dod-preset.
+dod:
+  req-traceability: false
+  tests-required: true
+  codebase-overview: false
+  security-audit: false
+
+# Optional: Whitelist der zu generierenden Rollen. Fehlt dieser Key → alle werden generiert.
+roles:
+  - orchestrator
+  - developer
+  - tester
+  - validator
+  - requirements
+  - ideation
+  - documenter
+  - release
+  - docker
+  - meta-feedback
+  - git
+  - feature
+  - agent-meta-manager
+
+# Optional: Modell pro Rolle überschreiben.
+# Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs (z.B. 'claude-opus-4-6').
+model-overrides:
+  git: haiku
+  meta-feedback: haiku
+  developer: sonnet
+
+# Optional: Memory-Scope pro Rolle überschreiben.
+# Scopes: 'project' (in Git), 'local' (gitignored), 'user' (global).
+memory-overrides:
+  validator: project
+  documenter: project
+
+# Optional: Berechtigungsmodus pro Rolle überschreiben.
+# Modi: 'default', 'acceptEdits', 'bypassPermissions', 'plan'.
+permission-mode-overrides:
+  validator: plan
+
+# Optional: Maximale Anzahl parallel laufender Agenten (1–5). Default: 2.
+max-parallel-agents: 2
+
+# Optional: Kommunikationsstil aller Agenten.
+# 'full' (Default) = kein Output. 'short' = Fakten only. 'childish' = kindgerecht. 'caveman' = Höhlenmensch.
+speech-mode: full
+
+# Optional: Hooks aktivieren. Two-Gate: Script muss existieren UND enabled: true gesetzt sein.
+hooks:
+  dod-push-check:
+    enabled: false
+
+project:
+  name: mein-projekt
+  prefix: mp
+  short: mein-projekt
+
+# Optional: Provider-spezifische Optionen.
+provider-options:
+  Claude: {}
+  Gemini: {}
+  Continue:
+    generate-prompts: false
+    prompt-mode: full
+
+# Optional: Externe Skills aktivieren.
+# Nur Skills mit approved: true in external-skills.config.yaml können aktiviert werden.
+external-skills:
+  home-organization:
+    enabled: false
+  opengrid-openscad:
+    enabled: false
+
+variables:
+
+  # ================================================================
+  # GENERISCHE VARIABLEN — für jedes Projekt relevant
+  # ================================================================
+
+  PROJECT_NAME: mein-projekt
+  PROJECT_DESCRIPTION: Kurzbeschreibung was das Projekt macht.
+  PROJECT_GOAL: Das primäre Ziel des Projekts — was soll es für wen lösen?
+  PLATFORM: Sharkord Plugin SDK
+  RUNTIME: Bun (NICHT Node.js)
+  LANGUAGE: TypeScript (ES6+, strict)
+  PROJECT_LANGUAGES: TypeScript
+
+  # Sprache in der der Agent antwortet — End-User Output (z.B. Englisch, Deutsch)
+  COMMUNICATION_LANGUAGE: Englisch
+  # Sprache in der der Nutzer Anweisungen gibt — Agent-Input (z.B. Deutsch, English)
+  USER_INPUT_LANGUAGE: Deutsch
+  # Sprache für öffentliche/externe Doku: README, CHANGELOG, Release Notes, GitHub Issues
+  DOCS_LANGUAGE: Englisch
+  # Sprache für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  # Sprache für code-nahe Artefakte: Code-Kommentare, Commit-Messages, Test-Beschreibungen
+  CODE_LANGUAGE: Englisch
+
+  # GitHub-Repo für Meta-Feedback Issues (owner/repo)
+  AGENT_META_REPO: Popoboxxo/agent-meta
+
+  # Git-Plattform und Repository-Konfiguration
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/owner/repo
+  GIT_MAIN_BRANCH: main
+
+  # Kern-Abhängigkeiten mit konkreter Version — eine pro Zeile als Markdown-Liste
+  SYSTEM_DEPENDENCIES: |
+    - @sharkord/plugin-sdk: `0.0.16`
+    - bun: `>=1.0.0`
+
+  # Relevante System-URLs — eine pro Zeile als Markdown-Liste
+  SYSTEM_URLS: "- Web-UI: `http://localhost:3000`"
+
+  BUILD_COMMAND: bun run build
+  TEST_COMMAND: bun test
+  DEV_COMMANDS: |
+    bun run build
+    bun test
+  DEV_STACK_START: docker compose -f docker-compose.dev.yml up -d
+  DEV_STACK_RELOAD: docker compose -f docker-compose.dev.yml restart
+
+  PROJECT_CONTEXT: Projektbeschreibung für Agenten — Tech-Stack, Ziel, Besonderheiten.
+  PROJECT_STRUCTURE: |
+    src/
+      index.ts       # Entry-Point
+      commands/      # Plugin-Kommandos
+      utils/         # Hilfsfunktionen
+  ENTRY_POINT_PATTERN: "src/index.ts — Entry-Point"
+  KEY_PATTERNS: "- Wichtige Muster des Projekts"
+  ARCHITECTURE: |
+    src/
+      index.ts  # Entry-Point
+  CODE_CONVENTIONS: |
+    - TypeScript ES6+, kein `require`, kein `var`, kein `any`
+    - Named Exports (kein default export)
+    - kebab-case: `module-name.ts`, Tests: `<module>.test.ts`
+  EXTRA_DONTS: ""
+  CODE_QUALITY_RULES: |
+    - Keine ungenutzten Imports
+    - Keine impliziten `any`
+    - Alle Funktionen typisiert
+
+  # Pfad zu sprachspezifischen Snippet-Dateien — relativ zu .agent-meta/snippets/
+  # (z.B. 'tester/bun-typescript.md'). NICHT .claude/snippets/ verwenden!
+  TESTER_SNIPPETS_PATH: tester/bun-typescript.md
+  DEVELOPER_SNIPPETS_PATH: developer/bun-typescript.md
+
+  TEST_COMMANDS: |
+    bun test
+    bun test --coverage
+  BUILD_COMMANDS: bun run build
+  REQ_CATEGORIES: |
+    - Kernfunktionalität
+    - Lifecycle
+    - Nichtfunktionale Anforderungen
+
+  # ================================================================
+  # INFRASTRUKTUR-VARIABLEN — Docker, Ports, Container (generisch)
+  # ================================================================
+
+  SERVICE_NAME: app
+  CONTAINER_NAME: mein-projekt-dev
+
+  # Haupt-Port der Anwendung (Web-UI, HTTP-API etc.)
+  PRIMARY_PORT: "3000"
+
+  # Weitere benötigte Ports — eine pro Zeile als Markdown-Liste. Leer lassen wenn nicht benötigt.
+  EXTRA_PORTS: ""
+
+  DOCKER_STACKS_OVERVIEW: "| Dev-Stack | docker-compose.dev.yml | Lokales Testen |"
+  EXTRA_VOLUMES: ""
+  EXTRA_VOLUME_DEFINITIONS: ""
+  EXTRA_ENV_VARS: ""
+  EXTRA_STARTUP_INFO: ""
+  HOST_LAN_IP: 192.168.1.100
+
+  # ================================================================
+  # PLATTFORM-VARIABLEN — nur bei platforms: ["sharkord"] relevant
+  # ================================================================
+
+  # Docker-Image-Tag des Sharkord-Kernsystems — muss mit peerDependencies in package.json übereinstimmen
+  PRIMARY_IMAGE_TAG: v0.0.16
+
+  # Verzeichnisname des Plugins = 'name'-Feld in package.json
+  PLUGIN_DIR_NAME: mein-projekt
+
+  # ================================================================
+  # PROJEKTSPEZIFISCHE VARIABLEN — individuelle Werte pro Projekt
+  # ================================================================
+
+  BUILD_OUTPUT: |
+    - index.js  (minified ESM Bundle)
+    - package.json
+  ARTIFACT_ZIP_CMD: >-
+    powershell -Command "Compress-Archive -Path 'dist/mein-projekt'
+    -DestinationPath 'dist/mein-projekt.zip' -Force"
+  ARTIFACT_TAR_CMD: cd dist && tar -czf mein-projekt.tar.gz mein-projekt/ && cd ..
+  GH_ASSETS: dist/mein-projekt.zip dist/mein-projekt.tar.gz
+  REQUIRED_BINARIES_SECTION: Keine externen Binaries erforderlich.
+  BINARY_INSTALL_STEPS: ""
+  REQUIRED_BINARY_NAMES: "(keine)"
+  BUILD_SYSTEM_NOTES: bun run build erzeugt dist/mein-projekt/
+  VERSION_DIST_BEHAVIOUR: build.ts kopiert package.json 1:1 ins Dist.

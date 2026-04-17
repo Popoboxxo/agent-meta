@@ -92,7 +92,7 @@ Einfach eine Datei in `.claude/rules/` anlegen — sync.py fasst sie nie an.
 ### Via sync.py Template
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-rule security-policy
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-rule security-policy
 ```
 
 Erstellt `.claude/rules/security-policy.md` mit leerem Template.

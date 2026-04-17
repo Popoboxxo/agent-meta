@@ -1,0 +1,56 @@
+# Zentrale Konfiguration für externe Skill-Pakete (Modell A — liegt in agent-meta).
+#
+# repos: bekannte externe Repos — korrespondieren mit .gitmodules Einträgen.
+#   pinned_commit wird von sync.py gegen den tatsächlichen Submodul-Commit geprüft.
+#
+# skills: 1:n zu repos.
+#   approved: true = vom Meta-Maintainer freigegeben.
+#   Projekte aktivieren via 'external-skills' in agent-meta.config.yaml.
+
+repos:
+  neat-little-package:
+    repo: https://github.com/racurry/neat-little-package
+    local_path: external/neat-little-package
+    pinned_commit: be411f313c9451b62024e91b3af972ee63cbc063
+
+  awesome-claude-code:
+    repo: https://github.com/hesreallyhim/awesome-claude-code
+    local_path: external/awesome-claude-code
+    pinned_commit: 3d8bde25f70bb296267b393890e3f111ef725fb8
+    # Meta-Repo (kuratierter Claude-Ökosystem-Index). Kein Skill-Eintrag —
+    # wird vom agent-meta-scout Agenten (1-generic) direkt per Read-Tool referenziert.
+
+skills:
+
+  home-organization:
+    approved: true
+    repo: neat-little-package
+    source: plugins/spirograph/skills/home-organization
+    entry: SKILL.md
+    role: home-organization-specialist
+    name: Home Organization Specialist
+    description: >-
+      Spezialist für 3D-gedruckte Heimorganisationssysteme (Gridfinity, OpenGrid, NeoGrid,
+      French Cleat, Underware, Deskware) — Auswahl, Kombination und Konfiguration.
+    additional_files:
+      - cross-system-compatibility.md
+      - deskware-reference.md
+      - french-cleat-reference.md
+      - frenchfinity-reference.md
+      - gridfinity-reference.md
+      - neogrid-reference.md
+      - opengrid-reference.md
+      - underware-reference.md
+
+  opengrid-openscad:
+    approved: true
+    repo: neat-little-package
+    source: plugins/spirograph/skills/opengrid-openscad
+    entry: SKILL.md
+    role: opengrid-designer
+    name: OpenGrid OpenSCAD Designer
+    description: >-
+      Spezialist für OpenSCAD-Code-Generierung für wandmontierte
+      OpenGrid/MultiConnect-Organizer (28mm Grid, QuackWorks-Patterns).
+    additional_files:
+      - enhancements.md

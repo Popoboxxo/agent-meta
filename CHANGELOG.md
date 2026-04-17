@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.24.0] — 2026-04-17
+
+### Added
+
+- **YAML config format** — All configuration files now use YAML as the primary format.
+  JSON is still supported as a backward-compatible fallback (auto-detected by file extension).
+  - `agent-meta.config.yaml` replaces `agent-meta.config.json`
+  - `roles.config.yaml` replaces `roles.config.json`
+  - `dod-presets.config.yaml` replaces `dod-presets.config.json`
+  - `external-skills.config.yaml` replaces `external-skills.config.json`
+- **`scripts/migrate-config.py`** — Migration helper: converts an existing
+  `agent-meta.config.json` to `agent-meta.config.yaml`. Strips `_comment*` keys,
+  preserves multiline strings as YAML block scalars, renames original to `.json.bak`.
+  Usage: `py .agent-meta/scripts/migrate-config.py --config agent-meta.config.json`
+- **`howto/agent-meta.config.example.yaml`** — YAML version of the example config
+  (replaces `agent-meta.config.example.json`).
+
+### Changed
+
+- **`sync.py`**: `load_config()` now accepts `.yaml` / `.yml` files directly.
+  When `--config agent-meta.config.json` is passed but a `.yaml` sibling exists,
+  the YAML file is preferred automatically (zero-friction migration).
+  `fill_defaults` write-back also writes YAML when the config is YAML.
+- **`sync.py`**: `load_dod_presets()`, `load_roles_config()`,
+  `load_external_skills_config()` all prefer `.yaml` over `.json` fallback.
+- **`sync.py`**: `add_skill` (`--add-skill`) writes `external-skills.config.yaml`.
+- All documentation and howto files updated: `.config.json` → `.config.yaml`.
+
+### Migration
+
+Existing projects on JSON configs continue to work unchanged.
+To migrate a project config to YAML:
+
+```bash
+py .agent-meta/scripts/migrate-config.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+```
+
+---
+
 ## [0.23.0] — 2026-04-16
 
 ### Added
@@ -43,7 +83,7 @@
 
 - **`--fill-defaults`** — New `sync.py` parameter that writes missing structural config fields
   (`dod-preset`, `max-parallel-agents`, `speech-mode`, `dod.*`) with their schema defaults
-  into `agent-meta.config.json`. Missing `variables.*` keys are reported as `[WARN]` only —
+  into `agent-meta.config.yaml`. Missing `variables.*` keys are reported as `[WARN]` only —
   no empty strings written (no sensible default exists for project-specific variables).
   Supports `--dry-run`. Useful for onboarding new projects or auditing existing configs.
 
@@ -53,7 +93,7 @@
 
 ### Added
 
-- **Multi-Provider Support** (`ai-providers` array in `agent-meta.config.json`):
+- **Multi-Provider Support** (`ai-providers` array in `agent-meta.config.yaml`):
   Projects can now target Claude, Gemini, and Continue simultaneously.
   Backward-compatible: legacy `ai-provider` string field still works.
 - **Continue integration**: sync.py generates `.continue/agents/`, `.continue/prompts/`,
@@ -94,12 +134,12 @@ No breaking changes — fully backward-compatible.
 
 ### Added
 
-- **DoD-Presets** (`dod-preset` in `agent-meta.config.json`):
+- **DoD-Presets** (`dod-preset` in `agent-meta.config.yaml`):
   Predefined quality profiles that set defaults for all DoD criteria.
   Three built-in presets: `full` (all checks, default), `standard` (tests yes, REQ-IDs no),
   `rapid-prototyping` (all off — max speed). Individual overrides via `dod` block.
   Precedence: `dod` override > `dod-preset` > `full`.
-- **`dod-presets.config.json`**: New config file defining presets. Meta-maintainer managed.
+- **`dod-presets.config.yaml`**: New config file defining presets. Meta-maintainer managed.
   Easy to extend: add a new preset entry, update schema enum.
 - **DoD visibility**: Resolved DoD values now appear in CLAUDE.md managed block
   (preset name + all criteria). sync.log shows `[INFO] DoD preset '...' -> ...`.
@@ -137,7 +177,7 @@ No breaking changes — fully backward-compatible.
   - Skill-aware: discovers opengrid-openscad and home-organization skills at runtime
   - BOSL2-aware: checks via `get_libraries`, uses library features when available
   - Versioned iteration: `model_v01.scad` → `model_v02.scad` — never overwrites previous state
-- New role in `roles.config.json`: tier `optional`, model `sonnet`, memory `local`
+- New role in `roles.config.yaml`: tier `optional`, model `sonnet`, memory `local`
 - New role in `agent-meta.schema.json` roles enum
 - ROLE_MAP entry in `sync.py`
 
@@ -156,13 +196,13 @@ No breaking changes — fully backward-compatible.
 
 ### Added
 
-- **Configurable Definition of Done** (`dod` block in `agent-meta.config.json`):
+- **Configurable Definition of Done** (`dod` block in `agent-meta.config.yaml`):
   Four independently toggleable quality criteria: `req-traceability` (default: true),
   `tests-required` (default: true), `codebase-overview` (default: true),
   `security-audit` (default: false). Missing `dod` block = all defaults (backward-compatible).
   `sync.py` injects `{{DOD_REQ_TRACEABILITY}}`, `{{DOD_TESTS_REQUIRED}}`,
   `{{DOD_CODEBASE_OVERVIEW}}`, `{{DOD_SECURITY_AUDIT}}` as template variables.
-- **Role tier classification** (`tier` field in `roles.config.json`):
+- **Role tier classification** (`tier` field in `roles.config.yaml`):
   `required` (orchestrator, developer, git), `recommended` (tester, validator, documenter,
   requirements, feature), `optional` (all others). Tier is a recommendation — all roles
   are generated by default. Users control via `roles` whitelist.
@@ -196,7 +236,7 @@ No breaking changes — fully backward-compatible.
   parallel validation+documentation (6∥7), DoD-Status block.
 - **agent-meta-manager.md** v1.0.0 → v1.1.0: Seven skill lifecycle sub-workflows.
 - **meta-feedback.md** v1.3.2 → v1.4.0: External skill feedback type + label.
-- **roles.config.json**: `tier` field added to all roles, `developer` description
+- **roles.config.yaml**: `tier` field added to all roles, `developer` description
   simplified (removed "nach REQ-IDs" — now conditional).
 - **agent-meta.schema.json**: `dod` block, `max-parallel-agents` field.
 - **CLAUDE.md**: DoD config section, commit format with Conventional Commits explanation,
@@ -218,7 +258,7 @@ No breaking changes — all new features are opt-in with backward-compatible def
 
 - `dod` block is optional. If absent, all defaults apply (same behavior as before).
 - `max-parallel-agents` defaults to 2. Set to 1 to keep sequential behavior.
-- `tier` in `roles.config.json` is informational — does not filter roles.
+- `tier` in `roles.config.yaml` is informational — does not filter roles.
 - Agent templates now contain `?`-marked steps that respect DoD config. With default
   config (all true), behavior is identical to v0.17.0.
 - Commit conventions now correctly exempt `chore`, `docs`, `ci` from REQ-ID requirement.
@@ -236,7 +276,7 @@ No breaking changes — all new features are opt-in with backward-compatible def
   Registrierung in `.claude/settings.json` nur bei Opt-in: `"hooks": {"<name>": {"enabled": true}}`.
   Settings.json wird bei jedem Sync gemergt (Hooks-Section) — nicht mehr nur einmalig angelegt.
 - **`dod-push-check.sh`** (`hooks/1-generic/`): Blockiert `git push` wenn Tests nicht grün sind.
-  Liest `TEST_COMMAND` aus `agent-meta.config.json` oder `$AGENT_META_TEST_COMMAND`.
+  Liest `TEST_COMMAND` aus `agent-meta.config.yaml` oder `$AGENT_META_TEST_COMMAND`.
 - **`--create-hook <name>`** in `sync.py`: Erstellt `.claude/hooks/<name>.sh` als Template.
   Projekt-eigene Hooks — nie von sync.py überschrieben.
 - **`init_settings_local_json()`** in `sync.py`: Erstellt `.claude/settings.local.json` Skeleton
@@ -245,14 +285,14 @@ No breaking changes — all new features are opt-in with backward-compatible def
   Schichten, Sync-Verhalten, dod-push-check Konfiguration, Abgrenzung zu Rules.
 - **`permissionMode`-Injection** in `sync.py`: `resolve_permission_mode()` +
   `inject_permission_mode_field()` — analog zu `model` und `memory`.
-  Liest aus `roles.config.json` (Meta-Default) oder `permission-mode-overrides` in
-  `agent-meta.config.json` (Projekt-Override).
-- **`permission_mode`-Feld in `roles.config.json`**: `validator` → `plan`,
+  Liest aus `roles.config.yaml` (Meta-Default) oder `permission-mode-overrides` in
+  `agent-meta.config.yaml` (Projekt-Override).
+- **`permission_mode`-Feld in `roles.config.yaml`**: `validator` → `plan`,
   `security-auditor` → `plan`. Alle anderen Rollen leer (Standard-Verhalten).
-- **`permission-mode-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen
+- **`permission-mode-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen
   überschreiben. Gültige Werte: `plan`, `acceptEdits`, `bypassPermissions`, `default`.
 - **`agent-meta.schema.json`** (neu): Vollständiges JSON Schema Draft-07 für
-  `agent-meta.config.json`. Validiert alle Top-Level-Keys, Enum-Werte für
+  `agent-meta.config.yaml`. Validiert alle Top-Level-Keys, Enum-Werte für
   `model-overrides` (haiku/sonnet/opus), `memory-overrides` (project/local/user),
   `permission-mode-overrides` (plan/acceptEdits/bypassPermissions/default), Hooks, External Skills.
 - **Optionale Schema-Validierung** in `sync.py`: Wenn `jsonschema` installiert ist,
@@ -273,7 +313,7 @@ No breaking changes — all new features are opt-in with backward-compatible def
 - **`CLAUDE.md`**: Hooks-System, permissionMode-Overrides, JSON-Schema, settings.json-Verhalten,
   settings.local.json-Init, agent-isolation.md — alle neuen Konzepte vollständig dokumentiert.
 - **`howto/instantiate-project.md`**: `$schema`-Zeile im Config-Template ergänzt.
-- **`agent-meta.config.json`** (self-hosting): `$schema`-Referenz ergänzt.
+- **`agent-meta.config.yaml`** (self-hosting): `$schema`-Referenz ergänzt.
 
 ### Migration von v0.16.5
 
@@ -285,7 +325,7 @@ Keine Breaking Changes.
 - `.claude/settings.local.json` wird beim nächsten Sync (wenn nicht vorhanden) erstellt.
 - `validator` und `security-auditor` erhalten `permissionMode: plan` im generierten Agent.
   Falls das für ein Projekt nicht gewünscht ist:
-  `"permission-mode-overrides": {"validator": "default"}` in `agent-meta.config.json`.
+  `"permission-mode-overrides": {"validator": "default"}` in `agent-meta.config.yaml`.
 
 ---
 
@@ -317,22 +357,22 @@ kein Log-Eintrag, kein Warning.
 ### Added
 
 - **`howto/agent-memory.md`** (neu): Vollständige Dokumentation des Agent-Memory-Systems —
-  drei Scopes (`project`, `local`, `user`), Konfiguration via `roles.config.json` +
+  drei Scopes (`project`, `local`, `user`), Konfiguration via `roles.config.yaml` +
   `memory-overrides`, MEMORY.md-Struktur-Empfehlungen, `.gitignore`-Verhalten.
 - **`memory:`-Injection in `sync.py`**: `resolve_memory()` + `inject_memory_field()` —
-  liest Memory-Scope aus `roles.config.json` (Meta-Default) oder `memory-overrides` in
-  `agent-meta.config.json` (Projekt-Override). Wird nach `model:` in den Frontmatter injiziert.
-- **`memory`-Feld in `roles.config.json`**: Memory-Scope-Defaults für alle Rollen.
+  liest Memory-Scope aus `roles.config.yaml` (Meta-Default) oder `memory-overrides` in
+  `agent-meta.config.yaml` (Projekt-Override). Wird nach `model:` in den Frontmatter injiziert.
+- **`memory`-Feld in `roles.config.yaml`**: Memory-Scope-Defaults für alle Rollen.
   `validator`, `documenter`, `requirements`, `security-auditor` → `project`;
   `agent-meta-scout` → `local`; alle anderen → leer (kein Gedächtnis).
-- **`memory-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen
+- **`memory-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen
   überschreiben. Precedence: Projekt-Override > Meta-Default > kein Feld.
 - **`CLAUDE.md`**: `memory-overrides`-Abschnitt mit Scopes-Tabelle und Defaults ergänzt.
 
 ### Migration von v0.16.3
 
 Keine Breaking Changes — generierte Agenten bekommen ggf. ein neues `memory:`-Feld,
-wenn `roles.config.json` einen Default definiert. Wer das nicht möchte: `"memory-overrides": { "<rolle>": "" }` im Projekt setzen.
+wenn `roles.config.yaml` einen Default definiert. Wer das nicht möchte: `"memory-overrides": { "<rolle>": "" }` im Projekt setzen.
 
 ---
 
@@ -340,18 +380,18 @@ wenn `roles.config.json` einen Default definiert. Wer das nicht möchte: `"memor
 
 ### Changed
 
-- **`roles.config.json`** (neu): Modell-Defaults aus `sync.py` ausgelagert —
+- **`roles.config.yaml`** (neu): Modell-Defaults aus `sync.py` ausgelagert —
   Meta-Maintainer pflegt Rollen + empfohlene Modelle + Beschreibungen zentral in dieser Datei.
   `sync.py` liest Defaults von dort statt aus einer hardkodierten Konstante.
 - **`sync.py`**: `DEFAULT_MODEL_MAP`-Konstante entfernt → `load_roles_config()` liest
-  `roles.config.json`; `resolve_model()` nimmt `agent_meta_root` als Parameter.
-- **`CLAUDE.md`**: `model-overrides`-Abschnitt zeigt auf `roles.config.json` statt sync.py;
-  Verzeichnisbaum um `roles.config.json` ergänzt.
+  `roles.config.yaml`; `resolve_model()` nimmt `agent_meta_root` als Parameter.
+- **`CLAUDE.md`**: `model-overrides`-Abschnitt zeigt auf `roles.config.yaml` statt sync.py;
+  Verzeichnisbaum um `roles.config.yaml` ergänzt.
 
 ### Migration von v0.16.2
 
 Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
-`roles.config.json` statt in `sync.py`.
+`roles.config.yaml` statt in `sync.py`.
 
 ---
 
@@ -361,7 +401,7 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
 
 - **Zentrales Modell-Mapping** (`DEFAULT_MODEL_MAP` in `sync.py`): Meta-Maintainer pflegt
   empfohlene Claude-Modelle pro Rolle. `sync.py` injiziert `model:`-Feld beim Generieren.
-- **`model-overrides`** in `agent-meta.config.json`: Projekte können einzelne Rollen überschreiben.
+- **`model-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen überschreiben.
   Precedence: Projekt-Override > Meta-Default > kein Feld (erbt vom Parent).
 - **`resolve_model()`** + **`inject_model_field()`** in `sync.py`: neue Hilfsfunktionen.
   `inject_model_field()` fügt `model:` nach `name:` ein, überschreibt bestehende Werte,
@@ -399,7 +439,7 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
   Wird **ausschließlich auf explizite Nutzer-Anfrage** gestartet (kein Auto-Trigger).
 - **`external/awesome-claude-code`**: neues Git Submodule (Meta-Repo mit kuratierten Claude-Skills).
   Gepinnt auf `3d8bde25`. Kein Skill-Wrapper — wird direkt vom `agent-meta-scout` per Read-Tool genutzt.
-- **`external-skills.config.json`**: neuer `repos`-Eintrag für `awesome-claude-code`.
+- **`external-skills.config.yaml`**: neuer `repos`-Eintrag für `awesome-claude-code`.
 - **Orchestrator Workflow M**: "Claude-Ökosystem scouten" — explizite Trigger-Liste,
   `agent-meta-scout` in Agenten-Tabelle eingetragen.
 
@@ -466,19 +506,19 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
 
 ### Breaking Changes
 
-- `external-skills.config.json`: `"submodules"` renamed to `"repos"` — update existing configs
-- `external-skills.config.json`: `"enabled"` renamed to `"approved"` (meta-maintainer quality gate)
-- `external-skills.config.json`: skill key `"submodule"` renamed to `"repo"`
-- `external-skills.catalog.json`: removed — content merged into `external-skills.config.json`
-- Projects must now opt-in to external skills via `"external-skills"` block in `agent-meta.config.json`
+- `external-skills.config.yaml`: `"submodules"` renamed to `"repos"` — update existing configs
+- `external-skills.config.yaml`: `"enabled"` renamed to `"approved"` (meta-maintainer quality gate)
+- `external-skills.config.yaml`: skill key `"submodule"` renamed to `"repo"`
+- `external-skills.catalog.json`: removed — content merged into `external-skills.config.yaml`
+- Projects must now opt-in to external skills via `"external-skills"` block in `agent-meta.config.yaml`
 
 ### Added
 
 - **Two-gate system for external skills:** `approved: true` (meta-maintainer) + `enabled: true` in project config both required
-- **`repos` section** in `external-skills.config.json`: 1:n relationship to skills, with `pinned_commit` for deterministic versioning
+- **`repos` section** in `external-skills.config.yaml`: 1:n relationship to skills, with `pinned_commit` for deterministic versioning
 - **`pinned_commit` enforcement:** `sync.py` warns on every sync if submodule deviates from pinned commit
 - **`add_skill()`** now auto-pins current commit to `pinned_commit` on registration
-- **Project opt-in:** new `"external-skills"` block in `agent-meta.config.json` activates approved skills per project
+- **Project opt-in:** new `"external-skills"` block in `agent-meta.config.yaml` activates approved skills per project
 - **`[WARN]`** for unknown or non-approved skills referenced in project config
 - **`howto/external-skills.md`**: comprehensive howto with ASCII diagrams, full lifecycle (Skill-Autor → Meta-Maintainer → Projekt-Entwickler), `--add-skill` parameter reference, log output guide, troubleshooting, versioning strategy
 - **`howto/first-steps.md`**: guided AI-assisted setup for first-time config
@@ -497,12 +537,12 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
 
 See [howto/upgrade-guide.md](howto/upgrade-guide.md) — section "Breaking Change: v0.14.4 → approved".
 
-In `external-skills.config.json`:
+In `external-skills.config.yaml`:
 - Rename `"submodules"` → `"repos"`, add `"pinned_commit"` to each repo entry
 - Rename `"enabled"` → `"approved"` in each skill entry
 - Rename `"submodule"` → `"repo"` in each skill entry
 
-In each project's `agent-meta.config.json`:
+In each project's `agent-meta.config.yaml`:
 - Add `"external-skills": { "skill-name": { "enabled": true } }` for each desired skill
 
 ---
@@ -634,7 +674,7 @@ In each project's `agent-meta.config.json`:
 
 ### Changed
 
-- `agent-meta.config.json` (self-hosting) — `roles` whitelist added, excludes `docker` + `tester` → 0 warnings on sync
+- `agent-meta.config.yaml` (self-hosting) — `roles` whitelist added, excludes `docker` + `tester` → 0 warnings on sync
 - `agent-meta.config.example.json` — `roles` field documented with comment
 
 ---
@@ -689,7 +729,7 @@ In each project's `agent-meta.config.json`:
 
 - **`0-external` Layer** — neuer Agenten-Layer für externe Skill-Pakete aus Drittrepos
 - `agents/0-external/_skill-wrapper.md` — generisches Wrapper-Template: Header + `{{SKILL_CONTENT}}` Substitution + lazy `additional_files`
-- `external-skills.config.json` — zentrale Skill-Konfiguration (Modell A): Submodule-URLs + Skill-Mapping + `enabled: true/false` Aktivierung
+- `external-skills.config.yaml` — zentrale Skill-Konfiguration (Modell A): Submodule-URLs + Skill-Mapping + `enabled: true/false` Aktivierung
 - `sync.py` — `sync_external_skills()`: generiert `.claude/agents/<role>.md` + kopiert Skill-Dateien nach `.claude/skills/<skill-name>/`
 - `sync.py` — `--add-skill <repo-url> --skill-name --source --role [--entry]`: registriert Git Submodule + legt Config-Eintrag an
 - CLAUDE.md — vollständiger "External Skills (0-external Layer)"-Abschnitt mit Konzept, Konfigurationsformat, Workflow, Versionierung
@@ -697,7 +737,7 @@ In each project's `agent-meta.config.json`:
 ### Changed
 
 - CLAUDE.md — "Drei-Schichten-Modell" → "Schichten-Modell" (0-external ergänzt, Override-Reihenfolge aktualisiert)
-- CLAUDE.md — Verzeichnisstruktur: `0-external/`, `external/`, `external-skills.config.json` dokumentiert
+- CLAUDE.md — Verzeichnisstruktur: `0-external/`, `external/`, `external-skills.config.yaml` dokumentiert
 - CLAUDE.md — Abhängigkeits-Karte + Änderungs-Kategorien um External Skills ergänzt
 
 ---

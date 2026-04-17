@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.23.0`
+**Current version:** `0.24.0`
 
 ---
 
@@ -66,7 +66,7 @@ git submodule add <repo-url> .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.23.0
+cd .agent-meta && git checkout v0.24.0
 ```
 
 ```bash
@@ -80,7 +80,7 @@ git submodule update --init --recursive
 ### 2. Create config
 
 ```bash
-cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.json
+cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.yaml
 ```
 
 Fill in your project values — see [howto/first-steps.md](howto/first-steps.md) for a guided walkthrough.
@@ -88,7 +88,7 @@ Fill in your project values — see [howto/first-steps.md](howto/first-steps.md)
 ### 3. Generate agents
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --init
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
 ```
 
 ```bash
@@ -108,13 +108,13 @@ Extensions let you add project-specific knowledge to a generated agent. The exte
 
 ```bash
 # Create extension for one role
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext developer
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext developer
 
 # Create extensions for all roles
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext all
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext all
 
 # Update managed blocks after config changes
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 ```
 
 Extensions live in `.claude/3-project/<prefix>-<role>-ext.md` in your project — never in this repo.
@@ -138,15 +138,15 @@ cd ..
 Update config version field: `"agent-meta-version": "<new-version>"`
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
 ```
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 ```
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 ```
 
 See [howto/upgrade-guide.md](howto/upgrade-guide.md) for details.
@@ -177,7 +177,7 @@ agent-meta/
     agent-meta.config.example.json
   scripts/
     sync.py           ← agent generator
-  external-skills.config.json  ← central skill registry (approved/pinned)
+  external-skills.config.yaml  ← central skill registry (approved/pinned)
   VERSION
   CHANGELOG.md
 ```

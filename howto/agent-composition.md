@@ -249,7 +249,7 @@ mit Sharkord-Anpassungen bei `Development Environment` und `Don'ts`, plus dem ne
 
 ```bash
 # dry-run zeigt was generiert wird (ohne zu schreiben)
-py .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
 cat sync.log  # INFO-Zeile: "composed from 1-generic/developer.md + sharkord-developer.md"
 ```
 
