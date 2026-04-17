@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.25.0] — 2026-04-17
+
+### Added
+
+- **`scripts/lib/`** — sync.py in 13 eigenständige Module aufgeteilt (log, io, config,
+  roles, dod, platform, providers, agents, rules, hooks, skills, extensions, context).
+  Jedes Modul ist ≤600 Zeilen und einzeln lesbar — optimiert für LLM-gestützte Entwicklung.
+- **`providers.config.yaml`** — `PROVIDER_CONFIG` aus sync.py ausgelagert.
+  Neuen AI-Provider (Cursor, Windsurf, ...) hinzufügen ohne Python-Code-Änderung.
+  Enthält auch `gitignore_entries` pro Provider.
+- **`templates/`** — Managed-Block-Templates als echte Dateien statt Multiline-Strings im Code:
+  `managed-block.md`, `managed-block-project-stub.md`, `claude-md-managed.md`
+
+### Changed
+
+- **`scripts/sync.py`**: 3151 → 259 Zeilen — reiner CLI-Entrypoint.
+  Alle Logik in `scripts/lib/` Module verschoben.
+- **`roles.config.yaml`**: `ROLE_MAP` wird jetzt dynamisch aus den Rollen-Keys gebaut —
+  kein separates Dict mehr im Python-Code.
+- **`dod-presets.config.yaml`**: `DOD_DEFAULTS` hardcoded Dict entfernt —
+  das `full`-Preset dient als Fallback (war inhaltlich identisch).
+
+---
+
 ## [0.24.0] — 2026-04-17
 
 ### Added
