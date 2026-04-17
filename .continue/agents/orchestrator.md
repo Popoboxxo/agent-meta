@@ -21,7 +21,7 @@ korrekt abläuft.
 agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
-**Sprachen:** Python, Markdown, JSON
+**Sprachen:** Python, Markdown, YAML
 
 ### Aktive DoD-Features
 
@@ -189,7 +189,7 @@ oder ähnliches sagt:
 
 **H1 — Nur Agenten-Dateien neu generieren (gleiche Version):**
 ```
-1. Führe aus: python .agent-meta/scripts/sync.py --config agent-meta.config.json
+1. Führe aus: python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
 2. Prüfe sync.log auf Warnungen
 3. git → Commit: "chore: regenerate agents"
 ```
@@ -198,7 +198,7 @@ oder ähnliches sagt:
 ```
 1. Prüfe aktuelle Version:
    cat .agent-meta/VERSION
-   cat agent-meta.config.json  # → "agent-meta-version"
+   cat agent-meta.config.yaml  # → "agent-meta-version"
 
 2. CHANGELOG der neuen Version lesen (Breaking Changes?):
    cd .agent-meta && git fetch && git log --oneline HEAD..v<neue-version> && cd ..
@@ -207,27 +207,27 @@ oder ähnliches sagt:
 3. Submodul auf neue Version ziehen:
    cd .agent-meta && git checkout v<neue-version> && cd ..
 
-4. agent-meta-version in agent-meta.config.json aktualisieren:
+4. agent-meta-version in agent-meta.config.yaml aktualisieren:
    "agent-meta-version": "<neue-version>"
 
 5. Dry-Run — was ändert sich?
-   python .agent-meta/scripts/sync.py --config agent-meta.config.json --dry-run
+   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
    → sync.log prüfen: neue Warnungen = fehlende Variablen
 
-6. Fehlende Variablen in agent-meta.config.json ergänzen
+6. Fehlende Variablen in agent-meta.config.yaml ergänzen
    (Referenz: cat .agent-meta/howto/agent-meta.config.example.json)
 
 7. Generische + Plattform-Agenten neu generieren:
-   python .agent-meta/scripts/sync.py --config agent-meta.config.json
+   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
    → sync.log prüfen
    → Welche Plattform-Agenten aktiv sind steht in config "platforms": [...]
    → sync.py wählt automatisch den richtigen 2-platform Layer
 
 8. Extensions aktualisieren (managed block):
-   python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 
 9. git → Commit + Push:
-   Dateien: .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.json
+   Dateien: .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.yaml
    Message: "chore: upgrade agent-meta to v<neue-version>"
 ```
 
@@ -239,7 +239,7 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H3 — Neue Extension erstellen:**
 ```
-1. python .agent-meta/scripts/sync.py --config agent-meta.config.json --create-ext <rolle>
+1. python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <rolle>
    (oder --create-ext all für alle Rollen)
 2. Öffne .claude/3-project/am-<rolle>-ext.md
 3. Ergänze projektspezifisches Wissen im Projektbereich (unterhalb des managed blocks)
@@ -247,14 +247,14 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H4 — Extension managed block aktualisieren** (nach config-Änderung):
 ```
-1. python .agent-meta/scripts/sync.py --config agent-meta.config.json --update-ext
+1. python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 2. Prüfe sync.log
 ```
 
 **Wichtig:**
 - `.claude/agents/` = generierter Output — nie manuell bearbeiten
 - `.claude/3-project/*-ext.md` = Projektdatei — managed block wird aktualisiert, Projektbereich nie
-- `agent-meta.config.json` = Projekt-Config — manuell pflegen
+- `agent-meta.config.yaml` = Projekt-Config — manuell pflegen
 
 ---
 
@@ -395,14 +395,15 @@ Folgende Aufgaben führst du als Orchestrator SELBST aus (nicht delegieren):
 ### Development Environment
 
 <!-- PROJEKTSPEZIFISCH: Build- und Docker-Kommandos eintragen -->
-python scripts/sync.py --config agent-meta.config.json
-python scripts/sync.py --config agent-meta.config.json --dry-run
+python scripts/sync.py --config agent-meta.config.yaml
+python scripts/sync.py --config agent-meta.config.yaml --dry-run
+
 
 ---
 
 ## Definition of Done (DoD) — Enforced by Orchestrator
 
-Die DoD-Kriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Die DoD-Kriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
 Fehlende Einträge verwenden die unten angegebenen Defaults.
 
 Eine Aufgabe ist erst abgeschlossen, wenn **alle aktiven** Kriterien erfüllt sind:

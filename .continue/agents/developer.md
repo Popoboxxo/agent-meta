@@ -24,7 +24,7 @@ Du implementierst Features und Bugfixes.
 agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
-**Sprachen:** Python, Markdown, JSON
+**Sprachen:** Python, Markdown, YAML
 
 ---
 
@@ -75,9 +75,10 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 - Platzhalter immer {{GROSS_MIT_UNTERSTRICH}}
 - Versionen in Frontmatter bei jeder inhaltlichen Änderung erhöhen
 
+
 ### Sprach-Best-Practices (PFLICHT)
 
-Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `Python 3, Markdown, JSON`
+Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `Python 3, Markdown, YAML`
 
 Falls `.claude/snippets/` existiert: Lies sie jetzt sofort mit dem Read-Tool und wende alle Code-Patterns an.
 
@@ -103,6 +104,7 @@ scripts/sync.py
 snippets/tester/ snippets/developer/
 external/<repo>/
 
+
 ---
 
 ## Commit-Konventionen
@@ -124,8 +126,9 @@ Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>` (ohne RE
 ## Development Environment
 
 <!-- PROJEKTSPEZIFISCH: Build-Kommandos eintragen -->
-python scripts/sync.py --config agent-meta.config.json
-python scripts/sync.py --config agent-meta.config.json --dry-run
+python scripts/sync.py --config agent-meta.config.yaml
+python scripts/sync.py --config agent-meta.config.yaml --dry-run
+
 
 ---
 
@@ -140,6 +143,7 @@ python scripts/sync.py --config agent-meta.config.json --dry-run
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+
 
 ## Delegation
 

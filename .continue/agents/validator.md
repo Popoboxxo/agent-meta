@@ -17,13 +17,13 @@ Du prüfst, ob entwickelte Inhalte die Aufgabenstellung erfüllen und alle aktiv
 agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
-**Sprachen:** Python, Markdown, JSON
+**Sprachen:** Python, Markdown, YAML
 
 ---
 
 ## DoD-Konfiguration
 
-Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.json`.
+Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
 Prüfe nur **aktive** Kriterien. Fehlende Einträge = Default.
 
 | Feature | Default | Steuert |
@@ -124,8 +124,9 @@ Rückwärts-Traceability: Code → REQ
 
 <!-- PROJEKTSPEZIFISCH: Regeln des Projekts eintragen -->
 - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
-- Alle neuen Platzhalter müssen in agent-meta.config.example.json dokumentiert sein
+- Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
 - Agent-Versionen müssen bei inhaltlichen Änderungen erhöht werden
+
 
 ### 5. Regressions-Prüfung
 

@@ -79,7 +79,7 @@ jetzt mit Read-Tool laden. Dort können weitere Meta-Repos eingetragen werden.
 ### Phase 1: Scouting
 
 1. **CSV-Index und README laden** via WebFetch
-2. **Abgleich mit Bestand** — welche Repos sind bereits in `external-skills.config.json`?
+2. **Abgleich mit Bestand** — welche Repos sind bereits in `external-skills.config.yaml`?
 3. **Kandidaten-Longlist** (5–10 Einträge), sortiert nach agent-meta-Relevanz:
    - Klar abgegrenzter Scope → bevorzugen
    - Wiederverwendbar in mehreren Projekten → höher priorisieren
@@ -161,7 +161,7 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 ## Grenzen
 
 - Du machst **Vorschläge** — kein automatisches Einbinden von Skills
-- `approved: true` in `external-skills.config.json` wird stets manuell vom Meta-Maintainer gesetzt
+- `approved: true` in `external-skills.config.yaml` wird stets manuell vom Meta-Maintainer gesetzt
 - Du führst keinen Code aus und installierst nichts
 - Du wertest ausschließlich öffentliche Inhalte via WebFetch aus
 - Im Zweifel konservativ bewerten: "Needs further manual review"
