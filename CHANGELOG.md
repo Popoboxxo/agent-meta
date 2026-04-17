@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.25.1] — 2026-04-17
+
+### Fixed
+
+- **CLAUDE.md**: Veraltete Referenzen auf `ROLE_MAP in sync.py`, `DOD_DEFAULTS in sync.py`
+  und `MANAGED_BLOCK_TEMPLATE in sync.py` korrigiert — zeigen jetzt auf die richtigen
+  Dateien (`roles.config.yaml`, `dod-presets.config.yaml`, `templates/managed-block.md`,
+  `scripts/lib/dod.py`).
+- **CLAUDE.md**: Verzeichnisstruktur um `scripts/lib/`, `templates/` und
+  `providers.config.yaml` ergänzt.
+- **howto/sync-concept.md**: Struktur um neue Module aktualisiert.
+- **howto/upgrade-guide.md**: `MANAGED_BLOCK_TEMPLATE` → `templates/managed-block.md`.
+
+---
+
 ## [0.25.0] — 2026-04-17
 
 ### Added
