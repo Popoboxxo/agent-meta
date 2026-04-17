@@ -174,7 +174,29 @@ agent-meta/
                                     Nicht-leerer Wert = sinnvoller Default
 
   scripts/
-    sync.py              ← Agent-Generator
+    sync.py              ← CLI-Entrypoint (nur argparse + main)
+    lib/                 ← Logik-Module (je ≤600 Zeilen, LLM-lesbar)
+      agents.py          ← Frontmatter, Composition, sync_agents
+      config.py          ← load_config, build_variables, fill_defaults
+      context.py         ← init_claude_md, sync_context, gitignore
+      dod.py             ← load_dod_presets, resolve_dod
+      extensions.py      ← create_extension, update_extensions
+      hooks.py           ← sync_hooks, create_hook
+      io.py              ← YAML/JSON-Loader
+      log.py             ← SyncLog
+      platform.py        ← load_platform_config, substitute_platform
+      providers.py       ← load_providers_config, resolve_providers
+      roles.py           ← load_roles_config, build_role_map, Resolver
+      rules.py           ← sync_rules, sync_speech_mode, create_rule
+      skills.py          ← External Skills: load, sync, add
+
+  templates/
+    managed-block.md              ← Extension-managed-block Template
+    managed-block-project-stub.md ← Projektbereich-Stub für neue Extensions
+    claude-md-managed.md          ← CLAUDE.md managed-block Template
+
+  providers.config.yaml  ← Provider-Konfiguration (Claude, Gemini, Continue)
+                           Neuen Provider hinzufügen ohne Python-Code-Änderung
 ```
 
 ---
@@ -528,8 +550,8 @@ Presets sind in `dod-presets.config.yaml` definiert (im agent-meta Root).
 Enum in `agent-meta.schema.json` erweitern.
 
 **Neue DoD-Spalten hinzufügen:**
-1. Feld in `dod-presets.config.yaml` (in jedem Preset) + `DOD_DEFAULTS` in `sync.py` definieren
-2. In `sync.py` als `DOD_<NAME>` auto-injizieren
+1. Feld in `dod-presets.config.yaml` (in jedem Preset + `full`-Preset als Fallback) definieren
+2. In `scripts/lib/dod.py` als `DOD_<NAME>` auto-injizieren
 3. In Agent-Templates via `{{DOD_<NAME>}}` referenzieren
 4. Schema in `agent-meta.schema.json` im `dod`-Block erweitern
 
@@ -1105,7 +1127,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 | `2-platform/sharkord-*.md` | Version in Template erhöhen + `based-on` aktuell halten + Projekte neu syncen |
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
 | `external-skills.config.yaml` | Projekte neu syncen |
-| `ROLE_MAP` in `sync.py` | Rollen-Übersicht hier + `howto/instantiate-project.md` |
+| `roles.config.yaml` (neue Rolle) | Rollen-Übersicht hier + `howto/instantiate-project.md` |
 | `hint:` Feld in einem Agenten-Template | Projekte neu syncen (AGENT_HINTS wird neu generiert) |
 | `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
 
@@ -1126,7 +1148,7 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 → `--add-skill` ausführen → `external-skills.config.yaml` prüfen → Projekte neu syncen.
 
 **Neue Agenten-Rolle hinzufügen:**
-→ `1-generic/<rolle>.md` + `ROLE_MAP` in `sync.py` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
+→ `1-generic/<rolle>.md` + Eintrag in `roles.config.yaml` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
 
 ---
 

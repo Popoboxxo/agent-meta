@@ -29,7 +29,10 @@ agent-meta/
     2-platform/      ← plattformspezifische Agenten
     3-project/       ← projektspezifische Overrides (selten)
   scripts/
-    sync.py          ← das Sync-Script (versioniert mit agent-meta)
+    sync.py          ← CLI-Entrypoint (argparse + main, ~260 Zeilen)
+    lib/             ← Logik-Module (je ≤600 Zeilen)
+  templates/         ← managed-block Templates (Extension, CLAUDE.md)
+  providers.config.yaml ← Provider-Konfiguration (Claude, Gemini, Continue)
   snippets/          ← sprachspezifische Code-Snippets
   external/          ← Git Submodule (externe Skill-Repos via --add-skill)
   external-skills.config.yaml   ← Skill-Konfiguration: repos (mit pinned_commit) + skills (mit approved)

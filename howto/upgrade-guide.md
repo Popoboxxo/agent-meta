@@ -84,7 +84,7 @@ py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
 cat sync.log
 ```
 
-Falls eine neue agent-meta Version den `MANAGED_BLOCK_TEMPLATE` in `sync.py` ändert
+Falls eine neue agent-meta Version das `templates/managed-block.md` ändert
 (neue Variablen, andere Struktur), werden alle Extensions beim nächsten `--update-ext`
 automatisch auf das neue Format gebracht.
 
