@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.3.1"
+version: "1.3.2"
 description: "Docker-Operationen: Compose-Stacks, Binary-Management, Test-Umgebungen und Diagnose — plattformunabhängig."
 hint: "Dev-Stack starten/stoppen, Dockerfiles, Binary-Management"
 tools:
@@ -349,6 +349,6 @@ docker inspect {{CONTAINER_NAME}}
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - `docker-compose.yml` Kommentare → {{CODE_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

@@ -164,28 +164,69 @@ agent-meta/
     2-platform/       <- platform-specific overrides (e.g. sharkord-docker.md)
     3-project/        <- intentionally empty (extensions live in your project)
   config/             <- framework config (managed by agent-meta, do not edit manually)
-    project.yaml          <- agent-meta self-hosting config
-    role-defaults.yaml    <- default model/memory/permissionMode per role
-    dod-presets.yaml      <- DoD quality presets
-    ai-providers.yaml     <- provider settings (Claude, Gemini, Continue)
-    skills-registry.yaml  <- external skills registry (approved/pinned)
+    project.yaml                <- agent-meta self-hosting config
+    role-defaults.yaml          <- default model/memory/permissionMode per role
+    dod-presets.yaml            <- DoD quality presets
+    ai-providers.yaml           <- provider settings (Claude, Gemini, Continue)
+    skills-registry.yaml        <- external skills registry (approved/pinned)
     project-config.schema.json  <- JSON Schema for project.yaml
   external/           <- Git submodules for external skill repos (pinned commits)
+  hooks/
+    0-external/       <- hooks from external skill repos
+    1-generic/        <- universal hooks (e.g. dod-push-check.sh)
+    2-platform/       <- platform-specific hook overrides
+  platform-configs/
+    *.defaults.yaml   <- default values for {{platform.*}} placeholders
+  rules/
+    0-external/       <- rules from external skill repos
+    1-generic/        <- universal rules (auto-loaded into every agent context)
+    2-platform/       <- platform-specific rule overrides
   snippets/
     tester/           <- language-specific test snippets (bun-typescript, pytest-python)
     developer/        <- language-specific code pattern snippets
+  speech/
+    short.md          <- facts-only style (no filler)
+    childish.md       <- playful, toy/animal analogies
+    caveman.md        <- caveman style: short, direct
+  templates/
+    managed-block.md              <- extension managed-block template
+    managed-block-project-stub.md <- project area stub for new extensions
+    claude-md-managed.md          <- CLAUDE.md managed-block template
   howto/
     first-steps.md
     instantiate-project.md
     agent-composition.md
+    agent-delegation-map.md
+    agent-isolation.md
+    agent-memory.md
+    agent-versioning.md
     external-skills.md
+    hooks.md
+    multi-provider.md
+    platform-config.md
+    rules.md
+    sync-concept.md
     upgrade-guide.md
     config-layout.md
     CLAUDE.project-template.md
-    sync-concept.md
-    project.yaml.example  <- starter config template for new projects
+    CLAUDE.personal-template.md
+    project.yaml.example          <- starter config template for new projects
   scripts/
-    sync.py           <- agent generator
+    sync.py           <- CLI entrypoint (argparse + main)
+    lib/
+      agents.py       <- frontmatter, composition, sync_agents
+      config.py       <- load_config, build_variables, substitute
+      context.py      <- init_claude_md, sync_context, gitignore, sync_snippets
+      dod.py          <- load_dod_presets, resolve_dod
+      extensions.py   <- create_extension, update_extensions
+      hooks.py        <- sync_hooks, create_hook
+      io.py           <- YAML/JSON loader
+      log.py          <- SyncLog
+      platform.py     <- load_platform_config, substitute_platform
+      providers.py    <- load_providers_config, resolve_providers
+      roles.py        <- load_roles_config, build_role_map
+      rules.py        <- sync_rules, sync_speech_mode, create_rule
+      skills.py       <- external skills: load, sync, add
   VERSION
   CHANGELOG.md
 ```

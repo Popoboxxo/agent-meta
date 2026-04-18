@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.2.0"
+version: "1.2.1"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -40,7 +40,7 @@ Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` 
 
 ## Sprache
 
-{{COMMUNICATION_LANGUAGE}}
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

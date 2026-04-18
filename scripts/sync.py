@@ -45,7 +45,7 @@ from lib.log import SyncLog
 from lib.io import _load_yaml_or_json, _write_yaml
 from lib.config import (
     load_config, find_agent_meta_root, build_variables,
-    fill_defaults, read_version, substitute,
+    fill_defaults, read_version, read_git_version, substitute,
 )
 from lib.roles import build_role_map
 from lib.dod import resolve_dod
@@ -183,6 +183,15 @@ def main():
     variables, pre_warnings = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
+
+    # Warn if actual git tag of agent-meta submodule doesn't match configured version
+    git_version = read_git_version(agent_meta_root)
+    if git_version != "unknown" and git_version != source_version:
+        log.warn(
+            f"agent-meta version mismatch: config says v{source_version}, "
+            f"but submodule git tag is v{git_version} — "
+            f"run: git submodule update --init .agent-meta"
+        )
 
     for w in pre_warnings:
         log.warn(w)

@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.0.1"
+version: "2.0.2"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -140,7 +140,7 @@ Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Code-Kommentare → {{CODE_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

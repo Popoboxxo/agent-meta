@@ -55,8 +55,10 @@ def build_frontmatter(content: str, name: str, description: str,
                 content, count=1, flags=re.MULTILINE,
             )
         else:
+            # Match the full description field including multiline YAML continuations
+            # (continuation lines start with whitespace in YAML)
             content = re.sub(
-                r'(^description:.*\n)',
+                r'(^description:(?:.*\n)(?:[ \t]+.*\n)*)',
                 rf'\1generated-from: "{generated_from}"\n',
                 content, count=1, flags=re.MULTILINE,
             )

@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.0.1"
+version: "2.0.2"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -219,6 +219,6 @@ Prüfe Konsistenz zwischen Dokumenten:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Berichte → {{INTERNAL_DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

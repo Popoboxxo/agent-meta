@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -198,6 +199,24 @@ def read_version(agent_meta_root: Path) -> str:
     version_file = agent_meta_root / "VERSION"
     if version_file.exists():
         return version_file.read_text(encoding="utf-8").strip()
+    return "unknown"
+
+
+def read_git_version(agent_meta_root: Path) -> str:
+    """Return the actual git tag version of agent-meta via git describe --tags.
+
+    Falls back to 'unknown' if git is unavailable or no tags exist.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--exact-match"],
+            cwd=str(agent_meta_root),
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip().lstrip("v")
+    except Exception:
+        pass
     return "unknown"
 
 

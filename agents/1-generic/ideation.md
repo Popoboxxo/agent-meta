@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.2.1"
+version: "1.2.2"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -169,6 +169,4 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Strukturierte Zusammenfassungen → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

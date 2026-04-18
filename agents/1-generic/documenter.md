@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.3.1"
+version: "1.3.2"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
@@ -150,7 +150,7 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## Sprache
 
-- `README.md` → **{{DOCS_LANGUAGE}}**
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- `README.md` → {{DOCS_LANGUAGE}}
 - Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → {{INTERNAL_DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

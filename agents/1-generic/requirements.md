@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.3.1"
+version: "1.3.2"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
@@ -144,6 +144,6 @@ Wenn eine bestehende Anforderung geändert wird:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - `docs/REQUIREMENTS.md` → {{INTERNAL_DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
