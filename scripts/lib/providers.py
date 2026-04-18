@@ -24,7 +24,7 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 "agents_dir": ".claude/agents",
                 "agent_ext": ".md",
                 "context_file": "CLAUDE.md",
-                "context_template": "howto/CLAUDE.project-template.md",
+                "context_template": "howto/configs/CLAUDE.project-template.md",
                 "has_rules": True,
                 "has_hooks": True,
                 "has_settings": True,

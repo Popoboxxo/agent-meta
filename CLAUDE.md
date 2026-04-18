@@ -441,7 +441,7 @@ Gültige Werte: `"haiku"`, `"sonnet"`, `"opus"` (oder vollständige Modell-IDs).
 | `openscad-developer` | `local` | Gelernte Toleranzen, Drucker-Profile, bewährte Patterns |
 | alle anderen | *(leer)* | Kein persistentes Gedächtnis |
 
-Siehe [howto/agent-memory.md](howto/agent-memory.md) für vollständige Dokumentation.
+Siehe [howto/features/agent-memory.md](howto/features/agent-memory.md) für vollständige Dokumentation.
 
 ---
 
@@ -502,7 +502,7 @@ Dort steuert er welche Workflow-Schritte (markiert mit `∥`) parallel ausgefüh
 **Modell-Kosten beachten:** Zwei `opus`-Agenten parallel = doppelter Token-Verbrauch.
 Bei knappem Budget `1` setzen oder teure Rollen via `model-overrides` auf `sonnet` herabstufen.
 
-Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vollständige
+Siehe [howto/features/agent-delegation-map.md](howto/features/agent-delegation-map.md) für die vollständige
 Delegations-Matrix und parallelisierbare Workflow-Schritte.
 
 ---
@@ -627,7 +627,7 @@ Skripte werden unabhängig von `enabled` immer nach `.claude/hooks/` kopiert.
 
 Projekt-eigene Hooks anlegen: `--create-hook <name>` (nie von sync.py überschrieben).
 
-Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
+Siehe [howto/features/hooks.md](howto/features/hooks.md) für vollständige Dokumentation.
 
 ---
 
@@ -637,7 +637,7 @@ Alle `{{PLATZHALTER}}` werden via `.meta-config/project.yaml` befüllt.
 Auto-injiziert (nicht in config nötig): `AGENT_META_VERSION`, `AGENT_META_DATE`, `AGENT_TABLE`, `AGENT_HINTS`, `AI_PROVIDER`, `MAX_PARALLEL_AGENTS`, `DOD_REQ_TRACEABILITY`, `DOD_TESTS_REQUIRED`, `DOD_CODEBASE_OVERVIEW`, `DOD_SECURITY_AUDIT`, `DOD_PRESET`.
 
 **Platform-Config-Platzhalter** (`{{platform.*}}`) werden separat via `platform-configs/<platform>.defaults.yaml` + `.claude/platform-config.yaml` befüllt.
-Siehe [howto/platform-config.md](howto/platform-config.md) für Details.
+Siehe [howto/features/platform-config.md](howto/features/platform-config.md) für Details.
 
 ### Generische Variablen (alle Projekte)
 
@@ -785,7 +785,7 @@ py .agent-meta/scripts/sync.py --create-rule security-policy
 | Laden | Explizit per Read-Hook | **Automatisch** |
 | Quelle | Projekt schreibt selbst | Alle 4 Schichten |
 
-Siehe [howto/rules.md](howto/rules.md) für vollständige Dokumentation.
+Siehe [howto/features/rules.md](howto/features/rules.md) für vollständige Dokumentation.
 
 ---
 
@@ -833,7 +833,7 @@ py .agent-meta/scripts/sync.py --create-hook mein-hook
 | Scope | Kontext für Agenten | Automatisierung / Enforcement |
 | Aktivierung | Immer aktiv | Opt-in via `.meta-config/project.yaml` |
 
-Siehe [howto/hooks.md](howto/hooks.md) für vollständige Dokumentation.
+Siehe [howto/features/hooks.md](howto/features/hooks.md) für vollständige Dokumentation.
 
 ---
 
@@ -951,7 +951,7 @@ python .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 Definiert in `1-generic/orchestrator.md`, gelten projektübergreifend.
 Schritte mit `∥` können parallel laufen (gesteuert via `max-parallel-agents`).
-Siehe [howto/agent-delegation-map.md](howto/agent-delegation-map.md) für die vollständige Delegations-Matrix.
+Siehe [howto/features/agent-delegation-map.md](howto/features/agent-delegation-map.md) für die vollständige Delegations-Matrix.
 
 ### Branch-Guard (Schritt 0 für Workflows A, B, E, L)
 ```
@@ -1136,9 +1136,9 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 | `2-platform/sharkord-*.md` | Version in Template erhöhen + `based-on` aktuell halten + Projekte neu syncen |
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
 | `config/skills-registry.yaml` | Projekte neu syncen |
-| `config/role-defaults.yaml` (neue Rolle) | Rollen-Übersicht hier + `howto/instantiate-project.md` |
+| `config/role-defaults.yaml` (neue Rolle) | Rollen-Übersicht hier + `howto/setup/instantiate-project.md` |
 | `hint:` Feld in einem Agenten-Template | Projekte neu syncen (AGENT_HINTS wird neu generiert) |
-| `howto/CLAUDE.project-template.md` | `howto/instantiate-project.md` (Checkliste) |
+| `howto/CLAUDE.project-template.md` | `howto/setup/instantiate-project.md` (Checkliste) |
 
 ### Änderungs-Kategorien
 
@@ -1151,13 +1151,13 @@ ARCHITECTURE.md ← grafische Übersicht (Mermaid)
 **Plattformwissen verbessern (gilt für alle Projekte auf Plattform X):**
 → `2-platform/<plattform>-<rolle>.md` ändern → Projekte neu syncen.
 → Composition-Modus: `extends: "1-generic/<rolle>.md"` + `patches:` im Frontmatter nutzen statt Vollkopie.
-→ Siehe [howto/agent-composition.md](howto/agent-composition.md) für Details.
+→ Siehe [howto/features/agent-composition.md](howto/features/agent-composition.md) für Details.
 
 **Neuen External Skill einbinden:**
 → `--add-skill` ausführen → `config/skills-registry.yaml` prüfen → Projekte neu syncen.
 
 **Neue Agenten-Rolle hinzufügen:**
-→ `1-generic/<rolle>.md` + Eintrag in `config/role-defaults.yaml` + Tabellen in dieser `CLAUDE.md` + `howto/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
+→ `1-generic/<rolle>.md` + Eintrag in `config/role-defaults.yaml` + Tabellen in dieser `CLAUDE.md` + `howto/setup/instantiate-project.md` + `howto/CLAUDE.project-template.md`.
 
 ---
 
@@ -1190,17 +1190,17 @@ Nur geänderte Agenten bekommen eine neue Versionsnummer.
 Wenn eine `1-generic`-Datei versioniert wird und ein `2-platform`-Agent darauf basiert:
 → `based-on` im Plattform-Agenten auf neue Generic-Version aktualisieren.
 
-Siehe [howto/agent-versioning.md](howto/agent-versioning.md) für Details.
+Siehe [howto/features/agent-versioning.md](howto/features/agent-versioning.md) für Details.
 
 ---
 
 ## Neue Projekte hinzufügen
 
-Siehe [howto/instantiate-project.md](howto/instantiate-project.md).
+Siehe [howto/setup/instantiate-project.md](howto/setup/instantiate-project.md).
 
 ## Upgrade auf neue Version
 
-Siehe [howto/upgrade-guide.md](howto/upgrade-guide.md).
+Siehe [howto/setup/upgrade-guide.md](howto/setup/upgrade-guide.md).
 
 ---
 

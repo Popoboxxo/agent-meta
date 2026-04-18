@@ -149,6 +149,6 @@ A01 Broken Access Control, A02 Cryptographic Failures, A03 Injection ...
 
 ## Verwandte Dokumente
 
-- [howto/agent-composition.md](agent-composition.md) — extends/patches System für Agenten
-- [howto/external-skills.md](external-skills.md) — External Skills einbinden
+- [howto/features/agent-composition.md](agent-composition.md) — extends/patches System für Agenten
+- [howto/features/external-skills.md](external-skills.md) — External Skills einbinden
 - [CLAUDE.md](../CLAUDE.md) — Vollständige Konfigurations-Referenz

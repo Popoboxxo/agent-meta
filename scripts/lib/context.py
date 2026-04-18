@@ -248,7 +248,7 @@ def init_claude_personal(
         return
 
     content = template_path.read_text(encoding="utf-8")
-    log.action("INIT", "CLAUDE.personal.md", "howto/CLAUDE.personal-template.md")
+    log.action("INIT", "CLAUDE.personal.md", "howto/configs/CLAUDE.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 
@@ -417,7 +417,7 @@ def init_claude_md(
 
     content = template_path.read_text(encoding="utf-8")
     content = substitute(content, variables, "CLAUDE.project-template.md", log)
-    log.action("INIT", "CLAUDE.md", "howto/CLAUDE.project-template.md")
+    log.action("INIT", "CLAUDE.md", "howto/configs/CLAUDE.project-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 

@@ -166,7 +166,7 @@ Mehrere Provider gleichzeitig (z.B. Claude + Continue):
 | `Continue` | `.continue/agents/`, `.continue/rules/project-context.md` | Wenn Continue im Team eingesetzt wird |
 
 > Backward-Compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
-> Vollständige Dokumentation: [howto/multi-provider.md](multi-provider.md)
+> Vollständige Dokumentation: [docs/providers/multi-provider.md](multi-provider.md)
 
 **AI-Assistent:** Frage ob neben Claude noch weitere Provider (Gemini, Continue) genutzt werden sollen.
 

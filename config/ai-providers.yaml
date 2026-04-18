@@ -3,7 +3,7 @@ providers:
     agents_dir: .claude/agents
     agent_ext: .md
     context_file: CLAUDE.md
-    context_template: howto/CLAUDE.project-template.md
+    context_template: howto/configs/CLAUDE.project-template.md
     has_rules: true
     has_hooks: true
     has_commands: true
@@ -20,7 +20,7 @@ providers:
     agents_dir: .gemini/agents
     agent_ext: .md
     context_file: .gemini/GEMINI.md
-    context_template: howto/GEMINI.project-template.md
+    context_template: howto/configs/GEMINI.project-template.md
     has_rules: false
     has_hooks: true
     hooks_dir: .gemini/hooks
@@ -29,19 +29,19 @@ providers:
     commands_ext: .toml
     has_settings: true
     settings_file: .gemini/settings.json
-    settings_template: howto/GEMINI.settings-template.json
+    settings_template: howto/configs/GEMINI.settings-template.json
     gitignore_entries: []
 
   Continue:
     agents_dir: .continue/agents
     agent_ext: .md
     context_file: .continue/rules/project-context.md
-    context_template: howto/CONTINUE.project-template.md
+    context_template: howto/configs/CONTINUE.project-template.md
     has_rules: true
     rules_dir: .continue/rules
     has_hooks: false
     has_commands: true
     has_settings: true
     settings_file: .continue/config.yaml
-    settings_template: howto/CONTINUE.config-template.yaml
+    settings_template: howto/configs/CONTINUE.config-template.yaml
     gitignore_entries: []

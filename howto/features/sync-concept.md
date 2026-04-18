@@ -336,7 +336,7 @@ SUMMARY
 Logfile: sync.log
 ```
 
-> **Multi-Provider Dokumentation:** [howto/multi-provider.md](multi-provider.md) — vollständige Beschreibung
+> **Multi-Provider Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — vollständige Beschreibung
 > aller Provider (Claude, Gemini, Continue), Frontmatter-Unterschiede, Stale-Tracking, Troubleshooting.
 
 ---

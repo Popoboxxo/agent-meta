@@ -198,7 +198,7 @@ Falls TEST_COMMAND in der Config gesetzt ist und automatische Push-Blockierung g
 
 Dann erneut syncen — der Hook wird in `.claude/settings.json` registriert.
 
-Vollständige Dokumentation: `.agent-meta/howto/hooks.md`
+Vollständige Dokumentation: `.agent-meta/howto/features/hooks.md`
 
 ### 4. permissionMode-Overrides (optional)
 
@@ -268,7 +268,7 @@ git add .claude/ .gemini/ .continue/ .meta-config/project.yaml .agent-meta
 git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 ```
 
-> **Vollständige Dokumentation:** [howto/multi-provider.md](multi-provider.md)
+> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md)
 
 ---
 

@@ -161,4 +161,4 @@ zu blockieren. Jeder feature-Agent hat seinen eigenen Branch und Arbeitszustand.
 
 - [Claude Code Dokumentation: Agent Isolation](https://docs.anthropic.com/en/docs/claude-code/sub-agents)
 - [Git Worktrees](https://git-scm.com/docs/git-worktree)
-- [howto/agent-composition.md](agent-composition.md) — Overrides für den feature-Agenten
+- [howto/features/agent-composition.md](agent-composition.md) — Overrides für den feature-Agenten

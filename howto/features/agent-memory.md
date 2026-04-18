@@ -212,6 +212,6 @@ Damit wird kein `memory:`-Feld injiziert — der Validator läuft ohne Gedächtn
 
 ## Verwandte Dokumente
 
-- [howto/agent-composition.md](agent-composition.md) — extends/patches System
-- [howto/external-skills.md](external-skills.md) — External Skills einbinden
+- [howto/features/agent-composition.md](agent-composition.md) — extends/patches System
+- [howto/features/external-skills.md](external-skills.md) — External Skills einbinden
 - [CLAUDE.md](../CLAUDE.md) — Vollständige Konfigurations-Referenz (`model-overrides`, `memory-overrides`)

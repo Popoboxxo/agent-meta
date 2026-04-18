@@ -28,7 +28,7 @@ Pflichtschritte — alle vier, sonst ist die Rolle unvollständig:
 1. `agents/1-generic/<rolle>.md` anlegen (mit Frontmatter: `name`, `version`, `description`, `hint`, `tools`)
 2. Eintrag in `config/role-defaults.yaml` (model, memory, permissionMode, tier)
 3. Agenten-Tabelle und Hints-Tabelle in `CLAUDE.md` ergänzen
-4. `howto/instantiate-project.md` und `howto/CLAUDE.project-template.md` ergänzen
+4. `howto/setup/instantiate-project.md` und `howto/CLAUDE.project-template.md` ergänzen
 
 ## Wenn du einen neuen Platzhalter einführst
 

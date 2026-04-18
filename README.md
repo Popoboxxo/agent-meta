@@ -69,7 +69,7 @@ generated agent  +  .claude/3-project/<prefix>-<role>-ext.md  =  full agent cont
 
 ## Quick Start
 
-> **First time setup?** Use [howto/first-steps.md](howto/first-steps.md) — hand it to your AI assistant
+> **First time setup?** Use [howto/setup/first-steps.md](howto/setup/first-steps.md) — hand it to your AI assistant
 > and say: "Help me set up agent-meta in this project." The assistant will guide you interactively.
 
 ### 1. Add as submodule
@@ -94,10 +94,10 @@ git submodule update --init --recursive
 
 ```bash
 mkdir -p .meta-config
-cp .agent-meta/howto/project.yaml.example .meta-config/project.yaml
+cp .agent-meta/howto/configs/project.yaml.example .meta-config/project.yaml
 ```
 
-Fill in your project values — see [howto/first-steps.md](howto/first-steps.md) for a guided walkthrough.
+Fill in your project values — see [howto/setup/first-steps.md](howto/setup/first-steps.md) for a guided walkthrough.
 
 ### 3. Generate agents
 
@@ -163,7 +163,7 @@ py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 ```
 
-See [howto/upgrade-guide.md](howto/upgrade-guide.md) for details.
+See [howto/setup/upgrade-guide.md](howto/setup/upgrade-guide.md) for details.
 
 ---
 
@@ -205,25 +205,37 @@ agent-meta/
     managed-block.md              <- extension managed-block template
     managed-block-project-stub.md <- project area stub for new extensions
     claude-md-managed.md          <- CLAUDE.md managed-block template
+  docs/
+    architecture/       <- architecture deep-dives (layer model, sync flow, roles, ...)
+    providers/
+      gemini-cli.md     <- Gemini CLI: features, limits, config reference
+      multi-provider.md <- multi-provider setup and comparison
   howto/
-    first-steps.md
-    instantiate-project.md
-    agent-composition.md
-    agent-delegation-map.md
-    agent-isolation.md
-    agent-memory.md
-    agent-versioning.md
-    external-skills.md
-    hooks.md
-    multi-provider.md
-    platform-config.md
-    rules.md
-    sync-concept.md
-    upgrade-guide.md
-    config-layout.md
-    CLAUDE.project-template.md
-    CLAUDE.personal-template.md
-    project.yaml.example          <- starter config template for new projects
+    setup/              <- first-time setup, instantiation, upgrade
+      first-steps.md
+      instantiate-project.md
+      upgrade-guide.md
+      config-layout.md
+    features/           <- feature-specific how-tos
+      agent-composition.md
+      agent-delegation-map.md
+      agent-isolation.md
+      agent-memory.md
+      agent-versioning.md
+      external-skills.md
+      hooks.md
+      lifecycle-triggers.md
+      platform-config.md
+      rules.md
+      sync-concept.md
+    configs/            <- templates and starter configs (never edit directly)
+      CLAUDE.project-template.md
+      CLAUDE.personal-template.md
+      GEMINI.project-template.md
+      GEMINI.settings-template.json
+      CONTINUE.project-template.md
+      CONTINUE.config-template.yaml
+      project.yaml.example        <- starter config for new projects
   scripts/
     sync.py           <- CLI entrypoint (argparse + main)
     lib/

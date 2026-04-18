@@ -79,7 +79,7 @@ du legst diese Dateien manuell an.
 > Der Wizard führt Schritt für Schritt durch alle Pflichtfelder,
 > generiert `.meta-config/project.yaml` und startet danach automatisch `--init`.
 >
-> Alternativ: [howto/first-steps.md](first-steps.md) für AI-assistierte Einrichtung.
+> Alternativ: [howto/setup/first-steps.md](first-steps.md) für AI-assistierte Einrichtung.
 
 ### Schritt 1: agent-meta als Submodul einbinden
 
@@ -216,7 +216,7 @@ Konfiguration in `.meta-config/project.yaml`:
 
 Das Legacy-Feld `"ai-provider": "Claude"` (String) wird weiterhin unterstützt — kein Breaking Change.
 
-> **Vollständige Dokumentation:** [howto/multi-provider.md](multi-provider.md) — Provider-Details,
+> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — Provider-Details,
 > Frontmatter-Unterschiede, Sync-Verhalten, Continue Best Practices, Troubleshooting.
 
 ---
@@ -304,7 +304,7 @@ patches:
 ---
 ```
 
-> **Vollständige Anleitung:** [howto/agent-composition.md](agent-composition.md) —
+> **Vollständige Anleitung:** [howto/features/agent-composition.md](agent-composition.md) —
 > alle Patch-Operationen (`append-after`, `replace`, `delete`, `append`), Anchor-Syntax, Beispiele.
 
 ### Externe Skills aktivieren
@@ -322,7 +322,7 @@ Skills werden **pro Projekt** aktiviert — in `.meta-config/project.yaml`:
 
 Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skills.config.yaml`
 
-> **Vollständige Anleitung:** [howto/external-skills.md](external-skills.md) —
+> **Vollständige Anleitung:** [howto/features/external-skills.md](external-skills.md) —
 > Lifecycle, Troubleshooting, Meta-Maintainer-Workflow, Versionierung.
 
 ---
