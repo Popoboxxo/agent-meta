@@ -9,7 +9,8 @@ ai-providers:
 
 dod-preset: rapid-prototyping
 
-platforms: []
+platforms:
+  - agent-meta
 
 roles:
   - orchestrator

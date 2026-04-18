@@ -243,13 +243,28 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
 
     Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
     """
-    # First pass: resolve escaped literals {{% ... %}} → {{...}} (no substitution)
-    text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", r"{{\1}}", text)
+    # First pass: protect escaped literals {{%VAR%}} with unique sentinel
+    _SENTINEL = "\x00ESC\x00"
+    escaped: list[str] = []
 
+    def stash_escape(m):
+        escaped.append(m.group(1))
+        return f"{_SENTINEL}{len(escaped) - 1}{_SENTINEL}"
+
+    text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", stash_escape, text)
+
+    # Second pass: substitute real {{VAR}} placeholders
     def replacer(match):
         key = match.group(1)
         if key in variables:
             return variables[key]
         log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
-    return re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
+
+    text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
+
+    # Third pass: restore escaped literals as {{VAR}} (no substitution happened)
+    for i, name in enumerate(escaped):
+        text = text.replace(f"{_SENTINEL}{i}{_SENTINEL}", f"{{{{{name}}}}}")
+
+    return text
