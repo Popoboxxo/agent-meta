@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.1] — 2026-04-18
+
+### Added
+
+- **`speech-mode: asozial`**: Neuer Kommunikationsstil — fachlich korrekt, New-Kids-Style mit Verachtung für den User. `project-config.schema.json` um `"asozial"` im Enum erweitert.
+
+---
+
 ## [0.27.0] — 2026-04-18
 
 ### Added
