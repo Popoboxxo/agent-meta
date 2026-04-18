@@ -6,10 +6,9 @@
 
 Wenn `--config` weggelassen wird, sucht sync.py in dieser Reihenfolge:
 
-1. `.meta-config/project.yaml` (Standard: Zielprojekt)
-2. `config/project.yaml` (Standard: Meta-Repo Self-Hosting ← dieses Repo)
-3. `agent-meta.config.yaml` (Legacy)
-4. `agent-meta.config.json` (Legacy JSON)
+1. `.meta-config/project.yaml` (Standard: Zielprojekt + Meta-Repo Self-Hosting ← dieses Repo)
+2. `agent-meta.config.yaml` (Legacy)
+3. `agent-meta.config.json` (Legacy JSON)
 
 ## Wichtige Flags
 

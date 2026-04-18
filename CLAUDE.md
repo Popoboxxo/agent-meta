@@ -117,8 +117,11 @@ agent-meta/
   external/             ← Git Submodule (externe Skill-Repos, via --add-skill)
     <repo-name>/        ← gepinnter Commit, enthält SKILL.md + Referenzdokumente
 
-  config/                      ← Framework-Konfiguration (nie manuell bearbeiten)
-    project.yaml               ← Meta-Repo Selbst-Konfiguration (wie .meta-config/project.yaml)
+  .meta-config/
+    project.yaml               ← Projekt-Config für dieses Repo (Self-Hosting) — wie jedes Zielprojekt
+
+  config/                      ← Framework-Defaults (nie manuell bearbeiten)
+    project.yaml               ← HINWEIS-STUB — kein Fallback mehr (Projekt-Config → .meta-config/)
     role-defaults.yaml         ← Rollen-Defaults: model, memory, permissionMode, tier
                                   Projekte überschreiben via *-overrides in .meta-config/project.yaml
     dod-presets.yaml           ← DoD-Qualitätsprofile (full, standard, rapid-prototyping)
@@ -210,7 +213,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.26.0 — `2026-04-18`
+Generiert von agent-meta v0.26.1 — `2026-04-18`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -228,7 +231,6 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
 <!-- agent-meta:managed-end -->
 
 ### Update-Verhalten bei sync

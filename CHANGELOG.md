@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.1] — 2026-04-18
+
+### Fixed
+
+- **Self-Hosting Config Layout**: `config/project.yaml` war gleichzeitig Framework-Default-Verzeichnis und Self-Hosting-Config — semantisch falsch. Die Projekt-Config für das Meta-Repo selbst liegt jetzt korrekt unter `.meta-config/project.yaml` (identisch zu jedem anderen Zielprojekt).
+  - `.meta-config/project.yaml` angelegt mit allen Self-Hosting-Einstellungen
+  - `config/project.yaml` durch Hinweis-Stub ersetzt (Framework-Defaults bleiben in `config/`)
+  - Auto-Detection: `config/project.yaml` aus Kandidaten-Liste entfernt — nur noch `.meta-config/project.yaml` → Legacy-Fallbacks
+  - `sync.py` Root-Erkennung: `"config"` als Elternordner-Sonderfall entfernt
+  - `CLAUDE.md` Verzeichnisstruktur: `.meta-config/` Block ergänzt, `config/project.yaml` als Stub dokumentiert
+  - `.claude/rules/sync-interface.md` Auto-Detection-Liste aktualisiert
+
+---
+
 ## [0.26.0] — 2026-04-18
 
 ### Added

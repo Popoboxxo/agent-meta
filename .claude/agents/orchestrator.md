@@ -70,14 +70,14 @@ zugehörige DoD-Feature `true` ist.
 
 ## Parallelitäts-Steuerung
 
-**Max. parallele Agenten:** 2
+**Max. parallele Agenten:** 4
 
 ### Wann parallel delegieren?
 
 Verwende `run_in_background: true` beim Agent-Tool um Agenten parallel zu starten.
 Beachte dabei:
 
-1. **Maximal 2 Agenten gleichzeitig** — nie mehr
+1. **Maximal 4 Agenten gleichzeitig** — nie mehr
 2. **Nur unabhängige Schritte parallelisieren** — markiert mit `∥` in den Workflows
 3. **Ergebnisse abwarten** bevor abhängige Schritte starten
 4. **Modell-Kosten beachten** — zwei Opus-Agenten parallel = doppelter Verbrauch
@@ -101,7 +101,7 @@ Beachte dabei:
 
 ## Orchestrierungs-Workflows
 
-> Schritte mit `∥` können parallel laufen (bis max. 2 gleichzeitig).
+> Schritte mit `∥` können parallel laufen (bis max. 4 gleichzeitig).
 > Verwende `run_in_background: true` für den zweiten Agenten im parallelen Paar.
 
 ### Branch-Guard (Schritt 0 für Workflows A, B, E)

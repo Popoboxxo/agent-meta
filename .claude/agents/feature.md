@@ -47,7 +47,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ## Feature-Lifecycle
 
-> Schritte mit `∥` können parallel laufen (max. 2 gleichzeitig).
+> Schritte mit `∥` können parallel laufen (max. 4 gleichzeitig).
 > Verwende `run_in_background: true` für den zweiten Agenten im parallelen Paar.
 
 ```

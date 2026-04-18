@@ -20,10 +20,9 @@ Usage:
                                       --source <path> --role <role> [--entry <file>]
 
 Config lookup order (when --config is omitted):
-  1. .meta-config/project.yaml    (new standard location — Zielprojekt)
-  2. config/project.yaml          (new standard location — Meta-Repo self-hosting)
-  3. agent-meta.config.yaml       (legacy flat-root)
-  4. agent-meta.config.json       (legacy JSON fallback)
+  1. .meta-config/project.yaml    (standard location — Zielprojekt + Meta-Repo self-hosting)
+  2. agent-meta.config.yaml       (legacy flat-root)
+  3. agent-meta.config.json       (legacy JSON fallback)
 
 External skills (config/skills-registry.yaml in agent-meta):
   - Managed centrally in agent-meta (Modell A)
@@ -59,6 +58,7 @@ from lib.agents import (
 )
 from lib.rules import sync_rules, sync_speech_mode, create_rule
 from lib.hooks import sync_hooks, create_hook
+from lib.commands import sync_commands_for_provider, create_command
 from lib.skills import (
     load_external_skills_config, check_pinned_commits, sync_external_skills, add_skill,
 )
@@ -81,8 +81,7 @@ EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
 
 # Config auto-detect order when --config is omitted
 _CONFIG_CANDIDATES = [
-    ".meta-config/project.yaml",   # standard: Zielprojekt
-    "config/project.yaml",         # standard: Meta-Repo self-hosting
+    ".meta-config/project.yaml",   # standard: Zielprojekt + Meta-Repo self-hosting
     "agent-meta.config.yaml",      # legacy flat-root
     "agent-meta.config.json",      # legacy JSON
 ]
@@ -121,7 +120,7 @@ def main():
     )
     parser.add_argument("--config", required=False, default=None,
                         help="Path to project.yaml (default: auto-detect .meta-config/project.yaml "
-                             "or legacy .meta-config/project.yaml). Not required for --add-skill.")
+                             "or legacy agent-meta.config.yaml). Not required for --add-skill.")
     parser.add_argument("--init", action="store_true",
                         help="Also generate CLAUDE.md from template (only if not present)")
     parser.add_argument("--only-variables", action="store_true",
@@ -137,6 +136,8 @@ def main():
                         help="Create .claude/hooks/<NAME>.sh template (never overwrites). "
                              "Enable via .meta-config/project.yaml: "
                              "hooks: <NAME>: enabled: true")
+    parser.add_argument("--create-command", metavar="NAME",
+                        help="Create .claude/commands/<NAME>.md template (never overwrites)")
     parser.add_argument("--fill-defaults", action="store_true",
                         help="Write missing config fields with their default values into "
                              ".meta-config/project.yaml (or .json). Structural fields (dod-preset, "
@@ -215,8 +216,7 @@ def main():
     config_resolved = Path(args.config).resolve()
     config_parent_name = config_resolved.parent.name
     # .meta-config/project.yaml → project root is two levels up
-    # config/project.yaml (meta-repo self-hosting) → project root is two levels up
-    if config_parent_name in (".meta-config", "config"):
+    if config_parent_name in (".meta-config",):
         project_root = config_resolved.parent.parent
     else:
         project_root = config_resolved.parent
@@ -267,6 +267,10 @@ def main():
         mode = f"create-hook:{args.create_hook}"
         create_hook(project_root, args.create_hook, log, args.dry_run)
 
+    elif args.create_command:
+        mode = f"create-command:{args.create_command}"
+        create_command(project_root, args.create_command, log, args.dry_run)
+
     else:
         provider_config = load_providers_config(agent_meta_root)
         providers = resolve_providers(config, provider_config)
@@ -314,6 +318,9 @@ def main():
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
+            if pc.get("has_commands", False):
+                sync_commands_for_provider(agent_meta_root, project_root, config, log,
+                                           args.dry_run, provider, variables=variables)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)
