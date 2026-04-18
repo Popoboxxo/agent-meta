@@ -15,6 +15,7 @@ Usage:
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule <name>
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-hook <name>
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
+  python .agent-meta/scripts/sync.py --setup
   python .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name>
                                       --source <path> --role <role> [--entry <file>]
 
@@ -118,6 +119,9 @@ def main():
                              ".meta-config/project.yaml (or .json). Structural fields (dod-preset, "
                              "max-parallel-agents, speech-mode, dod.*) are written when absent. "
                              "Missing variable keys are reported as warnings only.")
+    parser.add_argument("--setup", action="store_true",
+                        help="Interactive setup wizard: guided creation of .meta-config/project.yaml "
+                             "followed by --init sync. Use before the first sync on a new project.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
 
@@ -156,6 +160,21 @@ def main():
         log.write(agent_meta_root / LOGFILE, EXTERNAL_SKILLS_CONFIG,
                   read_version(agent_meta_root), mode, [], args.dry_run)
         return
+
+    if args.setup:
+        from lib.setup import run_setup_wizard
+        cwd = Path.cwd()
+        target_config = Path(args.config).resolve() if args.config else (
+            cwd / ".meta-config" / "project.yaml"
+        )
+        run_setup_wizard(agent_meta_root, cwd, target_config, args.dry_run)
+        if not args.dry_run:
+            # Run --init sync with the freshly created config
+            args.config = str(target_config)
+            args.init = True
+            print("\n  Starte --init Sync mit der neuen Konfiguration...\n")
+        else:
+            return
 
     # All other modes require --config (or auto-detect)
     if not args.config:

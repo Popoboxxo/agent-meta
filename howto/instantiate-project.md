@@ -12,9 +12,14 @@ Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 
 ## Ersteinrichtung
 
-> **Tipp:** Für eine geführte Einrichtung mit einem AI-Assistenten nutze
-> [howto/first-steps.md](first-steps.md) — gib die Datei deinem AI-Tool
-> und sage: "Hilf mir, agent-meta einzurichten."
+> **Tipp — Setup-Wizard:** Statt manueller Config-Erstellung:
+> ```bash
+> py .agent-meta/scripts/sync.py --setup
+> ```
+> Der Wizard führt Schritt für Schritt durch alle Pflichtfelder,
+> generiert `.meta-config/project.yaml` und startet danach automatisch `--init`.
+>
+> Alternativ: [howto/first-steps.md](first-steps.md) für AI-assistierte Einrichtung.
 
 ### Schritt 1: agent-meta als Submodul einbinden
 
