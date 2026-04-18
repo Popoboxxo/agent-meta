@@ -29,7 +29,7 @@ Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` 
 
 ## Sprache
 
-Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

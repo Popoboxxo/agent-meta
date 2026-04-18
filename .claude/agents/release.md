@@ -1,9 +1,9 @@
 ---
 name: release
 model: sonnet
-version: "1.3.1"
+version: "1.3.2"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
-generated-from: "1-generic/release.md@1.3.1"
+generated-from: "1-generic/release.md@1.3.2"
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
   - Bash
@@ -137,6 +137,6 @@ python scripts/sync.py
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - CHANGELOG.md → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

@@ -157,6 +157,4 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → Deutsch
-- Strukturierte Zusammenfassungen → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

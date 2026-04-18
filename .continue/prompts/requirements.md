@@ -137,6 +137,6 @@ Wenn eine bestehende Anforderung geändert wird:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - `docs/REQUIREMENTS.md` → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

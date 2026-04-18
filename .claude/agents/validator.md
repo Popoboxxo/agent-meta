@@ -3,9 +3,9 @@ name: validator
 model: sonnet
 memory: project
 permissionMode: plan
-version: "2.0.1"
+version: "2.0.2"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
-generated-from: "1-generic/validator.md@2.0.1"
+generated-from: "1-generic/validator.md@2.0.2"
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
   - Bash
@@ -226,6 +226,6 @@ Prüfe Konsistenz zwischen Dokumenten:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Berichte → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

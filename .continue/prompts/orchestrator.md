@@ -435,7 +435,6 @@ alle DoD-Punkte erfüllt sind.
 
 ## Sprache
 
-- **README.md** → **Englisch**
-- Alle anderen Dokumente → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- Dokumente → Englisch

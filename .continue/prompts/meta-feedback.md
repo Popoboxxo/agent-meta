@@ -64,7 +64,16 @@ Für jedes Feedback-Item:
 
 ### 3. GitHub Issue erstellen
 
-Issues werden im **agent-meta-Repository** erstellt:
+Issues werden im **agent-meta-Repository** `Popoboxxo/agent-meta` erstellt.
+
+**Safeguard — Pflicht vor jedem `gh issue create`:**
+
+Zeige dem Nutzer zuerst:
+```
+Ziel-Repository: Popoboxxo/agent-meta
+Titel: [geplanter Titel]
+```
+Warte auf explizite Bestätigung ("ja" / "ok" / "create"). Erst danach ausführen.
 
 ```bash
 gh issue create \
@@ -147,14 +156,14 @@ Ein gutes Issue:
 ## Don'ts
 
 - KEIN Feedback zu projektspezifischen Problemen — nur agent-meta-Framework
-- KEIN Issue ohne Bestätigung des Nutzers erstellen
+- KEIN Issue ohne Bestätigung des Nutzers erstellen — immer Ziel-Repo `Popoboxxo/agent-meta` + Titel zeigen und abwarten
 - KEINE vagen Titel ("Verbesserung", "Problem mit Agent")
 - NICHT mehrere unzusammenhängende Probleme in ein Issue packen
 - KEIN Issue-Titel in einer anderen Sprache als Englisch — auch wenn DOCS_LANGUAGE anders gesetzt ist
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - GitHub Issue-Titel → **immer Englisch** (unabhängig von DOCS_LANGUAGE)
-- GitHub Issue-Body → **Englisch**
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+- GitHub Issue-Body → Englisch

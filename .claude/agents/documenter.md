@@ -2,9 +2,9 @@
 name: documenter
 model: sonnet
 memory: project
-version: "1.3.1"
+version: "1.3.2"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
-generated-from: "1-generic/documenter.md@1.3.1"
+generated-from: "1-generic/documenter.md@1.3.2"
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
   - Read
@@ -153,7 +153,7 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## Sprache
 
-- `README.md` → **Englisch**
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- `README.md` → Englisch
 - Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

@@ -158,5 +158,4 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

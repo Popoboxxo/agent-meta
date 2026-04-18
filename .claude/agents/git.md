@@ -1,9 +1,9 @@
 ---
 name: git
 model: haiku
-version: "2.0.1"
+version: "2.0.2"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-generated-from: "1-generic/git.md@2.0.1"
+generated-from: "1-generic/git.md@2.0.2"
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
@@ -398,6 +398,6 @@ git remote set-url origin https://gitea.example.com/owner/repo.git
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Commit-Messages → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

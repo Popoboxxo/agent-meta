@@ -1,9 +1,9 @@
 ---
 name: requirements
 memory: project
-version: "1.3.1"
+version: "1.3.2"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
-generated-from: "1-generic/requirements.md@1.3.1"
+generated-from: "1-generic/requirements.md@1.3.2"
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
   - Read
@@ -149,6 +149,6 @@ Wenn eine bestehende Anforderung geändert wird:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - `docs/REQUIREMENTS.md` → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

@@ -2,9 +2,9 @@
 name: agent-meta-scout
 model: sonnet
 memory: local
-version: "1.0.0"
+version: "1.0.1"
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
-generated-from: "1-generic/agent-meta-scout.md@1.0.0"
+generated-from: "1-generic/agent-meta-scout.md@1.0.1"
 hint: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken"
 tools:
   - Read
@@ -168,5 +168,4 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

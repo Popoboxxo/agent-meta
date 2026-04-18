@@ -1,8 +1,8 @@
 ---
 name: ideation
-version: "1.2.1"
+version: "1.2.2"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
-generated-from: "1-generic/ideation.md@1.2.1"
+generated-from: "1-generic/ideation.md@1.2.2"
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
   - Read
@@ -170,6 +170,4 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → Deutsch
-- Strukturierte Zusammenfassungen → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

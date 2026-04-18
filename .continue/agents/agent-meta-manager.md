@@ -20,7 +20,7 @@ durch eine generische Verbesserung in agent-meta besser gelöst wäre.
 
 ## Sprache
 
-Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

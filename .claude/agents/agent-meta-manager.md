@@ -1,9 +1,9 @@
 ---
 name: agent-meta-manager
 model: sonnet
-version: "1.1.1"
+version: "1.1.2"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
-generated-from: "1-generic/agent-meta-manager.md@1.1.1"
+generated-from: "1-generic/agent-meta-manager.md@1.1.2"
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash
@@ -35,7 +35,7 @@ durch eine generische Verbesserung in agent-meta besser gelöst wäre.
 
 ## Sprache
 
-Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

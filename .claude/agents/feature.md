@@ -1,8 +1,8 @@
 ---
 name: feature
-version: "1.2.0"
+version: "1.2.1"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.2.0"
+generated-from: "1-generic/feature.md@1.2.1"
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
 #                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
@@ -41,7 +41,7 @@ Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` 
 
 ## Sprache
 
-Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

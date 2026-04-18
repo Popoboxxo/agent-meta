@@ -140,7 +140,7 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## Sprache
 
-- `README.md` → **Englisch**
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- `README.md` → Englisch
 - Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → Deutsch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

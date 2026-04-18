@@ -2,9 +2,9 @@
 name: developer
 version: 1.0.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
-generated-from: "2-platform/agent-meta-developer.md@1.0.0"
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
+generated-from: "2-platform/agent-meta-developer.md@1.0.0"
 hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown,
   YAML)
 tools:
@@ -168,7 +168,7 @@ python scripts/sync.py --dry-run
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Code-Kommentare → Englisch
 - Commit-Messages → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

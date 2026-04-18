@@ -151,7 +151,7 @@ python scripts/sync.py --dry-run
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Code-Kommentare → Englisch
 - Commit-Messages → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

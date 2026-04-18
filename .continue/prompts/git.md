@@ -386,6 +386,6 @@ git remote set-url origin https://gitea.example.com/owner/repo.git
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Commit-Messages → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch

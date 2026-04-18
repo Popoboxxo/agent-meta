@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.0.1"
+version: "2.0.2"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.0.1"
+generated-from: "1-generic/orchestrator.md@2.0.2"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -450,7 +450,6 @@ alle DoD-Punkte erfüllt sind.
 
 ## Sprache
 
-- **README.md** → **Englisch**
-- Alle anderen Dokumente → Englisch
-- Kommunikation mit dem Nutzer → Deutsch
-- Nutzer-Eingaben verstehen in → Deutsch
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- Dokumente → Englisch
