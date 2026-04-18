@@ -68,8 +68,12 @@ agent-meta/
       ...
     snippets/                ← kopiert aus agent-meta/snippets/
     skills/                  ← kopiert aus external/ Submodulen
-    rules/                   ← kopiert aus agent-meta/rules/ (auto-loaded in alle Agenten)
+    rules/                   ← auto-loaded in alle Agenten + Hauptchat
+      *.md                     ← von agent-meta verwaltet (sync.py, mit Variablensubstitution)
+      meine-regel.md           ← projekt-eigen (nie von sync.py berührt)
     hooks/                   ← kopiert aus agent-meta/hooks/ + in settings.json registriert
+    commands/                ← Custom Slash Commands (/project:<name>), manuell angelegt
+      deploy.md                ← → /project:deploy (läuft im Hauptkontext, kein isolierter Context)
     3-project/               ← handgeschrieben, nie von sync.py überschrieben
       <prefix>-<rolle>-ext.md  ← Extension (additiv geladen)
       <rolle>.md               ← Override (ersetzt Agenten komplett)
@@ -95,6 +99,21 @@ agent-meta/
 | `.claude/settings.local.json` | Nein (gitignored) | sync.py (einmalig) | Persönliche Permissions |
 
 `CLAUDE.personal.md` wird einmalig aus `howto/CLAUDE.personal-template.md` kopiert und danach nie wieder von sync.py angefasst. Jeder Entwickler füllt sie für sich aus.
+
+---
+
+## Abgrenzung: rules/ vs. 3-project/ vs. commands/
+
+| Mechanismus | Scope | Laden | Quelle | Von sync.py verwaltet |
+|-------------|-------|-------|--------|----------------------|
+| `.claude/rules/*.md` | **Alle** Agenten + Hauptchat | Automatisch | agent-meta + Projekt | Ja (agent-meta-Rules) / Nein (projekt-eigene) |
+| `.claude/3-project/*-ext.md` | **Ein** Agenten-Typ | Explizit per Read-Hook | Projekt | Nein |
+| `.claude/commands/*.md` | Hauptchat (kein isolierter Kontext) | Als Slash-Command `/project:<name>` | Projekt | Nein |
+
+**Wann was:**
+- Regel gilt für alle Agenten und Hauptchat → `.claude/rules/`
+- Zusatzwissen für einen spezifischen Agenten → `.claude/3-project/<rolle>-ext.md`
+- Wiederkehrender Einzel-Workflow im Hauptchat → `.claude/commands/`
 
 ---
 
