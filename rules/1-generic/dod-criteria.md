@@ -1,7 +1,20 @@
 # Definition of Done (DoD)
 
 Eine Aufgabe ist erst abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-Welche aktiv sind, steuert `dod` in `.meta-config/project.yaml`.
+Konfiguriert über `dod` in `.meta-config/project.yaml`.
+
+## Aktive DoD-Features (dieses Projekt)
+
+| Feature | Aktiv |
+|---------|-------|
+| REQ-Traceability | {{DOD_REQ_TRACEABILITY}} |
+| Tests erforderlich | {{DOD_TESTS_REQUIRED}} |
+| CODEBASE_OVERVIEW | {{DOD_CODEBASE_OVERVIEW}} |
+| Security-Audit | {{DOD_SECURITY_AUDIT}} |
+
+Nur Kriterien deren Feature `true` ist gelten als Pflicht.
+
+---
 
 ## Immer aktiv (Pflicht)
 
@@ -10,7 +23,7 @@ Welche aktiv sind, steuert `dod` in `.meta-config/project.yaml`.
 - [ ] **Commit-Message** im korrekten Conventional-Commits-Format
 - [ ] **Keine Regressions** — bestehende Tests brechen nicht
 
-## Wenn `req-traceability: true` (Default: true)
+## Wenn `req-traceability: true`
 
 - [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
 - [ ] **REQUIREMENTS.md** konsistent (REQ-Text passt zur Implementierung)
@@ -18,22 +31,20 @@ Welche aktiv sind, steuert `dod` in `.meta-config/project.yaml`.
 
 Wenn `false`: Keine REQ-ID nötig. Format: `<type>: <beschreibung>`.
 
-## Wenn `tests-required: true` (Default: true)
+## Wenn `tests-required: true`
 
 - [ ] **Test vorhanden** (mit `[REQ-xxx]` im Namen wenn req-traceability aktiv)
 - [ ] **Tests bestehen** (Test-Runner grün)
 
-Wenn `false`: Kein Test als DoD-Kriterium.
-
-## Wenn `codebase-overview: true` (Default: true)
+## Wenn `codebase-overview: true`
 
 - [ ] **CODEBASE_OVERVIEW.md** aktualisiert (falls Code-Änderungen)
 
-Wenn `false`: Kein Doku-Update als DoD-Kriterium.
-
-## Wenn `security-audit: true` (Default: false)
+## Wenn `security-audit: true`
 
 - [ ] **Security-Audit** vor Release durchgeführt
+
+---
 
 ## Enforcement
 

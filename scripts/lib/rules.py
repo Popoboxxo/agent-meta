@@ -51,6 +51,7 @@ def sync_rules(
     log: SyncLog,
     dry_run: bool,
     platform_vars: dict | None = None,
+    variables: dict | None = None,
 ):
     """Copy rule files from agent-meta/rules/ layers to .claude/rules/ in the project.
 
@@ -59,8 +60,12 @@ def sync_rules(
 
     Project rules in .claude/rules/ that are NOT from agent-meta are never touched.
     Stale agent-meta-managed rules (tracked in .claude/rules/.agent-meta-managed) are removed.
+
+    Variables substitution: if `variables` is provided, {{VAR}} placeholders in rule
+    files are substituted just like in agent templates.
     """
     from .platform import substitute_platform
+    from .config import substitute
 
     platforms = config.get("platforms", [])
     sources = collect_rule_sources(agent_meta_root, platforms)
@@ -88,10 +93,14 @@ def sync_rules(
         target_path = target_dir / output_name
         source_content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]  # "1-generic", "2-platform", "0-external"
+        rel_source = f"rules/{layer}/{source_path.name}"
+
+        # Apply variable substitution ({{VAR}} placeholders)
+        if variables is not None:
+            source_content = substitute(source_content, variables, rel_source, log)
 
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
-            rel_source = f"rules/{layer}/{source_path.name}"
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)
 
         log.action("COPY", str(target_path.relative_to(project_root)),

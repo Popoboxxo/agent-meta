@@ -258,7 +258,8 @@ def main():
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run)
             if pc["has_rules"] and provider == "Claude":
-                sync_rules(agent_meta_root, project_root, config, log, args.dry_run, platform_vars=platform_vars)
+                sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
+                           platform_vars=platform_vars, variables=variables)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
