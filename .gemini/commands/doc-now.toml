@@ -1,0 +1,6 @@
+description = "Delegate to documenter agent to update CODEBASE_OVERVIEW.md immediately"
+prompt = """
+Delegate to the `documenter` agent with this task:
+
+Update `CODEBASE_OVERVIEW.md` immediately. {{args}}
+"""

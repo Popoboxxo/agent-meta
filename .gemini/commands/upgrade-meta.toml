@@ -1,0 +1,16 @@
+description = "Upgrade agent-meta submodule to latest version and re-sync all agents"
+prompt = """
+Delegate to the `agent-meta-manager` agent with this task:
+
+Upgrade agent-meta to the latest version and re-sync all agents for this project. {{args}}
+
+Steps:
+1. Check the current agent-meta version (`cat .agent-meta/VERSION`)
+2. Fetch latest changes (`git -C .agent-meta fetch origin`)
+3. Check what the latest tag/version is (`git -C .agent-meta tag --sort=-v:refname | head -5`)
+4. If a newer version exists: update the submodule to it (`git -C .agent-meta checkout <latest-tag>`)
+5. Run sync: `py .agent-meta/scripts/sync.py` (or `python` depending on the system)
+6. Review sync.log for warnings or errors
+7. Stage and commit: `git add .agent-meta .claude/ CLAUDE.md` with message `chore: upgrade agent-meta to v<version>`
+8. Report what changed (new agents, removed agents, updated rules/hooks)
+"""

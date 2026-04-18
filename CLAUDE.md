@@ -173,6 +173,7 @@ agent-meta/
     short.md             ← Fakten-Stil: kein Filler, nur Ergebnisse
     childish.md          ← Kindgerechter Stil: spielerisch, Tier-/Spielzeug-Analogien
     caveman.md           ← Höhlenmensch-Stil: kurz, direkt, abgehakt
+    asozial.md           ← New-Kids-Stil: fachlich korrekt, aber mit Verachtung und Beleidigungen
 
   platform-configs/
     homeassistant.defaults.yaml  ← Default-Werte für {{platform.homeassistant.*}}-Platzhalter
@@ -213,7 +214,7 @@ agent-meta/
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.26.1 — `2026-04-18`
+Generiert von agent-meta v0.27.0 — `2026-04-18`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -522,6 +523,7 @@ Steuert den Kommunikationsstil aller Agenten. `sync.py` kopiert `speech/<mode>.m
 | `"short"` | Nur Fakten, keine Floskeln, keine Begrüßung/Zusammenfassung, Erklärungen nur auf Nachfrage |
 | `"childish"` | Kindgerecht, spielerisch, Beispiele aus Tierwelt/Spielzeug, Emojis erlaubt |
 | `"caveman"` | Höhlenmensch-Stil: kurz, direkt, abgehakt, keine Konjunktionen |
+| `"asozial"` | New-Kids-Stil: fachlich korrekt, vulgär, hält den User für beschränkt |
 
 **Technisch:**
 - `"full"` → keine Rule-Datei (Verhalten unverändert); vorhandene `speech-mode.md` wird entfernt
