@@ -80,7 +80,8 @@ git submodule update --init --recursive
 ### 2. Create config
 
 ```bash
-cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.yaml
+mkdir -p .meta-config
+cp .agent-meta/howto/project.yaml.example .meta-config/project.yaml
 ```
 
 Fill in your project values — see [howto/first-steps.md](howto/first-steps.md) for a guided walkthrough.
@@ -88,7 +89,7 @@ Fill in your project values — see [howto/first-steps.md](howto/first-steps.md)
 ### 3. Generate agents
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init
 ```
 
 ```bash
@@ -108,13 +109,13 @@ Extensions let you add project-specific knowledge to a generated agent. The exte
 
 ```bash
 # Create extension for one role
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext developer
+py .agent-meta/scripts/sync.py --create-ext developer
 
 # Create extensions for all roles
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext all
+py .agent-meta/scripts/sync.py --create-ext all
 
 # Update managed blocks after config changes
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+py .agent-meta/scripts/sync.py --update-ext
 ```
 
 Extensions live in `.claude/3-project/<prefix>-<role>-ext.md` in your project — never in this repo.
@@ -135,18 +136,18 @@ cd .agent-meta && git checkout v<new-version>
 cd ..
 ```
 
-Update config version field: `"agent-meta-version": "<new-version>"`
+Update config version field in `.meta-config/project.yaml`: `agent-meta-version: "<new-version>"`
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
 ```
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 ```
 
 See [howto/upgrade-guide.md](howto/upgrade-guide.md) for details.
@@ -158,29 +159,44 @@ See [howto/upgrade-guide.md](howto/upgrade-guide.md) for details.
 ```
 agent-meta/
   agents/
-    0-external/       ← wrapper template for external skill agents
-    1-generic/        ← universal agent templates
-    2-platform/       ← platform-specific overrides (e.g. sharkord-docker.md)
-    3-project/        ← intentionally empty (extensions live in your project)
-  external/           ← Git submodules for external skill repos (pinned commits)
+    0-external/       <- wrapper template for external skill agents
+    1-generic/        <- universal agent templates
+    2-platform/       <- platform-specific overrides (e.g. sharkord-docker.md)
+    3-project/        <- intentionally empty (extensions live in your project)
+  config/             <- framework config (managed by agent-meta, do not edit manually)
+    project.yaml          <- agent-meta self-hosting config
+    role-defaults.yaml    <- default model/memory/permissionMode per role
+    dod-presets.yaml      <- DoD quality presets
+    ai-providers.yaml     <- provider settings (Claude, Gemini, Continue)
+    skills-registry.yaml  <- external skills registry (approved/pinned)
+    project-config.schema.json  <- JSON Schema for project.yaml
+  external/           <- Git submodules for external skill repos (pinned commits)
   snippets/
-    tester/           ← language-specific test snippets (bun-typescript, pytest-python)
-    developer/        ← language-specific code pattern snippets
+    tester/           <- language-specific test snippets (bun-typescript, pytest-python)
+    developer/        <- language-specific code pattern snippets
   howto/
     first-steps.md
     instantiate-project.md
     agent-composition.md
     external-skills.md
     upgrade-guide.md
+    config-layout.md
     CLAUDE.project-template.md
     sync-concept.md
-    agent-meta.config.example.json
+    project.yaml.example  <- starter config template for new projects
   scripts/
-    sync.py           ← agent generator
-  external-skills.config.yaml  ← central skill registry (approved/pinned)
+    sync.py           <- agent generator
   VERSION
   CHANGELOG.md
 ```
+
+**Config layout:**
+
+| Location | Owned by | Purpose |
+|----------|----------|---------|
+| `.agent-meta/config/` | agent-meta framework | Role defaults, providers, DoD presets, skill registry — do not edit |
+| `.meta-config/project.yaml` | Your project | Project identity, variables, active roles, providers |
+| `.claude/platform-config.yaml` | Your project | Platform-specific value overrides (`{{platform.*}}` placeholders) |
 
 ---
 

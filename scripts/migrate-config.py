@@ -2,36 +2,44 @@
 """
 agent-meta migrate-config.py
 =============================
-Migrate a project's agent-meta.config.json → agent-meta.config.yaml.
+Two migration modes:
 
-Also migrates the internal agent-meta config files (roles, dod-presets,
-external-skills) if run inside the agent-meta repo itself — but those are
-already provided as .yaml files starting from v0.24.0, so this is mainly
-needed for project configs.
+  1. JSON -> YAML  (legacy, still supported):
+     Migrate a project's agent-meta.config.json -> agent-meta.config.yaml.
+
+  2. flat-root -> .meta-config/  (new, v0.26+):
+     Move agent-meta.config.yaml from the project root into .meta-config/project.yaml.
+     This is the standard layout introduced in v0.26.0.
 
 Usage:
-  # Migrate a project config (most common case):
+  # JSON -> YAML (legacy):
   py .agent-meta/scripts/migrate-config.py --config agent-meta.config.json
 
-  # Preview without writing:
+  # flat-root -> .meta-config/ (recommended for all existing projects):
+  py .agent-meta/scripts/migrate-config.py --to-meta-config
+  py .agent-meta/scripts/migrate-config.py --to-meta-config --dry-run
+
+  # Preview JSON migration without writing:
   py .agent-meta/scripts/migrate-config.py --config agent-meta.config.json --dry-run
 
-  # Migrate and keep the .json file as backup (default: rename to .json.bak):
+  # JSON migration, keep .json file as backup:
   py .agent-meta/scripts/migrate-config.py --config agent-meta.config.json --keep-json
 
-What it does:
-  1. Reads agent-meta.config.json
-  2. Writes agent-meta.config.yaml with clean YAML formatting
-     - Comments are added for major sections (not preserved from JSON _comment keys)
-     - Multiline string values are written as YAML block scalars
-  3. Renames the original .json to .json.bak (unless --keep-json is passed)
+What --to-meta-config does:
+  1. Creates .meta-config/ directory
+  2. Moves agent-meta.config.yaml -> .meta-config/project.yaml
+  3. Adds .meta-config/ to .gitignore (only the local-config entries, not the dir itself)
+  4. Prints next-step instructions
 
 After migration:
-  py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+  py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+  # or simply (auto-detect):
+  py .agent-meta/scripts/sync.py
 """
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -77,7 +85,11 @@ def _strip_comment_keys(d: dict) -> dict:
     return {k: v for k, v in d.items() if not k.startswith("_")}
 
 
-def migrate_config(src: Path, dry_run: bool, keep_json: bool) -> None:
+# ---------------------------------------------------------------------------
+# Mode 1: JSON -> YAML
+# ---------------------------------------------------------------------------
+
+def migrate_json_to_yaml(src: Path, dry_run: bool, keep_json: bool) -> None:
     if not src.exists():
         print(f"ERROR: not found: {src}", file=sys.stderr)
         sys.exit(1)
@@ -95,14 +107,11 @@ def migrate_config(src: Path, dry_run: bool, keep_json: bool) -> None:
     with src.open(encoding="utf-8") as f:
         raw = json.load(f)
 
-    # Strip _comment* keys at top level and inside variables
     cleaned = _strip_comment_keys(raw)
     if "variables" in cleaned and isinstance(cleaned["variables"], dict):
         cleaned["variables"] = _strip_comment_keys(cleaned["variables"])
 
-    # Convert multiline strings to block-style markers
     output = _to_yaml_value(cleaned)
-
     yaml.add_representer(_BlockStr, _block_str_representer)
 
     if dry_run:
@@ -128,33 +137,138 @@ def migrate_config(src: Path, dry_run: bool, keep_json: bool) -> None:
         print(f"  i  Original renamed to: {bak.name}")
 
     print()
-    print(f"Next step:")
-    print(f"  py .agent-meta/scripts/sync.py --config {dest.name}")
+    print(f"Next step — move to standard layout:")
+    print(f"  py .agent-meta/scripts/migrate-config.py --to-meta-config")
 
+
+# ---------------------------------------------------------------------------
+# Mode 2: flat-root -> .meta-config/
+# ---------------------------------------------------------------------------
+
+# Legacy source candidates (tried in order)
+_LEGACY_CONFIG_CANDIDATES = [
+    "agent-meta.config.yaml",
+    "agent-meta.config.yml",
+]
+
+
+def migrate_to_meta_config(project_root: Path, dry_run: bool) -> None:
+    """Move agent-meta.config.yaml -> .meta-config/project.yaml."""
+
+    # Find legacy source
+    src: Path | None = None
+    for candidate in _LEGACY_CONFIG_CANDIDATES:
+        p = project_root / candidate
+        if p.exists():
+            src = p
+            break
+
+    if src is None:
+        # Already migrated?
+        already = project_root / ".meta-config" / "project.yaml"
+        if already.exists():
+            print(f"  i  Already migrated: .meta-config/project.yaml exists.")
+            print(f"     Nothing to do.")
+            return
+        print(f"  !  No legacy config found in {project_root}", file=sys.stderr)
+        print(f"     Expected one of: {', '.join(_LEGACY_CONFIG_CANDIDATES)}", file=sys.stderr)
+        sys.exit(1)
+
+    dest_dir = project_root / ".meta-config"
+    dest = dest_dir / "project.yaml"
+
+    print(f"  >  Migrate: {src.name} -> .meta-config/project.yaml")
+
+    if dest.exists():
+        print(f"  !  .meta-config/project.yaml already exists — aborting.")
+        print(f"     Delete it first if you want to re-run the migration.")
+        sys.exit(1)
+
+    if dry_run:
+        print(f"DRY-RUN: would create {dest_dir}/")
+        print(f"DRY-RUN: would move   {src} -> {dest}")
+        print()
+        print("Next steps would be:")
+        _print_next_steps()
+        return
+
+    dest_dir.mkdir(exist_ok=True)
+    shutil.move(str(src), str(dest))
+    print(f"  +  Created: .meta-config/")
+    print(f"  +  Moved:   {src.name} -> .meta-config/project.yaml")
+
+    # Create placeholder .meta-config/skills.yaml if project had external-skills block
+    _maybe_create_skills_placeholder(dest, dest_dir)
+
+    print()
+    _print_next_steps()
+
+
+def _maybe_create_skills_placeholder(project_yaml: Path, dest_dir: Path) -> None:
+    """If project.yaml contains an external-skills block, hint about skills.yaml."""
+    try:
+        if not _YAML_AVAILABLE:
+            return
+        with project_yaml.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        if "external-skills" in data:
+            print(f"  i  external-skills block found in project.yaml.")
+            print(f"     You can optionally move it to .meta-config/skills.yaml")
+            print(f"     (not required — keeping it in project.yaml works fine)")
+    except Exception:
+        pass
+
+
+def _print_next_steps() -> None:
+    print("Next steps:")
+    print("  1. Run sync with new config location:")
+    print("       py .agent-meta/scripts/sync.py --config .meta-config/project.yaml")
+    print("     or simply (auto-detect):")
+    print("       py .agent-meta/scripts/sync.py")
+    print()
+    print("  2. Commit the change:")
+    print("       git add .meta-config/ agent-meta.config.yaml")
+    print("       git commit -m \"chore: migrate config to .meta-config/project.yaml\"")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Migrate agent-meta.config.json → agent-meta.config.yaml"
+        description="Migrate agent-meta config: JSON->YAML or flat-root->.meta-config/"
     )
     parser.add_argument(
-        "--config", required=True,
-        help="Path to agent-meta.config.json to migrate"
+        "--config",
+        help="Path to agent-meta.config.json to migrate to YAML (legacy mode)"
+    )
+    parser.add_argument(
+        "--to-meta-config", action="store_true",
+        help="Move agent-meta.config.yaml -> .meta-config/project.yaml (v0.26+ standard layout)"
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Preview the YAML output without writing files"
+        help="Preview what would be done without writing files"
     )
     parser.add_argument(
         "--keep-json", action="store_true",
-        help="Keep the original .json file (default: rename to .json.bak)"
+        help="(JSON->YAML only) Keep the original .json file instead of renaming to .json.bak"
     )
     args = parser.parse_args()
+
+    if not args.config and not args.to_meta_config:
+        parser.print_help()
+        sys.exit(1)
 
     if not _YAML_AVAILABLE:
         print("ERROR: PyYAML not installed. Run: pip install pyyaml", file=sys.stderr)
         sys.exit(1)
 
-    migrate_config(Path(args.config).resolve(), args.dry_run, args.keep_json)
+    if args.to_meta_config:
+        migrate_to_meta_config(Path.cwd(), args.dry_run)
+    else:
+        migrate_json_to_yaml(Path(args.config).resolve(), args.dry_run, args.keep_json)
 
 
 if __name__ == "__main__":

@@ -191,7 +191,7 @@ def sync_hooks(
     All hook scripts are always copied (like rules — no opt-in needed for the file).
     Registration in .claude/settings.json is opt-in per project:
 
-      agent-meta.config.yaml:
+      .meta-config/project.yaml:
         hooks: { dod-push-check: { enabled: true } }
 
     Stale managed hooks (tracked in .claude/hooks/.agent-meta-managed) are deleted.
@@ -280,7 +280,7 @@ def create_hook(
 
     The created file is a project-owned hook — it will never be touched by sync.py
     (not added to .agent-meta-managed).  To register it in settings.json, add
-    it to agent-meta.config.yaml:  hooks: <name>: enabled: true
+    it to .meta-config/project.yaml:  hooks: <name>: enabled: true
     """
     if not name.endswith(".sh"):
         name = f"{name}.sh"

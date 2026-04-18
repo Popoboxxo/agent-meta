@@ -67,9 +67,9 @@ Halte MEMORY.md unter 150 Zeilen — lagere Details in separate Themen-Dateien a
 
 ## Konfiguration in agent-meta
 
-### Meta-Defaults (`roles.config.yaml`)
+### Meta-Defaults (`config/role-defaults.yaml`)
 
-Der Meta-Maintainer definiert empfohlene Memory-Scopes in `roles.config.yaml`:
+Der Meta-Maintainer definiert empfohlene Memory-Scopes in `config/role-defaults.yaml`:
 
 ```json
 {
@@ -90,7 +90,7 @@ Der Meta-Maintainer definiert empfohlene Memory-Scopes in `roles.config.yaml`:
 
 Leerer String `""` = kein `memory:`-Feld im generierten Agenten.
 
-### Projekt-Overrides (`agent-meta.config.yaml`)
+### Projekt-Overrides (`.meta-config/project.yaml`)
 
 Projekte können einzelne Rollen überschreiben:
 
@@ -106,9 +106,9 @@ Projekte können einzelne Rollen überschreiben:
 ### Precedence
 
 ```
-memory-overrides in agent-meta.config.yaml   (höchste Priorität)
+memory-overrides in .meta-config/project.yaml   (höchste Priorität)
         ↓
-roles.config.yaml memory-Default
+config/role-defaults.yaml memory-Default
         ↓
 kein memory:-Feld (Agent hat kein Gedächtnis)
 ```

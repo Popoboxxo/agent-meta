@@ -39,7 +39,7 @@ _DOD_FIELD_DEFAULTS: dict = {
 
 
 def load_config(config_path: Path) -> dict:
-    """Load agent-meta.config.yaml or agent-meta.config.json.
+    """Load .meta-config/project.yaml or .meta-config/project.yaml.
 
     If the provided path ends in .json but a sibling .yaml file exists,
     the YAML file is preferred (migration path: old --config still works).
@@ -82,7 +82,9 @@ def _validate_config(config: dict, config_path: Path) -> None:
     if not _JSONSCHEMA_AVAILABLE:
         return
 
-    schema_path = Path(__file__).resolve().parent.parent.parent / "agent-meta.schema.json"
+    schema_path = Path(__file__).resolve().parent.parent.parent / "config/project-config.schema.json"
+    if not schema_path.exists():
+        schema_path = Path(__file__).resolve().parent.parent.parent / "agent-meta.schema.json"
     if not schema_path.exists():
         return
 
@@ -110,7 +112,9 @@ def find_agent_meta_root(script_path: Path) -> Path:
 
 def _load_schema_variable_keys(agent_meta_root: Path) -> list[str]:
     """Return the list of known variable keys from agent-meta.schema.json."""
-    schema_path = agent_meta_root / "agent-meta.schema.json"
+    schema_path = agent_meta_root / "config/project-config.schema.json"
+    if not schema_path.exists():
+        schema_path = agent_meta_root / "agent-meta.schema.json"
     if not schema_path.exists():
         return []
     try:
@@ -128,7 +132,7 @@ def fill_defaults(
     log: SyncLog,
     dry_run: bool,
 ) -> None:
-    """Write missing config fields with their default values into agent-meta.config.yaml.
+    """Write missing config fields with their default values into .meta-config/project.yaml.
 
     Structural fields (dod-preset, max-parallel-agents, speech-mode, dod.*):
       Written into the config file when absent.

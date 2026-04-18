@@ -5,18 +5,16 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json
 
-PROVIDERS_CONFIG_YAML = "providers.config.yaml"
-_PROVIDERS_CONFIG_JSON = "providers.config.json"  # legacy fallback (not currently used)
+PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
+_PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
+_PROVIDERS_CONFIG_JSON = "providers.config.json"  # legacy fallback
 
 
 def load_providers_config(agent_meta_root: Path) -> dict:
-    """Load providers.config.yaml from agent-meta root.
-
-    Returns the full providers dict keyed by provider name.
-    Falls back to a minimal built-in config if the file is missing.
-    """
+    """Load config/ai-providers.yaml with fallback to legacy paths."""
     data, _ = _load_yaml_or_json(
         agent_meta_root / PROVIDERS_CONFIG_YAML,
+        agent_meta_root / _PROVIDERS_CONFIG_LEGACY,
         agent_meta_root / _PROVIDERS_CONFIG_JSON,
     )
     if not data:
