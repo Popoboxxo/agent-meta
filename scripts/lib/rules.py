@@ -52,6 +52,7 @@ def sync_rules(
     dry_run: bool,
     platform_vars: dict | None = None,
     variables: dict | None = None,
+    rules_dir: str | None = None,
 ):
     """Copy rule files from agent-meta/rules/ layers to .claude/rules/ in the project.
 
@@ -73,7 +74,7 @@ def sync_rules(
     if not sources:
         return
 
-    target_dir = project_root / CLAUDE_RULES_DIR
+    target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     managed_index_path = target_dir / ".agent-meta-managed"
 
     # Load previously managed filenames so we can clean up stale ones
@@ -130,6 +131,7 @@ def sync_speech_mode(
     config: dict,
     log: SyncLog,
     dry_run: bool,
+    rules_dir: str | None = None,
 ):
     """Copy speech/<mode>.md to .claude/rules/speech-mode.md.
 
@@ -141,7 +143,7 @@ def sync_speech_mode(
     the 'full' -> 'full' no-op and 'full' -> remove transition.
     """
     mode = config.get("speech-mode", "full")
-    target_dir = project_root / CLAUDE_RULES_DIR
+    target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     target_path = target_dir / SPEECH_RULE_FILENAME
     managed_index_path = target_dir / ".agent-meta-managed"
 

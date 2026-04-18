@@ -25,11 +25,24 @@ Provides generic agent templates that are instantiated per project via `sync.py`
 
 ## What is agent-meta?
 
-`agent-meta` is a Git submodule that projects include to get a standardized multi-agent system for Claude Code. It provides:
+`agent-meta` is a Git submodule that projects include to get a standardized multi-agent system — usable across multiple AI providers from a single source of truth.
+
+**Core principle: Define once, transform per provider.**
+Agent roles, rules, skills, hooks, and commands are defined once in provider-agnostic source files (`agents/1-generic/`, `rules/1-generic/`, ...). `sync.py` transforms them at build time into provider-ready artifacts:
+
+| Provider | Agents | Rules | Commands |
+|----------|--------|-------|----------|
+| Claude Code | `.claude/agents/` | `.claude/rules/` | `.claude/commands/` |
+| Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` |
+| Gemini | `.gemini/agents/` | — | — |
+
+Platform- and project-specific layers stack on top of the generic definitions — but always remain provider-agnostic in their source. No knowledge needs to be maintained twice.
+
+It provides:
 
 - **Generic agent templates** for orchestrator, developer, tester, validator, requirements engineer, documenter, release, and docker roles
 - **Platform-specific overrides** (e.g., Sharkord plugins) that extend generic agents
-- **A sync script** (`sync.py`) that generates project-ready agent files into `.claude/agents/`
+- **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
 - **An extension system** that lets projects add project-specific knowledge without touching generated files
 
 ---

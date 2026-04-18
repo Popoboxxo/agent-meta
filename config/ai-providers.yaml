@@ -32,7 +32,8 @@ providers:
     agent_ext: .md
     context_file: .continue/rules/project-context.md
     context_template: howto/CONTINUE.project-template.md
-    has_rules: false
+    has_rules: true
+    rules_dir: .continue/rules
     has_hooks: false
     has_commands: true
     has_settings: true

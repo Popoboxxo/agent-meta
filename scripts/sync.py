@@ -312,11 +312,13 @@ def main():
             if provider == "Continue":
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run)
-            if pc["has_rules"] and provider == "Claude":
+            if pc["has_rules"]:
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
-                           platform_vars=platform_vars, variables=variables)
-                sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
-            if pc["has_hooks"] and provider == "Claude":
+                           platform_vars=platform_vars, variables=variables,
+                           rules_dir=pc.get("rules_dir"))
+                sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
+                                 rules_dir=pc.get("rules_dir"))
+            if pc["has_hooks"]:
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
             if pc.get("has_commands", False):
                 sync_commands_for_provider(agent_meta_root, project_root, config, log,
