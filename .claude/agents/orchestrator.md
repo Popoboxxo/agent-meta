@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.0.0"
+version: "2.0.1"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.0.0"
+generated-from: "1-generic/orchestrator.md@2.0.1"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -204,7 +204,7 @@ oder ähnliches sagt:
 
 **H1 — Nur Agenten-Dateien neu generieren (gleiche Version):**
 ```
-1. Führe aus: python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+1. Führe aus: python .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 2. Prüfe sync.log auf Warnungen
 3. git → Commit: "chore: regenerate agents"
 ```
@@ -213,7 +213,7 @@ oder ähnliches sagt:
 ```
 1. Prüfe aktuelle Version:
    cat .agent-meta/VERSION
-   cat agent-meta.config.yaml  # → "agent-meta-version"
+   cat .meta-config/project.yaml  # → "agent-meta-version"
 
 2. CHANGELOG der neuen Version lesen (Breaking Changes?):
    cd .agent-meta && git fetch && git log --oneline HEAD..v<neue-version> && cd ..
@@ -222,27 +222,27 @@ oder ähnliches sagt:
 3. Submodul auf neue Version ziehen:
    cd .agent-meta && git checkout v<neue-version> && cd ..
 
-4. agent-meta-version in agent-meta.config.yaml aktualisieren:
+4. agent-meta-version in .meta-config/project.yaml aktualisieren:
    "agent-meta-version": "<neue-version>"
 
 5. Dry-Run — was ändert sich?
-   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
+   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
    → sync.log prüfen: neue Warnungen = fehlende Variablen
 
-6. Fehlende Variablen in agent-meta.config.yaml ergänzen
-   (Referenz: cat .agent-meta/howto/agent-meta.config.example.json)
+6. Fehlende Variablen in .meta-config/project.yaml ergänzen
+   (Referenz: cat .agent-meta/howto/project.yaml.example)
 
 7. Generische + Plattform-Agenten neu generieren:
-   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml
    → sync.log prüfen
    → Welche Plattform-Agenten aktiv sind steht in config "platforms": [...]
    → sync.py wählt automatisch den richtigen 2-platform Layer
 
 8. Extensions aktualisieren (managed block):
-   python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 
 9. git → Commit + Push:
-   Dateien: .claude/agents/ .claude/3-project/ .agent-meta agent-meta.config.yaml
+   Dateien: .claude/agents/ .claude/3-project/ .agent-meta .meta-config/project.yaml
    Message: "chore: upgrade agent-meta to v<neue-version>"
 ```
 
@@ -254,7 +254,7 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H3 — Neue Extension erstellen:**
 ```
-1. python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <rolle>
+1. python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <rolle>
    (oder --create-ext all für alle Rollen)
 2. Öffne .claude/3-project/am-<rolle>-ext.md
 3. Ergänze projektspezifisches Wissen im Projektbereich (unterhalb des managed blocks)
@@ -262,14 +262,14 @@ passenden Agenten aus `2-platform/`. Beispiel: `"platforms": ["sharkord"]` →
 
 **H4 — Extension managed block aktualisieren** (nach config-Änderung):
 ```
-1. python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+1. python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 2. Prüfe sync.log
 ```
 
 **Wichtig:**
 - `.claude/agents/` = generierter Output — nie manuell bearbeiten
 - `.claude/3-project/*-ext.md` = Projektdatei — managed block wird aktualisiert, Projektbereich nie
-- `agent-meta.config.yaml` = Projekt-Config — manuell pflegen
+- `.meta-config/project.yaml` = Projekt-Config — manuell pflegen
 
 ---
 
@@ -410,58 +410,24 @@ Folgende Aufgaben führst du als Orchestrator SELBST aus (nicht delegieren):
 ### Development Environment
 
 <!-- PROJEKTSPEZIFISCH: Build- und Docker-Kommandos eintragen -->
-python scripts/sync.py --config agent-meta.config.yaml
-python scripts/sync.py --config agent-meta.config.yaml --dry-run
+python scripts/sync.py
+python scripts/sync.py --dry-run
 
 
 ---
 
 ## Definition of Done (DoD) — Enforced by Orchestrator
 
-Die DoD-Kriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
-Fehlende Einträge verwenden die unten angegebenen Defaults.
+Die vollständigen DoD-Kriterien stehen in Rule `.claude/rules/dod-criteria.md` (automatisch geladen).
+Konfigurierbar über `dod` in `.meta-config/project.yaml`.
 
-Eine Aufgabe ist erst abgeschlossen, wenn **alle aktiven** Kriterien erfüllt sind:
+**Workflow-Auswirkungen je DoD-Feature:**
 
-### Immer aktiv (Pflicht)
-
-- [ ] **Code** implementiert die Aufgabe vollständig
-- [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md)
-- [ ] **Commit** via `git`-Agent mit korrektem Conventional-Commits-Format
-
-### Aktiv wenn `req-traceability: true` (Default: true)
-
-- [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
-- [ ] **REQUIREMENTS.md** konsistent
-- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
-
-Wenn `req-traceability: false`: Keine REQ-ID nötig. Commit-Format: `<type>: <beschreibung>`.
-Workflow-Schritte mit `requirements`-Agent werden übersprungen.
-
-### Aktiv wenn `tests-required: true` (Default: true)
-
-- [ ] **Test** vorhanden (mit `[REQ-xxx]` im Namen wenn req-traceability aktiv)
-- [ ] **Tests grün** — Test-Suite bestanden
-
-Wenn `tests-required: false`: Kein Test als DoD-Kriterium.
-Workflow-Schritte mit `tester`-Agent werden übersprungen.
-
-### Aktiv wenn `codebase-overview: true` (Default: true)
-
-- [ ] **CODEBASE_OVERVIEW.md** aktualisiert
-
-Wenn `codebase-overview: false`: Kein Doku-Update als DoD-Kriterium.
-Workflow-Schritte mit `documenter`-Agent werden übersprungen.
-
-### Aktiv wenn `security-audit: true` (Default: false)
-
-- [ ] **Security-Audit** vor Release durchgeführt (via `security-auditor`-Agent)
-
-### Enforcement
-
-- **Keine finale Antwort** ohne dass alle **aktiven** DoD-Punkte geprüft sind
-- **Keine Commit-Empfehlung** ohne vorherige Prüfung aller aktiven Kriterien
-- Bei Unsicherheit: Default = Validierung durchführen
+| Wenn deaktiviert | Übersprungene Schritte |
+|-----------------|----------------------|
+| `req-traceability: false` | `requirements`-Agent-Schritte, REQ-ID im Commit |
+| `tests-required: false` | `tester`-Agent-Schritte |
+| `codebase-overview: false` | `documenter`-Agent-Schritte |
 
 ---
 

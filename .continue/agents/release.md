@@ -85,7 +85,7 @@ Vor jedem Release:
 ## Build-Prozess
 
 <!-- PROJEKTSPEZIFISCH: Build-Kommandos eintragen -->
-python scripts/sync.py --config agent-meta.config.yaml
+python scripts/sync.py
 
 ---
 
