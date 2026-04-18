@@ -56,7 +56,7 @@ def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) 
             log.warn(
                 f"repo '{repo_name}': submodule is at {actual}, "
                 f"expected pinned_commit {pinned[:8]} — "
-                f"run: cd {local_path} && git checkout {pinned[:8]}"
+                f"run: git -C {local_path} checkout {pinned[:8]}"
             )
 
 
@@ -173,7 +173,7 @@ def sync_external_skills(
         if submodule_dir.exists() and not any(submodule_dir.iterdir()):
             log.warn(
                 f"Submodule '{local_path}' is not initialized (empty directory) — "
-                f"please run: git submodule update --init --recursive"
+                f"please run: git submodule update --init {local_path}"
             )
             continue
 

@@ -557,6 +557,16 @@ def sync_snippets(
         if k.endswith("_SNIPPETS_PATH") and v
     ]
 
+    # Remove stale snippet files no longer referenced in config
+    expected_rel_paths: set[str] = set(snippet_paths)
+    if target_root.exists():
+        for existing in target_root.rglob("*.md"):
+            rel = existing.relative_to(target_root).as_posix()
+            if rel not in expected_rel_paths:
+                log.action("DELETE", str(existing.relative_to(project_root)), "stale snippet")
+                if not dry_run:
+                    existing.unlink()
+
     if not snippet_paths:
         return
 
