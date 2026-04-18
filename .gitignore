@@ -6,8 +6,9 @@ CLAUDE.personal.md
 sync.log
 
 # --- agent-meta managed (do not edit) ---
-.claude/settings.local.json
 .claude/agent-memory-local/
+.claude/pending-tasks.md
+.claude/settings.local.json
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---

@@ -374,6 +374,19 @@
       },
       "additionalProperties": false
     },
+    "lifecycle-triggers": {
+      "type": "object",
+      "description": "Agent tasks to run automatically on git lifecycle events (commit, merge, version bump, release). Requires lifecycle-check hook to be enabled.",
+      "properties": {
+        "on-commit":             { "$ref": "#/$defs/lifecycleTriggerList" },
+        "on-merge":              { "$ref": "#/$defs/lifecycleTriggerList" },
+        "on-version-bump-patch": { "$ref": "#/$defs/lifecycleTriggerList" },
+        "on-version-bump-minor": { "$ref": "#/$defs/lifecycleTriggerList" },
+        "on-version-bump-major": { "$ref": "#/$defs/lifecycleTriggerList" },
+        "on-release":            { "$ref": "#/$defs/lifecycleTriggerList" }
+      },
+      "additionalProperties": false
+    },
     "external-skills": {
       "type": "object",
       "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",
@@ -395,5 +408,26 @@
   "required": [
     "project"
   ],
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "lifecycleTriggerList": {
+      "type": "array",
+      "description": "List of agent tasks to run for this lifecycle event.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "Agent role to delegate the task to (e.g. 'documenter', 'validator')."
+          },
+          "task": {
+            "type": "string",
+            "description": "Task description passed to the agent."
+          }
+        },
+        "required": ["agent", "task"],
+        "additionalProperties": false
+      }
+    }
+  }
 }

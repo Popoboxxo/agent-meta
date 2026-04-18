@@ -11,6 +11,7 @@ providers:
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
+      - .claude/pending-tasks.md
       - CLAUDE.personal.md
       - sync.log
 
