@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.0.0"
+version: "2.0.1"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -110,17 +110,7 @@ Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 ## Commit-Konventionen
 
-Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>` (ohne REQ)
-
-| Type | Bedeutung | REQ-ID |
-|------|-----------|--------|
-| `feat` | Neues Feature | Wenn req-traceability aktiv |
-| `fix` | Bugfix | Wenn req-traceability aktiv |
-| `refactor` | Refactoring ohne Verhaltensänderung | Wenn req-traceability aktiv |
-| `test` | Tests hinzufügen/ändern | Wenn req-traceability aktiv |
-| `chore` | Wartung: Dependencies, Config, Versions-Bumps | **Nie** |
-| `docs` | Dokumentation | **Nie** |
-| `ci` | CI/CD-Änderungen | **Nie** |
+→ Vollständige Tabelle und Regeln: Rule `.claude/rules/commit-conventions.md` (automatisch geladen)
 
 ---
 

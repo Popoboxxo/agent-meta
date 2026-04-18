@@ -6,14 +6,16 @@ from pathlib import Path
 from .io import _load_yaml_or_json
 from .log import SyncLog
 
-DOD_PRESETS_CONFIG_YAML = "dod-presets.config.yaml"
+DOD_PRESETS_CONFIG_YAML = "config/dod-presets.yaml"
+_DOD_PRESETS_CONFIG_LEGACY = "dod-presets.config.yaml"
 _DOD_PRESETS_CONFIG_JSON = "dod-presets.config.json"  # legacy fallback
 
 
 def load_dod_presets(agent_meta_root: Path) -> dict:
-    """Load dod-presets.config.yaml (or .json fallback) from agent-meta root."""
+    """Load config/dod-presets.yaml with fallback to legacy paths."""
     data, _ = _load_yaml_or_json(
         agent_meta_root / DOD_PRESETS_CONFIG_YAML,
+        agent_meta_root / _DOD_PRESETS_CONFIG_LEGACY,
         agent_meta_root / _DOD_PRESETS_CONFIG_JSON,
     )
     if not data:

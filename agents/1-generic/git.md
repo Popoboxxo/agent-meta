@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.0.0"
+version: "2.0.1"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
@@ -316,7 +316,7 @@ Agent-meta kann einen `dod-push-check`-Hook bereitstellen, der `git push` automa
 blockiert wenn Tests nicht grün sind. Der Hook wird von Claude Code als `PreToolUse`-Hook
 ausgeführt — kein manueller Schritt nötig.
 
-**Aktivierung via `agent-meta.config.yaml`:**
+**Aktivierung via `.meta-config/project.yaml`:**
 ```json
 "hooks": {
   "dod-push-check": { "enabled": true }
@@ -330,7 +330,7 @@ Nach dem nächsten Sync (`sync.py --config ...`) ist der Hook aktiv:
 
 **Eigene Hooks anlegen:**
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook <name>
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-hook <name>
 ```
 
 Vollständige Dokumentation: `.agent-meta/howto/hooks.md`

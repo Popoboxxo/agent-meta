@@ -15,7 +15,7 @@
 | `.gitignore` | Fehlende Einträge werden **ergänzt** |
 | `.claude/3-project/*-ext.md` | Werden **nicht** überschrieben — bleiben erhalten |
 | `.claude/3-project/*.md` (Override) | Werden **nicht** angefasst |
-| `agent-meta.config.yaml` | Wird **nicht** angefasst — manuell prüfen |
+| `.meta-config/project.yaml` | Wird **nicht** angefasst — manuell prüfen |
 
 **Kernregel:** Alles in `.claude/agents/` wird bei jedem Sync neu generiert.
 Rollen die aus `config['roles']` entfernt wurden, werden automatisch gelöscht.
@@ -33,14 +33,14 @@ git checkout v0.2.0
 cd ..
 
 # 2. agent-meta-version in config aktualisieren
-#    Öffne agent-meta.config.yaml und setze:
+#    Öffne .meta-config/project.yaml und setze:
 #    "agent-meta-version": "0.2.0"
 
 # 3. Dry-Run — prüfen was sich ändern würde
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
 
 # 4. Sync ausführen
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 # 5. sync.log prüfen
 cat sync.log
@@ -48,7 +48,7 @@ cat sync.log
 # 6. Neue Warnungen? → Fehlende Variablen in config ergänzen, dann erneut syncen
 
 # 7. Committen
-git add .claude/agents/ .agent-meta agent-meta.config.yaml
+git add .claude/agents/ .agent-meta .meta-config/project.yaml
 git commit -m "chore: upgrade agent-meta to v0.2.0"
 ```
 
@@ -60,7 +60,7 @@ Wenn eine neue agent-meta Version neue `{{PLATZHALTER}}` einführt:
 
 1. Dry-Run zeigt `[WARN]` für fehlende Variablen
 2. `sync.log` listet alle unerfüllten Platzhalter
-3. Neue Variablen in `agent-meta.config.yaml` ergänzen
+3. Neue Variablen in `.meta-config/project.yaml` ergänzen
 4. Erneut syncen — Warnungen sollten verschwinden
 
 ```bash
@@ -78,7 +78,7 @@ Der handgeschriebene Projektbereich darunter bleibt immer erhalten.
 
 ```bash
 # Nach einem Upgrade: managed blocks aktualisieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 
 # Ergebnis prüfen
 cat sync.log
@@ -95,12 +95,12 @@ automatisch auf das neue Format gebracht.
 Bei Major-Version-Upgrades (z.B. v0.x → v1.0) können sich Strukturen ändern:
 - Neue Agent-Rollen
 - Geänderter Platzhalter-Name
-- Neue Pflichtfelder in `agent-meta.config.yaml`
+- Neue Pflichtfelder in `.meta-config/project.yaml`
 
 Vorgehen:
 1. `CHANGELOG.md` der neuen Version lesen: `cat .agent-meta/CHANGELOG.md`
 2. Breaking Changes identifizieren
-3. `agent-meta.config.yaml` anpassen
+3. `.meta-config/project.yaml` anpassen
 4. Dry-Run ausführen
 5. Sync ausführen und `sync.log` prüfen
 
@@ -117,7 +117,7 @@ git checkout v0.1.0
 cd ..
 
 # Agenten neu generieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 # Config-Version zurücksetzen
 # "agent-meta-version": "0.1.0"
@@ -160,7 +160,7 @@ Alle Änderungen sind rückwärtskompatibel — keine Breaking Changes.
 
 ### 1. JSON Schema hinzufügen (empfohlen)
 
-In `agent-meta.config.yaml` oben ergänzen:
+In `.meta-config/project.yaml` oben ergänzen:
 ```json
 {
   "$schema": ".agent-meta/agent-meta.schema.json",
@@ -174,9 +174,9 @@ Aktiviert IDE-Autovervollständigung und Validierung in VS Code und anderen Edit
 
 ```bash
 cd .agent-meta && git checkout v0.17.0 && cd ..
-# agent-meta.config.yaml: "agent-meta-version": "0.17.0"
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+# .meta-config/project.yaml: "agent-meta-version": "0.17.0"
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Nach dem Sync sind neu vorhanden:
@@ -214,7 +214,7 @@ Falls ein anderes Verhalten gewünscht:
 ### 5. Committen
 
 ```bash
-git add .claude/ agent-meta.config.yaml .agent-meta
+git add .claude/ .meta-config/project.yaml .agent-meta
 git commit -m "chore: upgrade agent-meta to v0.17.0"
 ```
 
@@ -256,15 +256,15 @@ Beim nächsten Sync legt `sync.py` automatisch die neuen Verzeichnisse an:
 
 ```bash
 cd .agent-meta && git checkout v0.21.1-beta && cd ..
-# agent-meta.config.yaml: "agent-meta-version": "0.21.1-beta"
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+# .meta-config/project.yaml: "agent-meta-version": "0.21.1-beta"
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 ### 4. Committen
 
 ```bash
-git add .claude/ .gemini/ .continue/ agent-meta.config.yaml .agent-meta
+git add .claude/ .gemini/ .continue/ .meta-config/project.yaml .agent-meta
 git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 ```
 
@@ -277,7 +277,7 @@ git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 Ab v0.14.4 gilt für External Skills ein **Two-Gate-System**:
 
 - `external-skills.config.yaml`: `enabled` wurde in `approved` umbenannt — Meta-Maintainer-Freigabe
-- `agent-meta.config.yaml`: neuer `"external-skills"` Block für projektlokale Aktivierung
+- `.meta-config/project.yaml`: neuer `"external-skills"` Block für projektlokale Aktivierung
 
 **Migration:**
 
@@ -290,7 +290,7 @@ In `external-skills.config.yaml` — alle `"enabled"` umbenennen:
 "approved": true
 ```
 
-In `agent-meta.config.yaml` des Projekts — neuen Block ergänzen für jeden gewünschten Skill:
+In `.meta-config/project.yaml` des Projekts — neuen Block ergänzen für jeden gewünschten Skill:
 ```json
 "external-skills": {
   "my-skill": { "enabled": true }

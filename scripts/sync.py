@@ -7,26 +7,29 @@ Manages .claude/3-project/<prefix>-<role>-ext.md extension files.
 Syncs snippets, rules, hooks and external skill agents.
 
 Usage:
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --init
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --only-variables
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <role>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-rule <name>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-hook <name>
-  python .agent-meta/scripts/sync.py --config agent-meta.config.yaml --dry-run
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --only-variables
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <role>
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule <name>
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-hook <name>
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
   python .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name>
                                       --source <path> --role <role> [--entry <file>]
 
-Config format: YAML preferred (.yaml). JSON still supported for backward compatibility.
-  Passing --config agent-meta.config.json automatically redirects to .yaml if it exists.
+Config lookup order (when --config is omitted):
+  1. .meta-config/project.yaml    (new standard location — Zielprojekt)
+  2. config/project.yaml          (new standard location — Meta-Repo self-hosting)
+  3. agent-meta.config.yaml       (legacy flat-root)
+  4. agent-meta.config.json       (legacy JSON fallback)
 
-External skills (external-skills.config.yaml):
+External skills (config/skills-registry.yaml in agent-meta):
   - Managed centrally in agent-meta (Modell A)
   - Each enabled skill generates a wrapper agent in .claude/agents/<role>.md
   - Skill files are copied to .claude/skills/<skill-name>/
   - Use --add-skill to register a new submodule + skill entry
-  - Use enabled: true/false in external-skills.config.yaml to activate/deactivate
+  - Activate per-project via .meta-config/skills.yaml or project.yaml external-skills block
 """
 
 import argparse
@@ -73,7 +76,15 @@ EXT_SUFFIX = "-ext"
 MANAGED_BEGIN = "<!-- agent-meta:managed-begin -->"
 MANAGED_END   = "<!-- agent-meta:managed-end -->"
 LOGFILE = "sync.log"
-EXTERNAL_SKILLS_CONFIG = "external-skills.config.yaml"
+EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
+
+# Config auto-detect order when --config is omitted
+_CONFIG_CANDIDATES = [
+    ".meta-config/project.yaml",   # standard: Zielprojekt
+    "config/project.yaml",         # standard: Meta-Repo self-hosting
+    "agent-meta.config.yaml",      # legacy flat-root
+    "agent-meta.config.json",      # legacy JSON
+]
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +96,8 @@ def main():
         description="Sync agent-meta agents into a project."
     )
     parser.add_argument("--config", required=False, default=None,
-                        help="Path to agent-meta.config.yaml (or .json; not required for --add-skill)")
+                        help="Path to project.yaml (default: auto-detect .meta-config/project.yaml "
+                             "or legacy .meta-config/project.yaml). Not required for --add-skill.")
     parser.add_argument("--init", action="store_true",
                         help="Also generate CLAUDE.md from template (only if not present)")
     parser.add_argument("--only-variables", action="store_true",
@@ -99,11 +111,11 @@ def main():
                         help="Create .claude/rules/<NAME>.md template (never overwrites)")
     parser.add_argument("--create-hook", metavar="NAME",
                         help="Create .claude/hooks/<NAME>.sh template (never overwrites). "
-                             "Enable via agent-meta.config.yaml: "
+                             "Enable via .meta-config/project.yaml: "
                              "hooks: <NAME>: enabled: true")
     parser.add_argument("--fill-defaults", action="store_true",
                         help="Write missing config fields with their default values into "
-                             "agent-meta.config.yaml (or .json). Structural fields (dod-preset, "
+                             ".meta-config/project.yaml (or .json). Structural fields (dod-preset, "
                              "max-parallel-agents, speech-mode, dod.*) are written when absent. "
                              "Missing variable keys are reported as warnings only.")
     parser.add_argument("--dry-run", action="store_true",
@@ -113,7 +125,7 @@ def main():
     parser.add_argument("--add-skill", metavar="REPO_URL",
                         help="Register a new external skill: git submodule add + config entry")
     parser.add_argument("--skill-name", metavar="NAME",
-                        help="Skill identifier (used in external-skills.config.yaml)")
+                        help="Skill identifier (used in config/skills-registry.yaml)")
     parser.add_argument("--source", metavar="PATH",
                         help="Path to skill directory within the submodule repo")
     parser.add_argument("--role", metavar="ROLE",
@@ -145,12 +157,27 @@ def main():
                   read_version(agent_meta_root), mode, [], args.dry_run)
         return
 
-    # All other modes require --config
+    # All other modes require --config (or auto-detect)
     if not args.config:
-        print("  !  --config is required (except for --add-skill)", file=sys.stderr)
-        sys.exit(1)
+        cwd = Path.cwd()
+        for candidate in _CONFIG_CANDIDATES:
+            if (cwd / candidate).exists():
+                args.config = candidate
+                print(f"  i  auto-detected config: {candidate}")
+                break
+        if not args.config:
+            print("  !  No config found. Pass --config or create .meta-config/project.yaml",
+                  file=sys.stderr)
+            sys.exit(1)
 
-    project_root = Path(args.config).resolve().parent
+    config_resolved = Path(args.config).resolve()
+    config_parent_name = config_resolved.parent.name
+    # .meta-config/project.yaml → project root is two levels up
+    # config/project.yaml (meta-repo self-hosting) → project root is two levels up
+    if config_parent_name in (".meta-config", "config"):
+        project_root = config_resolved.parent.parent
+    else:
+        project_root = config_resolved.parent
     config_path = Path(args.config).resolve()
     config = load_config(config_path)
     variables, pre_warnings = build_variables(config, agent_meta_root)
@@ -231,7 +258,8 @@ def main():
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run)
             if pc["has_rules"] and provider == "Claude":
-                sync_rules(agent_meta_root, project_root, config, log, args.dry_run, platform_vars=platform_vars)
+                sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
+                           platform_vars=platform_vars, variables=variables)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run)
             if pc["has_hooks"] and provider == "Claude":
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)

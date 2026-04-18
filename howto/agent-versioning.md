@@ -119,5 +119,5 @@ Dann in agent-meta `agents/1-generic/developer.md` die aktuelle Version prüfen.
 Stimmt sie nicht überein → Sync ausführen:
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```

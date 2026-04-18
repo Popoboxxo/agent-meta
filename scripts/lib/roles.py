@@ -4,14 +4,16 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json
 
-ROLES_CONFIG = "roles.config.yaml"
+ROLES_CONFIG = "config/role-defaults.yaml"
+_ROLES_CONFIG_LEGACY = "roles.config.yaml"
 _ROLES_CONFIG_JSON = "roles.config.json"  # legacy fallback
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
-    """Load roles.config.yaml (or .json fallback) from agent-meta root."""
+    """Load config/role-defaults.yaml with fallback to legacy paths."""
     data, _ = _load_yaml_or_json(
         agent_meta_root / ROLES_CONFIG,
+        agent_meta_root / _ROLES_CONFIG_LEGACY,
         agent_meta_root / _ROLES_CONFIG_JSON,
     )
     if not data:

@@ -9,7 +9,8 @@ ai-providers:
 
 dod-preset: rapid-prototyping
 
-platforms: []
+platforms:
+  - agent-meta
 
 roles:
   - orchestrator
@@ -68,11 +69,11 @@ variables:
   GIT_MAIN_BRANCH: main
   SYSTEM_DEPENDENCIES: "- Python: `>=3.8`"
   SYSTEM_URLS: ""
-  BUILD_COMMAND: python scripts/sync.py --config agent-meta.config.yaml
+  BUILD_COMMAND: python scripts/sync.py
   TEST_COMMAND: "(kein automatisiertes Test-System — manuelle Verifikation via --dry-run)"
   DEV_COMMANDS: |
-    python scripts/sync.py --config agent-meta.config.yaml
-    python scripts/sync.py --config agent-meta.config.yaml --dry-run
+    python scripts/sync.py
+    python scripts/sync.py --dry-run
   DEV_STACK_START: "(kein Dev-Stack)"
   DEV_STACK_RELOAD: "(kein Dev-Stack)"
   PROJECT_CONTEXT: >-
@@ -121,8 +122,8 @@ variables:
     - Agent-Versionen müssen bei inhaltlichen Änderungen erhöht werden
   TESTER_SNIPPETS_PATH: ""
   DEVELOPER_SNIPPETS_PATH: ""
-  TEST_COMMANDS: python scripts/sync.py --config agent-meta.config.yaml --dry-run
-  BUILD_COMMANDS: python scripts/sync.py --config agent-meta.config.yaml
+  TEST_COMMANDS: python scripts/sync.py --dry-run
+  BUILD_COMMANDS: python scripts/sync.py
   REQ_CATEGORIES: |
     - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
     - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)

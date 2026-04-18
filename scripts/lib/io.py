@@ -11,19 +11,27 @@ except ImportError:
     _YAML_AVAILABLE = False
 
 
-def _load_yaml_or_json(path_yaml: Path, path_json: Path) -> tuple[dict, Path]:
-    """Load YAML file if it exists, else fall back to JSON. Returns (data, used_path)."""
-    if path_yaml.exists():
-        if not _YAML_AVAILABLE:
-            print(f"ERROR: PyYAML not installed but {path_yaml.name} requires it. "
-                  f"Run: pip install pyyaml", file=sys.stderr)
-            sys.exit(1)
-        with path_yaml.open(encoding="utf-8") as f:
-            return _yaml.safe_load(f) or {}, path_yaml
-    if path_json.exists():
-        with path_json.open(encoding="utf-8") as f:
-            return json.load(f), path_json
-    return {}, path_yaml  # neither exists — return empty + preferred path
+def _load_yaml_or_json(*paths: Path) -> tuple[dict, Path]:
+    """Load the first existing file from paths (YAML or JSON). Returns (data, used_path).
+
+    Accepts 1..N paths tried in order — first existing file wins.
+    Preferred path (for "not found" return) is always paths[0].
+    """
+    preferred = paths[0]
+    for path in paths:
+        if not path.exists():
+            continue
+        if path.suffix.lower() in (".yaml", ".yml"):
+            if not _YAML_AVAILABLE:
+                print(f"ERROR: PyYAML not installed but {path.name} requires it. "
+                      f"Run: pip install pyyaml", file=sys.stderr)
+                sys.exit(1)
+            with path.open(encoding="utf-8") as f:
+                return _yaml.safe_load(f) or {}, path
+        else:
+            with path.open(encoding="utf-8") as f:
+                return json.load(f), path
+    return {}, preferred  # none found — return empty + preferred path
 
 
 def _write_yaml(path: Path, data: dict) -> None:

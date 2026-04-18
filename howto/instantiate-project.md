@@ -37,7 +37,8 @@ git submodule update --init --recursive
 ### Schritt 2: Config anlegen und befüllen
 
 ```bash
-cp .agent-meta/howto/agent-meta.config.example.json agent-meta.config.yaml
+mkdir -p .meta-config
+cp .agent-meta/howto/agent-meta.config.example.json .meta-config/project.yaml
 ```
 
 Pflichtfelder:
@@ -66,7 +67,7 @@ Fehlende Variablen → Warning in `sync.log`, Platzhalter bleibt sichtbar.
 ### Schritt 3: CLAUDE.md + Agenten generieren
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Das Script erzeugt beim ersten Aufruf (bei aktivem `"Claude"` in `ai-providers`):
@@ -95,16 +96,16 @@ Zusätzlich bei weiteren Providern (ohne `--init` nötig — beim ersten normale
 cat sync.log
 ```
 
-Alle `[WARN]` zeigen fehlende Variablen. In `agent-meta.config.yaml` ergänzen, dann erneut syncen:
+Alle `[WARN]` zeigen fehlende Variablen. In `.meta-config/project.yaml` ergänzen, dann erneut syncen:
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 ### Schritt 5: Committen
 
 ```bash
-git add CLAUDE.md .claude/settings.json .claude/agents/ .gitignore agent-meta.config.yaml .gitmodules .agent-meta
+git add CLAUDE.md .claude/settings.json .claude/agents/ .gitignore .meta-config/project.yaml .gitmodules .agent-meta
 git commit -m "chore: initialize agent-meta agents"
 ```
 
@@ -136,7 +137,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 ## Multi-Provider
 
 Seit v0.21.0 kann `sync.py` gleichzeitig Agenten-Dateien für mehrere AI-Provider erzeugen.
-Konfiguration in `agent-meta.config.yaml`:
+Konfiguration in `.meta-config/project.yaml`:
 
 ```json
 "ai-providers": ["Claude", "Continue"]
@@ -159,7 +160,7 @@ Das Legacy-Feld `"ai-provider": "Claude"` (String) wird weiterhin unterstützt �
 
 ### Einfache Werte → config.json
 
-Kurze Texte, Kommandos, Listen: in `agent-meta.config.yaml` unter `variables` eintragen.
+Kurze Texte, Kommandos, Listen: in `.meta-config/project.yaml` unter `variables` eintragen.
 Sie werden per `{{PLATZHALTER}}` in den generierten Agenten injiziert.
 
 Verfügbare Platzhalter:
@@ -182,10 +183,10 @@ Für SDK-spezifische Patterns, manuelle Workflows, domänenspezifische Regeln:
 
 ```bash
 # Einzelne Extension anlegen:
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext developer
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext developer
 
 # Alle Extensions auf einmal anlegen:
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext all
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext all
 ```
 
 Die Extension-Datei wird in `.claude/3-project/<prefix>-<rolle>-ext.md` erstellt mit:
@@ -194,7 +195,7 @@ Die Extension-Datei wird in `.claude/3-project/<prefix>-<rolle>-ext.md` erstellt
 
 Managed block aktualisieren (z.B. nach config-Änderung):
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 ```
 
 Format — einfaches Markdown, kein Frontmatter nötig:
@@ -245,7 +246,7 @@ patches:
 
 External Skills sind spezialisierte Agenten aus Drittrepos (z.B. 3D-Druck, CAD).
 
-Skills werden **pro Projekt** aktiviert — in `agent-meta.config.yaml`:
+Skills werden **pro Projekt** aktiviert — in `.meta-config/project.yaml`:
 
 ```json
 "external-skills": {
@@ -264,7 +265,7 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 ## Checkliste: Projekt vollständig eingerichtet?
 
 - [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.21.1-beta` oder neuer)
-- [ ] `agent-meta.config.yaml` vollständig befüllt (inkl. `ai-providers`, `$schema`)
+- [ ] `.meta-config/project.yaml` vollständig befüllt (inkl. `ai-providers`)
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter

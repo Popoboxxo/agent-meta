@@ -7,7 +7,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- Project-specific additions belong in the section BELOW this marker. -->
 
 **Projekt:** agent-meta | **Plattform:** Python CLI (sync.py) | **Runtime:** Python 3.x
-**Build:** `python scripts/sync.py --config agent-meta.config.yaml` | **Test:** `(kein automatisiertes Test-System — manuelle Verifikation via --dry-run)`
+**Build:** `python scripts/sync.py` | **Test:** `(kein automatisiertes Test-System — manuelle Verifikation via --dry-run)`
 <!-- agent-meta:managed-end -->
 
 ## Project Setup

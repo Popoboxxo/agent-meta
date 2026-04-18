@@ -1,0 +1,140 @@
+# .meta-config/project.yaml — Projekt-Konfiguration für agent-meta
+#
+# Diese Datei gehört dem Projekt (nicht dem agent-meta-Submodul).
+# Sie steuert welche Agenten generiert werden und mit welchem Kontext.
+#
+# Sync ausführen:
+#   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+#   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init   (erstmalig)
+
+# Welche Version von agent-meta wird eingesetzt?
+agent-meta-version: 0.25.0
+
+# AI-Provider: "Claude" (Standard), "Gemini", "Continue" — oder mehrere
+ai-providers:
+  - Claude
+
+# Qualitätsprofil: "full" (Default), "standard", "rapid-prototyping"
+dod-preset: full
+
+# Plattform: [] für generisch, ["sharkord"] für Sharkord-Plugins
+platforms: []
+
+# Agenten-Whitelist — welche Rollen sollen generiert werden?
+# Auskommentieren um alle Rollen zu generieren.
+roles:
+  - orchestrator
+  - developer
+  - requirements
+  - validator
+  - documenter
+  - git
+  - release
+  - meta-feedback
+  - ideation
+  - agent-meta-manager
+  - feature
+  - agent-meta-scout
+
+# Projekt-Identität (für Extension-Dateinamen und interne Kennzeichnung)
+project:
+  name: mein-projekt               # Vollständiger Projektname (z.B. sharkord-mein-plugin)
+  prefix: mp                       # Kürzel, max 5 Zeichen (z.B. mp für mein-plugin)
+  short: mein-plugin               # Kurzname ohne Plattform-Prefix
+
+# Kommunikationsstil: "full" (Default), "short", "childish", "caveman"
+# speech-mode: full
+
+# Maximale parallele Agenten (1 = sequentiell, 2 = Default)
+# max-parallel-agents: 2
+
+# Hooks — opt-in pro Hook
+# hooks:
+#   dod-push-check:
+#     enabled: true
+
+# Externe Skills — opt-in pro Skill (muss auch approved: true in skills-registry.yaml sein)
+# external-skills:
+#   home-organization:
+#     enabled: true
+
+# Modell-Overrides pro Rolle (haiku / sonnet / opus)
+# model-overrides:
+#   git: haiku
+#   developer: opus
+
+# Definition of Done — einzelne Kriterien überschreiben
+# dod:
+#   security-audit: true
+
+variables:
+  # --- Projekt-Identität ---
+  PROJECT_NAME: mein-projekt
+  PROJECT_DESCRIPTION: >-
+    Was macht dieses Projekt? Ein Satz.
+  PROJECT_GOAL: >-
+    Für wen und welches Problem wird gelöst?
+
+  # --- Technologie ---
+  PLATFORM: "z.B. Sharkord Plugin SDK"
+  RUNTIME: "z.B. Bun (NICHT Node.js)"
+  PROJECT_LANGUAGES: "TypeScript"
+
+  # --- Sprachen ---
+  COMMUNICATION_LANGUAGE: Deutsch
+  USER_INPUT_LANGUAGE: Deutsch
+  DOCS_LANGUAGE: Englisch
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  CODE_LANGUAGE: Englisch
+
+  # --- Git ---
+  GIT_PLATFORM: GitHub             # GitHub, GitLab oder Gitea
+  GIT_REMOTE_URL: https://github.com/owner/repo
+  GIT_MAIN_BRANCH: main
+
+  # --- Kommandos ---
+  BUILD_COMMAND: bun run build
+  TEST_COMMAND: bun test
+  DEV_COMMANDS: |
+    bun run build
+    bun run dev
+  TEST_COMMANDS: bun test
+  BUILD_COMMANDS: bun run build
+
+  # --- Projektkontext (für Agenten-Hintergrundwissen) ---
+  PROJECT_CONTEXT: >-
+    Längere Beschreibung: Tech-Stack, Besonderheiten, Ziel des Projekts.
+  ARCHITECTURE: |
+    src/
+      index.ts    # Entry-Point
+    dist/         # Build-Output
+  CODE_CONVENTIONS: |
+    - TypeScript strict mode
+    - camelCase für Variablen, PascalCase für Klassen
+    - Keine any-Typen
+  EXTRA_DONTS: ""
+  CODE_QUALITY_RULES: ""
+  REQ_CATEGORIES: ""
+
+  # --- Snippets (optional — Pfad relativ zu snippets/) ---
+  TESTER_SNIPPETS_PATH: ""
+  DEVELOPER_SNIPPETS_PATH: ""
+
+  # --- meta-feedback Agent ---
+  AGENT_META_REPO: Popoboxxo/agent-meta
+
+  # --- Infrastruktur (nur bei Docker-Projekten relevant) ---
+  SYSTEM_DEPENDENCIES: ""
+  SYSTEM_URLS: ""
+  SERVICE_NAME: ""
+  CONTAINER_NAME: ""
+  PRIMARY_PORT: ""
+  EXTRA_PORTS: ""
+
+  # --- Release (nur bei release-Agent relevant) ---
+  BUILD_OUTPUT: ""
+  ARTIFACT_ZIP_CMD: ""
+  ARTIFACT_TAR_CMD: ""
+  GH_ASSETS: ""
+  BUILD_SYSTEM_NOTES: ""
+  VERSION_DIST_BEHAVIOUR: ""

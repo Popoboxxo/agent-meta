@@ -39,7 +39,7 @@ _DOD_FIELD_DEFAULTS: dict = {
 
 
 def load_config(config_path: Path) -> dict:
-    """Load agent-meta.config.yaml or agent-meta.config.json.
+    """Load .meta-config/project.yaml or .meta-config/project.yaml.
 
     If the provided path ends in .json but a sibling .yaml file exists,
     the YAML file is preferred (migration path: old --config still works).
@@ -82,7 +82,9 @@ def _validate_config(config: dict, config_path: Path) -> None:
     if not _JSONSCHEMA_AVAILABLE:
         return
 
-    schema_path = Path(__file__).resolve().parent.parent.parent / "agent-meta.schema.json"
+    schema_path = Path(__file__).resolve().parent.parent.parent / "config/project-config.schema.json"
+    if not schema_path.exists():
+        schema_path = Path(__file__).resolve().parent.parent.parent / "agent-meta.schema.json"
     if not schema_path.exists():
         return
 
@@ -110,7 +112,9 @@ def find_agent_meta_root(script_path: Path) -> Path:
 
 def _load_schema_variable_keys(agent_meta_root: Path) -> list[str]:
     """Return the list of known variable keys from agent-meta.schema.json."""
-    schema_path = agent_meta_root / "agent-meta.schema.json"
+    schema_path = agent_meta_root / "config/project-config.schema.json"
+    if not schema_path.exists():
+        schema_path = agent_meta_root / "agent-meta.schema.json"
     if not schema_path.exists():
         return []
     try:
@@ -128,7 +132,7 @@ def fill_defaults(
     log: SyncLog,
     dry_run: bool,
 ) -> None:
-    """Write missing config fields with their default values into agent-meta.config.yaml.
+    """Write missing config fields with their default values into .meta-config/project.yaml.
 
     Structural fields (dod-preset, max-parallel-agents, speech-mode, dod.*):
       Written into the config file when absent.
@@ -239,13 +243,28 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
 
     Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
     """
-    # First pass: resolve escaped literals {{% ... %}} → {{...}} (no substitution)
-    text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", r"{{\1}}", text)
+    # First pass: protect escaped literals {{%VAR%}} with unique sentinel
+    _SENTINEL = "\x00ESC\x00"
+    escaped: list[str] = []
 
+    def stash_escape(m):
+        escaped.append(m.group(1))
+        return f"{_SENTINEL}{len(escaped) - 1}{_SENTINEL}"
+
+    text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", stash_escape, text)
+
+    # Second pass: substitute real {{VAR}} placeholders
     def replacer(match):
         key = match.group(1)
         if key in variables:
             return variables[key]
         log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
-    return re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
+
+    text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
+
+    # Third pass: restore escaped literals as {{VAR}} (no substitution happened)
+    for i, name in enumerate(escaped):
+        text = text.replace(f"{_SENTINEL}{i}{_SENTINEL}", f"{{{{{name}}}}}")
+
+    return text

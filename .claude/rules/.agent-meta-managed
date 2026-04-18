@@ -1,4 +1,9 @@
+architecture.md
 branch-guard.md
+commit-conventions.md
+conventions.md
+dod-criteria.md
 issue-lifecycle.md
 speech-mode.md
+sync-interface.md
 use-orchestrator.md

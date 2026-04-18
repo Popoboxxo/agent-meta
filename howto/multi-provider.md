@@ -8,7 +8,7 @@
 ## Konzept
 
 `sync.py` generiert Provider-spezifischen Output aus denselben universellen Agent-Templates.
-Ein einziges `agent-meta.config.yaml` reicht, um Agenten-Dateien für Claude Code, Gemini CLI
+Ein einziges `.meta-config/project.yaml` reicht, um Agenten-Dateien für Claude Code, Gemini CLI
 und Continue gleichzeitig zu erzeugen.
 
 ```json

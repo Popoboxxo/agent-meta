@@ -7,7 +7,8 @@ from pathlib import Path
 from .io import _load_yaml_or_json, _write_yaml
 from .log import SyncLog
 
-EXTERNAL_SKILLS_CONFIG = "external-skills.config.yaml"
+EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
+_EXTERNAL_SKILLS_CONFIG_LEGACY = "external-skills.config.yaml"
 _EXTERNAL_SKILLS_CONFIG_JSON = "external-skills.config.json"  # legacy fallback
 
 
@@ -16,7 +17,7 @@ def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> 
 
     Two-gate check:
     1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
-    2. enabled:  true in agent-meta.config.yaml        (project opt-in)
+    2. enabled:  true in .meta-config/project.yaml        (project opt-in)
 
     If project has no "external-skills" block at all, no skill is generated.
     """
@@ -27,9 +28,10 @@ def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> 
 
 
 def load_external_skills_config(agent_meta_root: Path) -> dict:
-    """Load external-skills.config.yaml (or .json fallback) from agent-meta root."""
+    """Load config/skills-registry.yaml with fallback to legacy paths."""
     data, _ = _load_yaml_or_json(
         agent_meta_root / EXTERNAL_SKILLS_CONFIG,
+        agent_meta_root / _EXTERNAL_SKILLS_CONFIG_LEGACY,
         agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON,
     )
     if not data:
@@ -121,7 +123,7 @@ def sync_external_skills(
 
     Two-gate check per skill:
     1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
-    2. enabled:  true in agent-meta.config.yaml        (project opt-in)
+    2. enabled:  true in .meta-config/project.yaml        (project opt-in)
     """
     from .agents import AGENTS_DIR, EXTERNAL_DIR, SKILL_WRAPPER
     from .config import substitute
@@ -150,7 +152,7 @@ def sync_external_skills(
             continue
         project_skill_cfg = project_skills.get(skill_name, {})
         if not project_skill_cfg.get("enabled", False):
-            log.info(role_label, f"skill '{skill_name}' not enabled in agent-meta.config.json — skipping")
+            log.info(role_label, f"skill '{skill_name}' not enabled in .meta-config/project.yaml — skipping")
             continue
 
         repo_key   = skill_cfg.get("repo", "")
@@ -276,8 +278,9 @@ def add_skill(
                 print(f"  !  git submodule add failed", file=sys.stderr)
                 return
 
-    # Update external-skills.config.yaml (or .json fallback)
+    # Update config/skills-registry.yaml (or legacy fallback)
     yaml_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
+    legacy_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_LEGACY
     json_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON
 
     try:
@@ -289,6 +292,10 @@ def add_skill(
     if yaml_path.exists() and _yaml_available:
         config_path = yaml_path
         with config_path.open(encoding="utf-8") as f:
+            raw = _yaml.safe_load(f) or {}
+    elif legacy_path.exists() and _yaml_available:
+        config_path = yaml_path  # write to new path even when reading legacy
+        with legacy_path.open(encoding="utf-8") as f:
             raw = _yaml.safe_load(f) or {}
     elif json_path.exists():
         config_path = json_path
@@ -329,4 +336,4 @@ def add_skill(
         print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
         print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
         print(f"  i  To activate: set approved: true in {config_path.name},")
-        print(f"     then add to agent-meta.config.yaml: external-skills: {skill_name}: enabled: true")
+        print(f"     then add to .meta-config/project.yaml: external-skills: {skill_name}: enabled: true")
