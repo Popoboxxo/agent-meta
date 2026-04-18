@@ -319,10 +319,13 @@ def main():
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                                  rules_dir=pc.get("rules_dir"))
             if pc["has_hooks"]:
-                sync_hooks(agent_meta_root, project_root, config, log, args.dry_run)
+                sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
+                           provider=provider, provider_config=provider_config)
             if pc.get("has_commands", False):
                 sync_commands_for_provider(agent_meta_root, project_root, config, log,
-                                           args.dry_run, provider, variables=variables)
+                                           args.dry_run, provider,
+                                           provider_config=provider_config,
+                                           variables=variables)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)

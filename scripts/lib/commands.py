@@ -1,5 +1,6 @@
 """Commands layer: collect, sync, create — analog to rules.py."""
 
+import re
 from pathlib import Path
 
 from .log import SyncLog
@@ -55,6 +56,32 @@ def _add_frontmatter_field(content: str, field: str, value: str) -> str:
     return "---" + frontmatter + insertion + content[end:]
 
 
+def _md_to_toml(content: str, stem: str) -> str:
+    """Convert a Claude-style .md command to a Gemini .toml command.
+
+    Extracts `description` from frontmatter and the body as `prompt`.
+    Replaces $ARGUMENTS with {{args}} (Gemini syntax).
+    """
+    description = stem.replace("-", " ").replace("_", " ").title()
+    body = content
+
+    if content.startswith("---"):
+        end = content.find("\n---", 3)
+        if end != -1:
+            fm = content[3:end]
+            m = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
+            if m:
+                description = m.group(1).strip().strip('"').strip("'")
+            body = content[end + 4:].lstrip("\n")
+
+    body = body.replace("$ARGUMENTS", "{{args}}")
+    body = body.strip()
+
+    # TOML multiline string
+    escaped = body.replace('"""', '\\"\\"\\"')
+    return f'description = "{description}"\nprompt = """\n{escaped}\n"""\n'
+
+
 def sync_commands_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -62,19 +89,21 @@ def sync_commands_for_provider(
     log: SyncLog,
     dry_run: bool,
     provider: str,
+    provider_config: dict | None = None,
     variables: dict | None = None,
 ):
     """Copy command files to the provider-specific target directory.
 
-    Claude  → .claude/commands/
-    Continue → .continue/prompts/
+    Claude   → .claude/commands/      (.md, as-is)
+    Continue → .continue/prompts/     (.md, invokable: true injected)
+    Gemini   → .gemini/commands/      (.toml, converted from .md)
 
     Variables substitution: {{VAR}} placeholders are substituted like rules.
-    Continue commands: invokable: true is injected automatically if absent.
     Stale-tracking via .agent-meta-managed in the target directory.
     """
     from .config import substitute
 
+    pc = (provider_config or {}).get(provider, {})
     platforms = config.get("platforms", [])
     sources = collect_command_sources(agent_meta_root, platforms)
 
@@ -84,10 +113,17 @@ def sync_commands_for_provider(
     if provider == "Claude":
         target_dir = project_root / CLAUDE_COMMANDS_DIR
         managed_index_path = target_dir / ".agent-meta-managed"
+        output_ext = ".md"
     elif provider == "Continue":
         target_dir = project_root / CONTINUE_COMMANDS_DIR
         # Use a separate managed index to avoid collision with sync_prompts_for_continue
         managed_index_path = target_dir / ".agent-meta-commands-managed"
+        output_ext = ".md"
+    elif provider == "Gemini":
+        commands_dir = pc.get("commands_dir", ".gemini/commands")
+        target_dir = project_root / commands_dir
+        managed_index_path = target_dir / ".agent-meta-managed"
+        output_ext = pc.get("commands_ext", ".toml")
     else:
         return
 
@@ -104,7 +140,10 @@ def sync_commands_for_provider(
         target_dir.mkdir(parents=True, exist_ok=True)
 
     for source_path, output_name in sources:
-        target_path = target_dir / output_name
+        # Rewrite extension for providers that use a different format (e.g. Gemini → .toml)
+        stem = Path(output_name).stem
+        final_name = stem + output_ext
+        target_path = target_dir / final_name
         content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]
         rel_source = f"commands/{layer}/{source_path.name}"
@@ -114,9 +153,11 @@ def sync_commands_for_provider(
 
         if provider == "Continue":
             content = _add_frontmatter_field(content, "invokable", "true")
+        elif provider == "Gemini":
+            content = _md_to_toml(content, stem)
 
         log.action("COPY", str(target_path.relative_to(project_root)), rel_source)
-        now_managed.add(output_name)
+        now_managed.add(final_name)
 
         if not dry_run:
             target_path.write_text(content, encoding="utf-8")

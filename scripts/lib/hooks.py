@@ -86,9 +86,9 @@ def collect_hook_sources(
     return [(src, name) for name, src in seen.items()]
 
 
-def _hook_settings_command(output_filename: str) -> str:
+def _hook_settings_command(output_filename: str, hooks_dir: str = CLAUDE_HOOKS_DIR) -> str:
     """Return the shell command string registered in settings.json for a hook."""
-    return f"bash .claude/hooks/{output_filename}"
+    return f"bash {hooks_dir}/{output_filename}"
 
 
 def _update_settings_hooks(
@@ -98,17 +98,19 @@ def _update_settings_hooks(
     active_entries: list[dict],
     log: SyncLog,
     dry_run: bool,
+    settings_path_rel: str = ".claude/settings.json",
+    hooks_dir: str = CLAUDE_HOOKS_DIR,
 ) -> None:
-    """Merge managed hook entries into .claude/settings.json.
+    """Merge managed hook entries into settings.json.
 
     - Removes entries for stale managed hooks (in previously_managed but not now_managed)
     - Removes then re-adds entries for active hooks (clean replace)
     - Preserves all non-managed entries (user hooks, permissions, etc.)
 
     Hooks are identified in settings.json by their command string
-    ``bash .claude/hooks/<filename>``.
+    ``bash <hooks_dir>/<filename>``.
     """
-    settings_path = project_root / ".claude" / "settings.json"
+    settings_path = project_root / settings_path_rel
 
     all_managed = previously_managed | now_managed
     if not all_managed and not settings_path.exists():
@@ -130,7 +132,7 @@ def _update_settings_hooks(
     hooks_section: dict = settings.get("hooks", {})
 
     # All commands we might have ever written (to remove stale + re-add active)
-    all_managed_cmds = {_hook_settings_command(n) for n in all_managed}
+    all_managed_cmds = {_hook_settings_command(n, hooks_dir) for n in all_managed}
 
     # Strip all managed entries from every event bucket
     for event_name in list(hooks_section.keys()):
@@ -151,7 +153,7 @@ def _update_settings_hooks(
         hook_entry: dict = {"hooks": [{"type": "command", "command": command}]}
         if matcher:
             hook_entry["matcher"] = matcher
-        hooks_section.setdefault(event, []).append(hook_entry)
+        hooks_section.setdefault(event, []).append(hook_entry)  # type: ignore[attr-defined]
 
     # Update or remove hooks key
     if hooks_section:
@@ -162,12 +164,13 @@ def _update_settings_hooks(
     new_content = json.dumps(settings, indent=2, ensure_ascii=False) + "\n"
 
     stale = previously_managed - now_managed
+    settings_rel = str(settings_path_rel)
     if stale:
-        log.action("UPDATE", ".claude/settings.json",
+        log.action("UPDATE", settings_rel,
                    f"removed stale hooks: {', '.join(Path(s).stem for s in sorted(stale))}")
     if active_entries:
         names = ", ".join(e["name"] for e in active_entries)
-        log.action("UPDATE", ".claude/settings.json", f"registered hooks: {names}")
+        log.action("UPDATE", settings_rel, f"registered hooks: {names}")
     elif not stale:
         return  # no effective change
 
@@ -182,28 +185,34 @@ def sync_hooks(
     config: dict,
     log: SyncLog,
     dry_run: bool,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
 ) -> None:
-    """Copy hook scripts from agent-meta/hooks/ layers to .claude/hooks/ in the project.
+    """Copy hook scripts from agent-meta/hooks/ layers to the provider hooks directory.
 
     Layer priority (same as rules and agents):
       2-platform  >  1-generic  >  0-external
 
     All hook scripts are always copied (like rules — no opt-in needed for the file).
-    Registration in .claude/settings.json is opt-in per project:
+    Registration in settings.json is opt-in per project:
 
       .meta-config/project.yaml:
         hooks: { dod-push-check: { enabled: true } }
 
-    Stale managed hooks (tracked in .claude/hooks/.agent-meta-managed) are deleted.
+    Stale managed hooks (tracked in <hooks_dir>/.agent-meta-managed) are deleted.
     Project-owned hook scripts (not in .agent-meta-managed) are never touched.
     """
+    pc = (provider_config or {}).get(provider, {})
+    hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
+    settings_file_rel = pc.get("settings_file", ".claude/settings.json")
+
     platforms = config.get("platforms", [])
     sources = collect_hook_sources(agent_meta_root, platforms)
 
     if not sources:
         return
 
-    target_dir = project_root / CLAUDE_HOOKS_DIR
+    target_dir = project_root / hooks_dir_rel
     managed_index_path = target_dir / ".agent-meta-managed"
 
     previously_managed: set[str] = set()
@@ -241,7 +250,7 @@ def sync_hooks(
                 "name": hook_stem,
                 "event": event,
                 "matcher": meta.get("matcher", ""),
-                "command": _hook_settings_command(output_name),
+                "command": _hook_settings_command(output_name, hooks_dir_rel),
             })
             log.info(str(target_path.relative_to(project_root)),
                      f"registered in settings.json (event: {event})")
@@ -266,7 +275,9 @@ def sync_hooks(
 
     # Merge hooks into settings.json
     _update_settings_hooks(
-        project_root, previously_managed, now_managed, active_entries, log, dry_run
+        project_root, previously_managed, now_managed, active_entries, log, dry_run,
+        settings_path_rel=settings_file_rel,
+        hooks_dir=hooks_dir_rel,
     )
 
 

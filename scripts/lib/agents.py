@@ -654,10 +654,15 @@ def sync_agents_for_provider(
                     log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
             elif provider == 'Gemini':
-                # Gemini: model only; strip memory and permissionMode
+                # Gemini: model only; strip memory, permissionMode and Claude-specific lines
                 model = resolve_model(role, config, agent_meta_root)
                 content = inject_model_field(content, model)
                 content = _remove_frontmatter_fields(content, ['memory', 'permissionMode'])
+                body = _strip_frontmatter(content)
+                body = _strip_claude_specific_lines(body)
+                fm_end = content.find('\n---', 3)
+                if fm_end != -1:
+                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)

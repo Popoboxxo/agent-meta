@@ -22,9 +22,14 @@ providers:
     context_file: .gemini/GEMINI.md
     context_template: howto/GEMINI.project-template.md
     has_rules: false
-    has_hooks: false
+    has_hooks: true
+    hooks_dir: .gemini/hooks
+    has_commands: true
+    commands_dir: .gemini/commands
+    commands_ext: .toml
     has_settings: true
     settings_file: .gemini/settings.json
+    settings_template: howto/GEMINI.settings-template.json
     gitignore_entries: []
 
   Continue:

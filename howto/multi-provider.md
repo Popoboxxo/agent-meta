@@ -38,10 +38,13 @@ Vollständiger Output — keine Einschränkungen:
 
 ### Gemini CLI
 
-Gemini hat kein Rules- oder Hooks-System:
 - `.gemini/agents/*.md` — generierte Agenten (gleicher Markdown-Body wie Claude)
 - `.gemini/GEMINI.md` — Kontext-Datei, managed block wird bei jedem sync aktualisiert
-- `.gemini/settings.json` — Skeleton (nur einmalig angelegt, nicht überschrieben)
+- `.gemini/settings.json` — Skeleton (einmalig angelegt); Hooks werden bei jedem sync eingetragen
+- `.gemini/commands/*.toml` — Slash-Commands (aus `commands/` transformiert, `.md` → `.toml`)
+- `.gemini/hooks/*.sh` — Hook-Skripte (kopiert, stale gelöscht)
+
+Kein Rules-System in Gemini CLI — Regeln werden direkt in GEMINI.md eingebettet.
 
 **Frontmatter-Unterschiede zu Claude:**
 - `permissionMode` wird entfernt (nicht unterstützt)
@@ -99,8 +102,9 @@ Nur bekannte Provider werden verarbeitet. Unbekannte Werte werden stillschweigen
 }
 ```
 
-**Hinweis:** Rules und Hooks werden nur für Claude generiert. Für andere Provider entfällt
-das Rules-/Hooks-System.
+**Hinweis:** Rules werden für Claude und Continue generiert (Claude → `.claude/rules/`,
+Continue → `.continue/rules/`). Hooks werden für Claude und Gemini generiert.
+Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
 
 ---
 
@@ -140,8 +144,9 @@ das Rules-/Hooks-System.
 | Kontext-Datei (managed block) | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert |
 | Kontext-Datei (Rest) | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst |
 | Settings/Config Skeleton | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig |
-| Rules | ✅ Sync (stale gelöscht) | — | — |
-| Hooks | ✅ Sync + registriert | — | — |
+| Rules | ✅ Sync (stale gelöscht) | — | ✅ Sync nach `.continue/rules/` |
+| Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — |
+| Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` |
 
 ---
 
