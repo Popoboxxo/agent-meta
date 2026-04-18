@@ -8,6 +8,66 @@ Agenten werden von `sync.py` **generiert** — nie manuell kopiert oder bearbeit
 Den Projektkontext liefert die `CLAUDE.md` des Projekts.
 Projektspezifische Erweiterungen leben in `.claude/3-project/`.
 
+### CLAUDE.md Hierarchie
+
+Claude Code lädt Kontext-Dateien in dieser Reihenfolge (alle werden zusammengeführt):
+
+```
+~/.claude/CLAUDE.md          ← global, alle Projekte (~50 Zeilen max)
+<projekt>/CLAUDE.md          ← projektspezifisch — von agent-meta verwaltet
+<ordner>/CLAUDE.md           ← optional in Unterordnern (z.B. src/backend/CLAUDE.md)
+```
+
+| Ebene | Inhalt | Wer pflegt es |
+|-------|--------|---------------|
+| Global (`~/.claude/CLAUDE.md`) | Persönliche Präferenzen, eigene Verbote, persönliche Kommunikationsstil | Du — manuell, einmalig |
+| Projekt (`CLAUDE.md`) | Tech-Stack, Commands, Architektur, DoD, Agenten-Hints | agent-meta (managed block) + Du (manuell) |
+| Ordner (`<ordner>/CLAUDE.md`) | Subsystem-spezifische Regeln (z.B. nur für `src/backend/`) | Du — manuell, bei Bedarf |
+
+**Empfehlung für die globale CLAUDE.md:** Persönliche Präferenzen die für *alle* Projekte gelten —
+kein projektspezifisches Wissen. Maximal ~50 Zeilen.
+
+**Ordner-level CLAUDE.md:** Sinnvoll wenn ein Unterordner eigene Konventionen hat die im
+Hauptkontext zu viel Platz wäre. Wird von agent-meta nicht berührt.
+
+### .claude/rules/ — modulare Regeln
+
+```
+.claude/rules/
+  branch-guard.md       ← von agent-meta generiert (sync.py)
+  commit-conventions.md ← von agent-meta generiert
+  language.md           ← von agent-meta generiert (mit substituierten Variablen)
+  dod-criteria.md       ← von agent-meta generiert
+  meine-regel.md        ← projekt-eigen (nie von sync.py berührt)
+```
+
+Regeln in `.claude/rules/` werden von Claude Code **automatisch** in jeden Agenten-Kontext
+und den Hauptchat geladen — kein `Read`-Tool nötig. agent-meta-verwaltete Rules werden bei
+jedem Sync aktualisiert; projekt-eigene Rules werden nie überschrieben.
+
+Projekt-eigene Rule anlegen:
+```bash
+py .agent-meta/scripts/sync.py --create-rule meine-regel
+```
+
+### .claude/commands/ — Custom Slash Commands
+
+```
+.claude/commands/
+  deploy.md      → /project:deploy
+  review.md      → /project:review
+```
+
+Slash Commands laufen im **Haupt-Kontext** (kein isoliertes Context Window wie Agenten).
+Geeignet für schnelle, wiederkehrende Einzel-Aktionen. agent-meta verwaltet commands/ nicht —
+du legst diese Dateien manuell an.
+
+| `.claude/agents/` | `.claude/commands/` |
+|-------------------|---------------------|
+| Vollständige Persona, isolierter Kontext | Schneller Einzel-Workflow im Hauptchat |
+| Für komplexe, mehrstufige Aufgaben | Für wiederkehrende Einzel-Aktionen |
+| Von agent-meta generiert und verwaltet | Manuell angelegt, nie von sync.py berührt |
+
 ---
 
 ## Ersteinrichtung
