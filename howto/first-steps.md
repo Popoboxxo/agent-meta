@@ -1,8 +1,10 @@
 # First Steps — agent-meta einrichten
 
-> Gib diese Datei deinem AI-Assistenten (Claude Code, Cursor, Copilot etc.) und sage:
-> **"Hilf mir, agent-meta in diesem Projekt einzurichten."**
+> **Schnellstart ohne AI-Assistent:** `py .agent-meta/scripts/sync.py --setup`
+> Der CLI-Wizard führt durch alle Pflichtfelder und startet danach `--init` automatisch.
 >
+> **Mit AI-Assistent:** Gib diese Datei deinem AI-Tool (Claude Code, Cursor, Copilot etc.)
+> und sage: **"Hilf mir, agent-meta in diesem Projekt einzurichten."**
 > Der Assistent liest dann diese Anleitung und führt dich interaktiv durch die Einrichtung.
 
 ---
