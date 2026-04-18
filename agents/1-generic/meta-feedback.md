@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "1.4.1"
+version: "1.4.2"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
@@ -173,7 +173,7 @@ Ein gutes Issue:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - GitHub Issue-Titel → **immer Englisch** (unabhängig von DOCS_LANGUAGE)
-- GitHub Issue-Body → **{{DOCS_LANGUAGE}}**
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
+- GitHub Issue-Body → {{DOCS_LANGUAGE}}

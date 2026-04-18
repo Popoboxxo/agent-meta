@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-scout
-version: "1.0.0"
+version: "1.0.1"
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 hint: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken"
 tools:
@@ -165,5 +165,4 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 
 ## Sprache
 
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.

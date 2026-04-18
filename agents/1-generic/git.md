@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.0.1"
+version: "2.0.2"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
@@ -396,6 +396,6 @@ git remote set-url origin https://gitea.example.com/owner/repo.git
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Commit-Messages → {{CODE_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

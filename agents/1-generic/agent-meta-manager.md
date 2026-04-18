@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.1.1"
+version: "1.1.2"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -33,7 +33,7 @@ durch eine generische Verbesserung in agent-meta besser gelöst wäre.
 
 ## Sprache
 
-{{COMMUNICATION_LANGUAGE}}
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.4.2"
+version: "1.4.3"
 description: "Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
@@ -187,6 +187,6 @@ er gibt falsches Vertrauen. Lieber **keinen Test** als einen der nichts beweist.
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Test-Beschreibungen (`it("...")`) → {{CODE_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

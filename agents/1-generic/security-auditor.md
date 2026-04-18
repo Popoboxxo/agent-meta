@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "1.0.0-beta"
+version: "1.0.1-beta"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution."
 hint: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse ohne Code-Ausführung"
 tools:
@@ -302,6 +302,6 @@ API_KEY = "sk_live_abc123..."  // hardkodierter Production-Key
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Audit-Reports → {{INTERNAL_DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
