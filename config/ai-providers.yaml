@@ -21,7 +21,8 @@ providers:
     agent_ext: .md
     context_file: .gemini/GEMINI.md
     context_template: howto/configs/GEMINI.project-template.md
-    has_rules: false
+    has_rules: true
+    rules_dir: .gemini/rules
     has_hooks: true
     hooks_dir: .gemini/hooks
     has_commands: true
