@@ -6,6 +6,7 @@ providers:
     context_template: howto/CLAUDE.project-template.md
     has_rules: true
     has_hooks: true
+    has_commands: true
     has_settings: true
     settings_file: .claude/settings.json
     gitignore_entries:
@@ -33,6 +34,7 @@ providers:
     context_template: howto/CONTINUE.project-template.md
     has_rules: false
     has_hooks: false
+    has_commands: true
     has_settings: true
     settings_file: .continue/config.yaml
     settings_template: howto/CONTINUE.config-template.yaml
