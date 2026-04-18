@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.4.1"
+version: "1.4.2"
 description: "Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
@@ -119,7 +119,7 @@ sprachspezifische Syntax, Import-Statements und Framework-Patterns.
 
 ## Commit-Konventionen für Tests
 
-Format: `test(REQ-xxx): <beschreibung>`
+Format: `test(REQ-xxx): <beschreibung>` — vollständige Tabelle in Rule `commit-conventions.md`
 
 ---
 

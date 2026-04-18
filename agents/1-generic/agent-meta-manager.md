@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.1.0"
+version: "1.1.1"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -63,7 +63,7 @@ cat .agent-meta/VERSION
 git submodule status .agent-meta
 
 # Konfigurierte Version in config
-grep "agent-meta-version" agent-meta.config.yaml
+grep "agent-meta-version" .meta-config/project.yaml
 
 # Letzter Sync-Zeitstempel
 cat sync.log | head -5
@@ -71,7 +71,7 @@ cat sync.log | head -5
 
 Ausgabe an den User:
 - Aktuelle Version im Submodul
-- Version in `agent-meta.config.yaml`
+- Version in `.meta-config/project.yaml`
 - Datum des letzten Sync
 - Ob `.claude/agents/` mit der Config übereinstimmt (Dry-run)
 
@@ -107,7 +107,7 @@ Bei einem Major-Versionssprung (z.B. 0.x.x → 1.0.0):
 > "Dies ist ein Major-Update mit Breaking Changes:
 > [Zusammenfassung der Breaking Changes]
 >
-> Manuelle Anpassungen in `agent-meta.config.yaml` oder `.claude/3-project/` können nötig sein.
+> Manuelle Anpassungen in `.meta-config/project.yaml` oder `.claude/3-project/` können nötig sein.
 > Soll ich trotzdem upgraden?"
 
 Erst nach expliziter Bestätigung fortfahren.
@@ -123,7 +123,7 @@ git add .agent-meta
 
 ### Schritt 5: Config-Version aktualisieren
 
-Aktualisiere `agent-meta-version` in `agent-meta.config.yaml` auf die neue Version.
+Aktualisiere `agent-meta-version` in `.meta-config/project.yaml` auf die neue Version.
 
 ### Schritt 6: Sync ausführen
 
@@ -132,7 +132,7 @@ Aktualisiere `agent-meta-version` in `agent-meta.config.yaml` auf die neue Versi
 ### Schritt 7: Commit
 
 ```bash
-git add .agent-meta agent-meta.config.yaml .claude/agents/ sync.log
+git add .agent-meta .meta-config/project.yaml .claude/agents/ sync.log
 git commit -m "chore: upgrade agent-meta to v<ZIELVERSION>"
 ```
 
@@ -141,12 +141,12 @@ git commit -m "chore: upgrade agent-meta to v<ZIELVERSION>"
 ## 3. Sync ausführen
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Nach dem Sync:
 1. `sync.log` lesen — alle `[WARN]` ausgeben und erklären
-2. Bei fehlenden Variablen: User auf den fehlenden Eintrag in `agent-meta.config.yaml` hinweisen
+2. Bei fehlenden Variablen: User auf den fehlenden Eintrag in `.meta-config/project.yaml` hinweisen
 3. Bei `[WARN] CLAUDE.md exists but has no managed block`: Nutzer anleiten den Block manuell einzufügen
 
 ---
@@ -213,7 +213,7 @@ Was brauche ich?
 │
 ├─ Zusätzliche Regeln / Wissen für einen bestehenden Agenten?
 │   → Extension: .claude/3-project/{{PREFIX}}-<rolle>-ext.md
-│   → Anlegen: py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <rolle>
+│   → Anlegen: py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <rolle>
 │
 └─ Komplett anderer Workflow / Struktur für eine Rolle?
     → Override: .claude/3-project/<rolle>.md
@@ -224,7 +224,7 @@ Was brauche ich?
 ### Extension anlegen
 
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --create-ext <rolle>
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <rolle>
 ```
 
 Die Extension enthält einen **managed block** (automatisch aktualisiert) und einen
@@ -236,7 +236,7 @@ handgeschriebenen Projektbereich. Erkläre dem User:
 
 Nach Config-Änderungen:
 ```bash
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml --update-ext
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 ```
 
 ### Minimalprinzip
@@ -257,7 +257,7 @@ Lies beide Konfigurationen und erstelle eine Gesamtübersicht:
 cat .agent-meta/external-skills.config.yaml
 
 # Projekt-Aktivierungen
-cat agent-meta.config.yaml   # → Block "external-skills"
+cat .meta-config/project.yaml   # → Block "external-skills"
 ```
 
 Zeige dem User eine **Statusmatrix**:
@@ -278,10 +278,10 @@ Zusätzlich: Hinweis auf Skills im Submodule-Repo die noch **nicht** in
 2. Prüfe ob das Submodule initialisiert ist:
    ls .agent-meta/external/<repo-name>/
    → Leer? → git submodule update --init --recursive
-3. Ergänze in agent-meta.config.yaml:
+3. Ergänze in .meta-config/project.yaml:
    "external-skills": { "skill-name": { "enabled": true } }
 4. Sync ausführen:
-   py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 5. sync.log prüfen — SKILL sollte unter [WRITE] erscheinen
 6. Bestätige dem User: Agent-Datei + Skill-Dateien generiert
 ```
@@ -294,10 +294,10 @@ Zusätzlich: Hinweis auf Skills im Submodule-Repo die noch **nicht** in
 ### 7.3 Skill deaktivieren
 
 ```
-1. In agent-meta.config.yaml den Skill auf enabled: false setzen:
+1. In .meta-config/project.yaml den Skill auf enabled: false setzen:
    "external-skills": { "skill-name": { "enabled": false } }
 2. Sync ausführen:
-   py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 3. sync.log prüfen — Skill-Agent wird als stale entfernt
 4. Bestätige dem User: Agent-Datei + Skill-Dateien entfernt
 ```
@@ -328,7 +328,7 @@ Wenn der User ein **konkretes Repo** benennt, das als External Skill eingebunden
 
 4. User informieren:
    - "Skill registriert mit approved: false"
-   - "Zum Aktivieren: approved: true setzen + in agent-meta.config.yaml aktivieren"
+   - "Zum Aktivieren: approved: true setzen + in .meta-config/project.yaml aktivieren"
    - "Empfehlung: Erst prüfen, dann freigeben"
 ```
 
@@ -372,7 +372,7 @@ git pull
 cd ../..
 git add .agent-meta/external/<repo-name>
 # pinned_commit in external-skills.config.yaml aktualisieren
-py .agent-meta/scripts/sync.py --config agent-meta.config.yaml
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 ### 7.7 Konsistenz-Check

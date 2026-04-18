@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.0.0"
+version: "2.0.1"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -32,7 +32,7 @@ Du prüfst, ob entwickelte Inhalte die Aufgabenstellung erfüllen und alle aktiv
 
 ## DoD-Konfiguration
 
-Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `agent-meta.config.yaml`.
+Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `.meta-config/project.yaml`.
 Prüfe nur **aktive** Kriterien. Fehlende Einträge = Default.
 
 | Feature | Default | Steuert |
@@ -77,25 +77,8 @@ Prüfe ob eine Implementierung die zugehörige Anforderung korrekt umsetzt:
 
 ### 2. Definition of Done (DoD) Checkliste
 
-Eine Aufgabe ist erst abgeschlossen, wenn alle **aktiven** Punkte erfüllt sind:
-
-**Immer aktiv (Pflicht):**
-- [ ] **Code implementiert** die Aufgabe vollständig (`src/`)
-- [ ] **Code-Konventionen** eingehalten (s. projektspezifische Regeln in CLAUDE.md)
-- [ ] **Commit-Message** im korrekten Conventional-Commits-Format
-- [ ] **Keine Regressions** — bestehende Tests brechen nicht
-
-**Wenn `req-traceability` aktiv:**
-- [ ] **REQ-ID existiert** in `docs/REQUIREMENTS.md`
-- [ ] **REQUIREMENTS.md** konsistent (REQ-Text passt zur Implementierung)
-- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
-
-**Wenn `tests-required` aktiv:**
-- [ ] **Test vorhanden** (mit `[REQ-xxx]` im Namen wenn req-traceability aktiv)
-- [ ] **Tests bestehen** (Test-Runner grün)
-
-**Wenn `codebase-overview` aktiv:**
-- [ ] **CODEBASE_OVERVIEW.md** aktualisiert (falls Code-Änderungen)
+Die vollständige DoD-Checkliste steht in Rule `.claude/rules/dod-criteria.md` (automatisch geladen).
+Prüfe nur **aktive** Kriterien gemäß der DoD-Konfiguration in `.meta-config/project.yaml`.
 
 ### 3. Traceability-Audit — `req-traceability`
 
