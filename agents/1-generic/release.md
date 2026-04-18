@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.3.1"
+version: "1.3.2"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
@@ -135,6 +135,6 @@ Vor jedem Release:
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - CHANGELOG.md → {{DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}

@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.0.0"
+version: "1.0.1"
 description: "Spezialisierter Developer für parametrische 3D-Modelle in OpenSCAD. Render-Inspect-Refine Loop via MCP, Druckbarkeits-Wissen, Toleranz-Management."
 hint: "OpenSCAD-Code generieren: parametrische 3D-Modelle, Render-Feedback, STL-Export, Druck-Optimierung"
 tools:
@@ -26,9 +26,9 @@ Du arbeitest **eigenständig** (kein Orchestrator nötig) und nutzt den
 
 ## Sprache
 
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
 - Code-Kommentare → {{CODE_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
 
 ---
 

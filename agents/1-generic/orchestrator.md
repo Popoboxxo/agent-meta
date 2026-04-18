@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "2.0.1"
+version: "2.0.2"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
@@ -447,7 +447,6 @@ alle DoD-Punkte erfüllt sind.
 
 ## Sprache
 
-- **README.md** → **{{DOCS_LANGUAGE}}**
-- Alle anderen Dokumente → {{DOCS_LANGUAGE}}
-- Kommunikation mit dem Nutzer → {{COMMUNICATION_LANGUAGE}}
-- Nutzer-Eingaben verstehen in → {{USER_INPUT_LANGUAGE}}
+Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
+
+- Dokumente → {{DOCS_LANGUAGE}}
