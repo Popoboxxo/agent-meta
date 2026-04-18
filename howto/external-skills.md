@@ -142,6 +142,31 @@ git add .claude/agents/ .claude/skills/ .meta-config/project.yaml
 git commit -m "feat: activate home-organization skill"
 ```
 
+### Skill-Dateien aus Git ausschließen (`gitignore: true`)
+
+Manche Skills kopieren große oder generierte Dateien nach `.claude/skills/<skill-name>/`
+(z.B. 3D-Modelle, Referenzdatenbanken), die nicht in Git gehören.
+
+Mit `gitignore: true` fügt sync.py den Pfad automatisch zum `.gitignore` managed block hinzu:
+
+```json
+{
+  "external-skills": {
+    "opengrid-openscad": {
+      "enabled": true,
+      "gitignore": true
+    }
+  }
+}
+```
+
+`sync.py` verwaltet den Eintrag vollständig:
+- **Aktiviert** (`gitignore: true`): `.claude/skills/opengrid-openscad/` wird zu `.gitignore` hinzugefügt
+- **Deaktiviert** (`gitignore: false` oder Feld fehlt): Eintrag wird aus `.gitignore` entfernt
+- **Skill deaktiviert** (`enabled: false`): Eintrag wird ebenfalls entfernt
+
+Der Eintrag erscheint im `# --- agent-meta managed ---` Block der `.gitignore` — nie manuell dort einfügen.
+
 ---
 
 ## Schritt 3: Skill deaktivieren

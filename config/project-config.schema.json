@@ -383,6 +383,10 @@
           "enabled": {
             "type": "boolean",
             "description": "Generate wrapper agent for this skill."
+          },
+          "gitignore": {
+            "type": "boolean",
+            "description": "Add .claude/skills/<skill-name>/ to the .gitignore managed block. Use when the skill copies large or generated files that should not be committed."
           }
         },
         "required": [

@@ -891,7 +891,8 @@ Projekte aktivieren freigegebene Skills über einen eigenen Block in `.meta-conf
 ```json
 {
   "external-skills": {
-    "my-skill": { "enabled": true }
+    "my-skill": { "enabled": true },
+    "large-skill": { "enabled": true, "gitignore": true }
   }
 }
 ```
@@ -902,6 +903,10 @@ Projekte aktivieren freigegebene Skills über einen eigenen Block in `.meta-conf
 
 Fehlt der `external-skills`-Block komplett → kein externer Skill wird generiert (sicheres Default).
 Referenziert ein Projekt einen unbekannten oder nicht-approved Skill → `[WARN]` im sync.log.
+
+**`gitignore: true`** (optional): `sync.py` fügt `.claude/skills/<skill-name>/` automatisch zum
+`.gitignore` managed block hinzu. Beim Deaktivieren wird der Eintrag wieder entfernt. Sinnvoll
+wenn der Skill große oder generierte Dateien nach `.claude/skills/` kopiert.
 
 ### Skill hinzufügen
 

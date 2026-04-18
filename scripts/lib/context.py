@@ -310,19 +310,24 @@ def ensure_gitignore_entries(
     log: SyncLog,
     dry_run: bool,
     gitignore_entries: list[str] | None = None,
+    exact_entries: list[str] | None = None,
 ):
     """Ensure required entries exist in a managed block in .gitignore.
 
     Writes a clearly marked block so users know the entries are managed by
     agent-meta and should not be removed manually.
-    If the block already exists, it is updated in-place (entries added, never removed).
-    Entries that already exist outside the block are not duplicated.
 
-    gitignore_entries: list of entries to add. If None, reads from providers.config.yaml (Claude).
+    gitignore_entries: entries to add (additive — never removes existing block entries).
+    exact_entries: if provided, the managed block is set to exactly these entries
+                   (entries no longer needed are removed from the block).
     """
-    if gitignore_entries is None:
+    if exact_entries is not None:
+        required = list(exact_entries)
+    elif gitignore_entries is not None:
+        required = list(gitignore_entries)
+    else:
         # Default: Claude entries (backward compat)
-        gitignore_entries = [
+        required = [
             ".claude/settings.local.json",
             ".claude/agent-memory-local/",
             "CLAUDE.personal.md",
@@ -344,12 +349,28 @@ def ensure_gitignore_entries(
             line.strip() for line in block_match.group(1).splitlines() if line.strip()
         }
 
-    missing = [e for e in gitignore_entries if e not in block_entries]
-    if not missing:
+    required_set = set(required)
+    if exact_entries is not None:
+        # Exact mode: block must contain exactly required_set
+        new_block_entries = sorted(required_set)
+        changed = block_entries != required_set
+        added = sorted(required_set - block_entries)
+        removed = sorted(block_entries - required_set)
+    else:
+        # Additive mode: add missing entries, never remove
+        missing = [e for e in required if e not in block_entries]
+        if not missing:
+            log.skip(".gitignore", "all required entries already present")
+            return
+        new_block_entries = sorted(block_entries | required_set)
+        changed = True
+        added = missing
+        removed = []
+
+    if not changed:
         log.skip(".gitignore", "all required entries already present")
         return
 
-    new_block_entries = sorted(block_entries | set(missing))
     new_block = (
         GITIGNORE_BLOCK_BEGIN + "\n"
         + "\n".join(new_block_entries) + "\n"
@@ -361,7 +382,12 @@ def ensure_gitignore_entries(
     else:
         new_content = existing.rstrip("\n") + "\n\n" + new_block + "\n"
 
-    log.action("UPDATE", ".gitignore", f"added to managed block: {', '.join(missing)}")
+    parts = []
+    if added:
+        parts.append(f"added: {', '.join(added)}")
+    if removed:
+        parts.append(f"removed: {', '.join(removed)}")
+    log.action("UPDATE", ".gitignore", f"managed block — {'; '.join(parts)}")
     if not dry_run:
         gitignore_path.write_text(new_content, encoding="utf-8")
 

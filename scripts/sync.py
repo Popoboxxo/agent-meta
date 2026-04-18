@@ -88,6 +88,29 @@ _CONFIG_CANDIDATES = [
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _collect_skill_gitignore_entries(config: dict, ext_config: dict) -> list[str]:
+    """Return .gitignore paths for skills with gitignore: true in project config.
+
+    Only generates entries for skills that are approved + enabled (two-gate).
+    """
+    entries: list[str] = []
+    project_skills = config.get("external-skills", {})
+    for skill_name, skill_project_cfg in project_skills.items():
+        if not skill_project_cfg.get("gitignore", False):
+            continue
+        skill_meta = ext_config.get("skills", {}).get(skill_name, {})
+        if not skill_meta.get("approved", False):
+            continue
+        if not skill_project_cfg.get("enabled", False):
+            continue
+        entries.append(f".claude/skills/{skill_name}/")
+    return entries
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -246,14 +269,14 @@ def main():
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
             claude_pc = provider_config.get("Claude", {})
-            gitignore_entries = claude_pc.get("gitignore_entries", [
+            base_gitignore_entries = claude_pc.get("gitignore_entries", [
                 ".claude/settings.local.json",
                 ".claude/agent-memory-local/",
                 "CLAUDE.personal.md",
                 "sync.log",
             ])
-            ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     gitignore_entries=gitignore_entries)
+            # Skill gitignore entries are collected after skills are processed (below)
+            # and merged via exact_entries so stale entries are removed automatically.
         # Per-provider sync
         for provider in providers:
             pc = provider_config[provider]
@@ -284,6 +307,12 @@ def main():
                 elif not ext_config["skills"][skill_name].get("approved", False):
                     log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        # Update .gitignore managed block: base entries + gitignore:true skill entries
+        if is_claude:
+            skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config)
+            all_gitignore_entries = base_gitignore_entries + skill_gitignore_entries
+            ensure_gitignore_entries(project_root, log, args.dry_run,
+                                     exact_entries=all_gitignore_entries)
 
     log_path = project_root / LOGFILE
     _providers = resolve_providers(config, load_providers_config(agent_meta_root)) if config else []
