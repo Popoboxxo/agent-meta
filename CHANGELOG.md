@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.27.0] — 2026-04-18
+
+### Added
+
+- **Commands-System**: Neues Schichten-Modell für Claude-Commands (`commands/1-generic/`, `2-platform/`, `0-external/`). `sync.py` synct Commands nach `.claude/commands/` (Claude) und `.continue/prompts/` (Continue).
+  - `commands/1-generic/doc-now.md` — erster generischer Command: delegiert an `documenter`-Agent
+  - `scripts/lib/commands.py` — Sync-Logik analog zu Rules und Hooks
+  - `config/ai-providers.yaml` — `has_commands: true` für Claude und Continue
+
+---
+
 ## [0.26.1] — 2026-04-18
 
 ### Fixed
