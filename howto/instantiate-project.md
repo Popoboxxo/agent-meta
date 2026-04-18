@@ -327,6 +327,45 @@ Welche Skills verfügbar (`approved: true`) sind: `cat .agent-meta/external-skil
 
 ---
 
+## CLAUDE.md iterativ verbessern
+
+agent-meta ist **kein "einmal einrichten und vergessen"** — CLAUDE.md wird mit jedem
+Claude-Fehler besser. Der `agent-meta-manager` begleitet diesen Prozess aktiv.
+
+### Sofort nach einem Claude-Fehler
+
+```
+1. Starte den agent-meta-manager
+2. Beschreibe den Fehler: "Claude hat X gemacht obwohl er Y hätte tun sollen"
+3. Der Manager liest CLAUDE.md, formuliert eine präzise Regel und ergänzt sie
+4. Verifizierung: "Was steht in deiner CLAUDE.md über [Thema]?"
+```
+
+### Alle 2–3 Wochen: Review-Runde
+
+```bash
+# agent-meta-manager starten und sagen:
+"Führe eine CLAUDE.md Review-Runde durch"
+```
+
+Der Manager führt durch strukturierte Fragen:
+- Welche Fehler hat Claude wiederholt?
+- Welche Regeln sind veraltet oder redundant?
+- Welche häufigen Aufgaben fehlen noch in der Doku?
+- Ist die CLAUDE.md noch kompakt genug? (Empfehlung: 200–500 Zeilen)
+
+### Qualitätsprinzip
+
+| Gut | Schlecht |
+|-----|---------|
+| `KEIN any` | `Vermeide any wenn möglich` |
+| `Tests in src/__tests__/` | `Tests sinnvoll ablegen` |
+| Kurze Imperativsätze | Ausführliche Erklärungen |
+
+Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & Verbesserung".
+
+---
+
 ## Checkliste: Projekt vollständig eingerichtet?
 
 - [ ] `.agent-meta/` Submodul auf gewünschter Version (`v0.21.1-beta` oder neuer)

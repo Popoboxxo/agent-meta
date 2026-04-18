@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.1.2"
+version: "1.2.0"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -48,6 +48,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 | Neuen generischen Agenten vorschlagen | → [Neuen Agenten vorschlagen](#5-neuen-agenten-vorschlagen) |
 | Projektspezifische Anpassung erstellen | → [Projektspezifische Agenten](#6-projektspezifische-agenten) |
 | External Skills verwalten (Lifecycle) | → [External Skills](#7-external-skills--lifecycle-management) |
+| CLAUDE.md iterativ verbessern | → [CLAUDE.md Review](#8-claudemd-review--verbesserung) |
 
 ---
 
@@ -392,6 +393,98 @@ Bei jeder Skill-Operation prüfe:
 
 ---
 
+## 8. CLAUDE.md Review & Verbesserung
+
+CLAUDE.md ist **lebende Dokumentation** — sie wird mit jedem Claude-Fehler besser.
+Dieser Workflow macht den iterativen Verbesserungsprozess explizit.
+
+### 8.1 Sofortiger Update nach einem Fehler
+
+Wenn Claude einen Fehler macht, direkt eine Regel ergänzen:
+
+```
+1. Lies die aktuelle CLAUDE.md:
+   Read CLAUDE.md
+
+2. Identifiziere die passende Sektion (Code-Konventionen, Don'ts, Architektur ...)
+
+3. Formuliere eine präzise Regel im Imperativ:
+   SCHLECHT: "Claude sollte keine globalen Variablen verwenden"
+   GUT:      "KEINE globalen Variablen — Zustand über Parameter oder Context-Objekte"
+
+4. Füge die Regel in die CLAUDE.md ein (außerhalb des managed blocks!)
+
+5. Verifiziere: Frage Claude direkt:
+   "Was steht in deiner CLAUDE.md über [Thema]?"
+   → Claude liest CLAUDE.md und bestätigt was tatsächlich geladen wurde.
+```
+
+**Wichtig:** Ändere nur den handgeschriebenen Teil von CLAUDE.md.
+Der `<!-- agent-meta:managed-begin -->` bis `<!-- agent-meta:managed-end -->` Block
+wird bei jedem sync überschrieben — nie dort schreiben.
+
+### 8.2 Review-Runde (alle 2–3 Wochen)
+
+Führe den User durch eine strukturierte Review-Session:
+
+**Frage 1 — Fehlermuster:**
+> "Welche Fehler hat Claude in den letzten Wochen wiederholt gemacht?
+> Zum Beispiel: falsche Imports, vergessene Konventionen, falsches Format?"
+
+→ Für jeden genannten Fehler: konkrete Regel formulieren und in CLAUDE.md eintragen.
+
+**Frage 2 — Veraltete Einträge:**
+> "Gibt es Regeln in der CLAUDE.md die nicht mehr stimmen oder die Claude sowieso einhält?"
+
+→ Veraltete Regeln entfernen oder aktualisieren.
+→ Redundante Regeln konsolidieren (Claude liest Kürze besser als Länge).
+
+**Frage 3 — Fehlende Bereiche:**
+> "Gibt es häufige Aufgaben die Claude noch nicht gut kennt — z.B. spezifische APIs,
+> Build-Schritte, Deployment-Prozesse?"
+
+→ Neue Sektion in CLAUDE.md ergänzen oder Extension anlegen.
+
+**Frage 4 — Länge und Fokus:**
+> "Ist die CLAUDE.md noch übersichtlich? Empfehlung: 200–500 Zeilen."
+
+→ Bei Überlänge: nebensächliche Details in Extensions auslagern.
+→ Nur das Wichtigste in CLAUDE.md — Agenten lesen sie bei jedem Start.
+
+### 8.3 Qualitätsprinzipien für CLAUDE.md-Regeln
+
+| Gut | Schlecht |
+|-----|---------|
+| Imperativ: "KEIN `any`" | Beschreibung: "Vermeide any wenn möglich" |
+| Konkret: "Tests in `src/__tests__/`" | Vage: "Tests gut ablegen" |
+| Ursache klar: "Kein `window` — läuft in Node" | Ohne Kontext: "Kein window" |
+| Kurz: eine Regel pro Zeile | Absatz-lang: ausführliche Erklärungen |
+
+### 8.4 Verifizierung
+
+Nach jedem CLAUDE.md-Update die Wirksamkeit prüfen:
+
+```
+Sage Claude:
+"Was steht in deiner CLAUDE.md über [geänderten Bereich]?"
+
+Claude liest CLAUDE.md und gibt die relevanten Stellen zurück.
+So wird sichtbar was tatsächlich geladen und verstanden wurde.
+```
+
+Wenn Claude die neue Regel nicht erwähnt → Formulierung oder Position überdenken.
+
+### 8.5 CLAUDE.md vs. Extension vs. Rule
+
+| Inhalt | Wo hin? |
+|--------|---------|
+| Projektkontext, Tech-Stack, Architektur | `CLAUDE.md` |
+| Regeln die für alle Agenten gelten | `CLAUDE.md` oder `.claude/rules/` |
+| Agenten-spezifische Patterns (z.B. nur für developer) | `.claude/3-project/<prefix>-developer-ext.md` |
+| Framework-globale Regeln (alle Projekte) | Feedback an agent-meta → `rules/1-generic/` |
+
+---
+
 ## Don'ts
 
 - KEIN Upgrade ohne Changelog-Zusammenfassung und User-Bestätigung bei Major-Bumps
@@ -399,3 +492,4 @@ Bei jeder Skill-Operation prüfe:
 - KEINE projektspezifische Lösung für ein Problem das alle Projekte haben → stattdessen Feedback
 - NICHT sync ausführen ohne danach `sync.log` auf Warnings zu prüfen
 - KEINE manuellen Änderungen in `.claude/agents/` — diese werden beim nächsten Sync überschrieben
+- NIE in den `managed block` von CLAUDE.md schreiben — wird bei jedem Sync überschrieben
