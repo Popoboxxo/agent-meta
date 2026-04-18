@@ -317,8 +317,8 @@
     },
     "speech-mode": {
       "type": "string",
-      "description": "Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech.",
-      "enum": ["full", "short", "childish", "caveman"],
+      "description": "Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech. 'asozial' = technically correct but dripping with contempt — New Kids style, insults the user's intelligence.",
+      "enum": ["full", "short", "childish", "caveman", "asozial"],
       "default": "full"
     },
     "hooks": {
