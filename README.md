@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.28.0`
+**Current version:** `0.28.1`
 
 ---
 
@@ -79,7 +79,7 @@ git submodule add <repo-url> .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.26.0
+cd .agent-meta && git checkout v0.28.1
 ```
 
 ```bash

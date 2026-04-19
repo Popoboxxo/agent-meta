@@ -53,7 +53,7 @@ git submodule update --init --recursive
 
 ```bash
 mkdir -p .meta-config
-cp .agent-meta/howto/project.yaml.example .meta-config/project.yaml
+cp .agent-meta/howto/configs/project.yaml.example .meta-config/project.yaml
 ```
 
 > **AI-Assistent:** Lies jetzt `.meta-config/project.yaml` und stelle dem User

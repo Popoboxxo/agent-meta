@@ -236,7 +236,7 @@ def init_claude_personal(
     dry_run: bool,
 ):
     """Copy CLAUDE.personal-template.md to CLAUDE.personal.md if not present yet."""
-    template_path = agent_meta_root / "howto" / "CLAUDE.personal-template.md"
+    template_path = agent_meta_root / "howto" / "configs" / "CLAUDE.personal-template.md"
     target_path = project_root / "CLAUDE.personal.md"
 
     if target_path.exists():
@@ -403,7 +403,7 @@ def init_claude_md(
     """Create CLAUDE.md from template if it does not exist."""
     from .config import substitute
 
-    template_path = agent_meta_root / "howto" / "CLAUDE.project-template.md"
+    template_path = agent_meta_root / "howto" / "configs" / "CLAUDE.project-template.md"
     target_path = project_root / "CLAUDE.md"
 
     if target_path.exists():

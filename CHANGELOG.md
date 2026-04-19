@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.28.1] — 2026-04-19
+
+### Fixed
+
+- **`context.py`: CLAUDE.md never created on `--init`** (`scripts/lib/context.py`): Template paths for `CLAUDE.project-template.md` and `CLAUDE.personal-template.md` corrected from `howto/` to `howto/configs/` — templates had been moved there but the paths were not updated.
+- **`first-steps.md`: wrong `project.yaml.example` path** (`howto/setup/first-steps.md`): `cp` command corrected from `howto/project.yaml.example` to `howto/configs/project.yaml.example`.
+
+---
+
 ## [0.28.0] — 2026-04-19
 
 ### Added
