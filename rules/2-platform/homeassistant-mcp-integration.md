@@ -63,6 +63,41 @@ User: "Mein Sensor springt ständig zwischen Werten."
 4. Lösungsvorschlag generieren basierend auf den Erkenntnissen
 ```
 
+## Lokale / Projektspezifische MCP-Server
+
+Neben dem HA-MCP und InfluxDB können projektspezifische MCP-Server lokal laufen.
+Diese werden in `settings.local.json` konfiguriert (gitignored — nie committen).
+
+### Dokumentation lokaler MCP-Server
+
+Wenn ein lokaler MCP-Server eingesetzt wird, dokumentiere ihn in `.claude/platform-config.yaml`:
+
+```yaml
+mcp_servers:
+  - name: mempalace           # Name des MCP-Servers (wie in settings.local.json)
+    purpose: >-               # Kurzbeschreibung: Wofür wird er genutzt?
+      Persistent memory for HA configuration context across sessions.
+    tools_allowed:            # Erlaubte Tools (leer = alle erlaubt)
+      - remember
+      - recall
+    tools_blocked: []         # Explizit verbotene Tools
+```
+
+### Umgang mit lokalen MCP-Tools
+
+- **Nutzung dokumentieren**: Welche Tools wofür, in `.claude/platform-config.yaml`
+- **Keine Secrets**: Keine API-Keys oder Passwörter via MCP-Tools speichern
+- **Gitignore prüfen**: `settings.local.json` muss in `.gitignore` stehen
+- **Fallback-Plan**: Wenn lokaler MCP nicht verfügbar → was ist die Alternative?
+
+### Empfohlene Struktur für projektspezifische MCP-Konfiguration
+
+```
+.claude/
+  platform-config.yaml      ← gittracked: MCP-Server-Beschreibung (kein Secret)
+  settings.local.json       ← gitignored: MCP-Server-Verbindungsparameter (mit Secrets)
+```
+
 ## Fehler-Handling
 
 Wenn MCP-Tools nicht verfügbar sind:

@@ -66,14 +66,16 @@ Für jedes Feedback-Item:
 
 Issues werden im **agent-meta-Repository** `Popoboxxo/agent-meta` erstellt.
 
-**Safeguard — Pflicht vor jedem `gh issue create`:**
+**Wichtig — Kontext-Verlust-Problem:**
+Der meta-feedback Agent läuft als Sub-Agent und verliert seinen Kontext wenn er neu gespawnt wird.
+Daher gilt: **Kein interner Bestätigungsschritt** — der Agent bereitet das Issue auf und erstellt
+es direkt. Die Bestätigung erfolgt im **aufrufenden Chat**, nicht durch einen neuen Agent-Spawn.
 
-Zeige dem Nutzer zuerst:
-```
-Ziel-Repository: Popoboxxo/agent-meta
-Titel: [geplanter Titel]
-```
-Warte auf explizite Bestätigung ("ja" / "ok" / "create"). Erst danach ausführen.
+**Workflow:**
+1. Issue-Text vollständig aufbereiten
+2. Dem aufrufenden Chat (Nutzer oder Orchestrator) das fertige Issue anzeigen
+3. `gh issue create` **sofort ausführen** — kein Warten auf "ja/ok" in einer neuen Nachricht
+4. Issue-URL zurückgeben
 
 ```bash
 gh issue create \
@@ -123,12 +125,15 @@ gh issue create --repo Popoboxxo/agent-meta --title "..." --body "..." --label "
 ```
 1. Nutzer beschreibt Problem oder Verbesserungsidee
 2. Feedback-Typ bestimmen
-3. Kontext klären (ggf. Rückfragen)
-4. Issue-Text formulieren und dem Nutzer zeigen
-5. Bestätigung abwarten
-6. gh issue create ausführen
-7. Issue-URL ausgeben
+3. Kontext klären (ggf. Rückfragen — nur wenn zwingend nötig)
+4. Issue-Text vollständig aufbereiten und dem Nutzer anzeigen
+5. gh issue create SOFORT ausführen (kein zweiter Bestätigungs-Spawn)
+6. Issue-URL ausgeben
 ```
+
+**Warum kein Bestätigungs-Schritt?** Jeder neue Spawn verliert den Kontext und erfindet
+ein anderes Issue. Die Bestätigung liegt beim Nutzer, der den Agenten aufgerufen hat —
+nicht in einem neuen Sub-Agent-Spawn.
 
 ### Workflow 2: Session-Abschluss (vom Orchestrator gerufen)
 
@@ -156,7 +161,8 @@ Ein gutes Issue:
 ## Don'ts
 
 - KEIN Feedback zu projektspezifischen Problemen — nur agent-meta-Framework
-- KEIN Issue ohne Bestätigung des Nutzers erstellen — immer Ziel-Repo `Popoboxxo/agent-meta` + Titel zeigen und abwarten
+- KEIN neuen Agent-Spawn für Bestätigung starten — Kontext geht verloren, Issue wird erfunden
+- Issue direkt erstellen nachdem es dem Nutzer angezeigt wurde (kein interaktiver Bestätigungs-Loop)
 - KEINE vagen Titel ("Verbesserung", "Problem mit Agent")
 - NICHT mehrere unzusammenhängende Probleme in ein Issue packen
 - KEIN Issue-Titel in einer anderen Sprache als Englisch — auch wenn DOCS_LANGUAGE anders gesetzt ist

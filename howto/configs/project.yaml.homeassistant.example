@@ -1,0 +1,116 @@
+# .meta-config/project.yaml — Projekt-Konfiguration für Home Assistant Projekte
+#
+# Diese Datei gehört dem Projekt (nicht dem agent-meta-Submodul).
+# Sie steuert welche Agenten generiert werden und mit welchem Kontext.
+#
+# Sync ausführen:
+#   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+#   py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init   (erstmalig)
+
+# Welche Version von agent-meta wird eingesetzt?
+agent-meta-version: 0.27.1
+
+# AI-Provider
+ai-providers:
+  - Claude
+
+# Qualitätsprofil: HA-Projekte sind typischerweise Konfigurationsprojekte ohne formale REQ-IDs
+dod-preset: rapid-prototyping
+
+# Plattform-Layer aktivieren
+platforms:
+  - homeassistant
+
+# Agenten-Whitelist — für HA typischerweise ohne tester, release, docker
+roles:
+  - orchestrator
+  - developer
+  - documenter
+  - git
+  - meta-feedback
+  - ideation
+  - agent-meta-manager
+
+# Kommunikationsstil
+# speech-mode: full
+
+# Maximale parallele Agenten
+# max-parallel-agents: 2
+
+# Hooks — opt-in
+# hooks:
+#   dod-push-check:
+#     enabled: true
+
+# Externe Skills
+# external-skills:
+#   home-assistant:
+#     enabled: true
+
+# Modell-Overrides pro Rolle
+# model-overrides:
+#   git: haiku
+
+variables:
+  # --- Projekt-Identität ---
+  PROJECT_NAME: mein-ha-projekt
+  PROJECT_DESCRIPTION: >-
+    Home Assistant Konfiguration für [Standort/Verwendungszweck].
+  PROJECT_GOAL: >-
+    Smarte Heimautomatisierung mit HA für [Nutzungskontext].
+
+  # --- Technologie ---
+  PLATFORM: "Home Assistant"
+  RUNTIME: "Home Assistant OS / Container"
+  PROJECT_LANGUAGES: "YAML, Jinja2"
+
+  # --- Sprachen ---
+  COMMUNICATION_LANGUAGE: Deutsch
+  USER_INPUT_LANGUAGE: Deutsch
+  DOCS_LANGUAGE: Englisch
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  CODE_LANGUAGE: Englisch
+
+  # --- Git ---
+  GIT_PLATFORM: GitHub             # GitHub, GitLab oder Gitea
+  GIT_REMOTE_URL: https://github.com/owner/ha-config
+  GIT_MAIN_BRANCH: main
+
+  # --- Kommandos (HA hat keinen klassischen Build — Reload via CLI/REST) ---
+  BUILD_COMMAND: ""
+  TEST_COMMAND: ""
+  DEV_COMMANDS: |
+    # HA-Konfiguration prüfen (via CLI im HA-Container):
+    # ha core check
+    # Alternativ via REST: curl -X POST http://homeassistant.local:8123/api/config/core/check_config
+  TEST_COMMANDS: ""
+  BUILD_COMMANDS: ""
+
+  # --- Projektkontext ---
+  PROJECT_CONTEXT: >-
+    Home Assistant Konfiguration mit Package-Struktur. Enthält Automatisierungen,
+    Template-Sensoren, Energy-Layer und Lovelace-Dashboard.
+  ARCHITECTURE: |
+    packages/
+      lights/       # Licht-Automatisierungen
+      energy/       # Energy-Layer (Template-Sensoren, Utility Meter)
+      security/     # Alarm, Kamera, Türklingel
+      presence/     # Anwesenheitserkennung
+    ui/
+      lovelace/     # Lovelace-Konfiguration
+    blueprints/     # Wiederverwendbare Automatisierungs-Blueprints
+  CODE_CONVENTIONS: |
+    - Vollständiger YAML-Code — nie Fragmente
+    - YAML-IDs: snake_case, beschreibend (automation.lights_bedroom_motion)
+    - Kommentare: Jede Automatisierung mit Zweck-Kommentar
+    - Moderne Syntax: action: statt service:, template: Domain
+  EXTRA_DONTS: ""
+  CODE_QUALITY_RULES: ""
+  REQ_CATEGORIES: ""
+
+  # --- Snippets (HA hat keine Code-Snippets — leer lassen) ---
+  TESTER_SNIPPETS_PATH: ""
+  DEVELOPER_SNIPPETS_PATH: ""
+
+  # --- meta-feedback Agent ---
+  AGENT_META_REPO: Popoboxxo/agent-meta

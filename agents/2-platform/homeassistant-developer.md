@@ -1,7 +1,7 @@
 ---
 name: developer
-version: "1.0.0"
-based-on: "1-generic/developer.md@2.0.0"
+version: "1.1.0"
+based-on: "1-generic/developer.md@2.0.2"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
 tools:
@@ -38,6 +38,12 @@ patches:
 
       **Aktualität**: Verwende immer **moderne HA-Syntax** (`action:` statt `service:`, neue `template:` Domain).
 
+  - op: delete
+    anchor: "### Sprach-Best-Practices (PFLICHT)"
+
+  - op: delete
+    anchor: "### Allgemein (projektübergreifend)"
+
   - op: append-after
     anchor: "## Code-Konventionen"
     content: |
@@ -56,6 +62,21 @@ patches:
       - `entity-data.md` — MCP- und CSV-Datenquellen-Hierarchie
       - `mcp-integration.md` — MCP Read-Only-Regel (ABSOLUT)
       - `notifications.md` — Notification-Gruppen, Debug-Modus
+
+  - op: append-after
+    anchor: "## Delegation"
+    content: |
+      ### Dokumentations-Pflichten (HA-spezifisch)
+
+      **Inline-Dokumentation (immer obligatorisch — kein separater Schritt):**
+      - Jede neue Entität, jeder neue Sensor, jede neue Automatisierung erhält direkt beim Implementieren einen YAML-Kommentar-Block
+      - Parameter, Abhängigkeiten und Verarbeitungslogik inline erklären
+      - Kein Warten auf Nutzer-Anfrage — inline kommentieren ist Teil der Implementierung
+
+      **MkDocs-Dokumentation (nur auf explizite Anfrage):**
+      - Trigger: Nutzer sagt explizit "dokumentiere in MkDocs", "doc-now", "aktualisiere die Doku" o.ä.
+      - Dann: `documenter`-Agent delegieren
+      - NICHT automatisch nach jeder Code-Änderung starten — kein Hintergrund-Spawn ohne Nutzer-Auftrag
 
   - op: append
     content: |
