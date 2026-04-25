@@ -12,3 +12,15 @@ sync.log
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---
+# Added by code-review-graph
+.code-review-graph/
+.cursorrules
+.mcp.json
+.opencode.json
+.windsurfrules
+AGENTS.md
+.claude/skills/debug-issue.md
+.claude/skills/explore-codebase.md
+.claude/skills/refactor-safely.md
+.claude/skills/review-changes.md
+.kiro/steering/code-review-graph.md
