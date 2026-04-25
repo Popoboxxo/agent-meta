@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.29.0] — 2026-04-25
+
+### Added
+
+- **Lazy-load `_wf-*.md` pattern** (`agents/1-generic/`, `rules/2-platform/`): Verbose workflow content extracted into `_wf-*.md` files that are skipped by `sync.py` and read on-demand via Read tool. Reduces always-loaded rule/agent tokens by 60–85%.
+- **`rules-preset` framework** (`config/rules-presets.yaml`): Central control for `alwaysApply: false` (Claude + Continue) and `gemini: skip` per rule. Configured in `project.yaml` with preset inheritance (`default`, `minimal`, `silent`). Analogous to `dod-preset`.
+- **Provider-aware `sync_rules()`** (`scripts/lib/rules.py`): Now receives `provider` parameter — injects `alwaysApply: false` frontmatter for Claude/Continue, skips rules entirely for Gemini based on preset config.
+- **DoD conditional blocks in agent templates**: `{{#if DOD_X}}...{{/if}}` blocks in `feature.md`, `validator.md` — inactive DoD features produce zero output in generated agents.
+- **New lazy-load knowledge files** (`agents/1-generic/`): `_wf-sync-interface.md`, `_wf-git-ops.md`, `_wf-security-audit.md`, `_wf-claude-review.md`, `_wf-feedback.md`, `_wf-scout.md`, `_wf-skill-lifecycle.md`, `_wf-upgrade.md`, `_wf-issue.md`.
+- **New lazy-load knowledge files** (`rules/2-platform/`): `_wf-ha-package-migration.md`, `_wf-ha-entity-data.md`, `_wf-ha-mcp-local.md`, `_wf-ha-energy-template.md`, `_wf-sharkord-docker-binaries.md`, `_wf-sharkord-mediasoup.md`.
+
+### Changed
+
+- **Slim platform rules** (`rules/2-platform/`): `homeassistant-package-structure.md`, `homeassistant-entity-data.md`, `homeassistant-mcp-integration.md`, `homeassistant-energy-abstraction.md`, `sharkord-docker-ops.md`, `sharkord-sdk.md` — core constraints only, workflow detail moved to `_wf-*.md`.
+- **Slim 1-generic rules**: `branch-guard.md`, `use-orchestrator.md`, `dod-criteria.md` — decision tree and verbose examples removed.
+- **Slim agents** (`agents/1-generic/`): `orchestrator.md`, `git.md`, `agent-meta-manager.md`, `security-auditor.md` — workflow content extracted to `_wf-*.md` files.
+- **`collect_rule_sources()`** (`scripts/lib/rules.py`): Now filters `_` prefix in both `1-generic` and `2-platform` layers — same pattern as `collect_sources()` in `agents.py`.
+
+### Fixed
+
+- **`strip_inactive_dod_blocks()` IndexError** (`scripts/lib/config.py`): Wrong group index `m.group(2)` (regex had only one capture group). Fixed via Python default argument closure.
+
+---
+
 ## [0.28.1] — 2026-04-19
 
 ### Fixed
