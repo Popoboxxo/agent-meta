@@ -257,6 +257,34 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     return variables, unmapped
 
 
+def strip_inactive_dod_blocks(text: str, variables: dict) -> str:
+    """Remove DoD-conditional blocks that are inactive in this project.
+
+    Recognizes the pattern:
+        {{#if DOD_X}}
+        ...content...
+        {{/if}}
+
+    If the corresponding DOD_X variable is "false", the entire block (including
+    markers) is removed. If "true", the markers are stripped but content kept.
+    This keeps generated agent files lean when DoD features are disabled.
+    """
+    dod_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
+
+    def replace_block(m: re.Match) -> str:
+        var_name = m.group(1)
+        block_content = m.group(2)
+        if variables.get(var_name, "true") == "false":
+            return ""
+        return block_content.strip("\n") + "\n"
+
+    for var in dod_vars:
+        pattern = rf"\{{{{#if {re.escape(var)}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+        text = re.sub(pattern, replace_block, text, flags=re.DOTALL)
+
+    return text
+
+
 def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> str:
     """Replace {{VAR}} occurrences. Warn for missing variables.
 
