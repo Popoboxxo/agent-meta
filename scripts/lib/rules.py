@@ -95,19 +95,22 @@ def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tu
         for f in sorted(ext_rules_dir.glob("*.md")):
             seen[f.name] = f
 
-    # 1-generic
+    # 1-generic (skip _ prefix — reserved for lazy-load knowledge files)
     generic_dir = agent_meta_root / RULES_DIR / "1-generic"
     if generic_dir.exists():
         for f in sorted(generic_dir.glob("*.md")):
-            seen[f.name] = f
+            if not f.name.startswith("_"):
+                seen[f.name] = f
 
     # 2-platform (platform-prefixed, e.g. sharkord-security.md → security.md)
+    # Skip _ prefix files — reserved for lazy-load knowledge files
     platform_dir = agent_meta_root / RULES_DIR / "2-platform"
     if platform_dir.exists():
         for platform in platforms:
             for f in sorted(platform_dir.glob(f"{platform}-*.md")):
-                output_name = f.name[len(platform) + 1:]
-                seen[output_name] = f
+                if not f.name.startswith("_"):
+                    output_name = f.name[len(platform) + 1:]
+                    seen[output_name] = f
 
     return [(src, name) for name, src in seen.items()]
 
