@@ -384,10 +384,11 @@ def collect_sources(
     overrides: dict[str, Path] = {}
     known_ext_roles: set[str] = set()
 
-    # 1. Generic agents
+    # 1. Generic agents (skip files starting with _ — reserved for resources/templates)
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
-        overrides[f.stem] = f
+        if not f.name.startswith("_"):
+            overrides[f.stem] = f
 
     # 2. Platform agents
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR

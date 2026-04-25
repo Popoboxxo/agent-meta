@@ -222,7 +222,7 @@ Wenn der Nutzer "Update die Agenten", "Upgrade agent-meta", "Neue agent-meta Ver
 ```
 
 **H2 — Auf neue agent-meta Version upgraden:**
-→ Lade `.agent-meta/howto/orchestrator-advanced-workflows.md` und folge Workflow H2.
+→ Lade `.agent-meta/agents/1-generic/_orchestrator-workflows.md` und folge Workflow H2.
 
 **H3 — Neue Extension erstellen:**
 ```
@@ -264,7 +264,7 @@ oder ein neues Projekt / Feature noch nicht konkret genug für Requirements ist:
 - N → "Schau dir dieses Repo an", "als Skill einbinden", User teilt GitHub-Link
 - K → Nutzer hat Framework-Feedback, oder am Session-Ende
 
-→ **Lade jetzt `.agent-meta/howto/orchestrator-advanced-workflows.md`** und folge dem
+→ **Lade jetzt `.agent-meta/agents/1-generic/_orchestrator-workflows.md`** und folge dem
   passenden Workflow.
 
 **Am Session-Ende:** Frage aktiv nach Framework-Feedback (Workflow K).
