@@ -1,8 +1,8 @@
 ---
 name: feature
-version: "1.2.1"
+version: "1.3.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.2.1"
+generated-from: "1-generic/feature.md@1.3.0"
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
 #                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
@@ -25,15 +25,7 @@ von der Idee bis zum fertigen PR — indem du spezialisierte Agenten koordiniers
 Du implementierst selbst **nichts**. Du delegierst jeden Schritt an den zuständigen Agenten
 und stellst sicher dass der Lifecycle korrekt und vollständig durchläuft.
 
-### Aktive DoD-Features
-
-| Feature | Status |
-|---------|--------|
-| REQ-Traceability | false |
-| Tests erforderlich | false |
-| CODEBASE_OVERVIEW | false |
-
-Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` ist.
+Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature aktiv ist.
 
 ---
 

@@ -1,53 +1,40 @@
+---
+alwaysApply: false
+---
 # Definition of Done (DoD)
 
-Eine Aufgabe ist erst abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-Konfiguriert über `dod` in `.meta-config/project.yaml`.
+Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
 
-## Aktive DoD-Features (dieses Projekt)
+## Immer Pflicht
 
-| Feature | Aktiv |
-|---------|-------|
-| REQ-Traceability | false |
-| Tests erforderlich | false |
-| CODEBASE_OVERVIEW | false |
-| Security-Audit | false |
+- [ ] Code implementiert die Aufgabe vollständig
+- [ ] Code-Konventionen eingehalten
+- [ ] Commit-Message im Conventional-Commits-Format
+- [ ] Keine Regressions
 
-Nur Kriterien deren Feature `true` ist gelten als Pflicht.
+{{#if DOD_REQ_TRACEABILITY}}
+## REQ-Traceability
 
----
-
-## Immer aktiv (Pflicht)
-
-- [ ] **Code** implementiert die Aufgabe vollständig
-- [ ] **Code-Konventionen** eingehalten (s. CLAUDE.md des Projekts)
-- [ ] **Commit-Message** im korrekten Conventional-Commits-Format
-- [ ] **Keine Regressions** — bestehende Tests brechen nicht
-
-## Wenn `req-traceability: true`
-
-- [ ] **REQ-ID** existiert in `docs/REQUIREMENTS.md`
-- [ ] **REQUIREMENTS.md** konsistent (REQ-Text passt zur Implementierung)
+- [ ] REQ-ID existiert in `docs/REQUIREMENTS.md`
 - [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
+{{/if}}
 
-Wenn `false`: Keine REQ-ID nötig. Format: `<type>: <beschreibung>`.
+{{#if DOD_TESTS_REQUIRED}}
+## Tests
 
-## Wenn `tests-required: true`
+- [ ] Test vorhanden und grün
+{{/if}}
 
-- [ ] **Test vorhanden** (mit `[REQ-xxx]` im Namen wenn req-traceability aktiv)
-- [ ] **Tests bestehen** (Test-Runner grün)
+{{#if DOD_CODEBASE_OVERVIEW}}
+## Dokumentation
 
-## Wenn `codebase-overview: true`
+- [ ] `CODEBASE_OVERVIEW.md` aktualisiert
+{{/if}}
 
-- [ ] **CODEBASE_OVERVIEW.md** aktualisiert (falls Code-Änderungen)
+{{#if DOD_SECURITY_AUDIT}}
+## Security
 
-## Wenn `security-audit: true`
+- [ ] Security-Audit vor Release durchgeführt
+{{/if}}
 
-- [ ] **Security-Audit** vor Release durchgeführt
-
----
-
-## Enforcement
-
-- **Keine finale Antwort** ohne dass alle aktiven Punkte geprüft sind
-- **Keine Commit-Empfehlung** ohne vorherige Prüfung aller aktiven Kriterien
-- Bei Unsicherheit: Default = Validierung durchführen
+**Keine finale Antwort und keine Commit-Empfehlung** ohne Prüfung aller aktiven Kriterien.

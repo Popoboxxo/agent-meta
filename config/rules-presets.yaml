@@ -1,0 +1,51 @@
+# Rules-Presets — steuern welche Rules wann geladen werden (alwaysApply) und für welche Provider.
+# Projekte wählen via 'rules-preset' in project.yaml.
+# Einzelne Rules können via 'rules' Block überschrieben werden.
+# Precedence: rules (Projekt-Override) > rules-preset > default (impliziter Default).
+#
+# Rule-Optionen:
+#   alwaysApply: false  → Claude + Continue: Rule nur bei Keyword-Match laden (nicht immer)
+#   gemini: skip        → Gemini: Rule wird gar nicht generiert
+#
+# Kein Eintrag = alwaysApply: true für alle Provider (Standardverhalten).
+
+presets:
+
+  # Alle Rules immer laden — maximale Sicherheit, höchste Token-Last.
+  # Impliziter Default wenn kein Preset gewählt.
+  default: {}
+
+  # Situative Rules auf alwaysApply: false — guter Kompromiss.
+  # Kernregeln (branch-guard, commit-conventions) bleiben immer aktiv.
+  minimal:
+    lifecycle-tasks:
+      alwaysApply: false
+      gemini: skip
+    issue-lifecycle:
+      alwaysApply: false
+      gemini: skip
+    security-audit:
+      alwaysApply: false
+      gemini: skip
+
+  # Maximale Token-Einsparung — nur absolut essenzielle Rules immer aktiv.
+  # Empfohlen für rapid-prototyping Projekte.
+  silent:
+    lifecycle-tasks:
+      alwaysApply: false
+      gemini: skip
+    issue-lifecycle:
+      alwaysApply: false
+      gemini: skip
+    security-audit:
+      alwaysApply: false
+      gemini: skip
+    use-orchestrator:
+      alwaysApply: false
+      gemini: skip
+    dod-criteria:
+      alwaysApply: false
+      gemini: skip
+    sync-interface:
+      alwaysApply: false
+      gemini: skip

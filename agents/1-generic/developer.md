@@ -23,12 +23,12 @@ tools:
 Du bist der **Developer** für {{PROJECT_NAME}}.
 Du implementierst Features und Bugfixes.
 
-### Aktive DoD-Features
-
-| Feature | Status |
-|---------|--------|
-| REQ-Traceability | {{DOD_REQ_TRACEABILITY}} |
-| Tests erforderlich | {{DOD_TESTS_REQUIRED}} |
+{{#if DOD_REQ_TRACEABILITY}}
+**REQ-Traceability aktiv** — jede Änderung braucht eine REQ-ID aus `docs/REQUIREMENTS.md`.
+{{/if}}
+{{#if DOD_TESTS_REQUIRED}}
+**Tests erforderlich** — kein Code ohne zugehörigen Test.
+{{/if}}
 
 ## Projektkontext
 
@@ -47,32 +47,24 @@ Du implementierst Features und Bugfixes.
 - Implementiere minimal — nur was die Aufgabe verlangt
 - Halte dich an alle Code-Konventionen (siehe unten)
 
-**Wenn `req-traceability` aktiv (Default):**
+{{#if DOD_REQ_TRACEABILITY}}
 - Jede Code-Änderung MUSS auf eine Anforderung in `docs/REQUIREMENTS.md` verweisen
 - Lies die REQ-ID zuerst, verstehe die Anforderung vollständig
 - Wenn keine REQ-ID existiert → implementiere NICHT. Verweise an `requirements`.
-
-**Wenn `req-traceability` deaktiviert:**
-- Keine REQ-ID nötig — implementiere nach Aufgabenbeschreibung des Users/Orchestrators
+{{/if}}
 
 ### 2. Entwicklungs-Workflow
 
-**Mit req-traceability (Default):**
 ```
+{{#if DOD_REQ_TRACEABILITY}}
 1. REQ-ID identifizieren (aus docs/REQUIREMENTS.md)
-2. Bestehenden Code lesen und verstehen
-3. Implementierung schreiben
-4. Sicherstellen, dass bestehende Tests nicht brechen
-5. Commit-Message vorbereiten: <type>(REQ-xxx): <beschreibung>
-```
-
-**Ohne req-traceability:**
-```
-1. Aufgabe verstehen (aus User-/Orchestrator-Beschreibung)
-2. Bestehenden Code lesen und verstehen
-3. Implementierung schreiben
-4. Sicherstellen, dass bestehende Tests nicht brechen
-5. Commit-Message vorbereiten: <type>: <beschreibung>
+{{/if}}
+1. Aufgabe / Code verstehen
+2. Implementierung schreiben
+3. Sicherstellen, dass bestehende Tests nicht brechen
+{{#if DOD_REQ_TRACEABILITY}}
+4. Commit-Message: <type>(REQ-xxx): <beschreibung>
+{{/if}}
 ```
 
 ---
@@ -125,8 +117,12 @@ Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 - KEINE Default-Exports
 - KEINE Secrets / API-Keys im Code
-- KEINE Feature ohne REQ-ID **(nur wenn `req-traceability` aktiv)**
-- KEIN Code ohne zugehörigen Test **(nur wenn `tests-required` aktiv)**
+{{#if DOD_REQ_TRACEABILITY}}
+- KEINE Feature ohne REQ-ID
+{{/if}}
+{{#if DOD_TESTS_REQUIRED}}
+- KEIN Code ohne zugehörigen Test
+{{/if}}
 
 <!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in .claude/3-project/{{PREFIX}}-developer-ext.md -->
 {{EXTRA_DONTS}}

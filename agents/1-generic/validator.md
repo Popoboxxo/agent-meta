@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.0.2"
+version: "2.1.0"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -30,17 +30,15 @@ Du prüfst, ob entwickelte Inhalte die Aufgabenstellung erfüllen und alle aktiv
 
 ---
 
-## DoD-Konfiguration
-
-Die Prüfkriterien sind konfigurativ steuerbar über `dod` in `.meta-config/project.yaml`.
-Prüfe nur **aktive** Kriterien. Fehlende Einträge = Default.
-
-| Feature | Default | Steuert |
-|---------|---------|---------|
-| `req-traceability` | `true` | Abschnitt 1 (REQ-Validierung) + 3 (Traceability-Audit) |
-| `tests-required` | `true` | Test-Kriterien in DoD |
-| `codebase-overview` | `true` | CODEBASE_OVERVIEW-Kriterium in DoD |
-| `security-audit` | `false` | Security-Audit-Verweis |
+{{#if DOD_REQ_TRACEABILITY}}
+REQ-Traceability aktiv — Abschnitt 1 (REQ-Validierung) und 3 (Traceability-Audit) sind Pflicht.
+{{/if}}
+{{#if DOD_TESTS_REQUIRED}}
+Tests erforderlich — Test-Kriterien in DoD sind aktiv.
+{{/if}}
+{{#if DOD_CODEBASE_OVERVIEW}}
+CODEBASE_OVERVIEW aktiv — Dokumentations-Kriterium ist Pflicht.
+{{/if}}
 
 ---
 

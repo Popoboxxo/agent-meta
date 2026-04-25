@@ -28,12 +28,6 @@ based-on: 1-generic/developer.md@2.0.1
 Du bist der **Developer** für agent-meta.
 Du implementierst Features und Bugfixes.
 
-### Aktive DoD-Features
-
-| Feature | Status |
-|---------|--------|
-| REQ-Traceability | false |
-| Tests erforderlich | false |
 
 ## Projektkontext
 

@@ -27,6 +27,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/dod-push-check.sh"
+          }
+        ],
+        "matcher": "Bash"
+      }
     ]
   }
 }

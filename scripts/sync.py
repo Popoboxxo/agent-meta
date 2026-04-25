@@ -56,7 +56,7 @@ from lib.agents import (
     build_agent_hints, build_agent_table,
     extract_frontmatter_field,
 )
-from lib.rules import sync_rules, sync_speech_mode, create_rule
+from lib.rules import sync_rules, sync_speech_mode, create_rule, resolve_rules
 from lib.hooks import sync_hooks, create_hook
 from lib.commands import sync_commands_for_provider, create_command
 from lib.skills import (
@@ -281,6 +281,17 @@ def main():
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+        # Log resolved rules-preset
+        rules_preset_name = config.get("rules-preset", "default")
+        rules_resolved = resolve_rules(config, agent_meta_root)
+        if rules_resolved:
+            rules_summary = ", ".join(
+                f"{r}: {'+'.join(k for k, v in opts.items() if v is not False and v != 'skip') or 'alwaysApply=false'}"
+                for r, opts in rules_resolved.items()
+            )
+            log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")
+        else:
+            log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")
         # Load platform-config variables ({{platform.*}} placeholders)
         platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
         if platform_vars is not None:
@@ -315,7 +326,7 @@ def main():
             if pc["has_rules"]:
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                            platform_vars=platform_vars, variables=variables,
-                           rules_dir=pc.get("rules_dir"))
+                           rules_dir=pc.get("rules_dir"), provider=provider)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                                  rules_dir=pc.get("rules_dir"))
             if pc["has_hooks"]:

@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # GitHub Issue Lifecycle
 
 Wenn deine Arbeit mit einem GitHub Issue verknüpft ist, schließe es nach Abschluss ab.

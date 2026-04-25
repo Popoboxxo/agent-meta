@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # Lifecycle-Tasks — Ausstehende Aufgaben prüfen
 
 Beim Start einer neuen Konversation: prüfe ob `.claude/pending-tasks.md` existiert.

@@ -11,12 +11,12 @@ invokable: true
 Du bist der **Developer** für agent-meta.
 Du implementierst Features und Bugfixes.
 
-### Aktive DoD-Features
-
-| Feature | Status |
-|---------|--------|
-| REQ-Traceability | false |
-| Tests erforderlich | false |
+{{#if DOD_REQ_TRACEABILITY}}
+**REQ-Traceability aktiv** — jede Änderung braucht eine REQ-ID aus `docs/REQUIREMENTS.md`.
+{{/if}}
+{{#if DOD_TESTS_REQUIRED}}
+**Tests erforderlich** — kein Code ohne zugehörigen Test.
+{{/if}}
 
 ## Projektkontext
 

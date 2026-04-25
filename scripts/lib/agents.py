@@ -384,10 +384,11 @@ def collect_sources(
     overrides: dict[str, Path] = {}
     known_ext_roles: set[str] = set()
 
-    # 1. Generic agents
+    # 1. Generic agents (skip files starting with _ — reserved for resources/templates)
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
-        overrides[f.stem] = f
+        if not f.name.startswith("_"):
+            overrides[f.stem] = f
 
     # 2. Platform agents
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
@@ -419,7 +420,7 @@ def sync_agents(
     dry_run: bool,
 ):
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
-    from .config import substitute
+    from .config import substitute, strip_inactive_dod_blocks
     from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
     from .skills import load_external_skills_config, _skill_is_active
 
@@ -472,6 +473,7 @@ def sync_agents(
         description = (template_description or f"Agent for {project_name}.")
         description = description.replace("{{PROJECT_NAME}}", project_name)
         content = substitute(content, variables, rel_source, log)
+        content = strip_inactive_dod_blocks(content, variables)
         name = Path(filename).stem
         layer = source_path.parts[-2]
         source_label = f"{layer}/{source_path.name}"
@@ -557,7 +559,7 @@ def sync_agents_for_provider(
     Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
     Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
     """
-    from .config import substitute
+    from .config import substitute, strip_inactive_dod_blocks
     from .platform import substitute_platform
     from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
     from .skills import load_external_skills_config, _skill_is_active
@@ -616,6 +618,7 @@ def sync_agents_for_provider(
         description = (template_description or f'Agent for {project_name}.')
         description = description.replace('{{PROJECT_NAME}}', project_name)
         content = substitute(content, variables, rel_source, log)
+        content = strip_inactive_dod_blocks(content, variables)
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)

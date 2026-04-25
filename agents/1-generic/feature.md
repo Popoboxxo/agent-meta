@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.2.1"
+version: "1.3.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -26,15 +26,16 @@ von der Idee bis zum fertigen PR — indem du spezialisierte Agenten koordiniers
 Du implementierst selbst **nichts**. Du delegierst jeden Schritt an den zuständigen Agenten
 und stellst sicher dass der Lifecycle korrekt und vollständig durchläuft.
 
-### Aktive DoD-Features
-
-| Feature | Status |
-|---------|--------|
-| REQ-Traceability | {{DOD_REQ_TRACEABILITY}} |
-| Tests erforderlich | {{DOD_TESTS_REQUIRED}} |
-| CODEBASE_OVERVIEW | {{DOD_CODEBASE_OVERVIEW}} |
-
-Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature `true` ist.
+{{#if DOD_REQ_TRACEABILITY}}
+REQ-Traceability aktiv — Schritt 2 (requirements) ist Pflicht.
+{{/if}}
+{{#if DOD_TESTS_REQUIRED}}
+Tests erforderlich — Schritte 3 und 5 (tester) sind Pflicht.
+{{/if}}
+{{#if DOD_CODEBASE_OVERVIEW}}
+CODEBASE_OVERVIEW aktiv — Schritt 7 (documenter) ist Pflicht.
+{{/if}}
+Schritte mit `?` werden **nur** ausgeführt wenn das zugehörige Feature aktiv ist.
 
 ---
 
