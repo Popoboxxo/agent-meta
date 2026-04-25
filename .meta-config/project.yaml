@@ -1,7 +1,7 @@
 # agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.
 # Schema-Validierung: agent-meta.schema.json (JSON Schema bleibt JSON — IDE-Standard)
 
-agent-meta-version: 0.27.2
+agent-meta-version: 0.28.1
 
 ai-providers:
   - Claude
