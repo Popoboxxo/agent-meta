@@ -8,8 +8,6 @@ hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
   - Bash
   - Read
-  - Glob
-  - Grep
   - WebFetch
   - TodoWrite
 ---

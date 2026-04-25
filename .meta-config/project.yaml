@@ -9,6 +9,7 @@ ai-providers:
   - Gemini
 
 dod-preset: rapid-prototyping
+rules-preset: silent
 
 platforms:
   - agent-meta

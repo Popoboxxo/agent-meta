@@ -271,14 +271,13 @@ def strip_inactive_dod_blocks(text: str, variables: dict) -> str:
     """
     dod_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
 
-    def replace_block(m: re.Match) -> str:
-        var_name = m.group(1)
-        block_content = m.group(2)
-        if variables.get(var_name, "true") == "false":
-            return ""
-        return block_content.strip("\n") + "\n"
-
     for var in dod_vars:
+        def replace_block(m: re.Match, _var: str = var) -> str:
+            block_content = m.group(1)
+            if variables.get(_var, "true") == "false":
+                return ""
+            return block_content.strip("\n") + "\n"
+
         pattern = rf"\{{{{#if {re.escape(var)}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
         text = re.sub(pattern, replace_block, text, flags=re.DOTALL)
 
