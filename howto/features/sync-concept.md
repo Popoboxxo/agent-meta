@@ -55,6 +55,8 @@ agent-meta/
   CLAUDE.md                  ← bei "Claude" in ai-providers automatisch erstellt, danach manuell gepflegt
                                ├─ managed block (auto-aktualisiert bei jedem sync)
                                └─ handgeschriebener Rest (nie überschrieben)
+  src/backend/CLAUDE.md      ← optional: ordnerspezifischer Kontext (nie von sync.py berührt)
+  src/frontend/CLAUDE.md     ← optional: ordnerspezifischer Kontext (nie von sync.py berührt)
   CLAUDE.personal.md         ← persönliche Präferenzen (gitignored, nie committen)
   .claude/                   ← Claude Code (immer wenn "Claude" in ai-providers)
     settings.json            ← Team-Permissions (committed ins Repo)
@@ -338,6 +340,64 @@ Logfile: sync.log
 
 > **Multi-Provider Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — vollständige Beschreibung
 > aller Provider (Claude, Gemini, Continue), Frontmatter-Unterschiede, Stale-Tracking, Troubleshooting.
+
+---
+
+## Ordner-level CLAUDE.md
+
+Claude Code lädt CLAUDE.md-Dateien **aus allen Unterordnern** automatisch wenn man sich in diesem Verzeichnis befindet. Das ist ein nativer Claude Code Feature — agent-meta berührt diese Dateien nicht.
+
+**Einsatz:** Wenn ein Unterordner eigene, spezifische Konventionen braucht die im Haupt-CLAUDE.md zu viel Platz wären.
+
+```
+src/
+  backend/
+    CLAUDE.md    ← Nur für Backend-Dateien: DB-Konventionen, API-Patterns
+  frontend/
+    CLAUDE.md    ← Nur für Frontend: Component-Struktur, CSS-Konventionen
+scripts/
+  CLAUDE.md      ← Script-spezifische Hinweise (z.B. Shell-Konventionen)
+```
+
+**Abgrenzung:**
+
+| Mechanismus | Scope | Geladen von |
+|-------------|-------|-------------|
+| `CLAUDE.md` (Root) | Gesamtprojekt | Claude Code automatisch |
+| `<ordner>/CLAUDE.md` | Nur dieser Ordner | Claude Code automatisch (wenn im Ordner) |
+| `.claude/3-project/*-ext.md` | Nur ein Agenten-Typ | Agent selbst per Read-Hook |
+
+Ordner-level CLAUDE.md eignet sich für allgemeine Konventionen. Für agentenspezifisches Wissen → Extension (`-ext.md`).
+
+---
+
+## Multi-Tool Strategie (AGENTS.md)
+
+Verschiedene AI-Tools nutzen verschiedene Konfigurationsdateinamen:
+- `CLAUDE.md` → Claude Code
+- `AGENTS.md` → OpenAI / generisch
+- `.cursor/rules/` → Cursor
+
+**Empfohlene Strategie für Multi-Tool-Teams:**
+
+```bash
+# AGENTS.md als primäre Datei, CLAUDE.md als Symlink
+mv CLAUDE.md AGENTS.md
+ln -s AGENTS.md CLAUDE.md          # Unix/macOS
+# mklink CLAUDE.md AGENTS.md       # Windows (als Admin)
+```
+
+Oder umgekehrt: CLAUDE.md primär (von agent-meta verwaltet), AGENTS.md als Symlink:
+```bash
+ln -s CLAUDE.md AGENTS.md
+```
+
+**Einschränkungen:**
+- Windows: Symlinks benötigen Admin-Rechte oder Developer Mode
+- agent-meta generiert immer `CLAUDE.md` als primäre Datei — der managed block wird nur in `CLAUDE.md` eingefügt
+- `AGENTS.md` wird von sync.py nicht verwaltet — manuell oder als Symlink pflegen
+
+**Wann sinnvoll:** Teams die Claude Code + andere Tools (Cursor, Copilot, OpenAI API) parallel nutzen.
 
 ---
 

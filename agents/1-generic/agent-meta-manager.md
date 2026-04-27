@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.4.0"
+version: "1.4.1"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -83,19 +83,21 @@ Nur dieses Projekt?           → Projektspezifischer Override (Abschnitt 6)
 
 ---
 
-## 6. Projektspezifische Agenten
+## 6. Projektspezifische Agenten & Regeln
 
 ```
-Zusätzliche Regeln/Wissen?    → Extension:  --create-ext <rolle>
-Komplett anderer Workflow?    → Override:   .claude/3-project/<rolle>.md (manuell)
+Gilt für alle Agenten + Hauptchat?  → Rule:      --create-rule <thema>
+Zusätzliches Wissen für 1 Agent?    → Extension: --create-ext <rolle>
+Komplett anderer Workflow?          → Override:  .claude/3-project/<rolle>.md (manuell)
 ```
 
 ```bash
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <rolle>
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 ```
 
-Extensions so kurz wie möglich halten.
+Extensions und Rules so kurz wie möglich halten.
 
 ---
 
@@ -146,3 +148,4 @@ der richtige Weg — nicht alles in CLAUDE.md packen).
 - NICHT sync ohne danach `sync.log` zu prüfen
 - KEINE manuellen Änderungen in `.claude/agents/`
 - NIE in den managed block von CLAUDE.md schreiben
+- Bei Multi-Tool-Teams (Cursor, OpenAI, etc.): auf Symlink-Strategie hinweisen — `AGENTS.md` ↔ `CLAUDE.md` Symlink, nicht zwei separate Dateien pflegen
