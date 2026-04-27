@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.30.0] — 2026-04-27
+
+### Added
+
+- **`session-conclusion.md` Rule** (`rules/1-generic/`): New generic rule enforcing session-end recognition in main chat and orchestrator. Defines session-end signals and requires documenter delegation.
+- **`rules-preset-optimization.md` Howto** (`howto/features/`): New document explaining word-count thresholds, preset selection guide (`default`/`minimal`/`silent`), and lazy-load `_wf-` pattern for platform-heavy projects.
+- **Configurable `.gitignore` behavior** (`scripts/sync.py`, `config/project-config.schema.json`): New `gitignore` section in `project.yaml` with three boolean flags — `local` (default: true), `generated` (default: false), `settings` (default: false). `generated: true` gitignores all provider agents/rules/hooks/commands dirs.
+- **Post-merge branch cleanup** (`agents/1-generic/git.md` v2.2.0): New section with keep/delete signal detection (open TODOs, disabled automations, Phase-2 hints) and user-confirmation flow.
+- **InfluxDB `measurement_schema` + `timezone` config** (`platform-configs/homeassistant.defaults.yaml`): New fields `influxdb_measurement_schema` (`by_entity`/`by_unit`) and `influxdb_timezone` prevent query failures from unknown schema or UTC offset.
+- **Multi-tool strategy (AGENTS.md)** (`howto/features/sync-concept.md`): New section documenting `CLAUDE.md` ↔ `AGENTS.md` symlink pattern for teams using multiple AI tools.
+- **Folder-level CLAUDE.md** (`howto/features/sync-concept.md`): New section with use cases and comparison table vs. `-ext.md`.
+
+### Changed
+
+- **`meta-feedback` agent v2.0.0** (`agents/1-generic/meta-feedback.md`): Complete rewrite with explicit decision tree and 10 typed issue templates — `bug`, `feat`, `new-agent`, `new-command`, `new-skill`, `new-platform`, `new-speech`, `improvement`, `docs`, `design`. Each type has its own title prefix, label set, and body template.
+- **`orchestrator` v2.3.0** (`agents/1-generic/orchestrator.md`): Session-end now offers documenter (conclusions) and workflow K (feedback) explicitly.
+- **`git` agent v2.2.0** (`agents/1-generic/git.md`): Post-merge cleanup decision block added.
+- **`agent-meta-manager` v1.4.2** (`agents/1-generic/agent-meta-manager.md`): Section 6 now includes `--create-rule`, `--create-command`; section 8 adds active `wc -l` length check with threshold table; Don'ts add AGENTS.md symlink guidance.
+- **`branch-guard.md` genericized** (`rules/1-generic/branch-guard.md`): `sync.py`-specific logic removed — rule now applies cleanly to non-agent-meta projects.
+- **`agent-meta-sync-interface.md` extended** (`rules/2-platform/`): Branch-guard extension for `sync.py` added here (agent-meta-specific only).
+- **`_wf-ha-mcp-local.md`** (`rules/2-platform/`): InfluxDB section now shows measurement schema and timezone context.
+- **`sync-concept.md`** (`howto/features/`): `.gitignore` config section, folder-level CLAUDE.md, multi-tool AGENTS.md strategy, and `gitignore` field in project.yaml table.
+
+### Fixed
+
+- **`branch-guard.md`** (`rules/1-generic/`): Was leaking agent-meta-internal `sync.py` references into generic projects. (#57)
+
+---
+
 ## [0.29.0] — 2026-04-25
 
 ### Added
