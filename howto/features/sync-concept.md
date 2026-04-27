@@ -188,6 +188,7 @@ variables:
 | `project.name` | Vollständiger Projektname |
 | `project.prefix` | Kurzpräfix für Extension-Dateinamen (`vwf-developer-ext.md`) |
 | `project.short` | Kurzname (informativ) |
+| `gitignore` | Konfigurierbares .gitignore-Verhalten für generierte und Settings-Dateien |
 | `model-overrides` | Modell pro Rolle überschreiben (z.B. `"git": "haiku"`) |
 | `permission-mode-overrides` | permissionMode pro Rolle überschreiben (z.B. `"validator": "default"`) |
 | `memory-overrides` | Memory-Scope pro Rolle überschreiben (z.B. `"validator": "local"`) |
@@ -340,6 +341,32 @@ Logfile: sync.log
 
 > **Multi-Provider Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — vollständige Beschreibung
 > aller Provider (Claude, Gemini, Continue), Frontmatter-Unterschiede, Stale-Tracking, Troubleshooting.
+
+---
+
+## .gitignore Konfiguration
+
+sync.py verwaltet einen managed block in `.gitignore`. Das Verhalten ist per `project.yaml` konfigurierbar:
+
+```yaml
+gitignore:
+  local: true       # Standard: persönliche Dateien sind gitignored (settings.local.json, CLAUDE.personal.md)
+  generated: false  # Standard: generierte Dateien sind committed (agents/, rules/, hooks/)
+  settings: false   # Standard: Settings-Dateien sind committed (settings.json, GEMINI.md)
+```
+
+| Flag | Standard | `true` bedeutet |
+|------|----------|-----------------|
+| `local` | `true` | `.claude/settings.local.json`, `CLAUDE.personal.md`, `sync.log` → gitignored |
+| `generated` | `false` | `agents/`, `rules/`, `hooks/`, `commands/` aller aktiven Provider → gitignored |
+| `settings` | `false` | `settings.json`, `GEMINI.md`, `config.yaml` der Provider → gitignored |
+
+**Hinweis:** `CLAUDE.md` wird nie gitignored — sie enthält handgeschriebene Sektionen außerhalb des managed blocks.
+
+**`generated: true` empfohlen wenn:**
+- Das Team sync.py bei jedem Checkout neu ausführt (CI/CD)
+- Diff-Noise bei Sync-Updates störend ist
+- Das Repo möglichst klein bleiben soll
 
 ---
 

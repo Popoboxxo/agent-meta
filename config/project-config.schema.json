@@ -374,6 +374,28 @@
       },
       "additionalProperties": false
     },
+    "gitignore": {
+      "type": "object",
+      "description": "Configurable .gitignore behavior for generated and settings files. Defaults match current behavior (local: true, generated: false, settings: false).",
+      "properties": {
+        "local": {
+          "type": "boolean",
+          "default": true,
+          "description": "Gitignore local/personal files (.claude/settings.local.json, CLAUDE.personal.md, sync.log). Default: true (gitignored)."
+        },
+        "generated": {
+          "type": "boolean",
+          "default": false,
+          "description": "Gitignore all generated directories (agents/, rules/, hooks/, commands/) for all active providers. Default: false (committed). Set true to follow 'generate, don't store' principle."
+        },
+        "settings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
+        }
+      },
+      "additionalProperties": false
+    },
     "lifecycle-triggers": {
       "type": "object",
       "description": "Agent tasks to run automatically on git lifecycle events (commit, merge, version bump, release). Requires lifecycle-check hook to be enabled.",
