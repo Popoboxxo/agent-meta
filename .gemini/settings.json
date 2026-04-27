@@ -2,18 +2,5 @@
   "permissions": {
     "allow": [],
     "deny": []
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .gemini/hooks/dod-push-check.sh"
-          }
-        ],
-        "matcher": "Bash"
-      }
-    ]
   }
 }

@@ -234,6 +234,13 @@ def sync_hooks(
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
 
+        # Provider filter: skip hook if it declares a specific provider that doesn't match
+        hook_provider = meta.get("provider", "")
+        if hook_provider and hook_provider != provider:
+            log.skip(str(target_path.relative_to(project_root)),
+                     f"provider-specific hook ({hook_provider} only)")
+            continue
+
         log.action("COPY", str(target_path.relative_to(project_root)),
                    f"hooks/{layer}/{source_path.name}")
         now_managed.add(output_name)

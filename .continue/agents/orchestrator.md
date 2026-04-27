@@ -31,12 +31,16 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `ideation` | Ideen explorieren, Scope schärfen |
 | `requirements` | REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `developer` | Features implementieren, Bugfixes |
-| `tester` | Tests schreiben (TDD), Test-Suite ausführen |
-| `validator` | DoD-Check, Traceability-Audit |
-| `documenter` | CODEBASE_OVERVIEW, README, Erkenntnisse |
-| `docker` | Dev/Test-Stack verwalten |
+| `feature` | Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR |
 | `git` | Commits, Branches, Tags, Push/Pull |
+| `documenter` | CODEBASE_OVERVIEW, README, Erkenntnisse |
+| `release` | Versioning, Changelog, GitHub Release |
+| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues |
+| `agent-meta-manager` | agent-meta Upgrade, Sync, Extensions anlegen |
 | `agent-meta-scout` | Claude-Ökosystem scouten — **nur auf explizite Anfrage** |
+| `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* |
+| `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* |
+| `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* |
 
 Parallel: max. 4 Agenten. `run_in_background: true` für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
