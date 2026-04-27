@@ -2,119 +2,127 @@
 # Definiert alle bekannten Rollen, empfohlene Modelle, Memory-Scopes und Kurzbeschreibungen.
 # Wird von sync.py beim Generieren gelesen.
 #
-# model: empfohlenes Claude-Modell für diese Rolle. Leer = erbt vom Parent-Kontext.
-#   Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs.
-#   Projekte überschreiben via 'model-overrides' in agent-meta.config.yaml.
+# model: Modell-Tier für diese Rolle. Leer = erbt vom Parent-Kontext (kein model:-Feld).
+#   Tier-Namen (provider-agnostisch, empfohlen):
+#     nano     — ultra-schnell, minimale Kosten (z.B. einfache Formatierungen)
+#     fast     — schnell & günstig (z.B. git, meta-feedback, docker)
+#     balanced — guter Kompromiss Kosten/Qualität (Standard für dev, docs, review)
+#     powerful — starkes Reasoning (z.B. security-audit, komplexe Architektur)
+#     max      — maximale Kapazität, reserviert für zukünftige Ultra-Modelle
+#   Rückwärtskompatibel: 'haiku', 'sonnet', 'opus' funktionieren als Claude-Aliase.
+#   Volle Modell-IDs ('claude-sonnet-4-6') werden direkt übergeben (kein Tier-Lookup).
+#   Provider-Mapping: config/ai-providers.yaml → model-tiers pro Provider.
+#   Projekte überschreiben via 'model-overrides' in .meta-config/project.yaml.
 #
 # memory: persistentes Agenten-Gedächtnis über Sessions hinweg. Leer = kein Gedächtnis.
 #   Gültige Werte: 'project' (.claude/agent-memory/<name>/, in git),
 #                  'local' (.claude/agent-memory-local/<name>/, gitignored),
 #                  'user' (~/.claude/agent-memory/<name>/, maschinenlokal).
-#   Projekte überschreiben via 'memory-overrides' in agent-meta.config.yaml.
+#   Projekte überschreiben via 'memory-overrides' in .meta-config/project.yaml.
 #
 # permission_mode: Claude Code Berechtigungsmodus. Leer = Standard (kein Frontmatter-Feld).
 #   Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only).
-#   Projekte überschreiben via 'permission-mode-overrides' in agent-meta.config.yaml.
+#   Projekte überschreiben via 'permission-mode-overrides' in .meta-config/project.yaml.
 #
-# tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
-#   'optional' = bei Bedarf. User steuert via 'roles' in agent-meta.config.yaml.
+# workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
+#   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
 
 roles:
 
   orchestrator:
-    model: ""
+    model: ""           # erbt vom Kontext — Entry-Point, User entscheidet
     memory: ""
-    tier: required
+    workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 
   developer:
-    model: ""
+    model: ""           # erbt — oft das stärkste verfügbare Modell gewünscht
     memory: ""
-    tier: required
+    workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
-    model: ""
+    model: ""           # erbt
     memory: project
-    tier: recommended
+    workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 
   ideation:
-    model: ""
+    model: ""           # erbt
     memory: ""
-    tier: optional
+    workflow_tier: optional
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 
   feature:
-    model: ""
+    model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
     memory: ""
-    tier: recommended
+    workflow_tier: recommended
     description: "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"
 
   tester:
-    model: sonnet
+    model: balanced
     memory: ""
-    tier: recommended
+    workflow_tier: recommended
     description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
 
   validator:
-    model: sonnet
+    model: balanced
     memory: project
     permission_mode: plan
-    tier: recommended
+    workflow_tier: recommended
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 
   documenter:
-    model: sonnet
+    model: balanced
     memory: project
-    tier: recommended
+    workflow_tier: recommended
     description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
 
   security-auditor:
-    model: sonnet
+    model: powerful
     memory: project
     permission_mode: plan
-    tier: optional
+    workflow_tier: optional
     description: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
 
   agent-meta-scout:
-    model: sonnet
+    model: balanced
     memory: local
-    tier: optional
+    workflow_tier: optional
     description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
 
   agent-meta-manager:
-    model: sonnet
+    model: balanced
     memory: ""
-    tier: optional
+    workflow_tier: optional
     description: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 
   release:
-    model: sonnet
+    model: balanced
     memory: ""
-    tier: optional
+    workflow_tier: optional
     description: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 
   git:
-    model: haiku
+    model: fast
     memory: ""
-    tier: required
+    workflow_tier: required
     description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 
   meta-feedback:
-    model: haiku
+    model: fast
     memory: ""
-    tier: optional
+    workflow_tier: optional
     description: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 
   docker:
-    model: haiku
+    model: fast
     memory: ""
-    tier: optional
+    workflow_tier: optional
     description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
 
   openscad-developer:
-    model: sonnet
+    model: balanced
     memory: local
-    tier: optional
+    workflow_tier: optional
     description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"

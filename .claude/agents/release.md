@@ -1,6 +1,6 @@
 ---
 name: release
-model: sonnet
+model: claude-sonnet-4-6
 version: "1.3.2"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 generated-from: "1-generic/release.md@1.3.2"

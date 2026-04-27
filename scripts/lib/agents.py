@@ -639,10 +639,15 @@ def sync_agents_for_provider(
             content = build_frontmatter(content, name, description, generated_from=generated_from)
 
             if provider == 'Claude':
-                model = resolve_model(role, config, agent_meta_root)
+                model = resolve_model(role, config, agent_meta_root,
+                                      provider=provider, provider_config=provider_config)
                 content = inject_model_field(content, model)
                 if model:
-                    src = 'project override' if role in config.get('model-overrides', {}) else 'meta default'
+                    po = config.get('model-overrides', {})
+                    is_override = (role in po.get('Claude', {})) or (
+                        role in po and not isinstance(po.get(role), dict)
+                    )
+                    src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
 
                 memory = resolve_memory(role, config, agent_meta_root)
@@ -658,9 +663,15 @@ def sync_agents_for_provider(
                     log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
             elif provider == 'Gemini':
-                # Gemini: model only; strip memory, permissionMode and Claude-specific lines
-                model = resolve_model(role, config, agent_meta_root)
+                # Gemini: provider-mapped model only; strip memory, permissionMode, Claude-specific lines
+                model = resolve_model(role, config, agent_meta_root,
+                                      provider=provider, provider_config=provider_config)
                 content = inject_model_field(content, model)
+                if model:
+                    po = config.get('model-overrides', {})
+                    is_override = role in po.get('Gemini', {})
+                    src = 'project override' if is_override else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
                 content = _remove_frontmatter_fields(content, ['memory', 'permissionMode'])
                 body = _strip_frontmatter(content)
                 body = _strip_claude_specific_lines(body)

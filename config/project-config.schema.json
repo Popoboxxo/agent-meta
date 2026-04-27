@@ -229,20 +229,45 @@
     },
     "model-overrides": {
       "type": "object",
-      "description": "Override the default model per role. Precedence: this > roles.config.json > (none).",
+      "description": "Override the default model tier or model ID per role. Two forms supported: (1) flat role→tier for Claude-only legacy use; (2) provider-keyed blocks for multi-provider control. Provider-specific blocks take precedence over flat values for that provider.",
+      "properties": {
+        "Claude": {
+          "type": "object",
+          "description": "Claude-specific model overrides: role → tier or full model ID.",
+          "additionalProperties": {
+            "type": "string",
+            "anyOf": [
+              {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
+              {"enum": ["haiku", "sonnet", "opus"]},
+              {"pattern": "^claude-"}
+            ]
+          }
+        },
+        "Gemini": {
+          "type": "object",
+          "description": "Gemini-specific model overrides: role → tier or full Gemini model ID.",
+          "additionalProperties": {
+            "type": "string",
+            "anyOf": [
+              {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
+              {"pattern": "^gemini-"}
+            ]
+          }
+        },
+        "Continue": {
+          "type": "object",
+          "description": "Continue model overrides (ignored — Continue manages models in config.yaml).",
+          "additionalProperties": {"type": "string"}
+        }
+      },
       "additionalProperties": {
         "type": "string",
+        "description": "Legacy flat form: role → tier/alias/model-id. Applied to Claude only.",
         "anyOf": [
-          {
-            "enum": [
-              "haiku",
-              "sonnet",
-              "opus"
-            ]
-          },
-          {
-            "pattern": "^claude-"
-          }
+          {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
+          {"enum": ["haiku", "sonnet", "opus"]},
+          {"pattern": "^claude-"},
+          {"pattern": "^gemini-"}
         ]
       }
     },

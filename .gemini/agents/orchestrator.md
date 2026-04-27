@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.4.0"
+version: "2.5.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.4.0"
+generated-from: "1-generic/orchestrator.md@2.5.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -57,6 +57,16 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 Parallel: max. 4 Agenten. `run_in_background: true` für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
+
+**Parallel-Pattern (konkret):**
+```
+# Vordergrund:
+Agent(subagent_type="validator", prompt="DoD-Check für ...")
+# Gleichzeitig im Hintergrund:
+Agent(subagent_type="documenter", prompt="Update CODEBASE_OVERVIEW ...", run_in_background=True)
+# Dann warten bis Hintergrund fertig, dann:
+Agent(subagent_type="git", prompt="Commit und PR erstellen ...")
+```
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: git
-model: haiku
+model: gemini-2.5-flash
 version: "2.2.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 generated-from: "1-generic/git.md@2.2.0"

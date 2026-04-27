@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "2.4.0"
+version: "2.5.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
@@ -70,6 +70,16 @@ Du bist der **Orchestrator** für {{PROJECT_NAME}}.
 
 Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten. `run_in_background: true` für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
+
+**Parallel-Pattern (konkret):**
+```
+# Vordergrund:
+Agent(subagent_type="validator", prompt="DoD-Check für ...")
+# Gleichzeitig im Hintergrund:
+Agent(subagent_type="documenter", prompt="Update CODEBASE_OVERVIEW ...", run_in_background=True)
+# Dann warten bis Hintergrund fertig, dann:
+Agent(subagent_type="git", prompt="Commit und PR erstellen ...")
+```
 
 ---
 
