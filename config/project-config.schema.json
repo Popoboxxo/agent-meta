@@ -308,6 +308,11 @@
       },
       "additionalProperties": false
     },
+    "debug-mode": {
+      "type": "boolean",
+      "description": "When true, sync.py injects a debug block into every generated agent. Active agents announce themselves ([Agent: <name>]), log every delegation (→ Delegiere an: ...), and confirm completion (✓ [Agent: <name>] fertig). Default: false — no change to any agent file.",
+      "default": false
+    },
     "max-parallel-agents": {
       "type": "integer",
       "description": "Maximum number of agents that a coordinator (orchestrator, feature) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",

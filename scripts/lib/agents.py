@@ -552,6 +552,7 @@ def sync_agents_for_provider(
     provider: str,
     provider_config: dict,
     platform_vars: dict | None = None,
+    debug_mode: bool = False,
 ):
     """Generate agent files for a specific provider.
 
@@ -667,6 +668,9 @@ def sync_agents_for_provider(
                 if fm_end != -1:
                     content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
 
+        if debug_mode:
+            content = inject_debug_block(content, name)
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)
         if not dry_run:
@@ -702,6 +706,43 @@ def sync_agents_for_provider(
             managed_index.write_text(
                 '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
             )
+
+
+_DEBUG_BLOCK_MARKER = "<!-- agent-meta:debug-mode -->"
+
+_DEBUG_BLOCK_TEMPLATE = """\
+
+---
+
+{marker}
+## Debug-Modus
+
+**Aktiv.** Starte jede Antwort mit: `[Agent: {agent_name}]`
+
+Bei jeder Delegation an einen Sub-Agenten:
+```
+→ Delegiere an: <agent-name> — <kurze Aufgabenbeschreibung>
+```
+
+Am Ende jeder Antwort:
+```
+✓ [Agent: {agent_name}] fertig
+```
+"""
+
+
+def inject_debug_block(content: str, agent_name: str) -> str:
+    """Append a debug-mode instructions block to agent content.
+
+    Only called when debug-mode: true is set in project.yaml.
+    When not called (debug-mode: false, the default), content is unchanged.
+    """
+    if _DEBUG_BLOCK_MARKER in content:
+        return content
+    return content.rstrip("\n") + _DEBUG_BLOCK_TEMPLATE.format(
+        marker=_DEBUG_BLOCK_MARKER,
+        agent_name=agent_name,
+    )
 
 
 def _strip_claude_specific_lines(content: str) -> str:

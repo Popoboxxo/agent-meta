@@ -3,6 +3,7 @@
 # version: 1.0.0
 # event: PostToolUse
 # matcher: Bash
+# provider: Claude
 # description: Detects git lifecycle events (tag push, merge, version bump) and writes pending tasks to .claude/pending-tasks.md
 # enabled_by_default: false
 

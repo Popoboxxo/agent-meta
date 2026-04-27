@@ -338,12 +338,16 @@ def main():
             # Skill gitignore entries are collected after skills are processed (below)
             # and merged via exact_entries so stale entries are removed automatically.
         # Per-provider sync
+        debug_mode = config.get("debug-mode", False)
+        if debug_mode:
+            log.info("debug-mode", "active — injecting debug block into all agents")
         for provider in providers:
             pc = provider_config[provider]
             log.provider_header(provider)
             sync_agents_for_provider(agent_meta_root, project_root, config, variables,
                                      log, args.dry_run, provider, provider_config,
-                                     platform_vars=platform_vars)
+                                     platform_vars=platform_vars,
+                                     debug_mode=debug_mode)
             sync_context_for_provider(agent_meta_root, project_root, config, variables,
                                       log, args.dry_run, provider, provider_config)
             if provider == "Continue":

@@ -3,6 +3,7 @@
 # version: 1.1.0
 # event: PreToolUse
 # matcher: Bash
+# provider: Claude
 # description: Blocks git push on main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
 

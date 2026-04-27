@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.31.0] — 2026-04-27
+
+### Added
+
+- **Debug Mode** (`scripts/lib/agents.py`, `config/project-config.schema.json`): New `debug-mode: true/false` flag in `project.yaml`. When active, `sync.py` injects a debug block into every generated agent — agents announce themselves (`[Agent: <name>]`), log delegations (`→ Delegiere an: ...`), and confirm completion (`✓ [Agent: <name>] fertig`). Default: `false` — zero change to any agent file.
+- **Provider filter for hooks** (`hooks/1-generic/`, `scripts/lib/hooks.py`): New `# provider: <name>` metadata in hook scripts. Hooks declaring a specific provider (e.g. `Claude`) are skipped for all other providers (e.g. Gemini). `lifecycle-check.sh` and `dod-push-check.sh` now correctly declare `# provider: Claude`.
+
+### Changed
+
+- **`orchestrator` v2.4.0** (`agents/1-generic/orchestrator.md`): Agents table now includes all roles — `feature`, `release`, `meta-feedback`, `agent-meta-manager` added; `tester`, `validator`, `docker` annotated as optional/conditional.
+
+### Fixed
+
+- **Gemini/Continue received Claude-specific hooks** (`scripts/lib/hooks.py`): `lifecycle-check.sh` and `dod-push-check.sh` use the Claude Code hook API (JSON on stdin) and must not be copied to Gemini/Continue hook directories. Provider filter now enforces this.
+
+---
+
 ## [0.30.0] — 2026-04-27
 
 ### Added
