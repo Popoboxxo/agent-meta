@@ -62,6 +62,25 @@ Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 
 ---
 
+## Post-Merge Branch Cleanup
+
+Nach einem erfolgreichen Merge: Empfehlung geben und User fragen.
+
+**Signale → Branch behalten:**
+- Offene TODOs im Commit-Body oder in geänderten Dateien
+- Code mit `enabled: false`, `initial_state: false`, `disabled: true`
+- "Phase 2", "follow-up", "pending", "wip" im Branch-Namen oder Commit
+- Testplan in Dokumentation als ausstehend markiert
+
+**Default → Branch löschen** (kein Signal oben vorhanden):
+```bash
+git branch -d <branch>        # safe delete (verhindert Löschen bei ungemergtem Inhalt)
+```
+
+Empfehlung formulieren, User-Bestätigung einholen, dann handeln.
+
+---
+
 ## Issue schließen (nach erledigter Arbeit)
 
 ```bash
