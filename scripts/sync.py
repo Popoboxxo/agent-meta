@@ -303,12 +303,38 @@ def main():
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
             claude_pc = provider_config.get("Claude", {})
-            base_gitignore_entries = claude_pc.get("gitignore_entries", [
-                ".claude/settings.local.json",
-                ".claude/agent-memory-local/",
-                "CLAUDE.personal.md",
-                "sync.log",
-            ])
+            gitignore_cfg = config.get("gitignore", {})
+            # local: true (default) — personal/local files are gitignored
+            if gitignore_cfg.get("local", True):
+                base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
+                    ".claude/settings.local.json",
+                    ".claude/agent-memory-local/",
+                    "CLAUDE.personal.md",
+                    "sync.log",
+                ]))
+            else:
+                base_gitignore_entries = []
+            # generated: false (default) — generated files are committed
+            if gitignore_cfg.get("generated", False):
+                for _prov in providers:
+                    _pc = provider_config.get(_prov, {})
+                    for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
+                        _d = _pc.get(_dir_key)
+                        if _d:
+                            base_gitignore_entries.append(_d + "/")
+                    if _pc.get("has_commands") and _pc.get("commands_dir"):
+                        base_gitignore_entries.append(_pc["commands_dir"] + "/")
+            # settings: false (default) — settings files are committed
+            if gitignore_cfg.get("settings", False):
+                for _prov in providers:
+                    _pc = provider_config.get(_prov, {})
+                    _sf = _pc.get("settings_file")
+                    if _sf:
+                        base_gitignore_entries.append(_sf)
+                    _ctx = _pc.get("context_file")
+                    # CLAUDE.md is semi-manual (has handwritten sections) — skip
+                    if _ctx and _ctx != "CLAUDE.md":
+                        base_gitignore_entries.append(_ctx)
             # Skill gitignore entries are collected after skills are processed (below)
             # and merged via exact_entries so stale entries are removed automatically.
         # Per-provider sync

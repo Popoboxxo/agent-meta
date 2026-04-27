@@ -1,9 +1,9 @@
 ---
 name: agent-meta-manager
 model: sonnet
-version: "1.4.1"
+version: "1.4.2"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
-generated-from: "1-generic/agent-meta-manager.md@1.4.1"
+generated-from: "1-generic/agent-meta-manager.md@1.4.2"
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash
@@ -83,19 +83,24 @@ Nur dieses Projekt?           → Projektspezifischer Override (Abschnitt 6)
 
 ---
 
-## 6. Projektspezifische Agenten & Regeln
+## 6. Projektspezifische Agenten, Regeln & Commands
 
 ```
-Gilt für alle Agenten + Hauptchat?  → Rule:      --create-rule <thema>
-Zusätzliches Wissen für 1 Agent?    → Extension: --create-ext <rolle>
-Komplett anderer Workflow?          → Override:  .claude/3-project/<rolle>.md (manuell)
+Gilt für alle Agenten + Hauptchat?   → Rule:     --create-rule <thema>
+Zusätzliches Wissen für 1 Agent?     → Extension: --create-ext <rolle>
+Komplett anderer Workflow?           → Override:  .claude/3-project/<rolle>.md (manuell)
+Wiederkehrender Workflow im Hauptchat → Command:  --create-command <name>
 ```
 
 ```bash
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <rolle>
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-command deploy
 ```
+
+Commands (`/project:<name>`) laufen im **Haupt-Kontext** — kein isoliertes Context Window.
+Geeignet für schnelle, wiederkehrende Einzel-Aktionen. Für komplexe Aufgaben → Agent.
 
 Extensions und Rules so kurz wie möglich halten.
 
