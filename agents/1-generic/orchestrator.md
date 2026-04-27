@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "2.2.0"
+version: "2.3.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
@@ -94,7 +94,7 @@ N  Skill-Repo:      → lies .agent-meta/agents/1-generic/_wf-scout.md
 K  Feedback:        → lies .agent-meta/agents/1-generic/_wf-feedback.md
 ```
 
-Am Session-Ende: Workflow K anbieten.
+Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).
 
 ---
 

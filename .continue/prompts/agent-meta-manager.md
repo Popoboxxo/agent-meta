@@ -111,6 +111,18 @@ git submodule update --init --recursive
 
 Sofort-Regel: Fehler beobachtet → Imperativ-Regel formulieren → außerhalb managed block einfügen.
 
+**Längen-Check (immer bei Review):**
+```bash
+wc -l CLAUDE.md
+```
+- ≤300 Zeilen: optimal
+- 301–500: akzeptabel, auf Redundanz prüfen
+- >500: **warnen** → Detailwissen auslagern
+
+Wenn >500 Zeilen: User aktiv darauf hinweisen. Lösung: Architekturdetails → `docs/ARCHITECTURE.md`,
+agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
+der richtige Weg — nicht alles in CLAUDE.md packen).
+
 ---
 
 ## Don'ts
