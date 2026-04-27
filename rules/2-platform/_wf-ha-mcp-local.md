@@ -26,7 +26,10 @@ User: "Mein Sensor springt ständig zwischen Werten."
 - **Protokoll**: InfluxDB OSS API v2 (Flux-Queries)
 - **Bucket**: `{{platform.homeassistant.influxdb_bucket}}`
 - **Organisation**: `{{platform.homeassistant.influxdb_org}}`
-- **Datenstruktur**: Measurements basieren auf Einheit (z.B. "W"), nicht "state"
+- **Measurement-Schema**: `{{platform.homeassistant.influxdb_measurement_schema}}`
+  - `by_entity` → Measurements = Entity-Namen (Standard-HA-Verhalten)
+  - `by_unit` → Measurements = Einheiten ("W", "°C", "kWh") — unüblich, aber möglich
+- **Timezone**: `{{platform.homeassistant.influxdb_timezone}}` — InfluxDB speichert UTC, Abfragefenster entsprechend anpassen
 - **Entity-IDs**: Ohne "sensor."-Prefix, können vom HA-Namen abweichen
 
 **Erlaubt:** Flux-Queries lesen, Wertebereich-Analysen, Pattern-Erkennung, Vergleiche.

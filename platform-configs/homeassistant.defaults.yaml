@@ -58,6 +58,15 @@ platform:
     # InfluxDB organization name
     influxdb_org: ""
 
+    # Measurement schema used by this HA instance
+    # "by_unit"   → measurements are unit names ("W", "°C", "kWh") — uncommon but valid
+    # "by_entity" → measurements are entity names ("sensor.living_room_temp") — default HA behavior
+    influxdb_measurement_schema: "by_entity"
+
+    # Local timezone of the HA instance (InfluxDB stores UTC, queries need offset)
+    # Example: "Europe/Berlin", "America/New_York", "UTC"
+    influxdb_timezone: "UTC"
+
     # -------------------------------------------------------------------------
     # Entity data / CSV export
     # -------------------------------------------------------------------------
