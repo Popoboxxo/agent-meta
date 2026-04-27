@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.3.0"
+version: "1.4.0"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -123,6 +123,18 @@ git submodule update --init --recursive
 → Lies `.agent-meta/agents/1-generic/_wf-claude-review.md` für Review-Prozess.
 
 Sofort-Regel: Fehler beobachtet → Imperativ-Regel formulieren → außerhalb managed block einfügen.
+
+**Längen-Check (immer bei Review):**
+```bash
+wc -l CLAUDE.md
+```
+- ≤300 Zeilen: optimal
+- 301–500: akzeptabel, auf Redundanz prüfen
+- >500: **warnen** → Detailwissen auslagern
+
+Wenn >500 Zeilen: User aktiv darauf hinweisen. Lösung: Architekturdetails → `docs/ARCHITECTURE.md`,
+agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
+der richtige Weg — nicht alles in CLAUDE.md packen).
 
 ---
 

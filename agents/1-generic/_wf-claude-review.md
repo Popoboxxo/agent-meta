@@ -25,8 +25,23 @@ Nie in den `<!-- agent-meta:managed-begin/end -->` Block schreiben.
 3. **Fehlende Bereiche:** "Welche häufigen Aufgaben kennt Claude noch nicht gut?"
    → Neue Sektion oder Extension anlegen.
 
-4. **Länge:** Empfehlung ≤500 Wörter.
-   → Nebensächliches in Extensions auslagern.
+4. **Länge prüfen:**
+   ```bash
+   wc -l CLAUDE.md
+   ```
+   | Zeilen | Bewertung | Maßnahme |
+   |--------|-----------|----------|
+   | ≤300 | Optimal | — |
+   | 301–500 | Akzeptabel | Auf redundante Sektionen prüfen |
+   | >500 | Zu lang | Detailwissen auslagern |
+
+   **Auslagern in:**
+   - Architekturdetails → `docs/ARCHITECTURE.md` (verlinken)
+   - Agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md`
+   - Gilt für alle Agenten → `.claude/rules/<thema>.md`
+
+   **Hinweis:** agent-meta-Extensions (`-ext.md`) sind die bevorzugte Lösung —
+   kein Wissen in CLAUDE.md packen das nur einen Agent-Typ betrifft.
 
 ## Qualitätsprinzipien
 
