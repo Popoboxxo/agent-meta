@@ -1,9 +1,9 @@
 ---
 name: git
 model: haiku
-version: "2.1.0"
+version: "2.2.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-generated-from: "1-generic/git.md@2.1.0"
+generated-from: "1-generic/git.md@2.2.0"
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
@@ -71,6 +71,25 @@ Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 - `git branch -D` → Alternative: `git branch -d`
 - `git clean -fd` → erst `git clean -nd` (dry-run)
 - KEIN `git push --force` auf `main`
+
+---
+
+## Post-Merge Branch Cleanup
+
+Nach einem erfolgreichen Merge: Empfehlung geben und User fragen.
+
+**Signale → Branch behalten:**
+- Offene TODOs im Commit-Body oder in geänderten Dateien
+- Code mit `enabled: false`, `initial_state: false`, `disabled: true`
+- "Phase 2", "follow-up", "pending", "wip" im Branch-Namen oder Commit
+- Testplan in Dokumentation als ausstehend markiert
+
+**Default → Branch löschen** (kein Signal oben vorhanden):
+```bash
+git branch -d <branch>        # safe delete (verhindert Löschen bei ungemergtem Inhalt)
+```
+
+Empfehlung formulieren, User-Bestätigung einholen, dann handeln.
 
 ---
 
