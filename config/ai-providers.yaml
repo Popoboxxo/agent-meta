@@ -15,6 +15,20 @@ providers:
       - .claude/pending-tasks.md
       - CLAUDE.personal.md
       - sync.log
+    # Model tiers: abstract tier name → provider-specific model ID.
+    # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
+    # sync.py maps each tier to the model ID written into agent frontmatter.
+    model-tiers:
+      nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
+      fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
+      balanced: claude-sonnet-4-6           # default workhorse: dev, docs, review
+      powerful: claude-opus-4-7             # complex reasoning: architecture, security
+      max:      claude-opus-4-7             # reserved for future ultra-capable models
+    # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
+    model-aliases:
+      haiku:  claude-haiku-4-5-20251001
+      sonnet: claude-sonnet-4-6
+      opus:   claude-opus-4-7
 
   Gemini:
     agents_dir: .gemini/agents
@@ -32,6 +46,13 @@ providers:
     settings_file: .gemini/settings.json
     settings_template: howto/configs/GEMINI.settings-template.json
     gitignore_entries: []
+    model-tiers:
+      nano:     gemini-2.5-flash            # ultra-fast, low-cost tasks
+      fast:     gemini-2.5-flash            # quick ops: git, formatting
+      balanced: gemini-2.5-pro              # reasoning + code (default)
+      powerful: gemini-2.5-pro              # same model, Gemini has no separate "opus"
+      max:      gemini-2.5-pro              # reserved for future Gemini Ultra
+    model-aliases: {}
 
   Continue:
     agents_dir: .continue/agents
@@ -46,3 +67,6 @@ providers:
     settings_file: .continue/config.yaml
     settings_template: howto/configs/CONTINUE.config-template.yaml
     gitignore_entries: []
+    # Continue manages models centrally in .continue/config.yaml — no per-agent model.
+    model-tiers: {}
+    model-aliases: {}

@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-model: sonnet
+model: claude-sonnet-4-6
 version: "1.4.2"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 generated-from: "1-generic/agent-meta-manager.md@1.4.2"

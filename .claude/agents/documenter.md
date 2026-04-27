@@ -1,6 +1,6 @@
 ---
 name: documenter
-model: sonnet
+model: claude-sonnet-4-6
 memory: project
 version: "1.3.2"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."

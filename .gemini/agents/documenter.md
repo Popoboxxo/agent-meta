@@ -1,6 +1,6 @@
 ---
 name: documenter
-model: sonnet
+model: gemini-2.5-pro
 version: "1.3.2"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 generated-from: "1-generic/documenter.md@1.3.2"

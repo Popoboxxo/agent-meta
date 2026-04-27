@@ -1,6 +1,6 @@
 ---
 name: agent-meta-scout
-model: sonnet
+model: gemini-2.5-pro
 version: "1.0.1"
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 generated-from: "1-generic/agent-meta-scout.md@1.0.1"

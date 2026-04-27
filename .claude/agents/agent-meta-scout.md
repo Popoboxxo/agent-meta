@@ -1,6 +1,6 @@
 ---
 name: agent-meta-scout
-model: sonnet
+model: claude-sonnet-4-6
 memory: local
 version: "1.0.1"
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."

@@ -1,6 +1,6 @@
 ---
 name: meta-feedback
-model: haiku
+model: claude-haiku-4-5-20251001
 version: "2.0.0"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 generated-from: "1-generic/meta-feedback.md@2.0.0"

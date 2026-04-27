@@ -58,10 +58,32 @@ project:
 #   home-organization:
 #     enabled: true
 
-# Modell-Overrides pro Rolle (haiku / sonnet / opus)
+# ---------------------------------------------------------------------------
+# Modell-Tiers — provider-agnostisch (empfohlen)
+# ---------------------------------------------------------------------------
+# Tiers:  nano | fast | balanced | powerful | max
+# nano/fast  → Gemini: gemini-2.5-flash   | Claude: claude-haiku-4-5
+# balanced   → Gemini: gemini-2.5-pro     | Claude: claude-sonnet-4-6
+# powerful   → Gemini: gemini-2.5-pro     | Claude: claude-opus-4-7
+# max        → reserviert für Ultra-Modelle (aktuell = powerful)
+#
+# Form A — provider-spezifisch (empfohlen bei Multi-Provider):
 # model-overrides:
-#   git: haiku
-#   developer: opus
+#   Claude:
+#     orchestrator: powerful   # Opus für komplexe Koordination
+#     developer: powerful      # Opus für Implementierung
+#     git: nano                # Haiku reicht für Commits
+#   Gemini:
+#     orchestrator: balanced   # Pro ist Geminis stärkstes Modell
+#     developer: balanced
+#     git: fast                # Flash für einfache Ops
+#
+# Form B — flat (Legacy, wird als Claude-Override interpretiert):
+# model-overrides:
+#   git: fast
+#   developer: powerful
+#
+# Rückwärtskompatibel: haiku / sonnet / opus funktionieren weiterhin für Claude.
 
 # Definition of Done — einzelne Kriterien überschreiben
 # dod:

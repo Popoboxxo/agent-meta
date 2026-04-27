@@ -1,6 +1,6 @@
 ---
 name: git
-model: haiku
+model: claude-haiku-4-5-20251001
 version: "2.2.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 generated-from: "1-generic/git.md@2.2.0"

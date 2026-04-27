@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.32.0] — 2026-04-28
+
+### Added
+
+- **Provider-spezifische Modell-Tiers** (`config/ai-providers.yaml`, `config/role-defaults.yaml`, `scripts/lib/roles.py`): Fünf abstrakte Tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) ersetzen Claude-spezifische Aliase in `role-defaults.yaml`. `sync.py` mappt Tiers per Provider auf konkrete Modell-IDs — Gemini bekommt jetzt korrekte Gemini-Modelle statt ungültige Claude-Aliase.
+- **Provider-Tier-Mapping** (`config/ai-providers.yaml`): `model-tiers` und `model-aliases` pro Provider:
+  - Claude: `nano/fast` → `claude-haiku-4-5-20251001` | `balanced` → `claude-sonnet-4-6` | `powerful/max` → `claude-opus-4-7`
+  - Gemini: `nano/fast` → `gemini-2.5-flash` | `balanced/powerful/max` → `gemini-2.5-pro`
+  - Continue: leer — Continue verwaltet Modelle zentral in `config.yaml`
+- **Provider-spezifische `model-overrides`** (`config/project-config.schema.json`, `scripts/lib/roles.py`): Neues Format `model-overrides.Claude.git: fast` neben Legacy `model-overrides.git: fast`. Provider-Block hat Vorrang für den jeweiligen Provider; Legacy-Block gilt nur für Claude.
+- **Rückwärtskompatibilität**: `haiku`/`sonnet`/`opus` als Aliase für Claude weiter gültig. Für andere Provider werden sie auf den entsprechenden Tier gemappt (`haiku` → `fast`, `sonnet` → `balanced`, `opus` → `powerful`).
+- **Konkretes `run_in_background`-Beispiel** (`agents/1-generic/orchestrator.md` v2.5.0): Orchestrator zeigt jetzt Python-Code-Pattern für parallele Delegation (Vordergrund + `run_in_background=True`).
+
+### Fixed
+
+- **Gemini-Agenten hatten ungültige `model:`-Felder** (`scripts/lib/agents.py`): `model: haiku` oder `model: sonnet` wurden in Gemini-Frontmatter geschrieben — Gemini CLI ignoriert oder lehnt diese ab. Alle Gemini-Agenten erhalten jetzt korrekte Gemini-Modell-IDs.
+
+---
+
 ## [0.31.0] — 2026-04-27
 
 ### Added
