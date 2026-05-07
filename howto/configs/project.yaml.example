@@ -42,7 +42,7 @@ project:
   prefix: mp                       # Kürzel, max 5 Zeichen (z.B. mp für mein-plugin)
   short: mein-plugin               # Kurzname ohne Plattform-Prefix
 
-# Kommunikationsstil: "full" (Default), "short", "childish", "caveman"
+# Kommunikationsstil: "full" (Default), "short", "childish", "caveman", "asozial", "submissive"
 # speech-mode: full
 
 # Maximale parallele Agenten (1 = sequentiell, 2 = Default)

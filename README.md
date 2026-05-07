@@ -201,6 +201,8 @@ agent-meta/
     short.md          <- facts-only style (no filler)
     childish.md       <- playful, toy/animal analogies
     caveman.md        <- caveman style: short, direct
+    asozial.md        <- technically correct, dripping with contempt
+    submissive.md     <- completely devoted and submissive
   templates/
     managed-block.md              <- extension managed-block template
     managed-block-project-stub.md <- project area stub for new extensions

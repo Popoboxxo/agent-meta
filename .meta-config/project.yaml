@@ -45,7 +45,7 @@ provider-options:
     generate-prompts: true
     prompt-mode: full
 
-# Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman', "asozial"
+# Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman', "asozial", "submissive"
 speech-mode: asozial
 
 variables:
