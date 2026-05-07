@@ -10,13 +10,19 @@
 # Claude Code passes hook context as JSON on stdin.
 # Exit 0 = allow, exit 2 = block (stdout shown to Claude as context).
 
-INPUT=$(cat)
-
 # python3 required for JSON parsing
 command -v python3 &>/dev/null || exit 0
 
-TOOL_NAME=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_name',''))" 2>/dev/null)
-COMMAND=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null)
+read -r -d '' _PARSE_HOOK_INPUT <<'PYEOF'
+import json, sys
+d = json.load(sys.stdin)
+print(d.get('tool_name', ''))
+print(d.get('tool_input', {}).get('command', ''))
+PYEOF
+
+_parsed=$(python3 -c "$_PARSE_HOOK_INPUT" 2>/dev/null)
+TOOL_NAME=$(printf '%s' "$_parsed" | head -1)
+COMMAND=$(printf '%s' "$_parsed" | tail -n +2)
 
 # Only intercept Bash tool calls
 [ "$TOOL_NAME" = "Bash" ] || exit 0
@@ -34,7 +40,7 @@ if [ -z "$MAIN_BRANCH" ]; then
   DIR="$PWD"
   for _ in 1 2 3 4; do
     if [ -f "$DIR/agent-meta.config.json" ]; then
-      MAIN_BRANCH=$(python3 -c "import json; c=json.load(open('$DIR/agent-meta.config.json')); print(c.get('variables',{}).get('GIT_MAIN_BRANCH','main'))" 2>/dev/null)
+      MAIN_BRANCH=$(python3 -c "import json,sys; c=json.load(open(sys.argv[1])); print(c.get('variables',{}).get('GIT_MAIN_BRANCH','main'))" "$DIR/agent-meta.config.json" 2>/dev/null)
       break
     fi
     DIR="$(dirname "$DIR")"
@@ -60,7 +66,7 @@ if [ -z "$TEST_CMD" ]; then
   DIR="$PWD"
   for _ in 1 2 3 4; do
     if [ -f "$DIR/agent-meta.config.json" ]; then
-      TEST_CMD=$(python3 -c "import json; c=json.load(open('$DIR/agent-meta.config.json')); print(c.get('variables',{}).get('TEST_COMMAND',''))" 2>/dev/null)
+      TEST_CMD=$(python3 -c "import json,sys; c=json.load(open(sys.argv[1])); print(c.get('variables',{}).get('TEST_COMMAND',''))" "$DIR/agent-meta.config.json" 2>/dev/null)
       break
     fi
     DIR="$(dirname "$DIR")"

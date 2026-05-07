@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from .io import _load_yaml_or_json, safe_path
+from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
 
 RULES_DIR = "rules"
@@ -196,7 +196,7 @@ def sync_rules(
         now_managed.add(output_name)
 
         if not dry_run:
-            target_path.write_text(source_content, encoding="utf-8")
+            write_checked(target_path, source_content, log, rel_source)
 
     # Remove stale managed rules no longer in current sources
     for stale_name in sorted(previously_managed - now_managed):

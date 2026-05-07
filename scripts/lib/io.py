@@ -41,6 +41,15 @@ def _write_yaml(path: Path, data: dict) -> None:
                    sort_keys=False, indent=2)
 
 
+def write_checked(path: Path, content: str, log: "SyncLog", rel_label: str) -> None:
+    """Write content to path, warning if potential secrets are detected."""
+    from .secrets import scan_for_secrets
+    findings = scan_for_secrets(content)
+    for finding in findings:
+        log.warn(f"potential secret in {rel_label}: {finding} — verify before committing")
+    path.write_text(content, encoding="utf-8")
+
+
 def safe_path(base: Path, *parts: str) -> Path:
     """Join base with parts and validate the result stays within base.
 
