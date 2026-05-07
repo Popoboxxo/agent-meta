@@ -102,8 +102,8 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       {path}: {err.message}", file=sys.stderr)
             if len(errors) > 5:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
-    except Exception:
-        pass  # schema validation is best-effort
+    except (ImportError, TypeError, ValueError) as e:
+        pass  # jsonschema not installed or validation error — best-effort
 
 
 def find_agent_meta_root(script_path: Path) -> Path:
@@ -123,7 +123,7 @@ def _load_schema_variable_keys(agent_meta_root: Path) -> list[str]:
             schema = json.load(f)
         props = schema.get("properties", {}).get("variables", {}).get("properties", {})
         return list(props.keys())
-    except Exception:
+    except (OSError, json.JSONDecodeError, KeyError):
         return []
 
 
@@ -215,7 +215,7 @@ def read_git_version(agent_meta_root: Path) -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip().lstrip("v")
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
     return "unknown"
 

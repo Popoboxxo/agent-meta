@@ -66,7 +66,7 @@ def load_platform_config(
         try:
             with project_config_path.open(encoding='utf-8') as f:
                 overrides_flat = _flatten_yaml_dict(_yaml.safe_load(f) or {})
-        except Exception as e:
+        except (OSError, _yaml.YAMLError) as e:
             log.warn(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
 
     for platform in platforms:
@@ -78,7 +78,7 @@ def load_platform_config(
         try:
             with defaults_path.open(encoding='utf-8') as f:
                 defaults_raw = _yaml.safe_load(f) or {}
-        except Exception as e:
+        except (OSError, _yaml.YAMLError) as e:
             log.warn(f'platform-config: failed to load {defaults_path.name}: {e}')
             continue
 

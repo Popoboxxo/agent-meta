@@ -1,5 +1,6 @@
 """I/O helpers for loading YAML/JSON config files."""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -39,6 +40,40 @@ def _write_yaml(path: Path, data: dict) -> None:
     with path.open("w", encoding="utf-8") as f:
         _yaml.dump(data, f, allow_unicode=True, default_flow_style=False,
                    sort_keys=False, indent=2)
+
+
+def content_hash(text: str) -> str:
+    """Return a short SHA-256 hex digest of text (first 16 chars)."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def is_unchanged(path: Path, new_content: str) -> bool:
+    """Return True when path exists and already contains new_content."""
+    if not path.exists():
+        return False
+    return path.read_text(encoding="utf-8") == new_content
+
+
+def write_checked(
+    path: Path,
+    content: str,
+    log: "SyncLog",
+    rel_label: str,
+    force: bool = False,
+) -> bool:
+    """Write content to path unless it is already identical (incremental sync).
+
+    Scans for potential secrets before writing and emits warnings.
+    Returns True when the file was written, False when skipped as unchanged.
+    """
+    if not force and is_unchanged(path, content):
+        return False
+    from .secrets import scan_for_secrets
+    findings = scan_for_secrets(content)
+    for finding in findings:
+        log.warn(f"potential secret in {rel_label}: {finding} — verify before committing")
+    path.write_text(content, encoding="utf-8")
+    return True
 
 
 def safe_path(base: Path, *parts: str) -> Path:

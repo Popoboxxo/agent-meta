@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from .log import SyncLog
-from .io import safe_path
+from .io import safe_path, write_checked
 
 try:
     import yaml as _yaml
@@ -22,12 +22,29 @@ EXT_SUFFIX = "-ext"
 
 
 def extract_frontmatter_field(content: str, field: str) -> str | None:
-    """Extract a single-line YAML frontmatter field value (unquoted or quoted)."""
-    match = re.search(
-        rf'^{re.escape(field)}:\s*"?([^"\n]+)"?\s*$',
+    """Extract a YAML frontmatter field value.
+
+    Handles three forms:
+      field: single line value
+      field: "quoted value that may wrap\n  across lines"
+      field: 'single-quoted value'
+    """
+    # First try: quoted value that may span multiple lines (YAML block scalar after yaml.dump)
+    # Matches: field: "...\n  ..." collecting continuation lines indented with 2+ spaces
+    multi = re.search(
+        rf'^{re.escape(field)}:\s+"((?:[^"\\]|\\.|\n  )*)"',
         content, flags=re.MULTILINE,
     )
-    return match.group(1).strip() if match else None
+    if multi:
+        val = multi.group(1).replace('\n  ', ' ').strip()
+        return val if val else None
+
+    # Second try: single-line (quoted or unquoted)
+    single = re.search(
+        rf"^{re.escape(field)}:\s*['\"]?([^'\"\n]+)['\"]?\s*$",
+        content, flags=re.MULTILINE,
+    )
+    return single.group(1).strip() if single else None
 
 
 def build_frontmatter(content: str, name: str, description: str,
@@ -206,7 +223,7 @@ def _parse_frontmatter_yaml(content: str) -> dict:
     try:
         result = _yaml.safe_load(inner)
         return result if isinstance(result, dict) else {}
-    except Exception:
+    except _yaml.YAMLError:
         return {}
 
 
@@ -326,7 +343,7 @@ def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     try:
         new_fm_inner = _yaml.dump(merged, allow_unicode=True, default_flow_style=False,
                                   sort_keys=False).rstrip("\n")
-    except Exception:
+    except _yaml.YAMLError:
         return base_content
 
     new_fm_block = f"---\n{new_fm_inner}\n---"
@@ -501,9 +518,14 @@ def sync_agents(
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)
+        rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            target_path.write_text(content, encoding="utf-8")
+            if write_checked(target_path, content, log, rel_label):
+                log.action("WRITE", rel_out, rel_label)
+            else:
+                log.skip(rel_out, "unchanged")
+        else:
+            log.action("WRITE", rel_out, rel_label)
 
     # Also track external skill agent filenames (they are not in overrides)
     ext_config = load_external_skills_config(agent_meta_root)
@@ -698,9 +720,14 @@ def sync_agents_for_provider(
             content = inject_debug_block(content, name)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)
+        rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            target_path.write_text(content, encoding='utf-8')
+            if write_checked(target_path, content, log, rel_label):
+                log.action('WRITE', rel_out, rel_label)
+            else:
+                log.skip(rel_out, 'unchanged')
+        else:
+            log.action('WRITE', rel_out, rel_label)
 
     # External skill filenames are always in .claude/agents/ (Claude only)
     if provider == 'Claude':
