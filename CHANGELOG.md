@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.34.1] — 2026-05-07
+
+### Security
+
+- **`safe_path()` helper** (`scripts/lib/io.py`): New path traversal guard. Validates all generated file paths stay within the project root before writing. Prevents malicious config values (e.g. `prefix: "../../evil"`) from escaping the project directory.
+- **All write operations secured** (`scripts/lib/agents.py`, `rules.py`, `hooks.py`, `commands.py`, `context.py`, `extensions.py`, `skills.py`): Every `write_text()`, `mkdir()`, and `unlink()` now uses `safe_path()`.
+
+### Fixed
+
+- Issue #64 — Path Traversal in sync.py (closed).
+
+---
+
 ## [0.34.0] — 2026-05-07
 
 ### Added
