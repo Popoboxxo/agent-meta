@@ -217,6 +217,8 @@ agent-meta/
       first-steps.md
       instantiate-project.md
       upgrade-guide.md
+    features/
+      agent-memory.md   <- persistent agent memory: scopes, config, best practices
       config-layout.md
     features/           <- feature-specific how-tos
       agent-composition.md
