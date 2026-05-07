@@ -46,7 +46,7 @@ provider-options:
     prompt-mode: full
 
 # Kommunikationsstil aller Agenten: 'full' (Default), 'short', 'childish', 'caveman', "asozial", "submissive"
-speech-mode: asozial
+speech-mode: submissive
 
 variables:
   PROJECT_NAME: agent-meta
