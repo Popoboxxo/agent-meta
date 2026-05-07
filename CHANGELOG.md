@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.33.0] — 2026-05-07
+
+### Added
+
+- **Opencode provider** (`config/ai-providers.yaml`, `scripts/lib/agents.py`, `scripts/lib/commands.py`, `scripts/lib/context.py`): Full sync.py support for [opencode](https://opencode.ai) (sst/opencode), a terminal-based AI coding assistant with 75+ provider support.
+  - Native agent frontmatter: `description`, `mode: subagent`, `model: anthropic/provider-id` (AI SDK convention)
+  - Rules embedded into `AGENTS.md` managed block (opencode has no native rules/ dir); respects `opencode: skip` rule option; includes speech-mode
+  - Commands: `.opencode/commands/*.md` — same `.md` + `$ARGUMENTS` format as Claude (no transformation needed)
+  - Context: `AGENTS.md` with managed block (agent hints + all active rules)
+  - Settings: `opencode.json` skeleton, created once, never overwritten
+  - Model tiers: `anthropic/claude-*` IDs by default; configurable via `model-overrides.Opencode`
+- **`AGENTS.personal.md`** (`howto/configs/AGENTS.personal-template.md`, `scripts/lib/context.py`): Personal opencode context file, analogous to `CLAUDE.personal.md`. Auto-created from template on first sync, gitignored, loaded via `instructions` field in `opencode.json`.
+- **Provider-agnostic gitignore collection** (`scripts/sync.py`): `ensure_gitignore_entries` now collects `gitignore_entries` from ALL active providers, not only Claude. Previously non-Claude provider entries (e.g. `AGENTS.personal.md`) were silently dropped when Claude was absent.
+- **Templates**: `howto/configs/OPENCODE.project-template.md`, `howto/configs/OPENCODE.settings-template.json`, `howto/configs/AGENTS.personal-template.md`
+- **Docs**: `docs/providers/opencode.md`, updated `docs/providers/multi-provider.md`
+
+---
+
 ## [0.32.0] — 2026-04-28
 
 ### Added
