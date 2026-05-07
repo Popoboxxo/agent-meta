@@ -1,5 +1,5 @@
 ---
-description: "'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen"
+description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen"
 mode: subagent
 generated-from: "2-platform/agent-meta-developer.md@1.0.0"
 ---

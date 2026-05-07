@@ -10,14 +10,22 @@
 # Claude Code passes hook context as JSON on stdin.
 # PostToolUse hooks receive the tool result — exit code is ignored.
 
-INPUT=$(cat)
-
 # python3 required for JSON parsing
 command -v python3 &>/dev/null || exit 0
 
-TOOL_NAME=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_name',''))" 2>/dev/null)
-COMMAND=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null)
-EXIT_CODE=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('tool_result',{}); print(r.get('exit_code','0') if isinstance(r,dict) else '0')" 2>/dev/null)
+read -r -d '' _PARSE_HOOK_INPUT <<'PYEOF'
+import json, sys
+d = json.load(sys.stdin)
+r = d.get('tool_result', {})
+print(d.get('tool_name', ''))
+print(d.get('tool_input', {}).get('command', ''))
+print(r.get('exit_code', '0') if isinstance(r, dict) else '0')
+PYEOF
+
+_parsed=$(python3 -c "$_PARSE_HOOK_INPUT" 2>/dev/null)
+TOOL_NAME=$(printf '%s' "$_parsed" | sed -n '1p')
+COMMAND=$(printf '%s' "$_parsed" | sed -n '2p')
+EXIT_CODE=$(printf '%s' "$_parsed" | sed -n '3p')
 
 # Only intercept successful Bash tool calls
 [ "$TOOL_NAME" = "Bash" ] || exit 0
