@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from .io import safe_path
 from .log import SyncLog
 
 HOOKS_DIR = "hooks"
@@ -229,7 +230,7 @@ def sync_hooks(
         target_dir.mkdir(parents=True, exist_ok=True)
 
     for source_path, output_name in sources:
-        target_path = target_dir / output_name
+        target_path = safe_path(target_dir, output_name)
         source_content = source_path.read_text(encoding="utf-8")
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
@@ -302,7 +303,7 @@ def create_hook(
     """
     if not name.endswith(".sh"):
         name = f"{name}.sh"
-    target_path = project_root / CLAUDE_HOOKS_DIR / name
+    target_path = safe_path(project_root, CLAUDE_HOOKS_DIR, name)
 
     if target_path.exists():
         log.skip(str(target_path.relative_to(project_root)),

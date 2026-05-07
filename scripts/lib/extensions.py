@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+from .io import safe_path
 from .log import SyncLog
 
 CLAUDE_EXT_DIR = ".claude/3-project"
@@ -99,7 +100,7 @@ def create_extension(
 
     prefix = config["project"].get("prefix", "")
     filename = ext_target_filename(role, prefix)
-    target_path = project_root / CLAUDE_EXT_DIR / filename
+    target_path = safe_path(project_root, CLAUDE_EXT_DIR, filename)
 
     if target_path.exists():
         log.skip(str(target_path.relative_to(project_root)), "extension already exists — use --update-ext to update")

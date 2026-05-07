@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from .io import _load_yaml_or_json
+from .io import _load_yaml_or_json, safe_path
 from .log import SyncLog
 
 RULES_DIR = "rules"
@@ -174,7 +174,7 @@ def sync_rules(
                      f"rules-preset: gemini: skip for '{rule_stem}'")
             continue
 
-        target_path = target_dir / output_name
+        target_path = safe_path(target_dir, output_name)
         source_content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]
         rel_source = f"rules/{layer}/{source_path.name}"
@@ -200,7 +200,7 @@ def sync_rules(
 
     # Remove stale managed rules no longer in current sources
     for stale_name in sorted(previously_managed - now_managed):
-        stale_path = target_dir / stale_name
+        stale_path = safe_path(target_dir, stale_name)
         if stale_path.exists():
             log.action("DELETE", str(stale_path.relative_to(project_root)),
                        "rule removed from agent-meta sources")
@@ -280,7 +280,7 @@ def create_rule(
     """Create .claude/rules/<name>.md as an empty template (never overwrites)."""
     if not name.endswith(".md"):
         name = f"{name}.md"
-    target_path = project_root / CLAUDE_RULES_DIR / name
+    target_path = safe_path(project_root, CLAUDE_RULES_DIR, name)
 
     if target_path.exists():
         log.skip(str(target_path.relative_to(project_root)),

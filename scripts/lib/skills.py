@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml
+from .io import _load_yaml_or_json, _write_yaml, safe_path
 from .log import SyncLog
 
 EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
@@ -204,12 +204,12 @@ def sync_external_skills(
         agent_content = substitute(wrapper_template, skill_vars,
                                    f"0-external/{skill_name}", log)
 
-        agent_target = agents_dir / f"{role}.md"
+        agent_target = safe_path(agents_dir, f"{role}.md")
         log.action("WRITE", str(agent_target.relative_to(project_root)),
                    f"0-external/{skill_name}@{commit}")
 
         # Copy + normalize skill files to .claude/skills/<skill_name>/
-        skill_target_dir = skills_dir / skill_name
+        skill_target_dir = safe_path(skills_dir, skill_name)
 
         # Entry file: copy and normalize relative paths
         log.action("COPY", str((skill_target_dir / entry_file).relative_to(project_root)),

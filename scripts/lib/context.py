@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from .io import safe_path
 from .log import SyncLog
 
 CLAUDE_SNIPPETS_DIR = ".claude/snippets"
@@ -110,7 +111,7 @@ def sync_context_for_provider(
         context_file = pc["context_file"]
         if context_file is None:
             return
-        target_path = project_root / context_file
+        target_path = safe_path(project_root, context_file)
         template_name = pc["context_template"]
         template_path = agent_meta_root / template_name if template_name else None
 
@@ -155,7 +156,7 @@ def sync_context_for_provider(
 
     elif provider == "Opencode":
         context_file = pc["context_file"]  # "AGENTS.md"
-        target_path = project_root / context_file
+        target_path = safe_path(project_root, context_file)
         template_name = pc.get("context_template")
         template_path = agent_meta_root / template_name if template_name else None
 
@@ -684,7 +685,7 @@ def sync_prompts_for_continue(
             continue
 
         expected.add(filename)
-        target_path = prompts_dir / filename
+        target_path = safe_path(prompts_dir, filename)
         content = source_path.read_text(encoding="utf-8")
 
         # Composition

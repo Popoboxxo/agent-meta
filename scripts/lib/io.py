@@ -39,3 +39,21 @@ def _write_yaml(path: Path, data: dict) -> None:
     with path.open("w", encoding="utf-8") as f:
         _yaml.dump(data, f, allow_unicode=True, default_flow_style=False,
                    sort_keys=False, indent=2)
+
+
+def safe_path(base: Path, *parts: str) -> Path:
+    """Join base with parts and validate the result stays within base.
+
+    Raises ValueError if the resolved path escapes the base directory.
+    This prevents path traversal via malicious config values (e.g. prefix='../../evil').
+    """
+    path = base.joinpath(*parts).resolve()
+    base_resolved = base.resolve()
+    try:
+        path.relative_to(base_resolved)
+    except ValueError:
+        raise ValueError(
+            f"Path traversal detected: attempted to write outside project root. "
+            f"Resolved path: {path}, base: {base_resolved}"
+        )
+    return path

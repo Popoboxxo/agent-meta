@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from .log import SyncLog
+from .io import safe_path
 
 try:
     import yaml as _yaml
@@ -454,7 +455,7 @@ def sync_agents(
             continue
 
         expected_filenames.add(filename)
-        target_path = target_dir / filename
+        target_path = safe_path(target_dir, filename)
         content = source_path.read_text(encoding="utf-8")
 
         # Composition mode: if 'extends:' present in frontmatter, compose from base
@@ -599,7 +600,7 @@ def sync_agents_for_provider(
             continue
 
         expected_filenames.add(filename)
-        target_path = target_dir / filename
+        target_path = safe_path(target_dir, filename)
         content = source_path.read_text(encoding='utf-8')
 
         # Composition mode
