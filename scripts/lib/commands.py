@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+from .io import safe_path
 from .log import SyncLog
 
 COMMANDS_DIR = "commands"
@@ -149,7 +150,7 @@ def sync_commands_for_provider(
         # Rewrite extension for providers that use a different format (e.g. Gemini → .toml)
         stem = Path(output_name).stem
         final_name = stem + output_ext
-        target_path = target_dir / final_name
+        target_path = safe_path(target_dir, final_name)
         content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]
         rel_source = f"commands/{layer}/{source_path.name}"
