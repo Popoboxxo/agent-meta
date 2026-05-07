@@ -64,9 +64,9 @@ from lib.skills import (
 )
 from lib.extensions import create_extension, update_extensions
 from lib.context import (
-    sync_context_for_provider, init_claude_personal, init_settings_json,
-    init_settings_local_json, ensure_gitignore_entries, init_claude_md,
-    only_variables, sync_prompts_for_continue, sync_snippets,
+    sync_context_for_provider, init_claude_personal, init_opencode_personal,
+    init_settings_json, init_settings_local_json, ensure_gitignore_entries,
+    init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets,
 )
 
 # ---------------------------------------------------------------------------
@@ -379,12 +379,25 @@ def main():
                 elif not ext_config["skills"][skill_name].get("approved", False):
                     log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
-        # Update .gitignore managed block: base entries + gitignore:true skill entries
+        # Update .gitignore managed block: base entries + per-provider entries + skill entries
+        # Collect gitignore_entries from all active non-Claude providers
+        extra_provider_entries: list[str] = []
+        for _p in providers:
+            if _p == "Claude":
+                continue  # already in base_gitignore_entries
+            _pc = provider_config.get(_p, {})
+            extra_provider_entries.extend(_pc.get("gitignore_entries", []))
         if is_claude:
             skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config)
-            all_gitignore_entries = base_gitignore_entries + skill_gitignore_entries
+            all_gitignore_entries = (
+                base_gitignore_entries + extra_provider_entries + skill_gitignore_entries
+            )
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      exact_entries=all_gitignore_entries)
+        elif extra_provider_entries:
+            # No Claude active but other providers have gitignore entries to manage
+            ensure_gitignore_entries(project_root, log, args.dry_run,
+                                     gitignore_entries=extra_provider_entries)
 
     log_path = project_root / LOGFILE
     _providers = resolve_providers(config, load_providers_config(agent_meta_root)) if config else []

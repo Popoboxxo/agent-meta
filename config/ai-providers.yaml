@@ -66,7 +66,8 @@ providers:
     has_settings: true
     settings_file: opencode.json
     settings_template: howto/configs/OPENCODE.settings-template.json
-    gitignore_entries: []
+    gitignore_entries:
+      - AGENTS.personal.md
     # opencode model IDs use "provider/model-id" format (AI SDK convention)
     model-tiers:
       nano:     anthropic/claude-haiku-4-5-20251001

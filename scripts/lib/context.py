@@ -197,6 +197,9 @@ def sync_context_for_provider(
                 else:
                     log.skip(context_file, "managed block unchanged")
 
+        # AGENTS.personal.md — personal local file, gitignored, created once
+        init_opencode_personal(agent_meta_root, project_root, log, dry_run)
+
         # opencode.json — skeleton created once, never overwritten
         settings_file = pc.get("settings_file")
         if settings_file:
@@ -405,6 +408,34 @@ def init_claude_personal(
 
     content = template_path.read_text(encoding="utf-8")
     log.action("INIT", "CLAUDE.personal.md", "howto/configs/CLAUDE.personal-template.md")
+    if not dry_run:
+        target_path.write_text(content, encoding="utf-8")
+
+
+def init_opencode_personal(
+    agent_meta_root: Path,
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+):
+    """Copy AGENTS.personal-template.md to AGENTS.personal.md if not present yet.
+
+    Analogous to CLAUDE.personal.md — gitignored, never committed, loaded via
+    the `instructions` field in opencode.json.
+    """
+    template_path = agent_meta_root / "howto" / "configs" / "AGENTS.personal-template.md"
+    target_path = project_root / "AGENTS.personal.md"
+
+    if target_path.exists():
+        log.skip("AGENTS.personal.md", "already exists")
+        return
+
+    if not template_path.exists():
+        log.warn("AGENTS.personal-template.md not found — skipping AGENTS.personal.md creation")
+        return
+
+    content = template_path.read_text(encoding="utf-8")
+    log.action("INIT", "AGENTS.personal.md", "howto/configs/AGENTS.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 
