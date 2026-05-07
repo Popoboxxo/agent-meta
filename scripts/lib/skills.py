@@ -70,7 +70,7 @@ def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
     return "unknown"
 

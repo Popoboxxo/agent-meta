@@ -278,12 +278,13 @@ def sync_context_for_provider(
                 else:
                     log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
 
-        # 2. .continue/config.yaml — skeleton, created once (never overwritten)
+        # 2. .continue/config.yaml — skeleton created once; managed comment block updated
         settings_file = pc["settings_file"]
         settings_path = project_root / settings_file
         if settings_path.exists():
-            log.skip(str(settings_path.relative_to(project_root)),
-                     "already exists - not overwritten")
+            _update_continue_config_managed_block(
+                settings_path, variables, log, dry_run, project_root
+            )
         else:
             settings_template_rel = pc.get("settings_template")
             if settings_template_rel:
@@ -310,6 +311,56 @@ def sync_context_for_provider(
             if not dry_run:
                 settings_path.parent.mkdir(parents=True, exist_ok=True)
                 settings_path.write_text(yaml_content, encoding="utf-8")
+
+
+_CONTINUE_MANAGED_BEGIN = "# agent-meta:managed-begin"
+_CONTINUE_MANAGED_END   = "# agent-meta:managed-end"
+
+
+def _update_continue_config_managed_block(
+    settings_path: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    project_root: Path,
+) -> None:
+    """Insert or update the agent-meta metadata comment block in config.yaml.
+
+    The block is YAML comments so it never affects parsing. User model config
+    and any other customisations are left completely untouched.
+    """
+    from datetime import date
+    version = variables.get("AGENT_META_VERSION", "?")
+    today = date.today().isoformat()
+    new_block = (
+        f"{_CONTINUE_MANAGED_BEGIN}\n"
+        f"# Managed by agent-meta v{version} — {today}\n"
+        f"# Agents : .continue/agents/  (auto-discovered by Continue)\n"
+        f"# Rules  : .continue/rules/   (auto-discovered by Continue)\n"
+        f"{_CONTINUE_MANAGED_END}"
+    )
+
+    existing = settings_path.read_text(encoding="utf-8")
+    rel = str(settings_path.relative_to(project_root))
+
+    managed_re = re.compile(
+        rf"^{re.escape(_CONTINUE_MANAGED_BEGIN)}.*?^{re.escape(_CONTINUE_MANAGED_END)}",
+        re.MULTILINE | re.DOTALL,
+    )
+    if managed_re.search(existing):
+        updated = managed_re.sub(new_block, existing, count=1)
+        if updated != existing:
+            log.action("UPDATE", rel, "managed comment block")
+            if not dry_run:
+                settings_path.write_text(updated, encoding="utf-8")
+        else:
+            log.skip(rel, "managed comment block unchanged")
+    else:
+        # Prepend block before first non-comment line
+        updated = new_block + "\n" + existing
+        log.action("UPDATE", rel, "inject managed comment block")
+        if not dry_run:
+            settings_path.write_text(updated, encoding="utf-8")
 
 
 def _strip_rule_frontmatter(content: str) -> str:

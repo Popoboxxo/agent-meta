@@ -20,32 +20,23 @@ presets:
   minimal:
     lifecycle-tasks:
       alwaysApply: false
-      gemini: skip
     issue-lifecycle:
       alwaysApply: false
-      gemini: skip
     security-audit:
       alwaysApply: false
-      gemini: skip
 
   # Maximale Token-Einsparung — nur absolut essenzielle Rules immer aktiv.
   # Empfohlen für rapid-prototyping Projekte.
   silent:
     lifecycle-tasks:
       alwaysApply: false
-      gemini: skip
     issue-lifecycle:
       alwaysApply: false
-      gemini: skip
     security-audit:
       alwaysApply: false
-      gemini: skip
     use-orchestrator:
       alwaysApply: false
-      gemini: skip
     dod-criteria:
       alwaysApply: false
-      gemini: skip
     sync-interface:
       alwaysApply: false
-      gemini: skip

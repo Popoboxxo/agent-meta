@@ -223,7 +223,7 @@ def _parse_frontmatter_yaml(content: str) -> dict:
     try:
         result = _yaml.safe_load(inner)
         return result if isinstance(result, dict) else {}
-    except Exception:
+    except _yaml.YAMLError:
         return {}
 
 
@@ -343,7 +343,7 @@ def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     try:
         new_fm_inner = _yaml.dump(merged, allow_unicode=True, default_flow_style=False,
                                   sort_keys=False).rstrip("\n")
-    except Exception:
+    except _yaml.YAMLError:
         return base_content
 
     new_fm_block = f"---\n{new_fm_inner}\n---"
@@ -518,9 +518,14 @@ def sync_agents(
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action("WRITE", str(target_path.relative_to(project_root)), rel_label)
+        rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            write_checked(target_path, content, log, rel_label)
+            if write_checked(target_path, content, log, rel_label):
+                log.action("WRITE", rel_out, rel_label)
+            else:
+                log.skip(rel_out, "unchanged")
+        else:
+            log.action("WRITE", rel_out, rel_label)
 
     # Also track external skill agent filenames (they are not in overrides)
     ext_config = load_external_skills_config(agent_meta_root)
@@ -715,9 +720,14 @@ def sync_agents_for_provider(
             content = inject_debug_block(content, name)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        log.action('WRITE', str(target_path.relative_to(project_root)), rel_label)
+        rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            write_checked(target_path, content, log, rel_label)
+            if write_checked(target_path, content, log, rel_label):
+                log.action('WRITE', rel_out, rel_label)
+            else:
+                log.skip(rel_out, 'unchanged')
+        else:
+            log.action('WRITE', rel_out, rel_label)
 
     # External skill filenames are always in .claude/agents/ (Claude only)
     if provider == 'Claude':

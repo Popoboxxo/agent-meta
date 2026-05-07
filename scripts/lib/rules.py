@@ -191,12 +191,17 @@ def sync_rules(
             log.info(str(target_path.relative_to(project_root)),
                      f"alwaysApply: false (rules-preset: '{config.get('rules-preset', 'default')}')")
 
-        log.action("COPY", str(target_path.relative_to(project_root)),
-                   f"rules/{layer}/{source_path.name}")
+        rel_out = str(target_path.relative_to(project_root))
+        src_label = f"rules/{layer}/{source_path.name}"
         now_managed.add(output_name)
 
         if not dry_run:
-            write_checked(target_path, source_content, log, rel_source)
+            if write_checked(target_path, source_content, log, rel_source):
+                log.action("COPY", rel_out, src_label)
+            else:
+                log.skip(rel_out, "unchanged")
+        else:
+            log.action("COPY", rel_out, src_label)
 
     # Remove stale managed rules no longer in current sources
     for stale_name in sorted(previously_managed - now_managed):
