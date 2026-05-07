@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.34.0] — 2026-05-07
+
+### Added
+
+- **`speech-mode: submissive`** (`speech/submissive.md`, `config/project-config.schema.json`, `README.md`, `howto/configs/*`): New communication style — completely devoted and submissive. Addresses user as master/mistress, no contradiction, no own opinion. No hardcoded mode list in syncer; works out-of-the-box via dynamic `speech/{mode}.md` resolution.
+- Project config now uses `speech-mode: submissive` for agent-meta itself.
+
+---
+
 ## [0.33.0] — 2026-05-07
 
 ### Added
