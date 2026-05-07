@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.34.2] — 2026-05-07
+
+### Security
+
+- **Shell injection fixed** (`hooks/1-generic/dod-push-check.sh`, `lifecycle-check.sh`): Replaced `echo "$INPUT" | python3` pattern with heredoc-based stdin parsing. Eliminated `$DIR` interpolation into Python inline strings by passing the config path as `sys.argv[1]`. Closes #67, #75.
+- **Secrets detection** (`scripts/lib/secrets.py`, `scripts/lib/io.py`): New `scan_for_secrets()` scans all generated files for API keys, tokens and passwords before writing. `write_checked()` helper integrates the scan into agents.py and rules.py with `[WARN]` output — does not block sync. Closes #68.
+
+### Fixed
+
+- **Gemini missing rules** (`config/rules-presets.yaml`): Removed all `gemini: skip` entries from `minimal` and `silent` presets. Gemini now receives `dod-criteria`, `issue-lifecycle`, `lifecycle-tasks`, `use-orchestrator` and `sync-interface` as plain rule files. Closes #71, #80.
+- **Bare `except Exception:`** (`scripts/lib/agents.py`, `config.py`, `platform.py`, `skills.py`): All 6 broad exception catches replaced with specific types (`YAMLError`, `OSError`, `SubprocessError`, `JSONDecodeError`, `KeyError`). Closes #65.
+- **Continue config.yaml never updating** (`scripts/lib/context.py`): Introduced a YAML-comment managed block (`# agent-meta:managed-begin/end`) that is refreshed on every sync with version and path metadata. User model configuration is left untouched. Closes #69.
+- **Description truncation in non-Claude agents** (`scripts/lib/agents.py`): `extract_frontmatter_field()` now handles multi-line YAML folded strings — Continue and Opencode agents no longer get truncated descriptions. Closes #77.
+
+### Performance
+
+- **Incremental sync** (`scripts/lib/io.py`, `agents.py`, `rules.py`): `write_checked()` skips writing when content is already identical to the existing file. `sync.log` shows `[SKIP] unchanged` for unmodified files. Closes #70.
+
+---
+
 ## [0.34.1] — 2026-05-07
 
 ### Security
