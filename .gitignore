@@ -18,7 +18,6 @@ sync.log
 .mcp.json
 .opencode.json
 .windsurfrules
-AGENTS.md
 .claude/skills/debug-issue.md
 .claude/skills/explore-codebase.md
 .claude/skills/refactor-safely.md

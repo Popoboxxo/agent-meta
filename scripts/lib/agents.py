@@ -679,6 +679,20 @@ def sync_agents_for_provider(
                 if fm_end != -1:
                     content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
 
+            elif provider == 'Opencode':
+                # Opencode: native frontmatter (description + mode: subagent + model)
+                # Model IDs use "provider/model-id" format (e.g. anthropic/claude-sonnet-4-6)
+                model = resolve_model(role, config, agent_meta_root,
+                                      provider=provider, provider_config=provider_config)
+                if model:
+                    po = config.get('model-overrides', {})
+                    is_override = role in po.get('Opencode', {})
+                    src = 'project override' if is_override else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                content = _transform_frontmatter_for_opencode(
+                    content, description, model, generated_from
+                )
+
         if debug_mode:
             content = inject_debug_block(content, name)
 
@@ -754,6 +768,32 @@ def inject_debug_block(content: str, agent_name: str) -> str:
         marker=_DEBUG_BLOCK_MARKER,
         agent_name=agent_name,
     )
+
+
+def _transform_frontmatter_for_opencode(
+    content: str,
+    description: str,
+    model: str,
+    generated_from: str,
+) -> str:
+    """Build opencode-native agent frontmatter.
+
+    opencode frontmatter schema (all others stripped):
+      description: "..."       (required)
+      mode: subagent           (all agent-meta agents are subagents)
+      model: provider/model-id (optional — only when tier maps to a model ID)
+      generated-from: "..."    (traceability, kept for diffability)
+    """
+    body = _strip_frontmatter(content)
+    body = _strip_claude_specific_lines(body)
+
+    lines = [f'description: "{description}"', 'mode: subagent']
+    if model:
+        lines.append(f'model: {model}')
+    if generated_from:
+        lines.append(f'generated-from: "{generated_from}"')
+
+    return '---\n' + '\n'.join(lines) + '\n---\n' + body
 
 
 def _strip_claude_specific_lines(content: str) -> str:

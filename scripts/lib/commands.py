@@ -124,6 +124,12 @@ def sync_commands_for_provider(
         target_dir = project_root / commands_dir
         managed_index_path = target_dir / ".agent-meta-managed"
         output_ext = pc.get("commands_ext", ".toml")
+    elif provider == "Opencode":
+        # Opencode auto-scans .opencode/commands/ — same .md format as Claude, same $ARGUMENTS syntax
+        commands_dir = pc.get("commands_dir", ".opencode/commands")
+        target_dir = project_root / commands_dir
+        managed_index_path = target_dir / ".agent-meta-managed"
+        output_ext = ".md"
     else:
         return
 

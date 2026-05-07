@@ -12,10 +12,18 @@ Ein einziges `.meta-config/project.yaml` reicht, um Agenten-Dateien für Claude 
 und Continue gleichzeitig zu erzeugen.
 
 ```json
-"ai-providers": ["Claude", "Gemini", "Continue"]
+"ai-providers": ["Claude", "Gemini", "Continue", "Opencode"]
 ```
 
 Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
+
+**Nur Opencode:**
+
+```json
+{
+  "ai-providers": ["Opencode"]
+}
+```
 
 ---
 
@@ -26,6 +34,7 @@ Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin u
 | `Claude` | `.claude/agents/` | `.md` | `CLAUDE.md` | Vollständig (`model`, `memory`, `permissionMode`, …) |
 | `Gemini` | `.gemini/agents/` | `.md` | `.gemini/GEMINI.md` | Reduziert (`model` only, kein `memory`/`permissionMode`) |
 | `Continue` | `.continue/agents/` | `.md` | `.continue/rules/project-context.md` | Minimal (`name`, `description`, `alwaysApply: false`) |
+| `Opencode` | `.opencode/agents/` | `.md` | `AGENTS.md` | Nativ (`description`, `mode: subagent`, `model: provider/id`) |
 
 ### Claude Code
 
@@ -138,15 +147,15 @@ Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
 
 ## Sync-Verhalten pro Provider
 
-| Datei | Claude | Gemini | Continue |
-|-------|--------|--------|----------|
-| Agenten-Dateien | ✅ Überschrieben (stale gelöscht) | ✅ Überschrieben (stale gelöscht) | ✅ Überschrieben (stale gelöscht) |
-| Kontext-Datei (managed block) | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert |
-| Kontext-Datei (Rest) | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst |
-| Settings/Config Skeleton | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig |
-| Rules | ✅ Sync (stale gelöscht) | — | ✅ Sync nach `.continue/rules/` |
-| Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — |
-| Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` |
+| Datei | Claude | Gemini | Continue | Opencode |
+|-------|--------|--------|----------|----------|
+| Agenten-Dateien | ✅ Überschrieben (stale gelöscht) | ✅ Überschrieben (stale gelöscht) | ✅ Überschrieben (stale gelöscht) | ✅ Überschrieben (stale gelöscht) |
+| Kontext-Datei (managed block) | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert (incl. eingebettete Rules) |
+| Kontext-Datei (Rest) | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst |
+| Settings/Config Skeleton | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig |
+| Rules | ✅ Sync (stale gelöscht) | — | ✅ Sync nach `.continue/rules/` | ✅ In `AGENTS.md` eingebettet |
+| Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — | — |
+| Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` | ✅ `.opencode/commands/*.md` |
 
 ---
 

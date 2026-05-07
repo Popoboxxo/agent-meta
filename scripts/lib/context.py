@@ -153,6 +153,85 @@ def sync_context_for_provider(
                 else:
                     log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
 
+    elif provider == "Opencode":
+        context_file = pc["context_file"]  # "AGENTS.md"
+        target_path = project_root / context_file
+        template_name = pc.get("context_template")
+        template_path = agent_meta_root / template_name if template_name else None
+
+        # Create AGENTS.md skeleton if it doesn't exist yet
+        if not target_path.exists():
+            if template_path and template_path.exists():
+                ocontent = template_path.read_text(encoding="utf-8")
+                ocontent = substitute(ocontent, variables, template_name, log)
+            else:
+                project_name = config["project"]["name"]
+                ocontent = (
+                    f"# {project_name}\n\n"
+                    "<!-- agent-meta:managed-begin -->\n"
+                    "<!-- agent-meta:managed-end -->\n"
+                )
+            log.action("INIT", context_file, template_name or "minimal fallback")
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(ocontent, encoding="utf-8")
+
+        # Always update the managed block (agent hints + embedded rules)
+        managed_pattern = re.compile(
+            r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+            re.DOTALL,
+        )
+        if dry_run and not target_path.exists():
+            log.action("UPDATE", context_file, "managed block (agent hints + rules)")
+        else:
+            existing = target_path.read_text(encoding="utf-8")
+            if managed_pattern.search(existing):
+                new_managed = _build_opencode_managed_block(
+                    agent_meta_root, config, variables, log
+                )
+                new_content = managed_pattern.sub(new_managed, existing, count=1)
+                if new_content != existing:
+                    log.action("UPDATE", context_file, "managed block (agent hints + rules)")
+                    if not dry_run:
+                        target_path.write_text(new_content, encoding="utf-8")
+                else:
+                    log.skip(context_file, "managed block unchanged")
+
+        # opencode.json — skeleton created once, never overwritten
+        settings_file = pc.get("settings_file")
+        if settings_file:
+            settings_path = project_root / settings_file
+            if settings_path.exists():
+                log.skip(str(settings_path.relative_to(project_root)),
+                         "already exists — not overwritten")
+            else:
+                settings_template_rel = pc.get("settings_template")
+                settings_template_path = (
+                    agent_meta_root / settings_template_rel if settings_template_rel else None
+                )
+                if settings_template_path and settings_template_path.exists():
+                    json_content = settings_template_path.read_text(encoding="utf-8")
+                    source_label = settings_template_rel
+                else:
+                    json_content = (
+                        '{\n'
+                        '  // opencode configuration — https://opencode.ai/docs/config\n'
+                        '  // Agents  : .opencode/agents/  (managed by agent-meta)\n'
+                        '  // Commands: .opencode/commands/ (managed by agent-meta)\n'
+                        '  // Rules   : embedded in AGENTS.md (managed by agent-meta)\n'
+                        '}\n'
+                    )
+                    source_label = "minimal fallback"
+                    if settings_template_rel:
+                        log.warn(
+                            f"{settings_template_rel} not found "
+                            f"— using minimal fallback for {settings_file}"
+                        )
+                log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
+                if not dry_run:
+                    settings_path.parent.mkdir(parents=True, exist_ok=True)
+                    settings_path.write_text(json_content, encoding="utf-8")
+
     elif provider == "Continue":
         # 1. .continue/rules/project-context.md — created once from template; managed block updated
         context_file = pc["context_file"]
@@ -227,6 +306,83 @@ def sync_context_for_provider(
             if not dry_run:
                 settings_path.parent.mkdir(parents=True, exist_ok=True)
                 settings_path.write_text(yaml_content, encoding="utf-8")
+
+
+def _strip_rule_frontmatter(content: str) -> str:
+    """Remove YAML frontmatter block from a rule file."""
+    if not content.startswith('---'):
+        return content
+    end = content.find('\n---', 3)
+    if end == -1:
+        return content
+    return content[end + 4:].lstrip('\n')
+
+
+def _collect_embedded_rules_md(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+) -> str:
+    """Collect all active rules and return them as concatenated markdown.
+
+    Used to embed rules into AGENTS.md for providers without a native rules directory
+    (e.g. opencode). Respects `opencode: skip` rule option and speech-mode config.
+    """
+    from .config import substitute
+    from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
+
+    platforms = config.get('platforms', [])
+    sources = collect_rule_sources(agent_meta_root, platforms)
+    rule_options = resolve_rules(config, agent_meta_root)
+
+    sections: list[str] = []
+
+    for source_path, output_name in sources:
+        rule_stem = Path(output_name).stem
+        opts = rule_options.get(rule_stem, {})
+        if opts.get('opencode') == 'skip':
+            continue
+        content = source_path.read_text(encoding='utf-8')
+        rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
+        if variables:
+            content = substitute(content, variables, rel_source, log)
+        body = _strip_rule_frontmatter(content).strip()
+        if body:
+            sections.append(body)
+
+    # Include speech-mode rule if configured (not handled by collect_rule_sources)
+    mode = config.get('speech-mode', 'full')
+    if mode != 'full':
+        speech_path = agent_meta_root / SPEECH_DIR / f'{mode}.md'
+        if speech_path.exists():
+            body = _strip_rule_frontmatter(speech_path.read_text(encoding='utf-8')).strip()
+            if body:
+                sections.append(body)
+
+    return '\n\n---\n\n'.join(sections)
+
+
+def _build_opencode_managed_block(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+) -> str:
+    """Build the managed block for AGENTS.md: agent hints + all embedded rules."""
+    from .config import substitute
+
+    template = _load_claude_md_managed_template(agent_meta_root)
+    managed = substitute(template, variables, 'AGENTS.md managed block', log)
+
+    rules_md = _collect_embedded_rules_md(agent_meta_root, config, variables, log)
+    if rules_md:
+        managed = managed.replace(
+            '<!-- agent-meta:managed-end -->',
+            f'\n## Regeln\n\n{rules_md}\n<!-- agent-meta:managed-end -->',
+        )
+
+    return managed
 
 
 def init_claude_personal(
