@@ -1,7 +1,8 @@
 ---
+name: documenter
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode-go/qwen3.6-plus
 generated-from: "1-generic/documenter.md@1.3.2"
 ---
 # Documenter — agent-meta

@@ -1,7 +1,8 @@
 ---
+name: meta-feedback
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 mode: subagent
-model: anthropic/claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 generated-from: "1-generic/meta-feedback.md@2.0.0"
 ---
 # Meta-Feedback — agent-meta

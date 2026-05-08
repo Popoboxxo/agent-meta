@@ -1,7 +1,8 @@
 ---
+name: agent-meta-manager
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode-go/qwen3.6-plus
 generated-from: "1-generic/agent-meta-manager.md@1.4.2"
 ---
 # Agent-Meta-Manager — agent-meta

@@ -304,8 +304,6 @@ def main():
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
-        if args.init:
-            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
             claude_pc = provider_config.get("Claude", {})
             gitignore_cfg = config.get("gitignore", {})
             # local: true (default) — personal/local files are gitignored
@@ -318,6 +316,8 @@ def main():
                 ]))
             else:
                 base_gitignore_entries = []
+        if args.init:
+            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
             # generated: false (default) — generated files are committed
             if gitignore_cfg.get("generated", False):
                 for _prov in providers:
@@ -341,6 +341,8 @@ def main():
                         base_gitignore_entries.append(_ctx)
             # Skill gitignore entries are collected after skills are processed (below)
             # and merged via exact_entries so stale entries are removed automatically.
+        if args.init:
+            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:

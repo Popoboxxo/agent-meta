@@ -1,7 +1,8 @@
 ---
+name: git
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 mode: subagent
-model: anthropic/claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 generated-from: "1-generic/git.md@2.2.0"
 ---
 # Git Agent — agent-meta
