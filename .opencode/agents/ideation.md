@@ -1,4 +1,5 @@
 ---
+name: ideation
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 mode: subagent
 generated-from: "1-generic/ideation.md@1.2.2"

@@ -713,7 +713,7 @@ def sync_agents_for_provider(
                     src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
                 content = _transform_frontmatter_for_opencode(
-                    content, description, model, generated_from
+                    content, name, description, model, generated_from
                 )
 
         if debug_mode:
@@ -800,6 +800,7 @@ def inject_debug_block(content: str, agent_name: str) -> str:
 
 def _transform_frontmatter_for_opencode(
     content: str,
+    name: str,
     description: str,
     model: str,
     generated_from: str,
@@ -807,6 +808,7 @@ def _transform_frontmatter_for_opencode(
     """Build opencode-native agent frontmatter.
 
     opencode frontmatter schema (all others stripped):
+      name: <role>             (required — used to invoke the agent)
       description: "..."       (required)
       mode: subagent           (all agent-meta agents are subagents)
       model: provider/model-id (optional — only when tier maps to a model ID)
@@ -815,7 +817,7 @@ def _transform_frontmatter_for_opencode(
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
 
-    lines = [f'description: "{description}"', 'mode: subagent']
+    lines = [f'name: {name}', f'description: "{description}"', 'mode: subagent']
     if model:
         lines.append(f'model: {model}')
     if generated_from:

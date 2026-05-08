@@ -1,4 +1,5 @@
 ---
+name: release
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 mode: subagent
 model: opencode-go/qwen3.6-plus

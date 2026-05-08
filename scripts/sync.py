@@ -341,6 +341,8 @@ def main():
                         base_gitignore_entries.append(_ctx)
             # Skill gitignore entries are collected after skills are processed (below)
             # and merged via exact_entries so stale entries are removed automatically.
+        if args.init:
+            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:

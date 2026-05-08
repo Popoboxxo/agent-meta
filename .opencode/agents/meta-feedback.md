@@ -1,4 +1,5 @@
 ---
+name: meta-feedback
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
