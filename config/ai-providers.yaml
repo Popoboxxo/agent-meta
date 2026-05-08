@@ -11,6 +11,7 @@ providers:
     settings_file: .claude/settings.json
     isolation-dirs:
       - .claude/
+      - CLAUDE.md
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
