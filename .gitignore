@@ -2,6 +2,7 @@
 __pycache__/
 .claude/settings.local.json
 .input/
+.local/
 CLAUDE.personal.md
 sync.log
 
