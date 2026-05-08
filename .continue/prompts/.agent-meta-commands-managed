@@ -1,8 +1,11 @@
 add-mcp-server.md
 add-project-role.md
 add-provider.md
+commit.md
 diagnose.md
 doc-now.md
+merge.md
+report-bug.md
 set-preset.md
 update-extensions.md
 upgrade-meta.md
