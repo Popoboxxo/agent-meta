@@ -1,4 +1,13 @@
-"""Lightweight secrets detection for sync.py generated files."""
+"""Lightweight secrets detection for sync.py generated files.
+
+Built-in patterns cover common cases (API keys, tokens, passwords).
+Projects can extend detection via security.secret-patterns in project.yaml:
+
+    security:
+      secret-patterns:
+        - name: "my-service-token"
+          regex: "my_[a-zA-Z0-9]{32}"
+"""
 
 import re
 
@@ -13,11 +22,16 @@ _SECRET_PATTERNS = [
     (r'(?i)secret\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}', "Generic secret assignment"),
     (r'(?i)token\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}', "Generic token assignment"),
     (r'(?i)password\s*[:=]\s*["\']?.{8,}', "Generic password assignment"),
+    # Bearer tokens: JWT format (eyJ...) used by Home Assistant, Keycloak, etc.
+    (r'eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}', "JWT / Bearer token"),
+    # InfluxDB tokens: long base64url strings (typically 86+ chars ending with ==)
+    (r'[a-zA-Z0-9_\-]{80,}={0,2}', "InfluxDB-style long token"),
 ]
 
 # Patterns that are clearly safe (variables, examples, placeholders)
 _SAFE_PATTERNS = [
     r'\{\{[A-Z0-9_]+\}\}',       # {{PLACEHOLDER}}
+    r'\$\{[A-Z0-9_]+\}',         # ${ENV_VAR}
     r'<[A-Z_]+>',                 # <PLACEHOLDER>
     r'your[_-]',                  # your_api_key
     r'example',
@@ -34,14 +48,32 @@ def _is_safe(value: str) -> bool:
     return False
 
 
-def scan_for_secrets(content: str) -> list[str]:
+def _load_project_patterns(config: dict) -> list[tuple[str, str]]:
+    """Load custom secret patterns from project.yaml security.secret-patterns."""
+    patterns = []
+    for entry in config.get("security", {}).get("secret-patterns", []):
+        regex = entry.get("regex")
+        name = entry.get("name", "Custom pattern")
+        if regex:
+            patterns.append((regex, name))
+    return patterns
+
+
+def scan_for_secrets(content: str, config: dict | None = None) -> list[str]:
     """Return list of human-readable warnings for potential secrets found in content.
 
     Only flags high-confidence patterns to avoid false positives.
     Skips lines that look like placeholders or documentation examples.
+
+    config: optional project config dict — extends detection with
+            security.secret-patterns entries from project.yaml.
     """
+    all_patterns = list(_SECRET_PATTERNS)
+    if config:
+        all_patterns.extend(_load_project_patterns(config))
+
     findings = []
-    for pattern, label in _SECRET_PATTERNS:
+    for pattern, label in all_patterns:
         if label is None:
             continue  # skip the broad base64 pattern — too noisy
         for match in re.finditer(pattern, content):

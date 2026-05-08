@@ -15,6 +15,11 @@ providers:
       - .claude/pending-tasks.md
       - CLAUDE.personal.md
       - sync.log
+      - .mcp.json
+    mcp-config:
+      committed-file: .claude/settings.json
+      secrets-file: .claude/settings.local.json
+      format: claude-settings
     # Model tiers: abstract tier name → provider-specific model ID.
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
@@ -47,6 +52,10 @@ providers:
     settings_template: howto/configs/GEMINI.settings-template.json
     gitignore_entries:
       - .gemini/settings.local.json
+    mcp-config:
+      committed-file: .gemini/settings.json
+      secrets-file: .gemini/settings.local.json
+      format: gemini-settings
     model-tiers:
       nano:     gemini-2.5-flash            # ultra-fast, low-cost tasks
       fast:     gemini-2.5-flash            # quick ops: git, formatting
@@ -70,6 +79,10 @@ providers:
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
+    mcp-config:
+      committed-file: opencode.json
+      secrets-file: .opencode/mcp.local.json
+      format: opencode-json
     # opencode model IDs use "provider/model-id" format (AI SDK convention)
     model-tiers:
       nano:     anthropic/claude-haiku-4-5-20251001
@@ -96,6 +109,10 @@ providers:
     settings_template: howto/configs/CONTINUE.config-template.yaml
     gitignore_entries:
       - .continue/settings.local.yaml
+    mcp-config:
+      committed-file: .continue/config.yaml
+      secrets-file: .continue/config.local.yaml
+      format: continue-yaml
     # Continue manages models centrally in .continue/config.yaml — no per-agent model.
     model-tiers: {}
     model-aliases: {}

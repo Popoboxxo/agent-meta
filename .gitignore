@@ -11,6 +11,7 @@ sync.log
 .claude/settings.local.json
 .continue/settings.local.yaml
 .gemini/settings.local.json
+.mcp.json
 .opencode/settings.local.json
 AGENTS.personal.md
 CLAUDE.personal.md

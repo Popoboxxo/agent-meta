@@ -1,0 +1,84 @@
+version: "1.0.0"
+
+# agent-meta MCP Registry
+# ========================
+# Global, provider-agnostic catalog of MCP servers.
+# Projects activate servers via mcp-servers: [...] in project.yaml
+# or implicitly via platform bundles (rules/2-platform/<platform>-mcp.yaml).
+#
+# sync.py reads this file and:
+#   - Generates rule files per active server + provider (allowed/blocked tools, hints)
+#   - Generates committed provider configs (${ENV_VAR} refs only — no secrets)
+#   - Adds secrets-files to the managed .gitignore block
+#
+# Adding a new server:
+#   1. Add entry here with tools, agent-hint, connection, secrets
+#   2. If platform-specific: add to rules/2-platform/<platform>-mcp.yaml
+#   3. Run sync.py — rule files and gitignore entries are generated automatically
+
+mcp-servers:
+
+  home-assistant:
+    description: "Home Assistant real-time device status, sensors, datetime and read-only data"
+    category: iot
+    enabled-by-default: true
+    tools:
+      allowed:
+        - GetLiveContext
+        - GetDateTime
+        - todo_get_items
+      blocked:
+        - HassTurnOn
+        - HassTurnOff
+        - HassLightSet
+        - HassCallService
+        - HassSetVolume
+        - HassBroadcast
+        - HassMediaPlay
+        - HassMediaPause
+    agent-hint: |
+      Primäres Tool: GetLiveContext für Echtzeit-Status.
+      Schreibende Operationen sind ABSOLUT VERBOTEN — kein HassTurnOn, HassTurnOff etc.
+      Gerätesteuerung nur über HA-App, Dashboard oder Sprachassistent.
+    connection:
+      type: sse
+      url: "{{MCP_HA_URL}}/api/mcp_server/sse"
+      headers:
+        Authorization: "Bearer {{MCP_HA_TOKEN}}"
+    secrets:
+      - MCP_HA_URL
+      - MCP_HA_TOKEN
+
+  influxdb:
+    description: "InfluxDB time-series database for historical trends and analysis via Flux"
+    category: database
+    enabled-by-default: false
+    tools:
+      allowed:
+        - query
+      blocked:
+        - write
+        - create_bucket
+        - delete_bucket
+        - update_retention
+        - delete_measurement
+    agent-hint: |
+      Nur für historische Zeitreihendaten und Trend-Analysen via Flux-Queries.
+      Schreiben, Bucket-Verwaltung und Retention-Änderungen sind VERBOTEN.
+      Timestamps: InfluxDB speichert UTC — Abfragefenster entsprechend anpassen.
+    connection:
+      type: stdio
+      command: npx
+      args:
+        - "-y"
+        - "influxdb-mcp-server"
+      env:
+        INFLUXDB_URL: "{{MCP_INFLUXDB_URL}}"
+        INFLUXDB_TOKEN: "{{MCP_INFLUXDB_TOKEN}}"
+        INFLUXDB_ORG: "{{MCP_INFLUXDB_ORG}}"
+        INFLUXDB_BUCKET: "{{MCP_INFLUXDB_BUCKET}}"
+    secrets:
+      - MCP_INFLUXDB_URL
+      - MCP_INFLUXDB_TOKEN
+      - MCP_INFLUXDB_ORG
+      - MCP_INFLUXDB_BUCKET
