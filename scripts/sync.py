@@ -386,6 +386,8 @@ def main():
             if _p == "Claude":
                 continue  # already in base_gitignore_entries
             _pc = provider_config.get(_p, {})
+            if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
+                log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
             extra_provider_entries.extend(_pc.get("gitignore_entries", []))
         if is_claude:
             skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config)
