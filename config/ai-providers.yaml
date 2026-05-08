@@ -9,6 +9,9 @@ providers:
     has_commands: true
     has_settings: true
     settings_file: .claude/settings.json
+    isolation-dirs:
+      - .claude/
+      - CLAUDE.md
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
@@ -50,6 +53,8 @@ providers:
     has_settings: true
     settings_file: .gemini/settings.json
     settings_template: howto/configs/GEMINI.settings-template.json
+    isolation-dirs:
+      - .gemini/
     gitignore_entries:
       - .gemini/settings.local.json
     mcp-config:
@@ -76,6 +81,10 @@ providers:
     has_settings: true
     settings_file: opencode.json
     settings_template: howto/configs/OPENCODE.settings-template.json
+    isolation-dirs:
+      - .opencode/
+      - opencode.json
+      - AGENTS.md
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
@@ -108,6 +117,8 @@ providers:
     has_settings: true
     settings_file: .continue/config.yaml
     settings_template: howto/configs/CONTINUE.config-template.yaml
+    isolation-dirs:
+      - .continue/
     gitignore_entries:
       - .continue/settings.local.yaml
     mcp-config:

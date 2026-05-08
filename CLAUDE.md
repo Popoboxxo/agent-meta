@@ -142,11 +142,39 @@ Nur auf Grep/Glob/Read zurückfallen wenn der Graph nicht ausreicht.
 
 ---
 
+## Provider-Isolation (Framework-Feature)
+
+Wenn mehrere AI-Provider in einem Projekt aktiv sind, generiert `sync.py` automatisch Hard-Blocks die verhindern dass ein Provider die Verzeichnisse eines anderen liest oder schreibt.
+
+### Aktivierung
+
+Automatisch aktiv wenn `>1 Provider` in `ai-providers` konfiguriert ist. Keine explizite Aktivierung nötig.
+
+### Deaktivieren (Opt-out)
+
+```yaml
+# .meta-config/project.yaml
+provider-isolation: disabled
+```
+
+Sinnvoll für das agent-meta Meta-Repository selbst, das alle Provider-Verzeichnisse verwalten muss.
+
+### Generierte Artefakte pro Provider
+
+| Provider | Mechanismus | Datei |
+|---|---|---|
+| Claude | `permissions.deny` (Glob) | `.claude/settings.json` |
+| Opencode | `permission.read/edit` deny (Glob) | `opencode.json` |
+| Gemini | TOML-Policy-Rules (Regex) | `.gemini/policies/provider-isolation.toml` |
+| Continue | Soft-Rule (kein nativer Hard-Block in IDE-Extensions) | `.continue/rules/provider-isolation.md` |
+
+---
+
 <!-- agent-meta:managed-begin -->
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.34.2 — `2026-05-08`
+Generiert von agent-meta v0.35.0 — `2026-05-08`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
