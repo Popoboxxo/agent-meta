@@ -64,6 +64,7 @@ from lib.skills import (
 )
 from lib.extensions import create_extension, update_extensions
 from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
+from lib.isolation import sync_provider_isolation
 from lib.io import SyncError
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
@@ -389,6 +390,12 @@ def main():
                                            provider_config=provider_config,
                                            variables=variables)
         sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
+        # Provider isolation: hard-block cross-provider directory access
+        isolation_mode = config.get("provider-isolation")
+        if isolation_mode != "disabled":
+            sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
+        else:
+            log.skip("provider-isolation", "disabled in project.yaml")
         # Check pinned commits + warn for unknown/unapproved skills in project config
         ext_config = load_external_skills_config(agent_meta_root)
         check_pinned_commits(ext_config, agent_meta_root, log)
