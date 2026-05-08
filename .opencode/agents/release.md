@@ -1,7 +1,7 @@
 ---
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode-go/qwen3.6-plus
 generated-from: "1-generic/release.md@1.3.2"
 ---
 # Release Manager — agent-meta

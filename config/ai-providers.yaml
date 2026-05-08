@@ -83,17 +83,18 @@ providers:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
       format: opencode-json
-    # opencode model IDs use "provider/model-id" format (AI SDK convention)
+    # opencode-go model IDs — format: opencode-go/<model-id>
+    # Full list: https://opencode.ai/docs/go/
     model-tiers:
-      nano:     anthropic/claude-haiku-4-5-20251001
-      fast:     anthropic/claude-haiku-4-5-20251001
-      balanced: anthropic/claude-sonnet-4-6
-      powerful: anthropic/claude-opus-4-7
-      max:      anthropic/claude-opus-4-7
+      nano:     opencode-go/deepseek-v4-flash   # fast & cheap: batch, throughput
+      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback
+      balanced: opencode-go/qwen3.6-plus        # default workhorse: dev, docs, review
+      powerful: opencode-go/kimi-k2.5           # complex reasoning: architecture, security
+      max:      opencode-go/kimi-k2.6           # maximum capability
     model-aliases:
-      haiku:  anthropic/claude-haiku-4-5-20251001
-      sonnet: anthropic/claude-sonnet-4-6
-      opus:   anthropic/claude-opus-4-7
+      flash:  opencode-go/deepseek-v4-flash
+      qwen:   opencode-go/qwen3.6-plus
+      kimi:   opencode-go/kimi-k2.6
 
   Continue:
     agents_dir: .continue/agents
