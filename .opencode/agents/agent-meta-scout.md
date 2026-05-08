@@ -1,4 +1,5 @@
 ---
+name: agent-meta-scout
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 mode: subagent
 model: anthropic/claude-sonnet-4-6

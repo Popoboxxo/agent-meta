@@ -1,4 +1,5 @@
 ---
+name: documenter
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 mode: subagent
 model: anthropic/claude-sonnet-4-6

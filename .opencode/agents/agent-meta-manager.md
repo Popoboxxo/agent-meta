@@ -1,4 +1,5 @@
 ---
+name: agent-meta-manager
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 mode: subagent
 model: anthropic/claude-sonnet-4-6

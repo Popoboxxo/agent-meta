@@ -1,4 +1,5 @@
 ---
+name: feature
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 mode: subagent
 generated-from: "1-generic/feature.md@1.3.0"

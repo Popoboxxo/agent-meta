@@ -1,4 +1,5 @@
 ---
+name: meta-feedback
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 mode: subagent
 model: anthropic/claude-haiku-4-5-20251001
