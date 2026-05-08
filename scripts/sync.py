@@ -63,7 +63,8 @@ from lib.skills import (
     load_external_skills_config, check_pinned_commits, sync_external_skills, add_skill,
 )
 from lib.extensions import create_extension, update_extensions
-from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers
+from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
+from lib.io import SyncError
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
@@ -303,6 +304,8 @@ def main():
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
             init_settings_local_json(project_root, log, args.dry_run)
+        if args.init:
+            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
             claude_pc = provider_config.get("Claude", {})
             gitignore_cfg = config.get("gitignore", {})
             # local: true (default) — personal/local files are gitignored
@@ -342,6 +345,7 @@ def main():
         debug_mode = config.get("debug-mode", False)
         if debug_mode:
             log.info("debug-mode", "active — injecting debug block into all agents")
+        allow_committed_secrets = config.get("allow-committed-secrets", False)
         mcp_gitignore_extras: list[str] = []
         for provider in providers:
             pc = provider_config[provider]
@@ -361,11 +365,16 @@ def main():
                            rules_dir=pc.get("rules_dir"), provider=provider)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                                  rules_dir=pc.get("rules_dir"))
-            # MCP: generate rule files + collect gitignore entries for secrets files
-            mcp_extras = generate_mcp_artifacts(
-                agent_meta_root, project_root, config, provider_config,
-                log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
-            )
+            # MCP: generate rule files + provider configs + collect gitignore entries
+            try:
+                mcp_extras = generate_mcp_artifacts(
+                    agent_meta_root, project_root, config, provider_config,
+                    log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+                    allow_committed_secrets=allow_committed_secrets,
+                )
+            except SyncError as exc:
+                print(f"\n  !!  MCP sync aborted: {exc}", file=sys.stderr)
+                sys.exit(1)
             for entry in mcp_extras:
                 if entry not in mcp_gitignore_extras:
                     mcp_gitignore_extras.append(entry)
