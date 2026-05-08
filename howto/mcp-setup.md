@@ -15,8 +15,8 @@ project.yaml: mcp-servers: [...]  ← Projekt-Aktivierung (was nutzt dieses Proj
         ↓
     sync.py
         ├─→  Regel-Dateien: mcp-<server>.md (erlaubte/verbotene Tools)
-        ├─→  Gitignore-Einträge für alle Secrets-Dateien
-        └─→  (Phase 3) Provider-Configs mit ${ENV_VAR}-Referenzen
+        ├─→  Provider-Configs: committed (${ENV_VAR}) + lokale (echte Werte)
+        └─→  Gitignore-Einträge für alle Secrets-Dateien
 ```
 
 ---
@@ -89,8 +89,8 @@ python .agent-meta/scripts/sync.py
 
 sync.py generiert automatisch:
 - `mcp-home-assistant.md` und `mcp-influxdb.md` in den Provider-Regel-Verzeichnissen
+- Provider-Configs (committed + gitignored lokal) für alle aktiven Provider
 - `.gitignore`-Einträge für alle Secrets-Dateien
-- Warnung wenn keine `secrets.local.yaml` vorhanden
 
 ---
 
@@ -108,7 +108,7 @@ sync.py generiert automatisch:
 
 - `secrets-file` pro Provider ist immer gitignored (automatisch via managed block)
 - `.meta-config/secrets.local.yaml` ist immer gitignored
-- `sync.py` warnt wenn Bearer-Token oder InfluxDB-Token in einer committed Datei erkannt wird
+- `sync.py` bricht ab (`SyncError`) wenn ein Secret in einer committed Datei erkannt wird — kein stilles Durchlassen
 
 ### Opt-out (bewusste Ausnahme)
 
@@ -116,8 +116,7 @@ Nur für lokale Dev-Umgebungen ohne Außenzugriff:
 
 ```yaml
 # project.yaml
-mcp:
-  allow-committed-secrets: true   # Erzeugt Warnung bei jedem Sync
+allow-committed-secrets: true   # Warnung statt Abbruch bei jedem Sync
 ```
 
 ### Eigene Secret-Patterns ergänzen

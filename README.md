@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.33.0`
+**Current version:** `0.35.0`
 
 ---
 
@@ -33,8 +33,9 @@ Agent roles, rules, skills, hooks, and commands are defined once in provider-agn
 | Provider | Agents | Rules | Commands |
 |----------|--------|-------|----------|
 | Claude Code | `.claude/agents/` | `.claude/rules/` | `.claude/commands/` |
+| Gemini CLI | `.gemini/agents/` | `.gemini/rules/` | `.gemini/commands/` |
+| Opencode | `.opencode/agents/` | *(embedded in AGENTS.md)* | `.opencode/commands/` |
 | Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` |
-| Gemini | `.gemini/agents/` | — | — |
 
 Platform- and project-specific layers stack on top of the generic definitions — but always remain provider-agnostic in their source. No knowledge needs to be maintained twice.
 
@@ -135,6 +136,40 @@ Extensions live in `.claude/3-project/<prefix>-<role>-ext.md` in your project �
 
 ---
 
+## MCP Servers
+
+agent-meta manages MCP servers as a first-class framework concept across all providers.
+
+### How it works
+
+1. **Registry** — `config/mcp-registry.yaml` defines available servers (tools, connection, secrets)
+2. **Activation** — activate per project via `mcp-servers:` in `project.yaml` or implicitly via platform bundles
+3. **Sync** — `sync.py` generates everything automatically:
+   - Rule files (`mcp-<server>.md`) per provider with allowed/blocked tools and agent hints
+   - Committed provider configs with `${ENV_VAR}` references (safe to commit)
+   - Gitignored local configs populated from `.meta-config/secrets.local.yaml` (actual values)
+   - `.gitignore` managed block entries for all secrets files
+
+```yaml
+# .meta-config/project.yaml
+mcp-servers:
+  - home-assistant
+  - influxdb
+```
+
+```bash
+# On first --init: .meta-config/secrets.local.yaml is generated automatically
+py .agent-meta/scripts/sync.py --init
+# Fill in secrets, then re-sync:
+py .agent-meta/scripts/sync.py
+```
+
+**Security:** `sync.py` raises a hard error (`SyncError`) when a real secret is detected in a committed file. Set `allow-committed-secrets: true` in `project.yaml` to downgrade to a warning (not recommended).
+
+See [howto/mcp-setup.md](howto/mcp-setup.md) for full documentation.
+
+---
+
 ## Upgrading
 
 ```bash
@@ -180,7 +215,8 @@ agent-meta/
     project.yaml                <- agent-meta self-hosting config
     role-defaults.yaml          <- default model/memory/permissionMode per role
     dod-presets.yaml            <- DoD quality presets
-    ai-providers.yaml           <- provider settings (Claude, Gemini, Continue)
+    ai-providers.yaml           <- provider settings (Claude, Gemini, Opencode, Continue)
+    mcp-registry.yaml           <- global MCP server catalog (tools, connection, secrets)
     skills-registry.yaml        <- external skills registry (approved/pinned)
     project-config.schema.json  <- JSON Schema for project.yaml
   external/           <- Git submodules for external skill repos (pinned commits)
