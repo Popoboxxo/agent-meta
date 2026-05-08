@@ -1,7 +1,7 @@
 ---
 description: "Scoutet das Claude-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode-go/qwen3.6-plus
 generated-from: "1-generic/agent-meta-scout.md@1.0.1"
 ---
 # Agent-Meta Scout — agent-meta
