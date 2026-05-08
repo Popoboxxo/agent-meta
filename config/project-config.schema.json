@@ -447,6 +447,11 @@
       },
       "uniqueItems": true
     },
+    "provider-isolation": {
+      "type": "string",
+      "enum": ["disabled"],
+      "description": "Set to 'disabled' to skip provider isolation generation (e.g. in the agent-meta meta-repo itself, which intentionally manages all provider directories)."
+    },
     "allow-committed-secrets": {
       "type": "boolean",
       "description": "Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.",
