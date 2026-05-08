@@ -63,6 +63,7 @@ from lib.skills import (
     load_external_skills_config, check_pinned_commits, sync_external_skills, add_skill,
 )
 from lib.extensions import create_extension, update_extensions
+from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
@@ -341,6 +342,7 @@ def main():
         debug_mode = config.get("debug-mode", False)
         if debug_mode:
             log.info("debug-mode", "active — injecting debug block into all agents")
+        mcp_gitignore_extras: list[str] = []
         for provider in providers:
             pc = provider_config[provider]
             log.provider_header(provider)
@@ -359,6 +361,14 @@ def main():
                            rules_dir=pc.get("rules_dir"), provider=provider)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                                  rules_dir=pc.get("rules_dir"))
+            # MCP: generate rule files + collect gitignore entries for secrets files
+            mcp_extras = generate_mcp_artifacts(
+                agent_meta_root, project_root, config, provider_config,
+                log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+            )
+            for entry in mcp_extras:
+                if entry not in mcp_gitignore_extras:
+                    mcp_gitignore_extras.append(entry)
             if pc["has_hooks"]:
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)
@@ -392,14 +402,15 @@ def main():
         if is_claude:
             skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config)
             all_gitignore_entries = (
-                base_gitignore_entries + extra_provider_entries + skill_gitignore_entries
+                base_gitignore_entries + extra_provider_entries
+                + skill_gitignore_entries + mcp_gitignore_extras
             )
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      exact_entries=all_gitignore_entries)
-        elif extra_provider_entries:
+        elif extra_provider_entries or mcp_gitignore_extras:
             # No Claude active but other providers have gitignore entries to manage
             ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     gitignore_entries=extra_provider_entries)
+                                     gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
     log_path = project_root / LOGFILE
     _providers = resolve_providers(config, load_providers_config(agent_meta_root)) if config else []

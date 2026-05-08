@@ -1,0 +1,9 @@
+platform: homeassistant
+
+# MCP server bundle for Home Assistant projects.
+# References entries from config/mcp-registry.yaml.
+# sync.py activates these servers for all projects with platforms: [homeassistant].
+
+mcp-servers:
+  - home-assistant
+  - influxdb

@@ -35,28 +35,124 @@ User: "Mein Sensor springt ständig zwischen Werten."
 **Erlaubt:** Flux-Queries lesen, Wertebereich-Analysen, Pattern-Erkennung, Vergleiche.
 **VERBOTEN:** Schreiboperationen, Bucket-Verwaltung, Retention-Policy-Änderungen.
 
-## Lokale / Projektspezifische MCP-Server
+## MCP-Konfiguration: Provider-Übersicht
 
-Konfiguration in `settings.local.json` (gitignored — nie committen).
-Dokumentation in `.claude/platform-config.yaml`:
+MCP-Secrets gehören **niemals** in committed Dateien. Für jeden Provider:
+
+| Provider | Committed (env-var refs) | Gitignored (echte Secrets) |
+|---|---|---|
+| Claude | `.claude/settings.json` → `mcpServers` | `.claude/settings.local.json` |
+| Opencode | `opencode.json` → `mcp` | `.opencode/mcp.local.json` |
+| Continue | `.continue/config.yaml` → `mcpServers` | `.continue/config.local.yaml` |
+| Gemini | `.gemini/settings.json` → `mcpServers` | `.gemini/settings.local.json` |
+
+Zentraler Secret-Store: `.meta-config/secrets.local.yaml` (gitignored, einmalig befüllen).
+
+## Konfigurationsbeispiele
+
+### Claude — `.claude/settings.json` (committed, keine Secrets)
+
+```json
+{
+  "mcpServers": {
+    "home-assistant": {
+      "type": "sse",
+      "url": "${MCP_HA_URL}/api/mcp_server/sse",
+      "headers": {
+        "Authorization": "Bearer ${MCP_HA_TOKEN}"
+      }
+    },
+    "influxdb": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "influxdb-mcp-server"],
+      "env": {
+        "INFLUXDB_URL": "${MCP_INFLUXDB_URL}",
+        "INFLUXDB_TOKEN": "${MCP_INFLUXDB_TOKEN}",
+        "INFLUXDB_ORG": "${MCP_INFLUXDB_ORG}",
+        "INFLUXDB_BUCKET": "${MCP_INFLUXDB_BUCKET}"
+      }
+    }
+  }
+}
+```
+
+### Claude — `.claude/settings.local.json` (gitignored, echte Werte)
+
+```json
+{
+  "mcpServers": {
+    "home-assistant": {
+      "env": {
+        "MCP_HA_URL": "http://192.168.1.100:8123",
+        "MCP_HA_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5..."
+      }
+    },
+    "influxdb": {
+      "env": {
+        "MCP_INFLUXDB_URL": "http://192.168.1.100:8086",
+        "MCP_INFLUXDB_TOKEN": "my-long-influxdb-token==",
+        "MCP_INFLUXDB_ORG": "homeassistant",
+        "MCP_INFLUXDB_BUCKET": "homeassistentbucket"
+      }
+    }
+  }
+}
+```
+
+### Opencode — `opencode.json` (committed, keine Secrets)
+
+```json
+{
+  "mcp": {
+    "home-assistant": {
+      "type": "sse",
+      "url": "${MCP_HA_URL}/api/mcp_server/sse",
+      "headers": { "Authorization": "Bearer ${MCP_HA_TOKEN}" }
+    },
+    "influxdb": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "influxdb-mcp-server"],
+      "env": {
+        "INFLUXDB_URL": "${MCP_INFLUXDB_URL}",
+        "INFLUXDB_TOKEN": "${MCP_INFLUXDB_TOKEN}",
+        "INFLUXDB_ORG": "${MCP_INFLUXDB_ORG}",
+        "INFLUXDB_BUCKET": "${MCP_INFLUXDB_BUCKET}"
+      }
+    }
+  }
+}
+```
+
+### Opencode — `.opencode/mcp.local.json` (gitignored, echte Werte)
+
+```json
+{
+  "MCP_HA_URL": "http://192.168.1.100:8123",
+  "MCP_HA_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5...",
+  "MCP_INFLUXDB_URL": "http://192.168.1.100:8086",
+  "MCP_INFLUXDB_TOKEN": "my-long-influxdb-token==",
+  "MCP_INFLUXDB_ORG": "homeassistant",
+  "MCP_INFLUXDB_BUCKET": "homeassistentbucket"
+}
+```
+
+## Zentraler Secret-Store: `.meta-config/secrets.local.yaml`
+
+Alle Provider können Werte aus dieser Datei beziehen (gitignored):
 
 ```yaml
-mcp_servers:
-  - name: mempalace
-    purpose: >-
-      Persistent memory for HA configuration context across sessions.
-    tools_allowed:
-      - remember
-      - recall
-    tools_blocked: []
+# .meta-config/secrets.local.yaml — NIEMALS committen
+MCP_HA_URL: "http://192.168.1.100:8123"
+MCP_HA_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5..."
+MCP_INFLUXDB_URL: "http://192.168.1.100:8086"
+MCP_INFLUXDB_TOKEN: "my-long-influxdb-token=="
+MCP_INFLUXDB_ORG: "homeassistant"
+MCP_INFLUXDB_BUCKET: "homeassistentbucket"
 ```
 
-**Struktur:**
-```
-.claude/
-  platform-config.yaml      ← gittracked: Beschreibung (kein Secret)
-  settings.local.json       ← gitignored: Verbindungsparameter (mit Secrets)
-```
+Template: `howto/configs/mcp-secrets.local-template.yaml`
 
 ## Fehler-Handling wenn MCP nicht verfügbar
 
