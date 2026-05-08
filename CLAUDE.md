@@ -67,6 +67,65 @@ Semver: Patch = Bugfix/Doku | Minor = neue Features/Rollen | Major = Breaking Ch
 
 Details: [howto/upgrade-guide.md](howto/upgrade-guide.md)
 
+## MCP-Server (Framework-Feature)
+
+MCP-Server werden zentral in `config/mcp-registry.yaml` verwaltet und per Projekt aktiviert.
+sync.py generiert daraus Rule-Dateien, Provider-Configs und Gitignore-Einträge automatisch.
+
+### Aktivierung
+
+```yaml
+# .meta-config/project.yaml
+mcp-servers:
+  - home-assistant   # explizit → immer aktiv
+  - influxdb         # explizit → immer aktiv
+
+# Oder implizit über Plattform-Bundle:
+# rules/2-platform/<platform>-mcp.yaml
+# (nur wenn enabled-by-default: true in mcp-registry.yaml)
+```
+
+### Generierte Artefakte (pro aktivem Server + Provider)
+
+Rule-Dateien und Provider-Configs werden für jeden aktiven Provider separat generiert:
+
+| Provider | Rule-Datei | Committed Config | Lokale Config (gitignored) |
+|---|---|---|---|
+| Claude | `.claude/rules/mcp-<server>.md` | `.claude/settings.json` → `mcpServers` | `.claude/settings.local.json` → `mcpServers` |
+| Gemini | `.gemini/rules/mcp-<server>.md` | `.gemini/settings.json` → `mcpServers` | `.gemini/settings.local.json` → `mcpServers` |
+| Opencode | *(kein rules-dir)* | `opencode.json` → `mcp` | `.opencode/mcp.local.json` |
+| Continue | `.continue/rules/mcp-<server>.md` | `.continue/config.yaml` → `mcpServers` | `.continue/config.local.yaml` → `mcpServers` |
+
+Zusätzlich (provider-übergreifend): `.meta-config/secrets.local.yaml` — Secrets-Template, via `--init` generiert, immer gitignored.
+
+### Secrets
+
+```bash
+# 1. Template anlegen (einmalig bei --init oder manuell):
+cp .agent-meta/howto/configs/mcp-secrets.local-template.yaml .meta-config/secrets.local.yaml
+# 2. Werte eintragen, dann sync ausführen:
+py .agent-meta/scripts/sync.py
+```
+
+`.meta-config/secrets.local.yaml` ist immer gitignored. Nie committen.
+
+### Neuen MCP-Server hinzufügen
+
+1. Eintrag in `config/mcp-registry.yaml` (description, tools, agent-hint, connection, secrets)
+2. Optional: Plattform-Bundle `rules/2-platform/<platform>-mcp.yaml` anpassen
+3. `sync.py` ausführen — alles wird automatisch generiert
+
+### Security
+
+`write_checked()` scannt alle generierten Dateien auf Secrets. Bei committed Dateien:
+- **Secrets gefunden** → `SyncError` (Sync abbrechend) — nie in VCS committen
+- **`allow-committed-secrets: true`** in `project.yaml` → nur Warnung (nicht empfohlen)
+- **Lokale/gitignored Dateien** → nur Warnung (korrekt, Secrets gehören dorthin)
+
+Details: [howto/mcp-setup.md](howto/mcp-setup.md)
+
+---
+
 ## MCP Tools: code-review-graph
 
 **Immer zuerst graph tools nutzen — schneller und token-effizienter als Grep/Glob/Read.**

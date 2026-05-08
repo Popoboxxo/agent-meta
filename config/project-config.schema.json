@@ -439,6 +439,19 @@
       },
       "additionalProperties": false
     },
+    "mcp-servers": {
+      "type": "array",
+      "description": "Explicitly activate MCP servers from config/mcp-registry.yaml. Servers listed here are always active, regardless of enabled-by-default. Additional servers may be added implicitly via platform bundles (rules/2-platform/<platform>-mcp.yaml) when enabled-by-default: true.",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "allow-committed-secrets": {
+      "type": "boolean",
+      "description": "Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.",
+      "default": false
+    },
     "external-skills": {
       "type": "object",
       "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",

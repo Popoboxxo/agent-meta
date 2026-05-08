@@ -5,6 +5,11 @@ import json
 import sys
 from pathlib import Path
 
+
+class SyncError(Exception):
+    """Fatal sync error — sync cannot continue safely."""
+    pass
+
 try:
     import yaml as _yaml
     _YAML_AVAILABLE = True
@@ -60,18 +65,33 @@ def write_checked(
     log: "SyncLog",
     rel_label: str,
     force: bool = False,
+    allow_secrets: bool = False,
 ) -> bool:
     """Write content to path unless it is already identical (incremental sync).
 
-    Scans for potential secrets before writing and emits warnings.
+    Scans for potential secrets before writing.
+    - allow_secrets=False (default): raises SyncError when a secret is detected.
+      Use this for committed files — secrets must never land in version control.
+    - allow_secrets=True: emits a warning only (use for gitignored local files).
+
+    Set allow-committed-secrets: true in project.yaml to override for a project
+    (not recommended — prefer ${ENV_VAR} references in committed configs).
+
     Returns True when the file was written, False when skipped as unchanged.
     """
     if not force and is_unchanged(path, content):
         return False
     from .secrets import scan_for_secrets
     findings = scan_for_secrets(content)
-    for finding in findings:
-        log.warn(f"potential secret in {rel_label}: {finding} — verify before committing")
+    if findings:
+        if not allow_secrets:
+            raise SyncError(
+                f"Secret detected in committed file '{rel_label}': "
+                + ", ".join(findings)
+                + "\n  Use allow-committed-secrets: true in project.yaml to bypass (not recommended)."
+            )
+        for finding in findings:
+            log.warn(f"potential secret in {rel_label}: {finding} — verify before committing")
     path.write_text(content, encoding="utf-8")
     return True
 

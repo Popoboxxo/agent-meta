@@ -1,6 +1,28 @@
 # Changelog
 
+## [0.35.0] — 2026-05-08
+
+### Added
+
+- **Provider config generation** (`scripts/lib/mcp.py` → `generate_provider_configs()`): sync.py now writes committed provider configs (with `${ENV_VAR}` references) and gitignored local configs (with actual values from `secrets.local.yaml`) for all active MCP servers. Supports all four formats: `claude-settings` (`.claude/settings.json`), `gemini-settings` (`.gemini/settings.json`), `opencode-json` (`opencode.json`), `continue-yaml` (`.continue/config.yaml`). Closes the Phase-2 gap from #86.
+- **`init_secrets_template()`** (`scripts/lib/mcp.py`): `sync.py --init` now generates `.meta-config/secrets.local.yaml` from the active servers' `secrets:` lists. Users fill in actual values; the file is always gitignored.
+- **`allow-committed-secrets`** in `project.yaml` / JSON Schema: new opt-out flag. `sync.py` reads the value and passes it to MCP config generation. Default: `false`.
+
+### Changed
+
+- **`write_checked()` now blocks on detected secrets** (`scripts/lib/io.py`): changed from warn-only to raising `SyncError` when a secret pattern is found in content destined for a committed file (`allow_secrets=False`, the new default). Local/gitignored files pass `allow_secrets=True` and continue to warn only. `sync.py` catches `SyncError` and exits with a clear message.
+- **`SyncError`** added to `scripts/lib/io.py`: new exception class for fatal sync conditions.
+- **`resolve_active_mcp_servers()` now respects `enabled-by-default`** (`scripts/lib/mcp.py`): servers added via platform bundles are only activated when their `enabled-by-default` flag is `true` (default). Servers explicitly listed in `mcp-servers:` in `project.yaml` are always activated regardless. Previously the flag had no effect.
+- **`generate_mcp_artifacts()` signature extended** (`scripts/lib/mcp.py`): new `allow_committed_secrets` parameter threaded from `sync.py`.
+- **`mcp-servers` and `allow-committed-secrets`** added to `config/project-config.schema.json`.
+
+---
+
 ## [0.34.2] — 2026-05-07
+
+### Added
+
+- **MCP as first-class framework concept** (`config/mcp-registry.yaml`, `scripts/lib/mcp.py`, `scripts/lib/secrets.py`, `config/ai-providers.yaml`, `howto/mcp-setup.md`): global provider-agnostic MCP server catalog; rule file generation per active server + provider; automatic `.gitignore` entries for secrets files; secrets detection for MCP-generated content; platform bundles (`rules/2-platform/<platform>-mcp.yaml`). Closes #86.
 
 ### Security
 
