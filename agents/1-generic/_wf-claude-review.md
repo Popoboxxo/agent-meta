@@ -37,7 +37,7 @@ Nie in den `<!-- agent-meta:managed-begin/end -->` Block schreiben.
 
    **Auslagern in:**
    - Architekturdetails → `docs/ARCHITECTURE.md` (verlinken)
-   - Agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md`
+   - Agent-spezifisches Wissen → `{{EXTENSION_DIR}}/<prefix>-<rolle>-ext.md`
    - Gilt für alle Agenten → `.claude/rules/<thema>.md`
 
    **Hinweis:** agent-meta-Extensions (`-ext.md`) sind die bevorzugte Lösung —
@@ -57,5 +57,5 @@ Nie in den `<!-- agent-meta:managed-begin/end -->` Block schreiben.
 |--------|------|
 | Projektkontext, Tech-Stack, Architektur | `CLAUDE.md` |
 | Gilt für alle Agenten | `.claude/rules/` |
-| Nur für einen Agent-Typ | `.claude/3-project/<prefix>-<rolle>-ext.md` |
+| Nur für einen Agent-Typ | `{{EXTENSION_DIR}}/<prefix>-<rolle>-ext.md` |
 | Gilt für alle Projekte | Feedback → `rules/1-generic/` |

@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.0.0"
+version: "2.0.1"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
@@ -12,7 +12,7 @@ tools:
 
 # Meta-Feedback — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

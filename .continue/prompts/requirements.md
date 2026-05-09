@@ -5,6 +5,7 @@ invokable: true
 ---
 # Requirements Engineer — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-requirements-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.0.1"
+version: "1.0.2"
 description: "Spezialisierter Developer für parametrische 3D-Modelle in OpenSCAD. Render-Inspect-Refine Loop via MCP, Druckbarkeits-Wissen, Toleranz-Management."
 hint: "OpenSCAD-Code generieren: parametrische 3D-Modelle, Render-Feedback, STL-Export, Druck-Optimierung"
 tools:
@@ -12,7 +12,7 @@ tools:
 
 # OpenSCAD Developer — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-openscad-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-openscad-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

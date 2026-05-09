@@ -3,10 +3,11 @@ name: release
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 mode: subagent
 model: opencode-go/qwen3.6-plus
-generated-from: "1-generic/release.md@1.3.2"
+generated-from: "1-generic/release.md@1.3.3"
 ---
 # Release Manager — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -5,6 +5,7 @@ invokable: true
 ---
 # Meta-Feedback — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.3.2"
+version: "1.3.3"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
@@ -15,7 +15,7 @@ tools:
 
 # Release Manager — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

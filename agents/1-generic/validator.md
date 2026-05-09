@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.1.0"
+version: "2.1.1"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -13,7 +13,7 @@ tools:
 
 # Validator — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-validator-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-validator-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

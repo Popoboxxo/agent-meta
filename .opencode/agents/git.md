@@ -3,10 +3,11 @@ name: git
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
-generated-from: "1-generic/git.md@2.2.0"
+generated-from: "1-generic/git.md@2.2.1"
 ---
 # Git Agent — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-git-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 Du verantwortest alle Git-Operationen. Du schreibst keinen Produktionscode und führst keine Tests aus.
 

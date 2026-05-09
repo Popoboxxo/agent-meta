@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "1.4.3"
+version: "1.4.4"
 description: "Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
@@ -16,7 +16,7 @@ tools:
 
 # Tester — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-tester-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-tester-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
@@ -106,7 +106,7 @@ result = functionUnderTest(input)
 assert result == expectedValue
 ```
 
-Lies jetzt `.claude/snippets/{{TESTER_SNIPPETS_PATH}}` mit dem Read-Tool für
+Lies jetzt `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}` mit dem Read-Tool für
 sprachspezifische Syntax, Import-Statements und Framework-Patterns.
 
 ### Test-Isolation
@@ -145,7 +145,7 @@ test "[REQ-004] should add a video to the queue":
   assert queue[0].id == item.id
 ```
 
-Sprachspezifische Beispiele → `.claude/snippets/{{TESTER_SNIPPETS_PATH}}`
+Sprachspezifische Beispiele → `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}`
 
 ### Realitätsnahe Testdaten (PFLICHT)
 
@@ -161,7 +161,7 @@ item = { id: "yt-dQw4w9WgXcQ", name: "Rick Astley - Never Gonna Give You Up",
 ```
 
 Frage dich: *Würde dieser Wert in einem echten Produktiv-Request so aussehen?*
-Wenn nein → Daten anpassen. Sprachspezifische Beispiele → `.claude/snippets/{{TESTER_SNIPPETS_PATH}}`
+Wenn nein → Daten anpassen. Sprachspezifische Beispiele → `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}`
 
 ### Kein Test um des Tests willen
 

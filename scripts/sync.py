@@ -60,7 +60,7 @@ from lib.rules import sync_rules, sync_speech_mode, create_rule, resolve_rules
 from lib.hooks import sync_hooks, create_hook
 from lib.commands import sync_commands_for_provider, create_command
 from lib.skills import (
-    load_external_skills_config, check_pinned_commits, sync_external_skills, add_skill,
+    load_external_skills_config, check_pinned_commits, sync_external_skills_for_provider, add_skill,
 )
 from lib.extensions import create_extension, update_extensions
 from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
@@ -69,7 +69,7 @@ from lib.io import SyncError
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
-    init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets,
+    init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
 )
 
 # ---------------------------------------------------------------------------
@@ -94,13 +94,19 @@ _CONFIG_CANDIDATES = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _collect_skill_gitignore_entries(config: dict, ext_config: dict) -> list[str]:
+def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_config: dict) -> list[str]:
     """Return .gitignore paths for skills with gitignore: true in project config.
 
     Only generates entries for skills that are approved + enabled (two-gate).
+    Generates one entry per active provider so that skill files in all provider
+    directories are properly gitignored when requested.
     """
     entries: list[str] = []
     project_skills = config.get("external-skills", {})
+    providers = config.get("ai-providers", config.get("ai-provider", ["Claude"]))
+    if isinstance(providers, str):
+        providers = [providers]
+
     for skill_name, skill_project_cfg in project_skills.items():
         if not skill_project_cfg.get("gitignore", False):
             continue
@@ -109,7 +115,11 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict) -> list[str
             continue
         if not skill_project_cfg.get("enabled", False):
             continue
-        entries.append(f".claude/skills/{skill_name}/")
+        for provider in providers:
+            pc = provider_config.get(provider, {})
+            skills_dir = pc.get("skills_dir")
+            if skills_dir:
+                entries.append(f"{skills_dir}/{skill_name}/")
     return entries
 
 
@@ -361,11 +371,13 @@ def main():
                                       log, args.dry_run, provider, provider_config)
             if provider == "Continue":
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
-                                          variables, log, args.dry_run)
+                                          variables, log, args.dry_run,
+                                          provider_config=provider_config)
             if pc["has_rules"]:
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                            platform_vars=platform_vars, variables=variables,
-                           rules_dir=pc.get("rules_dir"), provider=provider)
+                           rules_dir=pc.get("rules_dir"), provider=provider,
+                           provider_config=provider_config)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                                  rules_dir=pc.get("rules_dir"))
             # MCP: generate rule files + provider configs + collect gitignore entries
@@ -384,12 +396,18 @@ def main():
             if pc["has_hooks"]:
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)
+            else:
+                log.info("hooks", f"skipped for {provider} — not supported")
             if pc.get("has_commands", False):
                 sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                            args.dry_run, provider,
                                            provider_config=provider_config,
                                            variables=variables)
-        sync_snippets(agent_meta_root, project_root, config, log, args.dry_run)
+            # Sync snippets and external skills per provider
+            sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
+                                       provider, provider_config)
+            sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
+                                              log, args.dry_run, provider, provider_config)
         # Provider isolation: hard-block cross-provider directory access
         isolation_mode = config.get("provider-isolation")
         if isolation_mode != "disabled":
@@ -406,7 +424,6 @@ def main():
                     log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
                     log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
-        sync_external_skills(agent_meta_root, project_root, config, variables, log, args.dry_run)
         # Update .gitignore managed block: base entries + per-provider entries + skill entries
         # Collect gitignore_entries from all active non-Claude providers
         extra_provider_entries: list[str] = []
@@ -418,7 +435,7 @@ def main():
                 log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
             extra_provider_entries.extend(_pc.get("gitignore_entries", []))
         if is_claude:
-            skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config)
+            skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config, provider_config)
             all_gitignore_entries = (
                 base_gitignore_entries + extra_provider_entries
                 + skill_gitignore_entries + mcp_gitignore_extras

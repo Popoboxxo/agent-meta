@@ -5,6 +5,7 @@ invokable: true
 ---
 # Release Manager — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

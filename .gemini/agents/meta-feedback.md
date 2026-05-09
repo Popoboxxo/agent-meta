@@ -1,9 +1,9 @@
 ---
 name: meta-feedback
 model: gemini-2.5-flash
-version: "2.0.0"
+version: "2.0.1"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
-generated-from: "1-generic/meta-feedback.md@2.0.0"
+generated-from: "1-generic/meta-feedback.md@2.0.1"
 hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
   - Bash
@@ -13,6 +13,7 @@ tools:
 ---
 # Meta-Feedback — agent-meta
 
+> **Extension:** Falls `.gemini/3-project/am-meta-feedback-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -3,10 +3,11 @@ name: documenter
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 mode: subagent
 model: opencode-go/qwen3.6-plus
-generated-from: "1-generic/documenter.md@1.3.2"
+generated-from: "1-generic/documenter.md@1.3.3"
 ---
 # Documenter — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

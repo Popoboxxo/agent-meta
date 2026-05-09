@@ -1,12 +1,12 @@
 # Lifecycle-Tasks — Ausstehende Aufgaben prüfen
 
-Beim Start einer neuen Konversation: prüfe ob `.claude/pending-tasks.md` existiert.
+Beim Start einer neuen Konversation: prüfe ob `{{PENDING_TASKS_FILE}}` existiert.
 
 ## Pflicht beim Konversations-Start
 
 ```bash
 # Prüfen ob Lifecycle-Tasks ausstehen
-test -f .claude/pending-tasks.md && cat .claude/pending-tasks.md
+test -f {{PENDING_TASKS_FILE}} && cat {{PENDING_TASKS_FILE}}
 ```
 
 Wenn die Datei existiert und offene Tasks enthält (`- [ ]`):
@@ -18,7 +18,7 @@ Wenn die Datei existiert und offene Tasks enthält (`- [ ]`):
 
 3. Wenn User bestätigt → delegiere Tasks an die genannten Agenten.
 
-4. Nach Erledigung aller Tasks: lösche `.claude/pending-tasks.md`.
+4. Nach Erledigung aller Tasks: lösche `{{PENDING_TASKS_FILE}}`.
 
 ## Wann diese Rule greift
 
@@ -39,4 +39,4 @@ lifecycle-triggers:
 ## Wenn keine Tasks offen sind
 
 Datei existiert nicht oder enthält keine `- [ ]` Zeilen → nichts tun.
-Datei nicht committen — sie ist gitignored (`.claude/pending-tasks.md`).
+Datei nicht committen — sie ist gitignored (`{{PENDING_TASKS_FILE}}`).

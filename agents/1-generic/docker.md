@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.3.2"
+version: "1.3.3"
 description: "Docker-Operationen: Compose-Stacks, Binary-Management, Test-Umgebungen und Diagnose — plattformunabhängig."
 hint: "Dev-Stack starten/stoppen, Dockerfiles, Binary-Management"
 tools:
@@ -15,7 +15,7 @@ tools:
 
 # Docker — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-docker-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-docker-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

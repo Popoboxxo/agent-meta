@@ -51,12 +51,19 @@ def _load_config(path: Path) -> dict:
 # Pending tasks file
 # ---------------------------------------------------------------------------
 
-PENDING_FILE = ".claude/pending-tasks.md"
 PENDING_HEADER = "# Ausstehende Lifecycle-Tasks\n\n"
 PENDING_FOOTER = (
     "\n---\n"
     "_Generiert von lifecycle-check.py — lösche diese Datei wenn alle Tasks erledigt sind._\n"
 )
+
+# Provider-specific pending-tasks paths (kept in sync with config/ai-providers.yaml)
+_PROVIDER_PENDING_FILES: dict[str, str] = {
+    "Claude":   ".claude/pending-tasks.md",
+    "Opencode": ".opencode/pending-tasks.md",
+    "Gemini":   ".gemini/pending-tasks.md",
+    "Continue": ".continue/pending-tasks.md",
+}
 
 TRIGGER_LABELS = {
     "on-commit":              "Commit",
@@ -76,9 +83,9 @@ def _read_existing_tasks(path: Path) -> list[str]:
     return [l for l in lines if l.startswith("- [ ]")]
 
 
-def write_pending_tasks(project_root: Path, event: str, tasks: list[dict]) -> None:
-    """Append new pending tasks to .claude/pending-tasks.md."""
-    pending_path = project_root / PENDING_FILE
+def write_pending_tasks(project_root: Path, event: str, tasks: list[dict], pending_file: str) -> None:
+    """Append new pending tasks to the given pending-tasks file."""
+    pending_path = project_root / pending_file
     pending_path.parent.mkdir(parents=True, exist_ok=True)
 
     existing = _read_existing_tasks(pending_path)
@@ -111,7 +118,7 @@ def write_pending_tasks(project_root: Path, event: str, tasks: list[dict]) -> No
             PENDING_HEADER + section + PENDING_FOOTER, encoding="utf-8"
         )
 
-    print(f"lifecycle-check: {len(new_items)} task(s) added to {PENDING_FILE} (trigger: {event})")
+    print(f"lifecycle-check: {len(new_items)} task(s) added to {pending_file} (trigger: {event})")
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +154,13 @@ def main() -> None:
     if not tasks:
         sys.exit(0)
 
-    write_pending_tasks(project_root, event, tasks)
+    # Write to all active provider pending-files (multi-provider support)
+    providers = config.get("ai-providers", config.get("ai-provider", ["Claude"]))
+    if isinstance(providers, str):
+        providers = [providers]
+    for provider in providers:
+        pending_file = _PROVIDER_PENDING_FILES.get(provider, ".claude/pending-tasks.md")
+        write_pending_tasks(project_root, event, tasks, pending_file)
 
 
 if __name__ == "__main__":

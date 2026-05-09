@@ -28,5 +28,5 @@
    python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
 
 9. git → Commit: "chore: upgrade agent-meta to v<neu>"
-   Dateien: .claude/agents/ .claude/3-project/ .agent-meta .meta-config/project.yaml
+   Dateien: .claude/agents/ {{EXTENSION_DIR}}/ .agent-meta .meta-config/project.yaml
 ```

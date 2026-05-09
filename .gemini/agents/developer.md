@@ -20,6 +20,7 @@ based-on: 1-generic/developer.md@2.0.1
 ---
 # Developer — agent-meta
 
+> **Extension:** Falls `.gemini/3-project/am-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

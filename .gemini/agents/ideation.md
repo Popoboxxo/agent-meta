@@ -1,8 +1,8 @@
 ---
 name: ideation
-version: "1.2.2"
+version: "1.2.3"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
-generated-from: "1-generic/ideation.md@1.2.2"
+generated-from: "1-generic/ideation.md@1.2.3"
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
   - Read
@@ -16,6 +16,7 @@ tools:
 ---
 # Ideation — agent-meta
 
+> **Extension:** Falls `.gemini/3-project/am-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

@@ -1,9 +1,9 @@
 ---
 name: agent-meta-manager
 model: claude-sonnet-4-6
-version: "1.4.2"
+version: "1.4.3"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
-generated-from: "1-generic/agent-meta-manager.md@1.4.2"
+generated-from: "1-generic/agent-meta-manager.md@1.4.3"
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash

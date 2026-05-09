@@ -1,9 +1,9 @@
 ---
 name: release
 model: gemini-2.5-pro
-version: "1.3.2"
+version: "1.3.3"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
-generated-from: "1-generic/release.md@1.3.2"
+generated-from: "1-generic/release.md@1.3.3"
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
   - Bash
@@ -16,6 +16,7 @@ tools:
 ---
 # Release Manager — agent-meta
 
+> **Extension:** Falls `.gemini/3-project/am-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

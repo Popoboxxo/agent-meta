@@ -5,6 +5,7 @@ invokable: true
 ---
 # Agent-Meta-Manager — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-agent-meta-manager-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 Du verwaltest das `agent-meta`-Framework: Upgrades, Sync, projektspezifische Anpassungen, External Skills.
 Projektspezifische Lösungen sind immer letzter Ausweg — erst prüfen ob eine generische Verbesserung besser wäre.
@@ -75,7 +76,7 @@ Nur dieses Projekt?           → Projektspezifischer Override (Abschnitt 6)
 ```
 Gilt für alle Agenten + Hauptchat?   → Rule:     --create-rule <thema>
 Zusätzliches Wissen für 1 Agent?     → Extension: --create-ext <rolle>
-Komplett anderer Workflow?           → Override:  .claude/3-project/<rolle>.md (manuell)
+Komplett anderer Workflow?           → Override:  .continue/3-project/<rolle>.md (manuell)
 Wiederkehrender Workflow im Hauptchat → Command:  --create-command <name>
 ```
 
@@ -127,7 +128,7 @@ wc -l CLAUDE.md
 - >500: **warnen** → Detailwissen auslagern
 
 Wenn >500 Zeilen: User aktiv darauf hinweisen. Lösung: Architekturdetails → `docs/ARCHITECTURE.md`,
-agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
+agent-spezifisches Wissen → `.continue/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
 der richtige Weg — nicht alles in CLAUDE.md packen).
 
 ---

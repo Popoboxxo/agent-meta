@@ -2,9 +2,9 @@
 name: documenter
 model: claude-sonnet-4-6
 memory: project
-version: "1.3.2"
+version: "1.3.3"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
-generated-from: "1-generic/documenter.md@1.3.2"
+generated-from: "1-generic/documenter.md@1.3.3"
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
   - Read

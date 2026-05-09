@@ -2,10 +2,11 @@
 name: requirements
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 mode: subagent
-generated-from: "1-generic/requirements.md@1.3.2"
+generated-from: "1-generic/requirements.md@1.3.3"
 ---
 # Requirements Engineer — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-requirements-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

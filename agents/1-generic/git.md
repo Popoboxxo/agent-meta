@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.2.0"
+version: "2.2.1"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
@@ -14,7 +14,7 @@ tools:
 
 # Git Agent — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-git-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-git-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 Du verantwortest alle Git-Operationen. Du schreibst keinen Produktionscode und führst keine Tests aus.
 

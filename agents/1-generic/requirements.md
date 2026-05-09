@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.3.2"
+version: "1.3.3"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
@@ -14,7 +14,7 @@ tools:
 
 # Requirements Engineer — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-requirements-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-requirements-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

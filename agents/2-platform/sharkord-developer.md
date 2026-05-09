@@ -1,6 +1,6 @@
 ---
 name: sharkord-developer
-version: "2.1.0"
+version: "2.1.1"
 based-on: "1-generic/developer.md@1.4.1"
 description: "Sharkord-spezifischer Developer-Agent. Ergänzt den generischen Developer um Sharkord-Build-Kommandos. Das Sharkord Plugin-SDK Wissen (PluginContext API, Mediasoup, Commands, Events, Don'ts) kommt automatisch aus der Rule rules/2-platform/sharkord-sdk.md."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs (Sharkord Plugin SDK)"
@@ -34,6 +34,6 @@ patches:
       - KEINE Implementierung ohne dass eine REQ-ID in `docs/REQUIREMENTS.md` existiert
       - KEIN Code ohne zugehörigen Test (mindestens Test-Skeleton für den Tester)
 
-      <!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in .claude/3-project/{{PREFIX}}-developer-ext.md -->
+      <!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in {{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md -->
       {{EXTRA_DONTS}}
 ---

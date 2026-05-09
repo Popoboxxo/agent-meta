@@ -75,13 +75,13 @@ def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
     return "unknown"
 
 
-def build_additional_files_section(skill_name: str, additional_files: list[str]) -> str:
+def build_additional_files_section(skill_name: str, additional_files: list[str], skill_base_path: str) -> str:
     """Render the additional_files read-list for the wrapper template."""
     if not additional_files:
         return "_Keine weiteren Referenzdateien konfiguriert._"
     lines = ["Falls du detaillierte Referenzen brauchst, lies mit dem Read-Tool:"]
     for f in additional_files:
-        lines.append(f"- `.claude/skills/{skill_name}/{f}`")
+        lines.append(f"- `{skill_base_path}/{f}`")
     return "\n".join(lines)
 
 
@@ -111,25 +111,33 @@ def normalize_skill_paths(content: str, skill_base_path: str) -> str:
     return content
 
 
-def sync_external_skills(
+def sync_external_skills_for_provider(
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider: str,
+    provider_config: dict,
 ):
-    """Generate .claude/agents/<role>.md wrapper agents for approved + project-enabled skills.
+    """Generate provider-specific wrapper agents for approved + project-enabled skills.
 
     Two-gate check per skill:
     1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
     2. enabled:  true in .meta-config/project.yaml        (project opt-in)
+
+    Skill files are copied into the provider-specific skills_dir so that every
+    active provider gets its own self-contained skill reference tree.
     """
     from .agents import AGENTS_DIR, EXTERNAL_DIR, SKILL_WRAPPER
     from .config import substitute
 
-    CLAUDE_AGENTS_DIR = ".claude/agents"
-    CLAUDE_SKILLS_DIR = ".claude/skills"
+    pc = provider_config.get(provider, {})
+    agents_dir_rel = pc.get('agents_dir', '.claude/agents')
+    skills_dir_rel = pc.get('skills_dir', '.claude/skills')
+    agents_dir = project_root / agents_dir_rel
+    skills_dir = project_root / skills_dir_rel
 
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
@@ -142,11 +150,10 @@ def sync_external_skills(
         return
 
     wrapper_template = wrapper_path.read_text(encoding="utf-8")
-    agents_dir = project_root / CLAUDE_AGENTS_DIR
-    skills_dir = project_root / CLAUDE_SKILLS_DIR
 
     for skill_name, skill_cfg in skills.items():
-        role_label = f".claude/agents/{skill_cfg.get('role', skill_name)}.md"
+        role = skill_cfg.get('role', skill_name)
+        role_label = f"{agents_dir_rel}/{role}.md"
         if not skill_cfg.get("approved", False):
             log.info(role_label, f"skill '{skill_name}' not approved — skipping")
             continue
@@ -160,7 +167,6 @@ def sync_external_skills(
         local_path = repo_cfg.get("local_path", f"external/{repo_key}")
         source_rel    = skill_cfg.get("source", "")
         entry_file    = skill_cfg.get("entry", "SKILL.md")
-        role          = skill_cfg.get("role", skill_name)
         display_name  = skill_cfg.get("name", skill_name)
         description   = skill_cfg.get("description", "")
         additional    = skill_cfg.get("additional_files", [])
@@ -183,8 +189,8 @@ def sync_external_skills(
 
         commit = get_skill_commit(agent_meta_root, local_path)
 
-        # Canonical paths in the target project
-        skill_base_path  = f".claude/skills/{skill_name}"
+        # Canonical paths in the target project (provider-specific)
+        skill_base_path  = f"{skills_dir_rel}/{skill_name}"
         skill_entry_path = f"{skill_base_path}/{entry_file}"
 
         # Build skill-specific variables (extend project variables)
@@ -197,7 +203,7 @@ def sync_external_skills(
         skill_vars["SKILL_ENTRY_PATH"]    = skill_entry_path
         skill_vars["SKILL_BASE_PATH"]     = skill_base_path
         skill_vars["SKILL_ADDITIONAL_FILES_SECTION"] = build_additional_files_section(
-            skill_name, additional
+            skill_name, additional, skill_base_path
         )
 
         # Generate thin wrapper agent (no inline skill content)
@@ -208,7 +214,7 @@ def sync_external_skills(
         log.action("WRITE", str(agent_target.relative_to(project_root)),
                    f"0-external/{skill_name}@{commit}")
 
-        # Copy + normalize skill files to .claude/skills/<skill_name>/
+        # Copy + normalize skill files to <provider>/skills/<skill_name>/
         skill_target_dir = safe_path(skills_dir, skill_name)
 
         # Entry file: copy and normalize relative paths
@@ -227,7 +233,7 @@ def sync_external_skills(
             agent_target.write_text(agent_content, encoding="utf-8")
             skill_target_dir.mkdir(parents=True, exist_ok=True)
 
-            # Normalize ./ref paths in entry file → .claude/skills/<skill>/ref
+            # Normalize ./ref paths in entry file → <provider>/skills/<skill>/ref
             entry_content = entry_path.read_text(encoding="utf-8")
             entry_content = normalize_skill_paths(entry_content, skill_base_path)
             (skill_target_dir / entry_file).write_text(entry_content, encoding="utf-8")

@@ -125,6 +125,7 @@ def sync_rules(
     variables: dict | None = None,
     rules_dir: str | None = None,
     provider: str = "Claude",
+    provider_config: dict | None = None,
 ):
     """Copy rule files from agent-meta/rules/ layers to <rules_dir>/ in the project.
 
@@ -140,6 +141,15 @@ def sync_rules(
     """
     from .platform import substitute_platform
     from .config import substitute
+
+    pc = (provider_config or {}).get(provider, {})
+    provider_vars = {
+        'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
+        'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
+        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
+        'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+    }
+    merged_vars = {**variables, **provider_vars} if variables is not None else provider_vars
 
     platforms = config.get("platforms", [])
     sources = collect_rule_sources(agent_meta_root, platforms)
@@ -179,8 +189,7 @@ def sync_rules(
         layer = source_path.parts[-2]
         rel_source = f"rules/{layer}/{source_path.name}"
 
-        if variables is not None:
-            source_content = substitute(source_content, variables, rel_source, log)
+        source_content = substitute(source_content, merged_vars, rel_source, log)
 
         if platform_vars is not None:
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)

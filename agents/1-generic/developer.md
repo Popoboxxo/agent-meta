@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.0.2"
+version: "2.0.3"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -16,7 +16,7 @@ tools:
 
 # Developer — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
@@ -78,7 +78,7 @@ Du implementierst Features und Bugfixes.
 
 Befolge **strikt die Best Practices der verwendeten Programmiersprache(n)**: `{{LANGUAGE}}`
 
-Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt sofort mit dem Read-Tool und wende alle Code-Patterns an.
+Falls `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt sofort mit dem Read-Tool und wende alle Code-Patterns an.
 
 ### Allgemein (projektübergreifend)
 
@@ -124,7 +124,7 @@ Falls `.claude/snippets/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 - KEIN Code ohne zugehörigen Test
 {{/if}}
 
-<!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in .claude/3-project/{{PREFIX}}-developer-ext.md -->
+<!-- PROJEKTSPEZIFISCH: Weitere Don'ts → in {{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md -->
 {{EXTRA_DONTS}}
 
 ## Delegation

@@ -2,10 +2,11 @@
 name: feature
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 mode: subagent
-generated-from: "1-generic/feature.md@1.3.0"
+generated-from: "1-generic/feature.md@1.3.1"
 ---
 # Feature — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-feature-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 
@@ -29,7 +30,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 ## Feature-Lifecycle
 
 > Schritte mit `∥` können parallel laufen (max. 4 gleichzeitig).
-> Verwende `run_in_background: true` für den zweiten Agenten im parallelen Paar.
+> Verwende das Parallel-Pattern des Orchestrators für den zweiten Agenten im parallelen Paar.
 
 ```
 1.     Branch anlegen       → git
@@ -121,7 +122,7 @@ Bei fehlgeschlagenen Tests: zurück zu Schritt 4 mit dem Testergebnis.
 ## Schritt 6∥7 — Validierung + Dokumentation (parallel)
 
 Diese beiden Schritte haben keine Abhängigkeit zueinander und können parallel laufen.
-Starte `validator` im Vordergrund und `documenter` im Hintergrund (`run_in_background: true`).
+Starte `validator` im Vordergrund und `documenter` im Hintergrund (parallel).
 
 **Validator** (Vordergrund):
 ```
@@ -135,7 +136,7 @@ Aufgabe: Validiere die Implementierung von [REQ-ID].
 
 **Documenter** (Hintergrund, parallel):
 ```
-Delegiere an: documenter  (run_in_background: true)
+Delegiere an: documenter  (parallel im Hintergrund)
 Aufgabe: Aktualisiere CODEBASE_OVERVIEW.md für die Änderungen aus [REQ-ID].
          Dokumentiere relevante Architektur-Entscheidungen falls vorhanden.
 ```

@@ -6,6 +6,7 @@ generated-from: "2-platform/agent-meta-developer.md@1.0.0"
 ---
 # Developer — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

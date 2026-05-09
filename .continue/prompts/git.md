@@ -5,6 +5,7 @@ invokable: true
 ---
 # Git Agent — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-git-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 Du verantwortest alle Git-Operationen. Du schreibst keinen Produktionscode und führst keine Tests aus.
 

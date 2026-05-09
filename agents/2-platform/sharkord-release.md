@@ -1,6 +1,6 @@
 ---
 name: sharkord-release
-version: "1.3.1"
+version: "1.3.2"
 based-on: "1-generic/release.md@1.3.0"
 description: "Sharkord-Plattform Release-Agent. Baut auf template-release auf. Konsolidiert alle Erfahrungen aus sharkord-vid-with-friends und sharkord-hero-introducer: Versionierung, Bun-Build, Artifact-Packaging, GitHub Release via gh CLI, Required Binaries, Windows PATH-Fix."
 hint: "Sharkord Plugin Release: Bun-Build, ZIP/TAR, GitHub Release via gh CLI"
@@ -16,7 +16,7 @@ tools:
 
 # Release Agent — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-release-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

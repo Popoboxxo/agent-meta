@@ -7,7 +7,6 @@ from pathlib import Path
 from .io import safe_path
 from .log import SyncLog
 
-CLAUDE_SNIPPETS_DIR = ".claude/snippets"
 SNIPPETS_DIR = "snippets"
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
@@ -188,7 +187,8 @@ def sync_context_for_provider(
             existing = target_path.read_text(encoding="utf-8")
             if managed_pattern.search(existing):
                 new_managed = _build_opencode_managed_block(
-                    agent_meta_root, config, variables, log
+                    agent_meta_root, config, variables, log,
+                    provider=provider, provider_config=provider_config
                 )
                 new_content = managed_pattern.sub(new_managed, existing, count=1)
                 if new_content != existing:
@@ -378,6 +378,8 @@ def _collect_embedded_rules_md(
     config: dict,
     variables: dict,
     log: SyncLog,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
 ) -> str:
     """Collect all active rules and return them as concatenated markdown.
 
@@ -386,6 +388,15 @@ def _collect_embedded_rules_md(
     """
     from .config import substitute
     from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
+
+    pc = (provider_config or {}).get(provider, {})
+    provider_vars = {
+        'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
+        'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
+        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
+        'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+    }
+    merged_vars = {**variables, **provider_vars}
 
     platforms = config.get('platforms', [])
     sources = collect_rule_sources(agent_meta_root, platforms)
@@ -400,8 +411,7 @@ def _collect_embedded_rules_md(
             continue
         content = source_path.read_text(encoding='utf-8')
         rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
-        if variables:
-            content = substitute(content, variables, rel_source, log)
+        content = substitute(content, merged_vars, rel_source, log)
         body = _strip_rule_frontmatter(content).strip()
         if body:
             sections.append(body)
@@ -423,6 +433,8 @@ def _build_opencode_managed_block(
     config: dict,
     variables: dict,
     log: SyncLog,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
 ) -> str:
     """Build the managed block for AGENTS.md: agent hints + all embedded rules."""
     from .config import substitute
@@ -430,7 +442,8 @@ def _build_opencode_managed_block(
     template = _load_claude_md_managed_template(agent_meta_root)
     managed = substitute(template, variables, 'AGENTS.md managed block', log)
 
-    rules_md = _collect_embedded_rules_md(agent_meta_root, config, variables, log)
+    rules_md = _collect_embedded_rules_md(agent_meta_root, config, variables, log,
+                                            provider=provider, provider_config=provider_config)
     if rules_md:
         managed = managed.replace(
             '<!-- agent-meta:managed-end -->',
@@ -694,6 +707,7 @@ def sync_prompts_for_continue(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider_config: dict | None = None,
 ):
     """Generate .continue/prompts/<role>.md as invokable slash-commands.
 
@@ -707,7 +721,7 @@ def sync_prompts_for_continue(
     """
     from .agents import (collect_sources, extract_frontmatter_field, compose_agent,
                           target_filename, _strip_frontmatter, _strip_claude_specific_lines,
-                          _make_slim_body, AGENTS_DIR)
+                          _make_slim_body, AGENTS_DIR, _PROVIDER_PARALLEL_PATTERNS)
     from .config import substitute
     from .providers import resolve_provider_options
     from .roles import build_role_map
@@ -715,6 +729,16 @@ def sync_prompts_for_continue(
     opts = resolve_provider_options(config, "Continue")
     if not opts.get("generate-prompts", False):
         return
+
+    pc = (provider_config or {}).get("Continue", {})
+    provider_vars = {
+        'EXTENSION_DIR': pc.get('extension_dir', '.continue/3-project'),
+        'SNIPPETS_DIR': pc.get('snippets_dir', '.continue/snippets'),
+        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.continue/pending-tasks.md'),
+        'SKILLS_DIR': pc.get('skills_dir', '.continue/skills'),
+        'PARALLEL_PATTERN': _PROVIDER_PARALLEL_PATTERNS.get("Continue", _PROVIDER_PARALLEL_PATTERNS["Claude"]),
+    }
+    merged_vars = {**variables, **provider_vars}
 
     role_map = build_role_map(agent_meta_root)
     prompt_mode = opts.get("prompt-mode", "full")
@@ -746,7 +770,7 @@ def sync_prompts_for_continue(
             content = compose_agent(base_path, content, log)
 
         rel_source = str(source_path.relative_to(agent_meta_root))
-        content = substitute(content, variables, rel_source, log)
+        content = substitute(content, merged_vars, rel_source, log)
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
         template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
@@ -794,14 +818,16 @@ def sync_prompts_for_continue(
         managed_index.write_text("\n".join(sorted(expected)) + "\n", encoding="utf-8")
 
 
-def sync_snippets(
+def sync_snippets_for_provider(
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
     log: SyncLog,
     dry_run: bool,
+    provider: str,
+    provider_config: dict,
 ):
-    """Copy snippet files from agent-meta/snippets/ to .claude/snippets/ in the project.
+    """Copy snippet files from agent-meta/snippets/ to the provider-specific snippets dir.
 
     Only copies snippets referenced via TESTER_SNIPPETS_PATH (or similar *_SNIPPETS_PATH
     variables) in the project config. Unknown snippet files are skipped.
@@ -809,9 +835,15 @@ def sync_snippets(
     """
     from .agents import extract_frontmatter_field
 
+    pc = provider_config.get(provider, {})
+    snippets_dir_rel = pc.get('snippets_dir')
+    if not snippets_dir_rel:
+        log.info("snippets", f"skipped for {provider} — no snippets_dir configured")
+        return
+
     variables = config.get("variables", {})
     snippets_root = agent_meta_root / SNIPPETS_DIR
-    target_root = project_root / CLAUDE_SNIPPETS_DIR
+    target_root = project_root / snippets_dir_rel
 
     if not snippets_root.exists():
         return

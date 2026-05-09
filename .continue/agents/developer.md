@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 # Developer — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-developer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

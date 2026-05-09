@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.3.2"
+version: "1.3.3"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
@@ -14,7 +14,7 @@ tools:
 
 # Documenter — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

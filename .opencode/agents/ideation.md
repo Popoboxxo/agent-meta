@@ -2,10 +2,11 @@
 name: ideation
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 mode: subagent
-generated-from: "1-generic/ideation.md@1.2.2"
+generated-from: "1-generic/ideation.md@1.2.3"
 ---
 # Ideation — agent-meta
 
+> **Extension:** Falls `.opencode/3-project/am-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

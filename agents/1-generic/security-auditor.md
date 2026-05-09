@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "1.1.0"
+version: "1.1.1"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution."
 hint: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse ohne Code-Ausführung"
 tools:
@@ -14,7 +14,7 @@ tools:
 
 # Security Auditor — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-security-auditor-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-security-auditor-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 > **Beta:** Findings sind Empfehlungen, kein Ersatz für professionelle Pentests.
 

@@ -20,6 +20,36 @@ EXTERNAL_DIR = "0-external"
 SKILL_WRAPPER = "_skill-wrapper.md"
 EXT_SUFFIX = "-ext"
 
+# Provider-specific parallel execution patterns (injected as {{PARALLEL_PATTERN}})
+_PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
+    "Claude": (
+        "**Parallel-Pattern (konkret):**\n"
+        "```\n"
+        '# Vordergrund:\n'
+        'Agent(subagent_type="validator", prompt="DoD-Check für ...")\n'
+        "# Gleichzeitig im Hintergrund:\n"
+        'Agent(subagent_type="documenter", prompt="Update CODEBASE_OVERVIEW ...", run_in_background=True)\n'
+        "# Dann warten bis Hintergrund fertig, dann:\n"
+        'Agent(subagent_type="git", prompt="Commit und PR erstellen ...")\n'
+        "```\n"
+    ),
+    "Opencode": (
+        "**Parallel-Pattern (konkret):**\n"
+        "Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `Agent`-Tool-Aufrufe.\n"
+        "Starte unabhängige Agenten nacheinander im selben Kontext — sie laufen implizit parallel.\n"
+    ),
+    "Gemini": (
+        "**Parallel-Pattern (konkret):**\n"
+        "Gemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\n"
+        "Delegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
+    ),
+    "Continue": (
+        "**Parallel-Pattern:**\n"
+        "Continue unterstützt keine native parallele Subagent-Ausführung.\n"
+        "Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
+    ),
+}
+
 
 def extract_frontmatter_field(content: str, field: str) -> str | None:
     """Extract a YAML frontmatter field value.
@@ -641,7 +671,17 @@ def sync_agents_for_provider(
         template_description = extract_frontmatter_field(content, 'description')
         description = (template_description or f'Agent for {project_name}.')
         description = description.replace('{{PROJECT_NAME}}', project_name)
-        content = substitute(content, variables, rel_source, log)
+
+        # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
+        provider_vars = {
+            'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
+            'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
+            'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
+            'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+            'PARALLEL_PATTERN': _PROVIDER_PARALLEL_PATTERNS.get(provider, _PROVIDER_PARALLEL_PATTERNS['Claude']),
+        }
+        merged_vars = {**variables, **provider_vars}
+        content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_dod_blocks(content, variables)
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:

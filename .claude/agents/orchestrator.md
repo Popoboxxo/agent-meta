@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.5.0"
+version: "2.6.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.5.0"
+generated-from: "1-generic/orchestrator.md@2.6.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -52,12 +52,12 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `release` | Versioning, Changelog, GitHub Release |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues |
 | `agent-meta-manager` | agent-meta Upgrade, Sync, Extensions anlegen |
-| `agent-meta-scout` | Claude-Ökosystem scouten — **nur auf explizite Anfrage** |
+| `agent-meta-scout` | KI-Ökosystem scouten — **nur auf explizite Anfrage** |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* |
 | `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* |
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* |
 
-Parallel: max. 4 Agenten. `run_in_background: true` für unabhängige Schritte (∥).
+Parallel: max. 4 Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
 
 **Parallel-Pattern (konkret):**
@@ -69,6 +69,7 @@ Agent(subagent_type="documenter", prompt="Update CODEBASE_OVERVIEW ...", run_in_
 # Dann warten bis Hintergrund fertig, dann:
 Agent(subagent_type="git", prompt="Commit und PR erstellen ...")
 ```
+
 
 ---
 

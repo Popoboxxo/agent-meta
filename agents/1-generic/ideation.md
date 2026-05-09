@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.2.2"
+version: "1.2.3"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -16,7 +16,7 @@ tools:
 
 # Ideation — {{PROJECT_NAME}}
 
-> **Extension:** Falls `.claude/3-project/{{PREFIX}}-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+> **Extension:** Falls `{{EXTENSION_DIR}}/{{PREFIX}}-ideation-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

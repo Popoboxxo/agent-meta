@@ -23,6 +23,11 @@ providers:
       committed-file: .claude/settings.json
       secrets-file: .claude/settings.local.json
       format: claude-settings
+    # Provider-specific directories for multi-provider orchestration
+    skills_dir: .claude/skills
+    snippets_dir: .claude/snippets
+    pending_tasks_file: .claude/pending-tasks.md
+    extension_dir: .claude/3-project
     # Model tiers: abstract tier name → provider-specific model ID.
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
@@ -61,6 +66,10 @@ providers:
       committed-file: .gemini/settings.json
       secrets-file: .gemini/settings.local.json
       format: gemini-settings
+    skills_dir: .gemini/skills
+    snippets_dir: .gemini/snippets
+    pending_tasks_file: .gemini/pending-tasks.md
+    extension_dir: .gemini/3-project
     model-tiers:
       nano:     gemini-2.5-flash            # ultra-fast, low-cost tasks
       fast:     gemini-2.5-flash            # quick ops: git, formatting
@@ -92,6 +101,10 @@ providers:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
       format: opencode-json
+    skills_dir: .opencode/skills
+    snippets_dir: .opencode/snippets
+    pending_tasks_file: .opencode/pending-tasks.md
+    extension_dir: .opencode/3-project
     # opencode-go model IDs — format: opencode-go/<model-id>
     # Full list: https://opencode.ai/docs/go/
     model-tiers:
@@ -128,3 +141,7 @@ providers:
     # Continue manages models centrally in .continue/config.yaml — no per-agent model.
     model-tiers: {}
     model-aliases: {}
+    skills_dir: .continue/skills
+    snippets_dir: .continue/snippets
+    pending_tasks_file: .continue/pending-tasks.md
+    extension_dir: .continue/3-project

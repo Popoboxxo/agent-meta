@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 # Documenter — agent-meta
 
+> **Extension:** Falls `.continue/3-project/am-documenter-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 ---
 

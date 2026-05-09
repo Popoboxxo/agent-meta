@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.35.0 — `2026-05-09`
+Generiert von agent-meta v0.35.0 — `2026-05-10`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -14,7 +14,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | Agent | Zuständigkeit |
 |-------|--------------|
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
+| `agent-meta-scout` | KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
 | `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
@@ -208,13 +208,13 @@ rollenspezifische Zuordnung konkretisiert ihn.
 
 # Lifecycle-Tasks — Ausstehende Aufgaben prüfen
 
-Beim Start einer neuen Konversation: prüfe ob `.claude/pending-tasks.md` existiert.
+Beim Start einer neuen Konversation: prüfe ob `.opencode/pending-tasks.md` existiert.
 
 ## Pflicht beim Konversations-Start
 
 ```bash
 # Prüfen ob Lifecycle-Tasks ausstehen
-test -f .claude/pending-tasks.md && cat .claude/pending-tasks.md
+test -f .opencode/pending-tasks.md && cat .opencode/pending-tasks.md
 ```
 
 Wenn die Datei existiert und offene Tasks enthält (`- [ ]`):
@@ -226,7 +226,7 @@ Wenn die Datei existiert und offene Tasks enthält (`- [ ]`):
 
 3. Wenn User bestätigt → delegiere Tasks an die genannten Agenten.
 
-4. Nach Erledigung aller Tasks: lösche `.claude/pending-tasks.md`.
+4. Nach Erledigung aller Tasks: lösche `.opencode/pending-tasks.md`.
 
 ## Wann diese Rule greift
 
@@ -247,7 +247,7 @@ lifecycle-triggers:
 ## Wenn keine Tasks offen sind
 
 Datei existiert nicht oder enthält keine `- [ ]` Zeilen → nichts tun.
-Datei nicht committen — sie ist gitignored (`.claude/pending-tasks.md`).
+Datei nicht committen — sie ist gitignored (`.opencode/pending-tasks.md`).
 
 ---
 

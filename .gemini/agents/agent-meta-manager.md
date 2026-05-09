@@ -1,9 +1,9 @@
 ---
 name: agent-meta-manager
 model: gemini-2.5-pro
-version: "1.4.2"
+version: "1.4.3"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
-generated-from: "1-generic/agent-meta-manager.md@1.4.2"
+generated-from: "1-generic/agent-meta-manager.md@1.4.3"
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
   - Bash
@@ -18,6 +18,7 @@ tools:
 ---
 # Agent-Meta-Manager — agent-meta
 
+> **Extension:** Falls `.gemini/3-project/am-agent-meta-manager-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
 
 Du verwaltest das `agent-meta`-Framework: Upgrades, Sync, projektspezifische Anpassungen, External Skills.
 Projektspezifische Lösungen sind immer letzter Ausweg — erst prüfen ob eine generische Verbesserung besser wäre.
@@ -88,7 +89,7 @@ Nur dieses Projekt?           → Projektspezifischer Override (Abschnitt 6)
 ```
 Gilt für alle Agenten + Hauptchat?   → Rule:     --create-rule <thema>
 Zusätzliches Wissen für 1 Agent?     → Extension: --create-ext <rolle>
-Komplett anderer Workflow?           → Override:  .claude/3-project/<rolle>.md (manuell)
+Komplett anderer Workflow?           → Override:  .gemini/3-project/<rolle>.md (manuell)
 Wiederkehrender Workflow im Hauptchat → Command:  --create-command <name>
 ```
 
@@ -140,7 +141,7 @@ wc -l CLAUDE.md
 - >500: **warnen** → Detailwissen auslagern
 
 Wenn >500 Zeilen: User aktiv darauf hinweisen. Lösung: Architekturdetails → `docs/ARCHITECTURE.md`,
-agent-spezifisches Wissen → `.claude/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
+agent-spezifisches Wissen → `.gemini/3-project/<prefix>-<rolle>-ext.md` (Extensions sind
 der richtige Weg — nicht alles in CLAUDE.md packen).
 
 ---
