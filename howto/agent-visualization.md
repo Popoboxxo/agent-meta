@@ -73,6 +73,17 @@ viz:
     session_timeout_min: 5     # Session-Ende nach X Minuten Inaktivität
 ```
 
+**Oder via CLI (überschreibt Config):**
+
+```bash
+python .agent-meta/scripts/sync.py --viz-mode dynamic
+```
+
+Gültige Werte für `mode`:
+- `off` — Keine Visualisierung (default)
+- `static` — Nur Mindmap generieren
+- `dynamic` — Mindmap + Event-Logging in Agenten
+
 ### Wie es funktioniert
 
 1. **Agenten schreiben Events** — Jeder generierte Agent bekommt einen Prompt-Block, der ihn auffordert, seine Aktionen in `events.jsonl` zu protokollieren.
@@ -89,6 +100,29 @@ Jede Zeile ist ein gültiges JSON-Objekt:
 {"ts":"2026-05-10T19:01:00Z","event":"agent_end","agent":"developer","status":"success"}
 ```
 
+### Manuelle Event-Erstellung
+
+Wenn Agenten das automatische Logging nicht verwenden, können Events manuell in die JSONL-Datei geschrieben werden:
+
+```bash
+# Session starten
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_start","agent":"user","payload":{"task":"Meine Aufgabe"}}' >> .agent-meta/viz/events.jsonl
+
+# Agent starten
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_start","agent":"orchestrator","provider":"Claude"}' >> .agent-meta/viz/events.jsonl
+
+# Delegation
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"delegate","from":"orchestrator","to":"developer"}' >> .agent-meta/viz/events.jsonl
+
+# Agent beenden
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_end","agent":"developer","status":"success"}' >> .agent-meta/viz/events.jsonl
+
+# Session beenden
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_end","agent":"user"}' >> .agent-meta/viz/events.jsonl
+```
+
+**Wichtig:** Jede Zeile muss ein gültiges JSON-Objekt sein. Nutze `>>` zum Anhängen.
+
 **Event-Typen:**
 
 | Event | Beschreibung |
@@ -100,6 +134,16 @@ Jede Zeile ist ein gültiges JSON-Objekt:
 | `delegate` | Delegation von A an B |
 | `tool_call` | Agent führt Tool aus |
 | `log` | Freitext-Log |
+
+### Commands (Schnellzugriff)
+
+Folgende Commands stehen zur Verfügung (automatisch in `.claude/commands/` generiert):
+
+| Command | Zweck |
+|---------|-------|
+| `/viz-mindmap` | Statische Mindmap generieren |
+| `/viz-report` | Session-Report anzeigen (Terminal/HTML/JSON) |
+| `/viz-watch` | Live-Monitoring starten |
 
 ### CLI-Tool: `viz-report.py`
 
