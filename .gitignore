@@ -7,9 +7,9 @@ CLAUDE.personal.md
 sync.log
 
 # --- agent-meta managed (do not edit) ---
-.agent-meta/viz/
-.agent-meta/viz/events-*.jsonl
-.agent-meta/viz/session-reports/
+.meta-viz/
+.meta-viz/events-*.jsonl
+.meta-viz/session-reports/
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
@@ -34,6 +34,6 @@ sync.log
 .kiro/steering/code-review-graph.md
 
 # agent-meta viz sessions (never commit runtime events)
-.agent-meta/viz/
-.agent-meta/viz/events-*.jsonl
-.agent-meta/viz/session-reports/
+.meta-viz/
+.meta-viz/events-*.jsonl
+.meta-viz/session-reports/

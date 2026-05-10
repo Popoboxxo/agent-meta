@@ -358,15 +358,15 @@ Jeder generierte Agent bekommt im Prompt einen Abschnitt:
 ## Visualization Reporting (Optional)
 Wenn der Visualisierungsmodus aktiviert ist, berichte deinen Status:
 
-- **Beim Start:** `write_file(".agent-meta/viz/events.jsonl", append)` mit:
+- **Beim Start:** `write_file(".meta-viz/events.jsonl", append)` mit:
   ```json
   {"ts":"2026-05-10T19:12:34Z","event":"agent_start","agent":"orchestrator","task":"Fix bug #42"}
   ```
-- **Bei Delegation:** `write_file(".agent-meta/viz/events.jsonl", append)` mit:
+- **Bei Delegation:** `write_file(".meta-viz/events.jsonl", append)` mit:
   ```json
   {"ts":"2026-05-10T19:12:35Z","event":"delegate","from":"orchestrator","to":"developer","prompt":"Fix bug #42 in auth.py"}
   ```
-- **Beim Ende:** `write_file(".agent-meta/viz/events.jsonl", append)` mit:
+- **Beim Ende:** `write_file(".meta-viz/events.jsonl", append)` mit:
   ```json
   {"ts":"2026-05-10T19:13:11Z","event":"agent_end","agent":"orchestrator","status":"success"}
   ```
@@ -386,7 +386,7 @@ Wenn der Visualisierungsmodus aktiviert ist, berichte deinen Status:
 viz:
   enabled: true           # Feature 1: Statische Mindmap
   mode: "dynamic"         # Feature 2: "static" | "dynamic" | "off"
-  event_log: ".agent-meta/viz/events.jsonl"
+  event_log: ".meta-viz/events.jsonl"
 ```
 
 Oder CLI:
@@ -491,7 +491,7 @@ Wenn `viz.mode: dynamic` aktiv, injiziert `sync.py` in **jeden generierten Agent
 
 ```markdown
 ## Event Logging (Visualization Mode)
-Wenn du eine Aktion beginnst oder beendest, schreibe ein Event in `.agent-meta/viz/events.jsonl`.
+Wenn du eine Aktion beginnst oder beendest, schreibe ein Event in `.meta-viz/events.jsonl`.
 
 ### Format
 ```json
@@ -563,7 +563,7 @@ viz:
   
   # Feature 2: Dynamischer Modus
   mode: "dynamic"            # "off" | "static" | "dynamic"
-  event_log: ".agent-meta/viz/events.jsonl"
+  event_log: ".meta-viz/events.jsonl"
   
   # Optional: Welche Events geloggt werden
   events:

@@ -140,7 +140,7 @@ viz:
   mode: "full"        # off | static | dynamic | full
 ```
 
-When `dynamic` or `full`, every generated agent receives a prompt block that instructs it to log events (`agent_start`, `delegate`, `agent_end`, `tool_call`) to `.agent-meta/viz/events.jsonl`.
+When `dynamic` or `full`, every generated agent receives a prompt block that instructs it to log events (`agent_start`, `delegate`, `agent_end`, `tool_call`) to `.meta-viz/events.jsonl`.
 
 ### Session Reports
 

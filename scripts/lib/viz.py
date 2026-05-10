@@ -8,6 +8,8 @@ from pathlib import Path
 from .log import SyncLog
 from .io import write_checked
 from .agents import collect_sources, extract_frontmatter_field
+from .roles import resolve_model
+from .providers import load_providers_config
 
 # Standardisierte Hierarchie: wer delegiert an wen
 # Wird aus Beschreibungen und bekannten Workflows abgeleitet
@@ -38,15 +40,17 @@ _TIER_COLORS = {
 }
 
 
-def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dict) -> dict:
+def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dict, provider_config: dict | None = None) -> dict:
     """Baue die Agenten-Hierarchie aus allen verfügbaren Quellen.
 
     Sammelt 1-generic, 2-platform, 3-project und 0-external Skills.
     Extrahiert Frontmatter: description, model, memory, workflow_tier.
+    Löst das Modell pro konfiguriertem Provider über resolve_model() auf.
     """
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
     agents: dict[str, dict] = {}
+    providers = config.get("ai-providers", [])
 
     for role, path in overrides.items():
         if role.startswith("_"):
@@ -58,14 +62,29 @@ def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dic
 
         description = extract_frontmatter_field(content, "description") or ""
         tier = _infer_tier(role, config)
-        model = extract_frontmatter_field(content, "model") or ""
         memory = extract_frontmatter_field(content, "memory") or ""
+
+        # Resolve model per provider so the viz shows the actual assigned model
+        models_by_provider: dict[str, str] = {}
+        for provider in providers:
+            resolved = resolve_model(role, config, agent_meta_root,
+                                     provider=provider, provider_config=provider_config)
+            if resolved:
+                models_by_provider[provider] = resolved
+
+        # If all providers resolve to the same model, collapse to a single value
+        unique_models = set(models_by_provider.values())
+        if len(unique_models) == 1:
+            model = list(unique_models)[0]
+        else:
+            model = ""
 
         agents[role] = {
             "name": role,
             "description": description,
             "tier": tier,
             "model": model,
+            "models_by_provider": models_by_provider,
             "memory": memory,
             "source": str(path),
             "children": _DELEGATION_MAP.get(role, []),
@@ -135,8 +154,17 @@ def render_mermaid_mindmap(agents: dict, config: dict) -> str:
         lines.append(f"- **Tier:** {agent.get('tier', '-')}")
         desc = agent.get('description', '-')
         lines.append(f"- **Beschreibung:** {desc}")
-        model = agent.get('model', '')
-        lines.append(f"- **Model:** {model if model else 'inherited'}")
+        models_by_provider = agent.get("models_by_provider", {})
+        if models_by_provider:
+            unique = set(models_by_provider.values())
+            if len(unique) == 1:
+                lines.append(f"- **Model:** {list(unique)[0]}")
+            else:
+                parts = [f"{p}: {m}" for p, m in models_by_provider.items()]
+                lines.append(f"- **Model:** {', '.join(parts)}")
+        else:
+            model = agent.get('model', '')
+            lines.append(f"- **Model:** {model if model else 'inherited'}")
         if agent.get("children"):
             lines.append(f"- **Delegiert an:** {', '.join(agent['children'])}")
         lines.append("")
@@ -189,6 +217,7 @@ def render_interactive_html(agents: dict, config: dict) -> str:
         icon = _TIER_ICONS.get(tier, "⚪")
         desc = agent.get("description", "")
         model = agent.get("model", "")
+        models_by_provider = agent.get("models_by_provider", {})
         memory = agent.get("memory", "")
         children = agent.get("children", [])
 
@@ -200,6 +229,17 @@ def render_interactive_html(agents: dict, config: dict) -> str:
             )
             children_html = f'<div class="children"><strong>Delegiert an:</strong> {children_links}</div>'
 
+        if models_by_provider:
+            unique = set(models_by_provider.values())
+            if len(unique) == 1:
+                model_display = list(unique)[0]
+            else:
+                model_display = "<br>".join(
+                    f"<span>{p}: {m}</span>" for p, m in models_by_provider.items()
+                )
+        else:
+            model_display = model if model else 'inherited'
+
         agent_cards.append(f"""
         <div class="agent-card {card_class}" id="{role}">
             <div class="agent-header">
@@ -209,7 +249,7 @@ def render_interactive_html(agents: dict, config: dict) -> str:
             </div>
             <p class="description">{desc}</p>
             <div class="meta">
-                <span><strong>Model:</strong> {model if model else 'inherited'}</span>
+                <span><strong>Model:</strong> {model_display}</span>
                 <span><strong>Memory:</strong> {memory if memory else '-'}</span>
             </div>
             {children_html}
@@ -409,8 +449,9 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
 
     log.info("viz", "generiere Agenten-Visualisierung...")
 
-    # 1. Hierarchie aufbauen
-    agents = build_agent_hierarchy(agent_meta_root, project_root, config)
+    # 1. Hierarchie aufbauen (mit Provider-Config für korrekte Model-Auflösung)
+    provider_config = load_providers_config(agent_meta_root)
+    agents = build_agent_hierarchy(agent_meta_root, project_root, config, provider_config)
     log.info("viz", f"{len(agents)} Agenten gefunden")
 
     # 2. Output-Pfade bestimmen
@@ -440,7 +481,7 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
 # Dynamischer Modus: Event-Log-Management
 # ---------------------------------------------------------------------------
 
-VIZ_DIR = ".agent-meta/viz"
+VIZ_DIR = ".meta-viz"
 EVENT_LOG = "events.jsonl"
 SESSION_TIMEOUT_MIN = 5  # Konfigurierbar über project.yaml
 
@@ -453,8 +494,8 @@ def get_viz_dir(project_root: Path) -> Path:
 def get_event_log_path(project_root: Path, session_id: str | None = None) -> Path:
     """Gibt den Pfad zur Event-Log-Datei zurück.
 
-    Wenn session_id gegeben: .agent-meta/viz/events-<session_id>.jsonl
-    Sonst: .agent-meta/viz/events.jsonl (Legacy)
+    Wenn session_id gegeben: .meta-viz/events-<session_id>.jsonl
+    Sonst: .meta-viz/events.jsonl (Legacy)
     """
     viz_dir = get_viz_dir(project_root)
     if session_id:

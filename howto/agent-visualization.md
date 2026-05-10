@@ -68,7 +68,7 @@ In `.meta-config/project.yaml`:
 viz:
   enabled: true
   mode: "dynamic"              # off | static | dynamic
-  event_log: ".agent-meta/viz/events.jsonl"
+  event_log: ".meta-viz/events.jsonl"
   report:
     retention_days: 7          # Wie lange Sessions aufbewahrt werden
     session_timeout_min: 5     # Session-Ende nach X Minuten Inaktivität
@@ -113,7 +113,7 @@ Für Provider mit Hook-Infrastruktur (Claude Code, Gemini CLI) wird automatisch 
 **Funktionsweise:**
 1. Hook intercepted **jeden** Tool-Aufruf auf System-Ebene (vor Ausführung)
 2. Extrahiert Tool-Name, Input-Vorschau, Agent-Name und Provider aus dem Hook-Kontext
-3. Schreibt automatisch ein `tool_call`-Event in `.agent-meta/viz/events.jsonl`
+3. Schreibt automatisch ein `tool_call`-Event in `.meta-viz/events.jsonl`
 4. Exit 0 — der Tool-Aufruf wird nicht blockiert
 
 **Provider-Unterstützung:**
@@ -154,19 +154,19 @@ Wenn Agenten das automatische Logging nicht verwenden, können Events manuell in
 
 ```bash
 # Session starten
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_start","agent":"user","payload":{"task":"Meine Aufgabe"}}' >> .agent-meta/viz/events.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_start","agent":"user","payload":{"task":"Meine Aufgabe"}}' >> .meta-viz/events.jsonl
 
 # Agent starten
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_start","agent":"orchestrator","provider":"Claude"}' >> .agent-meta/viz/events.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_start","agent":"orchestrator","provider":"Claude"}' >> .meta-viz/events.jsonl
 
 # Delegation
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"delegate","from":"orchestrator","to":"developer"}' >> .agent-meta/viz/events.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"delegate","from":"orchestrator","to":"developer"}' >> .meta-viz/events.jsonl
 
 # Agent beenden
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_end","agent":"developer","status":"success"}' >> .agent-meta/viz/events.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"agent_end","agent":"developer","status":"success"}' >> .meta-viz/events.jsonl
 
 # Session beenden
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_end","agent":"user"}' >> .agent-meta/viz/events.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","event":"session_end","agent":"user"}' >> .meta-viz/events.jsonl
 ```
 
 **Wichtig:** Jede Zeile muss ein gültiges JSON-Objekt sein. Nutze `>>` zum Anhängen.
@@ -240,7 +240,7 @@ python scripts/viz-server.py open       # Dashboard im Browser öffnen
 ### Session-Management
 
 - **Session-ID**: Wird automatisch aus dem Zeitstempel generiert (`YYYYMMDD-HHMMSS`)
-- **Speicherort**: `.agent-meta/viz/events-<session_id>.jsonl`
+- **Speicherort**: `.meta-viz/events-<session_id>.jsonl`
 - **Git**: Alle Viz-Dateien sind automatisch in `.gitignore` eingetragen
 - **Aufräumen**: Alte Sessions werden nach `retention_days` automatisch gelöscht
 
@@ -251,9 +251,9 @@ python scripts/viz-server.py open       # Dashboard im Browser öffnen
 Folgende Einträge werden automatisch verwaltet:
 
 ```
-.agent-meta/viz/
-.agent-meta/viz/events-*.jsonl
-.agent-meta/viz/session-reports/
+.meta-viz/
+.meta-viz/events-*.jsonl
+.meta-viz/session-reports/
 ```
 
 ---
@@ -287,7 +287,7 @@ agent-meta/
 │   ├── agent-mindmap.md     # GENERIERT (Mermaid)
 │   ├── agent-graph.html     # GENERIERT (Interaktiv, statisch)
 │   └── live-dashboard.html  # GENERIERT (Echtzeit, Cytoscape.js)
-└── .agent-meta/viz/         # SESSION-DATEN (gitignored)
+└── .meta-viz/         # SESSION-DATEN (gitignored)
     ├── events.jsonl         # Haupt-Event-Log (append-only JSONL)
     ├── events-*.jsonl       # Session-spezifische Logs
     ├── .server-pid          # PID des laufenden viz-server
@@ -315,7 +315,7 @@ agent-meta/
 │         │         ┌─────────────────┘                   │
 │         ▼         ▼                                     │
 │  ┌──────────────────────────────────┐                  │
-│  │  .agent-meta/viz/events.jsonl    │                  │
+│  │  .meta-viz/events.jsonl    │                  │
 │  │  (append-only JSONL, gitignored) │                  │
 │  └──────────────────────────────────┘                  │
 │                           │                             │

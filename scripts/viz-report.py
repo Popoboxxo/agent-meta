@@ -15,7 +15,7 @@ Usage:
 Config in .meta-config/project.yaml:
   viz:
     mode: dynamic
-    event_log: .agent-meta/viz/events.jsonl
+    event_log: .meta-viz/events.jsonl
     report:
       retention_days: 7
       session_timeout_min: 5

@@ -2,7 +2,7 @@
 # hook: viz-log
 # version: 1.0.0
 # event: PreToolUse
-# description: Automatically logs all tool calls to .agent-meta/viz/events.jsonl for session visualization
+# description: Automatically logs all tool calls to .meta-viz/events.jsonl for session visualization
 # enabled_by_default: false
 #
 # This hook is managed by agent-meta sync.py.
@@ -39,7 +39,7 @@ try:
         if cmd:
             event["payload"] = {"command_preview": cmd[:120]}
     
-    viz_dir = ".agent-meta/viz"
+    viz_dir = ".meta-viz"
     os.makedirs(viz_dir, exist_ok=True)
     
     with open(f"{viz_dir}/events.jsonl", "a", encoding="utf-8") as f:

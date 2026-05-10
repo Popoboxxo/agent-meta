@@ -192,7 +192,7 @@ Berichte dem User:
 - KEINE PR ohne REQ-ID in der Commit-Message
 
 ## Visualization Reporting (Pflicht-Anweisung)
-Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `.agent-meta/viz/events.jsonl` protokollieren.
+Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `.meta-viz/events.jsonl` protokollieren.
 
 ### Format (eine Zeile pro Event, JSON)
 ```json

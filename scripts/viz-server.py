@@ -25,8 +25,8 @@ from pathlib import Path
 # Project-Root ist das Parent-Verzeichnis von scripts/
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-PID_FILE = PROJECT_ROOT / ".agent-meta/viz/.server-pid"
-LOG_FILE = PROJECT_ROOT / ".agent-meta/viz/server.log"
+PID_FILE = PROJECT_ROOT / ".meta-viz/.server-pid"
+LOG_FILE = PROJECT_ROOT / ".meta-viz/server.log"
 VIZ_REPORT = SCRIPT_DIR / "viz-report.py"
 PORT = 8765
 DEFAULT_TIMEOUT = 300  # 5 Minuten
