@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.36.0] — 2026-05-10
+
 ### Added
 
 - **`log-analyzer` agent** (`agents/1-generic/log-analyzer.md`): Analysiert System- und Applikations-Logs mit Frequency-Clustering (Bash-basiert, vor LLM-Analyse), RFC-5424-konformer Severity-Klassifikation (CRITICAL/HIGH/MEDIUM/LOW/INFO), Auto-Discovery bekannter Log-Pfade (syslog, journald, Docker, Home Assistant, Nginx) und strukturierten Finding-Cards. Zwei Modi: `--quick` (Standard, token-sparend) und `--deep` (Codebase-Suche + Online-Recherche). Delegations-Routing zu `feedback`, `developer`, `security-auditor` und `requirements`. `workflow_tier: required`.

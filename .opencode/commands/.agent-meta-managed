@@ -1,9 +1,12 @@
 add-mcp-server.md
 add-project-role.md
 add-provider.md
+analyze-logs.md
 commit.md
+consistency-check.md
 diagnose.md
 doc-now.md
+feedback.md
 merge.md
 report-bug.md
 set-preset.md
