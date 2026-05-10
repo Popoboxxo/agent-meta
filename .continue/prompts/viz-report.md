@@ -12,9 +12,9 @@ FLAGS="$ARGUMENTS"
 
 # Default (terminal output) if no flags given
 if [ -z "$FLAGS" ]; then
-    python .agent-meta/scripts/viz-report.py --format terminal
+    python scripts/viz-report.py --format terminal
 else
-    python .agent-meta/scripts/viz-report.py $FLAGS
+    python scripts/viz-report.py $FLAGS
 fi
 ```
 
@@ -23,9 +23,12 @@ fi
 - `$ARGUMENTS = "--session <id> --format terminal"`
 - `$ARGUMENTS = "--format json"`
 
+For the **live browser dashboard** (real-time graph, no page reload):
+```bash
+python scripts/viz-server.py toggle
+```
+
 Reports include:
 - Session name and duration
 - Agent status bars with progress
 - Delegation timeline
-- Mermaid Gantt chart (HTML only)
-- Mermaid sequence diagram (HTML only)

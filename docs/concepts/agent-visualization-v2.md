@@ -424,12 +424,12 @@ python scripts/sync.py --viz-mode dynamic
 | `tool_call` | `ts`, `event`, `agent`, `tool` | `payload.*` | Agent führt Tool aus |
 | `log` | `ts`, `event`, `agent` | `payload.message`, `payload.level` | Freitext-Log |
 
-### Visualisierungs-Tool
+### Visualisierungs-Tools
 
-`scripts/viz-report.py` — CLI-Tool das das Event-Log parsed und visualisiert:
+#### Terminal / Einmal-Reports: `viz-report.py`
 
 ```bash
-# Live-Monitoring (letzte 50 Events, refresht alle 5 Sekunden)
+# Live-Monitoring im Terminal (letzte 50 Events, refresht alle 5 Sekunden)
 python scripts/viz-report.py --watch
 
 # Einmaliger Report als HTML
@@ -440,10 +440,27 @@ python scripts/viz-report.py --format terminal
 
 # Filter auf bestimmten Agenten
 python scripts/viz-report.py --agent developer --watch
-
-# Filter auf Zeitraum
-python scripts/viz-report.py --since "2026-05-10T19:00:00Z" --until "2026-05-10T20:00:00Z"
 ```
+
+#### Echtzeit-Dashboard: `viz-server.py`
+
+```bash
+# Server starten/stoppen (Toggle)
+python scripts/viz-server.py toggle
+
+# Status prüfen
+python scripts/viz-server.py status
+
+# Dashboard im Browser öffnen
+python scripts/viz-server.py open
+```
+
+Features des Live-Dashboards (`docs/live-dashboard.html`):
+- **Cytoscape.js Graph** — Agenten als Nodes, Delegationen als animierte Kanten
+- **Echtzeit-Updates** — Pollt `/api/state` alle 2 Sekunden, kein Page-Reload
+- **Auto-Shutdown** — Server beendet sich nach 5 Minuten Inaktivität
+- **Keine Dependencies** — Nutzt Python's eingebauten `wsgiref` Server
+- **API-Endpunkte:** `/api/state`, `/api/events`, `/api/sessions`
 
 ### Terminal-Output (Beispiel)
 
@@ -513,17 +530,20 @@ Wenn du eine Aktion beginnst oder beendest, schreibe ein Event in `.agent-meta/v
 ├── .agent-meta/
 │   └── viz/
 │       ├── events.jsonl          <- Runtime-Events (gitignored)
-│       ├── events.jsonl.lock     <- File-Lock für parallele Writes
-│       └── session-reports/      <- Generierte Reports
-│           ├── session-20260510-190000.html
-│           └── session-20260510-190000.md
+│       ├── .server-pid           <- PID des laufenden viz-server
+│       └── server.log            <- Server-Log
 │
 ├── agent-meta/                   <- Submodule
 │   ├── scripts/
 │   │   ├── sync.py
-│   │   └── viz-report.py         <- NEU: CLI-Report-Tool
-│   └── scripts/lib/
-│       └── viz.py                <- NEU: Generator + Parser
+│   │   ├── viz-report.py         <- CLI-Report-Tool
+│   │   ├── viz-server.py         <- Live-Dashboard Server
+│   │   └── lib/
+│   │       └── viz.py            <- Generator + Parser + Event-Log
+│   └── docs/
+│       ├── agent-mindmap.md      <- GENERIERT (Mermaid)
+│       ├── agent-graph.html      <- GENERIERT (Interaktiv, statisch)
+│       └── live-dashboard.html   <- GENERIERT (Echtzeit, Cytoscape.js)
 │
 └── .meta-config/
     └── project.yaml              <- viz: mode: dynamic
@@ -569,17 +589,16 @@ viz:
 | IDE-Integration unmöglich | Keine IDE-Integration nötig |
 | Events von außen beobachten | Agenten berichten von innen (freiwillig) |
 | LLM muss mitspielen | Opt-in: Nutzer aktiviert es bewusst |
-| Flask-Server overhead | Kein Server — nur CLI-Tool (`viz-report.py`) |
-| Echtzeit-Tracking | Post-hoc Analyse ist ausreichend |
-| Wrapper-Script invasiv | Kein Wrapper — Prompt-Erweiterung |
+| Flask-Server overhead | Eingebauter `wsgiref` Server — keine Dependencies (`viz-server.py`) |
+| Echtzeit-Tracking | Live-Dashboard polltt API alle 2s (`docs/live-dashboard.html`) |
+| Wrapper-Script invasiv | Kein Wrapper — Prompt-Erweiterung + optionaler Server |
 
 ---
 
-## Offene Entscheidungen
+## Entscheidungen (erledigt)
 
-1. **Soll `viz-report.py` auch einen Mini-Webserver haben?**
-   - Nein: CLI reicht
-   - Ja: Optionaler `--serve` Flag für lokale HTML-Ansicht
+1. **Webserver für Live-Dashboard?**
+   - ✅ Ja: `viz-server.py` als separater Wrapper. Nutzt Python's eingebauten `wsgiref` — keine externen Dependencies. Auto-Shutdown nach Inaktivität.
 
 2. **Wie bekommen wir den LLM dazu, wirklich zu loggen?**
    - A) Prompt-Erinnerung (wie beschrieben)

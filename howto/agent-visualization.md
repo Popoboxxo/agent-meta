@@ -44,6 +44,7 @@ Generiert zwei Dateien:
 |-------|--------|--------------|
 | `docs/agent-mindmap.md` | Mermaid | Für GitHub/Doku — wird nativ gerendert |
 | `docs/agent-graph.html` | HTML + D3.js | Interaktive Seite mit Dark Mode |
+| `docs/live-dashboard.html` | HTML + Cytoscape.js | **Echtzeit-Dashboard** für laufende Sessions |
 
 ### Inhalt
 
@@ -195,21 +196,46 @@ Folgende Commands stehen zur Verfügung (automatisch in `.claude/commands/` gene
 ### CLI-Tool: `viz-report.py`
 
 ```bash
-# Live-Monitoring (aktualisiert alle 5 Sekunden)
-python .agent-meta/scripts/viz-report.py --watch
+# Live-Monitoring im Terminal (aktualisiert alle 5 Sekunden)
+python scripts/viz-report.py --watch
 
 # Einmaliger Report im Terminal
-python .agent-meta/scripts/viz-report.py --session <id> --format terminal
+python scripts/viz-report.py --session <id> --format terminal
 
-# HTML-Report generieren
-python .agent-meta/scripts/viz-report.py --session <id> --format html --output report.html
-
-# Lokaler Webserver (optional — erfordert Flask: `pip install flask`)
-python .agent-meta/scripts/viz-report.py --serve --port 8765
+# HTML-Report generieren (einmalig)
+python scripts/viz-report.py --session <id> --format html --output report.html
 
 # Alte Sessions aufräumen
-python .agent-meta/scripts/viz-report.py --cleanup --days 7
+python scripts/viz-report.py --cleanup --days 7
 ```
+
+### Live-Dashboard Server: `viz-server.py`
+
+Für die **Echtzeit-Visualisierung** laufender Sessions:
+
+```bash
+# Server starten (oder stoppen falls bereits laufend)
+python scripts/viz-server.py toggle
+
+# Weitere Befehle
+python scripts/viz-server.py start      # Im Hintergrund starten
+python scripts/viz-server.py stop       # Beenden
+python scripts/viz-server.py status     # Status prüfen
+python scripts/viz-server.py restart    # Neustarten
+python scripts/viz-server.py open       # Dashboard im Browser öffnen
+```
+
+**Features:**
+- **Echtzeit-Graph** mit Cytoscape.js — Agenten als Nodes, Delegationen als animierte Kanten
+- **Auto-Shutdown** nach 5 Minuten Inaktivität (keine neuen Events). Konfigurierbar:
+  ```bash
+  python scripts/viz-server.py start --timeout 600  # 10 Minuten
+  ```
+- **Keine externen Dependencies** — nutzt Python's eingebauten `wsgiref` Server
+- **API-Endpunkte:**
+  - `GET /api/state` — Berechneter Session-State (Agenten, Delegationen, Timeline)
+  - `GET /api/events` — Rohe Events aus dem JSONL-Log
+  - `GET /api/sessions` — Liste aller Session-IDs
 
 ### Session-Management
 
@@ -249,7 +275,8 @@ Folgende Einträge werden automatisch verwaltet:
 agent-meta/
 ├── scripts/
 │   ├── sync.py              # --viz, --viz-mode dynamic
-│   ├── viz-report.py        # CLI Reports + optionaler Webserver
+│   ├── viz-report.py        # CLI Reports
+│   ├── viz-server.py        # Live-Dashboard Server (start/stop/toggle)
 │   └── lib/
 │       ├── viz.py           # Generator + Event-Log-Management + inject_viz_prompt_block()
 │       └── hooks.py         # sync_hooks: conditional viz-log Management
@@ -258,11 +285,13 @@ agent-meta/
 │       └── viz-log.sh       # PreToolUse Hook: intercept tool calls → events.jsonl
 ├── docs/
 │   ├── agent-mindmap.md     # GENERIERT (Mermaid)
-│   └── agent-graph.html     # GENERIERT (Interaktiv)
+│   ├── agent-graph.html     # GENERIERT (Interaktiv, statisch)
+│   └── live-dashboard.html  # GENERIERT (Echtzeit, Cytoscape.js)
 └── .agent-meta/viz/         # SESSION-DATEN (gitignored)
     ├── events.jsonl         # Haupt-Event-Log (append-only JSONL)
     ├── events-*.jsonl       # Session-spezifische Logs
-    └── session-reports/     # Generierte Reports
+    ├── .server-pid          # PID des laufenden viz-server
+    └── server.log           # Server-Log
 ```
 
 ### Event-Logging Pipeline

@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Live Dashboard** (`docs/live-dashboard.html`, `scripts/viz-server.py`):
+  - Replaced static HTML refresh with real-time Cytoscape.js graph that polls `/api/state` every 2 seconds.
+  - Added `scripts/viz-server.py` wrapper for start/stop/toggle/status/restart/open commands.
+  - Server auto-shuts down after 300s of inactivity (no new events in log). Configurable via `--timeout`.
+  - Removed Flask dependency — server uses Python's built-in `wsgiref`.
+  - `viz-report.py --watch --format html` now starts the live server instead of writing a static file.
+  - Session state extraction fixed: only processes events from the latest `session_start`, preventing mixed-session data corruption.
+  - New API endpoints: `/api/state` (computed session state), `/api/events` (raw JSONL events).
+
 ---
 
 ## [0.37.0-beta.1] — 2026-05-10

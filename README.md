@@ -148,14 +148,11 @@ When `dynamic` or `full`, every generated agent receives a prompt block that ins
 # Live terminal watch
 py .agent-meta/scripts/viz-report.py --watch
 
-# HTML report with Gantt + sequence diagrams
-py .agent-meta/scripts/viz-report.py --format html --output report.html
+# Live Dashboard (browser, auto-refreshes via API)
+py scripts/viz-server.py toggle
 
 # Toggle mode and trigger sync
 /viz-toggle dynamic
-
-# Local web server (requires Flask: pip install flask)
-py .agent-meta/scripts/viz-report.py --serve
 ```
 
 Sessions are gitignored and auto-cleaned after `retention_days`. See [howto/agent-visualization.md](howto/agent-visualization.md) for the full guide.

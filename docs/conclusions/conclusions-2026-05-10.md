@@ -99,3 +99,103 @@ Der Viz-Prompt-Block wurde geändert (optional → Pflicht), aber kein Major/Min
 ## 6. Branch
 
 `feat/agent-visualization-dashboard`
+
+---
+
+## 7. Live-Dashboard für Agenten-Orchestrierung (Session 2)
+
+### Session-Zusammenfassung
+Das statische Mermaid-basierte Dashboard wurde durch ein vollständiges Live-Dashboard mit Cytoscape.js ersetzt. Zusätzlich wurde `viz-server.py` als neues Wrapper-Tool eingeführt und `viz-report.py` grundlegend überarbeitet. Flask als Dependency wurde komplett entfernt.
+
+---
+
+### 7.1 Live-Dashboard (`docs/live-dashboard.html`)
+
+**Vorher:** Statische HTML-Datei mit Mermaid-Diagrammen, manuelles Refresh nötig.
+**Nachher:** Echtzeit-Dashboard mit Cytoscape.js, automatisches Polling.
+
+| Feature | Alt | Neu |
+|---------|-----|-----|
+| Rendering | Mermaid (statisch) | Cytoscape.js (dynamisch) |
+| Aktualisierung | Page-Reload | JavaScript-Polling `/api/state` alle 2s |
+| Agenten-Nodes | Keine | Farbcodiert: running=gelb(pulsierend), success=grün, error=rot |
+| Delegationen | Keine | Animierte Kanten zwischen Agenten |
+| Agent-Cards | Keine | Status + Dauer pro Agent |
+| Event-Timeline | Statisch | Fade-In für neue Events |
+
+---
+
+### 7.2 viz-server.py — NEU (`scripts/viz-server.py`)
+
+Wrapper-Skript für den Viz-Server mit folgenden Kommandos:
+
+| Kommando | Funktion |
+|----------|----------|
+| `start` | Server starten |
+| `stop` | Server stoppen (via PID-File) |
+| `toggle` | Start ODER Stop mit einem Befehl |
+| `status` | Server-Status anzeigen |
+| `restart` | Server neu starten |
+| `open` | Dashboard im Browser öffnen |
+
+**Technische Details:**
+- PID-Tracking via `.agent-meta/viz/.server-pid`
+- Auto-Shutdown nach 300s Inaktivität (konfigurierbar)
+- Keine externen Dependencies (Python wsgiref)
+
+---
+
+### 7.3 viz-report.py — Überarbeitet (`scripts/viz-report.py`)
+
+**Wesentliche Änderungen:**
+
+1. **Flask → wsgiref:** Flask als externe Dependency entfernt. Nutzt jetzt `wsgiref.simple_server` aus der Python-Standardbibliothek.
+
+2. **Neue API-Endpunkte:**
+   - `GET /api/state` — Liefert aktuellen Session-State als JSON
+   - `GET /api/events` — Liefert Event-Log als JSON
+
+3. **`--watch --format html` Verhalten:** Startet jetzt den Live-Server statt eine statische Datei zu generieren.
+
+4. **Session-Trennung-Fix:** `_extract_latest_session()` isoliert korrekt nur die letzte Session. Bisheriger Bug: Mixed-Session-Daten wurden vermischt.
+
+5. **JSON-Serialisierung:** `_state_to_json()` konvertiert `datetime`-Objekte korrekt für JSON.
+
+6. **Auto-Shutdown:** `inactivity_watcher` Thread beendet den Server nach konfigurierter Inaktivitätszeit.
+
+---
+
+### 7.4 Dokumentation-Updates
+
+| Datei | Änderung |
+|-------|----------|
+| `howto/agent-visualization.md` | Live-Dashboard Sektion hinzugefügt |
+| `README.md` | Neue Session-Reports Befehle |
+| `CHANGELOG.md` | Unreleased Eintrag |
+| `docs/concepts/agent-visualization-v2.md` | Architektur, Tools, Dateistruktur |
+| `commands/1-generic/viz-watch.md` | Neue Pfade aktualisiert |
+| `commands/1-generic/viz-report.md` | Neue Pfade aktualisiert |
+
+---
+
+### 7.5 Aufräumen
+
+- `viz-server.py` von Repository-Root nach `scripts/` verschoben
+- Temp-Dateien gelöscht: `inject_live.py`, `live-dashboard.html` (Root)
+- Provider-Commands via `sync.py` regeneriert
+
+---
+
+### 7.6 Architektur-Entscheidungen
+
+1. **Flask entfernt → wsgiref:** Keine externen Dependencies mehr. Das Framework bleibt leichtgewichtig und installierbar ohne `pip install`.
+
+2. **Statisches HTML-Refresh entfernt → JavaScript-Polling:**用户体验 verbessert, kein manueller Reload mehr nötig.
+
+3. **Mixed-Session-Bug behoben:** `_extract_latest_session()` stellt sicher dass nur die aktuelle Session angezeigt wird.
+
+---
+
+### 7.7 Offene Punkte
+
+Keine offenen Punkte. Session vollständig abgeschlossen.

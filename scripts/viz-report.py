@@ -59,6 +59,17 @@ def _format_ts(dt: datetime) -> str:
     return dt.strftime("%H:%M:%S")
 
 
+def _extract_latest_session(events: list[dict]) -> list[dict]:
+    """Extrahiere nur Events der letzten Session (nach letztem session_start)."""
+    last_start_idx = None
+    for i, ev in enumerate(events):
+        if ev.get("event") == "session_start":
+            last_start_idx = i
+    if last_start_idx is None:
+        return events
+    return events[last_start_idx:]
+
+
 def build_session_state(events: list[dict]) -> dict:
     """Baue den Session-State aus Events.
 
@@ -71,6 +82,8 @@ def build_session_state(events: list[dict]) -> dict:
             "session_name": str,
         }
     """
+    events = _extract_latest_session(events)
+
     agents = defaultdict(lambda: {
         "status": "idle",
         "started_at": None,
@@ -140,6 +153,28 @@ def build_session_state(events: list[dict]) -> dict:
         "session_end": session_end,
         "session_name": session_name,
     }
+
+
+def _state_to_json(state: dict) -> dict:
+    """Konvertiere datetime-Objekte in ISO-Strings für JSON-Serialisierung."""
+    import copy
+    out = copy.deepcopy(state)
+    for ag in out.get("agents", {}).values():
+        if ag.get("started_at") and isinstance(ag["started_at"], datetime):
+            ag["started_at"] = ag["started_at"].isoformat()
+        if ag.get("ended_at") and isinstance(ag["ended_at"], datetime):
+            ag["ended_at"] = ag["ended_at"].isoformat()
+    if out.get("session_start") and isinstance(out["session_start"], datetime):
+        out["session_start"] = out["session_start"].isoformat()
+    if out.get("session_end") and isinstance(out["session_end"], datetime):
+        out["session_end"] = out["session_end"].isoformat()
+    for e in out.get("edges", []):
+        if e.get("ts") and isinstance(e["ts"], datetime):
+            e["ts"] = e["ts"].isoformat()
+    for t in out.get("timeline", []):
+        if t.get("ts") and isinstance(t["ts"], datetime):
+            t["ts"] = t["ts"].isoformat()
+    return out
 
 
 def render_terminal(events: list[dict], agent_filter: str | None = None) -> str:
@@ -512,58 +547,123 @@ def render_html(events: list[dict], live_mode: bool = False) -> str:
 """
 
 
-def serve_web(project_root: Path, port: int = 8765):
-    """Starte einen lokalen Webserver für die Visualisierung."""
-    try:
-        from flask import Flask, jsonify, render_template_string
-    except ImportError:
-        print("  !  Flask nicht installiert. Installiere mit: pip install flask")
-        print("  !  Oder nutze --format html statt --serve")
-        sys.exit(1)
+def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False, timeout_sec: int = 300):
+    """Starte einen lokalen Webserver für die Echtzeit-Visualisierung (keine externen Dependencies)."""
+    import mimetypes
+    import threading
+    from wsgiref.simple_server import make_server
 
-    app = Flask(__name__)
-    viz_dir = get_viz_dir(project_root)
+    docs_dir = project_root / "docs"
+    event_log = get_event_log_path(project_root)
+    shutdown_event = threading.Event()
 
-    @app.route("/")
-    def index():
-        sessions = list_sessions(project_root)
-        session_links = "<br>".join(
-            f'<a href="/session/{s}">{s}</a>' for s in sessions[:10]
-        ) if sessions else "<em>Keine Sessions gefunden</em>"
-        return render_template_string(f"""
-        <h1>🤖 agent-meta Visualisierung</h1>
-        <h2>Sessions</h2>
-        {session_links}
-        <h2>Statische Visualisierung</h2>
-        <a href="/agent-graph.html">Agenten-Graph</a>
-        """)
+    def wsgi_app(environ, start_response):
+        path = environ.get("PATH_INFO", "/")
+        method = environ.get("REQUEST_METHOD", "GET")
 
-    @app.route("/agent-graph.html")
-    def agent_graph():
-        graph_path = project_root / "docs" / "agent-graph.html"
-        if not graph_path.exists():
-            return "<h1>Agenten-Graph nicht gefunden</h1><p>Führe zuerst <code>python scripts/sync.py</code> aus.</p>", 404
-        return graph_path.read_text(encoding="utf-8")
+        headers = [("Content-Type", "application/json; charset=utf-8")]
 
-    @app.route("/session/<session_id>")
-    def session_report(session_id):
-        events = read_events(project_root, session_id)
-        if not events:
-            return "<h1>Keine Events</h1>", 404
-        return render_html(events)
+        if path == "/" or path == "/live-dashboard.html":
+            html_path = docs_dir / "live-dashboard.html"
+            if html_path.exists():
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [html_path.read_bytes()]
+            start_response("404 Not Found", headers)
+            return [b'{"error": "live-dashboard.html not found"}']
 
-    @app.route("/api/sessions")
-    def api_sessions():
-        return jsonify(list_sessions(project_root))
+        if path == "/agent-graph.html":
+            html_path = docs_dir / "agent-graph.html"
+            if html_path.exists():
+                headers = [("Content-Type", "text/html; charset=utf-8")]
+                start_response("200 OK", headers)
+                return [html_path.read_bytes()]
+            start_response("404 Not Found", headers)
+            return [b'{"error": "agent-graph.html not found"}']
 
-    @app.route("/api/session/<session_id>")
-    def api_session(session_id):
-        events = read_events(project_root, session_id)
-        return jsonify(events)
+        if path == "/api/state":
+            events = read_events(project_root)
+            state = build_session_state(events)
+            body = json.dumps(_state_to_json(state), ensure_ascii=False).encode("utf-8")
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/api/events":
+            events = read_events(project_root)
+            body = json.dumps(events, ensure_ascii=False, default=str).encode("utf-8")
+            start_response("200 OK", headers)
+            return [body]
+
+        if path == "/api/sessions":
+            body = json.dumps(list_sessions(project_root), ensure_ascii=False).encode("utf-8")
+            start_response("200 OK", headers)
+            return [body]
+
+        if path.startswith("/api/session/"):
+            session_id = path.split("/")[-1]
+            events = read_events(project_root, session_id)
+            body = json.dumps(events, ensure_ascii=False, default=str).encode("utf-8")
+            start_response("200 OK", headers)
+            return [body]
+
+        # Static files from docs/
+        static_path = docs_dir / path.lstrip("/")
+        if static_path.exists() and static_path.is_file():
+            ctype, _ = mimetypes.guess_type(str(static_path))
+            headers = [("Content-Type", (ctype or "application/octet-stream") + "; charset=utf-8")]
+            start_response("200 OK", headers)
+            return [static_path.read_bytes()]
+
+        start_response("404 Not Found", headers)
+        return [b'{"error": "not found"}']
+
+    def inactivity_watcher():
+        """Beende Server nach Inaktivitaet (keine neuen Events im Log)."""
+        last_size = event_log.stat().st_size if event_log.exists() else 0
+        last_change = time.time()
+        check_interval = min(30, timeout_sec // 2) if timeout_sec > 0 else 30
+
+        while not shutdown_event.is_set():
+            shutdown_event.wait(check_interval)
+            if shutdown_event.is_set():
+                break
+            current_size = event_log.stat().st_size if event_log.exists() else 0
+            if current_size != last_size:
+                last_size = current_size
+                last_change = time.time()
+                continue
+            elapsed = time.time() - last_change
+            remaining = timeout_sec - elapsed
+            if remaining <= 60 and remaining > 0:
+                print(f"\n  !  Auto-Shutdown in {int(remaining)}s (keine neuen Events)")
+            if elapsed >= timeout_sec:
+                print(f"\n  i  Auto-Shutdown nach {timeout_sec}s Inaktivitaet.")
+                httpd.shutdown()
+                break
 
     print(f"  i  Webserver läuft auf http://localhost:{port}")
+    print(f"  i  Live-Dashboard: http://localhost:{port}/")
+    if timeout_sec > 0:
+        print(f"  i  Auto-Shutdown nach {timeout_sec}s Inaktivitaet")
     print(f"  i  Drücke Ctrl+C zum Beenden")
-    app.run(host="127.0.0.1", port=port, debug=False)
+
+    if open_browser:
+        import webbrowser
+        webbrowser.open(f"http://localhost:{port}/")
+
+    httpd = make_server("127.0.0.1", port, wsgi_app)
+
+    if timeout_sec > 0:
+        watcher = threading.Thread(target=inactivity_watcher, daemon=True)
+        watcher.start()
+
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\n  i  Server beendet")
+    finally:
+        shutdown_event.set()
+        httpd.shutdown()
 
 
 def main():
@@ -596,12 +696,14 @@ def main():
                         help="Lösche alte Sessions")
     parser.add_argument("--days", type=int, default=7,
                         help="Retention-Tage für Cleanup (default: 7)")
+    parser.add_argument("--timeout", type=int, default=300,
+                        help="Auto-Shutdown nach N Sekunden Inaktivitaet (default: 300)")
 
     args = parser.parse_args()
     project_root = Path(args.project_root).resolve()
 
     if args.serve:
-        serve_web(project_root, port=args.port)
+        serve_web(project_root, port=args.port, timeout_sec=args.timeout)
         return
 
     if args.cleanup:
@@ -638,13 +740,11 @@ def main():
 
     if args.watch:
         is_html = args.format == "html"
-        out_file = Path(args.output) if args.output else Path("live-report.html")
 
         if is_html:
-            print(f"  i  Live-HTML-Dashboard gestartet")
-            print(f"  i  Schreibe nach: {out_file.resolve()}")
-            print(f"  i  Öffne diese Datei im Browser — aktualisiert sich alle 5 Sekunden")
-            print(f"  i  Drücke Ctrl+C zum Beenden")
+            # Starte Server statt statische Datei zu schreiben
+            serve_web(project_root, port=args.port, open_browser=True)
+            return
         else:
             print(f"  i  Live-Monitoring gestartet (Ctrl+C zum Beenden)")
 
@@ -652,15 +752,12 @@ def main():
         try:
             while True:
                 events = read_events(project_root, session_id, since)
-                if len(events) != last_len or is_html:
+                if len(events) != last_len:
                     last_len = len(events)
-                    output = _load_and_render(live=is_html)
+                    output = _load_and_render(live=False)
                     if output:
-                        if is_html:
-                            out_file.write_text(output, encoding="utf-8")
-                        else:
-                            os.system("cls" if os.name == "nt" else "clear")
-                            print(output)
+                        os.system("cls" if os.name == "nt" else "clear")
+                        print(output)
                 time.sleep(5)
         except KeyboardInterrupt:
             print("\n  i  Monitoring beendet")
