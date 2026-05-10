@@ -547,9 +547,9 @@ def sync_agents(
             pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
 
-        # Visualization: inject event-logging prompt block when dynamic mode is enabled
+        # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         viz_cfg = config.get("viz", {})
-        if viz_cfg.get("mode") == "dynamic":
+        if viz_cfg.get("mode") in ("dynamic", "full"):
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True)
 
@@ -762,9 +762,9 @@ def sync_agents_for_provider(
                     content, name, description, model, generated_from
                 )
 
-        # Visualization: inject event-logging prompt block when dynamic mode is enabled
+        # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         viz_cfg = config.get('viz', {})
-        if viz_cfg.get('mode') == 'dynamic' and provider in ('Claude', 'Opencode'):
+        if viz_cfg.get('mode') in ('dynamic', 'full') and provider in ('Claude', 'Opencode'):
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, provider, viz_enabled=True)
 

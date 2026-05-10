@@ -160,3 +160,12 @@ variables:
   VERSION_DIST_BEHAVIOUR: Keine Dist. Releases sind Git-Tags auf main.
 
 max-parallel-agents: 4
+
+# Visualisierung — Agenten-Mindmap und Session-Tracking
+viz:
+  enabled: true
+  mode: "full"                 # off | static | dynamic | full
+  event_log: ".agent-meta/viz/events.jsonl"
+  report:
+    retention_days: 7
+    session_timeout_min: 5

@@ -82,7 +82,8 @@ python .agent-meta/scripts/sync.py --viz-mode dynamic
 Gültige Werte für `mode`:
 - `off` — Keine Visualisierung (default)
 - `static` — Nur Mindmap generieren
-- `dynamic` — Mindmap + Event-Logging in Agenten
+- `dynamic` — Event-Logging in Agenten aktivieren
+- `full` — Beides: Mindmap generieren + Event-Logging aktivieren
 
 ### Wie es funktioniert
 

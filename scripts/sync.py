@@ -167,9 +167,9 @@ def main():
                         help="Show what would be done without writing files")
     parser.add_argument("--viz", action="store_true",
                         help="Generate static agent visualization (mindmap + interactive HTML)")
-    parser.add_argument("--viz-mode", choices=["off", "static", "dynamic"], default=None,
+    parser.add_argument("--viz-mode", choices=["off", "static", "dynamic", "full"], default=None,
                         help="Visualization mode: off (default), static (mindmap only), "
-                             "dynamic (agent event logging + reports)")
+                             "dynamic (agent event logging + reports), full (both)")
     parser.add_argument("--viz-only", action="store_true",
                         help="Only generate visualization, skip sync")
     parser.add_argument("--viz-cleanup", action="store_true",
@@ -469,9 +469,9 @@ def main():
             if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
                 log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
             extra_provider_entries.extend(_pc.get("gitignore_entries", []))
-        # Viz: add gitignore entries if viz mode is dynamic or viz is enabled
+        # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
         viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
-        if viz_mode == "dynamic" or viz_cfg.get("enabled", False) or args.viz:
+        if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
             viz_gitignore = viz_gitignore_entries()
             base_gitignore_entries.extend(viz_gitignore)
 
@@ -488,8 +488,9 @@ def main():
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
-    # Visualization: generate static mindmap if requested
-    if args.viz or viz_cfg.get("enabled", False):
+    # Visualization: generate static mindmap if requested (static or full mode)
+    viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
+    if args.viz or viz_cfg.get("enabled", False) or viz_mode in ("static", "full"):
         generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
 
     log_path = project_root / LOGFILE
