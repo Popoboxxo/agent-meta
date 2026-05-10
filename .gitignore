@@ -7,9 +7,6 @@ CLAUDE.personal.md
 sync.log
 
 # --- agent-meta managed (do not edit) ---
-.agent-meta/viz/
-.agent-meta/viz/events-*.jsonl
-.agent-meta/viz/session-reports/
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
