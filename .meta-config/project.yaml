@@ -32,6 +32,8 @@ roles:
   - agent-meta-manager
   - feature
   - agent-meta-scout
+  - log-analyzer
+  - feedback
 
 project:
   name: agent-meta

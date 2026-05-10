@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`log-analyzer` agent** (`agents/1-generic/log-analyzer.md`): Analysiert System- und Applikations-Logs mit Frequency-Clustering (Bash-basiert, vor LLM-Analyse), RFC-5424-konformer Severity-Klassifikation (CRITICAL/HIGH/MEDIUM/LOW/INFO), Auto-Discovery bekannter Log-Pfade (syslog, journald, Docker, Home Assistant, Nginx) und strukturierten Finding-Cards. Zwei Modi: `--quick` (Standard, token-sparend) und `--deep` (Codebase-Suche + Online-Recherche). Delegations-Routing zu `feedback`, `developer`, `security-auditor` und `requirements`. `workflow_tier: required`.
+- **`homeassistant-log-analyzer` platform agent** (`agents/2-platform/homeassistant-log-analyzer.md`): Erweitert den generischen Log-Analyzer via `extends: + patches:` mit HA-spezifischem Log-Format, Logger-zu-Komponenten-Mapping, bekannten Fehlermustern (TemplateError, Platform not ready, MQTT disconnect, ZHA, Recorder), Startup-Rauschen-Filter und HA-spezifischen Delegations-Ressourcen (community.home-assistant.io, HACS).
+- **`feedback` agent** (`agents/1-generic/feedback.md`): Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt als GitHub Issues. Pflicht-Gate vor jeder direkten `git`-basierten Issue-Erstellung. Sechs Typen (`bug`, `feat`, `improvement`, `docs`, `security`, `question`) mit Body-Templates. Auto-Repo-Erkennung via `gh repo view`. Klare Abgrenzung zu `meta-feedback` (Framework vs. Projekt). `workflow_tier: required`.
+- **`/analyze-logs` command** (`commands/1-generic/analyze-logs.md`): Delegiert an `log-analyzer`-Agent. Unterstützt optionalen Pfad und `--quick`/`--deep`-Flags. Wird für alle aktiven Provider generiert (Claude → `.claude/commands/`, Gemini → `.gemini/commands/` (`.toml`), Opencode → `.opencode/commands/`, Continue → `.continue/prompts/`).
+- **`/feedback` command** (`commands/1-generic/feedback.md`): Delegiert an `feedback`-Agent. Unterstützt optionalen Typ-Keyword (`bug | feat | improvement | docs | security | question`) und Kurzbeschreibung als Argument. Wird für alle aktiven Provider generiert.
+- **`/report-bug` command aktualisiert** (`commands/1-generic/report-bug.md`): Delegiert jetzt an `feedback`-Agent (Typ `bug` vorbelegt) statt eigenem Inline-Workflow — konsistent mit dem standardisierten Feedback-Kanal.
+- **Orchestrator Workflow O + P** (`agents/1-generic/orchestrator.md`): Workflow O (Log-Analyse via `log-analyzer`) und Workflow P (Projekt-Issue via `feedback → gh issue create`) ergänzt. Beide neuen Agenten in der Agenten-Tabelle eingetragen.
+- **`consistency-check.py`** (`scripts/consistency-check.py` + `scripts/lib/consistency/`): Neues Python-Script zur deterministischen Konsistenzprüfung von Agent-Templates, Commands und Cross-References ohne LLM-Aufruf. Prüft: Frontmatter-Version-Bumps (git-diff-basiert), semver-Format, extends/patches-Anchor-Auflösung, role-defaults-Vollständigkeit, Orchestrator-Tabelle, CHANGELOG-Erwähnungen, Platzhalter-Typos. Exit-Codes: 0=ok, 1=Fehler, 2=Script-Error. Flags: `--changed`, `--file`, `--strict`, `--json`, `--root`. Stdlib-only, PyYAML optional.
+- **`/consistency-check` command** (`commands/1-generic/consistency-check.md`): Slash-Command ruft das Script auf, interpretiert Findings und bietet interaktive Fixes an. Wird für alle aktiven Provider generiert.
+- **`agent-meta-manager` v1.5.0** (`agents/1-generic/agent-meta-manager.md`): Neuer Abschnitt 8 "Consistency-Check" mit vollständiger Referenz, Wann-ausführen-Tabelle und Link auf Howto.
+- **Howto** (`howto/features/consistency-check.md`): Vollständige Referenz mit manueller Ausführung, allen CLI-Flags, Check-Katalog, JSON-Format, GitHub-Actions-Integration und Anleitung zum Hinzufügen neuer Checks.
+
+---
+
 ## [0.35.0] — 2026-05-08
 
 ### Added

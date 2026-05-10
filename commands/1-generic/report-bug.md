@@ -1,86 +1,12 @@
 ---
-description: Report a bug in this project by filing a GitHub issue in the target repository
-allowed-tools: ["Bash", "Read"]
+description: Report a bug in this project by filing a standardized GitHub issue via the feedback agent
+allowed-tools: ["Agent"]
 argument-hint: "[short bug description]"
 ---
 
-File a bug report as a GitHub issue in this project's repository. $ARGUMENTS
+Delegate to the `feedback` agent with this task:
 
-**Step 1 — Identify the target repository**
+Create a bug report (type: bug) as a GitHub issue for this project. $ARGUMENTS
 
-```bash
-gh repo view --json nameWithOwner,url 2>/dev/null
-```
-
-If this fails (not a GitHub repo or gh not authenticated):
-> "Could not detect a GitHub repository. Make sure `gh` is authenticated and this project has a GitHub remote."
-Stop.
-
-Show the user:
-> "Filing bug report in: `<owner>/<repo>` (<url>)"
-> "Is this the correct repository? (yes/no)"
-If no: ask for the correct `owner/repo` to use.
-
-**Step 2 — Collect bug details**
-
-If $ARGUMENTS is empty:
-> "Please describe the bug briefly (one line):"
-Wait for input. Use it as the issue title.
-
-If $ARGUMENTS is provided: use it as the title basis.
-
-Then ask for details — one question at a time, wait for each answer:
-
-1. > "**What did you expect to happen?**"
-2. > "**What actually happened?** (include error messages if any)"
-3. > "**Steps to reproduce** (numbered list, or 'not sure'):"
-4. > "**Environment** (OS, tool version, branch — or press Enter to skip):"
-
-**Step 3 — Check for duplicates**
-
-```bash
-gh issue list --state open --search "<title keywords>" --limit 5
-```
-
-If similar issues found:
-> "Found potentially related open issues:"
-> [list with numbers and titles]
-> "Is this a new issue or related to one of these? (new / #<number>)"
-If related: suggest adding a comment instead of a new issue, show the command.
-
-**Step 4 — Compose and confirm**
-
-Build the issue body:
-
-```markdown
-## Description
-<what happened>
-
-## Expected behavior
-<what should have happened>
-
-## Steps to reproduce
-<steps>
-
-## Environment
-<environment info>
-```
-
-Show the full draft:
-> "Issue draft:
-> **Title:** `<title>`
-> **Body:** [formatted body]
->
-> File this issue? (yes/edit/no)"
-
-Wait for confirmation. If "edit": ask what to change and rebuild.
-
-**Step 5 — File the issue**
-
-```bash
-gh issue create --title "<title>" --body "<body>" --label "bug"
-```
-
-Report the issue URL.
-> "✅ Bug filed: <url>
-> The team has been notified. You can add more context or screenshots directly on GitHub."
+Pre-select issue type `bug`. If $ARGUMENTS is provided, use it as the title basis.
+The feedback agent will collect remaining details and file the issue via `gh issue create`.
