@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.37.0-beta.1] — 2026-05-10
+
 ### Added
 
 - **Agent Visualization Dashboard** (`scripts/lib/viz.py`, `scripts/viz-report.py`, `docs/agent-mindmap.md`, `docs/agent-graph.html`):
