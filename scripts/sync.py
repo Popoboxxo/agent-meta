@@ -71,6 +71,10 @@ from lib.context import (
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
     init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
 )
+from lib.viz import (
+    generate_viz, get_gitignore_entries as viz_gitignore_entries,
+    cleanup_old_sessions,
+)
 
 # ---------------------------------------------------------------------------
 # Entrypoint-only constants
@@ -161,6 +165,15 @@ def main():
                              "followed by --init sync. Use before the first sync on a new project.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
+    parser.add_argument("--viz", action="store_true",
+                        help="Generate static agent visualization (mindmap + interactive HTML)")
+    parser.add_argument("--viz-mode", choices=["off", "static", "dynamic"], default=None,
+                        help="Visualization mode: off (default), static (mindmap only), "
+                             "dynamic (agent event logging + reports)")
+    parser.add_argument("--viz-only", action="store_true",
+                        help="Only generate visualization, skip sync")
+    parser.add_argument("--viz-cleanup", action="store_true",
+                        help="Clean up old visualization sessions")
 
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
@@ -238,6 +251,7 @@ def main():
     variables, pre_warnings = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
+    viz_cfg = config.get("viz", {})
 
     # Warn if actual git tag of agent-meta submodule doesn't match configured version
     git_version = read_git_version(agent_meta_root)
@@ -283,6 +297,21 @@ def main():
     elif args.create_command:
         mode = f"create-command:{args.create_command}"
         create_command(project_root, args.create_command, log, args.dry_run)
+
+    elif args.viz_only:
+        mode = "viz-only"
+        # Override viz config
+        if "viz" not in config:
+            config["viz"] = {}
+        config["viz"]["enabled"] = True
+        generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
+
+    elif args.viz_cleanup:
+        mode = "viz-cleanup"
+        viz_cfg = config.get("viz", {})
+        retention = viz_cfg.get("report", {}).get("retention_days", 7)
+        cleanup_old_sessions(project_root, retention_days=retention,
+                             log=log, dry_run=args.dry_run)
 
     else:
         provider_config = load_providers_config(agent_meta_root)
@@ -434,6 +463,12 @@ def main():
             if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
                 log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
             extra_provider_entries.extend(_pc.get("gitignore_entries", []))
+        # Viz: add gitignore entries if viz mode is dynamic or viz is enabled
+        viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
+        if viz_mode == "dynamic" or viz_cfg.get("enabled", False) or args.viz:
+            viz_gitignore = viz_gitignore_entries()
+            base_gitignore_entries.extend(viz_gitignore)
+
         if is_claude:
             skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config, provider_config)
             all_gitignore_entries = (
@@ -446,6 +481,10 @@ def main():
             # No Claude active but other providers have gitignore entries to manage
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+
+    # Visualization: generate static mindmap if requested
+    if args.viz or viz_cfg.get("enabled", False):
+        generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
 
     log_path = project_root / LOGFILE
     _providers = resolve_providers(config, load_providers_config(agent_meta_root)) if config else []
