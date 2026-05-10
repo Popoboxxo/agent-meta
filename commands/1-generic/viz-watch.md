@@ -6,20 +6,20 @@ argument-hint: "[--agent <name>]"
 
 Start live monitoring of the active visualization session. Updates every 5 seconds.
 
-**Monitor all agents:**
 ```bash
-python .agent-meta/scripts/viz-report.py --watch
+FLAGS="$ARGUMENTS"
+
+# Default: watch current session
+if [ -z "$FLAGS" ]; then
+    python .agent-meta/scripts/viz-report.py --watch
+else
+    python .agent-meta/scripts/viz-report.py --watch $FLAGS
+fi
 ```
 
-**Filter by agent name:**
-```bash
-python .agent-meta/scripts/viz-report.py --watch --agent orchestrator
-```
-
-**For a specific session:**
-```bash
-python .agent-meta/scripts/viz-report.py --session <session-id> --watch
-```
+**Examples:**
+- `$ARGUMENTS = "--agent orchestrator"` — Filter by agent name
+- `$ARGUMENTS = "--session <session-id>"` — Watch specific session
 
 Press `Ctrl+C` to stop monitoring.
 

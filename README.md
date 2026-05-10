@@ -45,6 +45,7 @@ It provides:
 - **Platform-specific overrides** (e.g., Sharkord plugins) that extend generic agents
 - **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
 - **An extension system** that lets projects add project-specific knowledge without touching generated files
+- **Agent visualization** (opt-in): auto-generated mindmaps of all agents + dynamic session tracking with event reports (Gantt, sequence diagrams, live watch)
 
 ---
 
@@ -111,6 +112,50 @@ cat sync.log
 ```
 
 Agents are written to `.claude/agents/`. Never edit them manually — they are regenerated on every sync.
+
+---
+
+## Agent Visualization (Opt-in)
+
+Visualize your agent fleet, their delegations, and runtime sessions.
+
+### Static Mindmap
+
+Auto-generated on every sync when `viz.enabled: true`:
+
+```bash
+py .agent-meta/scripts/sync.py --viz
+```
+
+- `docs/agent-mindmap.md` — Mermaid diagram (renders natively on GitHub)
+- `docs/agent-graph.html` — Interactive dark-mode graph with agent details
+
+### Dynamic Session Tracking
+
+Enable event logging in `project.yaml`:
+
+```yaml
+viz:
+  enabled: true
+  mode: "full"        # off | static | dynamic | full
+```
+
+When `dynamic` or `full`, every generated agent receives a prompt block that instructs it to log events (`agent_start`, `delegate`, `agent_end`, `tool_call`) to `.agent-meta/viz/events.jsonl`.
+
+### Session Reports
+
+```bash
+# Live terminal watch
+py .agent-meta/scripts/viz-report.py --watch
+
+# HTML report with Gantt + sequence diagrams
+py .agent-meta/scripts/viz-report.py --format html --output report.html
+
+# Toggle mode and trigger sync
+/viz-toggle dynamic
+```
+
+Sessions are gitignored and auto-cleaned after `retention_days`. See [howto/agent-visualization.md](howto/agent-visualization.md) for the full guide.
 
 ---
 

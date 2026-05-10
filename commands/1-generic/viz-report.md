@@ -4,27 +4,23 @@ allowed-tools: ["Bash"]
 argument-hint: "[--html | --terminal | --json] [--output path]"
 ---
 
-Generate a report for the most recent visualization session.
+Generate a report for the most recent visualization session. Pass flags via `$ARGUMENTS`.
 
-**Default (terminal output):**
 ```bash
-python .agent-meta/scripts/viz-report.py --format terminal
+FLAGS="$ARGUMENTS"
+
+# Default (terminal output) if no flags given
+if [ -z "$FLAGS" ]; then
+    python .agent-meta/scripts/viz-report.py --format terminal
+else
+    python .agent-meta/scripts/viz-report.py $FLAGS
+fi
 ```
 
-**HTML report:**
-```bash
-python .agent-meta/scripts/viz-report.py --format html --output session-report.html
-```
-
-**JSON export:**
-```bash
-python .agent-meta/scripts/viz-report.py --format json
-```
-
-**For a specific session:**
-```bash
-python .agent-meta/scripts/viz-report.py --session <session-id> --format terminal
-```
+**Examples:**
+- `$ARGUMENTS = "--format html --output report.html"`
+- `$ARGUMENTS = "--session <id> --format terminal"`
+- `$ARGUMENTS = "--format json"`
 
 Reports include:
 - Session name and duration
