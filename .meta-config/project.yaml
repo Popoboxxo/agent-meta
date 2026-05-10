@@ -164,7 +164,7 @@ max-parallel-agents: 4
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:
   enabled: true
-  mode: "full"                 # off | static | dynamic | full
+  mode: "full"
   event_log: ".agent-meta/viz/events.jsonl"
   report:
     retention_days: 7

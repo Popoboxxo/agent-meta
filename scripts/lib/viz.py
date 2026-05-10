@@ -568,8 +568,8 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str, viz_en
         return agent_content
 
     block = f"""
-## Visualization Reporting (Optional — nur wenn dynamischer Modus aktiv)
-Wenn der Visualisierungsmodus aktiviert ist, berichte deinen Status in die Datei `{VIZ_DIR}/events.jsonl`.
+## Visualization Reporting (Pflicht-Anweisung)
+Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `{VIZ_DIR}/events.jsonl` protokollieren.
 
 ### Format (eine Zeile pro Event, JSON)
 ```json
@@ -602,7 +602,7 @@ Wenn der Visualisierungsmodus aktiviert ist, berichte deinen Status in die Datei
 - Jede Zeile ein gültiges JSON-Objekt (JSONL-Format).
 - Füge die Events am Dateiende an (append).
 - Nutze `write_file` oder `edit_file` mit Append-Modus.
-- Dies ist optional — nur wenn der Nutzer den Visualisierungsmodus aktiviert hat.
+- Dies ist eine Pflicht-Anweisung. Jeder Agenten-Aufruf MUSS protokolliert werden.
 """
 
     # Füge am Ende des Agenten-Inhalts an

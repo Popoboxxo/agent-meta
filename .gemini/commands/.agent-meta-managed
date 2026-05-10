@@ -12,4 +12,8 @@ report-bug.toml
 set-preset.toml
 update-extensions.toml
 upgrade-meta.toml
+viz-mindmap.toml
+viz-report.toml
+viz-toggle.toml
+viz-watch.toml
 what-is.toml

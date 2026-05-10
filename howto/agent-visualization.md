@@ -87,9 +87,55 @@ Gültige Werte für `mode`:
 
 ### Wie es funktioniert
 
-1. **Agenten schreiben Events** — Jeder generierte Agent bekommt einen Prompt-Block, der ihn auffordert, seine Aktionen in `events.jsonl` zu protokollieren.
-2. **Sessions** — Events werden pro Session in separaten Dateien gespeichert (`events-<session_id>.jsonl`).
-3. **Reports** — `viz-report.py` parst die Events und generiert Terminal/HTML-Reports.
+Das Visualisierungs-System nutzt einen **zweistufigen Ansatz** für maximale Zuverlässigkeit:
+
+#### Stufe 1: Pflicht-Prompt-Block (alle Provider)
+
+Jeder generierte Agent erhält einen Prompt-Block am Ende seiner Definition, der ihn **verpflichtet**, seine Aktionen in `events.jsonl` zu protokollieren. Dieser Block wird nur injiziert wenn `viz.mode` auf `dynamic` oder `full` gesetzt ist.
+
+**Protokollierte Events:**
+- `agent_start` — Agent beginnt mit Arbeit
+- `agent_end` — Agent fertig (success/error/cancelled)
+- `delegate` — Delegation von A an B
+- `tool_call` — Agent führt Tool aus
+
+#### Stufe 2: PreToolUse Hook (Claude + Gemini)
+
+Für Provider mit Hook-Infrastruktur (Claude Code, Gemini CLI) wird automatisch ein System-Hook registriert:
+
+| Komponente | Pfad | Zweck |
+|------------|------|-------|
+| Quell-Hook | `hooks/1-generic/viz-log.sh` | Bash-Skript mit eingebettetem Python |
+| Ziel-Hook | `.claude/hooks/viz-log.sh` | Kopiert von sync.py |
+| Registrierung | `.claude/settings.json` | PreToolUse Event → intercept |
+
+**Funktionsweise:**
+1. Hook intercepted **jeden** Tool-Aufruf auf System-Ebene (vor Ausführung)
+2. Extrahiert Tool-Name, Input-Vorschau, Agent-Name und Provider aus dem Hook-Kontext
+3. Schreibt automatisch ein `tool_call`-Event in `.agent-meta/viz/events.jsonl`
+4. Exit 0 — der Tool-Aufruf wird nicht blockiert
+
+**Provider-Unterstützung:**
+
+| Provider | Hook-Infrastruktur | Logging-Mechanismus |
+|----------|-------------------|---------------------|
+| Claude Code | ✅ PreToolUse Hooks | Hook + Pflicht-Prompt |
+| Gemini CLI | ✅ PreToolUse Hooks | Hook + Pflicht-Prompt |
+| Opencode | ❌ Keine Hooks | Nur Pflicht-Prompt |
+| Continue | ❌ Keine Hooks | Nur Pflicht-Prompt |
+
+#### Conditional Hook-Management
+
+Der `viz-log` Hook wird **nur** kopiert und registriert wenn `viz.mode` == `dynamic` oder `full`:
+
+| viz.mode | viz-log.sh kopiert? | In settings.json registriert? |
+|----------|---------------------|-------------------------------|
+| `off` | ❌ | ❌ (stale wird gelöscht) |
+| `static` | ❌ | ❌ (stale wird gelöscht) |
+| `dynamic` | ✅ | ✅ (auto-enabled) |
+| `full` | ✅ | ✅ (auto-enabled) |
+
+Das Clean-up funktioniert vollautomatisch: Wenn `viz.mode` von `dynamic` auf `static` wechselt, erkennt `sync.py` den Hook als stale und entfernt ihn sowohl aus `.claude/hooks/` als auch aus `.claude/settings.json`.
 
 ### Event-Format (JSONL)
 
@@ -189,10 +235,11 @@ Folgende Einträge werden automatisch verwaltet:
 ## Wichtige Hinweise
 
 1. **Statische Mindmap** funktioniert sofort — kein Opt-in nötig.
-2. **Dynamischer Modus** ist opt-in — der Nutzer muss ihn aktivieren.
-3. **Events werden vom LLM geschrieben** — Die Zuverlässigkeit hängt davon ab, ob der Agent den Prompt-Block befolgt.
-4. **Keine IDE-Integration** — Das Framework beobachtet die IDEs nicht von außen. Stattdessen berichten die Agenten freiwillig von innen.
-5. **Sessions sind flüchtig** — Sie werden nie committed und regelmäßig aufgeräumt.
+2. **Dynamischer Modus** ist aktiviert via `viz.enabled: true` und `mode: dynamic` oder `full`.
+3. **Zweistufiges Logging** — Pflicht-Prompt-Block für alle Provider + PreToolUse Hook für Claude/Gemini.
+4. **Hook ist conditional** — `viz-log.sh` wird nur kopiert/registriert wenn `viz.mode` == `dynamic` oder `full`. Bei Wechsel auf `off`/`static` automatisch entfernt.
+5. **Keine IDE-Integration** — Das Framework beobachtet die IDEs nicht von außen. Stattdessen protokollieren die Agenten ihre Aktivitäten selbst (via Prompt) und Hooks intercepten Tool-Aufrufe (via System-Ebene).
+6. **Sessions sind flüchtig** — Sie werden nie committed und regelmäßig aufgeräumt.
 
 ---
 
@@ -204,11 +251,50 @@ agent-meta/
 │   ├── sync.py              # --viz, --viz-mode dynamic
 │   ├── viz-report.py        # CLI Reports + optionaler Webserver
 │   └── lib/
-│       └── viz.py           # Generator + Event-Log-Management
+│       ├── viz.py           # Generator + Event-Log-Management + inject_viz_prompt_block()
+│       └── hooks.py         # sync_hooks: conditional viz-log Management
+├── hooks/
+│   └── 1-generic/
+│       └── viz-log.sh       # PreToolUse Hook: intercept tool calls → events.jsonl
 ├── docs/
 │   ├── agent-mindmap.md     # GENERIERT (Mermaid)
 │   └── agent-graph.html     # GENERIERT (Interaktiv)
 └── .agent-meta/viz/         # SESSION-DATEN (gitignored)
-    ├── events-*.jsonl
-    └── session-reports/
+    ├── events.jsonl         # Haupt-Event-Log (append-only JSONL)
+    ├── events-*.jsonl       # Session-spezifische Logs
+    └── session-reports/     # Generierte Reports
+```
+
+### Event-Logging Pipeline
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Agent-Session                        │
+│                                                         │
+│  ┌──────────────┐    ┌──────────────────────────────┐  │
+│  │ Pflicht-     │    │ PreToolUse Hook (Claude/     │  │
+│  │ Prompt-Block │    │ Gemini)                      │  │
+│  │ (alle Prov.) │    │                              │  │
+│  │              │    │  Intercept: JEDER Tool-Aufruf │  │
+│  │ LLM schreibt │    │  → python3 extrahiert:       │  │
+│  │ Events:      │    │    - tool_name               │  │
+│  │ agent_start  │    │    - tool_input (preview)    │  │
+│  │ agent_end    │    │    - agent_name, provider    │  │
+│  │ delegate     │    │                              │  │
+│  └──────┬───────┘    └──────────────┬───────────────┘  │
+│         │                           │                   │
+│         │         ┌─────────────────┘                   │
+│         ▼         ▼                                     │
+│  ┌──────────────────────────────────┐                  │
+│  │  .agent-meta/viz/events.jsonl    │                  │
+│  │  (append-only JSONL, gitignored) │                  │
+│  └──────────────────────────────────┘                  │
+│                           │                             │
+└───────────────────────────┼─────────────────────────────┘
+                            ▼
+              ┌─────────────────────────┐
+              │  viz-report.py          │
+              │  --watch / --format     │
+              │  Terminal / HTML / JSON │
+              └─────────────────────────┘
 ```

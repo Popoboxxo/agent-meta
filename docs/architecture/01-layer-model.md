@@ -39,9 +39,26 @@ graph LR
     SJ -->|triggers| CL[Claude Code PreToolUse/PostToolUse]
 ```
 
-Hooks werden **immer kopiert**, aber nur ausgeführt wenn `enabled: true` in `agent-meta.config.yaml`:
+Hooks werden **immer kopiert**, aber nur ausgeführt wenn `enabled: true` in `project.yaml`:
 ```json
 "hooks": {
   "dod-push-check": { "enabled": true }
 }
 ```
+
+### Conditional Hooks: viz-log
+
+Der `viz-log` Hook ist ein Sonderfall — er wird **nicht** manuell in `project.yaml` aktiviert, sondern automatisch basierend auf `viz.mode`:
+
+| `viz.mode` | `viz-log.sh` kopiert? | In `settings.json` registriert? |
+|------------|----------------------|--------------------------------|
+| `off` | Nein | Nein (stale → gelöscht) |
+| `static` | Nein | Nein (stale → gelöscht) |
+| `dynamic` | Ja | Ja (auto-enabled) |
+| `full` | Ja | Ja (auto-enabled) |
+
+**Implementierung in `scripts/lib/hooks.py`:**
+- Zeile ~230-247: `viz_active = viz_mode in ("dynamic", "full")`
+- Wenn `viz-log` und `not viz_active` → Hook wird übersprungen, nicht in `now_managed` aufgenommen
+- Stale-Tracking: Wenn Hook vorher managed war, aber jetzt nicht mehr → DELETE + aus settings.json entfernt
+- Clean-up erfolgt vollautomatisch beim nächsten `sync.py`-Lauf

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+<meta http-equiv="refresh" content="5">
+    <title>Session Report — Fix login bug</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f0f23;
+            --surface: #1a1a2e;
+            --text: #eaeaea;
+            --text-muted: #a0a0a0;
+            --border: #2a2a4a;
+            --running: #ffd43b;
+            --success: #69db7c;
+            --error: #ff6b6b;
+            --idle: #868e96;
+        }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        h2 { margin-top: 30px; color: var(--text-muted); }
+        .stats { display: flex; gap: 20px; margin: 20px 0; }
+        .stat { background: var(--surface); padding: 15px; border-radius: 8px; flex: 1; }
+        .agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .agent-card { background: var(--surface); padding: 15px; border-radius: 8px; border-left: 4px solid var(--idle); }
+        .agent-card.running { border-left-color: var(--running); }
+        .agent-card.done, .agent-card.success { border-left-color: var(--success); }
+        .agent-card.error { border-left-color: var(--error); }
+        .agent-name { font-weight: bold; font-size: 1.1rem; }
+        .agent-status { color: var(--text-muted); margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); }
+        .viz-container { background: var(--surface); padding: 20px; border-radius: 8px; margin: 20px 0; overflow: auto; }
+        .mermaid { background: var(--bg); padding: 15px; border-radius: 8px; }
+        footer { margin-top: 30px; color: var(--text-muted); font-size: 0.85rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Session Report</h1>
+        <h2>Fix login bug</h2>
+        <div class="stats">
+            <div class="stat">
+                <div>Session-Dauer</div>
+                <div><strong>01:46</strong></div>
+            </div>
+            <div class="stat">
+                <div>Agenten</div>
+                <div><strong>4</strong></div>
+            </div>
+            <div class="stat">
+                <div>Events</div>
+                <div><strong>15</strong></div>
+            </div>
+        </div>
+        <h2>Agenten-Ablauf (Gantt)</h2>
+        <div class="viz-container">
+            <div class="mermaid">
+```mermaid
+gantt
+    title Agenten-Ablauf
+    dateFormat YYYY-MM-DD HH:mm:ss
+    axisFormat %H:%M:%S
+    section Session
+    developer :done, 2026-01-01 19:00:03, 2026-01-01 19:01:30
+    git :done, 2026-01-01 19:01:32, 2026-01-01 19:01:45
+    orchestrator :done, 2026-01-01 19:00:01, 2026-01-01 19:01:46
+    tester :done, 2026-01-01 19:00:46, 2026-01-01 19:01:00
+```
+            </div>
+        </div>
+        <h2>Delegationen</h2>
+        <div class="viz-container" id="delegation-graph" style="min-height:500px;">
+        </div>
+        <h2>Agenten</h2>
+        <div class="agents">
+            
+        <div class="agent-card success">
+            <div class="agent-name">✓ developer</div>
+            <div class="agent-status">success</div>
+            <div class="agent-duration">01:27</div>
+        </div>
+        
+        <div class="agent-card success">
+            <div class="agent-name">✓ git</div>
+            <div class="agent-status">success</div>
+            <div class="agent-duration">00:13</div>
+        </div>
+        
+        <div class="agent-card success">
+            <div class="agent-name">✓ orchestrator</div>
+            <div class="agent-status">success</div>
+            <div class="agent-duration">01:45</div>
+        </div>
+        
+        <div class="agent-card success">
+            <div class="agent-name">✓ tester</div>
+            <div class="agent-status">success</div>
+            <div class="agent-duration">00:14</div>
+        </div>
+        
+        </div>
+        <h2>Timeline</h2>
+        <table>
+            <thead><tr><th>Zeit</th><th></th><th>Ereignis</th></tr></thead>
+            <tbody>
+                <tr><td>19:00:00</td><td>▶</td><td>Session gestartet: Fix login bug</td></tr><tr><td>19:00:01</td><td>▶</td><td>orchestrator gestartet</td></tr><tr><td>19:00:02</td><td>→</td><td>orchestrator → developer</td></tr><tr><td>19:00:03</td><td>▶</td><td>developer gestartet</td></tr><tr><td>19:00:15</td><td>🔧</td><td>developer: read_file</td></tr><tr><td>19:00:45</td><td>→</td><td>developer → tester</td></tr><tr><td>19:00:46</td><td>▶</td><td>tester gestartet</td></tr><tr><td>19:01:00</td><td>✓</td><td>tester beendet (success)</td></tr><tr><td>19:01:05</td><td>🔧</td><td>developer: edit_file</td></tr><tr><td>19:01:30</td><td>✓</td><td>developer beendet (success)</td></tr><tr><td>19:01:31</td><td>→</td><td>orchestrator → git</td></tr><tr><td>19:01:32</td><td>▶</td><td>git gestartet</td></tr><tr><td>19:01:45</td><td>✓</td><td>git beendet (success)</td></tr><tr><td>19:01:46</td><td>✓</td><td>orchestrator beendet (success)</td></tr><tr><td>19:01:46</td><td>■</td><td>Session beendet</td></tr>
+            </tbody>
+        </table>
+        <footer>
+            Generiert von agent-meta viz-report
+        </footer>
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        (function() {
+            const nodes = [{id:"orchestrator",status:"success",color:"#69db7c"},{id:"developer",status:"success",color:"#69db7c"},{id:"tester",status:"success",color:"#69db7c"},{id:"git",status:"success",color:"#69db7c"}];
+            const links = [{source:"orchestrator",target:"developer",ts:"2026-05-10 19:00:02+00:00"},{source:"developer",target:"tester",ts:"2026-05-10 19:00:45+00:00"},{source:"orchestrator",target:"git",ts:"2026-05-10 19:01:31+00:00"}];
+            const container = document.getElementById("delegation-graph");
+            const width = container.clientWidth || 800;
+            const height = 500;
+
+            const svg = d3.select("#delegation-graph")
+                .append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "auto")
+                .style("max-height", "600px");
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(140))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collide", d3.forceCollide().radius(35));
+
+            const linkGroup = svg.append("g").attr("class", "links");
+            const nodeGroup = svg.append("g").attr("class", "nodes");
+
+            const link = linkGroup.selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("stroke", "#444")
+                .attr("stroke-width", 2)
+                .attr("stroke-opacity", 0.6);
+
+            const node = nodeGroup.selectAll("g")
+                .data(nodes)
+                .join("g")
+                .call(d3.drag()
+                    .on("start", (event, d) => {
+                        if (!event.active) simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x; d.fy = d.y;
+                    })
+                    .on("drag", (event, d) => {
+                        d.fx = event.x; d.fy = event.y;
+                    })
+                    .on("end", (event, d) => {
+                        if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null; d.fy = null;
+                    }));
+
+            node.append("circle")
+                .attr("r", 22)
+                .attr("fill", d => d.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 2);
+
+            node.append("text")
+                .text(d => d.id)
+                .attr("text-anchor", "middle")
+                .attr("dy", ".35em")
+                .attr("fill", "#fff")
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
+                .style("pointer-events", "none");
+
+            // Tooltip
+            const tooltip = d3.select("body").append("div")
+                .style("position", "absolute")
+                .style("background", "#1a1a2e")
+                .style("color", "#eaeaea")
+                .style("padding", "8px 12px")
+                .style("border-radius", "6px")
+                .style("border", "1px solid #2a2a4a")
+                .style("font-size", "12px")
+                .style("pointer-events", "none")
+                .style("opacity", 0)
+                .style("transition", "opacity 0.2s");
+
+            node.on("mouseover", (event, d) => {
+                tooltip.style("opacity", 1).html(`<strong>${d.id}</strong><br>status: ${d.status}`);
+            })
+            .on("mousemove", (event) => {
+                tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY + 10) + "px");
+            })
+            .on("mouseout", () => tooltip.style("opacity", 0));
+
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            // Animated particle traveling along edges
+            if (links.length > 0) {
+                const particle = svg.append("circle")
+                    .attr("r", 6)
+                    .attr("fill", "#ffd43b")
+                    .attr("stroke", "#0f0f23")
+                    .attr("stroke-width", 2)
+                    .style("filter", "drop-shadow(0 0 6px #ffd43b)");
+
+                let currentLink = 0;
+                function animateParticle() {
+                    const l = links[currentLink];
+                    if (!l) return;
+                    particle
+                        .attr("cx", l.source.x)
+                        .attr("cy", l.source.y)
+                        .transition()
+                        .duration(1200)
+                        .ease(d3.easeLinear)
+                        .attr("cx", l.target.x)
+                        .attr("cy", l.target.y)
+                        .on("end", () => {
+                            currentLink = (currentLink + 1) % links.length;
+                            setTimeout(animateParticle, 200);
+                        });
+                }
+                // Start after layout settles
+                setTimeout(animateParticle, 800);
+            }
+        })();
+    </script>
+    
+</body>
+</html>

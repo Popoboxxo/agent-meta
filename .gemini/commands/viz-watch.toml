@@ -1,0 +1,26 @@
+description = "Start live monitoring of the current agent visualization session"
+prompt = """
+Start live monitoring of the active visualization session. Updates every 5 seconds.
+
+```bash
+FLAGS="{{args}}"
+
+# Default: watch current session
+if [ -z "$FLAGS" ]; then
+    python .agent-meta/scripts/viz-report.py --watch
+else
+    python .agent-meta/scripts/viz-report.py --watch $FLAGS
+fi
+```
+
+**Examples:**
+- `{{args}} = "--agent orchestrator"` — Filter by agent name
+- `{{args}} = "--session <session-id>"` — Watch specific session
+
+Press `Ctrl+C` to stop monitoring.
+
+The terminal view shows:
+- Real-time agent status (idle / running / done / error)
+- Progress bars relative to session duration
+- Live delegation timeline
+"""
