@@ -239,7 +239,7 @@ def _render_mermaid_sequence(state: dict) -> str:
 
 
 def render_html(events: list[dict]) -> str:
-    """Rendere HTML-Report mit Mermaid-Diagrammen."""
+    """Rendere HTML-Report mit Mermaid-Gantt und D3.js Delegations-Graph."""
     state = build_session_state(events)
     session_name = state.get("session_name", "Unnamed Session")
 
@@ -268,9 +268,149 @@ def render_html(events: list[dict]) -> str:
         msg = item["msg"]
         timeline_rows.append(f"<tr><td>{ts_str}</td><td>{icon}</td><td>{msg}</td></tr>")
 
-    # Mermaid Diagramme
+    # Mermaid Gantt
     gantt = _render_mermaid_gantt(state)
-    sequence = _render_mermaid_sequence(state)
+
+    # D3.js Daten
+    nodes_js = []
+    for name, info in state["agents"].items():
+        color = {"running": "#ffd43b", "success": "#69db7c", "done": "#69db7c", "error": "#ff6b6b"}.get(info["status"], "#868e96")
+        nodes_js.append(f'{{id:"{name}",status:"{info["status"]}",color:"{color}"}}')
+    nodes_json = "[" + ",".join(nodes_js) + "]"
+
+    edges_sorted = sorted(state["edges"], key=lambda e: e["ts"])
+    links_js = []
+    for e in edges_sorted:
+        links_js.append(f'{{source:"{e["from"]}",target:"{e["to"]}",ts:"{e["ts"]}"}}')
+    links_json = "[" + ",".join(links_js) + "]"
+
+    d3_script = f"""
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        (function() {{
+            const nodes = {nodes_json};
+            const links = {links_json};
+            const container = document.getElementById("delegation-graph");
+            const width = container.clientWidth || 800;
+            const height = 500;
+
+            const svg = d3.select("#delegation-graph")
+                .append("svg")
+                .attr("viewBox", `0 0 ${{width}} ${{height}}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "auto")
+                .style("max-height", "600px");
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(140))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collide", d3.forceCollide().radius(35));
+
+            const linkGroup = svg.append("g").attr("class", "links");
+            const nodeGroup = svg.append("g").attr("class", "nodes");
+
+            const link = linkGroup.selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("stroke", "#444")
+                .attr("stroke-width", 2)
+                .attr("stroke-opacity", 0.6);
+
+            const node = nodeGroup.selectAll("g")
+                .data(nodes)
+                .join("g")
+                .call(d3.drag()
+                    .on("start", (event, d) => {{
+                        if (!event.active) simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x; d.fy = d.y;
+                    }})
+                    .on("drag", (event, d) => {{
+                        d.fx = event.x; d.fy = event.y;
+                    }})
+                    .on("end", (event, d) => {{
+                        if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null; d.fy = null;
+                    }}));
+
+            node.append("circle")
+                .attr("r", 22)
+                .attr("fill", d => d.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 2);
+
+            node.append("text")
+                .text(d => d.id)
+                .attr("text-anchor", "middle")
+                .attr("dy", ".35em")
+                .attr("fill", "#fff")
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
+                .style("pointer-events", "none");
+
+            // Tooltip
+            const tooltip = d3.select("body").append("div")
+                .style("position", "absolute")
+                .style("background", "#1a1a2e")
+                .style("color", "#eaeaea")
+                .style("padding", "8px 12px")
+                .style("border-radius", "6px")
+                .style("border", "1px solid #2a2a4a")
+                .style("font-size", "12px")
+                .style("pointer-events", "none")
+                .style("opacity", 0)
+                .style("transition", "opacity 0.2s");
+
+            node.on("mouseover", (event, d) => {{
+                tooltip.style("opacity", 1).html(`<strong>${{d.id}}</strong><br>status: ${{d.status}}`);
+            }})
+            .on("mousemove", (event) => {{
+                tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY + 10) + "px");
+            }})
+            .on("mouseout", () => tooltip.style("opacity", 0));
+
+            simulation.on("tick", () => {{
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                node.attr("transform", d => `translate(${{d.x}},${{d.y}})`);
+            }});
+
+            // Animated particle traveling along edges
+            if (links.length > 0) {{
+                const particle = svg.append("circle")
+                    .attr("r", 6)
+                    .attr("fill", "#ffd43b")
+                    .attr("stroke", "#0f0f23")
+                    .attr("stroke-width", 2)
+                    .style("filter", "drop-shadow(0 0 6px #ffd43b)");
+
+                let currentLink = 0;
+                function animateParticle() {{
+                    const l = links[currentLink];
+                    if (!l) return;
+                    particle
+                        .attr("cx", l.source.x)
+                        .attr("cy", l.source.y)
+                        .transition()
+                        .duration(1200)
+                        .ease(d3.easeLinear)
+                        .attr("cx", l.target.x)
+                        .attr("cy", l.target.y)
+                        .on("end", () => {{
+                            currentLink = (currentLink + 1) % links.length;
+                            setTimeout(animateParticle, 200);
+                        }});
+                }}
+                // Start after layout settles
+                setTimeout(animateParticle, 800);
+            }}
+        }})();
+    </script>
+    """
 
     return f"""<!DOCTYPE html>
 <html lang="de">
@@ -306,7 +446,7 @@ def render_html(events: list[dict]) -> str:
         table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
         th, td {{ padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }}
         th {{ color: var(--text-muted); }}
-        .mermaid-container {{ background: var(--surface); padding: 20px; border-radius: 8px; margin: 20px 0; overflow: auto; }}
+        .viz-container {{ background: var(--surface); padding: 20px; border-radius: 8px; margin: 20px 0; overflow: auto; }}
         .mermaid {{ background: var(--bg); padding: 15px; border-radius: 8px; }}
         footer {{ margin-top: 30px; color: var(--text-muted); font-size: 0.85rem; text-align: center; }}
     </style>
@@ -330,16 +470,13 @@ def render_html(events: list[dict]) -> str:
             </div>
         </div>
         <h2>Agenten-Ablauf (Gantt)</h2>
-        <div class="mermaid-container">
+        <div class="viz-container">
             <div class="mermaid">
 {gantt}
             </div>
         </div>
         <h2>Delegationen</h2>
-        <div class="mermaid-container">
-            <div class="mermaid">
-{sequence}
-            </div>
+        <div class="viz-container" id="delegation-graph" style="min-height:500px;">
         </div>
         <h2>Agenten</h2>
         <div class="agents">
@@ -359,6 +496,7 @@ def render_html(events: list[dict]) -> str:
     <script>
         mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
     </script>
+{d3_script}
 </body>
 </html>
 """
