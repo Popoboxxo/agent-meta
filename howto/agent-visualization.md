@@ -158,7 +158,7 @@ python .agent-meta/scripts/viz-report.py --session <id> --format terminal
 # HTML-Report generieren
 python .agent-meta/scripts/viz-report.py --session <id> --format html --output report.html
 
-# Lokaler Webserver (optional — erfordert Flask)
+# Lokaler Webserver (optional — erfordert Flask: `pip install flask`)
 python .agent-meta/scripts/viz-report.py --serve --port 8765
 
 # Alte Sessions aufräumen

@@ -153,6 +153,9 @@ py .agent-meta/scripts/viz-report.py --format html --output report.html
 
 # Toggle mode and trigger sync
 /viz-toggle dynamic
+
+# Local web server (requires Flask: pip install flask)
+py .agent-meta/scripts/viz-report.py --serve
 ```
 
 Sessions are gitignored and auto-cleaned after `retention_days`. See [howto/agent-visualization.md](howto/agent-visualization.md) for the full guide.
