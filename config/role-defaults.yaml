@@ -121,6 +121,18 @@ roles:
     workflow_tier: optional
     description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
 
+  log-analyzer:
+    model: balanced
+    memory: ""
+    workflow_tier: required
+    description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
+
+  feedback:
+    model: balanced
+    memory: ""
+    workflow_tier: required
+    description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
+
   openscad-developer:
     model: balanced
     memory: local

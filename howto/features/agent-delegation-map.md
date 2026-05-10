@@ -9,7 +9,7 @@ Zeigt wer an wen delegiert (→) und wer an wen verweist (↗).
 
 | Agent | Delegiert an (→) | Verweist auf (↗) |
 |-------|-------------------|-------------------|
-| **orchestrator** | `ideation`, `requirements`, `developer`, `tester`, `validator`, `documenter`, `docker`, `git`, `agent-meta-scout`, `agent-meta-manager`, `meta-feedback` | — |
+| **orchestrator** | `ideation`, `requirements`, `developer`, `tester`, `validator`, `documenter`, `docker`, `git`, `agent-meta-scout`, `agent-meta-manager`, `meta-feedback`, `log-analyzer`, `feedback` | — |
 | **feature** | `git`, `requirements`, `tester`, `developer`, `validator`, `documenter` | — |
 | **developer** | — | `requirements`, `tester`, `documenter`, `validator` |
 | **tester** | — | `requirements`, `developer`, `documenter`, `validator` |
@@ -24,6 +24,8 @@ Zeigt wer an wen delegiert (→) und wer an wen verweist (↗).
 | **agent-meta-scout** | — | `requirements`, `agent-meta-manager`, `meta-feedback` |
 | **security-auditor** | — | `developer`, `tester`, `validator`, `requirements` |
 | **requirements** | — | `developer`, `tester`, `documenter` |
+| **log-analyzer** | `feedback`, `developer`, `security-auditor`, `requirements`, `orchestrator` | — |
+| **feedback** | — | `git` (für verwandte git-Ops nach Issue-Erstellung) |
 
 **Legende:**
 - **Delegiert an (→):** Startet den Ziel-Agenten aktiv via Agent-Tool
@@ -59,6 +61,11 @@ graph TD
         SCOUT[agent-meta-scout]
     end
 
+    subgraph "Diagnose & Feedback"
+        LOG[log-analyzer]
+        FBK[feedback]
+    end
+
     %% Orchestrator delegiert
     ORCH -->|delegiert| IDEA
     ORCH -->|delegiert| REQ
@@ -71,6 +78,8 @@ graph TD
     ORCH -->|delegiert| SCOUT
     ORCH -->|delegiert| MGR
     ORCH -->|delegiert| FB
+    ORCH -->|delegiert| LOG
+    ORCH -->|delegiert| FBK
 
     %% Feature delegiert
     FEAT -->|delegiert| GIT
@@ -134,6 +143,15 @@ graph TD
     SCOUT -.->|verweist| REQ
     SCOUT -.->|verweist| MGR
     SCOUT -.->|verweist| FB
+
+    %% Log-Analyzer delegiert
+    LOG -->|delegiert| FBK
+    LOG -->|delegiert| DEV
+    LOG -->|delegiert| SEC
+    LOG -->|delegiert| REQ
+
+    %% Feedback verweist
+    FBK -.->|verweist| GIT
 ```
 
 ---
@@ -144,10 +162,11 @@ graph TD
 
 | Rolle | Tools | Delegiert an |
 |-------|-------|-------------|
-| `orchestrator` | Agent, Bash, Read, Write, Edit, ... | 11 Rollen |
+| `orchestrator` | Agent, Bash, Read, Write, Edit, ... | 13 Rollen |
 | `feature` | Agent, Bash, Read | 6 Rollen |
 | `agent-meta-manager` | Agent, Bash, Read, Write, Edit, ... | 2 Rollen |
 | `ideation` | Agent (nur für requirements-Übergabe) | 1 Rolle |
+| `log-analyzer` | Agent, Bash, Read, Glob, Grep, ... | 4 Rollen |
 
 ### Spezialisten (kein Agent-Tool, verweisen nur)
 
@@ -161,6 +180,7 @@ graph TD
 | `release` | tester, validator, documenter, git |
 | `docker` | developer, release, tester |
 | `security-auditor` | developer, tester, validator, requirements |
+| `feedback` | git (für verwandte git-Ops nach Issue-Erstellung) |
 
 ### Endpunkte (keine aktive Delegation, nur Verweise)
 
@@ -206,4 +226,11 @@ User → orchestrator → agent-meta-scout → agent-meta-manager → git
 
 User → orchestrator → ideation → requirements
        └────────── Workflow I: Neue Idee ──────┘
+
+User → orchestrator → log-analyzer → feedback → gh issue create
+       └──────────── Workflow O+P: Log-Analyse + Issue ──────────┘
+
+User → /analyze-logs → log-analyzer
+User → /feedback     → feedback → gh issue create
+       └── Commands: direkte Einzel-Aktionen ──┘
 ```

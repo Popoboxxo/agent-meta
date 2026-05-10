@@ -50,23 +50,29 @@ Projekt-eigene Rule anlegen:
 py .agent-meta/scripts/sync.py --create-rule meine-regel
 ```
 
-### .claude/commands/ — Custom Slash Commands
+### .claude/commands/ — Slash Commands
 
 ```
 .claude/commands/
-  deploy.md      → /project:deploy
-  review.md      → /project:review
+  analyze-logs.md  → /project:analyze-logs    ← von agent-meta generiert
+  feedback.md      → /project:feedback        ← von agent-meta generiert
+  commit.md        → /project:commit          ← von agent-meta generiert
+  deploy.md        → /project:deploy          ← projekt-eigen (manuell)
 ```
 
 Slash Commands laufen im **Haupt-Kontext** (kein isoliertes Context Window wie Agenten).
-Geeignet für schnelle, wiederkehrende Einzel-Aktionen. agent-meta verwaltet commands/ nicht —
-du legst diese Dateien manuell an.
+Geeignet für schnelle, wiederkehrende Einzel-Aktionen.
+
+agent-meta verwaltet einen Teil der Commands automatisch (generisch und plattformspezifisch,
+analog zu Agenten). Projekt-eigene Commands in `.claude/3-project/commands/` werden nie überschrieben.
 
 | `.claude/agents/` | `.claude/commands/` |
 |-------------------|---------------------|
 | Vollständige Persona, isolierter Kontext | Schneller Einzel-Workflow im Hauptchat |
 | Für komplexe, mehrstufige Aufgaben | Für wiederkehrende Einzel-Aktionen |
-| Von agent-meta generiert und verwaltet | Manuell angelegt, nie von sync.py berührt |
+| Von agent-meta generiert (1-generic / 2-platform) | Von agent-meta generiert + projekt-eigen |
+
+Framework-Commands (immer verfügbar nach Sync): `/analyze-logs`, `/feedback`, `/commit`, `/merge`, `/doc-now`, `/diagnose`, `/upgrade-meta` u.a.
 
 ---
 
@@ -196,6 +202,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/feature.md` | `1-generic/feature.md` |
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
+| `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
+| `.claude/agents/feedback.md` | `1-generic/feedback.md` |
 
 ---
 
@@ -389,6 +397,10 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/feature.md` vorhanden
 - [ ] `.claude/agents/agent-meta-manager.md` vorhanden
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
+- [ ] `.claude/agents/log-analyzer.md` vorhanden
+- [ ] `.claude/agents/feedback.md` vorhanden
+- [ ] `.claude/commands/analyze-logs.md` vorhanden (nach Sync)
+- [ ] `.claude/commands/feedback.md` vorhanden (nach Sync)
 - [ ] Bei `"Gemini"` in `ai-providers`: `.gemini/GEMINI.md` vorhanden, `.gemini/agents/` befüllt
 - [ ] Bei `"Continue"` in `ai-providers`: `.continue/rules/project-context.md` vorhanden, `.continue/agents/` befüllt
 - [ ] `docs/REQUIREMENTS.md` initialisiert
