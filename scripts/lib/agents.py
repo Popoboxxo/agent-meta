@@ -763,8 +763,9 @@ def sync_agents_for_provider(
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
+        # Applies to ALL providers — every generated agent gets the viz reporting block
         viz_cfg = config.get('viz', {})
-        if viz_cfg.get('mode') in ('dynamic', 'full') and provider in ('Claude', 'Opencode'):
+        if viz_cfg.get('mode') in ('dynamic', 'full'):
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, provider, viz_enabled=True)
 
