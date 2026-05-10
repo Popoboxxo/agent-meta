@@ -3,7 +3,7 @@ name: agent-meta-manager
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 mode: subagent
 model: opencode-go/qwen3.6-plus
-generated-from: "1-generic/agent-meta-manager.md@1.4.3"
+generated-from: "1-generic/agent-meta-manager.md@1.5.0"
 ---
 # Agent-Meta-Manager — agent-meta
 
@@ -115,7 +115,46 @@ git submodule update --init --recursive
 
 ---
 
-## 8. CLAUDE.md verbessern
+## 8. Consistency-Check
+
+Validiert Agent-Templates, Commands und Cross-References auf Konsistenz — bevor committed wird.
+
+```bash
+# Nur geänderte Dateien prüfen (Standard, schnell)
+py .agent-meta/scripts/consistency-check.py --changed
+
+# Vollständige Prüfung aller Agents + Commands
+py .agent-meta/scripts/consistency-check.py
+
+# Einzelne Datei
+py .agent-meta/scripts/consistency-check.py --file agents/1-generic/<rolle>.md
+
+# JSON-Output (CI/Pipelines)
+py .agent-meta/scripts/consistency-check.py --changed --json
+```
+
+**Was geprüft wird:**
+
+| Kategorie | Checks |
+|---|---|
+| Frontmatter | version-bump bei Änderung, semver-Format, based-on für 2-platform, extends-Datei existiert, patch-Anchors lösen auf |
+| Cross-References | role-defaults vollständig, Orchestrator-Tabelle aktuell, CHANGELOG erwähnt neue Dateien |
+| Platzhalter | Bekannte Typos, unbekannte `{{VAR}}` |
+| Commands | allowed-tools ist Array, description vorhanden, $ARGUMENTS genutzt |
+
+**Wann ausführen:**
+- Nach dem Anlegen oder Ändern von Agenten / Commands
+- Vor jedem Commit auf Feature-Branches
+- Als Sanity-Check nach einem Sync
+
+**Befund beheben:** Jedes Finding enthält einen konkreten `-> Fix`-Hinweis.
+Bei `ERROR` → zwingend beheben. Bei `WARNING` → empfohlen.
+
+→ Vollständige Referenz: `.agent-meta/howto/features/consistency-check.md`
+
+---
+
+## 9. CLAUDE.md verbessern
 
 → Lies `.agent-meta/agents/1-generic/_wf-claude-review.md` für Review-Prozess.
 
@@ -135,7 +174,7 @@ der richtige Weg — nicht alles in CLAUDE.md packen).
 
 ---
 
-## Don'ts
+## 10. Don'ts
 
 - KEIN Upgrade ohne Changelog-Check und User-Bestätigung bei Major
 - KEINEN Override wenn Extension reicht

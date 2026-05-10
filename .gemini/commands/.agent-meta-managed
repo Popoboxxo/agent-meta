@@ -1,9 +1,12 @@
 add-mcp-server.toml
 add-project-role.toml
 add-provider.toml
+analyze-logs.toml
 commit.toml
+consistency-check.toml
 diagnose.toml
 doc-now.toml
+feedback.toml
 merge.toml
 report-bug.toml
 set-preset.toml

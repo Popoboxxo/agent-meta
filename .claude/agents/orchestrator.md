@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.6.0"
+version: "2.7.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.6.0"
+generated-from: "1-generic/orchestrator.md@2.7.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Bash
@@ -56,6 +56,8 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* |
 | `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* |
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* |
+| `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren |
+| `feedback` | Bug/Feature/Verbesserung als GitHub Issue einreichen — **immer vor `git` für Issues** |
 
 Parallel: max. 4 Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
@@ -95,7 +97,9 @@ I  Ideation:        ideation → requirements
 L  Issue:           → lies .agent-meta/agents/1-generic/_wf-issue.md
 M  Scout:           → lies .agent-meta/agents/1-generic/_wf-scout.md
 N  Skill-Repo:      → lies .agent-meta/agents/1-generic/_wf-scout.md
-K  Feedback:        → lies .agent-meta/agents/1-generic/_wf-feedback.md
+K  Meta-Feedback:   → lies .agent-meta/agents/1-generic/_wf-feedback.md
+O  Log-Analyse:     log-analyzer (--quick Standard | --deep für Tiefenanalyse)
+P  Projekt-Issue:   feedback → Issue aufbereiten + gh issue create (nie direkt git für Issues)
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).
