@@ -205,17 +205,26 @@ def _render_mermaid_gantt(state: dict) -> str:
     """Rendere Mermaid Gantt-Diagramm für die Session."""
     if not state["session_start"]:
         return ""
-    lines = ["```mermaid", "gantt", "    title Agenten-Ablauf", "    dateFormat HH:mm:ss", "    section Session"]
+    # Mermaid 10.x braucht ein Datum bei dateFormat; wir nutzen einen Dummy-Tag
+    dummy = "2026-01-01"
+    lines = [
+        "```mermaid",
+        "gantt",
+        "    title Agenten-Ablauf",
+        "    dateFormat YYYY-MM-DD HH:mm:ss",
+        "    axisFormat %H:%M:%S",
+        "    section Session",
+    ]
     for name, info in sorted(state["agents"].items()):
         if info["started_at"]:
-            start = info["started_at"].strftime("%H:%M:%S")
-            end = info["ended_at"].strftime("%H:%M:%S") if info["ended_at"] else "now"
+            s = info["started_at"].strftime(f"{dummy} %H:%M:%S")
+            e = info["ended_at"].strftime(f"{dummy} %H:%M:%S") if info["ended_at"] else "now"
             status = info["status"]
             tag = {"running": "active", "success": "done", "done": "done", "error": "crit"}.get(status, "")
             if tag:
-                lines.append(f'    {name} :{tag}, {start}, {end}')
+                lines.append(f'    {name} :{tag}, {s}, {e}')
             else:
-                lines.append(f'    {name} :{start}, {end}')
+                lines.append(f'    {name} :{s}, {e}')
     lines.append("```")
     return "\n".join(lines)
 
@@ -238,10 +247,11 @@ def _render_mermaid_sequence(state: dict) -> str:
     return "\n".join(lines)
 
 
-def render_html(events: list[dict]) -> str:
+def render_html(events: list[dict], live_mode: bool = False) -> str:
     """Rendere HTML-Report mit Mermaid-Gantt und D3.js Delegations-Graph."""
     state = build_session_state(events)
     session_name = state.get("session_name", "Unnamed Session")
+    live_meta = '<meta http-equiv="refresh" content="5">\n' if live_mode else ''
 
     # Agenten-Karten
     agent_cards = []
@@ -416,7 +426,7 @@ def render_html(events: list[dict]) -> str:
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <title>Session Report — {session_name}</title>
+{live_meta}    <title>Session Report — {session_name}</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
         :root {{
@@ -612,7 +622,7 @@ def main():
     if args.since:
         since = datetime.fromisoformat(args.since.replace("Z", "+00:00"))
 
-    def _load_and_render():
+    def _load_and_render(live: bool = False):
         events = read_events(project_root, session_id, since)
         if not events:
             print("  !  Keine Events gefunden")
@@ -621,23 +631,36 @@ def main():
         if args.format == "terminal":
             return render_terminal(events, args.agent)
         elif args.format == "html":
-            return render_html(events)
+            return render_html(events, live_mode=live)
         elif args.format == "json":
             return json.dumps(events, indent=2, ensure_ascii=False)
         return None
 
     if args.watch:
-        print(f"  i  Live-Monitoring gestartet (Ctrl+C zum Beenden)")
+        is_html = args.format == "html"
+        out_file = Path(args.output) if args.output else Path("live-report.html")
+
+        if is_html:
+            print(f"  i  Live-HTML-Dashboard gestartet")
+            print(f"  i  Schreibe nach: {out_file.resolve()}")
+            print(f"  i  Öffne diese Datei im Browser — aktualisiert sich alle 5 Sekunden")
+            print(f"  i  Drücke Ctrl+C zum Beenden")
+        else:
+            print(f"  i  Live-Monitoring gestartet (Ctrl+C zum Beenden)")
+
         last_len = 0
         try:
             while True:
                 events = read_events(project_root, session_id, since)
-                if len(events) != last_len:
+                if len(events) != last_len or is_html:
                     last_len = len(events)
-                    output = render_terminal(events, args.agent)
+                    output = _load_and_render(live=is_html)
                     if output:
-                        os.system("cls" if os.name == "nt" else "clear")
-                        print(output)
+                        if is_html:
+                            out_file.write_text(output, encoding="utf-8")
+                        else:
+                            os.system("cls" if os.name == "nt" else "clear")
+                            print(output)
                 time.sleep(5)
         except KeyboardInterrupt:
             print("\n  i  Monitoring beendet")
