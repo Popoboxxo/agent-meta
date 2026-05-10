@@ -29,3 +29,8 @@ sync.log
 .claude/skills/refactor-safely.md
 .claude/skills/review-changes.md
 .kiro/steering/code-review-graph.md
+
+# agent-meta viz sessions (never commit runtime events)
+.agent-meta/viz/
+.agent-meta/viz/events-*.jsonl
+.agent-meta/viz/session-reports/
