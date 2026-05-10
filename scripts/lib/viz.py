@@ -488,7 +488,7 @@ def read_events(project_root: Path, session_id: str | None = None, since: dateti
 
     events = []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             for line in f:
                 line = line.strip()
                 if not line:

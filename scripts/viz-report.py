@@ -68,6 +68,7 @@ def build_session_state(events: list[dict]) -> dict:
             "edges": [{"from": "...", "to": "...", "ts": dt}],
             "timeline": [...],
             "duration_sec": float,
+            "session_name": str,
         }
     """
     agents = defaultdict(lambda: {
@@ -81,6 +82,7 @@ def build_session_state(events: list[dict]) -> dict:
     timeline = []
     session_start = None
     session_end = None
+    session_name = "Unnamed Session"
 
     for ev in events:
         ts = _parse_ts(ev.get("ts", ""))
@@ -92,7 +94,10 @@ def build_session_state(events: list[dict]) -> dict:
         session_end = ts
 
         if event_type == "session_start":
-            timeline.append({"ts": ts, "icon": "▶", "msg": f"Session gestartet: {ev.get('payload', {}).get('task', '')}"})
+            task = ev.get('payload', {}).get('task', '')
+            if task:
+                session_name = task
+            timeline.append({"ts": ts, "icon": "▶", "msg": f"Session gestartet: {task}"})
         elif event_type == "session_end":
             timeline.append({"ts": ts, "icon": "■", "msg": "Session beendet"})
         elif event_type == "agent_start":
@@ -133,6 +138,7 @@ def build_session_state(events: list[dict]) -> dict:
         "duration_sec": duration,
         "session_start": session_start,
         "session_end": session_end,
+        "session_name": session_name,
     }
 
 
@@ -143,8 +149,12 @@ def render_terminal(events: list[dict], agent_filter: str | None = None) -> str:
 
     # Header
     start_str = _format_ts(state["session_start"]) if state["session_start"] else "??:??:??"
+    name = state.get("session_name", "Unnamed Session")
+    name = name[:50] + "..." if len(name) > 50 else name
     lines.append("┌" + "─" * 77 + "┐")
-    lines.append(f"│  🤖 AGENT SESSION REPORT — {start_str} — Dauer: {_format_duration(state['duration_sec'])}          │")
+    lines.append(f"│  🤖 AGENT SESSION REPORT                                               │")
+    lines.append(f"│  {name:<72}│")
+    lines.append(f"│  {start_str} — Dauer: {_format_duration(state['duration_sec']):<52}│")
     lines.append("├" + "─" * 77 + "┤")
 
     # Agenten-Status-Balken
@@ -191,9 +201,44 @@ def render_terminal(events: list[dict], agent_filter: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def _render_mermaid_gantt(state: dict) -> str:
+    """Rendere Mermaid Gantt-Diagramm für die Session."""
+    if not state["session_start"]:
+        return ""
+    lines = ["```mermaid", "gantt", "    title Agenten-Ablauf", "    dateFormat HH:mm:ss"]
+    for name, info in sorted(state["agents"].items()):
+        if info["started_at"]:
+            start = info["started_at"].strftime("%H:%M:%S")
+            end = info["ended_at"].strftime("%H:%M:%S") if info["ended_at"] else "now"
+            status = info["status"]
+            color = {"running": "#ffd43b", "success": "#69db7c", "done": "#69db7c", "error": "#ff6b6b"}.get(status, "#868e96")
+            lines.append(f'    {name} :{status},{color} {start}, {end}')
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _render_mermaid_sequence(state: dict) -> str:
+    """Rendere Mermaid Sequence-Diagramm für Delegationen."""
+    if not state["edges"]:
+        return ""
+    lines = ["```mermaid", "sequenceDiagram"]
+    # Sammle alle beteiligten Agenten
+    participants = set()
+    for e in state["edges"]:
+        participants.add(e["from"])
+        participants.add(e["to"])
+    for p in sorted(participants):
+        lines.append(f"    participant {p}")
+    for e in state["edges"]:
+        lines.append(f"    {e['from']}->>{e['to']}: delegate")
+    lines.append("```")
+    return "\n".join(lines)
+
+
 def render_html(events: list[dict]) -> str:
-    """Rendere HTML-Report."""
+    """Rendere HTML-Report mit Mermaid-Diagrammen."""
     state = build_session_state(events)
+    session_name = state.get("session_name", "Unnamed Session")
 
     # Agenten-Karten
     agent_cards = []
@@ -220,11 +265,16 @@ def render_html(events: list[dict]) -> str:
         msg = item["msg"]
         timeline_rows.append(f"<tr><td>{ts_str}</td><td>{icon}</td><td>{msg}</td></tr>")
 
+    # Mermaid Diagramme
+    gantt = _render_mermaid_gantt(state)
+    sequence = _render_mermaid_sequence(state)
+
     return f"""<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <title>Agent Session Report</title>
+    <title>Session Report — {session_name}</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
         :root {{
             --bg: #0f0f23;
@@ -238,8 +288,9 @@ def render_html(events: list[dict]) -> str:
             --idle: #868e96;
         }}
         body {{ background: var(--bg); color: var(--text); font-family: sans-serif; padding: 20px; }}
-        .container {{ max-width: 1000px; margin: 0 auto; }}
+        .container {{ max-width: 1200px; margin: 0 auto; }}
         h1 {{ border-bottom: 2px solid var(--border); padding-bottom: 10px; }}
+        h2 {{ margin-top: 30px; color: var(--text-muted); }}
         .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
         .stat {{ background: var(--surface); padding: 15px; border-radius: 8px; flex: 1; }}
         .agents {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }}
@@ -252,12 +303,15 @@ def render_html(events: list[dict]) -> str:
         table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
         th, td {{ padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }}
         th {{ color: var(--text-muted); }}
+        .mermaid-container {{ background: var(--surface); padding: 20px; border-radius: 8px; margin: 20px 0; overflow: auto; }}
+        .mermaid {{ background: var(--bg); padding: 15px; border-radius: 8px; }}
         footer {{ margin-top: 30px; color: var(--text-muted); font-size: 0.85rem; text-align: center; }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🤖 Agent Session Report</h1>
+        <h1>🤖 Session Report</h1>
+        <h2>{session_name}</h2>
         <div class="stats">
             <div class="stat">
                 <div>Session-Dauer</div>
@@ -270,6 +324,18 @@ def render_html(events: list[dict]) -> str:
             <div class="stat">
                 <div>Events</div>
                 <div><strong>{len(events)}</strong></div>
+            </div>
+        </div>
+        <h2>Agenten-Ablauf (Gantt)</h2>
+        <div class="mermaid-container">
+            <div class="mermaid">
+{gantt}
+            </div>
+        </div>
+        <h2>Delegationen</h2>
+        <div class="mermaid-container">
+            <div class="mermaid">
+{sequence}
             </div>
         </div>
         <h2>Agenten</h2>
@@ -287,6 +353,9 @@ def render_html(events: list[dict]) -> str:
             Generiert von agent-meta viz-report
         </footer>
     </div>
+    <script>
+        mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+    </script>
 </body>
 </html>
 """

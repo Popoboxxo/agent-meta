@@ -547,6 +547,12 @@ def sync_agents(
             pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
 
+        # Visualization: inject event-logging prompt block when dynamic mode is enabled
+        viz_cfg = config.get("viz", {})
+        if viz_cfg.get("mode") == "dynamic":
+            from .viz import inject_viz_prompt_block
+            content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True)
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
@@ -755,6 +761,12 @@ def sync_agents_for_provider(
                 content = _transform_frontmatter_for_opencode(
                     content, name, description, model, generated_from
                 )
+
+        # Visualization: inject event-logging prompt block when dynamic mode is enabled
+        viz_cfg = config.get('viz', {})
+        if viz_cfg.get('mode') == 'dynamic' and provider in ('Claude', 'Opencode'):
+            from .viz import inject_viz_prompt_block
+            content = inject_viz_prompt_block(content, role, provider, viz_enabled=True)
 
         if debug_mode:
             content = inject_debug_block(content, name)

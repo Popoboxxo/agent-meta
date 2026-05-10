@@ -251,6 +251,12 @@ def main():
     variables, pre_warnings = build_variables(config, agent_meta_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
+
+    # Merge CLI viz-mode into config
+    if args.viz_mode is not None:
+        if "viz" not in config:
+            config["viz"] = {}
+        config["viz"]["mode"] = args.viz_mode
     viz_cfg = config.get("viz", {})
 
     # Warn if actual git tag of agent-meta submodule doesn't match configured version
