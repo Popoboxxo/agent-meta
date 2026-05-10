@@ -205,14 +205,17 @@ def _render_mermaid_gantt(state: dict) -> str:
     """Rendere Mermaid Gantt-Diagramm für die Session."""
     if not state["session_start"]:
         return ""
-    lines = ["```mermaid", "gantt", "    title Agenten-Ablauf", "    dateFormat HH:mm:ss"]
+    lines = ["```mermaid", "gantt", "    title Agenten-Ablauf", "    dateFormat HH:mm:ss", "    section Session"]
     for name, info in sorted(state["agents"].items()):
         if info["started_at"]:
             start = info["started_at"].strftime("%H:%M:%S")
             end = info["ended_at"].strftime("%H:%M:%S") if info["ended_at"] else "now"
             status = info["status"]
-            color = {"running": "#ffd43b", "success": "#69db7c", "done": "#69db7c", "error": "#ff6b6b"}.get(status, "#868e96")
-            lines.append(f'    {name} :{status},{color} {start}, {end}')
+            tag = {"running": "active", "success": "done", "done": "done", "error": "crit"}.get(status, "")
+            if tag:
+                lines.append(f'    {name} :{tag}, {start}, {end}')
+            else:
+                lines.append(f'    {name} :{start}, {end}')
     lines.append("```")
     return "\n".join(lines)
 
@@ -221,14 +224,14 @@ def _render_mermaid_sequence(state: dict) -> str:
     """Rendere Mermaid Sequence-Diagramm für Delegationen."""
     if not state["edges"]:
         return ""
-    lines = ["```mermaid", "sequenceDiagram"]
+    lines = ["```mermaid", "sequenceDiagram", "    autonumber"]
     # Sammle alle beteiligten Agenten
     participants = set()
     for e in state["edges"]:
         participants.add(e["from"])
         participants.add(e["to"])
     for p in sorted(participants):
-        lines.append(f"    participant {p}")
+        lines.append(f'    participant "{p}" as {p}')
     for e in state["edges"]:
         lines.append(f"    {e['from']}->>{e['to']}: delegate")
     lines.append("```")
@@ -384,8 +387,15 @@ def serve_web(project_root: Path, port: int = 8765):
         <h2>Sessions</h2>
         {session_links}
         <h2>Statische Visualisierung</h2>
-        <a href="/static/agent-graph.html">Agenten-Graph</a>
+        <a href="/agent-graph.html">Agenten-Graph</a>
         """)
+
+    @app.route("/agent-graph.html")
+    def agent_graph():
+        graph_path = project_root / "docs" / "agent-graph.html"
+        if not graph_path.exists():
+            return "<h1>Agenten-Graph nicht gefunden</h1><p>Führe zuerst <code>python scripts/sync.py</code> aus.</p>", 404
+        return graph_path.read_text(encoding="utf-8")
 
     @app.route("/session/<session_id>")
     def session_report(session_id):
