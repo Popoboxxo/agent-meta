@@ -2,16 +2,43 @@
 
 ## [Unreleased]
 
+---
+
+## [0.38.0] — 2026-05-11
+
+### Added
+
+- **Thread-Safe Event Logging** (`scripts/lib/viz.py`):
+  - Added `threading.RLock` (`viz_lock`) for all read/write access to `events.jsonl`.
+  - Atomic `clear-log` operation under the lock.
+  - Tail-read heuristic for large logs (>1MB): reads last 10,000 lines instead of full file when a `since` filter is active.
+
+- **Config-Driven Viz Server** (`scripts/viz-server.py`, `.meta-config/project.yaml`):
+  - `viz.server.port` and `viz.server.timeout_sec` configurable via `project.yaml`.
+  - `viz-server.py` reads settings from config; falls back to hardcoded defaults (8765 / 300s).
+
+- **Dashboard UX Improvements** (`docs/live-dashboard.html`):
+  - Toast notifications after log clear (with event count).
+  - `localStorage` persistence for time-window selector and model-toggle state.
+  - Graceful degradation when Cytoscape CDN fails to load.
+  - Improved replay pause/resume precision via `pausedTotal` tracking.
+  - Canvas resize synchronization with Cytoscape layout refit.
+
+- **Documentation**:
+  - `docs/viz-api.md` — Complete API endpoint reference.
+  - `docs/viz-event-schema.md` — All 7 event types with field descriptions.
+  - `docs/viz-architecture.md` — Design decisions (stable edge IDs, two-mode system, inactivity watcher, thread-safety).
+
 ### Changed
 
-- **Live Dashboard** (`docs/live-dashboard.html`, `scripts/viz-server.py`):
-  - Replaced static HTML refresh with real-time Cytoscape.js graph that polls `/api/state` every 2 seconds.
-  - Added `scripts/viz-server.py` wrapper for start/stop/toggle/status/restart/open commands.
-  - Server auto-shuts down after 300s of inactivity (no new events in log). Configurable via `--timeout`.
-  - Removed Flask dependency — server uses Python's built-in `wsgiref`.
-  - `viz-report.py --watch --format html` now starts the live server instead of writing a static file.
-  - Session state extraction fixed: only processes events from the latest `session_start`, preventing mixed-session data corruption.
-  - New API endpoints: `/api/state` (computed session state), `/api/events` (raw JSONL events).
+- **Code Quality** (`scripts/viz-report.py`):
+  - Replaced `_state_to_json()` with `_DateTimeEncoder` for JSON serialization.
+  - Extracted magic numbers to module constants (`_SESSION_FALLBACK_MINUTES`, `_MIN_EVENTS_FALLBACK`, etc.).
+  - Consolidated duplicate status-icon mappings to `_STATUS_ICONS`.
+  - Fixed XSS vector in `render_html()` by using `json.dumps()` instead of string interpolation for D3.js data.
+  - Robust handling of events without timestamps (skip instead of crash).
+  - Warning log for unknown `?window=` parameter values.
+  - `import re` moved to module level (no more inline import).
 
 ---
 

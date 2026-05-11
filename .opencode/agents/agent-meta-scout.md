@@ -164,37 +164,33 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ## Visualization Reporting (Pflicht-Anweisung)
-Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `.meta-viz/events.jsonl` protokollieren.
 
-### Format (eine Zeile pro Event, JSON)
-```json
-{"ts":"ISO8601","event":"TYPE","agent":"agent-meta-scout",...}
+Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.
+
+### Pflicht-Events — exakt diese Bash-Befehle ausführen
+
+**1. Beim Start deiner Aufgabe (erstes was du tust):**
+```bash
+python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_start','agent':'agent-meta-scout','provider':'Opencode'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_start','agent':'agent-meta-scout','provider':'Opencode'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
 ```
 
-### Pflicht-Events
-1. **Beim Start deiner Aufgabe:**
-   ```json
-   {"ts":"2026-05-10T19:00:00Z","event":"agent_start","agent":"agent-meta-scout","provider":"Opencode"}
-   ```
+**2. Wenn du an einen anderen Agenten delegierst** (`ZIEL_AGENT` ersetzen):
+```bash
+python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'delegate','from':'agent-meta-scout','to':'ZIEL_AGENT'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'delegate','from':'agent-meta-scout','to':'ZIEL_AGENT'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
+```
 
-2. **Wenn du an einen anderen Agenten delegierst:**
-   ```json
-   {"ts":"2026-05-10T19:00:01Z","event":"delegate","from":"agent-meta-scout","to":"ZIEL_AGENT"}
-   ```
+**3. Wenn du fertig bist — Erfolg:**
+```bash
+python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'agent-meta-scout','status':'success'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'agent-meta-scout','status':'success'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
+```
 
-3. **Wenn du fertig bist:**
-   ```json
-   {"ts":"2026-05-10T19:00:10Z","event":"agent_end","agent":"agent-meta-scout","status":"success"}
-   ```
-   Bei Fehler: `"status":"error"` mit `payload:{"error":"..."}`
+**3b. Wenn du fertig bist — Fehler** (`FEHLERMELDUNG` ersetzen):
+```bash
+python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'agent-meta-scout','status':'error','payload':{'error':'FEHLERMELDUNG'}};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'agent-meta-scout','status':'error','payload':{'error':'FEHLERMELDUNG'}};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
+```
 
-4. **Wenn du ein Tool aufrufst:**
-   ```json
-   {"ts":"2026-05-10T19:00:05Z","event":"tool_call","agent":"agent-meta-scout","tool":"TOOL_NAME"}
-   ```
-
-### Wichtig
-- Jede Zeile ein gültiges JSON-Objekt (JSONL-Format).
-- Füge die Events am Dateiende an (append).
-- Nutze `write_file` oder `edit_file` mit Append-Modus.
-- Dies ist eine Pflicht-Anweisung. Jeder Agenten-Aufruf MUSS protokolliert werden.
+### Regeln
+- Diese Bash-Befehle **immer ausführen** — sie schreiben eine Zeile JSON ans Log.
+- Kein anderes Tool verwenden — nur `Bash`.
+- Timestamp wird automatisch gesetzt.
+- Nie den Bash-Befehl weglassen oder überspringen.
