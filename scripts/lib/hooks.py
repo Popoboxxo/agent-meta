@@ -226,6 +226,11 @@ def sync_hooks(
     project_hooks_cfg = config.get("hooks", {})
     active_entries: list[dict] = []
 
+    # Viz mode: conditional hooks (viz-log) are only managed when dynamic/full
+    viz_cfg = config.get("viz", {})
+    viz_mode = viz_cfg.get("mode", "off")
+    viz_active = viz_mode in ("dynamic", "full")
+
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -234,6 +239,12 @@ def sync_hooks(
         source_content = source_path.read_text(encoding="utf-8")
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
+        hook_stem = Path(output_name).stem
+
+        # Conditional hook: viz-log is only managed when viz mode is dynamic/full
+        if hook_stem == "viz-log" and not viz_active:
+            # Skip copying — do NOT add to now_managed so it gets deleted if stale
+            continue
 
         # Provider filter: skip hook if it declares a specific provider that doesn't match
         hook_provider = meta.get("provider", "")
@@ -249,8 +260,11 @@ def sync_hooks(
         if not dry_run:
             target_path.write_text(source_content, encoding="utf-8")
 
-        hook_stem = Path(output_name).stem
-        is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", False)
+        # Auto-enable viz-log when viz mode is dynamic/full
+        if hook_stem == "viz-log" and viz_active:
+            is_enabled = True
+        else:
+            is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", False)
 
         if is_enabled:
             event = meta.get("event", "PreToolUse")

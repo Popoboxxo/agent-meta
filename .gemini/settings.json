@@ -2,5 +2,17 @@
   "permissions": {
     "allow": [],
     "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .gemini/hooks/viz-log.sh"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -183,3 +183,39 @@ der richtige Weg — nicht alles in CLAUDE.md packen).
 - KEINE manuellen Änderungen in `.claude/agents/`
 - NIE in den managed block von CLAUDE.md schreiben
 - Bei Multi-Tool-Teams (Cursor, OpenAI, etc.): auf Symlink-Strategie hinweisen — `AGENTS.md` ↔ `CLAUDE.md` Symlink, nicht zwei separate Dateien pflegen
+
+## Visualization Reporting (Pflicht-Anweisung)
+Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `.meta-viz/events.jsonl` protokollieren.
+
+### Format (eine Zeile pro Event, JSON)
+```json
+{"ts":"ISO8601","event":"TYPE","agent":"agent-meta-manager",...}
+```
+
+### Pflicht-Events
+1. **Beim Start deiner Aufgabe:**
+   ```json
+   {"ts":"2026-05-10T19:00:00Z","event":"agent_start","agent":"agent-meta-manager","provider":"Opencode"}
+   ```
+
+2. **Wenn du an einen anderen Agenten delegierst:**
+   ```json
+   {"ts":"2026-05-10T19:00:01Z","event":"delegate","from":"agent-meta-manager","to":"ZIEL_AGENT"}
+   ```
+
+3. **Wenn du fertig bist:**
+   ```json
+   {"ts":"2026-05-10T19:00:10Z","event":"agent_end","agent":"agent-meta-manager","status":"success"}
+   ```
+   Bei Fehler: `"status":"error"` mit `payload:{"error":"..."}`
+
+4. **Wenn du ein Tool aufrufst:**
+   ```json
+   {"ts":"2026-05-10T19:00:05Z","event":"tool_call","agent":"agent-meta-manager","tool":"TOOL_NAME"}
+   ```
+
+### Wichtig
+- Jede Zeile ein gültiges JSON-Objekt (JSONL-Format).
+- Füge die Events am Dateiende an (append).
+- Nutze `write_file` oder `edit_file` mit Append-Modus.
+- Dies ist eine Pflicht-Anweisung. Jeder Agenten-Aufruf MUSS protokolliert werden.

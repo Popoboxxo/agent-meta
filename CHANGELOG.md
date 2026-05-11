@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Live Dashboard** (`docs/live-dashboard.html`, `scripts/viz-server.py`):
+  - Replaced static HTML refresh with real-time Cytoscape.js graph that polls `/api/state` every 2 seconds.
+  - Added `scripts/viz-server.py` wrapper for start/stop/toggle/status/restart/open commands.
+  - Server auto-shuts down after 300s of inactivity (no new events in log). Configurable via `--timeout`.
+  - Removed Flask dependency — server uses Python's built-in `wsgiref`.
+  - `viz-report.py --watch --format html` now starts the live server instead of writing a static file.
+  - Session state extraction fixed: only processes events from the latest `session_start`, preventing mixed-session data corruption.
+  - New API endpoints: `/api/state` (computed session state), `/api/events` (raw JSONL events).
+
+---
+
+## [0.37.0-beta.1] — 2026-05-10
+
+### Added
+
+- **Agent Visualization Dashboard** (`scripts/lib/viz.py`, `scripts/viz-report.py`, `docs/agent-mindmap.md`, `docs/agent-graph.html`):
+  - **Static Mindmap**: Auto-generated Mermaid mindmap and interactive HTML graph of all agents, their delegations, and `workflow_tier` color-coding (🔴 required / 🔵 recommended / ⚪ optional). Generated via `sync.py --viz` or `sync.py --viz-only`.
+  - **Dynamic Event Logging**: Opt-in mode where all generated agents receive a prompt block instructing them to write JSONL events (`agent_start`, `delegate`, `agent_end`, `tool_call`) to `.meta-viz/events.jsonl`. Sessions are per-run, gitignored, and auto-cleaned after `retention_days`.
+  - **Four Viz Modes** (`project.yaml` → `viz.mode`): `off` (default), `static` (mindmap only), `dynamic` (event logging only), `full` (both mindmap + event logging).
+  - **`viz-report.py` CLI**: Session reports in terminal (live watch), HTML (with Mermaid Gantt + sequence diagrams), or JSON. Optional Flask-based web server (`--serve`). Auto-cleanup of old sessions.
+  - **Viz Commands**: `/viz-mindmap` (generate static viz), `/viz-report` (session report), `/viz-watch` (live monitoring), `/viz-toggle` (cycle or set viz mode: off→static→dynamic→full→off, then triggers sync).
+  - **Howto** (`howto/agent-visualization.md`): Complete setup guide, manual event creation, JSONL format reference, session management, and architecture overview.
+  - **Visualization prompt injection** applies to **all providers** (Claude, Continue, Gemini, Opencode) when `viz.mode` is `dynamic` or `full`.
+
 ---
 
 ## [0.36.0] — 2026-05-10
