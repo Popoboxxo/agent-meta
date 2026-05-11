@@ -11,9 +11,15 @@ Usage:
   python scripts/viz-server.py restart    # Neustarten
   python scripts/viz-server.py open       # Dashboard im Browser öffnen
 
-Auto-Shutdown:
-  Der Server beendet sich automatisch nach 5 Minuten Inaktivitaet
-  (keine neuen Events im Log). Konfigurierbar via --timeout.
+Konfiguration:
+  Port und Auto-Shutdown werden aus .meta-config/project.yaml gelesen:
+
+    viz:
+      server:
+        port: 8765
+        timeout_sec: 300
+
+  Fehlt die Config, werden die Defaults 8765 / 300s verwendet.
 """
 
 import sys
@@ -22,14 +28,40 @@ import subprocess
 import time
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # Project-Root ist das Parent-Verzeichnis von scripts/
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 PID_FILE = PROJECT_ROOT / ".meta-viz/.server-pid"
 LOG_FILE = PROJECT_ROOT / ".meta-viz/server.log"
 VIZ_REPORT = SCRIPT_DIR / "viz-report.py"
-PORT = 8765
-DEFAULT_TIMEOUT = 300  # 5 Minuten
+
+# Hardcoded defaults (used when config is missing or unreadable)
+_DEFAULT_PORT = 8765
+_DEFAULT_TIMEOUT = 300  # 5 Minuten
+
+
+def _load_viz_server_config() -> tuple[int, int]:
+    """Load viz.server.port and viz.server.timeout_sec from project.yaml.
+
+    Returns (port, timeout_sec) with hardcoded defaults as fallback.
+    """
+    config_path = PROJECT_ROOT / ".meta-config" / "project.yaml"
+    try:
+        sys.path.insert(0, str(SCRIPT_DIR))
+        from lib.config import load_config
+        config = load_config(config_path)
+        viz_cfg = config.get("viz", {})
+        server_cfg = viz_cfg.get("server", {})
+        port = int(server_cfg.get("port", _DEFAULT_PORT))
+        timeout = int(server_cfg.get("timeout_sec", _DEFAULT_TIMEOUT))
+        return port, timeout
+    except Exception:
+        return _DEFAULT_PORT, _DEFAULT_TIMEOUT
 
 
 def get_pid():
@@ -60,12 +92,16 @@ def is_running(pid):
         return False
 
 
-def start_server(timeout: int = DEFAULT_TIMEOUT):
+def start_server(port: int | None = None, timeout: int | None = None):
     pid = get_pid()
     if pid and is_running(pid):
         print(f"  i  Server läuft bereits. PID: {pid}")
-        print(f"  i  Dashboard: http://localhost:{PORT}/")
+        print(f"  i  Dashboard: http://localhost:{get_configured_port()}/")
         return
+
+    cfg_port, cfg_timeout = _load_viz_server_config()
+    port = port if port is not None else cfg_port
+    timeout = timeout if timeout is not None else cfg_timeout
 
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +118,7 @@ def start_server(timeout: int = DEFAULT_TIMEOUT):
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0  # SW_HIDE
         proc = subprocess.Popen(
-            [sys.executable, str(VIZ_REPORT), "--serve", "--timeout", str(timeout)],
+            [sys.executable, str(VIZ_REPORT), "--serve", "--port", str(port), "--timeout", str(timeout)],
             stdout=open(LOG_FILE, "a", encoding="utf-8"),
             stderr=subprocess.STDOUT,
             startupinfo=si,
@@ -91,7 +127,7 @@ def start_server(timeout: int = DEFAULT_TIMEOUT):
         )
     else:
         proc = subprocess.Popen(
-            [sys.executable, str(VIZ_REPORT), "--serve", "--timeout", str(timeout)],
+            [sys.executable, str(VIZ_REPORT), "--serve", "--port", str(port), "--timeout", str(timeout)],
             stdout=open(LOG_FILE, "a", encoding="utf-8"),
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -103,7 +139,7 @@ def start_server(timeout: int = DEFAULT_TIMEOUT):
 
     if is_running(proc.pid):
         print(f"  i  Server gestartet. PID: {proc.pid}")
-        print(f"  i  Dashboard: http://localhost:{PORT}/")
+        print(f"  i  Dashboard: http://localhost:{port}/")
         print(f"  i  Auto-Shutdown: {timeout}s Inaktivitaet")
         print(f"  i  Log: {LOG_FILE}")
     else:
@@ -147,11 +183,17 @@ def toggle_server():
         start_server()
 
 
+def get_configured_port() -> int:
+    """Return the configured viz server port (with fallback)."""
+    return _load_viz_server_config()[0]
+
+
 def status():
     pid = get_pid()
+    port = get_configured_port()
     if pid and is_running(pid):
         print(f"  i  Server LAUFT. PID: {pid}")
-        print(f"  i  Dashboard: http://localhost:{PORT}/")
+        print(f"  i  Dashboard: http://localhost:{port}/")
         print(f"  i  Log: {LOG_FILE}")
     else:
         print("  i  Server läuft NICHT.")
@@ -167,7 +209,7 @@ def restart():
 
 def open_browser():
     import webbrowser
-    webbrowser.open(f"http://localhost:{PORT}/")
+    webbrowser.open(f"http://localhost:{get_configured_port()}/")
 
 
 def main():

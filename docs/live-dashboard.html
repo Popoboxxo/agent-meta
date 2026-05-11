@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>agent-meta — Live Dashboard</title>
-    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js" onerror="window.cytoscapeFailed=true"></script>
     <style>
         :root {
             --bg: #0f0f23;
             --surface: #1a1a2e;
-            --surface-hover: #16213e;
+            --surface-2: #16213e;
             --text: #eaeaea;
             --text-muted: #a0a0a0;
             --border: #2a2a4a;
@@ -17,8 +17,8 @@
             --success: #69db7c;
             --error: #ff6b6b;
             --idle: #868e96;
-            --recommended: #1971c2;
             --accent: #4dabf7;
+            --replay-color: #c084fc;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -29,447 +29,987 @@
             overflow-x: hidden;
         }
         #app { display: flex; flex-direction: column; height: 100vh; }
+
+        /* ── HEADER ── */
         header {
             background: var(--surface);
             border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
+            padding: 10px 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 16px;
             flex-shrink: 0;
         }
-        header h1 { font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
-        #session-meta { display: flex; gap: 20px; font-size: 0.85rem; color: var(--text-muted); }
-        #session-meta span strong { color: var(--text); }
+        .header-title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 1.1rem; font-weight: 600; white-space: nowrap;
+        }
         #status-dot {
             width: 10px; height: 10px; border-radius: 50%;
-            background: var(--idle); display: inline-block;
-            animation: none;
+            background: var(--idle); flex-shrink: 0;
         }
-        #status-dot.live {
-            background: var(--running);
-            box-shadow: 0 0 8px var(--running);
-            animation: pulse 1.5s infinite;
-        }
+        #status-dot.live { background: var(--running); box-shadow: 0 0 8px var(--running); animation: pulse 1.5s infinite; }
+        #status-dot.replay { background: var(--replay-color); box-shadow: 0 0 8px var(--replay-color); }
         @keyframes pulse {
-            0% { opacity: 1; box-shadow: 0 0 4px var(--running); }
-            50% { opacity: 0.6; box-shadow: 0 0 12px var(--running); }
-            100% { opacity: 1; box-shadow: 0 0 4px var(--running); }
+            0%,100% { opacity:1; box-shadow: 0 0 4px var(--running); }
+            50% { opacity:.6; box-shadow: 0 0 14px var(--running); }
         }
+        .mode-toggle {
+            display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+        }
+        .mode-btn {
+            background: transparent; color: var(--text-muted); border: none;
+            padding: 5px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+            transition: background .2s, color .2s; white-space: nowrap;
+        }
+        .mode-btn.active.live-mode  { background: rgba(255,212,59,.15); color: var(--running); }
+        .mode-btn.active.replay-mode { background: rgba(192,132,252,.15); color: var(--replay-color); }
+        .mode-btn:hover:not(.active) { background: rgba(255,255,255,.05); color: var(--text); }
+        .header-spacer { flex: 1; }
+        .action-btn {
+            background: rgba(255,107,107,.1); color: #ff8080; border: 1px solid rgba(255,107,107,.3);
+            border-radius: 6px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+            transition: background .2s;
+        }
+        .action-btn:hover { background: rgba(255,107,107,.2); }
+        .toggle-btn {
+            background: rgba(77,171,247,.08); color: var(--text-muted); border: 1px solid var(--border);
+            border-radius: 6px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+            transition: background .2s, color .2s, border-color .2s;
+        }
+        .toggle-btn.active { background: rgba(77,171,247,.18); color: var(--accent); border-color: var(--accent); }
+        .toggle-btn:hover:not(.active) { background: rgba(77,171,247,.12); color: var(--text); }
+
+        /* ── CONTROLS BAR ── */
+        #controls-bar {
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 20px;
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            font-size: 0.83rem; flex-shrink: 0;
+        }
+        #controls-bar .label { color: var(--text-muted); }
+        #controls-bar select, #controls-bar .ctrl-btn {
+            background: var(--bg); color: var(--text);
+            border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 10px; font-size: 0.82rem; cursor: pointer; outline: none;
+        }
+        #controls-bar select:hover, #controls-bar select:focus { border-color: var(--accent); }
+        .ctrl-btn { transition: background .15s; }
+        .ctrl-btn:hover:not(:disabled) { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+        .ctrl-btn:disabled { opacity: .4; cursor: default; }
+        .ctrl-btn.primary { border-color: var(--accent); color: var(--accent); }
+        .progress-wrap {
+            display: flex; align-items: center; gap: 8px; flex: 1; min-width: 160px;
+        }
+        .progress-bar {
+            flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+        }
+        #replay-progress-fill {
+            height: 100%; width: 0%; background: var(--replay-color);
+            border-radius: 3px; transition: width .25s linear;
+        }
+        #replay-progress-text { color: var(--text-muted); white-space: nowrap; min-width: 52px; }
+        #live-controls, #replay-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+        /* ── ERROR BANNER ── */
         #error-banner {
-            background: rgba(255, 107, 107, 0.15);
-            border: 1px solid var(--error);
-            color: var(--error);
-            padding: 10px 24px;
-            font-size: 0.9rem;
-            display: none;
-            align-items: center;
-            gap: 10px;
-            flex-shrink: 0;
+            background: rgba(255,107,107,.12); border-bottom: 1px solid var(--error);
+            color: var(--error); padding: 8px 20px; font-size: 0.87rem;
+            display: none; align-items: center; gap: 10px; flex-shrink: 0;
         }
+
+        /* ── MAIN AREA ── */
         #main {
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            gap: 1px;
-            background: var(--border);
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
+            display: grid; grid-template-columns: 1fr 300px;
+            gap: 1px; background: var(--border);
+            flex: 1; min-height: 0; overflow: hidden;
         }
-        #graph-container {
-            background: var(--bg);
-            position: relative;
-            overflow: hidden;
-        }
+        #graph-container { background: var(--bg); position: relative; overflow: hidden; }
         #cy { width: 100%; height: 100%; }
-        #sidebar {
-            background: var(--surface);
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            padding: 16px;
-            gap: 12px;
+        #particle-canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
         }
-        #sidebar h3 {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        .agent-card {
-            background: var(--bg);
-            border-radius: 8px;
-            padding: 12px;
-            border-left: 3px solid var(--idle);
-            transition: border-color 0.3s, transform 0.2s;
-            cursor: default;
-        }
-        .agent-card:hover { transform: translateX(2px); }
-        .agent-card.status-running { border-left-color: var(--running); }
-        .agent-card.status-success { border-left-color: var(--success); }
-        .agent-card.status-error { border-left-color: var(--error); }
-        .agent-card.status-done { border-left-color: var(--success); }
-        .agent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .agent-name { font-weight: 600; font-size: 0.95rem; }
-        .agent-badge {
-            font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px;
-            border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-muted);
-            font-weight: 600;
-        }
-        .agent-badge.status-running { background: rgba(255,212,59,0.15); color: var(--running); }
-        .agent-badge.status-success { background: rgba(105,219,124,0.15); color: var(--success); }
-        .agent-badge.status-error { background: rgba(255,107,107,0.15); color: var(--error); }
-        .agent-duration { font-size: 0.8rem; color: var(--text-muted); }
-        #timeline-container {
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            max-height: 220px;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        }
-        #timeline-container h3 {
-            padding: 10px 24px;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-            background: var(--surface);
-        }
-        #timeline-scroll { overflow-y: auto; flex: 1; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        thead th {
-            position: sticky; top: 0;
-            background: var(--surface);
-            padding: 8px 24px;
-            text-align: left;
-            color: var(--text-muted);
-            font-weight: 500;
-            border-bottom: 1px solid var(--border);
-        }
-        tbody td { padding: 6px 24px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-        tbody tr:hover { background: rgba(255,255,255,0.03); }
-        tbody tr.new-row { animation: fadein 0.5s ease-out; }
-        @keyframes fadein { from { opacity: 0; background: rgba(77,171,247,0.1); } to { opacity: 1; background: transparent; } }
-        .icon { width: 24px; text-align: center; }
-        .ts { color: var(--text-muted); font-family: monospace; font-size: 0.8rem; width: 70px; }
-        .msg { color: var(--text); overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
         #empty-state {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100%; color: var(--text-muted); gap: 12px;
+            position: absolute; inset: 0;
+            display: none; flex-direction: column; align-items: center;
+            justify-content: center; gap: 12px; color: var(--text-muted);
+            font-size: 0.9rem;
         }
         #empty-state code {
-            background: var(--surface); padding: 6px 12px; border-radius: 6px;
+            background: var(--surface); padding: 5px 12px; border-radius: 6px;
             border: 1px solid var(--border); color: var(--text);
         }
-        @media (max-width: 900px) {
-            #main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-            #sidebar { max-height: 200px; }
+        #sidebar {
+            background: var(--surface); display: flex; flex-direction: column;
+            overflow-y: auto; padding: 14px; gap: 10px;
         }
+        #sidebar h3 {
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: .05em;
+            color: var(--text-muted); margin-bottom: 2px;
+        }
+        .agent-card {
+            background: var(--bg); border-radius: 7px; padding: 10px 12px;
+            border-left: 3px solid var(--idle); transition: border-color .3s;
+        }
+        .agent-card.status-running { border-left-color: var(--running); }
+        .agent-card.status-success, .agent-card.status-done { border-left-color: var(--success); }
+        .agent-card.status-error { border-left-color: var(--error); }
+        .agent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .agent-name { font-weight: 600; font-size: 0.9rem; }
+        .agent-badge {
+            font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px;
+            border-radius: 4px; background: rgba(255,255,255,.07); color: var(--text-muted); font-weight: 600;
+        }
+        .agent-badge.status-running { background: rgba(255,212,59,.15); color: var(--running); }
+        .agent-badge.status-success, .agent-badge.status-done { background: rgba(105,219,124,.15); color: var(--success); }
+        .agent-badge.status-error { background: rgba(255,107,107,.15); color: var(--error); }
+        .agent-duration { font-size: 0.78rem; color: var(--text-muted); }
+
+        /* ── TIMELINE ── */
+        #timeline-container {
+            background: var(--surface); border-top: 1px solid var(--border);
+            max-height: 200px; display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        #timeline-container h3 {
+            padding: 8px 20px; font-size: 0.78rem; text-transform: uppercase;
+            letter-spacing: .05em; color: var(--text-muted);
+            border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        #timeline-scroll { overflow-y: auto; flex: 1; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+        thead th {
+            position: sticky; top: 0; background: var(--surface);
+            padding: 6px 20px; text-align: left; color: var(--text-muted);
+            font-weight: 500; border-bottom: 1px solid var(--border);
+        }
+        tbody td { padding: 5px 20px; border-bottom: 1px solid rgba(42,42,74,.5); white-space: nowrap; }
+        tbody tr:hover { background: rgba(255,255,255,.02); }
+        tbody tr.new-row { animation: fadein .4s ease-out; }
+        @keyframes fadein { from { opacity:0; background: rgba(77,171,247,.08); } to { opacity:1; } }
+        .ts { color: var(--text-muted); font-family: monospace; font-size: 0.78rem; width: 68px; }
+        .ico { width: 22px; text-align: center; }
+        .msg { color: var(--text); overflow: hidden; text-overflow: ellipsis; max-width: 55vw; }
+
+        @media (max-width: 860px) {
+            #main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+            #sidebar { max-height: 180px; }
+        }
+
+        /* ── CONFIRM OVERLAY ── */
+        #confirm-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.6);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+        }
+        #confirm-box {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 28px 32px; text-align: center; max-width: 340px;
+        }
+        #confirm-box h2 { font-size: 1rem; margin-bottom: 10px; }
+        #confirm-box p { color: var(--text-muted); font-size: 0.87rem; margin-bottom: 20px; }
+        .confirm-btns { display: flex; gap: 10px; justify-content: center; }
+        .btn-cancel { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 18px; cursor: pointer; }
+        .btn-danger { background: rgba(255,107,107,.15); color: var(--error); border: 1px solid rgba(255,107,107,.4); border-radius: 6px; padding: 7px 18px; cursor: pointer; font-weight: 600; }
+        .btn-danger:hover { background: rgba(255,107,107,.28); }
     </style>
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1><span id="status-dot"></span> agent-meta — Live Dashboard</h1>
-            <div id="session-meta">
-                <span>Session: <strong id="meta-name">—</strong></span>
-                <span>Dauer: <strong id="meta-duration">—</strong></span>
-                <span>Agenten: <strong id="meta-agents">0</strong></span>
-                <span>Events: <strong id="meta-events">0</strong></span>
-            </div>
-        </header>
-        <div id="error-banner">
-            <span>⚠</span> <span id="error-text">Server nicht erreichbar</span>
+<div id="app">
+
+    <header>
+        <div class="header-title">
+            <span id="status-dot"></span>
+            agent-meta — Live Dashboard
         </div>
-        <div id="main">
-            <div id="graph-container">
-                <div id="cy"></div>
-                <div id="empty-state" style="display:none">
-                    <div style="font-size:2rem">🤖</div>
-                    <div>Keine Session-Daten vorhanden</div>
-                    <div>Starte den Server: <code>python scripts/viz-report.py --serve</code></div>
-                </div>
-            </div>
-            <div id="sidebar">
-                <h3>Agenten-Status</h3>
-                <div id="agent-list"></div>
-            </div>
+        <div class="mode-toggle">
+            <button id="btn-live"   class="mode-btn active live-mode">● Live</button>
+            <button id="btn-replay" class="mode-btn replay-mode">▶ Replay</button>
         </div>
-        <div id="timeline-container">
-            <h3>Event-Timeline</h3>
-            <div id="timeline-scroll">
-                <table>
-                    <thead><tr><th class="ts">Zeit</th><th class="icon"></th><th>Ereignis</th></tr></thead>
-                    <tbody id="timeline-body"></tbody>
-                </table>
+        <div class="header-spacer"></div>
+        <button id="btn-model-toggle" class="toggle-btn" title="Sprachmodell-Info ein/ausblenden">🤖 Modell</button>
+        <button id="btn-clear-log" class="action-btn" title="Alle Events aus dem Log löschen">🗑 Log löschen</button>
+    </header>
+
+    <div id="controls-bar">
+        <!-- Live mode -->
+        <div id="live-controls">
+            <span>Session: <strong id="meta-name">—</strong></span>
+            <span>Dauer: <strong id="meta-duration">—</strong></span>
+            <span>Agenten: <strong id="meta-agents">0</strong></span>
+            <span>Events: <strong id="meta-events">0</strong></span>
+            <span class="label">Zeitraum:</span>
+            <select id="time-range-select">
+                <option value="60m">Letzte 60 Min</option>
+                <option value="15m">Letzte 15 Min</option>
+                <option value="30m">Letzte 30 Min</option>
+                <option value="3h">Letzte 3 Std</option>
+                <option value="6h">Letzte 6 Std</option>
+                <option value="24h">Letzte 24 Std</option>
+                <option value="today">Heute</option>
+                <option value="all">Alles</option>
+            </select>
+        </div>
+        <!-- Replay mode -->
+        <div id="replay-controls" style="display:none">
+            <span class="label">Zeitraum:</span>
+            <select id="replay-time-select">
+                <option value="60m">Letzte 60 Min</option>
+                <option value="3h">Letzte 3 Std</option>
+                <option value="6h">Letzte 6 Std</option>
+                <option value="24h">Letzte 24 Std</option>
+                <option value="today">Heute</option>
+                <option value="all">Alles</option>
+            </select>
+            <span class="label">Geschw.:</span>
+            <select id="replay-speed">
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="5" selected>5×</option>
+                <option value="10">10×</option>
+                <option value="30">30×</option>
+            </select>
+            <button id="btn-rplay"  class="ctrl-btn primary">▶ Play</button>
+            <button id="btn-rpause" class="ctrl-btn" disabled>⏸ Pause</button>
+            <button id="btn-rreset" class="ctrl-btn">⏮ Reset</button>
+            <div class="progress-wrap">
+                <div class="progress-bar"><div id="replay-progress-fill"></div></div>
+                <span id="replay-progress-text">0 / 0</span>
             </div>
         </div>
     </div>
 
-    <script>
-        (function() {
-            const POLL_MS = 2000;
-            let cy = null;
-            let lastEventCount = 0;
-            let isFirstLoad = true;
+    <div id="error-banner">
+        <span>⚠</span><span id="error-text">Server nicht erreichbar</span>
+    </div>
 
-            const colors = {
-                idle: '#868e96',
-                running: '#ffd43b',
-                success: '#69db7c',
-                error: '#ff6b6b',
-                done: '#69db7c',
-                edge: '#4dabf7',
-                edgeHighlight: '#ffd43b'
-            };
+    <div id="main">
+        <div id="graph-container">
+            <div id="cy"></div>
+            <canvas id="particle-canvas"></canvas>
+            <div id="empty-state">
+                <div style="font-size:2rem">🤖</div>
+                <div>Keine Session-Daten vorhanden</div>
+                <div>Server starten: <code>python scripts/viz-server.py toggle</code></div>
+            </div>
+        </div>
+        <div id="sidebar">
+            <h3>Agenten-Status</h3>
+            <div id="agent-list"></div>
+        </div>
+    </div>
 
-            function initGraph() {
-                cy = cytoscape({
-                    container: document.getElementById('cy'),
-                    style: [
-                        { selector: 'node', style: {
-                            'background-color': colors.idle,
-                            'label': 'data(label)',
-                            'color': '#fff',
-                            'text-valign': 'center',
-                            'text-halign': 'center',
-                            'shape': 'round-rectangle',
-                            'width': 'label',
-                            'height': 'label',
-                            'padding': '12px',
-                            'font-size': '13px',
-                            'font-weight': '600',
-                            'border-width': 2,
-                            'border-color': '#fff',
-                            'border-opacity': 0.3,
-                            'text-wrap': 'wrap',
-                            'text-max-width': '100px',
-                            'transition-property': 'background-color, border-color, border-width',
-                            'transition-duration': '0.3s'
-                        }},
-                        { selector: 'node.status-running', style: {
-                            'background-color': colors.running,
-                            'color': '#000',
-                            'border-color': colors.running,
-                            'border-opacity': 1,
-                            'border-width': 3,
-                            'shadow-blur': 12,
-                            'shadow-color': colors.running,
-                            'shadow-opacity': 0.6
-                        }},
-                        { selector: 'node.status-success', style: {
-                            'background-color': colors.success,
-                            'color': '#000',
-                            'border-color': colors.success,
-                            'border-opacity': 0.6
-                        }},
-                        { selector: 'node.status-done', style: {
-                            'background-color': colors.done,
-                            'color': '#000',
-                            'border-color': colors.done,
-                            'border-opacity': 0.6
-                        }},
-                        { selector: 'node.status-error', style: {
-                            'background-color': colors.error,
-                            'color': '#fff',
-                            'border-color': colors.error,
-                            'border-opacity': 1,
-                            'border-width': 3
-                        }},
-                        { selector: 'edge', style: {
-                            'width': 2,
-                            'line-color': colors.edge,
-                            'target-arrow-color': colors.edge,
-                            'target-arrow-shape': 'triangle',
-                            'curve-style': 'bezier',
-                            'arrow-scale': 1.2,
-                            'line-opacity': 0.5
-                        }},
-                        { selector: 'edge.highlight', style: {
-                            'line-color': colors.edgeHighlight,
-                            'target-arrow-color': colors.edgeHighlight,
-                            'line-opacity': 1,
-                            'width': 3,
-                            'shadow-blur': 8,
-                            'shadow-color': colors.edgeHighlight,
-                            'shadow-opacity': 0.5
-                        }}
-                    ],
-                    layout: { name: 'grid', padding: 30 },
-                    wheelSensitivity: 0.3,
-                    minZoom: 0.3,
-                    maxZoom: 2.5
-                });
+    <div id="timeline-container">
+        <h3>Event-Timeline</h3>
+        <div id="timeline-scroll">
+            <table>
+                <thead><tr><th class="ts">Zeit</th><th class="ico"></th><th>Ereignis</th></tr></thead>
+                <tbody id="timeline-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm dialog -->
+<div id="confirm-overlay">
+    <div id="confirm-box">
+        <h2>Log löschen?</h2>
+        <p>Alle Events in <code>.meta-viz/events.jsonl</code> werden unwiderruflich gelöscht.</p>
+        <div class="confirm-btns">
+            <button class="btn-cancel" id="confirm-cancel">Abbrechen</button>
+            <button class="btn-danger" id="confirm-ok">Löschen</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+// ─────────────────────────────────────────────────────────────
+// Constants & state
+// ─────────────────────────────────────────────────────────────
+const POLL_MS = 2000;
+const COLORS = {
+    idle:    '#868e96',
+    running: '#ffd43b',
+    success: '#69db7c',
+    done:    '#69db7c',
+    error:   '#ff6b6b',
+    edge:    '#4dabf7',
+    edgeHL:  '#ffd43b',
+};
+
+let cy = null;
+let isFirstLoad = true;
+let currentMode = 'live';   // 'live' | 'replay'
+let currentWindow = '60m';
+let liveTimer = null;
+let lastTimelineLength = 0;
+let showModel = false;
+
+// ─────────────────────────────────────────────────────────────
+// Particle canvas
+// ─────────────────────────────────────────────────────────────
+let pCanvas, pCtx, rafId = null;
+const particles = [];
+
+function initParticleCanvas() {
+    pCanvas = document.getElementById('particle-canvas');
+    resizeParticleCanvas();
+    window.addEventListener('resize', resizeParticleCanvas);
+}
+
+function resizeParticleCanvas() {
+    if (!pCanvas) return;
+    const c = document.getElementById('graph-container');
+    pCanvas.width  = c.clientWidth;
+    pCanvas.height = c.clientHeight;
+    pCtx = pCanvas.getContext('2d');
+    if (cy && cy.resize) {
+        cy.resize();
+        cy.fit(cy.elements(), 40);
+    }
+}
+
+function spawnParticle(fromId, toId) {
+    if (!cy) return;
+    const fn = cy.getElementById(fromId);
+    const tn = cy.getElementById(toId);
+    if (!fn.length || !tn.length) return;
+    particles.push({ fromId, toId, startTime: performance.now(), duration: 1400, trail: [] });
+    if (!rafId) rafId = requestAnimationFrame(animLoop);
+}
+
+function animLoop(now) {
+    if (!pCtx) return;
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        const fn = cy && cy.getElementById(p.fromId);
+        const tn = cy && cy.getElementById(p.toId);
+        if (!fn || !fn.length || !tn || !tn.length) { particles.splice(i, 1); continue; }
+
+        const t = Math.min((now - p.startTime) / p.duration, 1);
+        const ease = t < .5 ? 2*t*t : -1 + (4-2*t)*t;
+        const from = fn.renderedPosition();
+        const to   = tn.renderedPosition();
+        const x = from.x + (to.x - from.x) * ease;
+        const y = from.y + (to.y - from.y) * ease;
+
+        p.trail.push({ x, y, t: now });
+        p.trail = p.trail.filter(pt => now - pt.t < 230);
+
+        // Trail
+        p.trail.forEach((pt, idx) => {
+            const alpha = (idx / p.trail.length) * 0.32;
+            const r = 3.5 * (idx / p.trail.length);
+            pCtx.save(); pCtx.globalAlpha = alpha;
+            pCtx.fillStyle = '#ffd43b';
+            pCtx.beginPath(); pCtx.arc(pt.x, pt.y, r, 0, Math.PI*2); pCtx.fill();
+            pCtx.restore();
+        });
+
+        // Halo
+        const g = pCtx.createRadialGradient(x, y, 0, x, y, 20);
+        g.addColorStop(0, 'rgba(255,212,59,.5)');
+        g.addColorStop(1, 'rgba(255,212,59,0)');
+        pCtx.save(); pCtx.fillStyle = g;
+        pCtx.beginPath(); pCtx.arc(x, y, 20, 0, Math.PI*2); pCtx.fill(); pCtx.restore();
+
+        // Core
+        pCtx.save();
+        pCtx.shadowBlur = 14; pCtx.shadowColor = '#ffd43b';
+        pCtx.fillStyle = '#ffd43b';
+        pCtx.beginPath(); pCtx.arc(x, y, 8, 0, Math.PI*2); pCtx.fill();
+        pCtx.shadowBlur = 0; pCtx.fillStyle = 'rgba(255,255,255,.85)';
+        pCtx.beginPath(); pCtx.arc(x, y, 3.5, 0, Math.PI*2); pCtx.fill();
+        pCtx.restore();
+
+        if (t >= 1) particles.splice(i, 1);
+    }
+    if (particles.length > 0) rafId = requestAnimationFrame(animLoop);
+    else { pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height); rafId = null; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cytoscape graph
+// ─────────────────────────────────────────────────────────────
+function initGraph() {
+    if (window.cytoscapeFailed || typeof cytoscape === 'undefined') {
+        document.getElementById('cy').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);flex-direction:column;gap:10px;"><div style="font-size:2rem">⚠</div><div>Graph-Bibliothek nicht verfügbar</div><div style="font-size:0.8rem">Bitte Internetverbindung prüfen</div></div>';
+        return;
+    }
+    cy = cytoscape({
+        container: document.getElementById('cy'),
+        style: [
+            { selector: 'node', style: {
+                'background-color': COLORS.idle, 'label': 'data(label)',
+                'color': '#fff', 'text-valign': 'center', 'text-halign': 'center',
+                'shape': 'round-rectangle', 'width': 'label', 'height': 'label',
+                'padding': '12px', 'font-size': '13px', 'font-weight': '600',
+                'border-width': 2, 'border-color': '#fff', 'border-opacity': .3,
+                'text-wrap': 'wrap', 'text-max-width': '100px',
+                'transition-property': 'background-color,border-color,border-width',
+                'transition-duration': '0.3s'
+            }},
+            { selector: 'node.status-running', style: {
+                'background-color': COLORS.running, 'color': '#000',
+                'border-color': COLORS.running, 'border-opacity': 1, 'border-width': 3,
+                'shadow-blur': 12, 'shadow-color': COLORS.running, 'shadow-opacity': .6
+            }},
+            { selector: 'node.status-success,node.status-done', style: {
+                'background-color': COLORS.success, 'color': '#000',
+                'border-color': COLORS.success, 'border-opacity': .6
+            }},
+            { selector: 'node.status-error', style: {
+                'background-color': COLORS.error, 'color': '#fff',
+                'border-color': COLORS.error, 'border-opacity': 1, 'border-width': 3
+            }},
+            { selector: 'edge', style: {
+                'width': 2, 'line-color': COLORS.edge,
+                'target-arrow-color': COLORS.edge, 'target-arrow-shape': 'triangle',
+                'curve-style': 'bezier', 'arrow-scale': 1.2, 'line-opacity': .5,
+                'label': 'data(countLabel)', 'color': COLORS.edge,
+                'font-size': '10px', 'text-background-color': '#0f0f23',
+                'text-background-opacity': 1, 'text-background-padding': '2px',
+            }},
+            { selector: 'edge.highlight', style: {
+                'line-color': COLORS.edgeHL, 'target-arrow-color': COLORS.edgeHL,
+                'line-opacity': 1, 'width': 3,
+                'shadow-blur': 8, 'shadow-color': COLORS.edgeHL, 'shadow-opacity': .5
+            }}
+        ],
+        layout: { name: 'grid', padding: 30 },
+        wheelSensitivity: .3, minZoom: .3, maxZoom: 2.5
+    });
+}
+
+function updateNodeLabels() {
+    if (!cy) return;
+    cy.nodes().forEach(node => {
+        const name = node.id();
+        const model = node.data('model') || '';
+        if (showModel && model) {
+            const short = model.replace('claude-', '').replace(/-\d{8}$/, '').replace('-latest', '');
+            node.data('label', `${name}\n(${short})`);
+        } else {
+            node.data('label', name);
+        }
+    });
+}
+
+function applyStateToGraph(state) {
+    const agents = state.agents || {};
+    const edges  = state.edges  || [];
+
+    // Filter out unnamed/system nodes that clutter the graph
+    const neededNodes = new Set(
+        [...Object.keys(agents), ...edges.flatMap(e => [e.from, e.to])]
+        .filter(n => n && n !== '?' && n !== 'system' && !n.startsWith('agent-'))
+    );
+
+    // Remove stale nodes/edges
+    cy.nodes().filter(n => !neededNodes.has(n.id())).remove();
+    const neededEdgeIds = new Set(edges
+        .filter(e => neededNodes.has(e.from) && neededNodes.has(e.to))
+        .map(e => `edge-${e.from}-${e.to}`));
+    cy.edges().filter(e => !neededEdgeIds.has(e.id())).remove();
+
+    // Count existing nodes before adding (to detect topology changes)
+    const prevNodeCount = cy.nodes().length;
+
+    // Add / update nodes
+    neededNodes.forEach(name => {
+        if (cy.getElementById(name).length === 0)
+            cy.add({ group: 'nodes', data: { id: name, label: name } });
+        const node = cy.getElementById(name);
+        const info = agents[name] || {};
+        const status = info.status || 'idle';
+        if (info.model) node.data('model', info.model);
+        if (info.provider) node.data('provider', info.provider);
+        node.removeClass('status-idle status-running status-success status-error status-done');
+        node.addClass(`status-${status}`);
+    });
+
+    // Add / update edges with count labels
+    edges.forEach(e => {
+        if (!neededNodes.has(e.from) || !neededNodes.has(e.to)) return;
+        const id = `edge-${e.from}-${e.to}`;
+        if (cy.getElementById(id).length === 0)
+            cy.add({ group: 'edges', data: { id, source: e.from, target: e.to } });
+        const count = e.count || 1;
+        cy.getElementById(id).data('countLabel', count > 1 ? String(count) : '');
+    });
+
+    // Re-layout when topology changed (compare BEFORE add vs neededNodes count)
+    const topologyChanged = isFirstLoad || cy.nodes().length !== prevNodeCount;
+    if (topologyChanged) {
+        cy.layout({
+            name: 'breadthfirst',
+            directed: true,
+            roots: cy.nodes().filter(n => cy.edges(`[target="${n.id()}"]`).length === 0),
+            spacingFactor: 1.6,
+            animate: true,
+            animationDuration: 400,
+            fit: true,
+            padding: 40,
+        }).run();
+    }
+
+    updateNodeLabels();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sidebar / Timeline
+// ─────────────────────────────────────────────────────────────
+function renderAgents(agents) {
+    const container = document.getElementById('agent-list');
+    const needed = new Set(Object.keys(agents));
+    Array.from(container.children).forEach(c => { if (!needed.has(c.dataset.name)) c.remove(); });
+
+    Object.entries(agents).forEach(([name, info]) => {
+        let card = container.querySelector(`[data-name="${name}"]`);
+        const status = info.status || 'idle';
+        const dur = info.duration_sec || 0;
+        const ds = `${String(Math.floor(dur/60)).padStart(2,'0')}:${String(Math.floor(dur%60)).padStart(2,'0')}`;
+        if (!card) {
+            card = document.createElement('div');
+            card.dataset.name = name;
+            container.appendChild(card);
+        }
+        const toolCount = info.tool_calls || 0;
+        card.className = `agent-card status-${status}`;
+        card.innerHTML = `
+            <div class="agent-header">
+                <span class="agent-name">${esc(name)}</span>
+                <span class="agent-badge status-${status}">${status}</span>
+            </div>
+            <div class="agent-duration">⏱ ${dur > 0 ? ds : '—'}${toolCount > 0 ? ` · 🔧 ${toolCount}` : ''}</div>`;
+    });
+}
+
+function renderTimeline(timeline, highlightNewAfter) {
+    const tbody = document.getElementById('timeline-body');
+    const rows = timeline.slice().reverse();
+    tbody.innerHTML = rows.map((t, i) => {
+        const origIdx = timeline.length - 1 - i;
+        const ts = t.ts ? new Date(t.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false}) : '';
+        const isNew = highlightNewAfter !== undefined && origIdx >= highlightNewAfter;
+        return `<tr class="${isNew ? 'new-row' : ''}" data-idx="${origIdx}" style="cursor:pointer" title="${currentMode === 'replay' ? 'Klick: zu diesem Event springen' : ''}">
+            <td class="ts">${ts}</td>
+            <td class="ico">${t.icon}</td>
+            <td class="msg">${esc(t.msg)}</td></tr>`;
+    }).join('');
+}
+
+function renderMeta(state) {
+    document.getElementById('meta-name').textContent = state.session_name || '—';
+    document.getElementById('meta-duration').textContent = fmtDur(state.duration_sec || 0);
+    document.getElementById('meta-agents').textContent = Object.keys(state.agents || {}).length;
+    document.getElementById('meta-events').textContent = (state.timeline || []).length;
+}
+
+function fmtDur(sec) {
+    return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(Math.floor(sec%60)).padStart(2,'0')}`;
+}
+function esc(s) {
+    const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Error banner
+// ─────────────────────────────────────────────────────────────
+function showError(msg) {
+    document.getElementById('error-text').textContent = msg;
+    document.getElementById('error-banner').style.display = 'flex';
+    document.getElementById('status-dot').classList.remove('live', 'replay');
+}
+function hideError() {
+    document.getElementById('error-banner').style.display = 'none';
+}
+
+function showToast(msg, duration = 3000) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--success);color:#000;padding:10px 16px;border-radius:6px;font-size:0.85rem;z-index:200;animation:fadein 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, duration);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Live mode
+// ─────────────────────────────────────────────────────────────
+function checkDelegations(timeline) {
+    const newItems = timeline.slice(lastTimelineLength);
+    newItems.forEach(item => {
+        if (item.icon === '→') {
+            const idx = item.msg.indexOf(' → ');
+            if (idx !== -1) spawnParticle(item.msg.substring(0, idx).trim(), item.msg.substring(idx+3).trim());
+        }
+    });
+    lastTimelineLength = timeline.length;
+}
+
+async function fetchLiveState() {
+    if (currentMode !== 'live') return;
+    try {
+        const r = await fetch(`/api/state?window=${encodeURIComponent(currentWindow)}`);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const state = await r.json();
+        hideError();
+        document.getElementById('status-dot').className = 'live';
+        const hasData = Object.keys(state.agents || {}).length > 0 || (state.timeline||[]).length > 0;
+        document.getElementById('empty-state').style.display = hasData ? 'none' : 'flex';
+        if (!hasData) return;
+        renderMeta(state);
+        applyStateToGraph(state);
+        renderAgents(state.agents || {});
+        const tl = state.timeline || [];
+        checkDelegations(tl);
+        renderTimeline(tl, lastTimelineLength > 0 ? tl.length - (tl.length - lastTimelineLength) : undefined);
+        isFirstLoad = false;
+    } catch (e) {
+        showError('Server nicht erreichbar — starte: python scripts/viz-server.py toggle');
+        document.getElementById('empty-state').style.display = 'flex';
+    }
+}
+
+function startLive() {
+    if (liveTimer) return;
+    fetchLiveState();
+    liveTimer = setInterval(fetchLiveState, POLL_MS);
+}
+
+function stopLive() {
+    clearInterval(liveTimer);
+    liveTimer = null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Replay engine
+// ─────────────────────────────────────────────────────────────
+const replay = {
+    events: [],
+    timeouts: [],
+    currentIdx: 0,
+    isPaused: false,
+    pausedAt: 0,         // wall-clock ms at pause
+    pausedTotal: 0,      // total ms spent paused (subtracted from delays)
+    playStartTime: 0,    // wall-clock ms when play() was last called
+    speedFactor: 5,
+
+    // Build incremental state up to eventIndex (inclusive)
+    buildStateUpTo(idx) {
+        const state = { agents: {}, edges: [], timeline: [], session_name: 'Replay', duration_sec: 0 };
+        for (let i = 0; i <= idx && i < this.events.length; i++) this._apply(this.events[i], state);
+        if (this.events.length > 0 && idx >= 0) {
+            const t0 = new Date(this.events[0].ts).getTime();
+            const t1 = new Date(this.events[Math.min(idx, this.events.length-1)].ts).getTime();
+            state.duration_sec = (t1 - t0) / 1000;
+        }
+        return state;
+    },
+
+    _apply(ev, state) {
+        const type   = ev.event;
+        const agent  = ev.agent || '';
+        const icons  = { session_start:'▶', session_end:'■', agent_start:'▶', agent_end:'✓', delegate:'→', tool_call:'🔧', log:'ℹ' };
+
+        const ensureAgent = name => {
+            if (name && name !== 'user' && !state.agents[name])
+                state.agents[name] = { status: 'idle', started_at: null, ended_at: null, duration_sec: 0, tool_calls: 0, model: '', provider: '' };
+        };
+
+        if (type === 'session_start') {
+            state.session_name = (ev.payload || {}).task || 'Replay';
+        } else if (type === 'agent_start') {
+            ensureAgent(agent);
+            if (state.agents[agent]) {
+                state.agents[agent].status = 'running';
+                state.agents[agent].started_at = ev.ts;
+                if (ev.model) state.agents[agent].model = ev.model;
+                if (ev.provider) state.agents[agent].provider = ev.provider;
             }
-
-            function updateGraph(state) {
-                if (!cy) initGraph();
-                const agents = state.agents || {};
-                const edges = state.edges || [];
-
-                const existingNodes = new Set(cy.nodes().map(n => n.id()));
-                const existingEdges = new Set(cy.edges().map(e => e.id()));
-                const neededNodes = new Set(Object.keys(agents));
-                const neededEdges = new Set();
-
-                edges.forEach((e, i) => {
-                    neededNodes.add(e.from);
-                    neededNodes.add(e.to);
-                    neededEdges.add(`edge-${i}`);
-                });
-
-                // Remove old
-                cy.nodes().filter(n => !neededNodes.has(n.id())).remove();
-                cy.edges().filter(e => !neededEdges.has(e.id())).remove();
-
-                // Add/update nodes
-                Object.entries(agents).forEach(([name, info]) => {
-                    const status = info.status || 'idle';
-                    const el = cy.getElementById(name);
-                    if (el.length === 0) {
-                        cy.add({ group: 'nodes', data: { id: name, label: name } });
-                    }
-                    const node = cy.getElementById(name);
-                    node.removeClass('status-idle status-running status-success status-error status-done');
-                    node.addClass(`status-${status}`);
-                });
-
-                // Add/update edges
-                edges.forEach((e, i) => {
-                    const id = `edge-${i}`;
-                    if (cy.getElementById(id).length === 0) {
-                        cy.add({
-                            group: 'edges',
-                            data: { id: id, source: e.from, target: e.to }
-                        });
-                    }
-                });
-
-                // Layout nur beim ersten Mal oder wenn neue Nodes/Edges
-                if (isFirstLoad || cy.nodes().length !== existingNodes.size) {
-                    cy.layout({
-                        name: 'cose',
-                        padding: 30,
-                        animate: true,
-                        animationDuration: 500,
-                        fit: true,
-                        componentSpacing: 60,
-                        nodeOverlap: 20,
-                        refresh: 20,
-                        gravity: 0.8
-                    }).run();
+        } else if (type === 'agent_end') {
+            ensureAgent(agent);
+            if (state.agents[agent]) {
+                state.agents[agent].status = ev.status === 'error' ? 'error' : 'success';
+                state.agents[agent].ended_at = ev.ts;
+                if (state.agents[agent].started_at) {
+                    state.agents[agent].duration_sec =
+                        (new Date(ev.ts) - new Date(state.agents[agent].started_at)) / 1000;
                 }
             }
+        } else if (type === 'tool_call') {
+            ensureAgent(agent);
+            if (state.agents[agent]) state.agents[agent].tool_calls = (state.agents[agent].tool_calls || 0) + 1;
+        } else if (type === 'delegate') {
+            const { from = '', to = '' } = ev;
+            ensureAgent(from); ensureAgent(to);
+            const existing = state.edges.find(e => e.from === from && e.to === to);
+            if (existing) { existing.count = (existing.count || 1) + 1; }
+            else state.edges.push({ from, to, ts: ev.ts, count: 1 });
+        }
 
-            function updateAgents(agents) {
-                const container = document.getElementById('agent-list');
-                const existing = new Set(Array.from(container.children).map(c => c.dataset.name));
-                const needed = new Set(Object.keys(agents));
+        let msg = '';
+        if (type === 'delegate')      msg = `${ev.from || ''} → ${ev.to || ''}`;
+        else if (type === 'agent_start') msg = `${agent} gestartet`;
+        else if (type === 'agent_end')   msg = `${agent} beendet (${ev.status || '?'})`;
+        else if (type === 'tool_call')   msg = `${agent}: ${ev.tool || ''}`;
+        else if (type === 'session_start') msg = `Session: ${(ev.payload||{}).task || ''}`;
+        else if (type === 'session_end')   msg = 'Session beendet';
+        else if (type === 'log') msg = `${agent}: ${(ev.payload||{}).message || ''}`;
 
-                // Entferne alte
-                Array.from(container.children).forEach(c => {
-                    if (!needed.has(c.dataset.name)) c.remove();
-                });
+        state.timeline.push({ ts: ev.ts, icon: icons[type] || 'ℹ', msg });
+    },
 
-                Object.entries(agents).forEach(([name, info]) => {
-                    let card = container.querySelector(`[data-name="${name}"]`);
-                    const status = info.status || 'idle';
-                    const dur = info.duration_sec || 0;
-                    const durStr = dur > 0 ? `${Math.floor(dur/60).toString().padStart(2,'0')}:${Math.floor(dur%60).toString().padStart(2,'0')}` : '—';
+    _updateUI(idx) {
+        const state = this.buildStateUpTo(idx);
+        this.currentIdx = idx;
+        renderMeta(state);
+        applyStateToGraph(state);
+        renderAgents(state.agents || {});
+        renderTimeline(state.timeline, state.timeline.length - 1);
+        document.getElementById('empty-state').style.display = 'none';
 
-                    if (!card) {
-                        card = document.createElement('div');
-                        card.className = 'agent-card';
-                        card.dataset.name = name;
-                        container.appendChild(card);
-                    }
-                    card.className = `agent-card status-${status}`;
-                    card.innerHTML = `
-                        <div class="agent-header">
-                            <span class="agent-name">${name}</span>
-                            <span class="agent-badge status-${status}">${status}</span>
-                        </div>
-                        <div class="agent-duration">⏱ ${durStr}</div>
-                    `;
-                });
-            }
+        const pct = this.events.length > 1 ? Math.round((idx / (this.events.length-1)) * 100) : 100;
+        document.getElementById('replay-progress-fill').style.width = pct + '%';
+        document.getElementById('replay-progress-text').textContent = `${idx+1} / ${this.events.length}`;
 
-            function updateTimeline(timeline) {
-                const tbody = document.getElementById('timeline-body');
-                const rows = timeline.slice(-50).reverse();
-                const html = rows.map((t, i) => {
-                    const ts = t.ts ? t.ts.split('T')[1].substring(0, 8) : '';
-                    const isNew = i < (timeline.length - lastEventCount);
-                    const cls = isNew ? 'new-row' : '';
-                    return `<tr class="${cls}"><td class="ts">${ts}</td><td class="icon">${t.icon}</td><td class="msg">${escapeHtml(t.msg)}</td></tr>`;
-                }).join('');
-                tbody.innerHTML = html;
-                lastEventCount = timeline.length;
-            }
+        // Trigger particle for delegate events
+        const ev = this.events[idx];
+        if (ev && ev.event === 'delegate' && ev.from && ev.to) spawnParticle(ev.from, ev.to);
+    },
 
-            function escapeHtml(str) {
-                const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
-            }
+    play() {
+        if (this.events.length === 0) return;
+        this.isPaused = false;
+        document.getElementById('btn-rplay').disabled  = true;
+        document.getElementById('btn-rpause').disabled = false;
+        document.getElementById('status-dot').className = 'replay';
 
-            function updateMeta(state) {
-                document.getElementById('meta-name').textContent = state.session_name || '—';
-                document.getElementById('meta-duration').textContent = formatDuration(state.duration_sec || 0);
-                document.getElementById('meta-agents').textContent = Object.keys(state.agents || {}).length;
-                document.getElementById('meta-events').textContent = (state.timeline || []).length;
-            }
+        const speed = parseInt(document.getElementById('replay-speed').value, 10) || 5;
+        const startIdx = this.currentIdx;
+        const eventsToPlay = this.events.slice(startIdx);
+        if (eventsToPlay.length === 0) { this.reset(); this.play(); return; }
 
-            function formatDuration(sec) {
-                const m = Math.floor(sec / 60);
-                const s = Math.floor(sec % 60);
-                return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-            }
+        const t0Real = new Date(eventsToPlay[0].ts).getTime();
+        this.playStartTime = performance.now();
 
-            function showError(msg) {
-                const banner = document.getElementById('error-banner');
-                const text = document.getElementById('error-text');
-                text.textContent = msg;
-                banner.style.display = 'flex';
-                document.getElementById('status-dot').classList.remove('live');
-            }
-            function hideError() {
-                document.getElementById('error-banner').style.display = 'none';
-                document.getElementById('status-dot').classList.add('live');
-            }
+        eventsToPlay.forEach((ev, i) => {
+            const evTs = new Date(ev.ts).getTime();
+            const rawDelay = (evTs - t0Real) / speed;
+            const delay = Math.max(0, rawDelay - this.pausedTotal);
+            const t = setTimeout(() => {
+                if (this.isPaused) return;
+                this._updateUI(startIdx + i);
+                if (startIdx + i === this.events.length - 1) this._onComplete();
+            }, delay);
+            this.timeouts.push(t);
+        });
+    },
 
-            async function fetchState() {
-                try {
-                    const resp = await fetch('/api/state');
-                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    const state = await resp.json();
-                    hideError();
+    pause() {
+        this.isPaused = true;
+        if (this.playStartTime) {
+            this.pausedTotal += performance.now() - this.playStartTime;
+        }
+        this.timeouts.forEach(clearTimeout);
+        this.timeouts = [];
+        document.getElementById('btn-rplay').disabled  = false;
+        document.getElementById('btn-rpause').disabled = true;
+        document.getElementById('status-dot').className = '';
+    },
 
-                    const hasData = Object.keys(state.agents || {}).length > 0 || (state.timeline || []).length > 0;
-                    document.getElementById('empty-state').style.display = hasData ? 'none' : 'flex';
-                    if (!hasData) return;
+    reset() {
+        this.timeouts.forEach(clearTimeout);
+        this.timeouts = [];
+        this.isPaused = false;
+        this.currentIdx = 0;
+        this.pausedTotal = 0;
+        this.playStartTime = 0;
+        // Reset graph to empty
+        if (cy) { cy.elements().remove(); }
+        document.getElementById('agent-list').innerHTML = '';
+        document.getElementById('timeline-body').innerHTML = '';
+        document.getElementById('replay-progress-fill').style.width = '0%';
+        document.getElementById('replay-progress-text').textContent = `0 / ${this.events.length}`;
+        document.getElementById('meta-name').textContent = '—';
+        document.getElementById('meta-duration').textContent = '—';
+        document.getElementById('meta-agents').textContent = '0';
+        document.getElementById('meta-events').textContent = '0';
+        document.getElementById('status-dot').className = '';
+        document.getElementById('btn-rplay').disabled  = false;
+        document.getElementById('btn-rpause').disabled = true;
+        isFirstLoad = true;
+    },
 
-                    updateMeta(state);
-                    updateGraph(state);
-                    updateAgents(state.agents || {});
-                    updateTimeline(state.timeline || []);
-                    isFirstLoad = false;
-                } catch (e) {
-                    showError('Server nicht erreichbar — Starte mit: python scripts/viz-report.py --serve');
-                    if (!cy || cy.nodes().length === 0) {
-                        document.getElementById('empty-state').style.display = 'flex';
-                    }
-                }
-            }
+    seekTo(idx) {
+        this.timeouts.forEach(clearTimeout);
+        this.timeouts = [];
+        this.isPaused = true;
+        this.currentIdx = Math.max(0, Math.min(idx, this.events.length - 1));
+        this.pausedTotal = 0;
+        this.playStartTime = 0;
+        this._updateUI(this.currentIdx);
+        document.getElementById('btn-rplay').disabled  = false;
+        document.getElementById('btn-rpause').disabled = true;
+        document.getElementById('status-dot').className = '';
+    },
 
-            // Init
-            initGraph();
-            fetchState();
-            setInterval(fetchState, POLL_MS);
-        })();
-    </script>
+    _onComplete() {
+        document.getElementById('btn-rplay').disabled  = false;
+        document.getElementById('btn-rpause').disabled = true;
+        document.getElementById('status-dot').className = '';
+    },
+
+    async load(window) {
+        this.reset();
+        try {
+            const r = await fetch(`/api/events?window=${encodeURIComponent(window)}`);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const evs = await r.json();
+            this.events = evs.sort((a, b) => a.ts.localeCompare(b.ts));
+            document.getElementById('replay-progress-text').textContent = `0 / ${this.events.length}`;
+            hideError();
+            document.getElementById('empty-state').style.display =
+                this.events.length === 0 ? 'flex' : 'none';
+        } catch(e) {
+            showError('Events konnten nicht geladen werden.');
+        }
+    }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Mode switching
+// ─────────────────────────────────────────────────────────────
+function switchMode(mode) {
+    currentMode = mode;
+    const isLive = mode === 'live';
+
+    document.getElementById('live-controls').style.display   = isLive ? '' : 'none';
+    document.getElementById('replay-controls').style.display = isLive ? 'none' : '';
+    document.getElementById('btn-live').classList.toggle('active', isLive);
+    document.getElementById('btn-replay').classList.toggle('active', !isLive);
+
+    if (isLive) {
+        replay.reset();
+        isFirstLoad = true;
+        lastTimelineLength = 0;
+        document.getElementById('status-dot').className = 'live';
+        startLive();
+    } else {
+        stopLive();
+        document.getElementById('status-dot').className = '';
+        replay.load(document.getElementById('replay-time-select').value);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Clear log
+// ─────────────────────────────────────────────────────────────
+function showConfirm() {
+    document.getElementById('confirm-overlay').style.display = 'flex';
+}
+function hideConfirm() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+}
+async function clearLog() {
+    hideConfirm();
+    try {
+        const r = await fetch('/api/clear-log', { method: 'POST' });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'Unbekannter Fehler');
+        // Reset local state
+        lastTimelineLength = 0;
+        isFirstLoad = true;
+        if (cy) cy.elements().remove();
+        document.getElementById('agent-list').innerHTML = '';
+        document.getElementById('timeline-body').innerHTML = '';
+        if (currentMode === 'replay') {
+            replay.reset();
+            replay.events = [];
+            document.getElementById('replay-progress-text').textContent = '0 / 0';
+        }
+        showToast(`Log gelöscht — ${d.cleared || '?'} Events entfernt`);
+    } catch(e) {
+        showError('Log löschen fehlgeschlagen: ' + e.message);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Wire up buttons
+// ─────────────────────────────────────────────────────────────
+document.getElementById('btn-live').addEventListener('click', () => switchMode('live'));
+document.getElementById('btn-replay').addEventListener('click', () => switchMode('replay'));
+
+document.getElementById('time-range-select').addEventListener('change', e => {
+    currentWindow = e.target.value;
+    isFirstLoad = true;
+    lastTimelineLength = 0;
+    fetchLiveState();
+});
+
+document.getElementById('replay-time-select').addEventListener('change', e => {
+    replay.load(e.target.value);
+});
+
+document.getElementById('btn-rplay').addEventListener('click',  () => replay.play());
+document.getElementById('btn-rpause').addEventListener('click', () => replay.pause());
+document.getElementById('btn-rreset').addEventListener('click', () => replay.reset());
+
+document.getElementById('btn-model-toggle').addEventListener('click', () => {
+    showModel = !showModel;
+    document.getElementById('btn-model-toggle').classList.toggle('active', showModel);
+    updateNodeLabels();
+    localStorage.setItem('viz-show-model', showModel);
+});
+
+document.getElementById('btn-clear-log').addEventListener('click', showConfirm);
+document.getElementById('confirm-cancel').addEventListener('click', hideConfirm);
+document.getElementById('confirm-ok').addEventListener('click', clearLog);
+document.getElementById('confirm-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('confirm-overlay')) hideConfirm();
+});
+
+document.getElementById('timeline-body').addEventListener('click', e => {
+    const row = e.target.closest('tr[data-idx]');
+    if (!row || currentMode !== 'replay') return;
+    replay.seekTo(parseInt(row.dataset.idx, 10));
+});
+
+// Restore persisted preferences from localStorage
+(function restorePrefs() {
+    const savedWindow = localStorage.getItem('viz-window');
+    if (savedWindow) {
+        const sel = document.getElementById('time-range-select');
+        if (Array.from(sel.options).some(o => o.value === savedWindow)) {
+            sel.value = savedWindow;
+            currentWindow = savedWindow;
+        }
+    }
+    const savedModel = localStorage.getItem('viz-show-model');
+    if (savedModel === 'true') {
+        showModel = true;
+        document.getElementById('btn-model-toggle').classList.add('active');
+    }
+})();
+
+// Persist window selection
+document.getElementById('time-range-select').addEventListener('change', e => {
+    localStorage.setItem('viz-window', e.target.value);
+});
+
+// ─────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────
+initGraph();
+initParticleCanvas();
+switchMode('live');
+
+})();
+</script>
 </body>
 </html>

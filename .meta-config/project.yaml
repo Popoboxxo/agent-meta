@@ -169,3 +169,6 @@ viz:
   report:
     retention_days: 7
     session_timeout_min: 5
+  server:
+    port: 8765
+    timeout_sec: 300

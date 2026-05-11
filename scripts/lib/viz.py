@@ -2,6 +2,7 @@
 
 import json
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,6 +39,14 @@ _TIER_COLORS = {
     "recommended": "#1971c2",
     "optional": "#868e96",
 }
+
+# Thread-safety lock for concurrent read/write access to event logs
+viz_lock = threading.RLock()
+
+# Tail-read heuristic: if log file exceeds this size, read from end when since filter is active
+_TAIL_READ_THRESHOLD_BYTES = 1024 * 1024  # 1 MB
+_TAIL_READ_MAX_LINES = 10000
+_TAIL_READ_MIN_EVENTS = 100
 
 
 def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dict, provider_config: dict | None = None) -> dict:
@@ -506,7 +515,7 @@ def get_event_log_path(project_root: Path, session_id: str | None = None) -> Pat
 def write_event(project_root: Path, event: dict, session_id: str | None = None, log: SyncLog | None = None):
     """Schreibe ein Event in das Session-Event-Log.
 
-    Thread-safe via einfachem Append (JSONL ist append-only).
+    Thread-safe via RLock (serializes concurrent reads/writes).
     """
     event.setdefault("ts", datetime.now(timezone.utc).isoformat())
 
@@ -514,23 +523,61 @@ def write_event(project_root: Path, event: dict, session_id: str | None = None, 
     path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        with viz_lock:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
     except Exception as exc:
         if log:
             log.warn(f"viz-event: konnte nicht schreiben: {exc}")
 
 
+def _tail_read_lines(path: Path, max_lines: int) -> list[str]:
+    """Read approximately the last max_lines lines from a text file efficiently."""
+    with open(path, "rb") as f:
+        f.seek(0, 2)
+        end = f.tell()
+        pos = end
+        chunks = []
+        chunk_size = 8192
+
+        while pos > 0 and sum(c.count(b"\n") for c in chunks) < max_lines:
+            read_size = min(chunk_size, pos)
+            pos -= read_size
+            f.seek(pos)
+            chunk = f.read(read_size)
+            chunks.insert(0, chunk)
+
+        full = b"".join(chunks)
+        lines = full.decode("utf-8", errors="replace").splitlines()
+        # Skip potential partial first line unless we read from start
+        if pos > 0 and lines and not full.startswith(b"\n"):
+            lines = lines[1:]
+        return lines[-max_lines:]
+
+
 def read_events(project_root: Path, session_id: str | None = None, since: datetime | None = None) -> list[dict]:
-    """Lese Events aus dem Log."""
+    """Lese Events aus dem Log.
+
+    Thread-safe via RLock. Uses tail-read heuristic for large files when
+    a 'since' filter is active to avoid reading the entire file.
+    """
     path = get_event_log_path(project_root, session_id)
     if not path.exists():
         return []
 
     events = []
     try:
-        with open(path, "r", encoding="utf-8-sig") as f:
-            for line in f:
+        with viz_lock:
+            file_size = path.stat().st_size
+            use_tail = since is not None and file_size > _TAIL_READ_THRESHOLD_BYTES
+
+            if use_tail:
+                lines = _tail_read_lines(path, _TAIL_READ_MAX_LINES)
+            else:
+                with open(path, "r", encoding="utf-8-sig") as f:
+                    lines = f.readlines()
+
+            for line in lines:
                 line = line.strip()
                 if not line:
                     continue
@@ -543,6 +590,24 @@ def read_events(project_root: Path, session_id: str | None = None, since: dateti
                     events.append(ev)
                 except (json.JSONDecodeError, ValueError):
                     continue
+
+            # Safety fallback: if tail-read yielded too few events, read full file
+            if use_tail and len(events) < _TAIL_READ_MIN_EVENTS:
+                events = []
+                with open(path, "r", encoding="utf-8-sig") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            ev = json.loads(line)
+                            if since:
+                                ev_ts = datetime.fromisoformat(ev.get("ts", "").replace("Z", "+00:00"))
+                                if ev_ts < since:
+                                    continue
+                            events.append(ev)
+                        except (json.JSONDecodeError, ValueError):
+                            continue
     except Exception:
         pass
     return events
@@ -600,51 +665,85 @@ def get_gitignore_entries() -> list[str]:
     ]
 
 
-def inject_viz_prompt_block(agent_content: str, role: str, provider: str, viz_enabled: bool) -> str:
+_VIZ_PY_APPEND = (
+    "import json,os,sys;"
+    "from datetime import datetime,timezone;"
+    "d={0};"
+    "d.setdefault('ts',datetime.now(timezone.utc).isoformat());"
+    "p='.meta-viz/events.jsonl';"
+    "os.makedirs(os.path.dirname(p),exist_ok=True);"
+    "open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\\n')"
+)
+
+
+def _viz_bash_cmd(event_dict_literal: str) -> str:
+    """Gibt den Bash-Befehl zurück der ein Event ans JSONL-Log anhängt.
+
+    Funktioniert auf Windows (python) und Unix (python3/python).
+    event_dict_literal: Python-Dict-Literal als String, z.B. "{'event':'agent_start',...}"
+    """
+    py = _VIZ_PY_APPEND.format(event_dict_literal)
+    # Versuche python3, fallback python — beide plattformübergreifend
+    return f'python3 -c "{py}" 2>/dev/null || python -c "{py}" 2>/dev/null'
+
+
+def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
+                            viz_enabled: bool, model: str = "") -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
-    Nur wenn viz.mode == "dynamic" und viz_enabled == True.
+    Nur wenn viz.mode == "dynamic" oder "full" und viz_enabled == True.
+    Nutzt ausschließlich das `Bash`-Tool zum Schreiben — write_file/edit_file
+    existieren in Claude Code nicht und führen dazu dass Agenten den Block ignorieren.
     """
     if not viz_enabled:
         return agent_content
 
+    model_field = f",'model':'{model}'" if model else ""
+    start_cmd = _viz_bash_cmd(
+        f"{{'event':'agent_start','agent':'{role}','provider':'{provider}'{model_field}}}"
+    )
+    delegate_cmd = _viz_bash_cmd(
+        f"{{'event':'delegate','from':'{role}','to':'ZIEL_AGENT'}}"
+    )
+    end_cmd_ok  = _viz_bash_cmd(
+        f"{{'event':'agent_end','agent':'{role}','status':'success'}}"
+    )
+    end_cmd_err = _viz_bash_cmd(
+        f"{{'event':'agent_end','agent':'{role}','status':'error','payload':{{'error':'FEHLERMELDUNG'}}}}"
+    )
+
     block = f"""
 ## Visualization Reporting (Pflicht-Anweisung)
-Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status in die Datei `{VIZ_DIR}/events.jsonl` protokollieren.
 
-### Format (eine Zeile pro Event, JSON)
-```json
-{{"ts":"ISO8601","event":"TYPE","agent":"{role}",...}}
+Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.
+
+### Pflicht-Events — exakt diese Bash-Befehle ausführen
+
+**1. Beim Start deiner Aufgabe (erstes was du tust):**
+```bash
+{start_cmd}
 ```
 
-### Pflicht-Events
-1. **Beim Start deiner Aufgabe:**
-   ```json
-   {{"ts":"2026-05-10T19:00:00Z","event":"agent_start","agent":"{role}","provider":"{provider}"}}
-   ```
+**2. Wenn du an einen anderen Agenten delegierst** (`ZIEL_AGENT` ersetzen):
+```bash
+{delegate_cmd}
+```
 
-2. **Wenn du an einen anderen Agenten delegierst:**
-   ```json
-   {{"ts":"2026-05-10T19:00:01Z","event":"delegate","from":"{role}","to":"ZIEL_AGENT"}}
-   ```
+**3. Wenn du fertig bist — Erfolg:**
+```bash
+{end_cmd_ok}
+```
 
-3. **Wenn du fertig bist:**
-   ```json
-   {{"ts":"2026-05-10T19:00:10Z","event":"agent_end","agent":"{role}","status":"success"}}
-   ```
-   Bei Fehler: `"status":"error"` mit `payload:{{"error":"..."}}`
+**3b. Wenn du fertig bist — Fehler** (`FEHLERMELDUNG` ersetzen):
+```bash
+{end_cmd_err}
+```
 
-4. **Wenn du ein Tool aufrufst:**
-   ```json
-   {{"ts":"2026-05-10T19:00:05Z","event":"tool_call","agent":"{role}","tool":"TOOL_NAME"}}
-   ```
-
-### Wichtig
-- Jede Zeile ein gültiges JSON-Objekt (JSONL-Format).
-- Füge die Events am Dateiende an (append).
-- Nutze `write_file` oder `edit_file` mit Append-Modus.
-- Dies ist eine Pflicht-Anweisung. Jeder Agenten-Aufruf MUSS protokolliert werden.
+### Regeln
+- Diese Bash-Befehle **immer ausführen** — sie schreiben eine Zeile JSON ans Log.
+- Kein anderes Tool verwenden — nur `Bash`.
+- Timestamp wird automatisch gesetzt.
+- Nie den Bash-Befehl weglassen oder überspringen.
 """
 
-    # Füge am Ende des Agenten-Inhalts an
     return agent_content.rstrip() + "\n\n" + block.strip() + "\n"
