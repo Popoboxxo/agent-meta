@@ -2,7 +2,7 @@
 name: developer
 description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen"
 mode: subagent
-model: opencode-go/qwen3.6-plus
+model: opencode-go/kimi-k2.6
 generated-from: "2-platform/agent-meta-developer.md@1.0.0"
 ---
 # Developer — agent-meta

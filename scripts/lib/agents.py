@@ -199,6 +199,45 @@ def inject_model_field(content: str, model: str) -> str:
     )
 
 
+def inject_temperature_field(content: str, temperature: str) -> str:
+    """Insert or update the temperature: field in YAML frontmatter.
+
+    If temperature is empty, removes any existing temperature: field.
+    Inserted after permissionMode: (or memory:, model:, name: as fallback).
+    """
+    if not temperature:
+        content = re.sub(r"^temperature:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+    if re.search(r"^temperature:", content, flags=re.MULTILINE):
+        return re.sub(r"^temperature:.*$", f"temperature: {temperature}",
+                      content, count=1, flags=re.MULTILINE)
+    for anchor in (r"^permissionMode:.*$", r"^memory:.*$", r"^model:.*$", r"^name:.*$"):
+        if re.search(anchor, content, flags=re.MULTILINE):
+            return re.sub(anchor, rf"\g<0>\ntemperature: {temperature}",
+                          content, count=1, flags=re.MULTILINE)
+    return content
+
+
+def inject_max_tokens_field(content: str, max_tokens: str) -> str:
+    """Insert or update the maxTokens: field in YAML frontmatter.
+
+    If max_tokens is empty, removes any existing maxTokens: field.
+    Inserted after temperature: (or permissionMode:, memory:, model:, name:).
+    """
+    if not max_tokens:
+        content = re.sub(r"^maxTokens:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+    if re.search(r"^maxTokens:", content, flags=re.MULTILINE):
+        return re.sub(r"^maxTokens:.*$", f"maxTokens: {max_tokens}",
+                      content, count=1, flags=re.MULTILINE)
+    for anchor in (r"^temperature:.*$", r"^permissionMode:.*$", r"^memory:.*$",
+                   r"^model:.*$", r"^name:.*$"):
+        if re.search(anchor, content, flags=re.MULTILINE):
+            return re.sub(anchor, rf"\g<0>\nmaxTokens: {max_tokens}",
+                          content, count=1, flags=re.MULTILINE)
+    return content
+
+
 def target_filename(role: str, role_map: dict) -> str | None:
     """Return the output filename for a role, or None if not in role_map."""
     name = role_map.get(role)
@@ -469,7 +508,7 @@ def sync_agents(
 ):
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
     from .config import substitute, strip_inactive_dod_blocks
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
     from .skills import load_external_skills_config, _skill_is_active
 
     CLAUDE_AGENTS_DIR = ".claude/agents"
@@ -547,6 +586,18 @@ def sync_agents(
             pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
 
+        temperature = resolve_temperature(role, config, agent_meta_root)
+        content = inject_temperature_field(content, temperature)
+        if temperature:
+            temp_src = "project override" if role in config.get("temperature-overrides", {}) else "meta default"
+            log.info(str(target_path.relative_to(project_root)), f"temperature: {temperature} (from {temp_src})")
+
+        max_tokens = resolve_max_tokens(role, config, agent_meta_root)
+        content = inject_max_tokens_field(content, max_tokens)
+        if max_tokens:
+            mt_src = "project override" if role in config.get("max-tokens-overrides", {}) else "meta default"
+            log.info(str(target_path.relative_to(project_root)), f"maxTokens: {max_tokens} (from {mt_src})")
+
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         viz_cfg = config.get("viz", {})
         if viz_cfg.get("mode") in ("dynamic", "full"):
@@ -621,7 +672,7 @@ def sync_agents_for_provider(
     """
     from .config import substitute, strip_inactive_dod_blocks
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)

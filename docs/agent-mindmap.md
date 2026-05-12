@@ -62,7 +62,7 @@ mindmap
 ### developer
 - **Tier:** required
 - **Beschreibung:** Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface.
-- **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.6
 - **Delegiert an:** tester, git
 
 ### docker
@@ -118,6 +118,11 @@ mindmap
 - **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
 - **Delegiert an:** developer, feature, git, documenter, ideation, release, security-auditor, docker, log-analyzer, feedback, agent-meta-manager, agent-meta-scout, meta-feedback, requirements, validator, tester
 
+### performance
+- **Tier:** optional
+- **Beschreibung:** Performance-Profiling und Bottleneck-Analyse: CPU, Memory, I/O — mit konkreten Optimierungsempfehlungen.
+- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.5
+
 ### release
 - **Tier:** optional
 - **Beschreibung:** Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten.
@@ -129,10 +134,15 @@ mindmap
 - **Beschreibung:** Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
+### reviewer
+- **Tier:** recommended
+- **Beschreibung:** Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells prüfen.
+- **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+
 ### security-auditor
 - **Tier:** optional
 - **Beschreibung:** Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution.
-- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.5
+- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.6
 
 ### tester
 - **Tier:** recommended

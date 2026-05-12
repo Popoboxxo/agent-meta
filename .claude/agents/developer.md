@@ -1,6 +1,6 @@
 ---
 name: developer
-model: claude-sonnet-4-6
+model: claude-opus-4-7
 version: 1.0.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,

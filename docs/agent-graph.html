@@ -172,8 +172,8 @@ graph TD
     classDef recommended fill:#1971c2,stroke:#fff,stroke-width:2px,color:#fff
     classDef optional fill:#868e96,stroke:#fff,stroke-width:2px,color:#fff
     class developer,feedback,git,log-analyzer,orchestrator required
-    class documenter,feature,requirements,tester,validator recommended
-    class agent-meta-manager,agent-meta-scout,docker,ideation,meta-feedback,openscad-developer,release,security-auditor optional
+    class documenter,feature,requirements,reviewer,tester,validator recommended
+    class agent-meta-manager,agent-meta-scout,docker,ideation,meta-feedback,openscad-developer,performance,release,security-auditor optional
                 </div>
                 <div class="legend">
                     <div class="legend-item">
@@ -229,7 +229,7 @@ graph TD
             </div>
             <p class="description">Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface.</p>
             <div class="meta">
-                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Continue: claude-opus-4-7</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/kimi-k2.6</span></span>
                 <span><strong>Memory:</strong> -</span>
             </div>
             <div class="children"><strong>Delegiert an:</strong> <a href="#tester" onclick="scrollToAgent('tester')">tester</a>, <a href="#git" onclick="scrollToAgent('git')">git</a></div>
@@ -375,6 +375,20 @@ graph TD
             <div class="children"><strong>Delegiert an:</strong> <a href="#developer" onclick="scrollToAgent('developer')">developer</a>, <a href="#feature" onclick="scrollToAgent('feature')">feature</a>, <a href="#git" onclick="scrollToAgent('git')">git</a>, <a href="#documenter" onclick="scrollToAgent('documenter')">documenter</a>, <a href="#ideation" onclick="scrollToAgent('ideation')">ideation</a>, <a href="#release" onclick="scrollToAgent('release')">release</a>, <a href="#security-auditor" onclick="scrollToAgent('security-auditor')">security-auditor</a>, <a href="#docker" onclick="scrollToAgent('docker')">docker</a>, <a href="#log-analyzer" onclick="scrollToAgent('log-analyzer')">log-analyzer</a>, <a href="#feedback" onclick="scrollToAgent('feedback')">feedback</a>, <a href="#agent-meta-manager" onclick="scrollToAgent('agent-meta-manager')">agent-meta-manager</a>, <a href="#agent-meta-scout" onclick="scrollToAgent('agent-meta-scout')">agent-meta-scout</a>, <a href="#meta-feedback" onclick="scrollToAgent('meta-feedback')">meta-feedback</a>, <a href="#requirements" onclick="scrollToAgent('requirements')">requirements</a>, <a href="#validator" onclick="scrollToAgent('validator')">validator</a>, <a href="#tester" onclick="scrollToAgent('tester')">tester</a></div>
         </div>
         
+        <div class="agent-card tier-optional" id="performance">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>performance</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Performance-Profiling und Bottleneck-Analyse: CPU, Memory, I/O — mit konkreten Optimierungsempfehlungen.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Continue: claude-opus-4-7</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
         <div class="agent-card tier-optional" id="release">
             <div class="agent-header">
                 <span class="tier-icon">⚪</span>
@@ -403,6 +417,20 @@ graph TD
             
         </div>
         
+        <div class="agent-card tier-recommended" id="reviewer">
+            <div class="agent-header">
+                <span class="tier-icon">🔵</span>
+                <h3>reviewer</h3>
+                <span class="tier-badge">recommended</span>
+            </div>
+            <p class="description">Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells prüfen.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
         <div class="agent-card tier-optional" id="security-auditor">
             <div class="agent-header">
                 <span class="tier-icon">⚪</span>
@@ -411,7 +439,7 @@ graph TD
             </div>
             <p class="description">Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution.</p>
             <div class="meta">
-                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Continue: claude-opus-4-7</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Continue: claude-opus-4-7</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/kimi-k2.6</span></span>
                 <span><strong>Memory:</strong> -</span>
             </div>
             
