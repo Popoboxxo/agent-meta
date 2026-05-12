@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.39.0] — 2026-05-12
+
 ### Added
 
 - **`requires-agent:` Command Guard** (`scripts/lib/commands.py`, `commands/1-generic/`): Commands can declare a `requires-agent: <role>` frontmatter field. sync.py skips the command if that role is not active in `config['roles']`. Prevents dead slash-commands that delegate to inactive agents. Closes #113.
