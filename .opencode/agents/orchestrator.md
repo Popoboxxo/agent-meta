@@ -2,7 +2,8 @@
 name: orchestrator
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 mode: subagent
-generated-from: "1-generic/orchestrator.md@2.7.0"
+model: opencode-go/deepseek-v4-flash
+generated-from: "1-generic/orchestrator.md@2.8.0"
 ---
 # Orchestrator — agent-meta
 
@@ -53,6 +54,27 @@ Nicht parallel: tester↔developer, validator→git, requirements→tester.
 Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `Agent`-Tool-Aufrufe.
 Starte unabhängige Agenten nacheinander im selben Kontext — sie laufen implizit parallel.
 
+
+---
+
+## Framework-Feedback-Routing (Pflicht)
+
+Jede Kritik, jeder Verbesserungsvorschlag oder Bug-Report der **agent-meta selbst** betrifft
+(Templates, sync.py, Rollen-System, Rules, Hooks, MCP-Framework) → **immer** an `meta-feedback`.
+
+**Erkennungsmerkmale für Framework-Feedback:**
+- Nutzer kritisiert ein Agenten-Verhalten das aus einem Template kommt
+- Nutzer findet einen Bug in sync.py, einer Rule oder einem Hook
+- Nutzer schlägt neue Rolle / neues Feature für agent-meta vor
+- Nutzer sagt "das sollte der Agent immer/nie tun"
+
+**Routing:**
+```
+Framework-Feedback → meta-feedback (GitHub Issue erstellen)
+Projekt-Feedback   → feedback      (Projekt-Issue erstellen)
+```
+
+Nie Framework-Feedback direkt als `git`-Commit committen ohne vorher `meta-feedback` zu delegieren.
 
 ---
 

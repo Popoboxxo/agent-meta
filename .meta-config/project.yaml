@@ -43,6 +43,8 @@ project:
 hooks:
   dod-push-check:
     enabled: true
+  lifecycle-check:
+    enabled: true
 
 # Provider-spezifische Optionen — pro Provider konfigurierbar
 provider-options:

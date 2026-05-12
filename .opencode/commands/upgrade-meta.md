@@ -2,6 +2,7 @@
 description: Upgrade agent-meta submodule to latest version and re-sync all agents
 allowed-tools: ["Agent"]
 argument-hint: "[target version or empty for latest]"
+requires-agent: agent-meta-manager
 ---
 
 Delegate to the `agent-meta-manager` agent with this task:

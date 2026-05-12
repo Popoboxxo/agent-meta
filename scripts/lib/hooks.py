@@ -128,7 +128,7 @@ def _update_settings_hooks(
     else:
         if not active_entries:
             return
-        settings = {"permissions": {"allow": [], "deny": []}}
+        settings = {}
 
     hooks_section: dict = settings.get("hooks", {})
 

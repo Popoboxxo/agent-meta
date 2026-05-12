@@ -394,6 +394,25 @@ def generate_provider_configs(
         )
 
 
+_OPENCODE_TYPE_MAP = {"sse": "remote", "stdio": "local"}
+
+
+def _transform_for_opencode(entries: dict) -> dict:
+    """Remap MCP entry types and inject 'enabled' for Opencode's schema.
+
+    Opencode uses 'remote' instead of 'sse' and 'local' instead of 'stdio',
+    and requires an explicit 'enabled' key on every entry.
+    """
+    result: dict = {}
+    for name, entry in entries.items():
+        transformed = dict(entry)
+        raw_type = transformed.get("type", "")
+        transformed["type"] = _OPENCODE_TYPE_MAP.get(raw_type, raw_type)
+        # Insert 'enabled' as first key for readability
+        result[name] = {"enabled": True, **transformed}
+    return result
+
+
 def _write_provider_config(
     path: Path,
     mcp_entries: dict,
@@ -406,7 +425,7 @@ def _write_provider_config(
     if fmt in ("claude-settings", "gemini-settings"):
         _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets)
     elif fmt == "opencode-json":
-        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets)
+        _update_json_config(path, "mcp", _transform_for_opencode(mcp_entries), log, dry_run, allow_secrets)
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets)
     else:

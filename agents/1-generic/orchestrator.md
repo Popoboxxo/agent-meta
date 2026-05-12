@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "2.7.0"
+version: "2.8.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
@@ -74,6 +74,27 @@ Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
 
 {{PARALLEL_PATTERN}}
+
+---
+
+## Framework-Feedback-Routing (Pflicht)
+
+Jede Kritik, jeder Verbesserungsvorschlag oder Bug-Report der **agent-meta selbst** betrifft
+(Templates, sync.py, Rollen-System, Rules, Hooks, MCP-Framework) → **immer** an `meta-feedback`.
+
+**Erkennungsmerkmale für Framework-Feedback:**
+- Nutzer kritisiert ein Agenten-Verhalten das aus einem Template kommt
+- Nutzer findet einen Bug in sync.py, einer Rule oder einem Hook
+- Nutzer schlägt neue Rolle / neues Feature für agent-meta vor
+- Nutzer sagt "das sollte der Agent immer/nie tun"
+
+**Routing:**
+```
+Framework-Feedback → meta-feedback (GitHub Issue erstellen)
+Projekt-Feedback   → feedback      (Projekt-Issue erstellen)
+```
+
+Nie Framework-Feedback direkt als `git`-Commit committen ohne vorher `meta-feedback` zu delegieren.
 
 ---
 

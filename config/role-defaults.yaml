@@ -30,19 +30,19 @@
 roles:
 
   orchestrator:
-    model: ""           # erbt vom Kontext — Entry-Point, User entscheidet
+    model: fast         # quick delegation — does not do heavy reasoning itself
     memory: ""
     workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 
   developer:
-    model: ""           # erbt — oft das stärkste verfügbare Modell gewünscht
+    model: balanced     # coding quality should not depend on context model
     memory: ""
     workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
-    model: ""           # erbt
+    model: balanced     # REQ analysis needs solid context understanding
     memory: project
     workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
@@ -54,7 +54,7 @@ roles:
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 
   feature:
-    model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
+    model: balanced     # end-to-end coordination needs reliable reasoning
     memory: ""
     workflow_tier: recommended
     description: "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"

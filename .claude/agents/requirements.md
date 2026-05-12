@@ -1,5 +1,6 @@
 ---
 name: requirements
+model: claude-sonnet-4-6
 memory: project
 version: "1.3.3"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."

@@ -149,7 +149,7 @@ py .agent-meta/scripts/consistency-check.py --changed --json
 |---|---|
 | Frontmatter | version-bump bei Änderung, semver-Format, based-on für 2-platform, extends-Datei existiert, patch-Anchors lösen auf |
 | Cross-References | role-defaults vollständig, Orchestrator-Tabelle aktuell, CHANGELOG erwähnt neue Dateien |
-| Platzhalter | Bekannte Typos, unbekannte `{{VAR}}` |
+| Platzhalter | Bekannte Typos, unbekannte `{{%VAR%}}` |
 | Commands | allowed-tools ist Array, description vorhanden, $ARGUMENTS genutzt |
 
 **Wann ausführen:**

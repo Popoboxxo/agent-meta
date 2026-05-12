@@ -138,9 +138,19 @@ providers:
       committed-file: .continue/config.yaml
       secrets-file: .continue/config.local.yaml
       format: continue-yaml
-    # Continue manages models centrally in .continue/config.yaml — no per-agent model.
-    model-tiers: {}
-    model-aliases: {}
+    # Continue supports both local (Ollama) and API models.
+    # Tier mapping targets Claude API via Continue's Anthropic provider for cloud tiers,
+    # and local Ollama models for nano/fast. Override in project.yaml if needed.
+    model-tiers:
+      nano:     codellama:7b             # fast & local (Ollama)
+      fast:     codellama:7b             # quick ops: git, meta-feedback
+      balanced: claude-sonnet-4-6        # default workhorse via Anthropic API
+      powerful: claude-opus-4-7          # complex reasoning via Anthropic API
+      max:      claude-opus-4-7          # reserved for future ultra-capable models
+    model-aliases:
+      local:  codellama:7b
+      sonnet: claude-sonnet-4-6
+      opus:   claude-opus-4-7
     skills_dir: .continue/skills
     snippets_dir: .continue/snippets
     pending_tasks_file: .continue/pending-tasks.md

@@ -2,6 +2,7 @@
 description: Report a bug in this project by filing a standardized GitHub issue via the feedback agent
 allowed-tools: ["Agent"]
 argument-hint: "[short bug description]"
+requires-agent: feedback
 invokable: true
 ---
 

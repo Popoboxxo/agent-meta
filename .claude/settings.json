@@ -14,6 +14,15 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/lifecycle-check.sh"
+          }
+        ],
+        "matcher": "Bash"
       }
     ],
     "SessionStart": [
