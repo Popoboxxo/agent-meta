@@ -13,7 +13,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
+from .io import SyncError, _load_yaml_or_json, safe_path, write_checked, _yaml, _YAML_AVAILABLE
 from .log import SyncLog
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
@@ -249,9 +249,7 @@ def _update_continue_yaml_config(
     Injects a managed block so the section can be updated on subsequent syncs.
     User model and other settings are left untouched.
     """
-    try:
-        import yaml as _yaml
-    except ImportError:
+    if not _YAML_AVAILABLE:
         log.warn("mcp: PyYAML not installed — skipping Continue MCP config generation")
         return
 

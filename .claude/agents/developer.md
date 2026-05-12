@@ -1,6 +1,8 @@
 ---
 name: developer
 model: claude-opus-4-7
+temperature: 0.2
+maxTokens: 8192
 version: 1.0.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,

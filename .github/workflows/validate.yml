@@ -1,0 +1,76 @@
+name: Validate agent-meta
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "refactor/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate sync & agents
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema
+
+      - name: Run consistency check
+        run: python scripts/consistency-check.py --all --strict
+
+      - name: Run sync dry-run
+        run: python scripts/sync.py --dry-run
+
+      - name: Check for unresolved placeholders in generated agents
+        run: |
+          set +e
+          # Collect all generated agent directories that exist
+          DIRS=""
+          for d in .claude/agents .gemini/agents .continue/agents .opencode/agents; do
+            [ -d "$d" ] && DIRS="$DIRS $d"
+          done
+
+          if [ -z "$DIRS" ]; then
+            echo "No generated agent directories found — skipping placeholder check"
+            exit 0
+          fi
+
+          FOUND=$(grep -rn "{{[A-Z0-9_]\+}}" $DIRS 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "ERROR: Unresolved {{VAR}} placeholders found in generated files:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No unresolved placeholders found."
+
+      - name: Validate agent frontmatter
+        run: python scripts/validate-frontmatter.py
+
+  lint:
+    name: Python lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff
+        run: ruff check scripts/

@@ -9,6 +9,14 @@
 - **Continue model-tiers** (`config/ai-providers.yaml`): Continue provider now has a full 5-tier model mapping (nano/fast: `codellama:7b`, balanced: `claude-sonnet-4-6`, powerful/max: `claude-opus-4-7`). Closes #117.
 - **Model tiers for core agents** (`config/role-defaults.yaml`): `orchestrator` → `fast`, `developer`/`feature`/`requirements` → `balanced`. Ensures coding quality is independent of the user's active model selection. Closes #116.
 - **Framework-Feedback-Routing in Orchestrator** (`agents/1-generic/orchestrator.md` v2.8.0): Explicit routing section — any criticism or improvement suggestion targeting agent-meta itself must go to `meta-feedback`, not `git`. Closes #85.
+- **`reviewer` agent** (`agents/1-generic/reviewer.md` v1.0.0): New code-review agent with MUST-FIX/SUGGESTION/NITPICK format. Added to orchestrator workflow. Closes #116.
+- **`performance` agent** (`agents/1-generic/performance.md` v1.0.0): New performance-profiling agent (CPU, memory, I/O). Added to orchestrator workflow Q. Closes #116.
+- **`/parallel` command** (`commands/1-generic/parallel.md`): New slash-command for spawning multiple agents in parallel. Closes #118.
+- **temperature/maxTokens injection** (`scripts/lib/roles.py`, `scripts/lib/agents.py`): New `resolve_temperature()` / `resolve_max_tokens()` functions and corresponding frontmatter injection. Role defaults in `role-defaults.yaml`. Closes #79.
+- **Code refactoring** (`scripts/lib/io.py`, `agents.py`, `config.py`, `mcp.py`): YAML import guard centralized in `io.py`. `inject_agent_fields()` helper reduces duplication. Closes #72.
+- **API documentation** (`docs/architecture/07-api-reference.md`, `docs/architecture/08-provider-matrix.md`): Full module-by-module API reference and provider feature-comparison matrix. Closes #73.
+- **GitHub Actions CI/CD** (`.github/workflows/validate.yml`, `scripts/validate-frontmatter.py`): Automated validation pipeline — consistency check, sync dry-run, placeholder check, frontmatter validation. Closes #83.
+- **Unit test suite** (`scripts/lib/tests/`): 74 tests across `test_roles.py`, `test_agents.py`, `test_config.py`. CI via `.github/workflows/test.yml`. Closes #66.
 
 ### Fixed
 

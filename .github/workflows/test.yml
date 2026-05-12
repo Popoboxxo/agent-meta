@@ -1,0 +1,32 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "refactor/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: pytest scripts/lib/
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema pytest pytest-cov
+
+      - name: Run tests with coverage
+        working-directory: scripts
+        run: |
+          python -m pytest lib/tests/ -v \
+            --cov=lib \
+            --cov-report=term-missing \
+            --cov-fail-under=70
