@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`requires-agent:` Command Guard** (`scripts/lib/commands.py`, `commands/1-generic/`): Commands can declare a `requires-agent: <role>` frontmatter field. sync.py skips the command if that role is not active in `config['roles']`. Prevents dead slash-commands that delegate to inactive agents. Closes #113.
+- **`skip: true` Rule Option** (`scripts/lib/rules.py`, `config/rules-presets.yaml`): New rule option that suppresses a rule for all providers (not just Gemini). Documented in `howto/features/rules.md` and `rules-preset-optimization.md`. Closes #90.
+- **Continue model-tiers** (`config/ai-providers.yaml`): Continue provider now has a full 5-tier model mapping (nano/fast: `codellama:7b`, balanced: `claude-sonnet-4-6`, powerful/max: `claude-opus-4-7`). Closes #117.
+- **Model tiers for core agents** (`config/role-defaults.yaml`): `orchestrator` → `fast`, `developer`/`feature`/`requirements` → `balanced`. Ensures coding quality is independent of the user's active model selection. Closes #116.
+- **Framework-Feedback-Routing in Orchestrator** (`agents/1-generic/orchestrator.md` v2.8.0): Explicit routing section — any criticism or improvement suggestion targeting agent-meta itself must go to `meta-feedback`, not `git`. Closes #85.
+
+### Fixed
+
+- **Opencode MCP connection types** (`scripts/lib/mcp.py`): `_transform_for_opencode()` now maps `sse` → `remote` and `stdio` → `local`, and injects `"enabled": true` on every MCP entry. Opencode rejected the previously generated config. Closes #114.
+- **lifecycle-check hook enabled** (`.meta-config/project.yaml`): `lifecycle-check: enabled: true` added — hook was copied but never activated. Git events now trigger pending-tasks generation. Closes #82.
+- **Empty `allow`/`deny` arrays in settings.json** (`scripts/lib/hooks.py`): Init skeleton no longer writes empty permission arrays, reducing noise in new projects. Closes #108 (partial).
+- **`{{VAR}}` substitution warnings in docs** (`agents/1-generic/agent-meta-manager.md`, `commands/1-generic/consistency-check.md`): Documentation examples showing `{{VAR}}` syntax now use the escape form `{{%VAR%}}` to prevent false "Variable not in config" warnings. Closes #76.
+
 ---
 
 ## [0.38.0] — 2026-05-11
