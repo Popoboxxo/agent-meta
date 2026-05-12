@@ -192,6 +192,8 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
+| `performance` | Performance-Profiling: CPU, Memory, I/O — Bottleneck-Analyse und Optimierungsempfehlungen |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+| `reviewer` | Code-Review vor Merge: Qualität, Stil, Logik, Best Practices und Security-Smells |
 <!-- agent-meta:managed-end -->
