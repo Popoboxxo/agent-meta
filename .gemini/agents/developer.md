@@ -1,5 +1,6 @@
 ---
 name: developer
+model: gemini-2.5-pro
 version: 1.0.0
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,

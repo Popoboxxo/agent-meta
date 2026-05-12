@@ -178,6 +178,12 @@ def sync_rules(
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
 
+        # skip: true — skip rule for ALL providers (project opt-out)
+        if opts.get("skip") is True:
+            log.skip(str((target_dir / output_name).relative_to(project_root)),
+                     f"rules-preset: skip: true for '{rule_stem}'")
+            continue
+
         # Provider-aware: skip rule entirely for Gemini if gemini: skip
         if provider == "Gemini" and opts.get("gemini") == "skip":
             log.skip(str((target_dir / output_name).relative_to(project_root)),

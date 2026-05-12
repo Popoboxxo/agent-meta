@@ -2,6 +2,7 @@
 description: Analyze log files for errors, patterns, and issues with severity classification (RFC 5424)
 allowed-tools: ["Agent"]
 argument-hint: "[path/to/logfile | --deep | --quick]"
+requires-agent: log-analyzer
 invokable: true
 ---
 

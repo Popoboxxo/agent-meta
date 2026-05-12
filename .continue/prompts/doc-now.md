@@ -2,6 +2,7 @@
 description: Delegate to documenter agent to update CODEBASE_OVERVIEW.md immediately
 allowed-tools: ["Agent"]
 argument-hint: "[area or file to focus on]"
+requires-agent: documenter
 invokable: true
 ---
 

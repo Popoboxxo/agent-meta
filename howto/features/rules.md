@@ -147,8 +147,34 @@ A01 Broken Access Control, A02 Cryptographic Failures, A03 Injection ...
 
 ---
 
+## Rule-Optionen (via rules-preset / project.yaml)
+
+Rules können pro Stem konfiguriert werden:
+
+| Option | Wert | Effekt |
+|--------|------|--------|
+| `alwaysApply` | `false` | Claude + Continue: Rule nur bei Keyword-Match laden |
+| `gemini` | `"skip"` | Gemini: Rule wird gar nicht generiert |
+| `skip` | `true` | **Alle Provider**: Rule wird komplett übersprungen |
+
+```yaml
+# .meta-config/project.yaml
+rules:
+  lifecycle-tasks:
+    alwaysApply: false   # situativ laden
+  use-orchestrator:
+    gemini: skip         # Gemini bekommt diese Rule nicht
+  some-rule:
+    skip: true           # alle Provider überspringen (Rule nie generiert)
+```
+
+`skip: true` hat Vorrang vor allen anderen Optionen.
+
+---
+
 ## Verwandte Dokumente
 
 - [howto/features/agent-composition.md](agent-composition.md) — extends/patches System für Agenten
 - [howto/features/external-skills.md](external-skills.md) — External Skills einbinden
+- [howto/features/rules-preset-optimization.md](rules-preset-optimization.md) — Token-Optimierung mit Presets
 - [CLAUDE.md](../CLAUDE.md) — Vollständige Konfigurations-Referenz

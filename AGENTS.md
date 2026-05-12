@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.38.0 — `2026-05-11`
+Generiert von agent-meta v0.38.0 — `2026-05-12`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -293,6 +293,31 @@ Einstiegspunkt für alle Entwicklungsaufgaben: `orchestrator`-Agent.
 ## Immer Orchestrator
 
 Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation
+
+## Routing-Signale — wann welcher Agent
+
+### Explorative / Research-Fragen → `ideation`
+
+Direkt an `ideation` delegieren (nicht inline beantworten) wenn:
+
+- Frage beginnt mit "Wie könnte ich...", "Was wäre wenn...", "Welche Möglichkeiten gibt es..."
+- Expliziter Recherche-Wunsch: "Recherchiere...", "Suche Beispiele...", "Vergleiche Ansätze..."
+- WebSearch/WebFetch nötig (externe Quellen, Best Practices, andere Projekte)
+- Frage hat keinen konkreten Implementierungs-Scope (kein Ticket, kein Code-Pfad)
+
+**Grenze:** Wenn eine Frage direkt in einem laufenden Task beantwortet werden kann (≤2 Sätze, kein Research nötig) → inline. Sonst → `ideation`.
+
+### Log-Analyse → `log-analyzer`
+
+Bei: Fehler-Logs, Stack Traces, Produktions-Incidents, Monitoring-Daten analysieren.
+
+### Performance → `performance`
+
+Bei: "ist langsam", "zu viel Memory", "Bottleneck finden", "profilen".
+
+### Code-Review → `reviewer`
+
+Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem Merge.
 
 ## Ausnahmen — direkt an
 

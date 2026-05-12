@@ -145,3 +145,35 @@ def resolve_memory(role: str, project_config: dict, agent_meta_root: Path) -> st
         return str(project_overrides[role])
     roles_cfg = load_roles_config(agent_meta_root)
     return roles_cfg["roles"].get(role, {}).get("memory", "")
+
+
+def resolve_temperature(role: str, project_config: dict, agent_meta_root: Path) -> str:
+    """Resolve the temperature for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: project_config["temperature-overrides"][role]
+    2. Meta default:     role-defaults.yaml roles[role].temperature
+    3. Empty string:     no temperature: field injected
+    """
+    project_overrides = project_config.get("temperature-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    roles_cfg = load_roles_config(agent_meta_root)
+    val = roles_cfg["roles"].get(role, {}).get("temperature", "")
+    return str(val) if val != "" else ""
+
+
+def resolve_max_tokens(role: str, project_config: dict, agent_meta_root: Path) -> str:
+    """Resolve the maxTokens for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: project_config["max-tokens-overrides"][role]
+    2. Meta default:     role-defaults.yaml roles[role].max_tokens
+    3. Empty string:     no maxTokens: field injected
+    """
+    project_overrides = project_config.get("max-tokens-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    roles_cfg = load_roles_config(agent_meta_root)
+    val = roles_cfg["roles"].get(role, {}).get("max_tokens", "")
+    return str(val) if val != "" else ""

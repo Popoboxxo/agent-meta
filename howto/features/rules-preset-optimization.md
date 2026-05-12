@@ -34,6 +34,14 @@ Verfügbare Presets:
 | `minimal` | Situative Rules on-demand | Platform-heavy Projekte (empfohlen) |
 | `silent` | Nur Kern-Rules immer aktiv | Rapid-Prototyping, Token-Budget kritisch |
 
+**Verfügbare Rule-Optionen:**
+
+| Option | Effekt |
+|--------|--------|
+| `alwaysApply: false` | Claude + Continue: nur bei Keyword-Match laden |
+| `gemini: skip` | Gemini: Rule komplett weglassen |
+| `skip: true` | Alle Provider: Rule wird überhaupt nicht generiert |
+
 ### Schritt 2 — Große Platform Rules identifizieren
 
 ```bash

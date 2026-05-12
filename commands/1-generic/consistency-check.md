@@ -61,5 +61,5 @@ If user says yes → apply the fix, then re-run the check to confirm.
 | `frontmatter.extends-not-found` | Correct the `extends:` path |
 | `crossrefs.role-not-in-role-defaults` | Add entry to `config/role-defaults.yaml` |
 | `crossrefs.orchestrator-table-incomplete` | Add row to orchestrator agent table |
-| `placeholders.typo` | Fix the `{{VAR}}` spelling |
+| `placeholders.typo` | Fix the `{{%VAR%}}` spelling |
 | `commands.allowed-tools-not-list` | Change `allowed-tools` to a JSON array |

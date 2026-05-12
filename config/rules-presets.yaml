@@ -6,6 +6,7 @@
 # Rule-Optionen:
 #   alwaysApply: false  → Claude + Continue: Rule nur bei Keyword-Match laden (nicht immer)
 #   gemini: skip        → Gemini: Rule wird gar nicht generiert
+#   skip: true          → Alle Provider: Rule wird komplett übersprungen (nicht generiert)
 #
 # Kein Eintrag = alwaysApply: true für alle Provider (Standardverhalten).
 

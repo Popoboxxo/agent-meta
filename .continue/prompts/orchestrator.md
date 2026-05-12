@@ -51,6 +51,8 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues |
 | `agent-meta-manager` | agent-meta Upgrade, Sync, Extensions anlegen |
 | `agent-meta-scout` | KI-Ökosystem scouten — **nur auf explizite Anfrage** |
+| `reviewer` | Code-Review vor Merge: Qualität, Stil, Logik, Security-Smells |
+| `performance` | Profiling, Bottleneck-Analyse, Optimierungsempfehlungen — *auf Anfrage* |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* |
 | `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* |
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* |
@@ -67,6 +69,27 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 
 ---
 
+## Framework-Feedback-Routing (Pflicht)
+
+Jede Kritik, jeder Verbesserungsvorschlag oder Bug-Report der **agent-meta selbst** betrifft
+(Templates, sync.py, Rollen-System, Rules, Hooks, MCP-Framework) → **immer** an `meta-feedback`.
+
+**Erkennungsmerkmale für Framework-Feedback:**
+- Nutzer kritisiert ein Agenten-Verhalten das aus einem Template kommt
+- Nutzer findet einen Bug in sync.py, einer Rule oder einem Hook
+- Nutzer schlägt neue Rolle / neues Feature für agent-meta vor
+- Nutzer sagt "das sollte der Agent immer/nie tun"
+
+**Routing:**
+```
+Framework-Feedback → meta-feedback (GitHub Issue erstellen)
+Projekt-Feedback   → feedback      (Projekt-Issue erstellen)
+```
+
+Nie Framework-Feedback direkt als `git`-Commit committen ohne vorher `meta-feedback` zu delegieren.
+
+---
+
 ## Workflows
 
 `?` = nur wenn DoD-Feature aktiv. `∥` = parallelisierbar.
@@ -74,11 +97,11 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 **Branch-Guard (Pflicht vor A/B/E):** `git branch --show-current` → auf main/master? → Branch anlegen.
 
 ```
-A  Neues Feature:   0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
-B  Bugfix:          0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
+A  Neues Feature:   0.git  1.?req  2.?test  3.dev  4.?review  5.?test  6∥7.val+?doc  8.git
+B  Bugfix:          0.git  1.?req  2.?test  3.dev  4.?review  5.?test  6∥7.val+?doc  8.git
 C  Audit:           validator (Traceability + Qualitäts-Scan + Bericht)
 D  Erkenntnisse:    documenter → docs/conclusions/
-E  Refactoring:     0.git  1.?req  2.dev  3.?test  4∥5.val+?doc  6.git
+E  Refactoring:     0.git  1.?req  2.dev  3.?review  4.?test  5∥6.val+?doc  7.git
 F  Stack starten:   docker → starten + Startup-Display
 G  Docker-Config:   docker → erstellen | tester → validieren
 H1 Agents sync:     python .agent-meta/scripts/sync.py → git commit "chore: regenerate agents"
@@ -91,6 +114,7 @@ M  Scout:           → lies .agent-meta/agents/1-generic/_wf-scout.md
 N  Skill-Repo:      → lies .agent-meta/agents/1-generic/_wf-scout.md
 K  Meta-Feedback:   → lies .agent-meta/agents/1-generic/_wf-feedback.md
 O  Log-Analyse:     log-analyzer (--quick Standard | --deep für Tiefenanalyse)
+Q  Performance:     performance → Profiling + Bericht → developer für Fixes
 P  Projekt-Issue:   feedback → Issue aufbereiten + gh issue create (nie direkt git für Issues)
 ```
 

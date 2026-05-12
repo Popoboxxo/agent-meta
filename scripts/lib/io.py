@@ -14,6 +14,7 @@ try:
     import yaml as _yaml
     _YAML_AVAILABLE = True
 except ImportError:
+    _yaml = None  # type: ignore[assignment]
     _YAML_AVAILABLE = False
 
 

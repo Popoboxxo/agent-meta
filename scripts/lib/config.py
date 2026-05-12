@@ -7,14 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml
+from .io import _load_yaml_or_json, _write_yaml, _yaml, _YAML_AVAILABLE
 from .log import SyncLog
-
-try:
-    import yaml as _yaml
-    _YAML_AVAILABLE = True
-except ImportError:
-    _YAML_AVAILABLE = False
 
 try:
     import jsonschema as _jsonschema

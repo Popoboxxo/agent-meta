@@ -1,5 +1,6 @@
 ---
 name: feature
+model: gemini-2.5-pro
 version: "1.3.1"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 generated-from: "1-generic/feature.md@1.3.1"

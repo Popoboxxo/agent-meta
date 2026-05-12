@@ -117,6 +117,23 @@ agent-meta/
 - Zusatzwissen für einen spezifischen Agenten → `.claude/3-project/<rolle>-ext.md`
 - Wiederkehrender Einzel-Workflow im Hauptchat → `.claude/commands/`
 
+### Command–Agent-Guard (`requires-agent:`)
+
+Commands die einen Agenten delegieren, können via `requires-agent:` Frontmatter-Feld
+deklarieren welchen Agent sie benötigen. sync.py überspringt das Command wenn der Agent
+nicht in `config['roles']` aktiv ist:
+
+```markdown
+---
+description: Analyze logs
+allowed-tools: ["Agent"]
+requires-agent: log-analyzer
+---
+```
+
+Ist `log-analyzer` nicht in der Rollen-Liste → Command wird nicht deployed (SKIP mit Hinweis).
+Das verhindert tote Slash-Commands die beim Ausführen ins Leere delegieren.
+
 ---
 
 ## Entscheidungen

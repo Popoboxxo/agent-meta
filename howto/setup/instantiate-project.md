@@ -204,6 +204,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
 | `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
 | `.claude/agents/feedback.md` | `1-generic/feedback.md` |
+| `.claude/agents/reviewer.md` | `1-generic/reviewer.md` |
+| `.claude/agents/performance.md` | `1-generic/performance.md` |
 
 ---
 

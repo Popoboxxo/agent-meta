@@ -2,6 +2,7 @@
 name: feature
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 mode: subagent
+model: opencode-go/qwen3.6-plus
 generated-from: "1-generic/feature.md@1.3.1"
 ---
 # Feature — agent-meta

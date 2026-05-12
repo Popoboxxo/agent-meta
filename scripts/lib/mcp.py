@@ -13,7 +13,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
+from .io import SyncError, _load_yaml_or_json, safe_path, write_checked, _yaml, _YAML_AVAILABLE
 from .log import SyncLog
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
@@ -249,9 +249,7 @@ def _update_continue_yaml_config(
     Injects a managed block so the section can be updated on subsequent syncs.
     User model and other settings are left untouched.
     """
-    try:
-        import yaml as _yaml
-    except ImportError:
+    if not _YAML_AVAILABLE:
         log.warn("mcp: PyYAML not installed — skipping Continue MCP config generation")
         return
 
@@ -394,6 +392,25 @@ def generate_provider_configs(
         )
 
 
+_OPENCODE_TYPE_MAP = {"sse": "remote", "stdio": "local"}
+
+
+def _transform_for_opencode(entries: dict) -> dict:
+    """Remap MCP entry types and inject 'enabled' for Opencode's schema.
+
+    Opencode uses 'remote' instead of 'sse' and 'local' instead of 'stdio',
+    and requires an explicit 'enabled' key on every entry.
+    """
+    result: dict = {}
+    for name, entry in entries.items():
+        transformed = dict(entry)
+        raw_type = transformed.get("type", "")
+        transformed["type"] = _OPENCODE_TYPE_MAP.get(raw_type, raw_type)
+        # Insert 'enabled' as first key for readability
+        result[name] = {"enabled": True, **transformed}
+    return result
+
+
 def _write_provider_config(
     path: Path,
     mcp_entries: dict,
@@ -406,7 +423,7 @@ def _write_provider_config(
     if fmt in ("claude-settings", "gemini-settings"):
         _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets)
     elif fmt == "opencode-json":
-        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets)
+        _update_json_config(path, "mcp", _transform_for_opencode(mcp_entries), log, dry_run, allow_secrets)
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets)
     else:

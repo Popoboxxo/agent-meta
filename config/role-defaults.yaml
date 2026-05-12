@@ -30,19 +30,21 @@
 roles:
 
   orchestrator:
-    model: ""           # erbt vom Kontext — Entry-Point, User entscheidet
+    model: fast         # quick delegation — does not do heavy reasoning itself
     memory: ""
     workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 
   developer:
-    model: ""           # erbt — oft das stärkste verfügbare Modell gewünscht
+    model: max          # complex implementations benefit from highest capability (Kimi K2.6 at Opencode)
     memory: ""
+    temperature: 0.2    # deterministic code generation
+    max_tokens: 8192
     workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
-    model: ""           # erbt
+    model: balanced     # REQ analysis needs solid context understanding
     memory: project
     workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
@@ -50,11 +52,13 @@ roles:
   ideation:
     model: ""           # erbt
     memory: ""
+    temperature: 0.7    # higher creativity for exploration
+    max_tokens: 4096
     workflow_tier: optional
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 
   feature:
-    model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
+    model: balanced     # end-to-end coordination needs reliable reasoning
     memory: ""
     workflow_tier: recommended
     description: "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"
@@ -62,6 +66,8 @@ roles:
   tester:
     model: balanced
     memory: ""
+    temperature: 0.2    # deterministic test generation
+    max_tokens: 4096
     workflow_tier: recommended
     description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
 
@@ -69,6 +75,8 @@ roles:
     model: balanced
     memory: project
     permission_mode: plan
+    temperature: 0.1    # highly deterministic validation
+    max_tokens: 4096
     workflow_tier: recommended
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 
@@ -78,8 +86,20 @@ roles:
     workflow_tier: recommended
     description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
 
-  security-auditor:
+  reviewer:
+    model: balanced
+    memory: ""
+    workflow_tier: recommended
+    description: "Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells"
+
+  performance:
     model: powerful
+    memory: ""
+    workflow_tier: optional
+    description: "Performance-Profiling und Bottleneck-Analyse: CPU, Memory, I/O — mit Optimierungsempfehlungen"
+
+  security-auditor:
+    model: max          # deeper security analysis with fewer false positives (Kimi K2.6 at Opencode)
     memory: project
     permission_mode: plan
     workflow_tier: optional
@@ -106,6 +126,8 @@ roles:
   git:
     model: fast
     memory: ""
+    temperature: 0.1    # deterministic commit messages and git operations
+    max_tokens: 2048
     workflow_tier: required
     description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 

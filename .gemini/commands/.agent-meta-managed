@@ -8,6 +8,7 @@ diagnose.toml
 doc-now.toml
 feedback.toml
 merge.toml
+parallel.toml
 report-bug.toml
 set-preset.toml
 update-extensions.toml

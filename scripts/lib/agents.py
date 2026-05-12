@@ -4,13 +4,7 @@ import re
 from pathlib import Path
 
 from .log import SyncLog
-from .io import safe_path, write_checked
-
-try:
-    import yaml as _yaml
-    _YAML_AVAILABLE = True
-except ImportError:
-    _YAML_AVAILABLE = False
+from .io import safe_path, write_checked, _yaml, _YAML_AVAILABLE
 
 AGENTS_DIR = "agents"
 GENERIC_DIR = "1-generic"
@@ -197,6 +191,97 @@ def inject_model_field(content: str, model: str) -> str:
         rf"\1model: {model}\n",
         content, count=1, flags=re.MULTILINE,
     )
+
+
+def inject_temperature_field(content: str, temperature: str) -> str:
+    """Insert or update the temperature: field in YAML frontmatter.
+
+    If temperature is empty, removes any existing temperature: field.
+    Inserted after permissionMode: (or memory:, model:, name: as fallback).
+    """
+    if not temperature:
+        content = re.sub(r"^temperature:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+    if re.search(r"^temperature:", content, flags=re.MULTILINE):
+        return re.sub(r"^temperature:.*$", f"temperature: {temperature}",
+                      content, count=1, flags=re.MULTILINE)
+    for anchor in (r"^permissionMode:.*$", r"^memory:.*$", r"^model:.*$", r"^name:.*$"):
+        if re.search(anchor, content, flags=re.MULTILINE):
+            return re.sub(anchor, rf"\g<0>\ntemperature: {temperature}",
+                          content, count=1, flags=re.MULTILINE)
+    return content
+
+
+def inject_max_tokens_field(content: str, max_tokens: str) -> str:
+    """Insert or update the maxTokens: field in YAML frontmatter.
+
+    If max_tokens is empty, removes any existing maxTokens: field.
+    Inserted after temperature: (or permissionMode:, memory:, model:, name:).
+    """
+    if not max_tokens:
+        content = re.sub(r"^maxTokens:.*\n", "", content, count=1, flags=re.MULTILINE)
+        return content
+    if re.search(r"^maxTokens:", content, flags=re.MULTILINE):
+        return re.sub(r"^maxTokens:.*$", f"maxTokens: {max_tokens}",
+                      content, count=1, flags=re.MULTILINE)
+    for anchor in (r"^temperature:.*$", r"^permissionMode:.*$", r"^memory:.*$",
+                   r"^model:.*$", r"^name:.*$"):
+        if re.search(anchor, content, flags=re.MULTILINE):
+            return re.sub(anchor, rf"\g<0>\nmaxTokens: {max_tokens}",
+                          content, count=1, flags=re.MULTILINE)
+    return content
+
+
+def inject_agent_fields(
+    content: str,
+    role: str,
+    config: dict,
+    agent_meta_root: "Path",
+    provider: str = "Claude",
+    provider_config: dict | None = None,
+    log: "SyncLog | None" = None,
+    project_root: "Path | None" = None,
+) -> str:
+    """Inject all resolved frontmatter fields (model, memory, permissionMode, temperature, maxTokens).
+
+    Consolidates the five inject_*_field() + resolve_*() call pairs that appear
+    identically in sync_agents_for_claude() and sync_agents_for_provider().
+    Only memory and permissionMode are injected for non-Claude providers.
+    """
+    from .roles import resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
+
+    model = resolve_model(role, config, agent_meta_root, provider=provider,
+                          provider_config=provider_config or {})
+    content = inject_model_field(content, model)
+    if model and log and project_root:
+        src = "project override" if role in config.get("model-overrides", {}) else "meta default"
+        log.info(str(project_root), f"model: {model} (from {src})")
+
+    memory = resolve_memory(role, config, agent_meta_root)
+    content = inject_memory_field(content, memory)
+    if memory and log and project_root:
+        src = "project override" if role in config.get("memory-overrides", {}) else "meta default"
+        log.info(str(project_root), f"memory: {memory} (from {src})")
+
+    permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+    content = inject_permission_mode_field(content, permission_mode)
+    if permission_mode and log and project_root:
+        src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
+        log.info(str(project_root), f"permissionMode: {permission_mode} (from {src})")
+
+    temperature = resolve_temperature(role, config, agent_meta_root)
+    content = inject_temperature_field(content, temperature)
+    if temperature and log and project_root:
+        src = "project override" if role in config.get("temperature-overrides", {}) else "meta default"
+        log.info(str(project_root), f"temperature: {temperature} (from {src})")
+
+    max_tokens = resolve_max_tokens(role, config, agent_meta_root)
+    content = inject_max_tokens_field(content, max_tokens)
+    if max_tokens and log and project_root:
+        src = "project override" if role in config.get("max-tokens-overrides", {}) else "meta default"
+        log.info(str(project_root), f"maxTokens: {max_tokens} (from {src})")
+
+    return content
 
 
 def target_filename(role: str, role_map: dict) -> str | None:
@@ -469,7 +554,7 @@ def sync_agents(
 ):
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
     from .config import substitute, strip_inactive_dod_blocks
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map
     from .skills import load_external_skills_config, _skill_is_active
 
     CLAUDE_AGENTS_DIR = ".claude/agents"
@@ -529,23 +614,10 @@ def sync_agents(
         content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
 
-        model = resolve_model(role, config, agent_meta_root)
-        content = inject_model_field(content, model)
-        if model:
-            model_src = "project override" if role in config.get("model-overrides", {}) else "meta default"
-            log.info(str(target_path.relative_to(project_root)), f"model: {model} (from {model_src})")
-
-        memory = resolve_memory(role, config, agent_meta_root)
-        content = inject_memory_field(content, memory)
-        if memory:
-            memory_src = "project override" if role in config.get("memory-overrides", {}) else "meta default"
-            log.info(str(target_path.relative_to(project_root)), f"memory: {memory} (from {memory_src})")
-
-        permission_mode = resolve_permission_mode(role, config, agent_meta_root)
-        content = inject_permission_mode_field(content, permission_mode)
-        if permission_mode:
-            pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
-            log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
+        content = inject_agent_fields(
+            content, role, config, agent_meta_root,
+            log=log, project_root=target_path.parent,
+        )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         viz_cfg = config.get("viz", {})
@@ -621,7 +693,7 @@ def sync_agents_for_provider(
     """
     from .config import substitute, strip_inactive_dod_blocks
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map, resolve_model
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)
@@ -708,28 +780,11 @@ def sync_agents_for_provider(
             content = build_frontmatter(content, name, description, generated_from=generated_from)
 
             if provider == 'Claude':
-                model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config)
-                content = inject_model_field(content, model)
-                if model:
-                    po = config.get('model-overrides', {})
-                    is_override = (role in po.get('Claude', {})) or (
-                        role in po and not isinstance(po.get(role), dict)
-                    )
-                    src = 'project override' if is_override else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-
-                memory = resolve_memory(role, config, agent_meta_root)
-                content = inject_memory_field(content, memory)
-                if memory:
-                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
-
-                permission_mode = resolve_permission_mode(role, config, agent_meta_root)
-                content = inject_permission_mode_field(content, permission_mode)
-                if permission_mode:
-                    src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+                content = inject_agent_fields(
+                    content, role, config, agent_meta_root,
+                    provider=provider, provider_config=provider_config,
+                    log=log, project_root=target_path.parent,
+                )
 
             elif provider == 'Gemini':
                 # Gemini: provider-mapped model only; strip memory, permissionMode, Claude-specific lines

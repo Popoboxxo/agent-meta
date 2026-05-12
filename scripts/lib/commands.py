@@ -43,6 +43,20 @@ def collect_command_sources(agent_meta_root: Path, platforms: list[str]) -> list
     return [(src, name) for name, src in seen.items()]
 
 
+def _get_frontmatter_field(content: str, field: str) -> str | None:
+    """Extract a frontmatter field value from a command file. Returns None if absent."""
+    if not content.startswith("---"):
+        return None
+    end = content.find("\n---", 3)
+    if end == -1:
+        return None
+    frontmatter = content[3:end]
+    m = re.search(rf"^{re.escape(field)}:\s*(.+)$", frontmatter, re.MULTILINE)
+    if m:
+        return m.group(1).strip().strip('"').strip("'")
+    return None
+
+
 def _add_frontmatter_field(content: str, field: str, value: str) -> str:
     """Add a frontmatter field if the frontmatter block exists and the field is absent."""
     if not content.startswith("---"):
@@ -146,6 +160,8 @@ def sync_commands_for_provider(
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
+    active_roles: set[str] = set(config.get("roles", []))
+
     for source_path, output_name in sources:
         # Rewrite extension for providers that use a different format (e.g. Gemini → .toml)
         stem = Path(output_name).stem
@@ -154,6 +170,13 @@ def sync_commands_for_provider(
         content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]
         rel_source = f"commands/{layer}/{source_path.name}"
+
+        # Guard: skip command if its required agent is not in config['roles']
+        required_agent = _get_frontmatter_field(content, "requires-agent")
+        if required_agent and required_agent not in active_roles:
+            log.skip(str(target_path.relative_to(project_root)),
+                     f"requires-agent '{required_agent}' not in config roles — skipping command")
+            continue
 
         if variables is not None:
             content = substitute(content, variables, rel_source, log)

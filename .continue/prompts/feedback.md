@@ -2,6 +2,7 @@
 description: Report a bug, feature request, or improvement for this project as a standardized GitHub issue
 allowed-tools: ["Agent"]
 argument-hint: "[bug | feat | improvement | docs | security | question] [short description]"
+requires-agent: feedback
 invokable: true
 ---
 
