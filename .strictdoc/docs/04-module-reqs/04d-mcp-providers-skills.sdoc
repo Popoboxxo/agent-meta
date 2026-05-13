@@ -1,0 +1,739 @@
+[DOCUMENT]
+TITLE: Module Requirements — mcp.py, providers.py, skills.py
+PREAMBLE: >>>
+Design-level requirements for MCP server management, provider abstraction, and skill integration.
+Consolidated requirements for three foundational modules.
+Total: 32 requirements (mcp: 12, providers: 8, skills: 12).
+<<<
+
+[REQUIREMENT]
+UID: REQ-MCP-001
+TITLE: load_mcp_registry — Parse config/mcp-registry.yaml
+STATEMENT: >>>
+Load centralized MCP server definitions:
+  - name, version, description
+  - tools, connection (stdio/http/sse)
+  - secrets (required env vars)
+  - enabled-by-default (per platform)
+Return: dict {server_name: {tools, connection, secrets, ...}}.
+<<<
+RATIONALE: >>>
+Centralized MCP registry enables consistent server management and discovery.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_load_mcp_registry_valid
+- tests/test_mcp.py::test_load_mcp_registry_missing_file
+<<<
+TAGS: mcp, loading, registry
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-010
+- TYPE: called-by
+  VALUE: REQ-MCP-002
+
+[REQUIREMENT]
+UID: REQ-MCP-002
+TITLE: resolve_active_mcp_servers — Determine Enabled Servers
+STATEMENT: >>>
+Filter MCP servers by project config and defaults:
+  1. Explicit enablement: mcp-servers list in project.yaml
+  2. Default enablement: enabled-by-default: true in registry
+  3. Platform bundles: rules/2-platform/<platform>-mcp.yaml
+Return: List[mcp_server] of active servers.
+<<<
+RATIONALE: >>>
+Multi-source server resolution enables flexible activation strategies.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_resolve_active_mcp_servers_explicit
+- tests/test_mcp.py::test_resolve_active_mcp_servers_defaults
+<<<
+TAGS: mcp, resolution, configuration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-MCP-001
+- TYPE: called-by
+  VALUE: REQ-MCP-003
+
+[REQUIREMENT]
+UID: REQ-MCP-003
+TITLE: generate_mcp_rules — Create Rule Files for Servers
+STATEMENT: >>>
+For each active server, generate rule file documenting:
+  - Tools available
+  - Usage instructions
+  - Secrets required
+  - Provider-specific connection details
+Write to .claude/rules/mcp-<server>.md per provider.
+<<<
+RATIONALE: >>>
+Rule generation automates documentation of MCP capabilities.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_generate_mcp_rules
+<<<
+TAGS: mcp, rules, generation
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-005
+
+[REQUIREMENT]
+UID: REQ-MCP-004
+TITLE: generate_mcp_provider_config — Create Provider-Specific Settings
+STATEMENT: >>>
+Generate provider-specific MCP configurations:
+  - Claude: .claude/settings.json → mcpServers[]
+  - Gemini: .gemini/settings.json → mcpServers[]
+  - Continue: .continue/config.yaml → mcpServers[]
+  - Opencode: opencode.json → mcp[]
+<<<
+RATIONALE: >>>
+Provider-specific config generation automates settings management.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_generate_mcp_provider_config_claude
+- tests/test_mcp.py::test_generate_mcp_provider_config_continue
+<<<
+TAGS: mcp, provider, settings
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-005
+
+[REQUIREMENT]
+UID: REQ-MCP-005
+TITLE: sync_mcp_servers — Orchestrate Full MCP Sync
+STATEMENT: >>>
+Main MCP sync orchestration:
+  1. Load MCP registry
+  2. Resolve active servers
+  3. For each provider: generate rules + config
+  4. Generate secrets template
+  5. Validate secrets
+Return: summary {synced_servers, secrets_needed, errors}.
+<<<
+RATIONALE: >>>
+Orchestration ensures consistent MCP deployment across all providers.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_sync_mcp_servers_e2e
+<<<
+TAGS: mcp, sync, orchestration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-MCP-001, REQ-MCP-002, REQ-MCP-003, REQ-MCP-004, REQ-MCP-006
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-MCP-006
+TITLE: generate_secrets_template — Create .meta-config/secrets.local.yaml
+STATEMENT: >>>
+Generate template for MCP secrets (never committed, gitignored).
+Format: YAML with comments explaining each secret.
+<<<
+RATIONALE: >>>
+Template generation guides users in setting up required secrets.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_generate_secrets_template
+<<<
+TAGS: mcp, secrets, template
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-005
+
+[REQUIREMENT]
+UID: REQ-MCP-007
+TITLE: validate_mcp_server_config — Check Server Definition
+STATEMENT: >>>
+Validate MCP server config:
+  - Required fields present
+  - Connection type recognized
+  - Tools list non-empty (if required)
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Config validation catches server definition errors.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_validate_mcp_server_config_valid
+- tests/test_mcp.py::test_validate_mcp_server_config_invalid
+<<<
+TAGS: mcp, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-MCP-008
+TITLE: detect_mcp_conflicts — Check for Overlapping Servers
+STATEMENT: >>>
+Detect if multiple servers provide same tools (ambiguity).
+<<<
+RATIONALE: >>>
+Conflict detection prevents tool resolution ambiguity.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_detect_mcp_conflicts_found
+- tests/test_mcp.py::test_detect_mcp_conflicts_none
+<<<
+TAGS: mcp, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-MCP-009
+TITLE: resolve_mcp_server_connection — Get Connection Details
+STATEMENT: >>>
+Extract connection type and details from MCP server config.
+Return: (type: str, details: dict).
+<<<
+RATIONALE: >>>
+Connection resolution enables provider-specific configuration.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_resolve_mcp_server_connection
+<<<
+TAGS: mcp, connection
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-004
+
+[REQUIREMENT]
+UID: REQ-MCP-010
+TITLE: log_mcp_summary — Record MCP Sync Details
+STATEMENT: >>>
+Log to sync.log: active servers, rules generated, config applied.
+<<<
+RATIONALE: >>>
+Logging enables debugging and audit trails.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_log_mcp_summary
+<<<
+TAGS: mcp, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-MCP-011
+TITLE: validate_secrets_available — Check Required Secrets Set
+STATEMENT: >>>
+Warn if required secrets not set in .meta-config/secrets.local.yaml.
+Return: (valid: bool, missing_secrets: List[str]).
+<<<
+RATIONALE: >>>
+Secret validation prevents MCP server initialization failures.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_validate_secrets_available_all_set
+- tests/test_mcp.py::test_validate_secrets_available_missing
+<<<
+TAGS: mcp, secrets, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-005, REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-MCP-012
+TITLE: report_mcp_changes — Show What Changed Since Last Sync
+STATEMENT: >>>
+Compare current with previous state. Report: new servers, modified, deleted.
+<<<
+RATIONALE: >>>
+Change reporting helps users understand MCP deployment impact.
+<<<
+VERIFICATION: >>>
+- tests/test_mcp.py::test_report_mcp_changes
+<<<
+TAGS: mcp, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-001
+TITLE: load_provider_config — Parse Provider Definitions
+STATEMENT: >>>
+Load provider definitions from config/providers.yaml or built-ins:
+  - name, agents_dir, rules_dir, commands_dir, hooks_dir
+  - settings_path, settings_local_path
+  - provider_isolation, parallel_pattern
+Return: dict {provider_name: {agents_dir, rules_dir, ...}}.
+<<<
+RATIONALE: >>>
+Centralized provider config enables consistent directory and settings management.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_load_provider_config_builtin
+- tests/test_providers.py::test_load_provider_config_custom
+<<<
+TAGS: providers, loading, configuration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-006
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-002
+TITLE: validate_provider_config — Check All Provider Paths Exist
+STATEMENT: >>>
+Verify provider directories and settings files:
+  - Paths exist or creatable
+  - Readable/writable permissions
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Path validation prevents sync failures due to missing directories.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_validate_provider_config_valid
+- tests/test_providers.py::test_validate_provider_config_missing_dir
+<<<
+TAGS: providers, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-003
+TITLE: resolve_active_providers — Filter by Project Config
+STATEMENT: >>>
+From project.yaml ai_providers list, filter provider_config to active providers.
+Return: dict {provider: config} for active providers only.
+<<<
+RATIONALE: >>>
+Provider resolution determines which providers receive generated artifacts.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_resolve_active_providers_valid
+- tests/test_providers.py::test_resolve_active_providers_unknown
+<<<
+TAGS: providers, resolution
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-004
+TITLE: is_provider_active — Check Single Provider
+STATEMENT: >>>
+Simple check: is provider in project.ai_providers?
+Return: bool.
+<<<
+RATIONALE: >>>
+Provider check enables conditional logic.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_is_provider_active_yes
+- tests/test_providers.py::test_is_provider_active_no
+<<<
+TAGS: providers, helper
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: many
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-005
+TITLE: get_provider_isolation_setting — Resolve Isolation Mode
+STATEMENT: >>>
+Determine provider isolation status:
+  - Enabled (default) if >1 provider active and not explicitly disabled
+  - Disabled if provider-isolation: disabled in project.yaml
+Return: bool (isolation_enabled).
+<<<
+RATIONALE: >>>
+Isolation determination drives security hardening.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_get_provider_isolation_setting_enabled
+- tests/test_providers.py::test_get_provider_isolation_setting_disabled
+<<<
+TAGS: providers, isolation
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-006
+TITLE: get_provider_agents_dir — Resolve Agent Output Directory
+STATEMENT: >>>
+Get agents_dir for provider from provider config.
+Return: Path (absolute path).
+<<<
+RATIONALE: >>>
+Provider-specific directory resolution enables multi-provider deployment.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_get_provider_agents_dir
+<<<
+TAGS: providers, paths
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-007
+TITLE: ensure_provider_directories_exist — Create Missing Dirs
+STATEMENT: >>>
+Create provider directories (agents_dir, rules_dir, etc.) if missing.
+Return: (success: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Directory creation ensures provider is ready for artifact deployment.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_ensure_provider_directories_exist
+<<<
+TAGS: providers, io
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-PROVIDERS-008
+TITLE: report_provider_deployment — Show Provider Readiness
+STATEMENT: >>>
+Report per provider: directories exist, settings file exists, artifacts deployed.
+<<<
+RATIONALE: >>>
+Deployment reporting helps users verify provider setup.
+<<<
+VERIFICATION: >>>
+- tests/test_providers.py::test_report_provider_deployment
+<<<
+TAGS: providers, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-001
+TITLE: load_skills_registry — Parse config/skills-registry.yaml
+STATEMENT: >>>
+Load external skill definitions:
+  - name, version, description
+  - url (git submodule or HTTP)
+  - approved (meta maintainer quality gate)
+  - tools_provided
+  - agent_hint
+Return: dict {skill_name: {url, approved, tools, ...}}.
+<<<
+RATIONALE: >>>
+Centralized skill registry enables consistent skill discovery and quality gating.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_load_skills_registry_valid
+- tests/test_skills.py::test_load_skills_registry_missing_file
+<<<
+TAGS: skills, loading, registry
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SKILLS-002
+
+[REQUIREMENT]
+UID: REQ-SKILLS-002
+TITLE: resolve_enabled_skills — Filter by Project Config
+STATEMENT: >>>
+From project.yaml skills list, filter registry to enabled skills.
+Only include approved: true skills (meta quality gate).
+Return: List[skill_name] of enabled skills.
+<<<
+RATIONALE: >>>
+Approval gating ensures only vetted skills are used.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_resolve_enabled_skills_approved
+- tests/test_skills.py::test_resolve_enabled_skills_unapproved_skipped
+<<<
+TAGS: skills, resolution, approval
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-SKILLS-001
+- TYPE: called-by
+  VALUE: REQ-SKILLS-003
+
+[REQUIREMENT]
+UID: REQ-SKILLS-003
+TITLE: load_skill_content — Read Skill Agent Template
+STATEMENT: >>>
+Load agent template from skill submodule: agents/0-external/_<skill>.md.
+Return: (content: str, version: str).
+<<<
+RATIONALE: >>>
+Skill content loading enables skill composition.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_load_skill_content_valid
+- tests/test_skills.py::test_load_skill_content_missing_submodule
+<<<
+TAGS: skills, loading
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SKILLS-004
+
+[REQUIREMENT]
+UID: REQ-SKILLS-004
+TITLE: build_skill_wrapper — Create Wrapper Agent for Skill
+STATEMENT: >>>
+Merge base agent with skill agent:
+  1. Load base agent
+  2. Load skill agent
+  3. Merge: append skill tools and extensions
+Return: merged agent content.
+<<<
+RATIONALE: >>>
+Skill wrapper composition enables augmented agents.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_build_skill_wrapper_tools_merged
+<<<
+TAGS: skills, composition, wrapper
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-SKILLS-003
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003
+
+[REQUIREMENT]
+UID: REQ-SKILLS-005
+TITLE: sync_skill_submodules — Update Git Submodules
+STATEMENT: >>>
+For each enabled skill, run `git submodule update --init --recursive`.
+Warn if submodule is dirty (user edits).
+Return: (synced_count, errors).
+<<<
+RATIONALE: >>>
+Submodule sync ensures latest skill code is available.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_sync_skill_submodules
+<<<
+TAGS: skills, submodules, git
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-006
+TITLE: validate_skill_approval — Check Approval Status
+STATEMENT: >>>
+Check approved: true for skill in registry.
+Return: bool.
+<<<
+RATIONALE: >>>
+Approval validation enforces quality gate.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_validate_skill_approval_approved
+- tests/test_skills.py::test_validate_skill_approval_unapproved
+<<<
+TAGS: skills, approval, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SKILLS-002
+
+[REQUIREMENT]
+UID: REQ-SKILLS-007
+TITLE: inject_skill_tools — Add Skill Tools to Agent
+STATEMENT: >>>
+Merge skill tools into agent tools list.
+Handle duplicates (skill wins).
+<<<
+RATIONALE: >>>
+Tool injection enables skill capabilities in agents.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_inject_skill_tools_no_duplicates
+<<<
+TAGS: skills, tools, injection
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SKILLS-004
+
+[REQUIREMENT]
+UID: REQ-SKILLS-008
+TITLE: detect_skill_conflicts — Check for Overlapping Skills
+STATEMENT: >>>
+Detect if multiple enabled skills provide same tools (ambiguity).
+<<<
+RATIONALE: >>>
+Conflict detection prevents tool resolution ambiguity.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_detect_skill_conflicts_found
+- tests/test_skills.py::test_detect_skill_conflicts_none
+<<<
+TAGS: skills, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-009
+TITLE: validate_skill_version_compatibility — Check Compatibility
+STATEMENT: >>>
+Verify skill version is compatible with framework version.
+<<<
+RATIONALE: >>>
+Version compatibility prevents breaking changes.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_validate_skill_version_compatible
+- tests/test_skills.py::test_validate_skill_version_incompatible
+<<<
+TAGS: skills, versioning, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-010
+TITLE: log_skills_summary — Record Skill Sync Details
+STATEMENT: >>>
+Log to sync.log: enabled skills, submodules synced, errors.
+<<<
+RATIONALE: >>>
+Logging enables debugging and audit trails.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_log_skills_summary
+<<<
+TAGS: skills, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-011
+TITLE: report_skill_composition — Show Skill Integration
+STATEMENT: >>>
+Report which agents use which skills.
+<<<
+RATIONALE: >>>
+Reporting helps users understand skill deployment.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_report_skill_composition
+<<<
+TAGS: skills, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-SKILLS-012
+TITLE: cleanup_stale_skill_references — Remove Unused Skills
+STATEMENT: >>>
+Find agents with skill references to disabled or deleted skills.
+Report for cleanup.
+<<<
+RATIONALE: >>>
+Cleanup detection prevents broken skill references.
+<<<
+VERIFICATION: >>>
+- tests/test_skills.py::test_cleanup_stale_skill_references
+<<<
+TAGS: skills, cleanup
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001

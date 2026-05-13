@@ -1,0 +1,388 @@
+[DOCUMENT]
+TITLE: Module Requirements — config.py (Configuration Loading & Variables)
+PREAMBLE: >>>
+Design-level requirements for lib/config.py module.
+Covers project configuration loading, role defaults, variable building,
+substitution engine, and related operations.
+Total: 15 requirements covering all functions in config.py.
+<<<
+
+[REQUIREMENT]
+UID: REQ-CONFIG-001
+TITLE: load_project_config — Parse project.yaml
+STATEMENT: >>>
+Load project configuration from .meta-config/project.yaml:
+  - name, version, tech-stack, providers (ai-providers)
+  - custom_vars, role-overrides
+  - lifecycle-triggers, provider-isolation setting
+  - DoD preset, req-traceability flag
+Return: Config dataclass with all fields validated.
+<<<
+RATIONALE: >>>
+Centralized config loading ensures consistent defaults and validation.
+Single source of truth for project-wide settings.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_load_project_config_valid
+- tests/test_config.py::test_load_project_config_missing_required
+- tests/test_config.py::test_load_project_config_invalid_yaml
+<<<
+TAGS: config, loading, validation, schema
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-001
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-CONFIG-002
+TITLE: load_role_defaults — Parse role-defaults.yaml
+STATEMENT: >>>
+Load role configuration (model, memory, permissionMode, tier, temperature).
+Format:
+  roles:
+    orchestrator:
+      model: claude-opus-4-7
+      memory: project
+      permissionMode: allow
+      tier: 0
+      hint: Central coordination
+<<<
+RATIONALE: >>>
+Centralized role configuration enables consistent role definitions across projects.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_load_role_defaults_valid
+- tests/test_config.py::test_load_role_defaults_missing_file
+<<<
+TAGS: config, roles, loading
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-CONFIG-003
+TITLE: build_variables — Assemble All Substitution Variables
+STATEMENT: >>>
+Merge variables from:
+  1. project.yaml custom_vars
+  2. role-defaults.yaml role names/descriptions
+  3. DoD preset (DOD_*, if active)
+  4. Computed (FRAMEWORK_VERSION, AGENT_HINTS, etc.)
+  5. Environment (PROJECT_NAME, TECH_STACK, etc.)
+Return: dict {VAR_NAME: value} for {{VAR}} substitution.
+<<<
+RATIONALE: >>>
+Unified variable assembly enables dynamic template rendering.
+Variables come from multiple sources with clear precedence.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_build_variables_all_sources
+- tests/test_config.py::test_build_variables_precedence
+<<<
+TAGS: config, variables, building
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-CONTEXT-001
+- TYPE: called-by
+  VALUE: REQ-SYNC-001, REQ-CONTEXT-005
+- TYPE: refines
+  VALUE: REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-CONFIG-004
+TITLE: substitute — Replace {{PLACEHOLDERS}} in Content
+STATEMENT: >>>
+Find all {{UPPERCASE_WITH_UNDERSCORE}} patterns and replace with variable values.
+Pattern: [A-Z0-9_]+
+Warn if unresolved placeholders remain in final output.
+<<<
+RATIONALE: >>>
+Regex-based substitution enables flexible templating without special syntax.
+Warns on unresolved placeholders to catch config errors.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_substitute_basic
+- tests/test_config.py::test_substitute_unresolved_warning
+- tests/test_config.py::test_substitute_escaped_braces
+<<<
+TAGS: config, substitution, variables
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007, REQ-RULES-003, REQ-COMMANDS-003
+- TYPE: refines
+  VALUE: REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-CONFIG-005
+TITLE: validate_project_config — Check Config Validity
+STATEMENT: >>>
+Validate project config against schema:
+  - Required fields present (name, ai_providers)
+  - Field values are correct types
+  - Provider names are recognized
+  - Custom variable names follow naming rules
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Schema validation catches configuration errors early.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_validate_project_config_valid
+- tests/test_config.py::test_validate_project_config_missing_required
+- tests/test_config.py::test_validate_project_config_invalid_type
+<<<
+TAGS: config, validation, schema
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-CONFIG-006
+TITLE: resolve_model_for_role — Get LLM Model for Role
+STATEMENT: >>>
+Determine which LLM model to use for given role.
+Priority: project.yaml override > role-defaults.yaml > global default.
+Return: model string (e.g., "claude-opus-4-7").
+<<<
+RATIONALE: >>>
+Model configuration enables per-role LLM selection.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_resolve_model_for_role_override
+- tests/test_config.py::test_resolve_model_for_role_default
+<<<
+TAGS: config, model, resolution
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-005
+
+[REQUIREMENT]
+UID: REQ-CONFIG-007
+TITLE: resolve_memory_for_role — Get Memory Type for Role
+STATEMENT: >>>
+Determine memory configuration (project, local, user, none) for role.
+Priority: project override > role-defaults > global default.
+Return: memory type string.
+<<<
+RATIONALE: >>>
+Memory configuration enables per-role memory management.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_resolve_memory_for_role_override
+- tests/test_config.py::test_resolve_memory_for_role_default
+<<<
+TAGS: config, memory, resolution
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-005
+
+[REQUIREMENT]
+UID: REQ-CONFIG-008
+TITLE: resolve_permission_mode — Get Permission Model for Role
+STATEMENT: >>>
+Determine permission mode (allow, prompt, deny) for role.
+Priority: project override > role-defaults > global default.
+Return: permission mode string.
+<<<
+RATIONALE: >>>
+Permission configuration enables per-role safety policies.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_resolve_permission_mode_override
+- tests/test_config.py::test_resolve_permission_mode_default
+<<<
+TAGS: config, permissions, resolution
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-005
+
+[REQUIREMENT]
+UID: REQ-CONFIG-009
+TITLE: expand_variable_references — Resolve Nested Variables
+STATEMENT: >>>
+Resolve nested variable references: if {{VAR1}} = "hello {{VAR2}}",
+expand to actual value of VAR2.
+Single pass (no recursive resolution).
+Return: variables dict with expanded values.
+<<<
+RATIONALE: >>>
+Nested variables enable composition of complex values.
+Single-pass resolution prevents infinite loops.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_expand_variable_references_nested
+- tests/test_config.py::test_expand_variable_references_circular_detected
+<<<
+TAGS: config, variables, expansion
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-003
+
+[REQUIREMENT]
+UID: REQ-CONFIG-010
+TITLE: validate_custom_variables — Check User-Defined Variables
+STATEMENT: >>>
+Validate custom_vars from project.yaml:
+  - Names follow {{VAR_NAME}} pattern ([A-Z0-9_]+)
+  - Values are strings or JSON-serializable
+  - No reserved names (framework vars like FRAMEWORK_VERSION)
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Variable validation prevents naming conflicts and malformed references.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_validate_custom_variables_valid
+- tests/test_config.py::test_validate_custom_variables_invalid_name
+- tests/test_config.py::test_validate_custom_variables_reserved_name
+<<<
+TAGS: config, variables, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-CONFIG-011
+TITLE: resolve_dod_preset — Get Active DoD Configuration
+STATEMENT: >>>
+Load DoD preset (e.g., "rapid-prototyping") from dod-presets.yaml.
+Return: dict with DoD flags (DOD_TESTS_REQUIRED, DOD_SECURITY_AUDIT, etc.).
+<<<
+RATIONALE: >>>
+DoD presets enable switching between different quality standards.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_resolve_dod_preset_valid
+- tests/test_config.py::test_resolve_dod_preset_missing_default
+<<<
+TAGS: config, dod, presets
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-004
+
+[REQUIREMENT]
+UID: REQ-CONFIG-012
+TITLE: load_version — Get Framework Version
+STATEMENT: >>>
+Load VERSION file and return framework version string.
+Return: version string (e.g., "0.39.0").
+<<<
+RATIONALE: >>>
+Version tracking enables migration and compatibility checking.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_load_version_valid
+- tests/test_config.py::test_load_version_missing_default
+<<<
+TAGS: config, versioning
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-001
+
+[REQUIREMENT]
+UID: REQ-CONFIG-013
+TITLE: apply_variable_overrides — Apply Custom Variable Values
+STATEMENT: >>>
+Apply custom_vars from project.yaml to variables dict.
+Priority: custom_vars override all defaults.
+Return: merged variables dict.
+<<<
+RATIONALE: >>>
+Custom variable override enables project-specific templating.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_apply_variable_overrides
+<<<
+TAGS: config, variables, overrides
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-003
+
+[REQUIREMENT]
+UID: REQ-CONFIG-014
+TITLE: validate_variable_value — Check Single Variable
+STATEMENT: >>>
+Validate a single variable value:
+  - String or JSON-serializable
+  - No control characters
+  - Within reasonable length limits
+Return: (valid: bool, error_msg: str | None).
+<<<
+RATIONALE: >>>
+Per-variable validation enables fine-grained error detection.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_validate_variable_value_valid
+- tests/test_config.py::test_validate_variable_value_invalid_type
+<<<
+TAGS: config, variables, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-010, REQ-CONFIG-013
+
+[REQUIREMENT]
+UID: REQ-CONFIG-015
+TITLE: log_configuration_summary — Record Config Details
+STATEMENT: >>>
+Log to sync.log:
+  - Project name, version, tech stack
+  - Active providers, roles, custom variables
+  - DoD preset, req-traceability setting
+  - Role-specific overrides
+<<<
+RATIONALE: >>>
+Configuration logging enables debugging and auditing.
+<<<
+VERIFICATION: >>>
+- tests/test_config.py::test_log_configuration_summary
+<<<
+TAGS: config, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001

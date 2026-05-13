@@ -1,0 +1,522 @@
+[DOCUMENT]
+TITLE: Module Requirements — viz.py, migrate-config.py, lifecycle_check.py
+PREAMBLE: >>>
+Design-level requirements for visualization/reporting, configuration migration, and lifecycle automation.
+Consolidated requirements for three operational/infrastructure modules.
+Total: 22 requirements (viz: 8, migrate: 6, lifecycle: 8).
+<<<
+
+[REQUIREMENT]
+UID: REQ-VIZ-001
+TITLE: generate_sync_report — Create Human-Readable Sync Summary
+STATEMENT: >>>
+After sync completes, generate markdown report showing:
+  - Agents synced (count, list)
+  - Rules, commands, hooks, MCP servers
+  - Provider isolation applied
+  - Errors/warnings (count, details)
+  - Execution time
+<<<
+RATIONALE: >>>
+Human-readable reports help users understand sync outcomes.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_generate_sync_report
+<<<
+TAGS: viz, reporting, summary
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-VIZ-002
+TITLE: visualize_layer_priority — Show Override Precedence
+STATEMENT: >>>
+For each synced agent, show which layer was used:
+  [1-generic] orchestrator.md
+  [2-platform/claude] developer.md (overrides 1-generic)
+  [3-project] custom-role.md (full override)
+<<<
+RATIONALE: >>>
+Layer visualization helps debug composition issues.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_visualize_layer_priority
+<<<
+TAGS: viz, layering, debugging
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (via --verbose flag)
+
+[REQUIREMENT]
+UID: REQ-VIZ-003
+TITLE: generate_traceability_matrix — Create REQ → Code Mapping
+STATEMENT: >>>
+If req-traceability enabled: Create matrix showing REQ-ID → function/file.
+Format: Markdown table with REQ, Function, File, Status.
+<<<
+RATIONALE: >>>
+Traceability matrix documents requirements-to-implementation mapping.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_generate_traceability_matrix
+<<<
+TAGS: viz, traceability, compliance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-VIZ-004
+TITLE: generate_agent_diagram — Create ASCII Agent Architecture Diagram
+STATEMENT: >>>
+Create ASCII diagram showing:
+  - Layer hierarchy
+  - Extends relationships
+  - Skill composition
+<<<
+RATIONALE: >>>
+Architecture diagram aids understanding of agent composition.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_generate_agent_diagram
+<<<
+TAGS: viz, architecture, agents
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (via flag)
+
+[REQUIREMENT]
+UID: REQ-VIZ-005
+TITLE: write_sync_log_summary — Write sync.log Summary Section
+STATEMENT: >>>
+Append summary section to end of sync.log:
+  === SYNC SUMMARY ===
+  Duration, agent/rule/command/hook/MCP counts, errors, status.
+<<<
+RATIONALE: >>>
+Log summary provides quick overview of sync results.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_write_sync_log_summary
+<<<
+TAGS: viz, logging, summary
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-VIZ-006
+TITLE: validate_visual_output — Check Report Formatting
+STATEMENT: >>>
+Verify generated markdown reports:
+  - Valid markdown syntax
+  - Well-formed tables
+  - No broken links
+  - No dangling code blocks
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Output validation prevents malformed reports.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_validate_visual_output_valid
+- tests/test_viz.py::test_validate_visual_output_invalid
+<<<
+TAGS: viz, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-VIZ-007
+TITLE: export_json_summary — Generate JSON Report Format
+STATEMENT: >>>
+Export sync results as JSON for machine parsing.
+Format: {agents: [...], rules: [...], errors: [...]}.
+<<<
+RATIONALE: >>>
+JSON export enables programmatic analysis and tooling.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_export_json_summary
+<<<
+TAGS: viz, export, json
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (via flag)
+
+[REQUIREMENT]
+UID: REQ-VIZ-008
+TITLE: generate_html_report — Create Interactive HTML Report
+STATEMENT: >>>
+Generate interactive HTML report with:
+  - Collapsible sections
+  - Searchable tables
+  - Charts (agent distribution, errors, etc.)
+<<<
+RATIONALE: >>>
+Interactive HTML enables web-based sync result viewing.
+<<<
+VERIFICATION: >>>
+- tests/test_viz.py::test_generate_html_report
+<<<
+TAGS: viz, export, html
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (via flag)
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-001
+TITLE: load_old_project_config — Parse Legacy Project Configuration
+STATEMENT: >>>
+Support migration from older agent-meta versions:
+  - Old format: JSON or old YAML schema
+  - Detect format and version automatically
+  - Map old field names to new schema
+Return: dict representing old config.
+<<<
+RATIONALE: >>>
+Legacy support enables smooth upgrades between versions.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_load_old_project_config_json
+- tests/test_migrate.py::test_load_old_project_config_yaml
+<<<
+TAGS: migrate, config, legacy
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MIGRATE-002
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-002
+TITLE: map_old_to_new_schema — Transform Legacy Config
+STATEMENT: >>>
+Transform old config fields to new schema:
+  - old_name → name
+  - old_providers_list → ai_providers
+  - old_custom_vars → custom_vars
+  - old_dod_setting → dod_preset
+Warn on unmapped fields.
+<<<
+RATIONALE: >>>
+Schema mapping handles breaking changes across versions.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_map_old_to_new_schema_v038
+- tests/test_migrate.py::test_map_old_to_new_schema_v039
+<<<
+TAGS: migrate, schema, transformation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-MIGRATE-001
+- TYPE: called-by
+  VALUE: REQ-MIGRATE-004
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-003
+TITLE: validate_migrated_config — Check Migrated Config is Valid
+STATEMENT: >>>
+Verify converted config passes schema validation.
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Validation ensures migration results are usable.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_validate_migrated_config_valid
+- tests/test_migrate.py::test_validate_migrated_config_invalid
+<<<
+TAGS: migrate, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MIGRATE-004
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-004
+TITLE: migrate_project_config — Orchestrate Full Migration
+STATEMENT: >>>
+migrate_project_config(old_path, new_path, backup=True):
+  1. Load old config
+  2. Map to new schema
+  3. Validate
+  4. Backup old (optional)
+  5. Write new config
+Return: (success: bool, report: str).
+<<<
+RATIONALE: >>>
+Orchestration ensures safe, documented config migration.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_migrate_project_config_e2e
+<<<
+TAGS: migrate, orchestration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-MIGRATE-001, REQ-MIGRATE-002, REQ-MIGRATE-003
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-005
+TITLE: detect_config_version — Auto-Detect Legacy Format
+STATEMENT: >>>
+Identify which agent-meta version config is from.
+Return: version string (e.g., "0.38", "0.39", "current").
+<<<
+RATIONALE: >>>
+Auto-detection simplifies migration workflow.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_detect_config_version_038
+- tests/test_migrate.py::test_detect_config_version_current
+<<<
+TAGS: migrate, detection
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MIGRATE-001
+
+[REQUIREMENT]
+UID: REQ-MIGRATE-006
+TITLE: generate_migration_report — Document Transformation
+STATEMENT: >>>
+Create human-readable migration summary:
+  - Old → new version
+  - Fields mapped
+  - Fields with defaults
+  - Fields removed
+  - Warnings/errors
+<<<
+RATIONALE: >>>
+Migration report helps users understand changes.
+<<<
+VERIFICATION: >>>
+- tests/test_migrate.py::test_generate_migration_report
+<<<
+TAGS: migrate, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MIGRATE-004
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-001
+TITLE: load_lifecycle_triggers — Parse Lifecycle Configuration
+STATEMENT: >>>
+Load lifecycle-triggers from project.yaml:
+  on-release, on-merge, on-version-bump triggers with agent tasks.
+Return: dict {trigger_name: List[{agent, task}]}.
+<<<
+RATIONALE: >>>
+Trigger configuration enables automation on git events.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_load_lifecycle_triggers_valid
+<<<
+TAGS: lifecycle, loading, configuration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-LIFECYCLE-004
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-002
+TITLE: detect_lifecycle_event — Check Git Event Type
+STATEMENT: >>>
+Detect git event:
+  - on-release: new tag matching vX.Y.Z
+  - on-merge: merge commit (parent count = 2)
+  - on-version-bump: VERSION or CHANGELOG modified
+Return: event_type or None.
+<<<
+RATIONALE: >>>
+Event detection triggers lifecycle automation.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_detect_lifecycle_event_release
+- tests/test_lifecycle.py::test_detect_lifecycle_event_merge
+<<<
+TAGS: lifecycle, detection, git
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-LIFECYCLE-004
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-003
+TITLE: build_pending_tasks — Create Task List for Agents
+STATEMENT: >>>
+Given detected event: build task list and write .claude/pending-tasks.md.
+Format: [ ] agent-name: task description.
+<<<
+RATIONALE: >>>
+Task list delegation automates post-event agent triggering.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_build_pending_tasks
+<<<
+TAGS: lifecycle, tasks, delegation
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-LIFECYCLE-004
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-004
+TITLE: run_lifecycle_check — Orchestrate Full Lifecycle Hook
+STATEMENT: >>>
+run_lifecycle_check(project_root, project_config, dry_run=False):
+  1. Load triggers
+  2. Detect event
+  3. If matched: build pending tasks
+Return: (event_detected, tasks_queued).
+<<<
+RATIONALE: >>>
+Orchestration ensures consistent lifecycle automation.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_run_lifecycle_check_e2e
+<<<
+TAGS: lifecycle, orchestration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-LIFECYCLE-001, REQ-LIFECYCLE-002, REQ-LIFECYCLE-003
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-005
+TITLE: format_pending_tasks_file — Create Markdown Task List
+STATEMENT: >>>
+Format tasks as markdown:
+  # Lifecycle Tasks (triggered by: release)
+  - [ ] documenter: Update CODEBASE_OVERVIEW.md for this release.
+  Triggered: 2026-05-13T14:30:00
+<<<
+RATIONALE: >>>
+Markdown formatting is readable in .claude/pending-tasks.md.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_format_pending_tasks_file
+<<<
+TAGS: lifecycle, formatting, markdown
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-LIFECYCLE-003
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-006
+TITLE: check_pending_tasks_exist — Verify Task File Exists
+STATEMENT: >>>
+At session start, check if .claude/pending-tasks.md exists with unchecked tasks.
+Return: (has_pending, task_list).
+<<<
+RATIONALE: >>>
+Task checking enables session-start workflow automation.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_check_pending_tasks_exist_yes
+- tests/test_lifecycle.py::test_check_pending_tasks_exist_no
+<<<
+TAGS: lifecycle, checking
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: main chat or session-start hook
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-007
+TITLE: cleanup_completed_tasks — Remove Finished Task File
+STATEMENT: >>>
+After all pending tasks completed (all [ ] → [x]):
+  Delete .claude/pending-tasks.md.
+<<<
+RATIONALE: >>>
+Cleanup removes completed task state for next event.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_cleanup_completed_tasks
+<<<
+TAGS: lifecycle, cleanup
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: lifecycle-check or manual
+
+[REQUIREMENT]
+UID: REQ-LIFECYCLE-008
+TITLE: validate_lifecycle_config — Check Config Validity
+STATEMENT: >>>
+Validate lifecycle-triggers:
+  - Agent names are valid
+  - Task descriptions not empty
+  - Trigger names recognized
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Config validation catches lifecycle configuration errors.
+<<<
+VERIFICATION: >>>
+- tests/test_lifecycle.py::test_validate_lifecycle_config_valid
+- tests/test_lifecycle.py::test_validate_lifecycle_config_invalid
+<<<
+TAGS: lifecycle, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001

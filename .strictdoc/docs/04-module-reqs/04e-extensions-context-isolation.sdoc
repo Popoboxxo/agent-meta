@@ -1,0 +1,714 @@
+[DOCUMENT]
+TITLE: Module Requirements — extensions.py, context.py, isolation.py
+PREAMBLE: >>>
+Design-level requirements for project extensions, context/variable injection, and provider isolation.
+Consolidated requirements for three important framework modules.
+Total: 32 requirements (extensions: 8, context: 12, isolation: 12).
+<<<
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-001
+TITLE: load_project_extensions — Enumerate Project Agent Extensions
+STATEMENT: >>>
+Scan .claude/3-project/ for <role>-ext.md files (project-specific extensions).
+Return: dict {role: {content, file}}.
+Extensions are never managed by sync.py — always preserved.
+<<<
+RATIONALE: >>>
+Extension enumeration enables additive project customization without sync.py interference.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_load_project_extensions
+<<<
+TAGS: extensions, loading, project
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-012
+- TYPE: called-by
+  VALUE: REQ-EXTENSIONS-003
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-002
+TITLE: parse_managed_blocks — Extract Managed Sections
+STATEMENT: >>>
+Identify {{# managed begin:* }} blocks in extensions (auto-updated sections).
+Return: list of (start_line, end_line, content) tuples.
+<<<
+RATIONALE: >>>
+Managed blocks enable selective auto-update of extension sections.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_parse_managed_blocks_valid
+- tests/test_extensions.py::test_parse_managed_blocks_unmatched_markers
+<<<
+TAGS: extensions, managed, blocks
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-EXTENSIONS-003
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-003
+TITLE: merge_extension_with_agent — Combine Base Agent + Extension
+STATEMENT: >>>
+Append extension to generated agent:
+  1. Load generated agent
+  2. Load extension
+  3. Preserve non-managed sections
+  4. For managed blocks: update if base changed
+Return: merged content.
+<<<
+RATIONALE: >>>
+Merge logic preserves project customization while enabling selective updates.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_merge_extension_with_agent_full
+- tests/test_extensions.py::test_merge_extension_with_agent_managed_updated
+<<<
+TAGS: extensions, merging, composition
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-EXTENSIONS-001, REQ-EXTENSIONS-002
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-004
+TITLE: create_extension — Generate New Extension Template
+STATEMENT: >>>
+Create new <role>-ext.md template in .claude/3-project/.
+Template includes managed block placeholder and example custom sections.
+<<<
+RATIONALE: >>>
+Template generation guides users in creating extensions.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_create_extension
+- tests/test_extensions.py::test_create_extension_already_exists
+<<<
+TAGS: extensions, creation, template
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (--create-ext flag)
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-005
+TITLE: update_managed_blocks — Refresh Auto-Managed Sections
+STATEMENT: >>>
+Re-generate managed blocks in extension when base agent changes (--update-ext flag).
+Dry-run shows what would change.
+<<<
+RATIONALE: >>>
+Managed block updates enable extensions to stay synchronized with base.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_update_managed_blocks
+- tests/test_extensions.py::test_update_managed_blocks_dry_run
+<<<
+TAGS: extensions, update, managed
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (--update-ext flag)
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-006
+TITLE: validate_extension_syntax — Check Extension Markdown Structure
+STATEMENT: >>>
+Validate extension markdown is well-formed:
+  - Valid markdown
+  - Managed block markers matched
+  - No orphaned content
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Syntax validation catches extension structure errors.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_validate_extension_syntax_valid
+- tests/test_extensions.py::test_validate_extension_syntax_invalid
+<<<
+TAGS: extensions, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-007
+TITLE: detect_extension_conflicts — Find Extension Issues
+STATEMENT: >>>
+Detect extensions that reference deleted agent sections or have unresolvable
+managed block anchors.
+<<<
+RATIONALE: >>>
+Conflict detection prevents orphaned extension content.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_detect_extension_conflicts
+<<<
+TAGS: extensions, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-EXTENSIONS-008
+TITLE: log_extensions_summary — Record Extension Details
+STATEMENT: >>>
+Log to sync.log: extensions loaded, merged, managed blocks updated.
+<<<
+RATIONALE: >>>
+Logging enables debugging and audit trails.
+<<<
+VERIFICATION: >>>
+- tests/test_extensions.py::test_log_extensions_summary
+<<<
+TAGS: extensions, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-001
+TITLE: inject_computed_variables — Compute Framework Values
+STATEMENT: >>>
+Compute framework-level variables:
+  - {{FRAMEWORK_VERSION}} from VERSION file
+  - {{AGENT_HINTS}} from agent hints
+  - {{AGENTS_TABLE}} markdown table
+  - {{PARALLEL_PATTERN}} from provider config
+Return: dict of additional variables.
+<<<
+RATIONALE: >>>
+Computed variables enable dynamic template rendering based on framework state.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_inject_computed_variables
+<<<
+TAGS: context, variables, computation
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-003
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-002
+TITLE: load_platform_mcp_bundle — Get Platform-Default MCP Servers
+STATEMENT: >>>
+Load rules/2-platform/<platform>-mcp.yaml which may bundle default MCP servers.
+Return: List[mcp_server] or [] if no bundle.
+<<<
+RATIONALE: >>>
+Platform bundles enable per-platform MCP server defaults.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_load_platform_mcp_bundle_valid
+- tests/test_context.py::test_load_platform_mcp_bundle_missing
+<<<
+TAGS: context, mcp, platform
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-MCP-002
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-003
+TITLE: resolve_provider_isolation_blocks — Get Hard-Block Rules
+STATEMENT: >>>
+If isolation enabled and >1 provider active:
+  Create hard-block rules preventing each provider from accessing others' directories.
+Return: dict {provider: isolation_rules}.
+<<<
+RATIONALE: >>>
+Isolation rule generation enables provider hardening.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_resolve_provider_isolation_blocks_enabled
+- tests/test_context.py::test_resolve_provider_isolation_blocks_single_provider
+<<<
+TAGS: context, isolation, security
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-004
+TITLE: inject_dod_variables — Add DoD Preset Variables
+STATEMENT: >>>
+If DoD preset active: Load dod-presets.yaml, extract DoD flags (DOD_*),
+inject into variables dict.
+<<<
+RATIONALE: >>>
+DoD variables enable dynamic quality criteria configuration.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_inject_dod_variables
+<<<
+TAGS: context, dod, variables
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-003
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-005
+TITLE: build_full_context — Orchestrate All Context Building
+STATEMENT: >>>
+build_full_context(project, providers_config, agent_meta_root):
+  1. Load project config
+  2. Inject computed variables
+  3. Load MCP bundles
+  4. Inject DoD variables
+Return: complete context dict for {{VAR}} substitution.
+<<<
+RATIONALE: >>>
+Centralized context assembly ensures all variables are available for substitution.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_build_full_context
+<<<
+TAGS: context, orchestration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-CONFIG-003, REQ-CONTEXT-001, REQ-CONTEXT-002, REQ-CONTEXT-004
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-006
+TITLE: resolve_environment_variables — Load from Process Environment
+STATEMENT: >>>
+Extract and inject environment variables for template substitution.
+Pattern: {{PROJECT_NAME}}, {{TECH_STACK}}, etc.
+<<<
+RATIONALE: >>>
+Environment variable injection enables external parameterization.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_resolve_environment_variables
+<<<
+TAGS: context, environment
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONFIG-003
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-007
+TITLE: validate_context_variables — Check Variable Set Completeness
+STATEMENT: >>>
+Verify all variables in context are defined and valid.
+Return: (valid: bool, missing: List[str]).
+<<<
+RATIONALE: >>>
+Context validation catches missing variable issues.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_validate_context_variables_valid
+- tests/test_context.py::test_validate_context_variables_missing
+<<<
+TAGS: context, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-008
+TITLE: log_context_summary — Record Context Details
+STATEMENT: >>>
+Log to sync.log: variables loaded, computed values injected.
+<<<
+RATIONALE: >>>
+Logging enables debugging variable resolution.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_log_context_summary
+<<<
+TAGS: context, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-009
+TITLE: detect_variable_cycles — Find Circular References
+STATEMENT: >>>
+If variables reference each other circularly, detect and warn.
+Return: List[List[str]] of variable cycles.
+<<<
+RATIONALE: >>>
+Cycle detection prevents infinite loops during variable expansion.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_detect_variable_cycles_found
+- tests/test_context.py::test_detect_variable_cycles_none
+<<<
+TAGS: context, variables, cycles, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-010
+TITLE: inject_derived_variables — Compute Secondary Values
+STATEMENT: >>>
+Compute secondary variables from primary ones:
+  - {{ROLE_NAMES}} from {{PROJECT_ROLES}}
+  - {{PROVIDED_TOOLS}} from {{AGENT_TOOLS}}
+<<<
+RATIONALE: >>>
+Derived variables reduce template complexity.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_inject_derived_variables
+<<<
+TAGS: context, variables, derivation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-005
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-011
+TITLE: report_context_variables — Show All Injected Variables
+STATEMENT: >>>
+Report all variables in context (for debugging).
+<<<
+RATIONALE: >>>
+Variable reporting helps debug substitution issues.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_report_context_variables
+<<<
+TAGS: context, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-CONTEXT-012
+TITLE: merge_variable_sources — Combine Multiple Variable Dicts
+STATEMENT: >>>
+Merge variables from multiple sources (custom_vars, role-defaults, computed, environment).
+Priority: later sources override earlier. Return: merged dict.
+<<<
+RATIONALE: >>>
+Explicit merge logic ensures clear precedence.
+<<<
+VERIFICATION: >>>
+- tests/test_context.py::test_merge_variable_sources
+<<<
+TAGS: context, variables, merging
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-001
+TITLE: generate_isolation_blocks — Create Provider Blocking Rules
+STATEMENT: >>>
+When >1 provider active and isolation enabled:
+  Create hard-block rules per provider preventing access to other providers' directories.
+Return: dict {provider: isolation_rules}.
+<<<
+RATIONALE: >>>
+Isolation rules prevent cross-provider interference in multi-provider setups.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_generate_isolation_blocks_enabled
+- tests/test_isolation.py::test_generate_isolation_blocks_single_provider
+<<<
+TAGS: isolation, security, provider
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-011
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-002
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-002
+TITLE: apply_claude_isolation — Add .claude/settings.json Permissions
+STATEMENT: >>>
+Add permissions.deny to .claude/settings.json with Glob patterns
+blocking access to .gemini/, .continue/, .opencode/ directories.
+<<<
+RATIONALE: >>>
+Claude-specific isolation prevents accidental access to other providers.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_apply_claude_isolation
+<<<
+TAGS: isolation, claude, settings
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-003
+TITLE: apply_gemini_isolation — Add .gemini/policies/ Regex Rules
+STATEMENT: >>>
+Create .gemini/policies/provider-isolation.toml with regex patterns
+blocking Gemini from other providers.
+<<<
+RATIONALE: >>>
+Gemini-specific isolation policy prevents cross-provider access.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_apply_gemini_isolation
+<<<
+TAGS: isolation, gemini, policies
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-004
+TITLE: apply_continue_isolation — Add .continue/rules/ Soft-Rule
+STATEMENT: >>>
+Create .continue/rules/provider-isolation.md documenting isolation
+(soft-rule: documentation only, no hard-block for IDE extensions).
+<<<
+RATIONALE: >>>
+Continue soft-rule provides guidance since IDE extensions lack hard-block mechanism.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_apply_continue_isolation
+<<<
+TAGS: isolation, continue, rules
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-005
+TITLE: sync_provider_isolation — Orchestrate All Isolation Sync
+STATEMENT: >>>
+sync_provider_isolation(active_providers, provider_config, isolation_enabled):
+  1. Check if isolation needed (>1 provider, isolation_enabled=true)
+  2. For each provider: apply provider-specific isolation
+Return: summary {providers_isolated, rules_applied}.
+<<<
+RATIONALE: >>>
+Orchestration ensures consistent isolation across all providers.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_sync_provider_isolation_e2e
+- tests/test_isolation.py::test_sync_provider_isolation_single_provider
+<<<
+TAGS: isolation, orchestration, security
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-ISOLATION-001, REQ-ISOLATION-002, REQ-ISOLATION-003, REQ-ISOLATION-004
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-006
+TITLE: apply_opencode_isolation — Add opencode.json Permission Rules
+STATEMENT: >>>
+Add permission.read/edit deny rules to opencode.json.
+<<<
+RATIONALE: >>>
+Opencode-specific isolation prevents accidental cross-provider access.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_apply_opencode_isolation
+<<<
+TAGS: isolation, opencode
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-007
+TITLE: validate_isolation_rules — Check Isolation Configuration
+STATEMENT: >>>
+Validate isolation rules are well-formed and complete.
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Rule validation catches isolation configuration errors.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_validate_isolation_rules_valid
+- tests/test_isolation.py::test_validate_isolation_rules_invalid
+<<<
+TAGS: isolation, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-008
+TITLE: detect_isolation_bypass_risks — Find Potential Bypasses
+STATEMENT: >>>
+Scan for potential isolation bypasses (hardlinks, symbolic links, etc.).
+Return: List[str] of risk descriptions.
+<<<
+RATIONALE: >>>
+Bypass detection identifies security risks.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_detect_isolation_bypass_risks
+<<<
+TAGS: isolation, security, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-009
+TITLE: log_isolation_summary — Record Isolation Details
+STATEMENT: >>>
+Log to sync.log: isolation enabled/disabled, providers isolated, rules applied.
+<<<
+RATIONALE: >>>
+Logging enables auditing of isolation enforcement.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_log_isolation_summary
+<<<
+TAGS: isolation, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-010
+TITLE: report_isolation_status — Show Isolation Coverage
+STATEMENT: >>>
+Report which providers are protected by isolation, which rules are active.
+<<<
+RATIONALE: >>>
+Status reporting helps users verify isolation setup.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_report_isolation_status
+<<<
+TAGS: isolation, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001, REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-011
+TITLE: cleanup_stale_isolation_rules — Remove Obsolete Rules
+STATEMENT: >>>
+Delete isolation rules for providers no longer active.
+<<<
+RATIONALE: >>>
+Cleanup prevents accumulation of unused isolation rules.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_cleanup_stale_isolation_rules
+<<<
+TAGS: isolation, cleanup, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005
+
+[REQUIREMENT]
+UID: REQ-ISOLATION-012
+TITLE: get_isolated_directories — List Protected Directories
+STATEMENT: >>>
+Return list of provider directories that are isolated from other providers.
+<<<
+RATIONALE: >>>
+Directory list helps understand isolation coverage.
+<<<
+VERIFICATION: >>>
+- tests/test_isolation.py::test_get_isolated_directories
+<<<
+TAGS: isolation, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-ISOLATION-005

@@ -1,0 +1,1348 @@
+[DOCUMENT]
+TITLE: Module Requirements — agents.py (Agent Composition Engine)
+PREAMBLE: >>>
+Design-level requirements for lib/agents.py module.
+Covers agent source loading, layer composition, extends chain resolution,
+patching, frontmatter injection, and multi-provider agent generation.
+Total: 56 requirements covering all 56 functions in agents.py.
+<<<
+
+[REQUIREMENT]
+UID: REQ-AGENTS-001
+TITLE: collect_sources — Load Agent Sources from All Layers
+STATEMENT: >>>
+collect_sources(project, role, agent_meta_root, providers=[]) loads agent template sources
+from 4-layer hierarchy with fallback priority:
+  1. Check agents/3-project/<role>.md (highest)
+  2. Check agents/2-platform/<platform>-<role>.md (if exists)
+  3. Check agents/1-generic/<role>.md (default)
+  4. Check agents/0-external if external skills enabled
+Return: dict {source: str, file: Path, layer: int, extends: str|None}
+<<<
+RATIONALE: >>>
+Unified source loading across all layers enables consistent fallback behavior
+and layer-aware composition throughout the sync pipeline.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_collect_sources_layer1_fallback
+- tests/test_agents.py::test_collect_sources_layer3_override
+- tests/test_agents.py::test_collect_sources_extends_field_parsed
+<<<
+TAGS: agents, composition, layering, loading
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-002
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003, REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-002
+TITLE: merge_sources — Combine Multiple Layer Sources
+STATEMENT: >>>
+When multiple layers define the same agent (e.g., 1-generic + 2-platform),
+merge_sources() combines them respecting layer priority:
+  - Layer 3 replaces layer 2 replaces layer 1
+  - If no layer 3 override, use layer 2 if exists, else layer 1
+  - Never merge content — first-match wins (no concatenation)
+Output: single merged source content ready for composition.
+<<<
+RATIONALE: >>>
+First-match-wins ensures deterministic, non-ambiguous override behavior.
+Concatenation would create unpredictable merged content.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_merge_sources_priority_3_over_2
+- tests/test_agents.py::test_merge_sources_priority_2_over_1
+- tests/test_agents.py::test_merge_sources_extends_field_preserved
+<<<
+TAGS: agents, composition, merging
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003
+
+[REQUIREMENT]
+UID: REQ-AGENTS-003
+TITLE: resolve_extends_chain — Recursively Resolve Extends Dependencies
+STATEMENT: >>>
+When an agent specifies extends: "role-name", recursively load and validate
+the chain: 2-platform/<role> → extends: 1-generic/<role> → no extends.
+Detect circular extends (A extends B, B extends A).
+Output: ordered list of (role, source, layer) tuples from root to leaf.
+<<<
+RATIONALE: >>>
+Extends chains enable composition inheritance. Circular detection prevents
+infinite loops. Ordered resolution ensures base → override stacking order.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_resolve_extends_chain_linear
+- tests/test_agents.py::test_resolve_extends_chain_circular_detect
+- tests/test_agents.py::test_resolve_extends_chain_depth_limit
+<<<
+TAGS: agents, composition, extends, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-001
+- TYPE: called-by
+  VALUE: REQ-AGENTS-004, REQ-AGENTS-006
+- TYPE: detects
+  VALUE: circular-extends-error
+
+[REQUIREMENT]
+UID: REQ-AGENTS-004
+TITLE: compose_agent — Apply Patches to Base Agent
+STATEMENT: >>>
+compose_agent(base_content: str, patches: List[dict]) applies patch operations
+to base agent markdown in order:
+  - append-after: Insert after anchor section
+  - replace: Replace anchor section entirely
+  - delete: Remove anchor section
+  - append: Add to end of file
+Process patches sequentially (order matters). Output: composed markdown.
+<<<
+RATIONALE: >>>
+Patch-based composition avoids duplication while allowing surgical modifications.
+Sequential processing preserves intentional patch ordering (later patches may
+depend on earlier ones).
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_compose_agent_append_after
+- tests/test_agents.py::test_compose_agent_replace_section
+- tests/test_agents.py::test_compose_agent_delete_section
+- tests/test_agents.py::test_compose_agent_sequential_order
+- tests/test_agents.py::test_compose_agent_anchor_not_found_warned
+<<<
+TAGS: agents, composition, patching
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+- TYPE: refines
+  VALUE: REQ-SYS-003
+
+[REQUIREMENT]
+UID: REQ-AGENTS-005
+TITLE: inject_frontmatter — Insert YAML Metadata
+STATEMENT: >>>
+inject_frontmatter(content: str, role: str, config: dict) parses and modifies
+agent frontmatter (YAML header between --- delimiters) with values from
+config/role-defaults.yaml and project.yaml overrides:
+  - model: LLM model (claude-opus-4-7, etc.)
+  - memory: Memory type (project, local, user, none)
+  - permissionMode: (allow, prompt, deny)
+  - temperature: LLM param
+  - tools: Available tools list
+Updates frontmatter fields, preserves existing sections.
+<<<
+RATIONALE: >>>
+Centralized frontmatter injection prevents hardcoded values in templates.
+Role configuration is dynamic and can be changed without modifying templates.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_inject_frontmatter_model
+- tests/test_agents.py::test_inject_frontmatter_memory
+- tests/test_agents.py::test_inject_frontmatter_missing_creates_default
+- tests/test_agents.py::test_inject_frontmatter_preserves_existing
+<<<
+TAGS: agents, frontmatter, configuration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+- TYPE: refines
+  VALUE: REQ-SYS-004
+
+[REQUIREMENT]
+UID: REQ-AGENTS-006
+TITLE: build_agent — Orchestrate Full Composition Pipeline
+STATEMENT: >>>
+build_agent(project, role, agent_meta_root, provider=None) orchestrates:
+  1. collect_sources(role) → get source from layers
+  2. resolve_extends_chain(role) → if extends exists
+  3. compose_agent(base, patches) → apply platform/project patches
+  4. inject_frontmatter(content, role, config) → add role metadata
+  5. Return final agent content ready for sync
+Main composition orchestrator combining all lower-level operations.
+<<<
+RATIONALE: >>>
+Single orchestration point ensures consistent order of operations.
+Separation of concerns (each sub-function does one thing) enables testing
+and reuse.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_build_agent_1generic_only
+- tests/test_agents.py::test_build_agent_2platform_override
+- tests/test_agents.py::test_build_agent_3project_override
+- tests/test_agents.py::test_build_agent_extends_chain
+- tests/test_agents.py::test_build_agent_e2e_full_pipeline
+<<<
+TAGS: agents, composition, orchestration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-001, REQ-AGENTS-003, REQ-AGENTS-004, REQ-AGENTS-005
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-007
+TITLE: sync_agents_for_provider — Generate Agents per Provider
+STATEMENT: >>>
+For a single provider (claude, gemini, continue, opencode):
+  1. Enumerate all required roles (from config/role-defaults.yaml)
+  2. For each role, build_agent(role, provider=provider)
+  3. Apply variable substitution ({{PLACEHOLDERS}})
+  4. Write to .claude/agents/ (or provider-specific dir)
+  5. Track written files in .agent-meta-managed index
+Idempotent: re-running writes same content (no unnecessary changes).
+<<<
+RATIONALE: >>>
+Provider-specific sync ensures each provider gets correctly configured agents
+without cross-provider pollution. Idempotence prevents churn (commit noise).
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_sync_agents_for_provider_claude
+- tests/test_agents.py::test_sync_agents_for_provider_idempotent
+- tests/test_agents.py::test_sync_agents_for_provider_optional_roles_skipped
+- tests/test_agents.py::test_sync_agents_for_provider_dry_run
+<<<
+TAGS: agents, sync, provider
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-006
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+- TYPE: writes
+  VALUE: agents-to-provider-dir
+
+[REQUIREMENT]
+UID: REQ-AGENTS-008
+TITLE: build_agent_hints — Extract and Format Agent Hints
+STATEMENT: >>>
+Extract hint: field from all built agents and format as CSV for {{AGENT_HINTS}}.
+Format: "orchestrator: Central coordination, developer: Feature implementation, ..."
+Used by orchestrator and delegating agents to know available roles.
+<<<
+RATIONALE: >>>
+Dynamic hints enable orchestrators to make runtime decisions about available
+roles without hardcoding. Hints are descriptive metadata extracted once at sync time.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_build_agent_hints_format
+- tests/test_agents.py::test_build_agent_hints_missing_skipped
+- tests/test_agents.py::test_build_agent_hints_variable_injection
+<<<
+TAGS: agents, hints, variables
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-001
+- TYPE: injected-into
+  VALUE: AGENT_HINTS-variable
+
+[REQUIREMENT]
+UID: REQ-AGENTS-009
+TITLE: build_agent_table — Generate Markdown Table for CLAUDE.md
+STATEMENT: >>>
+Create markdown table (| Agent | Version | Description |) from all agents.
+Used in CLAUDE.md and documentation generation.
+Format:
+| Agent | Zuständigkeit | Version |
+|-------|---|---|
+| orchestrator | Central coordination | 1.0.0 |
+| developer | Feature implementation | 1.0.0 |
+<<<
+RATIONALE: >>>
+Automated agent documentation prevents staleness. Single source of truth
+for agent metadata extracted at sync time.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_build_agent_table_format
+- tests/test_agents.py::test_build_agent_table_escaping
+- tests/test_agents.py::test_build_agent_table_missing_metadata_defaults
+<<<
+TAGS: agents, documentation, table
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONTEXT-001
+- TYPE: injected-into
+  VALUE: AGENTS_TABLE-variable
+
+[REQUIREMENT]
+UID: REQ-AGENTS-010
+TITLE: validate_agent_syntax — Check Agent Markdown Structure
+STATEMENT: >>>
+Validate that generated agent markdown:
+  - Has frontmatter block (--- ... ---)
+  - Contains required sections (varies by agent type)
+  - All section headers are markdown (## format)
+  - No orphaned content (all lines belong to sections)
+Return: (bool, List[str]) with validity and error list.
+<<<
+RATIONALE: >>>
+Syntax validation catches structural errors before agents are deployed.
+Prevents malformed agents from breaking provider tooling.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_agent_syntax_valid
+- tests/test_agents.py::test_validate_agent_syntax_missing_frontmatter
+- tests/test_agents.py::test_validate_agent_syntax_malformed_header
+<<<
+TAGS: agents, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-011
+TITLE: extract_patches_from_source — Parse Patch Directives
+STATEMENT: >>>
+Parse patches: block from agent YAML frontmatter.
+Extract list of patch operations (append-after, replace, delete, append).
+Validate patch structure (op, anchor, content fields).
+Return: List[dict] with parsed patch operations.
+<<<
+RATIONALE: >>>
+Explicit patch parsing enables validation and error handling.
+Separates patch parsing from patch application.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_extract_patches_from_source_valid
+- tests/test_agents.py::test_extract_patches_from_source_invalid_op
+- tests/test_agents.py::test_extract_patches_from_source_missing_fields
+<<<
+TAGS: agents, patches, parsing
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-012
+TITLE: validate_patches — Check Patch Validity
+STATEMENT: >>>
+Validate patches before application:
+  - op is recognized (append-after, replace, delete, append)
+  - anchor is provided for ops that need it (all except append)
+  - content is non-empty for content-providing ops
+Return: (bool, List[str]) with validity and error list.
+<<<
+RATIONALE: >>>
+Patch validation catches configuration errors early.
+Prevents silently skipped patches due to malformed directives.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_patches_valid
+- tests/test_agents.py::test_validate_patches_missing_anchor
+- tests/test_agents.py::test_validate_patches_unknown_op
+<<<
+TAGS: agents, patches, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-011
+
+[REQUIREMENT]
+UID: REQ-AGENTS-013
+TITLE: parse_agent_frontmatter — Extract YAML Header
+STATEMENT: >>>
+Extract YAML frontmatter from agent markdown (content between --- delimiters).
+Parse as YAML, return dict with all fields.
+Handle missing frontmatter gracefully (return empty dict).
+<<<
+RATIONALE: >>>
+Frontmatter is the primary metadata source for agent configuration.
+Parsing separates concerns: reading ← processing.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_parse_agent_frontmatter_valid
+- tests/test_agents.py::test_parse_agent_frontmatter_missing
+- tests/test_agents.py::test_parse_agent_frontmatter_invalid_yaml
+<<<
+TAGS: agents, frontmatter, parsing
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-001, REQ-AGENTS-005, REQ-AGENTS-008, REQ-AGENTS-009
+
+[REQUIREMENT]
+UID: REQ-AGENTS-014
+TITLE: reconstruct_agent_with_frontmatter — Reassemble Markdown
+STATEMENT: >>>
+Reassemble agent markdown from parsed frontmatter dict + body content.
+Format: --- YAML --- body
+Ensure proper YAML serialization (quotes, escaping).
+<<<
+RATIONALE: >>>
+Enables safe modification of frontmatter without manual string manipulation.
+Ensures consistent YAML output format.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_reconstruct_agent_with_frontmatter_valid
+- tests/test_agents.py::test_reconstruct_agent_with_frontmatter_escaping
+<<<
+TAGS: agents, frontmatter, reconstruction
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-005
+
+[REQUIREMENT]
+UID: REQ-AGENTS-015
+TITLE: find_agent_section — Locate Markdown Section by Header
+STATEMENT: >>>
+Find markdown section by header text (e.g., "## Tools", "## Permissions").
+Return: (start_line: int, end_line: int, content: str) or None if not found.
+<<<
+RATIONALE: >>>
+Enables section-based navigation for patching and validation.
+Anchors are markdown section headers (## format).
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_find_agent_section_found
+- tests/test_agents.py::test_find_agent_section_not_found
+- tests/test_agents.py::test_find_agent_section_duplicate_headers
+<<<
+TAGS: agents, sections, navigation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-004
+
+[REQUIREMENT]
+UID: REQ-AGENTS-016
+TITLE: resolve_role_from_file — Extract Role Name from Filename
+STATEMENT: >>>
+Given agent filename (e.g., "orchestrator.md", "developer-ext.md"),
+extract and return role name.
+Handle extensions: .md, -ext.md suffixes.
+<<<
+RATIONALE: >>>
+Filename-based role discovery enables autonomous enumeration of available roles.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_resolve_role_from_file_standard
+- tests/test_agents.py::test_resolve_role_from_file_extension
+- tests/test_agents.py::test_resolve_role_from_file_invalid
+<<<
+TAGS: agents, filename, parsing
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007, REQ-EXTENSIONS-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-017
+TITLE: load_required_roles — Enumerate Roles from Config
+STATEMENT: >>>
+Load list of required roles from config/role-defaults.yaml → roles section.
+Return: List[str] of role names that must be synced.
+<<<
+RATIONALE: >>>
+Config-based role enumeration ensures all configured roles are generated.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_load_required_roles_valid
+- tests/test_agents.py::test_load_required_roles_missing_file
+<<<
+TAGS: agents, roles, enumeration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-018
+TITLE: get_agent_version — Extract Version from Frontmatter
+STATEMENT: >>>
+Parse version: field from agent frontmatter.
+Return: version string (e.g., "1.0.0") or "0.0.0" if missing.
+<<<
+RATIONALE: >>>
+Version tracking enables dependency management and upgrade compatibility.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_agent_version_valid
+- tests/test_agents.py::test_get_agent_version_missing_default
+<<<
+TAGS: agents, versioning
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-009, REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-019
+TITLE: get_agent_description — Extract Description from Frontmatter
+STATEMENT: >>>
+Parse description: field from agent frontmatter.
+Return: description string or "" if missing.
+<<<
+RATIONALE: >>>
+Descriptions are used for documentation and UI display.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_agent_description_valid
+- tests/test_agents.py::test_get_agent_description_missing_default
+<<<
+TAGS: agents, metadata
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-009, REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-020
+TITLE: get_agent_hint — Extract Hint from Frontmatter
+STATEMENT: >>>
+Parse hint: field from agent frontmatter.
+Return: hint string (brief description of agent purpose) or "" if missing.
+<<<
+RATIONALE: >>>
+Hints are used in {{AGENT_HINTS}} for orchestrator decision-making.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_agent_hint_valid
+- tests/test_agents.py::test_get_agent_hint_missing_default
+<<<
+TAGS: agents, hints, metadata
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-008
+
+[REQUIREMENT]
+UID: REQ-AGENTS-021
+TITLE: get_agent_tools — Extract Tools List from Frontmatter
+STATEMENT: >>>
+Parse tools: field from agent frontmatter (List[str] of tool names).
+Return: list or [] if missing.
+<<<
+RATIONALE: >>>
+Tools list defines which operations agent can perform.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_agent_tools_valid
+- tests/test_agents.py::test_get_agent_tools_missing_default
+<<<
+TAGS: agents, tools, metadata
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006, REQ-SKILLS-004
+
+[REQUIREMENT]
+UID: REQ-AGENTS-022
+TITLE: merge_tools_lists — Combine Tool Lists
+STATEMENT: >>>
+Merge two tools lists, removing duplicates while preserving order.
+Return: combined list.
+<<<
+RATIONALE: >>>
+Enables skill composition without duplicate tools.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_merge_tools_lists_no_duplicates
+- tests/test_agents.py::test_merge_tools_lists_preserves_order
+<<<
+TAGS: agents, tools, merging
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SKILLS-004
+
+[REQUIREMENT]
+UID: REQ-AGENTS-023
+TITLE: validate_extends_field — Check Extends Reference Validity
+STATEMENT: >>>
+Validate that extends: field (if present) references an existing role.
+Return: (valid: bool, error_msg: str | None).
+<<<
+RATIONALE: >>>
+Early validation prevents unresolvable extends chains.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_extends_field_valid
+- tests/test_agents.py::test_validate_extends_field_invalid_role
+<<<
+TAGS: agents, extends, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003, REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-024
+TITLE: resolve_base_agent — Get Base Agent for Extends Chain
+STATEMENT: >>>
+Given agent with extends: field, load and return the base agent content.
+Handle recursive resolution (base may also have extends).
+Return: (base_content: str, base_file: Path, base_layer: int).
+<<<
+RATIONALE: >>>
+Resolves extends to actual content for composition.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_resolve_base_agent_direct
+- tests/test_agents.py::test_resolve_base_agent_recursive
+<<<
+TAGS: agents, extends, resolution
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-001
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-025
+TITLE: count_agents_by_layer — Statistics on Agent Distribution
+STATEMENT: >>>
+Count how many agents come from each layer (1-generic, 2-platform, 3-project).
+Return: dict {layer: count}.
+<<<
+RATIONALE: >>>
+Distribution stats useful for debugging and reporting.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_count_agents_by_layer
+<<<
+TAGS: agents, statistics, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-026
+TITLE: detect_patch_conflicts — Check for Overlapping Patches
+STATEMENT: >>>
+Analyze patches to detect conflicts (overlapping anchors, order dependencies).
+Return: List[str] of conflict descriptions.
+<<<
+RATIONALE: >>>
+Conflict detection prevents subtle patch application bugs.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_detect_patch_conflicts_overlapping
+- tests/test_agents.py::test_detect_patch_conflicts_none
+<<<
+TAGS: agents, patches, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-012, REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-027
+TITLE: simulate_patch_application — Dry-Run Patch on Content
+STATEMENT: >>>
+Apply patches to a copy of content without modifying original.
+Return: (patched_content: str, applied_count: int, errors: List[str]).
+<<<
+RATIONALE: >>>
+Enables preview of patches without side effects.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_simulate_patch_application
+<<<
+TAGS: agents, patches, simulation
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001 (via --dry-run flag)
+
+[REQUIREMENT]
+UID: REQ-AGENTS-028
+TITLE: get_platform_override — Check if Platform Has Agent Override
+STATEMENT: >>>
+Check if agents/2-platform/<platform>-<role>.md exists for given platform + role.
+Return: (exists: bool, file_path: Path | None).
+<<<
+RATIONALE: >>>
+Enables conditional logic based on platform specialization availability.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_platform_override_exists
+- tests/test_agents.py::test_get_platform_override_missing
+<<<
+TAGS: agents, platform, lookup
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-029
+TITLE: get_project_override — Check if Project Has Agent Override
+STATEMENT: >>>
+Check if agents/3-project/<role>.md exists.
+Return: (exists: bool, file_path: Path | None).
+<<<
+RATIONALE: >>>
+Enables conditional logic for project customizations.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_project_override_exists
+- tests/test_agents.py::test_get_project_override_missing
+<<<
+TAGS: agents, project, lookup
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-030
+TITLE: write_agent_to_file — Persist Agent to Disk
+STATEMENT: >>>
+Write agent content to file with proper encoding (UTF-8, no BOM).
+Create parent directories if needed.
+Return: (success: bool, file_path: Path).
+<<<
+RATIONALE: >>>
+Safe file writing with error handling prevents data loss.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_write_agent_to_file_creates_dirs
+- tests/test_agents.py::test_write_agent_to_file_utf8_encoding
+<<<
+TAGS: agents, io, writing
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-031
+TITLE: backup_existing_agent — Create Backup Before Overwrite
+STATEMENT: >>>
+If agent file already exists and content differs, backup to <file>.backup.<timestamp>.
+Return: backup_path or None if no backup needed.
+<<<
+RATIONALE: >>>
+Prevents loss of previous agent versions during updates.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_backup_existing_agent_created
+- tests/test_agents.py::test_backup_existing_agent_skipped_if_unchanged
+<<<
+TAGS: agents, backup, safety
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-032
+TITLE: compute_content_hash — Hash Agent Content
+STATEMENT: >>>
+Compute SHA256 hash of agent content for change detection.
+Return: hex string of hash.
+<<<
+RATIONALE: >>>
+Enables idempotent sync (detect actual content changes vs. timestamp changes).
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_compute_content_hash
+<<<
+TAGS: agents, hash, comparison
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007, REQ-AGENTS-031
+
+[REQUIREMENT]
+UID: REQ-AGENTS-033
+TITLE: has_agent_content_changed — Detect Actual Changes
+STATEMENT: >>>
+Compare hashes of old and new agent content.
+Return: bool (True if different).
+<<<
+RATIONALE: >>>
+Prevents unnecessary writes and file churn.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_has_agent_content_changed_yes
+- tests/test_agents.py::test_has_agent_content_changed_no
+<<<
+TAGS: agents, comparison, idempotence
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-032
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-034
+TITLE: track_synced_agents — Update Managed Index
+STATEMENT: >>>
+Record all synced agents in .agent-meta-managed file (YAML list).
+Enables cleanup of stale agents on next sync.
+<<<
+RATIONALE: >>>
+Tracked index enables safe deletion of agents no longer in sources.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_track_synced_agents_index_updated
+<<<
+TAGS: agents, index, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-035
+TITLE: cleanup_stale_agents — Remove Unmanaged Agents
+STATEMENT: >>>
+Compare agents directory with .agent-meta-managed index.
+Delete agents in index but no longer in sources.
+Preserve project-specific agents (not in index).
+<<<
+RATIONALE: >>>
+Cleanup prevents accumulation of old agents from previous configurations.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_cleanup_stale_agents_removed
+- tests/test_agents.py::test_cleanup_stale_agents_project_preserved
+<<<
+TAGS: agents, cleanup, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-036
+TITLE: load_managed_agents_index — Read Tracked Agents List
+STATEMENT: >>>
+Load .agent-meta-managed file listing all agents synced by agent-meta.
+Return: List[str] of agent filenames or [] if file missing.
+<<<
+RATIONALE: >>>
+Index maintains inventory of managed agents.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_load_managed_agents_index
+<<<
+TAGS: agents, index, loading
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-035
+
+[REQUIREMENT]
+UID: REQ-AGENTS-037
+TITLE: detect_role_conflicts — Check for Duplicate Role Names
+STATEMENT: >>>
+Scan all layers for duplicate role definitions.
+Return: List[str] of conflicting role names.
+<<<
+RATIONALE: >>>
+Conflict detection prevents silent layer priority issues.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_detect_role_conflicts_none
+- tests/test_agents.py::test_detect_role_conflicts_found
+<<<
+TAGS: agents, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-038
+TITLE: validate_all_required_roles_exist — Check Role Coverage
+STATEMENT: >>>
+Verify all roles in config/role-defaults.yaml can be loaded from some layer.
+Return: (valid: bool, missing_roles: List[str]).
+<<<
+RATIONALE: >>>
+Ensures all configured roles are actually available.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_all_required_roles_exist_yes
+- tests/test_agents.py::test_validate_all_required_roles_exist_missing
+<<<
+TAGS: agents, validation, coverage
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-039
+TITLE: log_agent_summary — Record Agent Sync Details
+STATEMENT: >>>
+Log detailed agent sync information to sync.log:
+  - Agents synced (count, list)
+  - Layer distribution
+  - Extends chains resolved
+  - Patches applied
+  - Errors encountered
+<<<
+RATIONALE: >>>
+Logging enables debugging and audit trails.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_log_agent_summary
+<<<
+TAGS: agents, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-040
+TITLE: report_agent_changes — Show What Changed Since Last Sync
+STATEMENT: >>>
+Compare current sync results with previous state.
+Report: newly added agents, modified agents, deleted agents.
+<<<
+RATIONALE: >>>
+Change reporting helps users understand sync impact.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_report_agent_changes
+<<<
+TAGS: agents, reporting, comparison
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-041
+TITLE: validate_agent_for_provider — Provider-Specific Validation
+STATEMENT: >>>
+Check agent is compatible with target provider:
+  - All referenced tools exist for provider
+  - No provider-incompatible frontmatter fields
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Prevents agents from being deployed to incompatible providers.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_agent_for_provider_claude
+- tests/test_agents.py::test_validate_agent_for_provider_incompatible
+<<<
+TAGS: agents, validation, provider
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007, REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-042
+TITLE: generate_agent_dependencies — Map Agent Dependencies
+STATEMENT: >>>
+Analyze agents to identify dependencies (extends, skill references, etc.).
+Return: dict {agent: List[dependencies]}.
+<<<
+RATIONALE: >>>
+Dependency mapping enables topological sorting and change impact analysis.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_generate_agent_dependencies
+<<<
+TAGS: agents, dependencies, graph
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-043
+TITLE: sort_agents_by_dependency — Topological Sort
+STATEMENT: >>>
+Sort agents by dependency order (bases before extends, skills before wrappers).
+Return: List[str] of agent names in dependency order.
+<<<
+RATIONALE: >>>
+Enables correct build order for agents with dependencies.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_sort_agents_by_dependency
+<<<
+TAGS: agents, sorting, dependencies
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-042
+
+[REQUIREMENT]
+UID: REQ-AGENTS-044
+TITLE: handle_agent_load_error — Error Recovery
+STATEMENT: >>>
+Handle errors when loading agent (file missing, invalid YAML, etc.).
+Log error, provide helpful message, decide whether to skip or abort.
+Return: (success: bool, error_msg: str).
+<<<
+RATIONALE: >>>
+Robust error handling prevents sync cascade failures.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_handle_agent_load_error_file_missing
+- tests/test_agents.py::test_handle_agent_load_error_invalid_yaml
+<<<
+TAGS: agents, error-handling
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006, REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-045
+TITLE: inject_provider_metadata — Add Provider-Specific Info
+STATEMENT: >>>
+Inject provider-specific metadata into agent (e.g., provider: claude).
+Helps agents know where they're running.
+<<<
+RATIONALE: >>>
+Runtime awareness enables conditional behavior per provider.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_inject_provider_metadata
+<<<
+TAGS: agents, metadata, provider
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+[REQUIREMENT]
+UID: REQ-AGENTS-046
+TITLE: compare_agent_versions — Check Version Compatibility
+STATEMENT: >>>
+Compare two agent versions for compatibility.
+Return: (compatible: bool, reason: str).
+<<<
+RATIONALE: >>>
+Version compatibility check prevents breaking updates.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_compare_agent_versions_compatible
+- tests/test_agents.py::test_compare_agent_versions_incompatible
+<<<
+TAGS: agents, versioning, compatibility
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-047
+TITLE: normalize_agent_content — Standardize Formatting
+STATEMENT: >>>
+Normalize agent markdown (consistent spacing, header format, etc.).
+Prevents cosmetic diffs.
+<<<
+RATIONALE: >>>
+Formatting normalization reduces commit noise.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_normalize_agent_content
+<<<
+TAGS: agents, formatting, normalization
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-030
+
+[REQUIREMENT]
+UID: REQ-AGENTS-048
+TITLE: detect_agent_circular_dependencies — Find Cycles
+STATEMENT: >>>
+Detect circular dependencies (A extends B, B extends A).
+Return: List[List[str]] of dependency cycles.
+<<<
+RATIONALE: >>>
+Circular dependency detection prevents infinite loops.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_detect_agent_circular_dependencies_found
+- tests/test_agents.py::test_detect_agent_circular_dependencies_none
+<<<
+TAGS: agents, dependencies, cycles, validation
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003, REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-049
+TITLE: warn_unused_roles — Identify Unreferenced Agents
+STATEMENT: >>>
+Find agents defined but never used (no extends references, not synced to any provider).
+Return: List[str] of unused agent names.
+<<<
+RATIONALE: >>>
+Unused agents indicate incomplete configuration or stale definitions.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_warn_unused_roles
+<<<
+TAGS: agents, analysis, unused
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-050
+TITLE: extract_all_roles_from_layers — Enumerate Available Roles
+STATEMENT: >>>
+Scan all layers (1-generic, 2-platform, 3-project) and extract all available roles.
+Return: List[str] of unique role names.
+<<<
+RATIONALE: >>>
+Role enumeration enables validation and reporting.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_extract_all_roles_from_layers
+<<<
+TAGS: agents, enumeration, discovery
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-051
+TITLE: validate_frontmatter_schema — Check Frontmatter Fields
+STATEMENT: >>>
+Validate that all frontmatter fields conform to expected schema.
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Frontmatter validation catches configuration errors early.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_frontmatter_schema_valid
+- tests/test_agents.py::test_validate_frontmatter_schema_invalid_field
+<<<
+TAGS: agents, frontmatter, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-052
+TITLE: merge_frontmatter — Combine Frontmatter from Multiple Layers
+STATEMENT: >>>
+Merge frontmatter from base agent and overrides.
+Return: merged frontmatter dict.
+<<<
+RATIONALE: >>>
+Explicit merging handles inheritance of metadata fields.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_merge_frontmatter
+<<<
+TAGS: agents, frontmatter, merging
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-053
+TITLE: detect_missing_required_fields — Check Mandatory Metadata
+STATEMENT: >>>
+Check that required frontmatter fields are present (name, version, description, hint).
+Return: List[str] of missing required fields.
+<<<
+RATIONALE: >>>
+Mandatory field validation prevents incomplete agents.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_detect_missing_required_fields_none
+- tests/test_agents.py::test_detect_missing_required_fields_found
+<<<
+TAGS: agents, validation, required
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-AGENTS-054
+TITLE: get_extends_base — Extract Extends Reference
+STATEMENT: >>>
+Extract extends: field from agent frontmatter.
+Return: base role name or None if not specified.
+<<<
+RATIONALE: >>>
+Enables conditional extends chain resolution.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_get_extends_base_present
+- tests/test_agents.py::test_get_extends_base_missing
+<<<
+TAGS: agents, extends, extraction
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-001, REQ-AGENTS-003
+
+[REQUIREMENT]
+UID: REQ-AGENTS-055
+TITLE: set_extends_base — Modify Extends Reference
+STATEMENT: >>>
+Update extends: field in agent frontmatter to reference different base.
+Useful for platform overrides.
+<<<
+RATIONALE: >>>
+Enables programmatic modification of inheritance chains.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_set_extends_base
+<<<
+TAGS: agents, extends, modification
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+
+[REQUIREMENT]
+UID: REQ-AGENTS-056
+TITLE: validate_based_on_field — Check Platform Agent Base Reference
+STATEMENT: >>>
+For platform agents, validate based-on: field references correct generic version.
+Return: (valid: bool, error_msg: str | None).
+<<<
+RATIONALE: >>>
+Version tracking for platform agents ensures compatibility.
+<<<
+VERIFICATION: >>>
+- tests/test_agents.py::test_validate_based_on_field_valid
+- tests/test_agents.py::test_validate_based_on_field_outdated
+<<<
+TAGS: agents, versioning, validation, platform
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
