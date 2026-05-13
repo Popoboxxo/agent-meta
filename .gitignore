@@ -37,3 +37,7 @@ sync.log
 .meta-viz/
 .meta-viz/events-*.jsonl
 .meta-viz/session-reports/
+
+# strictdoc-sync local config (credentials, server URLs)
+.strictdoc-sync-config.local.yaml
+.strictdoc-sync-state.json
