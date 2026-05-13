@@ -1,0 +1,63 @@
+[project]
+title = "agent-meta Requirements Specification"
+version = "1.0.0"
+authors = ["Daniel Duchrow"]
+copyright = "2026 Anthropic"
+
+[environment]
+enable_rst = false
+enable_mathjax = false
+
+[export]
+formats = ["html", "pdf"]
+output_dir = "_build"
+
+[[requirements_grammar]]
+header = "REQUIREMENT"
+human_title = "Requirement"
+fields = [
+  { name = "UID", type = "String", required = true, human_title = "Unique ID" },
+  { name = "TITLE", type = "String", required = true, human_title = "Title" },
+  { name = "STATEMENT", type = "Multiline", required = true, human_title = "Statement" },
+  { name = "RATIONALE", type = "Multiline", required = false, human_title = "Rationale" },
+  { name = "VERIFICATION", type = "Multiline", required = false, human_title = "Verification" },
+  { name = "TAGS", type = "String", required = false, human_title = "Tags" },
+  { name = "STATUS", type = "String", required = true, default = "Draft", human_title = "Status" },
+  { name = "PRIORITY", type = "String", required = false, human_title = "Priority" },
+  { name = "OWNER", type = "String", required = false, human_title = "Owner" },
+  { name = "RELATIONS", type = "Relations", required = false, human_title = "Relations" },
+  { name = "COMMENTS", type = "Multiline", required = false, human_title = "Change History" }
+]
+
+[[requirements_grammar]]
+header = "DEFINITION"
+human_title = "Definition"
+fields = [
+  { name = "UID", type = "String", required = true, human_title = "Unique ID" },
+  { name = "TERM", type = "String", required = true, human_title = "Term" },
+  { name = "DEFINITION", type = "Multiline", required = true, human_title = "Definition" },
+  { name = "SYNONYMS", type = "String", required = false, human_title = "Synonyms" }
+]
+
+[[requirements_grammar]]
+header = "SECTION"
+human_title = "Section"
+fields = [
+  { name = "TITLE", type = "String", required = true, human_title = "Title" },
+  { name = "STATEMENT", type = "Multiline", required = false, human_title = "Content" }
+]
+
+[[features]]
+requirement_relations = true
+diff = true
+traceability = true
+review = false
+html_auto_parallelization = true
+search = true
+pdf = true
+
+[[project_tree_root]]
+file_tree_mount_folder = "docs"
+
+[[document]]
+path = "docs/index.sdoc"

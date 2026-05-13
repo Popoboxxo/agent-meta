@@ -1,0 +1,5 @@
+_build/
+.strictdoc.cache
+*.pyc
+__pycache__/
+.DS_Store

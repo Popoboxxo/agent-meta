@@ -1,0 +1,209 @@
+[DOCUMENT]
+TITLE: Design Requirements — Implementation Modules (L3)
+
+[REQUIREMENT]
+UID: REQ-DES-001
+TITLE: collect_sources() liefert Agent-Stack
+STATEMENT: >>>
+Funktion in lib/agents.py:
+- Input: role_name, all Schichten-Pfade, Konfiguration
+- Output: dict mit {layer: content} für jede gefundene Schicht
+- Reihenfolge: 3-project > 2-platform > 1-generic > 0-external
+Fallback: Wenn Schicht nicht existiert, weiter zur nächsten
+<<<
+RATIONALE: >>>
+Zentrale Logik für Layer-Stacking ohne Duplikation.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/agents.py
+- Tests validieren Schichten-Merging
+<<<
+TAGS: design, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-002
+
+[REQUIREMENT]
+UID: REQ-DES-002
+TITLE: compose_agent() wendet Patches an
+STATEMENT: >>>
+Funktion in lib/agents.py:
+- Input: Base-Content (1-generic), Patches-Liste (YAML)
+- Output: Komponierter Inhalt mit angewendeten Patches
+- Operationen: append-after, replace, delete, append
+Anchor-Suche ist robust gegen Whitespace.
+<<<
+RATIONALE: >>>
+Implementiert Composition-Syntax deklarativ.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/agents.py
+- Tests für jede Patch-Operation
+<<<
+TAGS: design, agents
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-003
+
+[REQUIREMENT]
+UID: REQ-DES-003
+TITLE: build_variables() sammelt alle Platzhalter
+STATEMENT: >>>
+Funktion in lib/config.py:
+- Input: project.yaml, role-defaults.yaml, DoD-Preset
+- Output: dict mit {{VARIABLE}}: Wert Mappings
+- Warnt bei fehlenden required Variablen
+Quellen: custom_vars, role-defaults, DoD, berechnete
+<<<
+RATIONALE: >>>
+Zentraler Punkt für Variablen-Sammlung.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/config.py
+- Tests prüfen auf alle Variablen
+<<<
+TAGS: design, config
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-DES-004
+TITLE: substitute() ersetzt Platzhalter
+STATEMENT: >>>
+Funktion in lib/config.py:
+- Input: content (String), variables dict
+- Output: content mit ersetzten {{VAR}}
+- Regex: [A-Z0-9_]+ (Großbuchstaben, Ziffern, Unterstrich)
+Escaping: {{{{VAR}}}} → {{VAR}}
+<<<
+RATIONALE: >>>
+Konsistente Substituierungs-Logik über alle Dateien.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/config.py
+- Tests für Regex-Korrektheit
+- Ungeersetzte {{VAR}} werden gewarnt
+<<<
+TAGS: design, config
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-DES-005
+TITLE: sync_agents_for_provider() generiert Agenten
+STATEMENT: >>>
+Funktion in lib/agents.py:
+- Input: Provider-Name, variables, alle Schichten
+- Output: Schreibt .claude/agents/*.md (oder Provider-spezifisch)
+- Schritte:
+  1. Für jede Rolle: collect_sources()
+  2. Wenn extends: → compose_agent()
+  3. Frontmatter injizieren
+  4. Variablen ersetzen
+  5. write_checked() aufrufen
+<<<
+RATIONALE: >>>
+Provider-spezifische Agent-Generierung, zentral.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/agents.py
+- Wird von main() aufgerufen pro Provider
+<<<
+TAGS: design, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-002, REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-DES-006
+TITLE: resolve_active_mcp_servers() bestimmt aktive Server
+STATEMENT: >>>
+Funktion in lib/mcp.py:
+- Input: project.yaml, agent-meta root
+- Output: list von aktiven Server-Namen
+- Logik:
+  1. Explizit: mcp-servers: [...] in project.yaml
+  2. Implizit: platform bundles rules/2-platform/<platform>-mcp.yaml
+  3. Nur wenn enabled-by-default: true
+<<<
+RATIONALE: >>>
+Bestimmt welche MCP-Server sync.py generieren soll.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/mcp.py
+- Tests validieren Merging-Logik
+<<<
+TAGS: design, mcp
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-010
+
+[REQUIREMENT]
+UID: REQ-DES-007
+TITLE: write_checked() validiert vor Schreiben
+STATEMENT: >>>
+Funktion in lib/io.py:
+- Input: file_path, content
+- Scans: Secrets (nicht in committed Files)
+- Fallback zu lokale/gitignored Dateien
+- Wirft SyncError bei Secrets in committed Dateien
+<<<
+RATIONALE: >>>
+Verhindert dass Secrets committed werden.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/io.py
+- Tests für Secret-Scanning
+<<<
+TAGS: design, security
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-014
+
+[REQUIREMENT]
+UID: REQ-DES-008
+TITLE: load_config() parst project.yaml
+STATEMENT: >>>
+Funktion in lib/config.py:
+- Input: config_path
+- Output: dict mit vollständiger Konfiguration
+- Parsing: YAML oder JSON (fallback)
+- Validierung: Optional gegen Schema
+<<<
+RATIONALE: >>>
+Zentrale Konfiguration-Parsing-Logik.
+<<<
+VERIFICATION: >>>
+- Existiert in lib/config.py
+- Tests für YAML + JSON
+<<<
+TAGS: design, config
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-001

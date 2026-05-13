@@ -1,0 +1,392 @@
+[DOCUMENT]
+TITLE: System Requirements — Agent Framework Core (L2)
+
+PREAMBLE: >>>
+System-level requirements for the core agent framework:
+- sync.py as central orchestration engine
+- Layer-stacking and composition
+- Frontmatter injection
+- Agent hints and metadata
+<<<
+
+[REQUIREMENT]
+UID: REQ-SYS-001
+TITLE: sync.py ist zentrale Generator-Engine
+STATEMENT: >>>
+sync.py orchestriert den kompletten Generierungs-Prozess:
+1. Konfiguration laden (project.yaml) + validieren
+2. Alle Schichten-Quellen sammeln (0-external, 1-generic, 2-platform, 3-project)
+3. Für jeden aktiven Provider:
+   a. Agenten zusammensetzen (collect_sources + merge)
+   b. Frontmatter injizieren (model, memory, etc.)
+   c. Variablen ersetzen ({{VAR}})
+   d. Validierung durchführen
+4. Rules, Hooks, Commands, Snippets, Extensions syncen
+5. MCP-Artifacts generieren
+6. Provider-Isolation applizieren
+7. Output validieren + write_checked() aufrufen
+8. Logs schreiben (sync.log)
+<<<
+RATIONALE: >>>
+Ein konsistenter Generator-Punkt verhindert State-Divergenz zwischen Quellen und Output.
+Alle Transformationen folgen gleicher Logik, Same-Order-Garantie.
+<<<
+VERIFICATION: >>>
+- sync.py hat main() Entry-Point mit Argument-Parsing
+- lib/ Module implementieren Einzelne Schritte (agents.py, rules.py, mcp.py, etc.)
+- --dry-run zeigt exakt was würde geändert (ohne zu schreiben)
+- sync.log dokumentiert jeden Schritt und Fehler
+- Alle Operationen sind idempotent (mehrfaches Ausführen ändert nichts)
+<<<
+TAGS: system, sync, core
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-001, REQ-STK-002, REQ-STK-003, REQ-STK-004
+
+[REQUIREMENT]
+UID: REQ-SYS-002
+TITLE: Layer-Stack-Engine mit expliziter Priorität
+STATEMENT: >>>
+System muss für jede Rolle einen 4-Schichten-Stack zusammensetzen mit Fallback-Logik:
+1. Prüfe 3-project/<role>.md (Projekt-Override)
+   → Wenn existent: nutze dies (höchste Priorität)
+2. Prüfe 2-platform/<platform>-<role>.md (Plattform-Override)
+   → Wenn existent: nutze dies
+3. Prüfe 1-generic/<role>.md (Generischer Base)
+   → Wenn existent: nutze dies
+4. Prüfe 0-external (externe Skills)
+   → Wenn existent und enabled: nutze Wrapper-Agent
+5. Wenn nichts gefunden: ERROR (Rolle ist required)
+Bei Extends in 2/3: Nutze Composition-Engine (REQ-SYS-003)
+<<<
+RATIONALE: >>>
+Implementiert das Schichten-Modell mit expliziter, vorhersagbarer Priorität.
+Fallback verhindert dass "Rollen verschwinden" wenn eine Schicht nicht existiert.
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat collect_sources() Funktion mit vollständiger Logik
+- Mehrere Schichten-Quellen werden korrekt combined
+- Override-Priorität wird in Unit-Tests validiert für alle Kombinationen
+- Edge-Cases getestet: fehlende Schichten, leere Dateien, extends ohne Base
+- Error-Meldungen sind aussagekräftig wenn Role nicht gefunden
+<<<
+TAGS: system, composition, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-002
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-003
+TITLE: Composition-Engine für Extends & Patches
+STATEMENT: >>>
+System erkennt extends: <role> im Frontmatter von 2-platform/3-project Agenten
+und wendet Patch-Operationen auf den Base-Agent an:
+Patch-Format YAML:
+  patches:
+    - op: append-after
+      anchor: "## Section Name"
+      content: |
+        ## New Section
+        Content here
+    - op: replace
+      anchor: "## Old Section"
+      content: |
+        ## New Section (replaces old)
+    - op: delete
+      anchor: "## Removed Section"
+    - op: append
+      content: "Append to end of file"
+Output: Vollständiger, komponierter Agent mit appliziertem Patch.
+<<<
+RATIONALE: >>>
+Ermöglicht deklarative Spezialisierungen ohne vollständige Kopien.
+Wenn 1-generic sich ändert, bleibt 2-platform's Base up-to-date.
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat compose_agent(base_content, patches_list) Funktion
+- Jede Patch-Operation ist einzeln implementiert und testbar
+- Anchor-Suche funktioniert mit Markdown-Section-Syntax
+- Tests validieren jede Operation: append-after, replace, delete, append
+- Edge-cases: mehrfache gleiche Anchors, fehlende Anchors, leere Patches
+- Patch-Anwendung ist idempotent
+<<<
+TAGS: system, composition, agents
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-006
+- TYPE: refines
+  VALUE: REQ-SYS-002
+
+[REQUIREMENT]
+UID: REQ-SYS-004
+TITLE: Frontmatter-Injections für Rollen-Variablen
+STATEMENT: >>>
+System injiziert Rollen-konfigurierte Werte in Agent-Frontmatter (YAML header):
+- model: Claude-Modell (claude-opus-4-7, claude-sonnet-4-6, etc.)
+  Quelle: project.yaml → model override, oder role-defaults.yaml
+- memory: Art Gedächtnis (project | local | user | none)
+  Quelle: role-defaults.yaml, optional überschreibbar
+- permissionMode: Claude Code Permission-Modell (allow, prompt, deny)
+  Quelle: role-defaults.yaml pro Rolle
+- temperature: LLM-Parameter (0.0 - 2.0)
+  Quelle: role-defaults.yaml
+- (weitere Felder je nach role-defaults.yaml Schema)
+Injizierung erfolgt NACH Composition, VOR Variable-Substitution.
+<<<
+RATIONALE: >>>
+Zentralisierte Rollen-Konfiguration statt hardcoded Werte in Templates.
+Model/Memory-Entscheidungen sind zentral steuerbar ohne Templates zu editieren.
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat inject_*_field() Funktionen für jedes Feld
+- role-defaults.yaml YAML Schema definiert alle injizierbaren Felder
+- project.yaml kann pro Rolle Overrides definieren
+- Überschreibungen aus project.yaml funktionieren und werden geloggt
+- Alle Injektionen sind in sync.log dokumentiert
+- Tests prüfen Model-Kompatibilität (z.B. opus-4-7 existiert)
+<<<
+TAGS: system, configuration, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-004
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-005
+TITLE: Variablen-Substitution Engine
+STATEMENT: >>>
+System sammelt alle Platzhalter-Variablen aus verschiedenen Quellen
+und ersetzt alle {{GROSS_MIT_UNTERSTRICH}} in Agenten-Output:
+Quellen:
+1. project.yaml: custom_vars block
+2. role-defaults.yaml: role-names, role-descriptions, default values
+3. DoD-Preset: DOD_* Variablen (DOD_TESTS_REQUIRED, etc.)
+4. Berechnete: {{FRAMEWORK_VERSION}}, {{AGENT_HINTS}}, {{PARALLEL_PATTERN}}, etc.
+5. Umgebung: {{PROJECT_NAME}}, {{TECH_STACK}}, etc.
+Pattern: Regex [A-Z0-9_]+ (Großbuchstaben, Ziffern, Unterstrich)
+Ersetzung erfolgt NACH Composition, NACH Frontmatter-Injection.
+Warnung bei unersetzten Platzhaltern im Final-Output.
+<<<
+RATIONALE: >>>
+Ermöglicht dynamische Agent-Anpassung an Projekt-Kontext ohne
+dass Templates wissen müssen, welche Variablen existieren.
+<<<
+VERIFICATION: >>>
+- lib/config.py hat build_variables(project.yaml, role-defaults.yaml, dod_preset) Funktion
+- substitute(content, variables_dict) ersetzt alle {{VAR}} mit Regex
+- --only-variables Mode updatet nur Platzhalter (fast operation)
+- Tests prüfen auf ungeersetzte {{VAR}} im Final-Output
+- Fehlerhafte Variablen (z.B. {{UNKNOWN}}) werden gewarnt
+- {{{{ESCAPED}}}} → {{ESCAPED}} (Escaping für Literale)
+<<<
+TAGS: system, configuration, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-005
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-006
+TITLE: Provider-Abstraktions-Layer
+STATEMENT: >>>
+System abstrahiert Provider-spezifische Details in lib/providers.py:
+Jeder Provider hat definierte Eigenschaften:
+- agents_dir: Wo Agenten hingeschrieben werden (.claude/agents/, etc.)
+- rules_dir: Wo Rules hingeschrieben werden (.claude/rules/, etc.)
+- commands_dir: Wo Commands hingeschrieben werden (.claude/commands/, etc.)
+- settings_path: Hauptkonfigurationsdatei (settings.json, config.yaml, etc.)
+- settings_local_path: Lokale Überrides (gitignored)
+- Provider-spezifische Optionen (z.B. generate-prompts für Continue)
+- Parallel-Pattern: Wie werden Agenten parallel instanziiert
+- Isolation-Mechanismus: Wie wird Provider-Isolation durchgesetzt
+Neue Provider können hinzugefügt werden ohne sync.py core zu modifizieren.
+<<<
+RATIONALE: >>>
+Abstrahierung ermöglicht dass neue Provider hinzugefügt werden können
+ohne Schichten-Logik zu ändern.
+Jeder Provider hat seine eigenen Directories und Configs,
+aber gemeinsame Agenten/Rules/Commands Sources.
+<<<
+VERIFICATION: >>>
+- lib/providers.py definiert Provider-Klasse oder Config-Dict
+- Jeder Provider hat vollständige Konfiguration (4+ Eigenschaften)
+- sync_agents_for_provider() iteriert über alle aktiven Provider
+- Provider-spezifische Pfade werden korrekt verwendet
+- Tests validieren dass Agenten in den richtigen Verzeichnissen landen
+<<<
+TAGS: system, providers, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-003
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-007
+TITLE: Rules-Sync mit Schichten-Override
+STATEMENT: >>>
+System kopiert Rules aus allen Schichten mit Priorität:
+2-platform > 1-generic > 0-external
+Logik:
+1. Sammle alle .md-Dateien aus rules/1-generic/
+2. Überprüfe rules/2-platform/<platform>-*.md
+   - Wenn 2-platform/sharkord-security.md existiert,
+     überschreibt es 1-generic/security.md
+3. Output: Copy zu .claude/rules/ (oder Provider-spezifisch)
+4. Maintainance: Stale Rules (in .agent-meta-managed Index) werden gelöscht
+5. Projekt-eigene .claude/rules/ werden NIEMALS angefasst oder gelöscht
+<<<
+RATIONALE: >>>
+Rules müssen Projekt-unabhängig aktualisiert werden können
+(z.B. Sicherheits-Policy von agent-meta auf alle Projekte)
+ohne dass Projekt-Erweiterungen überschrieben werden.
+<<<
+VERIFICATION: >>>
+- lib/rules.py hat sync_rules(project, providers) Funktion
+- Rules aus allen Schichten werden geladen und mit Priorität gemergt
+- .claude/rules/.agent-meta-managed Index-Datei wird gepflegt
+- Stale Rules (nicht in Quellen aber in Index) werden gelöscht
+- Projekt-Rules bleiben unverändert (auch wenn gleicher Name)
+- Logs dokumentieren welche Rules gesync wurden
+<<<
+TAGS: system, rules, agents
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-007
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-008
+TITLE: Agent-Hints und Parallel-Patterns
+STATEMENT: >>>
+System extrahiert hint: Feld aus Agent-Frontmatter und nutzt es für:
+1. AGENT_HINTS: CSV-String mit allen Hinweisen für Orchestrator
+   Format: "orchestrator: Koordination und Delegation, developer: Feature-Implementierung, ..."
+   Wird in {{AGENT_HINTS}} injiziert (z.B. im Orchestrator-Template)
+   Hilft Orchestrator zu entscheiden, welche Rollen verfügbar sind
+2. PARALLEL_PATTERN: Provider-spezifisches Muster für parallele Execution
+   Quelle: provider-Konfiguration, abhängig von Provider-Fähigkeiten
+   Wird in {{PARALLEL_PATTERN}} injiziert
+Beide werden zur Sync-Zeit berechnet und injiziert.
+<<<
+RATIONALE: >>>
+Agenten (besonders Orchestrator) müssen zur Runtime wissen,
+welche anderen Rollen verfügbar sind und wie man sie delegiert.
+Provider unterstützen unterschiedliche Parallel-Patterns
+(Serial für manche, true Parallel für andere).
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat build_agent_hints(all_agents) Funktion
+- {{AGENT_HINTS}} wird in Orchestrator und anderen delegierenden Agenten genutzt
+- {{PARALLEL_PATTERN}} wird korrekt pro Provider gesetzt
+- Hints sind aussagekräftig und aus Frontmatter korrekt extrahiert
+- Tests validieren Hint-Generierung für verschiedene Agent-Sets
+<<<
+TAGS: system, agents, orchestration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-001
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-009
+TITLE: Hooks-Registry und Registrierung
+STATEMENT: >>>
+System verwaltet Hooks (automatisierte Shell-Scripts):
+1. Sammle Hook-Skripte aus hooks/1-generic/, hooks/2-platform/
+2. Parse Hook-Meta-Header (hook:, version:, event:, matcher:, enabled:)
+3. Filter: Nur aktivierte Hooks (enabled: true in Config)
+4. Kopiere zu .claude/hooks/
+5. Registriere in settings.json → hooks block mit:
+   - Hook-Name
+   - Event (PreToolUse, PostToolUse, PreCommit, etc.)
+   - Matcher (Glob-Pattern für wann hook greift)
+   - Script-Pfad
+Two-Gate: Datei muss existieren UND enabled: true sein.
+<<<
+RATIONALE: >>>
+Hooks automatisieren Validierungs-Prozesse (z.B. DoD-Checks vor Push).
+Zentrale Registry verhindert doppelte Hook-Definition.
+<<<
+VERIFICATION: >>>
+- lib/hooks.py implementiert sync_hooks(project, providers)
+- Hook-Meta wird aus Script-Header geparst
+- settings.json hooks. Block wird korrekt mit Hook-Definitionen gefüllt
+- Enabled-Filter funktioniert korrekt
+- Tests validieren Hook-Parsing und -Registrierung
+- Stale Hooks werden gelöscht (mittels managed Index)
+<<<
+TAGS: system, hooks, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-010
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-010
+TITLE: Agent-Table für CLAUDE.md Auto-Generation
+STATEMENT: >>>
+System extrahiert Metadaten aus allen Agenten (name, version, description, hint)
+und generiert Agenten-Tabelle für CLAUDE.md (oder ähnliche Dokumentation):
+Struktur:
+| Agent | Zuständigkeit | Hint |
+|-------|---------------|------|
+| orchestrator | v1.0.0 | Koordiniert alle anderen Agenten |
+| developer | v1.0.0 | Feature-Implementierung und Bugfixes |
+| ...
+
+Diese Tabelle wird als {{AGENTS_TABLE}} injiziert in CLAUDE.md.
+Falls CLAUDE.md nicht vorhanden, kann sie generiert werden.
+<<<
+RATIONALE: >>>
+Automatische Dokumentation der verfügbaren Agenten
+verhindert dass CLAUDE.md veraltet.
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat build_agent_table(all_agents) Funktion
+- {{AGENTS_TABLE}} wird in CLAUDE.md injiziert
+- Tabelle enthält Version, Beschreibung, Hints
+- Agenten-Reihenfolge ist konsistent
+- Tests validieren Tabellen-Format
+<<<
+TAGS: system, agents, documentation
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-SYS-001

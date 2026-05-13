@@ -1,0 +1,300 @@
+[DOCUMENT]
+TITLE: System Requirements — Sync System, Rules, Extensions (L2)
+
+[REQUIREMENT]
+UID: REQ-SYS-011
+TITLE: External Skills Integration
+STATEMENT: >>>
+System lädt externe Skills aus config/skills-registry.yaml:
+- Repo URL + Submodul
+- Approval-Status (approved: true/false)
+- Pinned Commit (für Stabilität)
+Für aktivierte Skills: generiert Wrapper-Agent und kopiert Skill-Dateien.
+<<<
+RATIONALE: >>>
+Skill-Wiederverwendung ohne dass Zielprojekte Submodule selbst verwalten.
+<<<
+VERIFICATION: >>>
+- lib/skills.py implementiert sync_external_skills_for_provider()
+- --add-skill registriert neuen Skill
+- Wrapper-Agenten werden generiert
+- Pinned-Commits werden überprüft
+<<<
+TAGS: system, skills
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-009
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-012
+TITLE: Extension-System mit Managed Blocks
+STATEMENT: >>>
+System verwaltet .claude/3-project/<prefix>-<role>-ext.md:
+- --create-ext erstellt Extension
+- Managed Block mit Variablen wird von sync.py aktualisiert
+- Projekt-Block wird nie berührt
+- Extensions werden in Agenten via Read-Hook geladen
+<<<
+RATIONALE: >>>
+Projekte können Agenten erweitern ohne dass Sync überschreibt.
+<<<
+VERIFICATION: >>>
+- lib/extensions.py hat create_extension() und update_extensions()
+- Managed-Block wird korrekt identifiziert
+- Projekt-Block bleibt unverändert
+- Agenten haben Read-Hook für Extensions
+<<<
+TAGS: system, extensions
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-012
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-013
+TITLE: Provider-Isolation Hard-Blocks
+STATEMENT: >>>
+System generiert Provider-Isolation (wenn >1 Provider):
+- Claude: permissions.deny mit Glob-Patterns
+- Gemini: TOML-Policy-Rules mit Regex
+- Opencode: permission.read/edit deny
+- Continue: Soft-Rule Dokumentation
+<<<
+RATIONALE: >>>
+Security: Provider können nicht auf andere Provider-Verzeichnisse zugreifen.
+<<<
+VERIFICATION: >>>
+- lib/isolation.py implementiert sync_provider_isolation()
+- settings.json wird mit deny-Globs gefüllt
+- Tests validieren Isolation-Regeln
+<<<
+TAGS: system, security, providers
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-011
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-014
+TITLE: Secrets-Handling (Template, Local, Committed)
+STATEMENT: >>>
+System verwaltet Secrets:
+1. secrets.local.yaml (gitignored, aktuelle Werte)
+2. Committed Config ({{VAR}} Referenzen nur)
+3. Generator scannt auf Secrets (SyncError wenn committed)
+<<<
+RATIONALE: >>>
+Sicherheit: Keine Secrets in Git. Aber projektübergreifend konfigurierbar.
+<<<
+VERIFICATION: >>>
+- lib/secrets.py implementiert Scanning + Template-Init
+- write_checked() wirft SyncError bei committed Secrets
+- secrets.local.yaml ist in .gitignore
+<<<
+TAGS: system, security
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-008, REQ-STK-011
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-015
+TITLE: Konfiguration Auto-Detect
+STATEMENT: >>>
+System erkennt Konfiguration automatisch:
+1. --config Flag (explizit)
+2. .meta-config/project.yaml (Standard)
+3. agent-meta.config.yaml (Legacy)
+4. agent-meta.config.json (Legacy)
+<<<
+RATIONALE: >>>
+Convenience: Nutzung ohne --config Flag.
+<<<
+VERIFICATION: >>>
+- sync.py main() hat Config-Auto-Detect
+- _CONFIG_CANDIDATES Liste ist dokumentiert
+<<<
+TAGS: system, configuration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-004
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-016
+TITLE: Dry-Run Mode für sichere Preview
+STATEMENT: >>>
+System unterstützt --dry-run Flag:
+- Alle Operationen ausführen ABER keine Dateien schreiben
+- Output zeigt was würde geändert
+- Sicherheit: Nutzer kann Änderungen prüfen
+<<<
+RATIONALE: >>>
+Sicherheit: Prüfung vor Anwendung.
+<<<
+VERIFICATION: >>>
+- sync.py hat --dry-run Flag
+- write_checked() wird nicht aufgerufen
+- Logs zeigen was würde geschrieben
+<<<
+TAGS: system, quality
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-017
+TITLE: Logging und Fehler-Handling
+STATEMENT: >>>
+System loggt alle Operationen:
+- lib/log.py SyncLog Klasse
+- Level: info, warn, error
+- Logs gehen in sync.log
+- SyncError für kritische Fehler (abbrechend)
+<<<
+RATIONALE: >>>
+Debugging und Audit-Trail der Sync-Operationen.
+<<<
+VERIFICATION: >>>
+- SyncLog Klasse existiert
+- sync.log wird geschrieben
+- Fehler-Meldungen sind aussagekräftig
+<<<
+TAGS: system, quality
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-018
+TITLE: DoD-Preset-Auflösung
+STATEMENT: >>>
+System lädt DoD-Presets und injiziert DoD_* Variablen:
+- REQ_TRACEABILITY: Commits brauchen REQ-IDs?
+- TESTS_REQUIRED: Tests sind Pflicht?
+- CODEBASE_OVERVIEW: Doku aktualisieren?
+- SECURITY_AUDIT: Security-Prüfung vor Release?
+<<<
+RATIONALE: >>>
+Flexible Quality-Standards je Projekt.
+<<<
+VERIFICATION: >>>
+- lib/dod.py implementiert resolve_dod()
+- config/dod-presets/ enthält Presets
+- {{#if DOD_*}} Blöcke in Templates funktionieren
+<<<
+TAGS: system, quality
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-014
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-019
+TITLE: Platform-Config-Loading
+STATEMENT: >>>
+System lädt Plattform-spezifische Config:
+- rules/2-platform/<platform>-mcp.yaml für MCP-Bundles
+- platform-configs/<platform>.yaml für Plattform-Variablen
+- Ergänzt Project-Config
+<<<
+RATIONALE: >>>
+Plattformen können vorkonfigurierte Defaults bereitstellen.
+<<<
+VERIFICATION: >>>
+- lib/platform.py implementiert load_platform_config()
+- rules/2-platform/ Verzeichnis existiert
+<<<
+TAGS: system, configuration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-010
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-020
+TITLE: Agent-Hints und Parallel-Patterns
+STATEMENT: >>>
+System extrahiert hint: und erzeugt:
+- AGENT_HINTS: CSV mit Hinweisen für Orchestrator
+- PARALLEL_PATTERN: Provider-spezifisches Muster
+Beide werden injiziert.
+<<<
+RATIONALE: >>>
+Agenten wissen wo sie delegieren können.
+<<<
+VERIFICATION: >>>
+- lib/agents.py hat build_agent_hints()
+- {{AGENT_HINTS}} wird injiziert
+- {{PARALLEL_PATTERN}} ist Provider-spezifisch
+<<<
+TAGS: system, agents
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-SYS-021
+TITLE: Visualization (Mindmap + Session-Tracking)
+STATEMENT: >>>
+System visualisiert Agenten:
+1. Static Mindmap: docs/agent-mindmap.md + agent-graph.html
+2. Dynamic: Events loggen zu .meta-viz/events.jsonl
+3. Reports: Gantt, Sequence Diagrams
+<<<
+RATIONALE: >>>
+Hilft Nutzer verstehen Agent-Koordination.
+<<<
+VERIFICATION: >>>
+- lib/viz.py implementiert generate_viz()
+- --viz Flag wird unterstützt
+- Events werden geloggt
+- Reports werden generiert
+<<<
+TAGS: system, visualization
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-STK-016
+- TYPE: refines
+  VALUE: REQ-SYS-001
