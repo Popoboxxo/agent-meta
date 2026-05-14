@@ -187,6 +187,7 @@ def run_setup_wizard(
     config["speech-mode"] = "full"
     config["max-parallel-agents"] = 2
     config["model-overrides"] = {}
+    config["meta-repo"] = False
     config["hooks"] = {}
     config["provider-options"] = {}
     config["external-skills"] = {}
@@ -330,6 +331,15 @@ def _write_config(path: Path, config: dict) -> None:
             "#     generate-prompts: true\n"
             "#     prompt-mode: full\n"
             "#   Opencode: {}\n"
+            "\n"
+        ),
+    )
+    body = body.replace(
+        "meta-repo: false\n",
+        (
+            "# Meta-Repo Modus — nur aktivieren wenn dieses Projekt mehrere Sub-Projekte koordiniert\n"
+            "# (z.B. sharkord-meta mit mehreren Plugin-Repos). Aktiviert Cross-Plugin Standardisierung.\n"
+            "# meta-repo: true\n"
             "\n"
         ),
     )

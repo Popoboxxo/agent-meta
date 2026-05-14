@@ -474,6 +474,11 @@
       "enum": ["disabled"],
       "description": "Set to 'disabled' to skip provider isolation generation (e.g. in the agent-meta meta-repo itself, which intentionally manages all provider directories)."
     },
+    "meta-repo": {
+      "type": "boolean",
+      "description": "When true, activates meta-repository features: cross-plugin standardization, multi-repo workspace awareness, and centralized documentation (PATTERNS.md, LEARNINGS.md, CONVENTIONS.md). Use when this project coordinates multiple sub-projects (e.g. sharkord-meta with multiple plugins).",
+      "default": false
+    },
     "rules-preset": {
       "type": "string",
       "description": "Controls which rules are always active (alwaysApply) and per-provider skip behavior. Presets are defined in config/rules-presets.yaml.",
