@@ -1,6 +1,5 @@
 """Unit tests for scripts/lib/roles.py"""
 
-import pytest
 from lib.roles import (
     _resolve_tier_to_model,
     resolve_model,

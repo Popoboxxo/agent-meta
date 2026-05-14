@@ -968,14 +968,6 @@ def _make_slim_body(content: str) -> str:
         "## Beispiel",
         "## Anhang",
     }
-    keep_sections = {
-        "## Don'ts",
-        "## Donts",
-        "## Don",
-        "## Kernregeln",
-        "## Aktive DoD",
-        "## DoD",
-    }
 
     for line in lines:
         stripped = line.strip()

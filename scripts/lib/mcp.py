@@ -221,7 +221,6 @@ def _update_json_config(
 
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
-    rel_out = str(path.relative_to(path.parent.parent)) if path.parent.name else rel
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -258,11 +257,6 @@ def _update_continue_yaml_config(
 
     rel = str(path.name)
 
-    # Build the managed block content
-    servers_yaml = _yaml.dump(
-        {"mcpServers": list(mcp_entries.values())},
-        allow_unicode=True, default_flow_style=False, sort_keys=False,
-    )
     # Annotate with server names as comments
     server_lines: list[str] = []
     for server_name, entry in mcp_entries.items():

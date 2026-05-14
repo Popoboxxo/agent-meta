@@ -1,7 +1,6 @@
 """Agent-Visualisierung: Statische Mindmap-Generierung und Event-Log-Management."""
 
 import json
-import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path

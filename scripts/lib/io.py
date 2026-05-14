@@ -1,9 +1,15 @@
 """I/O helpers for loading YAML/JSON config files."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .log import SyncLog
 
 
 class SyncError(Exception):
@@ -63,7 +69,7 @@ def is_unchanged(path: Path, new_content: str) -> bool:
 def write_checked(
     path: Path,
     content: str,
-    log: "SyncLog",
+    log: SyncLog,
     rel_label: str,
     force: bool = False,
     allow_secrets: bool = False,

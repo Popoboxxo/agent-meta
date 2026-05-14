@@ -42,19 +42,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from lib.log import SyncLog
-from lib.io import _load_yaml_or_json, _write_yaml
 from lib.config import (
     load_config, find_agent_meta_root, build_variables,
-    fill_defaults, read_version, read_git_version, substitute,
+    fill_defaults, read_version, read_git_version,
 )
 from lib.roles import build_role_map
 from lib.dod import resolve_dod
-from lib.providers import load_providers_config, resolve_providers, resolve_provider_options
+from lib.providers import load_providers_config, resolve_providers
 from lib.platform import load_platform_config
 from lib.agents import (
-    collect_sources, sync_agents_for_provider,
-    build_agent_hints, build_agent_table,
-    extract_frontmatter_field,
+    sync_agents_for_provider,
 )
 from lib.rules import sync_rules, sync_speech_mode, create_rule, resolve_rules
 from lib.hooks import sync_hooks, create_hook
@@ -63,12 +60,11 @@ from lib.skills import (
     load_external_skills_config, check_pinned_commits, sync_external_skills_for_provider, add_skill,
 )
 from lib.extensions import create_extension, update_extensions
-from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
+from lib.mcp import generate_mcp_artifacts, init_secrets_template
 from lib.isolation import sync_provider_isolation
 from lib.io import SyncError
 from lib.context import (
-    sync_context_for_provider, init_claude_personal, init_opencode_personal,
-    init_settings_json, init_settings_local_json, ensure_gitignore_entries,
+    sync_context_for_provider, init_claude_personal, init_settings_json, init_settings_local_json, ensure_gitignore_entries,
     init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
 )
 from lib.viz import (

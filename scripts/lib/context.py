@@ -1,6 +1,5 @@
 """Context file management: CLAUDE.md managed block, provider context, gitignore, settings."""
 
-import json
 import re
 from pathlib import Path
 

@@ -13,7 +13,6 @@ Usage:
 """
 
 import sys
-import os
 import json
 import yaml
 import argparse

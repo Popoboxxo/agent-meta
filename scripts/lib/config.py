@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml, _yaml, _YAML_AVAILABLE
+from .io import _write_yaml, _yaml, _YAML_AVAILABLE
 from .log import SyncLog
 
 try:
@@ -96,7 +96,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       {path}: {err.message}", file=sys.stderr)
             if len(errors) > 5:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
-    except (ImportError, TypeError, ValueError) as e:
+    except (ImportError, TypeError, ValueError):
         pass  # jsonschema not installed or validation error — best-effort
 
 

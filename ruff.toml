@@ -1,0 +1,12 @@
+# Ruff configuration for agent-meta scripts.
+# Default ruleset is `E4, E7, E9, F` (pycodestyle errors + pyflakes).
+# We extend-ignore rules that don't catch real bugs in this codebase:
+#   E402 — scripts/* perform sys.path manipulation before importing lib/, by design.
+#   E741 — `l` is used as a line iterator in compact list comprehensions.
+#   F541 — f-strings without placeholders are kept for visual consistency.
+
+target-version = "py312"
+line-length = 120
+
+[lint]
+extend-ignore = ["E402", "E741", "F541"]
