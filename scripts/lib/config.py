@@ -248,10 +248,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     sub_projects = config.get("variables", {}).get("SUB_PROJECTS", "")
     if sub_projects:
         variables["SUB_PROJECTS"] = sub_projects
-    # META_REPO: auto-inject flag for meta-repository documentation strategy
-    meta_repo = config.get("variables", {}).get("META_REPO", "")
+    # META_REPO: auto-inject from top-level config field (default: false)
+    # When true, activates cross-plugin standardization and centralized docs
+    meta_repo = config.get("meta-repo", False)
     if meta_repo:
-        variables["META_REPO"] = meta_repo
+        variables["META_REPO"] = "true"
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)

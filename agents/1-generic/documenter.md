@@ -129,7 +129,8 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ## 4. Meta-Repository Documentation Strategy (Optional)
 
-> Activated when `META_REPO: true` is set in project variables.
+> Activated when `meta-repo: true` is set in `.meta-config/project.yaml`.
+> For normal (non-meta) projects, skip this section.
 
 If this project is a **meta-repository** coordinating multiple sub-projects:
 
