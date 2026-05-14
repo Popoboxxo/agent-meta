@@ -130,7 +130,54 @@ Dokumentationszyklus MUSS laufen, wenn mindestens eines zutrifft:
 
 ---
 
-## 4. README.md Pflege
+## 4. Meta-Repository Documentation Strategy (Optional)
+
+> Activated when `meta-repo: true` is set in `.meta-config/project.yaml`.
+> For normal (non-meta) projects, skip this section.
+
+If this project is a **meta-repository** coordinating multiple sub-projects:
+
+### Scope Separation
+
+| Topic | Location | Owner |
+|-------|----------|-------|
+| Plugin feature docs | Plugin repo `README.md` | Plugin developer |
+| Plugin API docs | Plugin repo `docs/API.md` | Plugin developer |
+| Shared conventions | **Meta-repo** `docs/CONVENTIONS.md` | Meta documenter |
+| Cross-plugin patterns | **Meta-repo** `docs/PATTERNS.md` | Meta documenter |
+| Lessons learned | **Meta-repo** `docs/LEARNINGS.md` | Meta documenter |
+| Architecture decisions | **Meta-repo** `docs/ARCHITECTURE.md` | Meta documenter |
+| Plugin-specific architecture | Plugin repo `docs/ARCHITECTURE.md` | Plugin documenter |
+
+### Learning Capture Format
+
+When a session produces insights relevant beyond a single project, use this template:
+→ `.agent-meta/templates/learning-capture.md`
+
+```markdown
+## <Learning Title>
+
+**Context:** Which project(s) and situation
+**Problem:** What went wrong or was unclear
+**Solution:** What fixed it or the recommended approach
+**Applies to:** Which projects should follow this
+**Date:** YYYY-MM-DD
+```
+
+### Monitoring Responsibility
+
+Periodically review sub-project changelogs and architecture docs for decisions that should be elevated to meta-repo conventions. Propose updates via `meta-feedback` agent.
+
+### Cross-Plugin Sync Workflow
+
+1. Check plugin-local `docs/conclusions/` for patterns worth sharing
+2. Copy relevant entries to meta-repo `docs/LEARNINGS.md` with attribution
+3. Propose standardization in `docs/PATTERNS.md` if the pattern is reusable
+4. Update `docs/CONVENTIONS.md` if a new cross-plugin convention emerges
+
+---
+
+## 5. README.md Pflege
 
 **WICHTIG:** README MUSS immer auf **Englisch** geschrieben werden.
 

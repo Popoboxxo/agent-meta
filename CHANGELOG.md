@@ -4,6 +4,32 @@
 
 ---
 
+## [0.41.0] — 2026-05-15
+
+### Added
+
+- **Sharkord plugin system** (`agents/2-platform/sharkord-developer.md`, `sharkord-validator.md`, `sharkord-feature.md`, `sharkord-orchestrator.md`): Enhanced developer agent with plugin structure, naming conventions, config validation, and cross-plugin pattern sharing. New validator agent with SDK deprecation, structure, test pyramid, and Docker checks. New feature agent with skeleton bootstrap checklist. New orchestrator extension with cross-plugin standardization workflow. Closes #140, #131, #132, #133.
+- **Sharkord test pyramid** (`rules/2-platform/sharkord-developer.md`, `sharkord-feature.md`): Test pyramid guidance for Sharkord plugins. Closes #137.
+- **SDK compatibility layer** (`rules/2-platform/sharkord-sdk.md`): SDK compatibility layer with stale TODO validation. Closes #136.
+- **Build variant decision guide** (`rules/2-platform/sharkord-release.md`, `sharkord-docker-ops.md`): Build variant guidance for Sharkord releases and Docker operations. Closes #138.
+- **Sharkord CI template** (`templates/sharkord-plugin-ci.yml`): CI template referenced by sharkord-release.md. Closes #135.
+- **Meta-repo documentation strategy** (`agents/1-generic/documenter.md`, `docs/PATTERNS.md`, `docs/LEARNINGS.md`, `docs/CONVENTIONS.md`, `templates/learning-capture.md`): New documentation strategy with pattern/learning/convention files and learning-capture template. Closes #134, #142.
+- **Multi-repo workspace support** (`scripts/lib/config.py`, `rules/1-generic/multi-repo-workspace.md`, `howto/project.yaml.example`): Config placeholders, multi-repo workspace rule, and project.yaml example updates. Closes #141.
+- **Meta-repo as first-class config option** (`config/project-config.schema.json`, `scripts/lib/config.py`): `meta-repo` top-level config option with schema validation. Closes #148.
+- **Standardized Sharkord starter templates** (`templates/2-platform/sharkord/starter/`): Plugin starter templates with standardized build system and structure enforcement, organized in layered directory structure.
+
+### Fixed
+
+- **Opencode provider support** (`config/project-config.schema.json`, `scripts/setup.py`): Added Opencode to all provider enums, missing roles (log-analyzer, feedback, infrastructure-check), missing top-level config fields (rules-preset, viz). Relaxed model-override pattern. Closes #139.
+- **Sharkord orchestrator scope** (`agents/2-platform/sharkord-orchestrator.md`): Cross-plugin features now only active when `META_REPO: true`. Removed incorrect assumption that all Sharkord plugin repos are meta-repos. Closes #147.
+- **StrictDoc double blank lines** (`docs/requirements/*.sdoc`): Removed consecutive blank lines causing TextX parse failures in 01-stakeholder-reqs.sdoc, 02a-agent-framework.sdoc, and index.sdoc. Closes #129.
+
+### Changed
+
+- **Templates directory layer architecture**: Moved starter templates from flat `templates/plugin-starter/` to layered `templates/2-platform/sharkord/starter/` structure, mirroring agents/ and rules/ conventions. Updated `sync.py` `copy_starter_templates()` accordingly. Closes #151.
+
+---
+
 ## [0.40.0] — 2026-05-14
 
 ### Added
