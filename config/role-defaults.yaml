@@ -155,6 +155,13 @@ roles:
     workflow_tier: required
     description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
 
+  infrastructure-check:
+    model: fast
+    memory: ""
+    permission_mode: plan
+    workflow_tier: optional
+    description: "On-demand Prerequisite-Check: fehlende CLIs/Runtimes in Hooks, MCP-Configs und Agent-Templates erkennen und Installationsanleitung geben"
+
   openscad-developer:
     model: balanced
     memory: local
