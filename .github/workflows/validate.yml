@@ -45,7 +45,11 @@ jobs:
             exit 0
           fi
 
-          FOUND=$(grep -rn "{{[A-Z0-9_]\+}}" $DIRS 2>/dev/null || true)
+          # Documentation literals — intentional examples of placeholder syntax,
+          # not real substitution targets. Keep in sync with the source templates
+          # that describe the {{VAR}} convention.
+          DOC_LITERALS='\{\{(GROSS_MIT_UNTERSTRICH|VAR)\}\}'
+          FOUND=$(grep -rn "{{[A-Z0-9_]\+}}" $DIRS 2>/dev/null | grep -vE "$DOC_LITERALS" || true)
           if [ -n "$FOUND" ]; then
             echo "ERROR: Unresolved {{VAR}} placeholders found in generated files:"
             echo "$FOUND"
