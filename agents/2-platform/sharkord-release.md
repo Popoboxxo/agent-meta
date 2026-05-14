@@ -51,6 +51,9 @@ Sharkord plugins use one of two build strategies. Choose based on traceability n
 
 ## Release-Workflow (Schritt für Schritt)
 
+> Mit standardisiertem Build (`scripts/build.ts`) sind viele frühere Placeholders obsolet.
+> Die folgenden Schritte gehen vom Standard-Build aus.
+
 ### 1. Version setzen
 
 In `package.json` die Version anpassen — **BEVOR** der Build läuft:
@@ -60,19 +63,6 @@ Stable:  X.Y.Z           (z.B. 0.1.0)
 Alpha:   X.Y.Z-alpha.N   (z.B. 0.1.0-alpha.1)
 Beta:    X.Y.Z-beta.N    (z.B. 0.1.0-beta.1)
 ```
-
-<!-- PROJEKTSPEZIFISCH: Wie landet die Version im Dist?
-
-  Variante A — Timestamp-Build (z.B. sharkord-vid-with-friends):
-    scripts/write-dist-package.ts liest die Version und ergänzt einen Build-Timestamp:
-      package.json:      "version": "0.1.0-alpha.1"
-      dist/package.json: "version": "0.1.0-alpha.1-190326-20-26-02"
-                         "sharkordVersionTrace": "0.1.0-alpha.1:190326_20_26_02"
-
-  Variante B — 1:1-Kopie (z.B. sharkord-hero-introducer):
-    build.ts kopiert package.json unverändert ins Dist. Keine Timestamp-Ergänzung.
--->
-{{VERSION_DIST_BEHAVIOUR}}
 
 Sharkord erkennt Plugin und Version anhand des Dist-`package.json`.
 
@@ -85,23 +75,19 @@ Sharkord erkennt Plugin und Version anhand des Dist-`package.json`.
 ### 3. Build erstellen
 
 ```bash
-bun run build
+bun scripts/build.ts
 ```
 
-<!-- PROJEKTSPEZIFISCH: Was erzeugt der Build in dist/{{PLUGIN_DIR_NAME}}/?
+Der Standard-Build erzeugt immer:
+```
+dist/{{PLUGIN_DIR_NAME}}/
+  index.js          # Minified ESM Bundle
+  package.json      # Plugin Metadaten
+  logo.png          # (optional)
+  bin/              # Externe Binary-Verzeichnis
+```
 
-  Variante A — Single Bundle (z.B. sharkord-vid-with-friends):
-    - index.js        (minified ESM Plugin-Bundle)
-    - package.json    (Version + Timestamp)
-    - bin/            (leeres Verzeichnis — Binaries nicht enthalten)
-
-  Variante B — Server+Client Bundle (z.B. sharkord-hero-introducer):
-    - server.js       (minified ESM, Bun-Target)
-    - client.js       (minified ESM, Browser-Target)
-    - package.json    (1:1 Kopie)
--->
-Erzeugt in `dist/{{PLUGIN_DIR_NAME}}/`:
-{{BUILD_OUTPUT}}
+> **Hinweis:** Bei Abweichungen vom Standard-Build → `developer` mit Migration zu `scripts/build.ts` beauftragen.
 
 ### 4. Release-Artifacts erstellen
 

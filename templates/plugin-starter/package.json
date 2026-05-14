@@ -1,0 +1,25 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "{{INITIAL_VERSION}}",
+  "description": "{{PROJECT_DESCRIPTION}}",
+  "type": "module",
+  "main": "dist/{{PROJECT_NAME}}/index.js",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "dev": "bun scripts/build.ts --watch",
+    "test": "bun test",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@sharkord/plugin-sdk": "{{platform.sharkord.min_version}}"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/bun": "latest"
+  },
+  "sharkord": {
+    "author": "{{AUTHOR}}",
+    "homepage": "{{GIT_REMOTE_URL}}"
+  }
+}

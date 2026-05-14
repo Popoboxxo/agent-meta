@@ -94,6 +94,51 @@ _CONFIG_CANDIDATES = [
 # Helpers
 # ---------------------------------------------------------------------------
 
+def copy_starter_templates(agent_meta_root: Path, project_root: Path, config: dict, variables: dict,
+                          log: SyncLog, dry_run: bool) -> list[str]:
+    """Copy platform-specific starter templates from agent-meta into the project.
+
+    Templates live in .agent-meta/templates/<platform>-starter/ and are copied
+    into the project root with {{VARIABLE}} substitution.
+
+    Returns list of copied file paths (or would-be paths in dry-run).
+    """
+    platforms = config.get("platforms", [])
+    copied: list[str] = []
+    templates_dir = agent_meta_root / "templates"
+
+    for platform in platforms:
+        starter_dir = templates_dir / f"{platform}-starter"
+        if not starter_dir.exists():
+            log.info(f"No starter templates for platform '{platform}' — skipping.")
+            continue
+
+        for src_file in starter_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+            rel_path = src_file.relative_to(starter_dir)
+            dest = project_root / rel_path
+
+            if dry_run:
+                copied.append(str(dest))
+                continue
+
+            if dest.exists():
+                log.info(f"Starter template already exists — skipping: {rel_path}")
+                continue
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            content = src_file.read_text(encoding="utf-8")
+            # Substitute {{VARIABLE}} placeholders from config variables
+            for key, value in variables.items():
+                content = content.replace(f"{{{{{key}}}}}", str(value))
+            dest.write_text(content, encoding="utf-8")
+            copied.append(str(dest))
+            log.info(f"Copied starter template: {rel_path}")
+
+    return copied
+
+
 def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_config: dict) -> list[str]:
     """Return .gitignore paths for skills with gitignore: true in project config.
 
@@ -159,6 +204,13 @@ def main():
     parser.add_argument("--setup", action="store_true",
                         help="Interactive setup wizard: guided creation of .meta-config/project.yaml "
                              "followed by --init sync. Use before the first sync on a new project.")
+    parser.add_argument("--init-templates", action="store_true",
+                        help="Copy platform-specific starter templates into the project "
+                             "(e.g. scripts/build.ts, src/index.ts, tests/helpers/...). "
+                             "Requires --init or --copy-templates.")
+    parser.add_argument("--copy-templates", action="store_true",
+                        help="Copy starter templates only, skip agent sync. "
+                             "Useful for bootstrapping a new project before first sync.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
     parser.add_argument("--viz", action="store_true",
@@ -300,6 +352,13 @@ def main():
         mode = f"create-command:{args.create_command}"
         create_command(project_root, args.create_command, log, args.dry_run)
 
+    elif args.copy_templates:
+        mode = "copy-templates"
+        copied = copy_starter_templates(agent_meta_root, project_root, config, variables,
+                                       log, args.dry_run)
+        if not args.dry_run:
+            print(f"\n  Starter templates copied: {len(copied)} file(s)")
+
     elif args.viz_only:
         mode = "viz-only"
         # Override viz config
@@ -385,6 +444,11 @@ def main():
             # and merged via exact_entries so stale entries are removed automatically.
         if args.init:
             init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+            if args.init_templates:
+                copied = copy_starter_templates(agent_meta_root, project_root, config, variables,
+                                               log, args.dry_run)
+                if not args.dry_run:
+                    print(f"\n  Starter templates copied: {len(copied)} file(s)")
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:
