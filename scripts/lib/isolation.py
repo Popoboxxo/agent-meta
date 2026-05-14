@@ -57,9 +57,6 @@ def sync_provider_isolation(
     log.info("provider-isolation", f"generating isolation for: {', '.join(providers)}")
 
     for provider in providers:
-        pc = provider_config.get(provider, {})
-        own_dirs: list[str] = pc.get("isolation-dirs", [])
-
         # foreign_dirs = isolation-dirs of all OTHER active providers
         foreign_dirs: list[str] = []
         for other in providers:

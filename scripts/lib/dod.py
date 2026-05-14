@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 from .io import _load_yaml_or_json
-from .log import SyncLog
 
 DOD_PRESETS_CONFIG_YAML = "config/dod-presets.yaml"
 _DOD_PRESETS_CONFIG_LEGACY = "dod-presets.config.yaml"

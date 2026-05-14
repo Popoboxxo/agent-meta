@@ -47,7 +47,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Release
     "BUILD_OUTPUT", "ARTIFACT_ZIP_CMD", "ARTIFACT_TAR_CMD", "GH_ASSETS",
     "REQUIRED_BINARIES_SECTION", "BINARY_INSTALL_STEPS", "REQUIRED_BINARY_NAMES",
-    "BUILD_SYSTEM_NOTES", "VERSION_DIST_BEHAVIOUR",
+    "BUILD_SYSTEM_NOTES", "VERSION_DIST_BEHAVIOUR", "TECH_STACK",
+    # Platform: Sharkord plugins (defined per-project in project.yaml `variables:`,
+    # but recognized centrally since 2-platform/sharkord-*.md templates use them).
+    "PLUGIN_DIR_NAME",
     # Misc
     "SYSTEM_DEPENDENCIES", "SYSTEM_URLS",
 })

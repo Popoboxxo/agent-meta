@@ -47,7 +47,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from lib.log import SyncLog
 from lib.viz import (
     read_events, list_sessions, get_viz_dir, get_event_log_path,
-    cleanup_old_sessions, _TIER_ICONS, _TIER_COLORS, viz_lock,
+    cleanup_old_sessions, viz_lock,
 )
 
 
@@ -769,7 +769,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                         if log_path.exists():
                             prev_lines = sum(1 for _ in log_path.read_text(encoding="utf-8-sig").splitlines() if _)
                         # Atomic truncate via 'w' mode
-                        with open(log_path, "w", encoding="utf-8") as f:
+                        with open(log_path, "w", encoding="utf-8"):
                             pass
                     log.info(f"log cleared — removed {prev_lines} events")
                     log.req(method, path, 200, extra=f"cleared {prev_lines} events")
