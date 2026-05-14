@@ -98,7 +98,7 @@ def copy_starter_templates(agent_meta_root: Path, project_root: Path, config: di
                           log: SyncLog, dry_run: bool) -> list[str]:
     """Copy platform-specific starter templates from agent-meta into the project.
 
-    Templates live in .agent-meta/templates/<platform>-starter/ and are copied
+    Templates live in .agent-meta/templates/2-platform/<platform>/starter/ and are copied
     into the project root with {{VARIABLE}} substitution.
 
     Returns list of copied file paths (or would-be paths in dry-run).
@@ -108,7 +108,7 @@ def copy_starter_templates(agent_meta_root: Path, project_root: Path, config: di
     templates_dir = agent_meta_root / "templates"
 
     for platform in platforms:
-        starter_dir = templates_dir / f"{platform}-starter"
+        starter_dir = templates_dir / "2-platform" / platform / "starter"
         if not starter_dir.exists():
             log.info(f"No starter templates for platform '{platform}' — skipping.")
             continue

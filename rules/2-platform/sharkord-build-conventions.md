@@ -37,7 +37,7 @@ dist/<plugin-name>/
 
 ## Referenz-Implementation
 
-→ `.agent-meta/templates/plugin-starter/scripts/build.ts`
+→ `.agent-meta/templates/2-platform/sharkord/starter/scripts/build.ts`
 
 ## Migration
 
