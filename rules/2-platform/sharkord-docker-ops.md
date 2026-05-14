@@ -28,6 +28,17 @@ docker logs <container-name> 2>&1 | grep -i "token\|access" | head -5
 
 **WARNUNG: `docker compose down --volumes` löscht die Datenbank → Token ungültig!**
 
+## Build Context
+
+Docker builds MUST respect the plugin's build variant:
+
+| Build Variant | Docker Context | Notes |
+|--------------|----------------|-------|
+| **Variant A (Timestamp)** | `dist/<plugin-name>/` contains `index.js`, `package.json` (with timestamp), `bin/` | Dockerfile copies from `dist/` |
+| **Variant B (1:1 Copy)** | `dist/<plugin-name>/` contains `server.js`, `client.js`, `package.json` (1:1) | Dockerfile copies from `dist/` |
+
+**Important:** The Dockerfile `COPY` source must match the build output structure. If switching from Variant B to A, update both the build script AND the Dockerfile.
+
 ## Binary-Strategie
 
 - **Nur ffmpeg via apt** → Strategie B: Dockerfile (einfacher, kein separater Service)
