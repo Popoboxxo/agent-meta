@@ -18,9 +18,10 @@ import json
 import yaml
 import argparse
 import logging
+import requests
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
 # Setup paths
@@ -118,6 +119,59 @@ def parse_sdoc_requirements(sdoc_content: str) -> List[Dict]:
     return {"requirement_count": blocks}
 
 
+def push_file_to_server(
+    file_path: Path,
+    base_url: str,
+    target_dir: str,
+    logger: logging.Logger,
+    auth: Optional[Dict] = None
+) -> Tuple[bool, str]:
+    """Push a single .sdoc file to Strictdoc Server via HTTP POST"""
+    try:
+        with open(file_path, "rb") as f:
+            files = {"document": (file_path.name, f, "text/plain")}
+
+            # Try multiple endpoint patterns
+            endpoints = [
+                f"{base_url}/api/documents/upload",
+                f"{base_url}/api/upload",
+                f"{base_url}/upload",
+                f"{base_url}/api/v1/documents",
+            ]
+
+            headers = {}
+            if auth and auth.get("api_token"):
+                headers["Authorization"] = f"Bearer {auth['api_token']}"
+
+            for endpoint in endpoints:
+                try:
+                    response = requests.post(
+                        endpoint,
+                        files=files,
+                        headers=headers,
+                        timeout=10
+                    )
+                    if response.status_code in [200, 201, 204]:
+                        logger.info(f"[OK] Pushed {file_path.name} to {endpoint}")
+                        return True, f"HTTP {response.status_code}"
+                    elif response.status_code == 404:
+                        continue  # Try next endpoint
+                    else:
+                        logger.warning(
+                            f"Server returned {response.status_code} for {endpoint}: "
+                            f"{response.text[:100]}"
+                        )
+                except requests.exceptions.RequestException:
+                    continue  # Try next endpoint
+
+            logger.error(f"[FAIL] No valid upload endpoint found for {file_path.name}")
+            return False, "No endpoint found"
+
+    except Exception as e:
+        logger.error(f"[FAIL] Failed to push {file_path.name}: {e}")
+        return False, str(e)
+
+
 def push_to_unraid(config: SyncConfig, logger: logging.Logger, force: bool = False):
     """Push .sdoc files to Unraid Strictdoc Server"""
     logger.info(f"Starting Strictdoc sync to {config.base_url}")
@@ -145,7 +199,21 @@ def push_to_unraid(config: SyncConfig, logger: logging.Logger, force: bool = Fal
 
     logger.info(f"Syncing {len(files_to_sync)} files...")
 
-    # Simulate push (real implementation would use Strictdoc API or file copy)
+    # Check server connectivity
+    try:
+        response = requests.get(f"{config.base_url}/", timeout=5)
+        logger.info(f"[OK] Server reachable ({response.status_code})")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[FAIL] Cannot reach server {config.base_url}: {e}")
+        if config.dry_run and not force:
+            logger.warning("(Continuing in dry-run mode)")
+        else:
+            return False
+
+    # Process files
+    synced = 0
+    failed = 0
+
     for file_path in files_to_sync:
         sdoc_data = load_sdoc_file(file_path)
         req_count = parse_sdoc_requirements(sdoc_data["content"])
@@ -156,25 +224,37 @@ def push_to_unraid(config: SyncConfig, logger: logging.Logger, force: bool = Fal
                 f"({req_count['requirement_count']} REQs, {sdoc_data['size_bytes']} bytes)"
             )
         else:
-            logger.info(
-                f"[PUSH] Syncing: {file_path.name} "
-                f"({req_count['requirement_count']} REQs, {sdoc_data['size_bytes']} bytes)"
+            success, msg = push_file_to_server(
+                file_path,
+                config.base_url,
+                config.target_dir,
+                logger,
+                auth={"api_token": None}  # Extend with real auth from config if needed
             )
-            # TODO: Implement actual push (HTTP POST, file copy, etc.)
+            if success:
+                synced += 1
+                logger.info(
+                    f"[PUSH] Synced: {file_path.name} "
+                    f"({req_count['requirement_count']} REQs, {sdoc_data['size_bytes']} bytes) — {msg}"
+                )
+            else:
+                failed += 1
+                logger.error(f"[PUSH] Failed: {file_path.name} — {msg}")
 
     # Update state
     if not config.dry_run or force:
         state = {
             "last_sync": datetime.now().isoformat(),
-            "files_synced": len(files_to_sync),
-            "status": "success",
+            "files_synced": synced,
+            "files_failed": failed,
+            "status": "success" if failed == 0 else "partial",
         }
         with open(STATE_FILE, "w") as f:
             json.dump(state, f, indent=2)
         logger.info(f"State saved to {STATE_FILE}")
 
-    logger.info("Strictdoc sync completed!")
-    return True
+    logger.info(f"Strictdoc sync completed! Synced: {synced}, Failed: {failed}")
+    return failed == 0
 
 
 def parse_locally(config: SyncConfig, logger: logging.Logger):
