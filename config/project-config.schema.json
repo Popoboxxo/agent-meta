@@ -25,18 +25,20 @@
         "Claude",
         "Gemini",
         "Continue",
+        "Opencode",
         "GitHub"
       ]
     },
     "ai-providers": {
       "type": "array",
-      "description": "List of AI providers. Supports Claude, Gemini, Continue. Replaces the deprecated ai-provider string field. Backward-compatible: ai-provider (string) still works.",
+      "description": "List of AI providers. Supports Claude, Gemini, Continue, Opencode. Replaces the deprecated ai-provider string field. Backward-compatible: ai-provider (string) still works.",
       "items": {
         "type": "string",
         "enum": [
           "Claude",
           "Gemini",
-          "Continue"
+          "Continue",
+          "Opencode"
         ]
       },
       "uniqueItems": true
@@ -70,7 +72,10 @@
           "feature",
           "agent-meta-scout",
           "security-auditor",
-          "openscad-developer"
+          "openscad-developer",
+          "log-analyzer",
+          "feedback",
+          "infrastructure-check"
         ]
       },
       "uniqueItems": true
@@ -258,6 +263,17 @@
           "type": "object",
           "description": "Continue model overrides (ignored — Continue manages models in config.yaml).",
           "additionalProperties": {"type": "string"}
+        },
+        "Opencode": {
+          "type": "object",
+          "description": "Opencode-specific model overrides: role → tier or full model ID.",
+          "additionalProperties": {
+            "type": "string",
+            "anyOf": [
+              {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
+              {"pattern": "^opencode"}
+            ]
+          }
         }
       },
       "additionalProperties": {
@@ -400,6 +416,12 @@
               "default": "full"
             }
           }
+        },
+        "Opencode": {
+          "type": "object",
+          "description": "Options for the Opencode provider.",
+          "additionalProperties": false,
+          "properties": {}
         }
       },
       "additionalProperties": false
@@ -451,6 +473,74 @@
       "type": "string",
       "enum": ["disabled"],
       "description": "Set to 'disabled' to skip provider isolation generation (e.g. in the agent-meta meta-repo itself, which intentionally manages all provider directories)."
+    },
+    "rules-preset": {
+      "type": "string",
+      "description": "Controls which rules are always active (alwaysApply) and per-provider skip behavior. Presets are defined in config/rules-presets.yaml.",
+      "enum": ["default", "minimal", "silent"],
+      "default": "default"
+    },
+    "viz": {
+      "type": "object",
+      "description": "Agent visualization and session tracking configuration.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable agent visualization (mindmap, event log, session tracking).",
+          "default": false
+        },
+        "mode": {
+          "type": "string",
+          "description": "Visualization mode: 'off' = disabled, 'static' = only mindmap, 'dynamic' = session tracking, 'full' = both.",
+          "enum": ["off", "static", "dynamic", "full"],
+          "default": "off"
+        },
+        "event_log": {
+          "type": "string",
+          "description": "Path to the newline-delimited JSON event log file.",
+          "default": ".meta-viz/events.jsonl"
+        },
+        "report": {
+          "type": "object",
+          "description": "Session report retention settings.",
+          "properties": {
+            "retention_days": {
+              "type": "integer",
+              "description": "How long to keep generated session reports.",
+              "default": 7,
+              "minimum": 1
+            },
+            "session_timeout_min": {
+              "type": "integer",
+              "description": "Minutes of inactivity before a session is considered ended.",
+              "default": 5,
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "server": {
+          "type": "object",
+          "description": "Optional local visualization server settings.",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "Port for the local viz server.",
+              "default": 8765,
+              "minimum": 1024,
+              "maximum": 65535
+            },
+            "timeout_sec": {
+              "type": "integer",
+              "description": "Server request timeout in seconds.",
+              "default": 300,
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "allow-committed-secrets": {
       "type": "boolean",

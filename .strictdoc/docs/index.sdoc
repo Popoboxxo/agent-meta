@@ -4,6 +4,7 @@ TITLE: agent-meta Requirements Specification
 [[SECTION]]
 TITLE: Total Requirements: 46
 
+[TEXT]
 - 17 Stakeholder Requirements (REQ-STK-001..017)
 - 21 System Requirements (REQ-SYS-001..021)
 - 8 Design Requirements (REQ-DES-001..008)
