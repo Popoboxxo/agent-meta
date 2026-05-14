@@ -5,37 +5,37 @@
 ```mermaid
 mindmap
   root((orchestrator))
-    🔴 developer
+    ⚪ developer
       tester
       git
-    🔵 feature
+    ⚪ feature
       requirements
       validator
       developer
       tester
       git
-    🔴 git
-    🔵 documenter
+    ⚪ git
+    ⚪ documenter
     ⚪ ideation
     ⚪ release
       git
       documenter
     ⚪ security-auditor
     ⚪ docker
-    🔴 log-analyzer
+    ⚪ log-analyzer
       feedback
       developer
       security-auditor
-    🔴 feedback
+    ⚪ feedback
     ⚪ agent-meta-manager
       agent-meta-scout
       developer
       git
     ⚪ agent-meta-scout
     ⚪ meta-feedback
-    🔵 requirements
-    🔵 validator
-    🔵 tester
+    ⚪ requirements
+    ⚪ validator
+    ⚪ tester
 ```
 
 ## Legende
@@ -60,7 +60,7 @@ mindmap
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### developer
-- **Tier:** required
+- **Tier:** optional
 - **Beschreibung:** Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface.
 - **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.6
 - **Delegiert an:** tester, git
@@ -71,23 +71,23 @@ mindmap
 - **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
 
 ### documenter
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### feature
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 - **Delegiert an:** requirements, validator, developer, tester, git
 
 ### feedback
-- **Tier:** required
+- **Tier:** optional
 - **Beschreibung:** Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### git
-- **Tier:** required
+- **Tier:** optional
 - **Beschreibung:** Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea).
 - **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
 
@@ -96,8 +96,13 @@ mindmap
 - **Beschreibung:** Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements.
 - **Model:** inherited
 
+### infrastructure-check
+- **Tier:** optional
+- **Beschreibung:** Prüft alle generierten Artefakte auf fehlende externe Voraussetzungen (CLIs, Runtimes, Binaries) — provider-übergreifend für alle aktiven AI-Provider.
+- **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+
 ### log-analyzer
-- **Tier:** required
+- **Tier:** optional
 - **Beschreibung:** Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 - **Delegiert an:** feedback, developer, security-auditor
@@ -113,7 +118,7 @@ mindmap
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### orchestrator
-- **Tier:** required
+- **Tier:** optional
 - **Beschreibung:** Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation.
 - **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
 - **Delegiert an:** developer, feature, git, documenter, ideation, release, security-auditor, docker, log-analyzer, feedback, agent-meta-manager, agent-meta-scout, meta-feedback, requirements, validator, tester
@@ -130,12 +135,12 @@ mindmap
 - **Delegiert an:** git, documenter
 
 ### requirements
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### reviewer
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells prüfen.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
@@ -145,11 +150,11 @@ mindmap
 - **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.6
 
 ### tester
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### validator
-- **Tier:** recommended
+- **Tier:** optional
 - **Beschreibung:** Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
