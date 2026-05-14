@@ -1,10 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — viz.py, migrate-config.py, lifecycle_check.py
-PREAMBLE: >>>
-Design-level requirements for visualization/reporting, configuration migration, and lifecycle automation.
-Consolidated requirements for three operational/infrastructure modules.
-Total: 22 requirements (viz: 8, migrate: 6, lifecycle: 8).
-<<<
 
 [REQUIREMENT]
 UID: REQ-VIZ-001

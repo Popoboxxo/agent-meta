@@ -1,11 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — agents.py (Agent Composition Engine)
-PREAMBLE: >>>
-Design-level requirements for lib/agents.py module.
-Covers agent source loading, layer composition, extends chain resolution,
-patching, frontmatter injection, and multi-provider agent generation.
-Total: 56 requirements covering all 56 functions in agents.py.
-<<<
 
 [REQUIREMENT]
 UID: REQ-AGENTS-001

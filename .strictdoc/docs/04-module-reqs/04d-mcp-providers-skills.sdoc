@@ -1,10 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — mcp.py, providers.py, skills.py
-PREAMBLE: >>>
-Design-level requirements for MCP server management, provider abstraction, and skill integration.
-Consolidated requirements for three foundational modules.
-Total: 32 requirements (mcp: 12, providers: 8, skills: 12).
-<<<
 
 [REQUIREMENT]
 UID: REQ-MCP-001

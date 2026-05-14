@@ -1,11 +1,6 @@
 [DOCUMENT]
 TITLE: Stakeholder Requirements Specification (L1)
 
-PREAMBLE: >>>
-This document captures user-level and product-level requirements for agent-meta.
-These are the capabilities that users and developers expect from the framework.
-Stakeholders: Framework developers, project maintainers, AI researchers.
-<<<
 
 [REQUIREMENT]
 UID: REQ-STK-001

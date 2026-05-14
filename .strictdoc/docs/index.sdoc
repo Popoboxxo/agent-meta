@@ -1,19 +1,6 @@
 [DOCUMENT]
 TITLE: agent-meta Requirements Specification
 
-PREAMBLE: >>>
-Central requirements specification for agent-meta framework v0.39.0.
-
-This specification is organized in three levels following ISO/IEC/IEEE 29148 standard:
-- L1 (Stakeholder): What users expect from the framework
-- L2 (System): How the system implements stakeholder requirements
-- L3 (Design): Which modules implement system requirements
-
-All requirements are traceable from stakeholder needs through system design to implementation.
-
-Generated from source: .sdoc files using Strictdoc format.
-Last updated: 2026-05-13
-<<<
 
 [[SECTION]]
 TITLE: Total Requirements: 46

@@ -1,13 +1,6 @@
 [DOCUMENT]
 TITLE: System Requirements — Agent Framework Core (L2)
 
-PREAMBLE: >>>
-System-level requirements for the core agent framework:
-- sync.py as central orchestration engine
-- Layer-stacking and composition
-- Frontmatter injection
-- Agent hints and metadata
-<<<
 
 [REQUIREMENT]
 UID: REQ-SYS-001

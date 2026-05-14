@@ -1,10 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — extensions.py, context.py, isolation.py
-PREAMBLE: >>>
-Design-level requirements for project extensions, context/variable injection, and provider isolation.
-Consolidated requirements for three important framework modules.
-Total: 32 requirements (extensions: 8, context: 12, isolation: 12).
-<<<
 
 [REQUIREMENT]
 UID: REQ-EXTENSIONS-001
