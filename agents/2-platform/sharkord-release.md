@@ -30,6 +30,25 @@ Du baust Release-Artifacts, erstellst GitHub Releases und verwaltest die Version
 
 ---
 
+## Build Variant Decision Guide
+
+Sharkord plugins use one of two build strategies. Choose based on traceability needs:
+
+| Criteria | Variant A (Timestamp) | Variant B (1:1 Copy) |
+|----------|----------------------|---------------------|
+| **When to use** | Plugin needs build traceability (audit, debugging, support) | Simple plugin, no traceability need |
+| **Complexity** | Higher (custom script required) | Lower (basic copy) |
+| **Output** | Manifest + timestamped artifacts | Mirror of source |
+| **Example** | vid-with-friends | hero-introducer |
+| **Migration** | Easy to add later if traceability becomes needed | — |
+
+**Migration path (B → A):**
+1. Create `scripts/write-dist-package.ts` that reads `package.json` and appends timestamp
+2. Update `bun run build` to call the new script
+3. Update Release-Agent `VERSION_DIST_BEHAVIOUR` variable
+
+---
+
 ## Release-Workflow (Schritt für Schritt)
 
 ### 1. Version setzen
@@ -216,6 +235,21 @@ cat dist/{{PLUGIN_DIR_NAME}}/package.json | grep version
 | **Beta** | `X.Y.Z-beta.N` | `--prerelease` | Feature-complete, Stabilisierung |
 | **Stable** | `X.Y.Z` | `--latest` | Produktionsreif |
 | **Patch** | `X.Y.(Z+1)` | `--latest` | Bugfix für Stable |
+
+---
+
+## CI/CD Pipeline
+
+All Sharkord plugins SHOULD use the reusable GitHub Actions workflow template:
+→ `.agent-meta/templates/sharkord-plugin-ci.yml`
+
+Copy this template to `.github/workflows/ci.yml` in your plugin repo. It runs:
+- `bun test` on every push
+- `bun run build` on every push
+- `bun run lint` (tsc --noEmit) for type checking
+- Docker smoke test (build + health check) for voice/streaming plugins
+
+**Release-Agent Responsibility:** When scaffolding a new plugin, ensure the CI template is copied and the `PLUGIN_DIR_NAME` variable is adjusted.
 
 ---
 

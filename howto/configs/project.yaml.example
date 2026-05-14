@@ -89,6 +89,24 @@ max-parallel-agents: 2
 # dod:
 #   security-audit: true
 
+# Multi-Repo Workspace (optional — für Meta-Repos mit mehreren Plugin-Repos)
+# variables:
+#   WORKSPACE_REPOS: |
+#     - path: ../sharkord-vid-with-friends
+#       name: vid-with-friends
+#       prefix: vid
+#     - path: ../sharkord-stream-with-friends
+#       name: stream-with-friends
+#       prefix: swf
+#     - path: ../sharkord-hero-introducer
+#       name: hero-introducer
+#       prefix: hero
+#   META_REPO: "true"
+#   SUB_PROJECTS: |
+#     - vid-with-friends
+#     - stream-with-friends
+#     - hero-introducer
+
 variables:
   # --- Projekt-Identität ---
   PROJECT_NAME: mein-projekt

@@ -240,6 +240,18 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         )
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
+    # WORKSPACE_REPOS: auto-inject for multi-repo workspace support
+    workspace_repos = config.get("variables", {}).get("WORKSPACE_REPOS", "")
+    if workspace_repos:
+        variables["WORKSPACE_REPOS"] = workspace_repos
+    # SUB_PROJECTS: auto-inject for meta-repo coordination
+    sub_projects = config.get("variables", {}).get("SUB_PROJECTS", "")
+    if sub_projects:
+        variables["SUB_PROJECTS"] = sub_projects
+    # META_REPO: auto-inject flag for meta-repository documentation strategy
+    meta_repo = config.get("variables", {}).get("META_REPO", "")
+    if meta_repo:
+        variables["META_REPO"] = meta_repo
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)
