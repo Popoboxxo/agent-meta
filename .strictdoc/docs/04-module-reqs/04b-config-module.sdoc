@@ -1,11 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — config.py (Configuration Loading & Variables)
-PREAMBLE: >>>
-Design-level requirements for lib/config.py module.
-Covers project configuration loading, role defaults, variable building,
-substitution engine, and related operations.
-Total: 15 requirements covering all functions in config.py.
-<<<
 
 [REQUIREMENT]
 UID: REQ-CONFIG-001

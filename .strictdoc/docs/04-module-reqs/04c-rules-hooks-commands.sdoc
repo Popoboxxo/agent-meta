@@ -1,10 +1,5 @@
 [DOCUMENT]
 TITLE: Module Requirements — rules.py, hooks.py, commands.py
-PREAMBLE: >>>
-Design-level requirements for policy management, hook registration, and command sync.
-Consolidated requirements for three related policy/configuration modules.
-Total: 30 requirements (rules: 12, hooks: 8, commands: 10).
-<<<
 
 [REQUIREMENT]
 UID: REQ-RULES-001
