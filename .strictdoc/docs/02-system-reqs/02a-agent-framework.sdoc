@@ -1,7 +1,6 @@
 [DOCUMENT]
 TITLE: System Requirements — Agent Framework Core (L2)
 
-
 [REQUIREMENT]
 UID: REQ-SYS-001
 TITLE: sync.py ist zentrale Generator-Engine
