@@ -89,7 +89,11 @@ max-parallel-agents: 2
 # dod:
 #   security-audit: true
 
-# Multi-Repo Workspace (optional — für Meta-Repos mit mehreren Plugin-Repos)
+# Meta-Repo Modus — nur aktivieren wenn dieses Projekt mehrere Sub-Projekte koordiniert
+# Aktiviert Cross-Plugin Standardisierung und zentrale Dokumentation (PATTERNS.md, LEARNINGS.md, CONVENTIONS.md)
+# meta-repo: true
+
+# Multi-Repo Workspace (optional — nur bei meta-repo: true relevant)
 # variables:
 #   WORKSPACE_REPOS: |
 #     - path: ../sharkord-vid-with-friends
@@ -101,7 +105,6 @@ max-parallel-agents: 2
 #     - path: ../sharkord-hero-introducer
 #       name: hero-introducer
 #       prefix: hero
-#   META_REPO: "true"
 #   SUB_PROJECTS: |
 #     - vid-with-friends
 #     - stream-with-friends

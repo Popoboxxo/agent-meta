@@ -28,7 +28,7 @@ patches:
 
       ## Cross-Plugin Standardization (NUR bei Meta-Repo)
 
-      > **Hinweis:** Dieser Abschnitt ist nur relevant wenn `META_REPO: true` in `project.yaml` gesetzt ist.
+      > **Hinweis:** Dieser Abschnitt ist nur relevant wenn `meta-repo: true` in `.meta-config/project.yaml` gesetzt ist.
       > Für normale Plugin-Repos überspringen.
 
       Wenn dieses Projekt ein Meta-Repo ist (koordiniert mehrere Plugins):
