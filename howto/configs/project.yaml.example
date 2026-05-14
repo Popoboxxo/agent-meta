@@ -117,6 +117,8 @@ variables:
     Was macht dieses Projekt? Ein Satz.
   PROJECT_GOAL: >-
     Für wen und welches Problem wird gelöst?
+  AUTHOR: "Dein Name"
+  INITIAL_VERSION: "0.1.0-alpha.1"
 
   # --- Technologie ---
   PLATFORM: "z.B. Sharkord Plugin SDK"

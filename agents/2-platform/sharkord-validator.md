@@ -41,19 +41,37 @@ patches:
       Enforce the Sharkord plugin directory layout:
 
       - [ ] `src/index.ts` exists and has a default export typed as `PluginConfig`.
-      - [ ] `src/index.ts` contains **only** bootstrapping / export logic (< 100 lines of actual logic).
-      - [ ] Commands live in separate files under `src/commands/` (or equivalent).
-      - [ ] No single source file exceeds **500 lines**.
+      - [ ] `src/index.ts` contains **only** wiring logic (< 100 lines of actual logic).
+      - [ ] `src/commands/` exists — each command gets its own file.
+      - [ ] `src/services/` exists — business logic is separated.
+      - [ ] `src/handlers/` exists — event handlers are separated.
       - [ ] `src/hooks/` uses the `useSharkord<Feature>` naming convention.
+      - [ ] `src/utils/` exists for helper functions.
+      - [ ] `src/types/` exists for internal type definitions.
+      - [ ] No single source file exceeds **300 lines**.
+      - [ ] `scripts/build.ts` exists and uses the standard build template.
+      - [ ] `tests/helpers/mock-plugin-context.ts` exists.
       - [ ] `dist/` is listed in `.gitignore`.
       - [ ] `package.json` declares `@sharkord/plugin-sdk` in `peerDependencies`.
+      - [ ] **Keine verbotenen Dateien/Ordner:** `.claude/`, `.opencode/`, `.continue/`, `.gemini/`, `AGENTS.md`, `CLAUDE.md`, `.agent-meta/`, `.meta-config/`
 
       **Verification commands:**
       ```bash
       test -f src/index.ts && echo "PASS: index.ts exists" || echo "FAIL: index.ts missing"
       wc -l src/index.ts | awk '$1 > 100 {print "WARN: index.ts has", $1, "lines"}'
-      find src -name "*.ts" -exec wc -l {} + | awk '$1 > 500 {print "WARN:", $2, "has", $1, "lines"}'
+      test -d src/commands && echo "PASS: src/commands/ exists" || echo "FAIL: src/commands/ missing"
+      test -d src/services && echo "PASS: src/services/ exists" || echo "FAIL: src/services/ missing"
+      test -d src/handlers && echo "PASS: src/handlers/ exists" || echo "FAIL: src/handlers/ missing"
+      test -d src/hooks && echo "PASS: src/hooks/ exists" || echo "WARN: src/hooks/ missing"
+      test -d src/utils && echo "PASS: src/utils/ exists" || echo "WARN: src/utils/ missing"
+      test -d src/types && echo "PASS: src/types/ exists" || echo "WARN: src/types/ missing"
+      find src -name "*.ts" -exec wc -l {} + | awk '$1 > 300 {print "WARN:", $2, "has", $1, "lines"}'
+      test -f scripts/build.ts && echo "PASS: scripts/build.ts exists" || echo "FAIL: scripts/build.ts missing"
+      test -f tests/helpers/mock-plugin-context.ts && echo "PASS: mock context exists" || echo "FAIL: mock context missing"
       grep -q "dist/" .gitignore && echo "PASS: dist/ gitignored" || echo "FAIL: dist/ not gitignored"
+      for f in .claude .opencode .continue .gemini AGENTS.md CLAUDE.md .agent-meta .meta-config; do
+        test -e "$f" && echo "FAIL: forbidden file/Dir found: $f" || echo "PASS: $f absent"
+      done
       ```
 
       ### 3. Test Pyramid Enforcement

@@ -26,36 +26,32 @@ patches:
   - op: append-after
     anchor: "## Build & Commands"
     content: |
-      ## Sharkord Plugin Structure
+      ## Plugin Structure Enforcement
 
-      Every Sharkord plugin MUST follow this directory layout. Enforce it during implementation and refactoring:
+      When working on a Sharkord plugin, verify the project follows the standard structure defined in `rules/2-platform/sharkord-plugin-structure.md`:
 
-      ```
-      <plugin-name>/
-        src/
-          index.ts              # MUST export valid Sharkord PluginConfig (default export)
-          components/           # React/UI components (PascalCase)
-          hooks/                # Custom hooks — MUST use useSharkord<Feature> prefix
-          utils/                # Helper functions (camelCase)
-        package.json            # Dependencies + scripts + plugin metadata
-        tsconfig.json           # TypeScript strict mode
-        sharkord.config.ts      # Sharkord-specific configuration (optional but recommended)
-        README.md
-        dist/                   # Build output (gitignored)
-      ```
+      ### Verzeichnis-Checkliste
+      1. **Check `src/index.ts`** — existiert und exportiert einen validen `PluginConfig` Default-Export
+      2. **Check `src/commands/`** — existiert, jeder Command hat eigene Datei
+      3. **Check `src/services/`** — existiert für Business Logic
+      4. **Check `src/handlers/`** — existiert für Event Handler
+      5. **Check `src/hooks/`** — existiert, Naming: `useSharkord<Feature>`
+      6. **Check `src/utils/`** — existiert für Hilfsfunktionen
+      7. **Check `src/types/`** — existiert für interne Type-Definitionen
+      8. **Check `scripts/build.ts`** — existiert und verwendet Standard-Build
+      9. **Check `tests/helpers/mock-plugin-context.ts`** — existiert für Tests
+      10. **Check verbotene Dateien/Ordner** — KEINE `.claude/`, `.opencode/`, `.continue/`, `.gemini/`, `AGENTS.md`, `CLAUDE.md`
 
-      ### Enforcement Rules
-
-      - If `src/index.ts` is missing or does not export a valid `PluginConfig`, reject the implementation.
-      - If hooks exist outside `src/hooks/` or do not follow the naming convention, propose a refactor.
-      - `dist/` must be in `.gitignore`.
+      ### Hard Rules
+      - **Max 300 Zeilen pro Datei** — bei Überschreitung Refactoring erzwingen
+      - **`index.ts` = Wiring only** — nur Imports + Registrierung, keine Business Logic
+      - **Jeder Command** bekommt seine eigene Datei unter `src/commands/`
 
       ## Naming Conventions
 
       ### Hooks
-      - **Mandatory prefix:** `useSharkord<Feature>`
+      - **Pflicht-Präfix:** `useSharkord<Feature>`
       - Examples: `useSharkordVoiceRouter`, `useSharkordStreamState`, `useSharkordHeroAnimation`
-      - Rationale: Prevents collisions with generic React hooks and makes Sharkord-specific intent explicit.
 
       ### Components
       - PascalCase, descriptive (e.g., `VoiceChannelPanel`, `StreamOverlay`)
@@ -68,15 +64,16 @@ patches:
       The default export from `src/index.ts` MUST be a valid Sharkord `PluginConfig` object. Validate during every implementation:
 
       ```typescript
-      import { PluginConfig } from "@sharkord/plugin-sdk";
+      import { PluginConfig, PluginContext } from "@sharkord/plugin-sdk";
 
-      const config: PluginConfig = {
-        name: "my-plugin",
-        version: "1.0.0",
-        // ... required fields
-      };
-
-      export default config;
+      export default function plugin(context: PluginContext): PluginConfig {
+        return {
+          name: "my-plugin",
+          version: "1.0.0",
+          onLoad() { ... },
+          onUnload() { ... },
+        };
+      }
       ```
 
       ### Checklist before marking implementation complete
@@ -84,37 +81,9 @@ patches:
       - [ ] Default export is typed as `PluginConfig`
       - [ ] `package.json` has `@sharkord/plugin-sdk` in `peerDependencies`
       - [ ] `tsconfig.json` has `strict: true`
-
-      ## Sharkord Test Pyramid
-
-      Every Sharkord plugin MUST follow a three-tier test structure:
-
-      ```
-      tests/
-        unit/              # Pure logic, mocked dependencies
-        integration/       # Command-to-service flows with real SDK context
-        docker/            # Smoke tests with real ffmpeg + mediasoup in container
-      ```
-
-      ### Test Naming Convention
-      Every test MUST reference its REQ-ID:
-      ```typescript
-      it("[REQ-042] should persist queue across restarts", async () => { ... });
-      ```
-
-      ### Required Tests per Feature Type
-
-      | Feature Type | Unit | Integration | Docker E2E |
-      |-------------|------|-------------|------------|
-      | Voice/Streaming | ✅ Required | ✅ Required | ✅ Required |
-      | Commands | ✅ Required | ✅ Required | ⚪ Optional |
-      | UI Components | ✅ Required | ⚪ Optional | ❌ Not needed |
-      | Utils/Helpers | ✅ Required | ❌ Not needed | ❌ Not needed |
-
-      ### Test Infrastructure
-      - `tests/helpers/mock-plugin-context.ts` — MUST exist for integration tests
-      - Integration tests MUST use a real `PluginContext` (not fully mocked)
-      - Docker E2E tests MUST verify `docker-compose.dev.yml` health checks
+      - [ ] `scripts/build.ts` uses standard build template
+      - [ ] No file exceeds 300 lines
+      - [ ] `index.ts` contains only wiring (no business logic)
 
       ## Cross-Plugin Pattern Sharing
 
