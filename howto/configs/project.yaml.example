@@ -43,10 +43,10 @@ project:
   short: mein-plugin               # Kurzname ohne Plattform-Prefix
 
 # Kommunikationsstil: "full" (Default), "short", "childish", "caveman", "asozial", "submissive"
-# speech-mode: full
+speech-mode: full
 
 # Maximale parallele Agenten (1 = sequentiell, 2 = Default)
-# max-parallel-agents: 2
+max-parallel-agents: 2
 
 # Hooks — opt-in pro Hook
 # hooks:

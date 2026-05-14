@@ -183,6 +183,13 @@ def run_setup_wizard(
         config["platforms"] = platforms
 
     config["dod-preset"] = dod_preset
+    config["dod"] = {}
+    config["speech-mode"] = "full"
+    config["max-parallel-agents"] = 2
+    config["model-overrides"] = {}
+    config["hooks"] = {}
+    config["provider-options"] = {}
+    config["external-skills"] = {}
     config["project"] = {
         "name": name,
         "prefix": prefix,
@@ -264,4 +271,76 @@ def _write_config(path: Path, config: dict) -> None:
         "# Danach: py .agent-meta/scripts/sync.py\n\n"
     )
     body = yaml.dump(config, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    # Replace empty placeholders with commented YAML blocks
+    body = body.replace(
+        "dod: {}\n",
+        (
+            "# Definition of Done — einzelne Kriterien überschreiben (erbt von dod-preset)\n"
+            "# dod:\n"
+            "#   req-traceability: false\n"
+            "#   tests-required: false\n"
+            "#   codebase-overview: false\n"
+            "#   security-audit: false\n"
+            "\n"
+        ),
+    )
+    body = body.replace(
+        "model-overrides: {}\n",
+        (
+            "# Modell-Tiers pro Rolle überschreiben (optional)\n"
+            "# Tiers: nano | fast | balanced | powerful | max\n"
+            "# Form A — provider-spezifisch (empfohlen bei Multi-Provider):\n"
+            "# model-overrides:\n"
+            "#   Claude:\n"
+            "#     orchestrator: powerful\n"
+            "#     developer: powerful\n"
+            "#     git: nano\n"
+            "#   Gemini:\n"
+            "#     orchestrator: balanced\n"
+            "#     developer: balanced\n"
+            "#     git: fast\n"
+            "#\n"
+            "# Form B — flat (Legacy, wird als Claude-Override interpretiert):\n"
+            "# model-overrides:\n"
+            "#   git: fast\n"
+            "#   developer: powerful\n"
+            "\n"
+        ),
+    )
+    body = body.replace(
+        "hooks: {}\n",
+        (
+            "# Hooks — opt-in pro Hook (Script muss existieren + enabled: true)\n"
+            "# hooks:\n"
+            "#   dod-push-check:\n"
+            "#     enabled: true\n"
+            "#   lifecycle-check:\n"
+            "#     enabled: true\n"
+            "\n"
+        ),
+    )
+    body = body.replace(
+        "provider-options: {}\n",
+        (
+            "# Provider-spezifische Optionen — z.B. Continue: generate-prompts, prompt-mode\n"
+            "# provider-options:\n"
+            "#   Claude: {}\n"
+            "#   Gemini: {}\n"
+            "#   Continue:\n"
+            "#     generate-prompts: true\n"
+            "#     prompt-mode: full\n"
+            "#   Opencode: {}\n"
+            "\n"
+        ),
+    )
+    body = body.replace(
+        "external-skills: {}\n",
+        (
+            "# Externe Skills — opt-in (muss auch approved: true in skills-registry.yaml sein)\n"
+            "# external-skills:\n"
+            "#   home-organization:\n"
+            "#     enabled: true\n"
+            "\n"
+        ),
+    )
     path.write_text(header + body, encoding="utf-8")

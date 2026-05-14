@@ -32,10 +32,10 @@ roles:
   - agent-meta-manager
 
 # Kommunikationsstil
-# speech-mode: full
+speech-mode: full
 
 # Maximale parallele Agenten
-# max-parallel-agents: 2
+max-parallel-agents: 2
 
 # Hooks — opt-in
 # hooks:
