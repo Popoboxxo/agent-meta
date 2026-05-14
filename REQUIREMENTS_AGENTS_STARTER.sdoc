@@ -1,0 +1,1323 @@
+DOCUMENT: agent-meta Requirements — Agents Module (REQ-AGENTS-*)
+TITLE: Agent Generation and Composition Engine Specifications
+VERSION: 0.1.0
+CREATED: 2026-05-13
+UPDATED: 2026-05-13
+
+[SECTION: Core Compilation + Frontmatter Extraction]
+
+[REQUIREMENT]
+UID: REQ-AGENTS-001
+TITLE: extract_frontmatter_field() — YAML Frontmatter Field Extraction
+STATEMENT: >>>
+extract_frontmatter_field(content: str, field: str) → str | None extracts a single YAML
+frontmatter field value from agent markdown documents.
+
+FUNCTION SIGNATURE:
+  def extract_frontmatter_field(content: str, field: str) -> str | None
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document with optional YAML frontmatter block (---...---)
+    - May contain multi-line field values
+    - Required: valid UTF-8
+
+  field (str)
+    - YAML field name to extract (e.g., "name", "version", "extends", "patches")
+    - Case-sensitive
+    - No quotes needed in the field parameter itself
+
+FIELD VALUE MATCHING RULES:
+  The function handles THREE YAML value forms:
+    1. Unquoted: field: simple_value
+       - Regex: ^field:\s*([^\n]+)$
+       - Captures value up to newline, trimmed
+
+    2. Double-quoted: field: "value with\n  continuation lines"
+       - Regex: ^field:\s+"((?:[^"\\]|\\.|\n  )*)"\s*$
+       - Captures multi-line values indented with 2+ spaces
+       - Continuation lines joined with single space
+
+    3. Single-quoted: field: 'value'
+       - Regex: ^field:\s*'([^']+)'$
+       - Captures everything between single quotes
+
+MATCHING PRIORITY:
+  1. Try multi-line double-quoted match first (most specific)
+  2. Fall back to single-line match (both quoted and unquoted)
+  3. Return None if no match found
+
+OUTPUT:
+  Returns: str | None
+    - Extracted value, trimmed of whitespace
+    - Returns None if field not found or value is empty string
+    - Multi-line values have \n converted to space (YAML folding semantics)
+
+ERROR HANDLING:
+  - No exceptions raised; returns None on parse failure
+  - Invalid YAML syntax does NOT cause error; best-effort extraction
+  - Empty values ("", '') return None (not empty string)
+
+USE CASES:
+  - Reading "version:" for source attribution (REQ-AGENTS-002)
+  - Detecting "extends:" field for composition mode (REQ-AGENTS-006)
+  - Extracting "patches:" for patch engine (REQ-AGENTS-007)
+  - Reading "name:", "description:", "generated-from:" metadata
+
+EDGE CASES & VALIDATION:
+  ✓ Field at EOF (no trailing newline)
+  ✓ Field with trailing spaces before quote
+  ✓ Field value contains escaped quotes (\")
+  ✓ Multi-line value with blank continuation lines
+  ✗ Multiple same fields → Returns FIRST match only
+  ✗ YAML syntax invalid → Does NOT validate, just extracts
+<<<
+RATIONALE: >>>
+Frontmatter extraction is the foundation for all downstream composition, variable injection,
+and metadata tracking. Must be robust to:
+  - Both quoted and unquoted YAML values
+  - Multi-line YAML strings with proper indentation handling
+  - Missing fields (graceful None return, not error)
+
+Used in 5+ contexts:
+  1. Detecting composition mode (extends: present?)
+  2. Reading base template paths (extends: <path>)
+  3. Tracking source versions (version: X.Y.Z)
+  4. Reading patch instructions (patches: [...])
+  5. Extracting metadata for generated-from attribution
+<<<
+VERIFICATION: >>>
+Unit tests must cover:
+  - Unquoted single-line values
+  - Double-quoted multi-line values (2-space continuation)
+  - Single-quoted values
+  - Empty field (returns None)
+  - Missing field (returns None)
+  - Field with special chars in value (colons, hyphens, underscores)
+  - Field NOT at start of line (should not match)
+  - Multiple same fields (first wins)
+  - No trailing newline in file
+  - YAML syntax errors (invalid quotes, etc.) — best effort extract
+
+Test files:
+  - tests/test_agents.py::test_extract_frontmatter_field_*
+  - tests/fixtures/agents/sample-*.md (various frontmatter formats)
+<<<
+TAGS: design, agents, frontmatter, parsing, metadata
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-AGENTS-002
+- TYPE: calls
+  VALUE: REQ-AGENTS-006
+- TYPE: called-by
+  VALUE: sync_agents()
+- TYPE: called-by
+  VALUE: sync_agents_for_provider()
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-002
+TITLE: _split_frontmatter() — Separate YAML Block from Body
+STATEMENT: >>>
+_split_frontmatter(content: str) → tuple[str, str] splits markdown document into
+(frontmatter_block, body) where frontmatter_block includes the '---' delimiters.
+
+FUNCTION SIGNATURE:
+  def _split_frontmatter(content: str) -> tuple[str, str]
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document
+    - Assumed UTF-8 encoding
+    - May be empty or have no frontmatter
+
+FRONTMATTER STRUCTURE:
+  Standard YAML frontmatter delimited by '---':
+    ---
+    name: value
+    version: 1.0.0
+    ...
+    ---
+    # Markdown body starts here
+
+SPLIT LOGIC:
+  1. If content does NOT start with "---" → return ("", content)
+  2. Find closing "---" marker:
+     - Search for "\n---" starting from position 3 (skip opening delimiter)
+     - If not found → return ("", content) [malformed, treat as body-only]
+  3. Split at closing marker:
+     - frontmatter_block = content[0 : end + 4]  includes both --- delimiters
+     - body = content[end + 4:]                    excludes closing --- line
+
+OUTPUT:
+  Returns: (str, str) tuple
+    - [0] frontmatter_block: "---\n...fields...\n---"  (empty string if no FM)
+    - [1] body: everything after closing "---" (full content if no FM)
+    - Guaranteed: frontmatter_block + body != original if FM found (closing --- removed from join)
+
+ERROR HANDLING:
+  - No exceptions; always returns 2-tuple
+  - Malformed FM (no closing ---) treated as "no frontmatter" → ("", content)
+  - Empty document ("") returns ("", "")
+  - Document with only "---" returns ("", "---")
+
+USAGE CONTEXT:
+  - Preprocessing before YAML parsing (REQ-AGENTS-003)
+  - Composition engine base loading (REQ-AGENTS-006)
+  - Frontmatter merging (REQ-AGENTS-009)
+  - Extension filtering (project-ext.md handling)
+
+EDGE CASES:
+  ✓ No frontmatter: "# Heading\nBody" → ("", "# Heading\nBody")
+  ✓ Only opening ---: "---\nBody" → ("", "---\nBody")
+  ✓ FM without closing ---: "---\nname: value\n# Body" → ("", "---\nname: value\n# Body")
+  ✓ Closing --- on same line as body: "---\n---# Text" → ("---\n---", "# Text")
+  ✓ Multiple --- in body: FM with 2 blocks → split at FIRST occurrence only
+  ✓ Empty FM block: "---\n---\nBody" → ("---\n---", "\nBody")
+<<<
+RATIONALE: >>>
+Clean separation of frontmatter from body is essential for:
+  - YAML parsing without trying to parse markdown body as YAML
+  - Preserving exact frontmatter structure for re-serialization
+  - Composition engine to apply patches to body only, not FM
+  - Extension blocks to know what's metadata vs content
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_split_frontmatter_with_fm: "---\nname: x\n---\nBody"
+  - test_split_frontmatter_no_fm: "# Heading\nBody"
+  - test_split_frontmatter_malformed_closing: "---\nname: x\n# Body"
+  - test_split_frontmatter_multiple_dashes_in_body: Body contains "---"
+  - test_split_frontmatter_empty_document: ""
+  - test_split_frontmatter_empty_fm_block: "---\n---\n"
+<<<
+TAGS: design, agents, parsing, frontmatter
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-003
+- TYPE: called-by
+  VALUE: REQ-AGENTS-009
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-003
+TITLE: _parse_frontmatter_yaml() — Parse YAML Frontmatter to Dict
+STATEMENT: >>>
+_parse_frontmatter_yaml(content: str) → dict parses YAML frontmatter block extracted
+from markdown document into a Python dictionary.
+
+FUNCTION SIGNATURE:
+  def _parse_frontmatter_yaml(content: str) -> dict
+
+PRECONDITIONS:
+  - PyYAML library available (checked via _YAML_AVAILABLE flag)
+  - content parameter is full markdown document (not pre-split)
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document with optional YAML frontmatter
+    - Required: valid UTF-8
+
+PARSING FLOW:
+  1. Check if PyYAML available:
+     - If not available → return {} (empty dict, no error)
+     - If available → proceed to step 2
+  2. Call _split_frontmatter(content) → (fm_block, body)
+  3. If fm_block is empty → return {} (no frontmatter found)
+  4. Strip --- delimiters from fm_block:
+     - Remove leading "---\n"
+     - Remove trailing "\n---"
+  5. Call yaml.safe_load(inner_fm) → parse to dict
+  6. Validate result is dict:
+     - If not dict (e.g., null, list) → return {}
+     - If dict → return as-is
+  7. On yaml.YAMLError → catch and return {} (no error propagation)
+
+OUTPUT:
+  Returns: dict
+    - Empty dict {} if:
+      - PyYAML not available
+      - No frontmatter found
+      - YAML parsing fails (invalid syntax)
+      - YAML parses to non-dict (e.g., list, scalar)
+    - Dict of parsed YAML fields if successful
+    - Field keys are strings (YAML keys)
+    - Field values retain YAML types (str, int, bool, list, dict, None)
+
+YAML FIELD TYPES PRESERVED:
+  - name: "string" → {"name": "string"}
+  - version: 1.0.0 → {"version": 1.0} (float) or "1.0.0" (string)?
+  - enabled: true → {"enabled": True}
+  - extends: null → {"extends": None}
+  - patches: [{op: append, ...}] → {"patches": [{...}]} (list of dicts)
+  - memory: "session" → {"memory": "session"}
+
+ERROR HANDLING:
+  - YAML.YAMLError caught and silently returns {}
+  - No logging; errors handled gracefully
+  - No exceptions propagated to caller
+  - Safe for malformed YAML input
+
+USAGE CONTEXT:
+  - Composition detection (checking for "extends" key)
+  - Patch extraction (reading "patches" list)
+  - Frontmatter merging (REQ-AGENTS-009)
+  - Metadata reading (version, name, description)
+
+EDGE CASES:
+  ✓ Empty YAML block: "---\n---" → {}
+  ✓ YAML null: "---\nname: null\n---" → {"name": None}
+  ✓ YAML list (non-dict): "---\n- item1\n- item2\n---" → {}
+  ✓ Invalid YAML: "---\ninvalid: : syntax\n---" → {}
+  ✓ No frontmatter: content without --- → {}
+  ✗ Nested YAML structures: Fully supported by yaml.safe_load
+
+COMPATIBILITY:
+  - Python 3.10+ (uses | syntax for type unions)
+  - PyYAML 5.1+ required (yaml.safe_load, yaml.YAMLError)
+  - If PyYAML not installed → graceful fallback to {}
+<<<
+RATIONALE: >>>
+YAML parsing must be safe and graceful because:
+  1. Not all agent files have frontmatter
+  2. Frontmatter may be malformed (user error, merge conflicts)
+  3. PyYAML may not be installed in all environments
+  4. Composition engine depends on patches field being extracted correctly
+  5. Fallback to {} is safer than raising exceptions
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_parse_fm_yaml_valid: Standard YAML with multiple fields
+  - test_parse_fm_yaml_empty_fm: "---\n---"
+  - test_parse_fm_yaml_no_fm: "# Markdown body"
+  - test_parse_fm_yaml_nested_structures: patches: [{...}] lists
+  - test_parse_fm_yaml_invalid_syntax: Malformed YAML
+  - test_parse_fm_yaml_non_dict: YAML list or scalar at root
+  - test_parse_fm_yaml_yaml_not_available: Mock _YAML_AVAILABLE=False
+  - test_parse_fm_yaml_preserves_types: int, bool, None in values
+
+Integration:
+  - Must integrate with compose_agent() (REQ-AGENTS-006)
+  - Must work with _merge_frontmatter() (REQ-AGENTS-009)
+<<<
+TAGS: design, agents, frontmatter, yaml, parsing
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-002
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+- TYPE: called-by
+  VALUE: REQ-AGENTS-009
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-004
+TITLE: _find_section_bounds() — Locate Markdown Heading Sections
+STATEMENT: >>>
+_find_section_bounds(lines: list[str], anchor: str) → tuple[int, int] | None
+finds the start and end line indices of a markdown section identified by its heading.
+
+FUNCTION SIGNATURE:
+  def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | None
+
+INPUT PARAMETERS:
+  lines (list[str])
+    - Document split into lines (including keepends=True line breaks)
+    - Line format: "# Heading\n" or "Content\n" or final line may lack \n
+    - Empty lines are preserved: ""
+
+  anchor (str)
+    - Markdown heading text to find, e.g. "## Tools" or "## Composition"
+    - Must match heading line EXACTLY (after rstrip() stripping trailing whitespace)
+    - Case-sensitive
+
+HEADING MATCHING LOGIC:
+  1. Strip anchor and each line to remove trailing whitespace:
+     - anchor_stripped = anchor.strip()
+     - line_stripped = line.rstrip()
+  2. Exact match required:
+     - if line_stripped == anchor_stripped → Found anchor
+  3. Determine anchor heading level (number of # at start):
+     - anchor_level = len(anchor_stripped) - len(anchor_stripped.lstrip("#"))
+     - Examples: "## Tools" → level 2, "### Subsection" → level 3
+
+SECTION BOUNDS CALCULATION:
+  After finding anchor at line start_idx:
+
+  Section start: start_idx (inclusive, includes heading line)
+
+  Section end: First line satisfying:
+    - Line starts with "#" (heading marker)
+    - Heading level <= anchor_level (same or higher level = new section)
+    - First such line index = section end (exclusive)
+    - If no such line found before EOF → section_end = len(lines)
+
+OUTPUT:
+  Returns: tuple[int, int] | None
+    - (start_idx, end_idx) if anchor found
+      - start_idx: inclusive (heading line)
+      - end_idx: exclusive (first line of next section or EOF)
+    - None if anchor not found in document
+
+EXAMPLE WALKTHROUGH:
+  Document (with line indices):
+    0: "---\n"
+    1: "name: agent\n"
+    2: "---\n"
+    3: "# Top Level\n"
+    4: "Content\n"
+    5: "## Tools\n"
+    6: "Tool 1\n"
+    7: "Tool 2\n"
+    8: "## Hooks\n"
+    9: "Hook 1\n"
+
+  Call: _find_section_bounds(lines, "## Tools")
+    - Anchor level: 2
+    - Found at start_idx=5
+    - Scan forward from 6: "Tool 1\n" (not heading), "Tool 2\n" (not heading)
+    - At 8: "## Hooks\n" (heading, level 2 ≤ anchor_level 2) → section_end=8
+    - Return: (5, 8)
+
+ERROR HANDLING:
+  - No exceptions raised
+  - Returns None if anchor not found
+  - Returns None if anchor matches nothing in document
+
+EDGE CASES:
+  ✓ Anchor at EOF: (start, len(lines))
+  ✓ Anchor last line: (idx, len(lines))
+  ✓ Section immediately followed by higher-level heading: Correct end
+  ✓ Nested headings: "## A" section ends at first "## B" or "#" or "# Top"
+  ✓ Heading with trailing spaces: anchor.strip() matches line.rstrip()
+  ✗ Heading with different case: No match (case-sensitive)
+  ✗ Partial heading match: No match (exact match required)
+
+COMPOSITION ENGINE INTEGRATION:
+  Used by patch operations:
+    - _patch_append_after(): Find section, append after end
+    - _patch_replace(): Find section, replace entire section
+    - _patch_delete(): Find section, delete entire section
+<<<
+RATIONALE: >>>
+Section finding must be precise for composition engine reliability:
+  - Headings are the only reliable anchor for markdown patches
+  - Must handle nested sections (level-based hierarchy)
+  - Exact match prevents accidental partial matches
+  - Must work with line-based iteration for efficient searching
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_find_bounds_simple: Single section at middle
+  - test_find_bounds_nested: Multiple heading levels
+  - test_find_bounds_at_eof: Anchor before EOF, no trailing heading
+  - test_find_bounds_last_section: Section at document end
+  - test_find_bounds_first_section: Section starting after frontmatter
+  - test_find_bounds_case_sensitive: Different case → no match
+  - test_find_bounds_partial_match: "## T" for "## Tools" → no match
+  - test_find_bounds_whitespace: Heading with trailing spaces
+  - test_find_bounds_not_found: Anchor doesn't exist
+  - test_find_bounds_identical_anchors: Multiple same headings → FIRST wins
+<<<
+TAGS: design, agents, composition, markdown-parsing
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-005
+- TYPE: called-by
+  VALUE: REQ-AGENTS-006
+- TYPE: called-by
+  VALUE: REQ-AGENTS-007
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-005
+TITLE: _patch_append_after() — Insert Content After Section
+STATEMENT: >>>
+_patch_append_after(content: str, anchor: str, patch_content: str, log: SyncLog, source_label: str)
+→ str inserts patch_content immediately after the section identified by anchor heading.
+
+FUNCTION SIGNATURE:
+  def _patch_append_after(content: str, anchor: str, patch_content: str,
+                          log: SyncLog, source_label: str) -> str
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document (body only, after frontmatter split)
+    - May contain multiple sections
+  anchor (str)
+    - Heading to find (e.g., "## Tools")
+    - Passed to _find_section_bounds()
+  patch_content (str)
+    - Markdown content to insert after the section
+    - Will be surrounded by blank lines (## Tools\nSection content\n\n<patch>\n\n)
+  log (SyncLog)
+    - Logging object for warnings/info
+  source_label (str)
+    - File name or description for logging (e.g., "1-generic/developer.md")
+
+INSERTION LOGIC:
+  1. Split content into lines: lines = content.splitlines(keepends=True)
+  2. Find section bounds: (start_idx, end_idx) = _find_section_bounds(lines, anchor)
+  3. If bounds is None (anchor not found):
+     - Log warning: "Composition patch 'append-after': anchor '<anchor>' not found in <source_label>"
+     - Return content unchanged (no modification)
+  4. If bounds found, insert after end_idx:
+     - Create padding: "\n\n" + patch_content.rstrip("\n") + "\n\n"
+     - Split padding into lines with keepends=True
+     - Insert at lines[end_idx]:
+       result_lines = lines[:end_idx] + patch_lines + lines[end_idx:]
+  5. Join result_lines back to string and return
+
+EXAMPLE:
+  Original content (lines 0-5):
+    0: "# Top\n"
+    1: "Intro\n"
+    2: "## Section A\n"
+    3: "Content A\n"
+    4: "## Section B\n"
+    5: "Content B\n"
+
+  Call: _patch_append_after(content, "## Section A", "New content")
+
+  _find_section_bounds(lines, "## Section A") → (2, 4)
+
+  Insert after line 4:
+    - Padding: "\n\nNew content\n\n" → split to lines
+    - Result: lines[0:4] + padding_lines + lines[4:]
+    - Output lines:
+      0: "# Top\n"
+      1: "Intro\n"
+      2: "## Section A\n"
+      3: "Content A\n"
+      4: "\n"
+      5: "\n"
+      6: "New content\n"
+      7: "\n"
+      8: "\n"
+      9: "## Section B\n"
+      10: "Content B\n"
+
+ERROR HANDLING:
+  - Anchor not found: Log warning, return unmodified content (not error)
+  - Empty patch_content: Still inserts blank lines, valid use case
+  - content empty: Returns unchanged (splitlines yields empty list)
+
+PADDING RULES:
+  - Always adds "\n\n" before patch content
+  - Always adds "\n\n" after patch content
+  - Preserves patch_content trailing newlines via rstrip("\n")
+  - Ensures proper markdown spacing (2 blank lines = new paragraph)
+
+LOG MESSAGES:
+  Warning format: "Composition patch 'append-after': anchor '<anchor>' not found in <source_label>"
+  Info (optional): Could log successful insertion with line counts
+
+USAGE IN COMPOSITION ENGINE:
+  - Used by apply_patch() when op == "append-after" (REQ-AGENTS-008)
+  - Part of compose_agent() multi-patch application (REQ-AGENTS-006)
+
+COMPOSITION MODES:
+  - This is a MODIFYING operation (vs _patch_replace / _patch_delete)
+  - Preserves anchor section and appends new content after
+  - Safe for sequential patches (earlier patches don't affect anchor positions if anchors differ)
+
+EDGE CASES:
+  ✓ Anchor at EOF: Appends before EOF line
+  ✓ Empty patch_content: Still adds blank line padding
+  ✓ patch_content with internal structure (nested headings, code blocks): Preserved as-is
+  ✓ Anchor not found: Content unchanged, warning logged
+  ✗ Anchor matches multiple sections: Only FIRST match used (from _find_section_bounds)
+  ✗ Overlapping patches (same anchor in multiple patches): Applied sequentially (order matters)
+<<<
+RATIONALE: >>>
+Append-after is the safest composition operation because:
+  - Preserves original section intact
+  - Doesn't delete or replace content (safe for rollback)
+  - Supports extending agents with new subsections
+  - Graceful fallback (warning, no error) if anchor missing
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_patch_append_after_middle: Normal case
+  - test_patch_append_after_at_eof: Section at document end
+  - test_patch_append_after_empty_patch: patch_content = ""
+  - test_patch_append_after_nested_structure: patch_content has headings
+  - test_patch_append_after_anchor_not_found: Missing anchor → warning
+  - test_patch_append_after_multiple_same_anchors: First match only
+  - test_patch_append_after_padding: Exact spacing validation
+  - test_patch_append_after_line_preservation: keepends maintained
+
+Integration test:
+  - compose_agent() with append-after patch (REQ-AGENTS-006)
+<<<
+TAGS: design, agents, composition, patch-engine
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-004
+- TYPE: called-by
+  VALUE: REQ-AGENTS-008
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-006
+TITLE: _patch_replace() — Replace Section Content
+STATEMENT: >>>
+_patch_replace(content: str, anchor: str, patch_content: str, log: SyncLog, source_label: str)
+→ str replaces the entire section identified by anchor heading with new patch_content.
+
+FUNCTION SIGNATURE:
+  def _patch_replace(content: str, anchor: str, patch_content: str,
+                     log: SyncLog, source_label: str) -> str
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document body
+  anchor (str)
+    - Heading to find and replace (e.g., "## Don'ts")
+    - Heading line itself IS REPLACED (not preserved)
+  patch_content (str)
+    - Full replacement content (must include heading if desired)
+    - Typically: "## New Heading\nNew content\n"
+  log (SyncLog)
+    - Logging object
+  source_label (str)
+    - Source file label for logging
+
+REPLACEMENT LOGIC:
+  1. Split: lines = content.splitlines(keepends=True)
+  2. Find bounds: (start_idx, end_idx) = _find_section_bounds(lines, anchor)
+  3. If bounds is None:
+     - Log warning: "Composition patch 'replace': anchor '<anchor>' not found in <source_label>"
+     - Return content unchanged
+  4. If bounds found, replace section:
+     - Extract patch lines: patch_lines = (patch_content.rstrip("\n") + "\n").splitlines(keepends=True)
+     - Replace: result_lines = lines[:start_idx] + patch_lines + lines[end_idx:]
+  5. Join and return
+
+EXAMPLE:
+  Original (lines 0-5):
+    0: "# Top\n"
+    1: "Intro\n"
+    2: "## Tools\n"
+    3: "Old tool 1\n"
+    4: "Old tool 2\n"
+    5: "## Next\n"
+
+  Call: _patch_replace(content, "## Tools", "## Tools\nNew tool 1\nNew tool 2\n")
+
+  _find_section_bounds → (2, 5)
+
+  Replace lines[2:5]:
+    0: "# Top\n"
+    1: "Intro\n"
+    2: "## Tools\n"
+    3: "New tool 1\n"
+    4: "New tool 2\n"
+    5: "## Next\n"
+
+REPLACEMENT SEMANTICS:
+  - Old section heading COMPLETELY REPLACED (not preserved)
+  - If patch_content should include heading → must be in patch_content explicitly
+  - Entire section from heading to next same-level heading is replaced
+  - Everything after end_idx is preserved
+
+ERROR HANDLING:
+  - Anchor not found: Warning logged, content unchanged
+  - Empty patch_content: Section replaced with nothing (deletion)
+  - No exceptions raised
+
+WHITESPACE HANDLING:
+  - patch_content trimmed of trailing newlines: .rstrip("\n")
+  - Single newline added: + "\n"
+  - Then split to lines with keepends=True
+  - Preserves exact newline structure
+
+USE CASES:
+  - Updating agent instructions entirely
+  - Removing deprecated sections and replacing with new content
+  - Patching platform-specific tools list
+  - Overriding role-specific prompts
+
+COMPOSITION INTEGRATION:
+  - Part of apply_patch() op == "replace" (REQ-AGENTS-008)
+  - Called from compose_agent() (REQ-AGENTS-006)
+  - More aggressive than append-after (full replacement)
+
+EDGE CASES:
+  ✓ Replace section at EOF: Correctly handles
+  ✓ patch_content empty (deletion): Removes entire section
+  ✓ patch_content without heading: Content appended (but typically include heading)
+  ✓ Anchor not found: Warning, no change
+  ✗ Nested sections: Entire heading level replaced, nested sections within removed
+
+RISK PROFILE:
+  - MEDIUM: Deletes original content (not recoverable without version control)
+  - Compared to append-after: More destructive, use carefully
+  - Recommended: Use replace for full platform/project overrides, not partial updates
+<<<
+RATIONALE: >>>
+Replace is needed for complete section overrides because:
+  - Append-after can't remove bad original content
+  - Platform-specific agents need different heading levels (e.g., ## vs ###)
+  - Full text replacement ensures no stale content remains
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_patch_replace_middle: Normal section replacement
+  - test_patch_replace_at_eof: Section at end
+  - test_patch_replace_empty_patch: Deletion via empty patch_content
+  - test_patch_replace_with_heading: patch includes new heading
+  - test_patch_replace_without_heading: patch_content is raw text (edge case)
+  - test_patch_replace_nested_removal: Original nested headings removed
+  - test_patch_replace_anchor_not_found: Missing anchor → warning
+  - test_patch_replace_line_ending_normalization: Newline handling
+
+Integration:
+  - Composition engine with replace operations
+<<<
+TAGS: design, agents, composition, patch-engine
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-004
+- TYPE: called-by
+  VALUE: REQ-AGENTS-008
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-007
+TITLE: _patch_delete() — Remove Section from Document
+STATEMENT: >>>
+_patch_delete(content: str, anchor: str, log: SyncLog, source_label: str) → str
+removes the entire section identified by anchor heading, including blank lines before it.
+
+FUNCTION SIGNATURE:
+  def _patch_delete(content: str, anchor: str, log: SyncLog, source_label: str) -> str
+
+INPUT PARAMETERS:
+  content (str)
+    - Full markdown document body
+  anchor (str)
+    - Heading to find and delete (e.g., "## Deprecated Section")
+  log (SyncLog)
+    - Logging object
+  source_label (str)
+    - Source file label for logging
+
+DELETION LOGIC:
+  1. Split: lines = content.splitlines(keepends=True)
+  2. Find bounds: (start_idx, end_idx) = _find_section_bounds(lines, anchor)
+  3. If bounds is None:
+     - Log warning: "Composition patch 'delete': anchor '<anchor>' not found in <source_label>"
+     - Return content unchanged
+  4. If bounds found, remove section AND preceding blank line:
+     - trim_start = start_idx
+     - if trim_start > 0 AND lines[trim_start - 1].strip() == "": trim_start -= 1
+     - result_lines = lines[:trim_start] + lines[end_idx:]
+  5. Join and return
+
+EXAMPLE:
+  Original (lines 0-6):
+    0: "# Top\n"
+    1: "Intro\n"
+    2: "\n"
+    3: "## Deprecated\n"
+    4: "Old content\n"
+    5: "## Next\n"
+    6: "New content\n"
+
+  Call: _patch_delete(content, "## Deprecated")
+
+  _find_section_bounds → (3, 5)
+  trim_start: lines[2].strip() == "" → trim_start = 2
+  result_lines = lines[:2] + lines[5:]
+
+  Output (lines 0-4):
+    0: "# Top\n"
+    1: "Intro\n"
+    2: "## Next\n"
+    3: "New content\n"
+
+BLANK LINE CLEANUP:
+  - Removes heading line
+  - Removes all content up to next same-level heading
+  - Also removes ONE blank line BEFORE heading (if present)
+  - Prevents "orphaned" blank lines in document
+
+PRECEDENT LOGIC FOR BLANK LINE TRIMMING:
+  - Check if line[start_idx - 1] exists
+  - Check if that line is blank: .strip() == ""
+  - If both true → trim_start = start_idx - 1
+  - Otherwise → trim_start = start_idx
+
+ERROR HANDLING:
+  - Anchor not found: Warning logged, content unchanged
+  - No exceptions raised
+  - Safe to call on already-deleted sections (idempotent in effect)
+
+EDGE CASES:
+  ✓ Section at start of document: No preceding blank line to trim
+  ✓ Section at EOF: Correctly removes to end
+  ✓ Multiple blank lines before section: Removes ONLY first blank line
+  ✓ No blank line before section: Just removes section
+  ✓ Anchor not found: Warning, unchanged
+  ✗ Section at start of file with no blank line: Correctly removes heading only
+
+USE CASES:
+  - Removing deprecated tools/features from agent template
+  - Removing platform-specific sections that don't apply to all platforms
+  - Cleaning up agent files after major refactor (remove old approaches)
+
+COMPOSITION INTEGRATION:
+  - Part of apply_patch() op == "delete" (REQ-AGENTS-008)
+  - Destructive operation (actually removes content)
+  - Recommended: Only for removing truly obsolete sections
+
+RISK PROFILE:
+  - HIGH: Permanently deletes content
+  - Only use when section is confirmed obsolete
+  - Version control is the safety net (revert if needed)
+
+SPACING AFTER DELETION:
+  - Result should have proper spacing between remaining sections
+  - Removing blank line before section prevents double-spacing
+  - Multiple deletions in sequence work correctly (each removes one section)
+<<<
+RATIONALE: >>>
+Delete with blank-line trimming is essential for composition cleanup:
+  - Prevents orphaned blank lines when removing sections
+  - Enables complete section removal without manual cleanup
+  - Supports deprecation workflows (phase out old content gradually)
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_patch_delete_middle: Normal deletion
+  - test_patch_delete_at_start: First section deletion (no trim)
+  - test_patch_delete_at_eof: Last section deletion
+  - test_patch_delete_with_preceding_blank: Blank line trimmed
+  - test_patch_delete_no_preceding_blank: Heading at start of content
+  - test_patch_delete_multiple_blanks: Only first blank trimmed
+  - test_patch_delete_anchor_not_found: Missing anchor → warning
+  - test_patch_delete_sequential: Multiple delete operations in composition
+
+Integration:
+  - Composition engine with multiple delete patches
+<<<
+TAGS: design, agents, composition, patch-engine
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-004
+- TYPE: called-by
+  VALUE: REQ-AGENTS-008
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-008
+TITLE: apply_patch() — Unified Patch Operation Dispatcher
+STATEMENT: >>>
+apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) → str
+applies a single composition patch (append, append-after, replace, or delete) to document content.
+
+FUNCTION SIGNATURE:
+  def apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) -> str
+
+INPUT PARAMETERS:
+  content (str)
+    - Document (body or full content depending on operation)
+  patch (dict)
+    - Patch specification with required keys:
+      - "op" (str): Operation type (append, append-after, replace, delete)
+      - "anchor" (str): Heading anchor for append-after/replace/delete (required for those ops)
+      - "content" (str): Patch content for append/append-after/replace (not used for delete)
+  log (SyncLog)
+    - Logging object
+  source_label (str)
+    - File name for logging
+
+PATCH DICTIONARY SCHEMA:
+  {
+    "op": "append" | "append-after" | "replace" | "delete",
+    "anchor": str (optional, required for ops other than "append"),
+    "content": str (optional, required for ops other than "delete")
+  }
+
+  Example patches:
+    {"op": "append", "content": "## New Section\nContent"}
+    {"op": "append-after", "anchor": "## Tools", "content": "More tools"}
+    {"op": "replace", "anchor": "## Deprecated", "content": "## New\nContent"}
+    {"op": "delete", "anchor": "## Old"}
+
+OPERATION DISPATCHER:
+  1. Extract op, anchor, content from patch dict (default to "" if missing)
+  2. Switch on op:
+
+     a) op == "append":
+        - Append patch_content to EOF (no anchor needed)
+        - content.rstrip("\n") + "\n\n" + patch_content.rstrip("\n") + "\n"
+        - Call: content.rstrip("\n") + "\n\n" + patch_content.rstrip("\n") + "\n"
+
+     b) op == "append-after":
+        - Delegate: _patch_append_after(content, anchor, patch_content, log, source_label)
+
+     c) op == "replace":
+        - Delegate: _patch_replace(content, anchor, patch_content, log, source_label)
+
+     d) op == "delete":
+        - Delegate: _patch_delete(content, anchor, log, source_label)
+
+     e) op unknown:
+        - Log warning: "Composition: unknown patch op '<op>' in <source_label>"
+        - Return content unchanged
+
+RETURN VALUE:
+  Returns: str
+    - Modified content after patch application
+    - Unchanged content if op unknown or operation fails (gracefully)
+
+ERROR HANDLING:
+  - Unknown op: Warning logged, content unchanged (not error)
+  - Missing required fields: Treated as empty string (delegates handle)
+  - No exceptions raised
+
+LOGGING:
+  - Unknown op: "Composition: unknown patch op '<op>' in <source_label>"
+  - Delegates log their own warnings (anchor not found, etc.)
+
+COMPOSITION SEQUENCE:
+  - Used by compose_agent() to apply patches in order
+  - Patches applied sequentially: patch1 → patch2 → patch3 → ...
+  - Each patch operates on output of previous patch
+  - Anchors for later patches must exist in result of earlier patches
+
+EDGE CASES:
+  ✓ Empty patch dict: Treated as unknown op → warning
+  ✓ op missing: Defaults to "" → unknown → warning
+  ✓ anchor/content missing: Treated as "" → delegates handle gracefully
+  ✓ Multiple patches same op: Each applied independently
+  ✗ Patch order matters: Later patches depend on earlier patch results
+
+USAGE IN COMPOSITION:
+  - Part of compose_agent() (REQ-AGENTS-006)
+  - Applied to agent body after frontmatter split
+  - Patches list can contain multiple operations
+  - Order is significant (apply in sequence)
+<<<
+RATIONALE: >>>
+Unified dispatcher simplifies composition engine:
+  - Single entry point for all patch types
+  - Graceful handling of unknown operations
+  - Logs warnings for debugging composition issues
+  - Delegates to specialized functions for correctness
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_apply_patch_append: op == "append"
+  - test_apply_patch_append_after: op == "append-after"
+  - test_apply_patch_replace: op == "replace"
+  - test_apply_patch_delete: op == "delete"
+  - test_apply_patch_unknown_op: Unknown op → warning
+  - test_apply_patch_missing_op: No "op" key → warning
+  - test_apply_patch_empty_dict: Empty patch → warning
+  - test_apply_patch_sequential: Multiple patches applied in order
+
+Integration:
+  - compose_agent() with multiple patches (REQ-AGENTS-006)
+<<<
+TAGS: design, agents, composition, patch-engine
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-005
+- TYPE: uses
+  VALUE: REQ-AGENTS-006
+- TYPE: uses
+  VALUE: REQ-AGENTS-007
+- TYPE: called-by
+  VALUE: REQ-AGENTS-010
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-009
+TITLE: _merge_frontmatter() — Merge Override Frontmatter with Base
+STATEMENT: >>>
+_merge_frontmatter(base_content: str, override_fm: dict) → str merges override frontmatter
+fields with base document frontmatter, removing composition metadata (extends, patches).
+
+FUNCTION SIGNATURE:
+  def _merge_frontmatter(base_content: str, override_fm: dict) -> str
+
+INPUT PARAMETERS:
+  base_content (str)
+    - Full base template document (typically from 1-generic/<role>.md)
+    - Contains frontmatter and body
+  override_fm (dict)
+    - Parsed frontmatter from override file (from _parse_frontmatter_yaml())
+    - May contain composition keys: "extends", "patches"
+    - Other keys: "name", "version", "description", "based-on", "hint", "tools", etc.
+
+MERGING LOGIC:
+  1. Precondition: PyYAML available (_YAML_AVAILABLE)
+     - If not available → return base_content unchanged (cannot merge)
+  2. Split base: (fm_block, body) = _split_frontmatter(base_content)
+  3. Parse base frontmatter: base_fm = _parse_frontmatter_yaml(base_content)
+  4. Merge: merged = {**base_fm, **override_fm}
+     - base_fm provides defaults
+     - override_fm values override base_fm values (standard dict merge)
+  5. Strip composition keys: merged.pop("extends"), merged.pop("patches")
+  6. Serialize merged back to YAML:
+     - yaml.dump(merged, allow_unicode=True, default_flow_style=False, sort_keys=False)
+     - Preserve key order from override_fm (sort_keys=False)
+  7. Reconstruct document:
+     - new_fm_block = "---\n" + yaml_dump_result + "\n---"
+     - return new_fm_block + body
+
+FIELD OVERRIDE SEMANTICS:
+  Priority: override_fm > base_fm
+
+  Example:
+    base_fm:     {"name": "developer", "version": "1.0.0", "tools": [...]}
+    override_fm: {"version": "2.0.0", "extends": "1-generic/developer.md", "patches": [...]}
+    merged:      {"name": "developer", "version": "2.0.0", "tools": [...]}
+
+  - "name" kept from base (not in override)
+  - "version" overridden by override
+  - "tools" kept from base (not overridden)
+  - "extends" and "patches" stripped (composition metadata only)
+
+ERROR HANDLING:
+  - PyYAML not available: Return base unchanged (safe fallback)
+  - yaml.YAMLError during dump: Return base unchanged (safe fallback)
+  - No exceptions raised
+
+COMPOSITION METADATA STRIPPING:
+  - Remove "extends" key (composition source reference)
+  - Remove "patches" key (patch instructions)
+  - These are NOT part of agent definition, only used during composition
+  - Output frontmatter should be "clean" (no composition metadata)
+
+YAML SERIALIZATION:
+  - allow_unicode=True: Preserve non-ASCII chars (e.g., German umlauts)
+  - default_flow_style=False: Block style (readable YAML)
+  - sort_keys=False: Preserve insertion order (Python 3.7+)
+
+USAGE IN COMPOSITION:
+  - Called by compose_agent() after all patches applied (REQ-AGENTS-010)
+  - Merges override frontmatter into base document
+  - Ensures final agent has correct metadata (version, etc. from override)
+
+EDGE CASES:
+  ✓ No base frontmatter: FM reconstructed from override only
+  ✓ Empty override_fm: Returns base frontmatter unchanged
+  ✓ override_fm with only "extends" and "patches": Merges, then strips those keys
+  ✓ Multiline YAML values: Preserved by yaml.dump
+  ✗ YAML error during dump: Returns base (safe, not error)
+
+OUTPUT FRONTMATTER EXAMPLES:
+  Input base_fm:     {"name": "developer", "version": "1.0.0"}
+  Input override_fm: {"version": "2.0.0", "extends": "1-generic/developer.md"}
+
+  Output YAML:
+    ---
+    name: developer
+    version: 2.0.0
+    ---
+
+BODY PRESERVATION:
+  - Original body from base_content preserved exactly
+  - No modification to markdown content
+  - Only frontmatter changed
+<<<
+RATIONALE: >>>
+Frontmatter merging is essential for composition because:
+  - Override agent may have new metadata (version, based-on) not in base
+  - Composition keys (extends, patches) must be removed (implementation detail)
+  - Base fields preserved if override doesn't override them
+  - Ensures final agent frontmatter is "clean" for use
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_merge_fm_simple: Override version, keep name from base
+  - test_merge_fm_empty_override: Empty override → base unchanged
+  - test_merge_fm_strips_extends: "extends" key removed
+  - test_merge_fm_strips_patches: "patches" key removed
+  - test_merge_fm_yaml_not_available: PyYAML missing → base unchanged
+  - test_merge_fm_yaml_error: Invalid YAML dump → base unchanged
+  - test_merge_fm_preserves_body: Body unchanged
+  - test_merge_fm_multiline_values: YAML block values preserved
+  - test_merge_fm_key_order: Order from override preserved (sort_keys=False)
+
+Integration:
+  - compose_agent() with frontmatter merge (REQ-AGENTS-010)
+<<<
+TAGS: design, agents, composition, frontmatter, yaml
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-AGENTS-010
+
+
+[REQUIREMENT]
+UID: REQ-AGENTS-010
+TITLE: compose_agent() — Composition Engine: Apply Patches and Merge Frontmatter
+STATEMENT: >>>
+compose_agent(base_path: Path, override_content: str, log: SyncLog) → str
+orchestrates the complete agent composition process: loads base template, applies
+patches from override frontmatter, and merges frontmatter for final output.
+
+FUNCTION SIGNATURE:
+  def compose_agent(
+    base_path: Path,
+    override_content: str,
+    log: SyncLog,
+  ) -> str
+
+INPUT PARAMETERS:
+  base_path (Path)
+    - Path to base template file (e.g., Path("agents/1-generic/developer.md"))
+    - Should exist on filesystem
+    - Typically: agent_meta_root / "agents" / base_path_from_frontmatter
+  override_content (str)
+    - Content from override file (e.g., 2-platform/win32-developer.md)
+    - Contains frontmatter with "extends:" and optional "patches:" keys
+  log (SyncLog)
+    - Logging object for warnings/info
+
+COMPOSITION PRECONDITIONS:
+  - PyYAML library available
+  - base_path points to valid markdown file
+  - override_content contains valid YAML frontmatter
+
+COMPOSITION FLOW:
+  1. Precondition check:
+     - If not _YAML_AVAILABLE:
+       - Log warning: "PyYAML not available — composition skipped. Install: pip install pyyaml"
+       - Return override_content unchanged (graceful fallback)
+
+  2. Validate base template exists:
+     - If not base_path.exists():
+       - Log warning: f"Composition: base template not found: {base_path}"
+       - Return override_content unchanged (graceful fallback)
+
+  3. Load base template:
+     - base_content = base_path.read_text(encoding="utf-8")
+
+  4. Parse override frontmatter:
+     - override_fm = _parse_frontmatter_yaml(override_content)
+     - Extract patches: patches = override_fm.get("patches") or []
+
+  5. Apply patches sequentially:
+     - Start result = base_content
+     - For each patch in patches:
+       - result = apply_patch(result, patch, log, base_path.name)
+       - Each patch modifies result for next patch
+
+  6. Merge frontmatter:
+     - result = _merge_frontmatter(result, override_fm)
+     - Override fields win over base fields
+     - Composition keys (extends, patches) stripped
+
+  7. Return composed document
+
+EXAMPLE WALKTHROUGH:
+  Files:
+    agents/1-generic/developer.md:
+      ---
+      name: developer
+      version: 1.0.0
+      ---
+      # Developer Agent
+      ## Tools
+      - Tool 1
+      ## Hooks
+      - Hook 1
+
+    agents/2-platform/win32-developer.md:
+      ---
+      extends: 1-generic/developer.md
+      version: 1.0.1
+      patches:
+        - op: append-after
+          anchor: "## Tools"
+          content: "- Windows Tool"
+        - op: replace
+          anchor: "## Hooks"
+          content: "## Hooks\n- Windows Hook"
+      ---
+      (body ignored, overridden by base)
+
+  Call: compose_agent(Path("agents/1-generic/developer.md"), win32_content, log)
+
+  Step 1-3: Load base_content
+    ---
+    name: developer
+    version: 1.0.0
+    ---
+    # Developer Agent
+    ## Tools
+    - Tool 1
+    ## Hooks
+    - Hook 1
+
+  Step 4: override_fm = {"extends": "1-generic/developer.md", "version": "1.0.1", "patches": [...]}
+  Step 5a: patches = [{"op": "append-after", ...}, {"op": "replace", ...}]
+
+  Step 5b: Apply patch 1 (append-after)
+    result = base_content with "- Windows Tool" appended after "## Tools"
+
+    # Developer Agent
+    ## Tools
+    - Tool 1
+
+    - Windows Tool
+
+    ## Hooks
+    - Hook 1
+
+  Step 5c: Apply patch 2 (replace "## Hooks")
+    result = previous result with "## Hooks" section replaced
+
+    # Developer Agent
+    ## Tools
+    - Tool 1
+
+    - Windows Tool
+
+    ## Hooks
+    - Windows Hook
+
+  Step 6: Merge frontmatter
+    merged = base_fm + override_fm
+    result frontmatter = {name: developer, version: 1.0.1}  (version overridden)
+
+    Final output:
+    ---
+    name: developer
+    version: 1.0.1
+    ---
+    # Developer Agent
+    ## Tools
+    - Tool 1
+
+    - Windows Tool
+
+    ## Hooks
+    - Windows Hook
+
+ERROR HANDLING:
+  - PyYAML unavailable: Log warning, return override_content (safe)
+  - Base template not found: Log warning, return override_content (safe)
+  - Patch anchor not found: Patch operation logs warning, continues (no error)
+  - YAML merge error: Return base_content (safe)
+  - No exceptions propagated
+
+LOGGING:
+  - Info: f"composed from {extends_base} + {source_path.name}" (in sync_agents, REQ-AGENTS-002)
+  - Warnings: From patch operations and merge operations
+
+COMPOSITION MODES:
+  - FULL REPLACEMENT: override_content body is ignored; result body comes from base_content
+  - PATCH SYSTEM: Patches applied to base_content body in sequence
+  - FRONTMATTER OVERRIDE: Override frontmatter fields override base fields
+  - METADATA STRIPPING: Composition keys (extends, patches) not in output
+
+USAGE IN SYNC FLOW:
+  - Called by sync_agents() when "extends:" detected in source file (REQ-AGENTS-002)
+  - Path resolution: agent_meta_root / "agents" / extends_field_value
+  - Part of agent generation for 2-platform and 3-project agents
+
+ADVANTAGES OF COMPOSITION SYSTEM:
+  1. DRY: Avoid duplicating base agent content
+  2. Maintainable: Change base, platform-specific agents inherit updates
+  3. Safe: Patches are explicit, not copy-paste
+  4. Traceable: generated-from metadata shows composition sources
+
+PATCH ORDER SIGNIFICANCE:
+  - Patches applied in order from patches list
+  - Later patches operate on output of earlier patches
+  - Anchors for later patches must exist in result of earlier patches
+  - Order matters: reverse order would produce different results
+
+COMPOSITION SAFETY:
+  - Graceful fallback at each step (no hard failures)
+  - Patch misses logged as warnings (no error)
+  - Original base preserved (no side effects)
+  - Result is "clean" (no composition metadata in output)
+
+EDGE CASES:
+  ✓ Empty patches list: Base template returned with merged frontmatter
+  ✓ No patches field: Base template returned as-is
+  ✓ Base not found: Override returned unchanged (graceful)
+  ✓ PyYAML missing: Override returned unchanged (graceful)
+  ✓ Sequential patches with dependencies: Works if anchors preserved
+  ✗ Circular extends (base extends itself): Not detected, infinite recursion risk
+  ✗ Missing base template: Warning logged, override returned (not re-composed)
+<<<
+RATIONALE: >>>
+Composition engine is critical for:
+  1. Platform-specific agent variants (windows-developer, linux-developer)
+  2. Avoiding duplication of generic agent content
+  3. Maintainable agent templates (update base once, platform updates inherit)
+  4. Explicit, auditable changes (patches logged)
+  5. Safe fallbacks (never fails, always returns usable result)
+
+The approach (extends + patches + merge) is safer than copy-paste because:
+  - Changes to generic agent automatically propagate
+  - Patches are explicit (not hidden in copy-paste diffs)
+  - Frontmatter is cleanly merged (no conflicting metadata)
+<<<
+VERIFICATION: >>>
+Unit tests:
+  - test_compose_agent_simple_extends: Load base, no patches
+  - test_compose_agent_with_append_after: Append-after patch
+  - test_compose_agent_with_replace: Replace patch
+  - test_compose_agent_with_delete: Delete patch
+  - test_compose_agent_multiple_patches: Sequential patches
+  - test_compose_agent_base_not_found: Missing base → override returned
+  - test_compose_agent_yaml_unavailable: PyYAML missing → override returned
+  - test_compose_agent_patch_anchor_not_found: Anchor missing → warning, result valid
+  - test_compose_agent_frontmatter_merge: Override version overrides base version
+  - test_compose_agent_full_workflow: 2-platform agent from 1-generic + patches
+
+Integration test:
+  - sync_agents() with platform agents (REQ-AGENTS-002)
+  - End-to-end: 1-generic/developer.md → 2-platform/win32-developer.md → composed output
+<<<
+TAGS: design, agents, composition, engine
+STATUS: Active
+PRIORITY: P0
+OWNER: @daniel
+RELATIONS:
+- TYPE: uses
+  VALUE: REQ-AGENTS-001
+- TYPE: uses
+  VALUE: REQ-AGENTS-003
+- TYPE: uses
+  VALUE: REQ-AGENTS-008
+- TYPE: uses
+  VALUE: REQ-AGENTS-009
+- TYPE: called-by
+  VALUE: REQ-AGENTS-002

@@ -1,0 +1,565 @@
+[DOCUMENT]
+TITLE: Stakeholder Requirements Specification (L1)
+
+PREAMBLE: >>>
+This document captures user-level and product-level requirements for agent-meta.
+These are the capabilities that users and developers expect from the framework.
+Stakeholders: Framework developers, project maintainers, AI researchers.
+<<<
+
+[REQUIREMENT]
+UID: REQ-STK-001
+TITLE: Framework stellt standardisierte Agent-Rollen bereit
+STATEMENT: >>>
+Das Framework muss eine zentrale Bibliothek von Agent-Rollen bereitstellen
+(orchestrator, developer, documenter, tester, validator, requirements, release, etc.)
+die in allen Projekten wiederverwendbar sind.
+Prinzip: einmal definieren, überall nutzen.
+<<<
+RATIONALE: >>>
+Konsistenz über alle Projekte und AI-Provider hinweg.
+Vermeidung von Duplizierung von Agent-Definitionen.
+Schnellere Onboarding für neue Projekte.
+<<<
+VERIFICATION: >>>
+- agents/1-generic/ Verzeichnis existiert mit mindestens 8 Rollen
+- Jede Rolle hat ein Markdown-Template mit YAML-Frontmatter
+- sync.py kann Rollen in mindestens 4 Provider (Claude, Gemini, Continue, Opencode) instanziieren
+- CLAUDE.md dokumentiert alle verfügbaren Rollen
+<<<
+TAGS: core, agent-framework
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-STK-002
+TITLE: Mehrschichten-Architektur für Agent-Spezialisierung
+STATEMENT: >>>
+Das Framework muss eine vierschichtige Architektur unterstützen:
+- Layer 0: Externe Skills (Git Submodule, höchste Priorität)
+- Layer 1: Generische Agenten (universell, für alle Projekte)
+- Layer 2: Plattformspezifische Overrides (z.B. Sharkord Plugin)
+- Layer 3: Projektspezifische Extensions/Overrides
+Mit definierter Priorität: 3-project > 2-platform > 1-generic > 0-external
+<<<
+RATIONALE: >>>
+Ermöglicht Spezialisierung auf Plattform- und Projektebene
+ohne dass generische Templates dupliziert oder modifiziert werden müssen.
+Jede Ebene hat klare Verantwortung.
+<<<
+VERIFICATION: >>>
+- Vier Schichten-Verzeichnisse (agents/0-external/, agents/1-generic/, agents/2-platform/, .claude/3-project/)
+- Override-Priorität ist in CLAUDE.md und Architektur-Dokumentation dokumentiert
+- sync.py wendet Schichten-Priorität korrekt an
+- Unit-Tests validieren Schichten-Merging für verschiedene Kombinationen
+<<<
+TAGS: core, architecture
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-002
+
+[REQUIREMENT]
+UID: REQ-STK-003
+TITLE: Multi-Provider-Unterstützung
+STATEMENT: >>>
+Das Framework muss Agent-Templates für mehrere AI-Provider generieren können:
+- Claude Code (.claude/ Verzeichnis)
+- Gemini CLI (.gemini/ Verzeichnis)
+- Continue IDE (.continue/ Verzeichnis)
+- Opencode (.opencode/ Verzeichnis)
+Alle Ausgaben aus einer Quelle generiert, keine Duplikation.
+<<<
+RATIONALE: >>>
+Verschiedene Projekte nutzen unterschiedliche Providers.
+Ein Framework unterstützt alle Providers statt dass jeder Provider
+seine eigene Agent-Definition braucht.
+Reduktion von Wartungs-Overhead.
+<<<
+VERIFICATION: >>>
+- Mindestens 4 Provider-Konfigurationen existieren (lib/providers.py)
+- sync.py erzeugt Provider-spezifische Ausgabeverzeichnisse
+- Provider-Optionen können per Projekt in project.yaml konfiguriert werden
+- Integration-Tests validieren Output für alle 4 Provider
+<<<
+TAGS: core, providers
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-006
+
+[REQUIREMENT]
+UID: REQ-STK-004
+TITLE: Konfigurationsgetriebene Instanziierung
+STATEMENT: >>>
+Projekte können via .meta-config/project.yaml konfigurieren:
+- Welche Agenten-Rollen sie verwenden
+- Welche Rules, Commands, Skills aktiviert sind
+- Welche MCP-Server integriert werden
+- DoD-Presets, Speech-Mode, Provider-Optionen
+Eine zentrale YAML-Konfiguration für alle Integrationen.
+<<<
+RATIONALE: >>>
+Reduktion von Boilerplate und Fehler-Anfälligkeit.
+Alle projekt- und plattformspezifischen Entscheidungen in einer Datei.
+Leicht zu verstehen und zu ändern.
+<<<
+VERIFICATION: >>>
+- project.yaml Schema ist dokumentiert und validiert
+- sync.py liest Konfiguration vollständig und wendet sie an
+- Alle Konfigurationsoptionen sind in CLAUDE.md und howto/ dokumentiert
+- --only-variables Mode erlaubt schnelle Konfiguration-Updates ohne vollständigen Sync
+<<<
+TAGS: core, configuration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-004
+
+[REQUIREMENT]
+UID: REQ-STK-005
+TITLE: Variable-Substitution für Projektkontext
+STATEMENT: >>>
+Das Framework muss {{VARIABLE}} Platzhalter in Agent-Templates unterstützen
+die zur Sync-Zeit mit Projekt-spezifischen Werten ersetzt werden:
+- Projektnamen ({{PROJECT_NAME}})
+- Technologie-Stack ({{TECH_STACK}})
+- DoD-Werte ({{DOD_TESTS_REQUIRED}}, {{DOD_REQ_TRACEABILITY}})
+- Framework-Werte ({{FRAMEWORK_VERSION}}, {{AGENT_HINTS}})
+Pattern: {{GROSS_MIT_UNTERSTRICH}}
+<<<
+RATIONALE: >>>
+Ermöglicht generische Templates die sich automatisch ans Projekt anpassen
+ohne dass pro Projekt manuelle Bearbeitungen nötig sind.
+Zeitersparnis und fehlerfreier.
+<<<
+VERIFICATION: >>>
+- Regex findet alle {{GROSS_MIT_UNTERSTRICH}} Platzhalter
+- Alle Platzhalter sind in CLAUDE.md dokumentiert mit Quelle und Verwendung
+- sync.py ersetzt alle gefundenen Platzhalter mit Werten aus Variablen-Dict
+- Tests prüfen auf ungeersetzte Platzhalter in Final-Output
+- --only-variables Mode ermöglicht schnelle Variable-Updates
+<<<
+TAGS: core, configuration
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-004
+- TYPE: implements
+  VALUE: REQ-SYS-005
+
+[REQUIREMENT]
+UID: REQ-STK-006
+TITLE: Agent Composition mit Extends & Patches
+STATEMENT: >>>
+Plattform- und Projekt-Agenten können den Base-Agent (1-generic) erweitern
+statt ihn vollständig zu kopieren, mit gezielten Patch-Operationen:
+- append-after <anchor>: Inhalt nach Section einfügen
+- replace <anchor>: Section komplett ersetzen
+- delete <anchor>: Section entfernen
+- append: Am Ende der Datei anhängen
+Format: extends: "1-generic/developer.md" + patches: [...]
+<<<
+RATIONALE: >>>
+Verhindert dass 2-platform Agenten schnell veraltet werden wenn 1-generic sich ändert.
+Explizite, lesbare Patches machen Änderungen transparent.
+Reduziert Kopien und Maintenance-Burden.
+<<<
+VERIFICATION: >>>
+- 2-platform/*/\<agent\>.md können extends: Feld haben
+- 3-project/\<role\>.md können extends: Feld haben
+- Alle Patch-Operationen sind in lib/agents.py implementiert
+- sync.py merged Patches korrekt
+- Unit-Tests validieren jede Patch-Operation separat
+- Anchor-Suche ist robust gegen Whitespace-Variationen
+<<<
+TAGS: core, composition
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-002
+- TYPE: implements
+  VALUE: REQ-SYS-003
+
+[REQUIREMENT]
+UID: REQ-STK-007
+TITLE: Rules als global geladene Projekt-Policies
+STATEMENT: >>>
+Das Framework muss Rules bereitstellen die von Claude Code automatisch
+in jeden Agenten-Kontext geladen werden — ohne dass Agenten explizit
+einen Read-Call ausführen müssen.
+Rules definieren globale Policies, Konventionen, Constraints
+für ein Projekt (z.B. branch-guard.md, commit-conventions.md).
+<<<
+RATIONALE: >>>
+Konsistente Behavior für alle Agenten im Projekt
+ohne dass jeder Agent manuell dieselben Dateien lesen muss.
+Automatische Richtlinien-Durchsetzung.
+<<<
+VERIFICATION: >>>
+- rules/ Verzeichnis mit Schichten-Struktur existiert (1-generic, 2-platform, 3-project)
+- sync.py kopiert Rules korrekt zu .claude/rules/
+- .claude/settings.json enthält rules: Block mit allen aktiven Rules
+- Tests prüfen dass Rules automatisch geladen werden
+- Projekt-Rules in .claude/rules/ werden von sync.py nicht überschrieben
+<<<
+TAGS: core, rules
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-007
+
+[REQUIREMENT]
+UID: REQ-STK-008
+TITLE: MCP-Server Verwaltung und Centralized Configuration
+STATEMENT: >>>
+Das Framework verwaltet MCP-Server zentral in config/mcp-registry.yaml
+und generiert automatisch:
+- Rule-Dateien (.claude/rules/mcp-\<server\>.md mit Tool-Hints)
+- Provider-spezifische Configs (JSON/YAML mit {{VAR}} Referenzen)
+- Secret-Templates (.meta-config/secrets.local.yaml)
+- Gitignore-Einträge (für lokale Secrets-Dateien)
+Keine Duplikation von MCP-Config über Provider hinweg.
+<<<
+RATIONALE: >>>
+Centralized control über Tool-Zugriff, Security-Policies, Umgebungsvariablen.
+Vermeidung manueller Duplikation von MCP-Config.
+Security: Secrets bleiben lokal, Configs sind shareable.
+<<<
+VERIFICATION: >>>
+- config/mcp-registry.yaml existiert und ist valid YAML mit Schema-Validierung
+- sync.py erzeugt Rule-Dateien pro Server und pro Provider
+- Secrets-Template wird initialisiert und ist in .gitignore
+- Provider-Configs referenzieren {{VAR}} statt hardcoded Secrets
+- Alle MCP-Server sind dokumentiert in CLAUDE.md
+<<<
+TAGS: core, mcp, security
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-003
+- TYPE: implements
+  VALUE: REQ-SYS-010
+
+[REQUIREMENT]
+UID: REQ-STK-009
+TITLE: External Skills als Wrapper-Agenten
+STATEMENT: >>>
+Das Framework unterstützt externe Git-Submodule als "Skills"
+die via automatisch generierte Wrapper-Agenten in Zielprojekte integriert werden.
+Skills werden in config/skills-registry.yaml registriert mit:
+- Repo URL
+- Approval-Status (approved: true/false)
+- Pinned Commit (für Stabilität)
+- Entrypoints (welche Rollen verwenden diesen Skill)
+<<<
+RATIONALE: >>>
+Ermöglicht Wiederverwendung spezialisierter Agent-Skills
+ohne dass Zielprojekte die Submodule selbst verwalten müssen.
+Zentrale Kontrolle über externe Dependencies.
+<<<
+VERIFICATION: >>>
+- config/skills-registry.yaml existiert mit Skill-Einträgen
+- agents/0-external/_skill-wrapper.md ist Vorlage für Wrapper-Agenten
+- sync.py erzeugt Wrapper-Agenten pro aktiviertem Skill und Provider
+- External Submodule können per project.yaml aktiviert/deaktiviert werden
+- --add-skill Kommando registriert neuen Skill
+- Pinned-Commit-Überprüfung verhindert unerwartete Updates
+<<<
+TAGS: core, skills, extensions
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-002
+- TYPE: implements
+  VALUE: REQ-SYS-011
+
+[REQUIREMENT]
+UID: REQ-STK-010
+TITLE: Hooks für automatisierte Pre/Post-Validierung
+STATEMENT: >>>
+Das Framework unterstützt Shell-Hooks (z.B. PreToolUse, PostToolUse, PreCommit)
+die Claude Code automatisch vor/nach bestimmten Events ausführt:
+- Validierung vor Push (DoD-Checks)
+- Automatische Linting nach Edit
+- Lifecycle-Tasks nach Merge/Release
+Hooks sind aktivierbar/deaktivierbar per Projekt.
+<<<
+RATIONALE: >>>
+Automatische Validierung von Entwicklungs-Prozessen
+ohne dass Agenten manuell Checks einbauen müssen.
+Erzwingt Best Practices (z.B. immer Tests vor Push).
+<<<
+VERIFICATION: >>>
+- hooks/ Verzeichnis mit Schichten-Struktur (1-generic, 2-platform) existiert
+- Hook-Skripte haben Meta-Header (hook:, version:, event:, matcher:)
+- sync.py kopiert Hooks und registriert sie in settings.json
+- settings.json hooks. Block wird korrekt mit Hook-Definitionen gefüllt
+- Hooks können per project.yaml enabled/disabled werden
+<<<
+TAGS: core, hooks, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-009
+
+[REQUIREMENT]
+UID: REQ-STK-011
+TITLE: Provider-Isolation für Multi-Provider-Sicherheit
+STATEMENT: >>>
+Wenn ein Projekt mehrere AI-Provider aktiviert hat, generiert sync.py
+automatisch Hard-Blocks die verhindern dass ein Provider die
+Verzeichnisse eines anderen Providers liest oder schreibt.
+Z.B.: Claude kann nicht in .gemini/ schreiben, Gemini kann nicht .claude/settings.local.json lesen.
+<<<
+RATIONALE: >>>
+Security: Provider A kann nicht auf Provider B's private Settings/Secrets lesen.
+Clarity: Jeder Provider hat seinen isolierten Namespace.
+Vermeidung von Cross-Provider-Kontamination.
+<<<
+VERIFICATION: >>>
+- Provider-Isolation Logik existiert in lib/isolation.py
+- Unterschiedliche Hard-Block-Mechanismen pro Provider:
+  - Claude: permissions.deny mit Glob-Patterns
+  - Gemini: TOML-Policy-Rules mit Regex
+  - Opencode: permission.read/edit deny
+  - Continue: Soft-Rule Dokumentation
+- settings.json wird mit deny-Globs gefüllt
+- Unit-Tests validieren Isolation-Regeln
+<<<
+TAGS: core, security, providers
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-003
+- TYPE: implements
+  VALUE: REQ-SYS-013
+
+[REQUIREMENT]
+UID: REQ-STK-012
+TITLE: Extension-System für projektspezifisches Wissen
+STATEMENT: >>>
+Projekte können .claude/3-project/\<prefix\>-\<role\>-ext.md Dateien erstellen
+die zusätzliches Kontext-Wissen zu einem Agenten bereitstellen —
+ohne dass der generierte Agent editiert wird.
+Extensions werden von Agenten automatisch via Read-Hook geladen.
+Managed-Blöcke werden von sync.py aktualisiert, Projekt-Blöcke bleiben unangetastet.
+<<<
+RATIONALE: >>>
+Projekte können Agenten-Verhalten anpassen und erweitern
+ohne dass Änderungen beim nächsten Sync überschrieben werden.
+Trennung von generated und projektspezifischem Wissen.
+<<<
+VERIFICATION: >>>
+- Extension-Dateien werden nicht von sync.py überschrieben
+- Agenten lesen Extensions automatisch (Read-Hook in Template)
+- --create-ext und --update-ext Kommandos funktionieren
+- Managed-Blöcke (unter HTML-Kommentaren) werden aktualisiert
+- Projekt-Blöcke (nach Marker) bleiben unverändert
+<<<
+TAGS: core, extensions
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-004
+- TYPE: implements
+  VALUE: REQ-SYS-012
+
+[REQUIREMENT]
+UID: REQ-STK-013
+TITLE: Versions-Tracking und Kompatibilität
+STATEMENT: >>>
+Das Framework versioniert alle Artefakte:
+- Agent-Templates: version: X.Y.Z in Frontmatter
+- Plattform-Agenten: version: und based-on: "1-generic/role.md@X.Y.Z"
+- agent-meta Framework selbst: VERSION Datei, Git Tags (vX.Y.Z)
+- Project.yaml: agent-meta-version: Tracking
+Changelog dokumentiert Breaking Changes pro Version.
+<<<
+RATIONALE: >>>
+Nachverfolgung von Kompatibilität.
+Agent-meta kann upgradet werden ohne dass Projekte unbeabsichtigt
+Breaking Changes oder Inkompatibilität erhalten.
+Klare Migrations-Pfade für Major-Upgrades.
+<<<
+VERIFICATION: >>>
+- YAML Frontmatter aller Agenten hat version: Feld (Semver)
+- Plattform-Agenten mit extends: haben auch based-on: Feld
+- agent-meta hat VERSION Datei mit aktuellem Semver
+- CHANGELOG.md ist aktuell mit Breaking Changes gekennzeichnet
+- Upgrade-Guide dokumentiert explizit Breaking Changes
+- Git Tags folgen vX.Y.Z Pattern
+<<<
+TAGS: core, versioning
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-STK-014
+TITLE: Definition of Done (DoD) Presets
+STATEMENT: >>>
+Das Framework bietet konfigurierbare DoD-Presets die definieren
+welche Anforderungen für Commits aktiv sind:
+- rapid-prototyping: Minimal (Code nur, keine Tests)
+- mvp: Moderat (Code + Unit-Tests)
+- production: Strikt (Code + Tests + REQ-Traceability + Security-Audit)
+Presets können pro Projekt in project.yaml konfiguriert werden.
+<<<
+RATIONALE: >>>
+Unterschiedliche Projekte haben unterschiedliche Quality-Standards.
+Ein Framework muss flexible DoD unterstützen je nach Projekt-Phase.
+Automatische Injizierung von DoD-Variablen in Agent-Templates.
+<<<
+VERIFICATION: >>>
+- config/dod-presets/ Verzeichnis mit Preset-Dateien
+- project.yaml kann dod-preset setzen
+- sync.py injiziert DoD_* Variablen (DOD_TESTS_REQUIRED, etc.) in Agenten
+- dod-criteria.md Template nutzt {{#if DOD_*}} für conditional Content
+- Alle Presets sind dokumentiert
+<<<
+TAGS: core, quality
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-018
+
+[REQUIREMENT]
+UID: REQ-STK-015
+TITLE: Speech-Mode für Agenten-Kommunikation
+STATEMENT: >>>
+Das Framework unterstützt Kommunikationsstil-Optionen die den Ton
+der Agenten-Ausgabe anpassen:
+- full: Standard, ausführlich
+- short: Knapp, direkt
+- submissive: Devot, respektvoll
+- childish: Spielerisch
+Andere Varianten möglich. Konfigurierbar per project.yaml.
+<<<
+RATIONALE: >>>
+Projekte und Nutzer können den Agenten-Ton anpassen an ihre Kultur und Vorlieben.
+Unterschiedliche Teams arbeiten mit unterschiedlichen Stilen besser.
+<<<
+VERIFICATION: >>>
+- speech-mode Optionen sind dokumentiert in config/speech/
+- config/speech/ Verzeichnis mit Varianten-Dateien
+- sync.py injiziert gewählten Mode in Agenten (speech_mode: Variablable)
+- Agenten-Templates können {{SPEECH_MODE}} referenzieren
+- Alle Modes sind in CLAUDE.md dokumentiert
+<<<
+TAGS: core, configuration
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-001
+
+[REQUIREMENT]
+UID: REQ-STK-016
+TITLE: Agent Visualization für Verständlichkeit
+STATEMENT: >>>
+Das Framework kann eine optionale Visualisierung generieren:
+1. Statische Mindmap: agents/graph → docs/agent-mindmap.md + agent-graph.html
+2. Dynamisches Session-Tracking: Agent-Start/Stop, Delegierungen, Tool-Calls
+3. Event-Reports: Gantt-Diagramme, Sequence-Diagramme, Ausführungsflüsse
+Aktivierbar via --viz Flag oder mode: full/dynamic in project.yaml.
+<<<
+RATIONALE: >>>
+Hilft Nutzern die Agent-Koordination zu verstehen.
+Macht Ausführungs-Flows nachvollziehbar.
+Debugging und Monitoring von Agent-Behavior.
+<<<
+VERIFICATION: >>>
+- .meta-viz/ Verzeichnis speichert Events (events.jsonl)
+- docs/agent-mindmap.md wird generiert (Graph-Struktur)
+- docs/agent-graph.html ist interaktiv (optional)
+- --viz Flag triggert Generierung
+- viz-report.py analysiert Events und erstellt Reports
+- Visualization ist optional und belastet nicht den Standard-Sync
+<<<
+TAGS: core, visualization
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-021
+
+[REQUIREMENT]
+UID: REQ-STK-017
+TITLE: Konsistenz-Validierung und Fehler-Früherkennung
+STATEMENT: >>>
+Das Framework validiert Konsistenz während und nach Sync:
+- Frontmatter-Korrektheit in Agenten (required fields, valid YAML)
+- Platzhalter-Vollständigkeit (alle {{VAR}} ersetzt?)
+- Cross-Referenzen zwischen Dateien (verweist auf existierende Rollen?)
+- Skill-Registry-Konsistenz (pinned Commits, approved Status)
+- Provider-Config-Validierung (gültiges JSON/YAML)
+Fehler werden geloggt und verhindern fehlerhaften Output.
+<<<
+RATIONALE: >>>
+Erkennt Fehler früh, vermeidet stale oder inkonsistente Dokumentation.
+Spart Zeit bei Debugging und Troubleshooting.
+<<<
+VERIFICATION: >>>
+- consistency-check Kommando existiert
+- lib/consistency/ Modul mit spezialisierten Checks
+- Alle Validierungen sind in Tests abgedeckt
+- Warnungen werden geloggt und zusammengefasst
+- --consistency-check Flag wird vor Schreiben ausgeführt
+<<<
+TAGS: core, quality
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: refines
+  VALUE: REQ-STK-001
+- TYPE: implements
+  VALUE: REQ-SYS-017

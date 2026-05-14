@@ -1,0 +1,101 @@
+2026-05-14 00:09:09,178 [INFO] Strictdoc Sync v1.0 — Config: C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-config.local.yaml
+2026-05-14 00:09:09,179 [INFO] Server: http://172.20.4.255:8081
+2026-05-14 00:09:09,179 [INFO] Parsing .sdoc files from .strictdoc/docs/04-module-reqs
+2026-05-14 00:09:09,179 [INFO]   04a-agents-module.sdoc: 56 REQs, 38194 bytes
+2026-05-14 00:09:09,180 [INFO]   04b-config-module.sdoc: 15 REQs, 10707 bytes
+2026-05-14 00:09:09,180 [INFO]   04c-rules-hooks-commands.sdoc: 30 REQs, 16764 bytes
+2026-05-14 00:09:09,180 [INFO]   04d-mcp-providers-skills.sdoc: 32 REQs, 18565 bytes
+2026-05-14 00:09:09,181 [INFO]   04e-extensions-context-isolation.sdoc: 32 REQs, 18691 bytes
+2026-05-14 00:09:09,181 [INFO]   04f-viz-migrate-lifecycle.sdoc: 22 REQs, 12944 bytes
+2026-05-14 00:09:09,181 [INFO] Total: 187 REQs across 6 files
+2026-05-14 00:09:09,181 [INFO] Total size: 113.1 KB
+2026-05-14 00:09:37,894 [INFO] Strictdoc Sync v1.0 — Config: C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-config.local.yaml
+2026-05-14 00:09:37,894 [INFO] Server: http://172.20.4.255:8081
+2026-05-14 00:09:37,894 [INFO] Starting Strictdoc sync to http://172.20.4.255:8081
+2026-05-14 00:09:37,895 [INFO] Found: 04a-agents-module.sdoc
+2026-05-14 00:09:37,895 [INFO] Found: 04b-config-module.sdoc
+2026-05-14 00:09:37,895 [INFO] Found: 04c-rules-hooks-commands.sdoc
+2026-05-14 00:09:37,895 [INFO] Found: 04d-mcp-providers-skills.sdoc
+2026-05-14 00:09:37,895 [INFO] Found: 04e-extensions-context-isolation.sdoc
+2026-05-14 00:09:37,895 [INFO] Found: 04f-viz-migrate-lifecycle.sdoc
+2026-05-14 00:09:37,895 [INFO] Syncing 6 files...
+2026-05-14 00:09:37,896 [INFO] [PUSH] Syncing: 04a-agents-module.sdoc (56 REQs, 38194 bytes)
+2026-05-14 00:09:37,896 [INFO] [PUSH] Syncing: 04b-config-module.sdoc (15 REQs, 10707 bytes)
+2026-05-14 00:09:37,896 [INFO] [PUSH] Syncing: 04c-rules-hooks-commands.sdoc (30 REQs, 16764 bytes)
+2026-05-14 00:09:37,896 [INFO] [PUSH] Syncing: 04d-mcp-providers-skills.sdoc (32 REQs, 18565 bytes)
+2026-05-14 00:09:37,897 [INFO] [PUSH] Syncing: 04e-extensions-context-isolation.sdoc (32 REQs, 18691 bytes)
+2026-05-14 00:09:37,897 [INFO] [PUSH] Syncing: 04f-viz-migrate-lifecycle.sdoc (22 REQs, 12944 bytes)
+2026-05-14 00:09:37,898 [INFO] State saved to C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-state.json
+2026-05-14 00:09:37,898 [INFO] Strictdoc sync completed!
+2026-05-14 00:09:51,679 [INFO] Strictdoc Sync v1.0 — Config: C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-config.local.yaml
+2026-05-14 00:09:51,679 [INFO] Server: http://172.20.4.255:8081
+2026-05-14 00:09:51,684 [INFO] Last sync: 2026-05-14T00:09:37.897566
+2026-05-14 00:09:51,684 [INFO] Files synced: 6
+2026-05-14 00:09:51,684 [INFO] Status: success
+2026-05-14 00:18:50,208 [INFO] Strictdoc Sync v1.0 — Config: C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-config.local.yaml
+2026-05-14 00:18:50,208 [INFO] Server: http://172.20.4.255:8081
+2026-05-14 00:18:50,208 [INFO] Starting Strictdoc sync to http://172.20.4.255:8081
+2026-05-14 00:18:50,208 [WARNING] DRY-RUN MODE: no files will be pushed. Use --force to push.
+2026-05-14 00:18:50,209 [INFO] Found: 04a-agents-module.sdoc
+2026-05-14 00:18:50,209 [INFO] Found: 04b-config-module.sdoc
+2026-05-14 00:18:50,209 [INFO] Found: 04c-rules-hooks-commands.sdoc
+2026-05-14 00:18:50,209 [INFO] Found: 04d-mcp-providers-skills.sdoc
+2026-05-14 00:18:50,209 [INFO] Found: 04e-extensions-context-isolation.sdoc
+2026-05-14 00:18:50,210 [INFO] Found: 04f-viz-migrate-lifecycle.sdoc
+2026-05-14 00:18:50,210 [INFO] Syncing 6 files...
+2026-05-14 00:18:50,260 [INFO] [DRY-RUN] Would push: 04a-agents-module.sdoc (56 REQs, 38194 bytes)
+2026-05-14 00:18:50,261 [INFO] [DRY-RUN] Would push: 04b-config-module.sdoc (15 REQs, 10707 bytes)
+2026-05-14 00:18:50,261 [INFO] [DRY-RUN] Would push: 04c-rules-hooks-commands.sdoc (30 REQs, 16764 bytes)
+2026-05-14 00:18:50,261 [INFO] [DRY-RUN] Would push: 04d-mcp-providers-skills.sdoc (32 REQs, 18565 bytes)
+2026-05-14 00:18:50,262 [INFO] [DRY-RUN] Would push: 04e-extensions-context-isolation.sdoc (32 REQs, 18691 bytes)
+2026-05-14 00:18:50,262 [INFO] [DRY-RUN] Would push: 04f-viz-migrate-lifecycle.sdoc (22 REQs, 12944 bytes)
+2026-05-14 00:18:50,262 [INFO] Strictdoc sync completed! Synced: 0, Failed: 0
+2026-05-14 00:19:08,760 [INFO] Strictdoc Sync v1.0 — Config: C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-config.local.yaml
+2026-05-14 00:19:08,760 [INFO] Server: http://172.20.4.255:8081
+2026-05-14 00:19:08,761 [INFO] Starting Strictdoc sync to http://172.20.4.255:8081
+2026-05-14 00:19:08,761 [INFO] Found: 04a-agents-module.sdoc
+2026-05-14 00:19:08,761 [INFO] Found: 04b-config-module.sdoc
+2026-05-14 00:19:08,761 [INFO] Found: 04c-rules-hooks-commands.sdoc
+2026-05-14 00:19:08,761 [INFO] Found: 04d-mcp-providers-skills.sdoc
+2026-05-14 00:19:08,761 [INFO] Found: 04e-extensions-context-isolation.sdoc
+2026-05-14 00:19:08,761 [INFO] Found: 04f-viz-migrate-lifecycle.sdoc
+2026-05-14 00:19:08,761 [INFO] Syncing 6 files...
+2026-05-14 00:19:08,790 [INFO] [OK] Server reachable (200)
+2026-05-14 00:19:08,817 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,844 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,853 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,870 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,870 [ERROR] [FAIL] No valid upload endpoint found for 04a-agents-module.sdoc
+2026-05-14 00:19:08,870 [ERROR] [PUSH] Failed: 04a-agents-module.sdoc — No endpoint found
+2026-05-14 00:19:08,882 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,894 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,907 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,931 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,931 [ERROR] [FAIL] No valid upload endpoint found for 04b-config-module.sdoc
+2026-05-14 00:19:08,931 [ERROR] [PUSH] Failed: 04b-config-module.sdoc — No endpoint found
+2026-05-14 00:19:08,943 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,964 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:08,978 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,006 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,006 [ERROR] [FAIL] No valid upload endpoint found for 04c-rules-hooks-commands.sdoc
+2026-05-14 00:19:09,006 [ERROR] [PUSH] Failed: 04c-rules-hooks-commands.sdoc — No endpoint found
+2026-05-14 00:19:09,036 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,045 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,066 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,079 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,079 [ERROR] [FAIL] No valid upload endpoint found for 04d-mcp-providers-skills.sdoc
+2026-05-14 00:19:09,080 [ERROR] [PUSH] Failed: 04d-mcp-providers-skills.sdoc — No endpoint found
+2026-05-14 00:19:09,092 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,129 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,155 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,185 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,186 [ERROR] [FAIL] No valid upload endpoint found for 04e-extensions-context-isolation.sdoc
+2026-05-14 00:19:09,186 [ERROR] [PUSH] Failed: 04e-extensions-context-isolation.sdoc — No endpoint found
+2026-05-14 00:19:09,214 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/documents/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,244 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,277 [WARNING] Server returned 405 for http://172.20.4.255:8081/upload: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,311 [WARNING] Server returned 405 for http://172.20.4.255:8081/api/v1/documents: {"detail":"Method Not Allowed"}
+2026-05-14 00:19:09,311 [ERROR] [FAIL] No valid upload endpoint found for 04f-viz-migrate-lifecycle.sdoc
+2026-05-14 00:19:09,311 [ERROR] [PUSH] Failed: 04f-viz-migrate-lifecycle.sdoc — No endpoint found
+2026-05-14 00:19:09,312 [INFO] State saved to C:\Repositorys\MetaAgent\agent-meta\.strictdoc-sync-state.json
+2026-05-14 00:19:09,312 [INFO] Strictdoc sync completed! Synced: 0, Failed: 6

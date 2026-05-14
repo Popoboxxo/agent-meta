@@ -1,0 +1,148 @@
+[DOCUMENT]
+TITLE: Glossary — Key Terms and Definitions
+
+[REQUIREMENT]
+UID: TERM-AGENT
+TITLE: Agent
+STATEMENT: >>>
+An AI agent is an autonomous program that receives instructions in markdown format
+from the agent-meta framework and executes tasks using available tools (Bash, Read, Edit, etc.).
+<<<
+
+[REQUIREMENT]
+UID: TERM-TEMPLATE
+TITLE: Agent Template
+STATEMENT: >>>
+An agent template is a markdown file that defines an agent's role, tools, permissions,
+and behavior. Templates are composed from multiple layers (1-generic, 2-platform, 3-project).
+<<<
+
+[REQUIREMENT]
+UID: TERM-SYNC
+TITLE: Sync / Synchronization
+STATEMENT: >>>
+Synchronization process (sync.py) that:
+1. Reads template sources from multiple layers
+2. Applies composition logic and variable substitution
+3. Writes generated agents to provider-specific directories
+4. Updates provider configurations automatically
+<<<
+
+[REQUIREMENT]
+UID: TERM-COMPOSITION
+TITLE: Agent Composition
+STATEMENT: >>>
+Process of combining base agent templates with layer-specific patches (append, replace, delete)
+to create specialized agents for specific platforms or projects without duplicating code.
+<<<
+
+[REQUIREMENT]
+UID: TERM-PROVIDER
+TITLE: AI Provider
+STATEMENT: >>>
+An external AI service that runs agents, such as:
+- Claude Code (Anthropic)
+- Gemini CLI (Google)
+- Continue (IDE Extension)
+- Opencode
+The framework generates provider-specific agents for each.
+<<<
+
+[REQUIREMENT]
+UID: TERM-RULE
+TITLE: Rule / Project Policy
+STATEMENT: >>>
+A markdown file defining global policies, conventions, or constraints for a project.
+Rules are automatically loaded into all agent contexts without explicit reads.
+Examples: branch-guard.md, commit-conventions.md, language.md
+<<<
+
+[REQUIREMENT]
+UID: TERM-HOOK
+TITLE: Hook / Automated Validation Script
+STATEMENT: >>>
+A shell script that Claude Code automatically executes before or after specific events
+(PreToolUse, PostToolUse, PreCommit, etc.) to validate or enforce development practices.
+<<<
+
+[REQUIREMENT]
+UID: TERM-SKILL
+TITLE: Skill / External Skill Module
+STATEMENT: >>>
+A specialized agent role provided via external Git submodule.
+Skills are registered in config/skills-registry.yaml and integrated via wrapper agents.
+<<<
+
+[REQUIREMENT]
+UID: TERM-MCP
+TITLE: MCP / Model Context Protocol
+STATEMENT: >>>
+Model Context Protocol - standard for tools/resources available to AI models.
+The framework manages MCP servers centrally in config/mcp-registry.yaml
+and generates provider-specific configurations automatically.
+<<<
+
+[REQUIREMENT]
+UID: TERM-LAYER
+TITLE: Architecture Layer
+STATEMENT: >>>
+One of four template source layers with priority-based override:
+- Layer 0: External Skills (Git Submodules, highest priority)
+- Layer 1: Generic / Universal (all projects)
+- Layer 2: Platform-specific (e.g., Sharkord plugin)
+- Layer 3: Project-specific (extensions/overrides, lowest priority in priority, highest in specificity)
+<<<
+
+[REQUIREMENT]
+UID: TERM-PLACEHOLDER
+TITLE: Placeholder / {{VARIABLE}}
+STATEMENT: >>>
+Template variables in form {{GROSS_MIT_UNTERSTRICH}} that are replaced with project-specific
+values during sync (PROJECT_NAME, TECH_STACK, DOD_TESTS_REQUIRED, etc.).
+<<<
+
+[REQUIREMENT]
+UID: TERM-FRONTMATTER
+TITLE: Frontmatter / YAML Header
+STATEMENT: >>>
+The YAML header section of an agent template file containing metadata:
+- name: Agent name
+- version: Semver
+- description: Purpose
+- hint: Brief hint for orchestrator
+- model: LLM model to use
+- memory: Persistence type
+- permissionMode: Permission level
+<<<
+
+[REQUIREMENT]
+UID: TERM-EXTENSION
+TITLE: Extension / Project-Specific Knowledge
+STATEMENT: >>>
+A .claude/3-project/<prefix>-<role>-ext.md file that adds context to an agent
+without editing the generated agent itself. Extensions have managed and project blocks.
+<<<
+
+[REQUIREMENT]
+UID: TERM-DOD-PRESET
+TITLE: DoD Preset / Definition of Done Preset
+STATEMENT: >>>
+A configuration set that defines quality criteria for commits (rapid-prototyping, mvp, production).
+Presets control whether tests, REQ-traceability, security audits, or documentation are required.
+<<<
+
+[REQUIREMENT]
+UID: TERM-TRACEABILITY
+TITLE: Traceability / Requirements Traceability
+STATEMENT: >>>
+Bidirectional linking of requirements across levels (L1→L2→L3).
+Forward traceability: Which L3 implements L2? Backward: Which tests validate L3?
+<<<
+
+[REQUIREMENT]
+UID: TERM-MANAGED-BLOCK
+TITLE: Managed Block
+STATEMENT: >>>
+A section in extension files (between HTML comment markers) that sync.py updates
+automatically while preserving the project block below it.
+<<<

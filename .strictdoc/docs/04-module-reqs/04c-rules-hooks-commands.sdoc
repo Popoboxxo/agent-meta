@@ -1,0 +1,658 @@
+[DOCUMENT]
+TITLE: Module Requirements — rules.py, hooks.py, commands.py
+PREAMBLE: >>>
+Design-level requirements for policy management, hook registration, and command sync.
+Consolidated requirements for three related policy/configuration modules.
+Total: 30 requirements (rules: 12, hooks: 8, commands: 10).
+<<<
+
+[REQUIREMENT]
+UID: REQ-RULES-001
+TITLE: load_rules_sources — Gather Rules from All Layers
+STATEMENT: >>>
+Enumerate all .md files in rules/1-generic/ and rules/2-platform/<platform>-*.md.
+Priority: 2-platform > 1-generic. Return: dict {rule_name: {source, file, layer}}.
+<<<
+RATIONALE: >>>
+Layered rule sources enable platform-specific policy customization while maintaining
+universal base rules.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_load_rules_sources_priority
+- tests/test_rules.py::test_load_rules_sources_platform_overrides
+<<<
+TAGS: rules, loading, layering
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: implements
+  VALUE: REQ-SYS-007
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-002
+TITLE: validate_rule_metadata — Parse Rule Header
+STATEMENT: >>>
+Extract metadata from rule markdown (title, version, tags, scope).
+Validate version format (semver), tags against allowed list.
+<<<
+RATIONALE: >>>
+Metadata validation ensures rules are well-documented and discoverable.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_validate_rule_metadata_valid
+- tests/test_rules.py::test_validate_rule_metadata_invalid_version
+<<<
+TAGS: rules, metadata, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-003
+TITLE: sync_rules — Write Rules to Provider Directories
+STATEMENT: >>>
+For each provider: load rules, validate, substitute variables, write to
+provider rules_dir, update .agent-meta-managed index, cleanup stale rules.
+Idempotent: re-running doesn't duplicate.
+<<<
+RATIONALE: >>>
+Provider-specific rule sync ensures each provider gets correctly configured policies
+without cross-provider pollution.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_sync_rules_idempotent
+- tests/test_rules.py::test_sync_rules_cleanup_stale
+<<<
+TAGS: rules, sync, provider
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-RULES-001, REQ-RULES-002, REQ-RULES-004, REQ-RULES-005, REQ-RULES-006
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-RULES-004
+TITLE: load_managed_rules_index — Track Synced Rules
+STATEMENT: >>>
+Load .agent-meta-managed index file tracking rules synced by agent-meta.
+Return: List[str] of managed rule filenames or [] if missing.
+<<<
+RATIONALE: >>>
+Index enables safe cleanup of stale rules.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_load_managed_rules_index
+<<<
+TAGS: rules, index, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-005
+TITLE: update_managed_rules_index — Record Synced Rules
+STATEMENT: >>>
+Write .agent-meta-managed with current synced rules list.
+<<<
+RATIONALE: >>>
+Maintains inventory for cleanup on next sync.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_update_managed_rules_index
+<<<
+TAGS: rules, index, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-006
+TITLE: cleanup_stale_rules — Remove Unmanaged Rules
+STATEMENT: >>>
+Delete rules in .agent-meta-managed but no longer in sources.
+Preserve project-specific rules (not in index).
+<<<
+RATIONALE: >>>
+Cleanup prevents accumulation of obsolete rules.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_cleanup_stale_rules_removes
+- tests/test_rules.py::test_cleanup_stale_rules_preserves_project
+<<<
+TAGS: rules, cleanup, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-007
+TITLE: validate_rule_references — Check Cross-References
+STATEMENT: >>>
+Validate that rules don't reference nonexistent other rules or artifacts.
+<<<
+RATIONALE: >>>
+Reference validation prevents broken policy chains.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_validate_rule_references_valid
+- tests/test_rules.py::test_validate_rule_references_broken
+<<<
+TAGS: rules, validation, references
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-RULES-008
+TITLE: detect_rule_conflicts — Check for Overlapping Rules
+STATEMENT: >>>
+Detect rules with conflicting scopes or overlapping applicability.
+<<<
+RATIONALE: >>>
+Conflict detection prevents ambiguous policy application.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_detect_rule_conflicts_none
+- tests/test_rules.py::test_detect_rule_conflicts_found
+<<<
+TAGS: rules, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-RULES-009
+TITLE: log_rules_summary — Record Rule Sync Details
+STATEMENT: >>>
+Log to sync.log: rules synced (count, list), layer distribution, errors.
+<<<
+RATIONALE: >>>
+Logging enables debugging and audit trails.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_log_rules_summary
+<<<
+TAGS: rules, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-RULES-010
+TITLE: get_rule_scope — Determine Rule Applicability
+STATEMENT: >>>
+Extract scope field from rule: global, provider-specific, role-specific.
+Return: scope string.
+<<<
+RATIONALE: >>>
+Scope determines when and where rule is applied.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_get_rule_scope
+<<<
+TAGS: rules, scope, metadata
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-002
+
+[REQUIREMENT]
+UID: REQ-RULES-011
+TITLE: filter_rules_by_scope — Select Applicable Rules
+STATEMENT: >>>
+Filter rule list to only those applicable for given provider/role.
+<<<
+RATIONALE: >>>
+Scope filtering ensures only relevant rules are deployed.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_filter_rules_by_scope
+<<<
+TAGS: rules, filtering
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-RULES-003
+
+[REQUIREMENT]
+UID: REQ-RULES-012
+TITLE: report_rule_changes — Show What Changed Since Last Sync
+STATEMENT: >>>
+Compare current sync with previous state. Report: new rules, modified, deleted.
+<<<
+RATIONALE: >>>
+Change reporting helps users understand sync impact.
+<<<
+VERIFICATION: >>>
+- tests/test_rules.py::test_report_rule_changes
+<<<
+TAGS: rules, reporting, comparison
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-HOOKS-001
+TITLE: parse_hook_metadata — Extract Hook Header Info
+STATEMENT: >>>
+Parse hook script header (first 20 lines) for metadata:
+hook, version, event (PreToolUse, PostMerge, etc.), matcher, enabled.
+Return: dict {name, version, event, matcher, enabled, ...}.
+<<<
+RATIONALE: >>>
+Metadata parsing enables hook discovery and configuration.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_parse_hook_metadata_valid
+- tests/test_hooks.py::test_parse_hook_metadata_missing_enabled
+<<<
+TAGS: hooks, parsing, metadata
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-002
+- TYPE: implements
+  VALUE: REQ-SYS-009
+
+[REQUIREMENT]
+UID: REQ-HOOKS-002
+TITLE: load_hook_sources — Gather Hooks from Layers
+STATEMENT: >>>
+Enumerate .sh files in hooks/1-generic/ and hooks/2-platform/<platform>-*.sh.
+Priority: 2-platform > 1-generic. Return: dict {hook_name: {content, file, layer, metadata}}.
+<<<
+RATIONALE: >>>
+Layered hook sources enable platform-specific automation customization.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_load_hook_sources_priority
+<<<
+TAGS: hooks, loading, layering
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-003
+
+[REQUIREMENT]
+UID: REQ-HOOKS-003
+TITLE: filter_enabled_hooks — Filter by Enabled Flag
+STATEMENT: >>>
+Select only hooks where enabled: true and in project config hooks enablement list.
+Return: filtered dict of enabled hooks.
+<<<
+RATIONALE: >>>
+Filtering prevents disabled hooks from being registered.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_filter_enabled_hooks_all_disabled
+- tests/test_hooks.py::test_filter_enabled_hooks_mixed
+<<<
+TAGS: hooks, filtering, configuration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-004
+
+[REQUIREMENT]
+UID: REQ-HOOKS-004
+TITLE: sync_hooks — Write Hooks and Register in Settings
+STATEMENT: >>>
+Load, filter, and sync enabled hooks. Write to provider hooks_dir.
+Register in settings.json hooks[] block. Update .agent-meta-managed.
+Cleanup stale hooks. Idempotent.
+<<<
+RATIONALE: >>>
+Hook sync automates registration across all providers without manual config.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_sync_hooks_idempotent
+- tests/test_hooks.py::test_sync_hooks_settings_registered
+<<<
+TAGS: hooks, sync, provider
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-HOOKS-001, REQ-HOOKS-002, REQ-HOOKS-003, REQ-HOOKS-005, REQ-HOOKS-006, REQ-HOOKS-007
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-HOOKS-005
+TITLE: register_hook_in_settings — Add Hook to settings.json
+STATEMENT: >>>
+Update provider settings with hook entry:
+{name, event, matcher, path}.
+<<<
+RATIONALE: >>>
+Hook registration makes hooks discoverable by provider.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_register_hook_in_settings
+- tests/test_hooks.py::test_register_hook_in_settings_duplicate_update
+<<<
+TAGS: hooks, settings, registration
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-004
+
+[REQUIREMENT]
+UID: REQ-HOOKS-006
+TITLE: cleanup_stale_hooks — Remove Unmanaged Hooks
+STATEMENT: >>>
+Delete hooks in .agent-meta-managed but no longer in sources.
+Leave project-specific hooks.
+<<<
+RATIONALE: >>>
+Cleanup prevents accumulation of obsolete hooks.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_cleanup_stale_hooks
+<<<
+TAGS: hooks, cleanup
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-004
+
+[REQUIREMENT]
+UID: REQ-HOOKS-007
+TITLE: validate_hook_script — Check Shell Script Syntax
+STATEMENT: >>>
+Run bash -n syntax check on hook script.
+Warn on dangerous patterns (rm -rf, etc.).
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Script validation prevents syntactically broken hooks and catches dangerous operations.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_validate_hook_script_valid
+- tests/test_hooks.py::test_validate_hook_script_syntax_error
+<<<
+TAGS: hooks, validation, security
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-HOOKS-008
+TITLE: make_hook_executable — Set Executable Permission
+STATEMENT: >>>
+chmod +x on hook script file. Idempotent.
+<<<
+RATIONALE: >>>
+Executability is required for shell scripts to run.
+<<<
+VERIFICATION: >>>
+- tests/test_hooks.py::test_make_hook_executable
+<<<
+TAGS: hooks, permissions
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-HOOKS-004
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-001
+TITLE: load_command_sources — Gather Commands from Layers
+STATEMENT: >>>
+Enumerate command files (.md) in commands/1-generic/ and commands/2-platform/
+<platform>-*.md. Priority: 2-platform > 1-generic.
+Return: dict {command_name: {content, file, layer}}.
+<<<
+RATIONALE: >>>
+Layered command sources enable platform-specific command customization.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_load_command_sources
+<<<
+TAGS: commands, loading, layering
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-COMMANDS-002
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-002
+TITLE: parse_command_definition — Extract Command Metadata
+STATEMENT: >>>
+Extract command definition: name, trigger (/ prefix), scope, body.
+Validate trigger format. Return: dict {name, trigger, scope, body, version}.
+<<<
+RATIONALE: >>>
+Command parsing enables validation and cross-provider generation.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_parse_command_definition_valid
+- tests/test_commands.py::test_parse_command_definition_invalid_scope
+<<<
+TAGS: commands, parsing
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-COMMANDS-003
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-003
+TITLE: sync_commands — Write Commands to Provider Directories
+STATEMENT: >>>
+Load commands, parse definitions, substitute variables, write to provider
+commands_dir, register in settings. For Continue: generate .continue/prompts/.
+Idempotent.
+<<<
+RATIONALE: >>>
+Provider-specific command sync automates cross-provider command deployment.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_sync_commands_idempotent
+- tests/test_commands.py::test_sync_commands_continue_prompts
+<<<
+TAGS: commands, sync, provider
+STATUS: Active
+PRIORITY: P1
+OWNER: @daniel
+RELATIONS:
+- TYPE: calls
+  VALUE: REQ-COMMANDS-001, REQ-COMMANDS-002, REQ-COMMANDS-004, REQ-COMMANDS-005
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-004
+TITLE: generate_continue_prompts — Convert Commands to Continue Format
+STATEMENT: >>>
+Transform agent-meta commands to Continue IDE prompt format.
+Store in .continue/prompts/. Handle @slash, @context, etc.
+<<<
+RATIONALE: >>>
+IDE-specific conversion enables consistent command experience across providers.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_generate_continue_prompts
+<<<
+TAGS: commands, continue, conversion
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-COMMANDS-003
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-005
+TITLE: validate_command_definition — Check Command Structure
+STATEMENT: >>>
+Validate: trigger format, scope recognized, body non-empty, no injection risks.
+Return: (valid: bool, errors: List[str]).
+<<<
+RATIONALE: >>>
+Command validation catches configuration and security errors.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_validate_command_definition_valid
+- tests/test_commands.py::test_validate_command_definition_conflict_with_role
+<<<
+TAGS: commands, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-006
+TITLE: detect_command_trigger_conflicts — Check Trigger Uniqueness
+STATEMENT: >>>
+Detect duplicate command triggers or conflicts with role names.
+<<<
+RATIONALE: >>>
+Conflict detection prevents ambiguous command invocation.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_detect_command_trigger_conflicts
+<<<
+TAGS: commands, conflict, validation
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-CONSISTENCY-001
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-007
+TITLE: cleanup_stale_commands — Remove Unmanaged Commands
+STATEMENT: >>>
+Delete commands in .agent-meta-managed but no longer in sources.
+<<<
+RATIONALE: >>>
+Cleanup prevents stale command accumulation.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_cleanup_stale_commands
+<<<
+TAGS: commands, cleanup
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-COMMANDS-003
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-008
+TITLE: log_commands_summary — Record Command Sync Details
+STATEMENT: >>>
+Log to sync.log: commands synced (count, list), provider-specific counts.
+<<<
+RATIONALE: >>>
+Logging enables debugging and reporting.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_log_commands_summary
+<<<
+TAGS: commands, logging, reporting
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-SYNC-001
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-009
+TITLE: report_command_changes — Show What Changed Since Last Sync
+STATEMENT: >>>
+Compare current with previous state. Report: new commands, modified, deleted.
+<<<
+RATIONALE: >>>
+Change reporting helps users understand sync impact.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_report_command_changes
+<<<
+TAGS: commands, reporting
+STATUS: Active
+PRIORITY: P3
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-VIZ-001
+
+[REQUIREMENT]
+UID: REQ-COMMANDS-010
+TITLE: load_command_managed_index — Track Synced Commands
+STATEMENT: >>>
+Load .agent-meta-managed index of synced commands.
+Return: List[str] or [].
+<<<
+RATIONALE: >>>
+Index tracks commands for cleanup.
+<<<
+VERIFICATION: >>>
+- tests/test_commands.py::test_load_command_managed_index
+<<<
+TAGS: commands, index, maintenance
+STATUS: Active
+PRIORITY: P2
+OWNER: @daniel
+RELATIONS:
+- TYPE: called-by
+  VALUE: REQ-COMMANDS-003

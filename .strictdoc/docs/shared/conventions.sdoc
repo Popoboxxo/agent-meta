@@ -1,0 +1,170 @@
+[DOCUMENT]
+TITLE: Conventions — Standards and Rules
+
+[REQUIREMENT]
+UID: CONV-UID-FORMAT
+TITLE: UID Naming Convention
+STATEMENT: >>>
+Requirement UIDs follow format: REQ-<LEVEL>-<CATEGORY>-<NUMBER>
+
+Levels:
+  STK = Stakeholder (L1)
+  SYS = System (L2)
+  DES = Design (L3)
+
+Categories (optional, zur Lesbarkeit):
+  (keine) = Generische REQs
+  SYNC = Sync-System
+  MCP = MCP-Integration
+  PRV = Provider-System
+  AGT = Agent Framework
+  SEC = Security
+  TEST = Testing/Quality
+
+Examples:
+  REQ-STK-001         (Stakeholder #1, general)
+  REQ-SYS-SYNC-001    (System #1, Sync category)
+  REQ-DES-002         (Design #2, general)
+  TERM-AGENT          (Glossary term)
+  CONV-UID-FORMAT     (Convention)
+<<<
+
+[REQUIREMENT]
+UID: CONV-STATUS-VALUES
+TITLE: Requirement Status Values
+STATEMENT: >>>
+Valid status values for requirements:
+
+Draft:      In progress, not yet approved / finalized
+Active:     Approved and currently valid / implemented
+Deprecated: Replaced by another requirement (with link)
+Deleted:    Archived / no longer relevant (UID never reused)
+<<<
+
+[REQUIREMENT]
+UID: CONV-PRIORITY
+TITLE: Priority Levels
+STATEMENT: >>>
+Relative importance of requirements:
+
+P1: Critical (must have, blocks other work, high impact)
+P2: Important (should have, enhances system, medium impact)
+P3: Nice-to-have (could have, future consideration, low impact)
+P4: Backlog (not planned, for reference only)
+<<<
+
+[REQUIREMENT]
+UID: CONV-RELATIONS
+TITLE: Relation Types
+STATEMENT: >>>
+Standard RELATIONS types used in Strictdoc:
+
+refines:    L2/L3 refines/clarifies L1/L2 (vertical hierarchy)
+implements: L3 implements/codes L2 (vertical hierarchy)
+tests:      Test code validates requirement (L3 ← tests)
+related:    Bidirectional, loosely connected
+depends-on: A depends on B (pre-requisite)
+contradicts: Conflict or tension documented
+<<<
+
+[REQUIREMENT]
+UID: CONV-FRONTMATTER
+TITLE: Agent-Template Frontmatter Fields
+STATEMENT: >>>
+Standard fields in agent markdown header (YAML):
+
+name:           Agent name (kebab-case: orchestrator, developer)
+version:        Semver: X.Y.Z (patch = text, minor = behavior, major = breaking)
+description:    One-line purpose
+hint:           Brief hint for orchestrator (used in {{AGENT_HINTS}})
+tools:          Comma-separated list of available tools
+model:          Claude model (claude-opus-4-7, claude-sonnet-4-6, etc.)
+memory:         'project' | 'local' | 'user' | 'none'
+permissionMode: 'allow' | 'prompt' | 'deny'
+temperature:    0.0 - 2.0 (float)
+based-on:       For extends: agents (e.g., "1-generic/developer.md@1.0.0")
+extends:        For composition mode (e.g., "1-generic/developer.md")
+patches:        List of patch operations (append-after, replace, delete, append)
+<<<
+
+[REQUIREMENT]
+UID: CONV-STATEMENT-FORMAT
+TITLE: STATEMENT Field Format
+STATEMENT: >>>
+Requirements statements should follow RFC 2119 language:
+
+MUST / MUST NOT    = Mandatory requirement
+SHOULD / SHOULD NOT = Strong recommendation
+MAY / OPTIONAL     = Truly optional feature
+
+Example:
+The system MUST support multi-provider templates.
+The system SHOULD validate configuration before sync.
+The system MAY offer a GUI interface (future).
+<<<
+
+[REQUIREMENT]
+UID: CONV-VERIFICATION-FORMAT
+TITLE: VERIFICATION Field Format
+STATEMENT: >>>
+Verification describes how a requirement is validated:
+
+Format: Bulleted list of test methods
+- Unit test: tests/test_X.py::test_Y
+- Integration: Deploy and check behavior
+- Code review: Pattern/convention check
+- Manual: Described step-by-step
+
+Each requirement MUST have at least one verification method.
+<<<
+
+[REQUIREMENT]
+UID: CONV-TAGS
+TITLE: Standard Tags
+STATEMENT: >>>
+Use consistent tags for categorization:
+
+core           = Framework core functionality
+agent-framework = Agent system (roles, composition)
+sync           = Sync engine and orchestration
+providers      = Multi-provider support
+configuration  = Config handling
+security       = Security and isolation
+rules          = Rules/Policies system
+hooks          = Hooks/Automation
+skills         = External skills
+mcp            = MCP integration
+extensions     = Extension system
+quality        = Quality assurance / DoD
+visualization  = Agent visualization
+documentation  = Docs and examples
+<<<
+
+[REQUIREMENT]
+UID: CONV-OWNER
+TITLE: Owner Field
+STATEMENT: >>>
+OWNER field identifies person responsible:
+
+Format: @github-username or team identifier
+Typically: @daniel (framework maintainer)
+Can be role-based: @architecture-team
+
+Used for routing reviews and accountability.
+<<<
+
+[REQUIREMENT]
+UID: CONV-COMMENTS
+TITLE: COMMENTS Field / Change History
+STATEMENT: >>>
+Track requirement evolution via COMMENTS:
+
+Format:
+- DATE | EVENT | AUTHOR | DESCRIPTION
+- 2026-05-13 | CREATED | Daniel | Initial requirement
+- 2026-05-14 | UPDATED | Daniel | Clarified scope
+- 2026-05-15 | APPROVED | Sarah | Design review sign-off
+- 2026-05-16 | IMPLEMENTED | Daniel | Code merged commit abc123
+
+Alternative: Git blame on .sdoc files for detailed history.
+<<<
