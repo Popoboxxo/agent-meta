@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.39.0 — `2026-05-12`
+Generiert von agent-meta v0.39.0 — `2026-05-14`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -21,6 +21,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `feedback` | Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git |
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
+| `infrastructure-check` | Prerequisite-Check: fehlende CLIs/Runtimes in Hooks, MCP-Configs und Agent-Templates aller aktiven Provider erkennen und Installationsanleitung geben |
 | `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |

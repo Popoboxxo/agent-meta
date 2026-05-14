@@ -34,6 +34,7 @@ roles:
   - agent-meta-scout
   - log-analyzer
   - feedback
+  - infrastructure-check
 
 project:
   name: agent-meta
