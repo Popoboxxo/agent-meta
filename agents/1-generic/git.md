@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.2.1"
+version: "2.3.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
@@ -62,6 +62,72 @@ git push origin <branch>
 
 Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 → Lies `.agent-meta/agents/1-generic/_wf-git-ops.md`
+
+---
+
+## CI/CD Status Polling (after push)
+
+{{#if CI_POLL_ENABLED}}
+After `git push`, automatically poll CI/CD pipeline status and report back.
+
+**Configuration:**
+- Poll interval: {{CI_POLL_INTERVAL}} seconds
+- Max retries: {{CI_POLL_MAX_RETRIES}}
+
+**Workflow:**
+
+1. After successful push, announce: `"Pushed! Checking CI status..."`
+
+2. Poll CI status using the appropriate CLI:
+
+   **GitHub** (via `gh` CLI):
+   ```bash
+   # Get the latest workflow run for the current branch
+   gh run list --branch <branch> --limit 1 --json status,conclusion,url,databaseId
+   ```
+
+   Alternatively, for PR checks:
+   ```bash
+   gh pr checks --repo <owner>/<repo>
+   ```
+
+3. Interpret the result:
+
+   | status     | conclusion | Message                                    |
+   |------------|------------|--------------------------------------------|
+   | `completed`| `success`  | `"CI passed — pipeline green — [Link]"`    |
+   | `completed`| `failure`  | `"CI failed — pipeline red — [Link]"`      |
+   | `completed`| `cancelled`| `"CI cancelled — [Link]"`                  |
+   | `in_progress`| —       | Continue polling (count toward max retries)|
+   | `queued`   | —          | Continue polling (count toward max retries)|
+   | `waiting`  | —          | Continue polling (count toward max retries)|
+
+4. If max retries reached and CI is still running:
+   `"CI still running after {{CI_POLL_MAX_RETRIES}} attempts — check manually: [Link]"`
+
+5. If CI failed, offer to show failure details:
+   ```bash
+   gh run view <run-id> --log-failed
+   ```
+
+**Polling loop (pseudocode):**
+```
+retry = 0
+while retry < {{CI_POLL_MAX_RETRIES}}:
+    wait {{CI_POLL_INTERVAL}} seconds
+    result = gh run list --branch <branch> --limit 1 --json status,conclusion,url
+    if result.status == "completed":
+        report conclusion (success/failure/cancelled) + URL
+        break
+    retry += 1
+if retry == {{CI_POLL_MAX_RETRIES}}:
+    report timeout + URL
+```
+
+{{/if}}
+{{^CI_POLL_ENABLED}}
+CI polling is disabled. Set `CI_POLL_ENABLED: true` in `.meta-config/project.yaml` to enable.
+{{/CI_POLL_ENABLED}}
 
 ---
 

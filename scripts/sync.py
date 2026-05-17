@@ -71,6 +71,7 @@ from lib.viz import (
     generate_viz, get_gitignore_entries as viz_gitignore_entries,
     cleanup_old_sessions,
 )
+from lib.setup import scaffold_meta_repo_docs
 
 # ---------------------------------------------------------------------------
 # Entrypoint-only constants
@@ -223,6 +224,19 @@ def main():
     parser.add_argument("--viz-cleanup", action="store_true",
                         help="Clean up old visualization sessions")
 
+    # Clean mode: remove generated files, then full sync
+    parser.add_argument("--clean", action="store_true",
+                        help="Remove all generated output files, then run a full sync from scratch. "
+                             "Protected: settings, local settings, 3-project/*-ext.md, .meta-config/, "
+                             "CLAUDE.md/AGENTS.md. Use --force to skip confirmation.")
+    parser.add_argument("--force", action="store_true",
+                        help="Skip confirmation prompt for --clean mode")
+
+    # Update mode: explicit alias for default sync (logs as 'update' instead of 'sync')
+    parser.add_argument("--update", action="store_true",
+                        help="Explicit update mode (alias for default sync without --init). "
+                             "Logs mode as 'update' in sync.log")
+
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
                         help="Register a new external skill: git submodule add + config entry")
@@ -374,10 +388,216 @@ def main():
         cleanup_old_sessions(project_root, retention_days=retention,
                              log=log, dry_run=args.dry_run)
 
+    elif args.clean:
+        from lib.io import clean_generated_files
+        provider_config = load_providers_config(agent_meta_root)
+        providers = resolve_providers(config, provider_config)
+        mode = "clean+init" if args.init else "clean+sync"
+
+        print(f"\n  {'=' * 50}")
+        print(f"  Clean Mode — removing generated files")
+        print(f"  {'=' * 50}")
+
+        result = clean_generated_files(project_root, provider_config, providers,
+                                       log, dry_run=args.dry_run)
+
+        if result["deleted"]:
+            print(f"\n  {'Would delete' if args.dry_run else 'Deleted'} {len(result['deleted'])} item(s):")
+            for item in result["deleted"]:
+                print(f"    - {item}")
+        else:
+            print(f"\n  No generated files found to clean.")
+
+        if result["protected"]:
+            print(f"\n  Protected ({len(result['protected'])} item(s), not deleted):")
+            for item in result["protected"]:
+                print(f"    ~ {item}")
+
+        if not args.dry_run and result["deleted"]:
+            if not args.force:
+                try:
+                    confirm = input(f"\n  Continue with full sync? [y/N] ").strip().lower()
+                    if confirm not in ("y", "yes"):
+                        print("  Clean aborted.")
+                        log.write(project_root / LOGFILE, args.config, source_version,
+                                  mode, platforms, args.dry_run,
+                                  providers=providers)
+                        return
+                except (EOFError, KeyboardInterrupt):
+                    print("\n  Clean aborted.")
+                    log.write(project_root / LOGFILE, args.config, source_version,
+                              mode, platforms, args.dry_run,
+                              providers=providers)
+                    return
+
+            print(f"\n  Proceeding with full sync...\n")
+            # Fall through to main sync logic — set init flag appropriately
+            # We need to re-enter the else branch, so we set args.init and
+            # let the code below handle it by NOT using elif/else structure.
+            # Instead, we'll run the sync inline here.
+            log.info("providers", "active: " + ", ".join(providers))
+            preset_name = config.get("dod-preset", "full")
+            dod_resolved = resolve_dod(config, agent_meta_root)
+            dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
+            log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+            rules_preset_name = config.get("rules-preset", "default")
+            rules_resolved = resolve_rules(config, agent_meta_root)
+            if rules_resolved:
+                rules_summary = ", ".join(
+                    f"{r}: {'+'.join(k for k, v in opts.items() if v is not False and v != 'skip') or 'alwaysApply=false'}"
+                    for r, opts in rules_resolved.items()
+                )
+                log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")
+            else:
+                log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")
+            platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
+            if platform_vars is not None:
+                log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
+            is_claude = "Claude" in providers
+            if args.init or is_claude:
+                init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
+                init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
+                init_settings_json(project_root, log, args.dry_run)
+                init_settings_local_json(project_root, log, args.dry_run)
+                claude_pc = provider_config.get("Claude", {})
+                gitignore_cfg = config.get("gitignore", {})
+                if gitignore_cfg.get("local", True):
+                    base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
+                        ".claude/settings.local.json",
+                        ".claude/agent-memory-local/",
+                        "CLAUDE.personal.md",
+                        "sync.log",
+                    ]))
+                else:
+                    base_gitignore_entries = []
+            if args.init:
+                init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+                if gitignore_cfg.get("generated", False):
+                    for _prov in providers:
+                        _pc = provider_config.get(_prov, {})
+                        for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
+                            _d = _pc.get(_dir_key)
+                            if _d:
+                                base_gitignore_entries.append(_d + "/")
+                        if _pc.get("has_commands") and _pc.get("commands_dir"):
+                            base_gitignore_entries.append(_pc["commands_dir"] + "/")
+                if gitignore_cfg.get("settings", False):
+                    for _prov in providers:
+                        _pc = provider_config.get(_prov, {})
+                        _sf = _pc.get("settings_file")
+                        if _sf:
+                            base_gitignore_entries.append(_sf)
+                        _ctx = _pc.get("context_file")
+                        if _ctx and _ctx != "CLAUDE.md":
+                            base_gitignore_entries.append(_ctx)
+                init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+                if args.init_templates:
+                    copied = copy_starter_templates(agent_meta_root, project_root, config, variables,
+                                                   log, args.dry_run)
+                    if not args.dry_run:
+                        print(f"\n  Starter templates copied: {len(copied)} file(s)")
+                # Meta-repo docs scaffolding
+                if config.get("meta-repo", False):
+                    scaffold_meta_repo_docs(agent_meta_root, project_root, log, args.dry_run)
+            debug_mode = config.get("debug-mode", False)
+            if debug_mode:
+                log.info("debug-mode", "active — injecting debug block into all agents")
+            allow_committed_secrets = config.get("allow-committed-secrets", False)
+            mcp_gitignore_extras: list[str] = []
+            for provider in providers:
+                pc = provider_config[provider]
+                log.provider_header(provider)
+                sync_agents_for_provider(agent_meta_root, project_root, config, variables,
+                                         log, args.dry_run, provider, provider_config,
+                                         platform_vars=platform_vars,
+                                         debug_mode=debug_mode)
+                sync_context_for_provider(agent_meta_root, project_root, config, variables,
+                                          log, args.dry_run, provider, provider_config)
+                if provider == "Continue":
+                    sync_prompts_for_continue(agent_meta_root, project_root, config,
+                                              variables, log, args.dry_run,
+                                              provider_config=provider_config)
+                if pc["has_rules"]:
+                    sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
+                               platform_vars=platform_vars, variables=variables,
+                               rules_dir=pc.get("rules_dir"), provider=provider,
+                               provider_config=provider_config)
+                    sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
+                                     rules_dir=pc.get("rules_dir"))
+                try:
+                    mcp_extras = generate_mcp_artifacts(
+                        agent_meta_root, project_root, config, provider_config,
+                        log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+                        allow_committed_secrets=allow_committed_secrets,
+                    )
+                except SyncError as exc:
+                    print(f"\n  !!  MCP sync aborted: {exc}", file=sys.stderr)
+                    sys.exit(1)
+                for entry in mcp_extras:
+                    if entry not in mcp_gitignore_extras:
+                        mcp_gitignore_extras.append(entry)
+                if pc["has_hooks"]:
+                    sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
+                               provider=provider, provider_config=provider_config)
+                else:
+                    log.info("hooks", f"skipped for {provider} — not supported")
+                if pc.get("has_commands", False):
+                    sync_commands_for_provider(agent_meta_root, project_root, config, log,
+                                               args.dry_run, provider,
+                                               provider_config=provider_config,
+                                               variables=variables)
+                sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
+                                           provider, provider_config)
+                sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
+                                                  log, args.dry_run, provider, provider_config)
+            isolation_mode = config.get("provider-isolation")
+            if isolation_mode != "disabled":
+                sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
+            else:
+                log.skip("provider-isolation", "disabled in project.yaml")
+            ext_config = load_external_skills_config(agent_meta_root)
+            check_pinned_commits(ext_config, agent_meta_root, log)
+            if "external-skills" in config:
+                known_skills = set(ext_config.get("skills", {}).keys())
+                for skill_name in config["external-skills"]:
+                    if skill_name not in known_skills:
+                        log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
+                    elif not ext_config["skills"][skill_name].get("approved", False):
+                        log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
+            extra_provider_entries: list[str] = []
+            for _p in providers:
+                if _p == "Claude":
+                    continue
+                _pc = provider_config.get(_p, {})
+                if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
+                    log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
+                extra_provider_entries.extend(_pc.get("gitignore_entries", []))
+            viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
+            if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
+                viz_gitignore = viz_gitignore_entries()
+                base_gitignore_entries.extend(viz_gitignore)
+
+            if is_claude:
+                skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config, provider_config)
+                all_gitignore_entries = (
+                    base_gitignore_entries + extra_provider_entries
+                    + skill_gitignore_entries + mcp_gitignore_extras
+                )
+                ensure_gitignore_entries(project_root, log, args.dry_run,
+                                         exact_entries=all_gitignore_entries)
+            elif extra_provider_entries or mcp_gitignore_extras:
+                ensure_gitignore_entries(project_root, log, args.dry_run,
+                                         gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+
     else:
         provider_config = load_providers_config(agent_meta_root)
         providers = resolve_providers(config, provider_config)
-        mode = "init" if args.init else "sync"
+        if args.update:
+            mode = "update"
+        elif args.init:
+            mode = "init"
+        else:
+            mode = "sync"
         log.info("providers", "active: " + ", ".join(providers))
         # Log resolved DoD
         preset_name = config.get("dod-preset", "full")
@@ -449,6 +669,9 @@ def main():
                                                log, args.dry_run)
                 if not args.dry_run:
                     print(f"\n  Starter templates copied: {len(copied)} file(s)")
+            # Meta-repo docs scaffolding — auto-generate knowledge files when meta-repo: true
+            if config.get("meta-repo", False):
+                scaffold_meta_repo_docs(agent_meta_root, project_root, log, args.dry_run)
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:

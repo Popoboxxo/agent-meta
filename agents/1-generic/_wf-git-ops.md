@@ -9,6 +9,8 @@ git commit -m "<type>: <beschreibung>"
 git push origin {{GIT_MAIN_BRANCH}}
 ```
 
+When `CI_POLL_ENABLED` is `true`: after push, poll CI status using `gh run list` and report result (see CI/CD Status Polling section in git.md).
+
 **W2 Feature-Branch:**
 ```bash
 git checkout -b feat/REQ-042-kurzbeschreibung
