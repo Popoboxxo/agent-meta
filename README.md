@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.40.0`
+**Current version:** `0.41.0`
 
 ---
 
@@ -112,6 +112,35 @@ cat sync.log
 ```
 
 Agents are written to `.claude/agents/`. Never edit them manually — they are regenerated on every sync.
+
+### Sync Modes
+
+```bash
+# Default sync (incremental — only changed files are written)
+py .agent-meta/scripts/sync.py
+
+# Explicit update (same as default, but logs mode as 'update')
+py .agent-meta/scripts/sync.py --update
+
+# Clean sync (delete all generated files, then full sync from scratch)
+py .agent-meta/scripts/sync.py --clean
+
+# Clean + init (clean + CLAUDE.md/settings initialization)
+py .agent-meta/scripts/sync.py --clean --init
+
+# Clean with dry-run (preview what would be deleted)
+py .agent-meta/scripts/sync.py --clean --dry-run
+
+# Clean without confirmation prompt
+py .agent-meta/scripts/sync.py --clean --force
+```
+
+**Protected paths** (never deleted by `--clean`):
+- Settings files (`settings.json`, `opencode.json`, `config.yaml`)
+- Local settings (`*.local.*` files)
+- Project extensions (`3-project/*-ext.md`)
+- `.meta-config/` directory
+- CLAUDE.md / AGENTS.md (semi-managed files)
 
 ---
 
@@ -289,7 +318,11 @@ agent-meta/
     managed-block-project-stub.md <- project area stub for new extensions
     claude-md-managed.md          <- CLAUDE.md managed-block template
   docs/
+    ARCHITECTURE.md       <- Architektur-Überblick (neu in v0.41.0)
+    CODEBASE_OVERVIEW.md  <- Codegenaue Bestandsaufnahme aller src/ Dateien (neu in v0.41.0)
+    LEARNINGS.md          <- Cross-Plugin Lessons Learned
     architecture/       <- architecture deep-dives (layer model, sync flow, roles, ...)
+    conclusions/        <- Tägliche Session-Erkenntnisse
     providers/
       gemini-cli.md     <- Gemini CLI: features, limits, config reference
       multi-provider.md <- multi-provider setup and comparison
@@ -378,4 +411,7 @@ agent-meta/
 | `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
 | `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
 | `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
+| `log-analyzer` | Log analysis: error clustering, severity classification (RFC 5424), findings as issues |
+| `feedback` | Project feedback: bugs, features, improvements as standardized GitHub Issues |
+| `infrastructure-check` | Prerequisite check: missing CLIs/runtimes in hooks, MCP configs and agent templates |
 | `openscad-developer` | Parametric 3D models in OpenSCAD, render-inspect-refine via MCP, print optimization |

@@ -137,6 +137,11 @@ variables:
   GIT_REMOTE_URL: https://github.com/owner/repo
   GIT_MAIN_BRANCH: main
 
+  # --- CI/CD Polling (after push) ---
+  # CI_POLL_ENABLED: "false"       # Set to "true" to enable CI status polling after push
+  # CI_POLL_INTERVAL: "30"         # Seconds between polls (default: 30)
+  # CI_POLL_MAX_RETRIES: "10"      # Max polling attempts before timeout (default: 10)
+
   # --- Kommandos ---
   BUILD_COMMAND: bun run build
   TEST_COMMAND: bun test

@@ -226,6 +226,19 @@
         },
         "VERSION_DIST_BEHAVIOUR": {
           "type": "string"
+        },
+        "CI_POLL_ENABLED": {
+          "type": "string",
+          "description": "Enable CI/CD status polling after git push. 'true' to enable, 'false' to disable (default).",
+          "enum": ["true", "false"]
+        },
+        "CI_POLL_INTERVAL": {
+          "type": "string",
+          "description": "Polling interval in seconds between CI status checks. Default: 30."
+        },
+        "CI_POLL_MAX_RETRIES": {
+          "type": "string",
+          "description": "Maximum number of polling attempts before timeout. Default: 10."
         }
       },
       "additionalProperties": {

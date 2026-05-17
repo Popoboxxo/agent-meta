@@ -119,3 +119,148 @@ def safe_path(base: Path, *parts: str) -> Path:
             f"Resolved path: {path}, base: {base_resolved}"
         )
     return path
+
+
+def clean_generated_files(
+    project_root: Path,
+    provider_config: dict,
+    providers: list[str],
+    log,
+    dry_run: bool = False,
+) -> dict:
+    """Remove all generated output files from provider directories, then run a full sync.
+
+    Protected paths (NEVER deleted):
+      - Settings files: settings.json, opencode.json, config.yaml (per provider)
+      - Local settings: settings.local.* files
+      - Project extension files: 3-project/*-ext.md
+      - .meta-config/ directory (everything inside it)
+      - CLAUDE.md / AGENTS.md (semi-managed files)
+
+    Returns dict with 'deleted' and 'protected' lists of relative path strings.
+    """
+    deleted: list[str] = []
+    protected: list[str] = []
+
+    # Build protected file set (relative to project_root)
+    protected_files: set[str] = set()
+    protected_dirs: set[str] = {".meta-config"}
+
+    for provider in providers:
+        pc = provider_config.get(provider, {})
+        # Settings file (committed)
+        sf = pc.get("settings_file")
+        if sf:
+            protected_files.add(sf)
+        # Context file (CLAUDE.md, AGENTS.md, etc. — semi-managed)
+        ctx = pc.get("context_file")
+        if ctx:
+            protected_files.add(ctx)
+        # Extension directory contents (*-ext.md)
+        ext_dir = pc.get("extension_dir")
+        if ext_dir:
+            protected_dirs.add(ext_dir)
+        # MCP secrets file (local, should not be deleted as it may contain user secrets)
+        mcp = pc.get("mcp-config", {})
+        secrets_file = mcp.get("secrets-file")
+        if secrets_file:
+            protected_files.add(secrets_file)
+        # Pending tasks file
+        pending = pc.get("pending_tasks_file")
+        if pending:
+            protected_files.add(pending)
+
+    def _is_protected(rel: str) -> bool:
+        """Check if a relative path is protected."""
+        if rel in protected_files:
+            return True
+        for pd in protected_dirs:
+            if rel == pd or rel.startswith(pd + "/") or rel.startswith(pd + "\\"):
+                return True
+        # Local settings pattern: settings.local.* or *.local.*
+        basename = Path(rel).name
+        if ".local." in basename:
+            return True
+        return False
+
+    items_to_delete: list[tuple[str, bool]] = []  # (rel_path, is_dir)
+
+    # Map dir_key -> has_* flag for implicit directory resolution
+    DIR_HAS_MAP = {
+        "rules_dir": "has_rules",
+        "hooks_dir": "has_hooks",
+        "commands_dir": "has_commands",
+        "skills_dir": "has_skills",
+        "snippets_dir": "has_snippets",
+    }
+
+    def _resolve_dir(provider: str, pc: dict, dir_key: str) -> str | None:
+        """Resolve a provider directory path, with fallback for implicit dirs."""
+        # Explicit key takes precedence
+        explicit = pc.get(dir_key)
+        if explicit:
+            return explicit
+        # agents_dir is always explicit (all providers have it)
+        if dir_key == "agents_dir":
+            return None
+        # Infer from has_* flag + provider naming convention
+        has_key = DIR_HAS_MAP.get(dir_key)
+        if has_key and pc.get(has_key, False):
+            dir_name = dir_key.replace("_dir", "")
+            return f".{provider.lower()}/{dir_name}"
+        return None
+
+    # Phase 1: Scan provider directories
+    for provider in providers:
+        pc = provider_config.get(provider, {})
+        for dir_key in ("agents_dir", "rules_dir", "hooks_dir", "commands_dir",
+                        "skills_dir", "snippets_dir"):
+            dir_path = _resolve_dir(provider, pc, dir_key)
+            if not dir_path:
+                continue
+            full_dir = project_root / dir_path
+            if not full_dir.exists():
+                continue
+            for item in sorted(full_dir.iterdir()):
+                rel = item.relative_to(project_root).as_posix()
+                if _is_protected(rel):
+                    protected.append(rel)
+                    continue
+                if item.is_dir():
+                    items_to_delete.append((rel, True))
+                else:
+                    items_to_delete.append((rel, False))
+
+    # Phase 2: Scan top-level generated files
+    top_level_generated = ["sync.log"]
+    for item_name in top_level_generated:
+        full_path = project_root / item_name
+        if full_path.exists():
+            rel = item_name
+            if not _is_protected(rel):
+                items_to_delete.append((rel, False))
+
+    # Phase 3: Execute deletions (files first, then directories)
+    files_to_del = [(r, d) for r, d in items_to_delete if not d]
+    dirs_to_del = [(r, d) for r, d in items_to_delete if d]
+
+    for rel, _ in files_to_del:
+        full_path = project_root / rel
+        if dry_run:
+            log.info("clean", f"would delete: {rel}")
+        else:
+            full_path.unlink()
+            log.info("clean", f"deleted: {rel}")
+        deleted.append(rel)
+
+    for rel, _ in dirs_to_del:
+        full_path = project_root / rel
+        if dry_run:
+            log.info("clean", f"would delete: {rel}/")
+        else:
+            import shutil
+            shutil.rmtree(full_path)
+            log.info("clean", f"deleted: {rel}/")
+        deleted.append(rel)
+
+    return {"deleted": deleted, "protected": protected}

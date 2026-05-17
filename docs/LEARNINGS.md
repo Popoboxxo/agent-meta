@@ -30,4 +30,15 @@ Use `.agent-meta/templates/learning-capture.md` for new entries.
 
 ---
 
+## DISCOVERY-002: Provider-Configs können implizite Verzeichnisse haben
+
+**Context:** agent-meta sync.py — `clean_generated_files()` in `scripts/lib/io.py`
+**Problem:** Provider-Configs wie Claude haben keine expliziten `rules_dir`/`hooks_dir`/`commands_dir` Keys. Der Sync-Code nutzt Fallback-Defaults (`has_rules` Flag + Provider-Naming-Konvention `.{provider}/{dirname}`). Neue Funktionen die über Provider-Verzeichnisse iterieren MÜSSEN diese implizite Auflösung nachbilden, sonst werden Verzeichnisse übersehen.
+**Solution:** `_resolve_dir()` Hilfsfunktion in `clean_generated_files()` die zuerst explizite Keys prüft, dann aus `has_*` Flags + Provider-Namen inferiert (`.{provider.lower()}/{dir_name}`). Diese Logik muss in allen neuen Funktionen repliziert werden die Provider-Verzeichnisse scannen.
+**Applies to:** Alle zukünftigen sync.py-Erweiterungen die über Provider-Output-Verzeichnisse iterieren (clean, audit, migrate)
+**Date:** 2026-05-17
+**Source:** agent-meta@feat/super-fix-session
+
+---
+
 *Add new learnings via PR against this file. Reference the originating plugin and commit for traceability.*

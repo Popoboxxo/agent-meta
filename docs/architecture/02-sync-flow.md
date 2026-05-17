@@ -53,6 +53,15 @@ flowchart TD
     SYNC -->|CREATE once| SETL
 ```
 
+## Neue Features in v0.41.0
+
+| Feature | Was sync.py tut |
+|---------|----------------|
+| **Clean Mode** (`--clean`) | Löscht alle generierten Dateien (geschützt: Settings, Extensions, .meta-config/, CLAUDE.md), dann voller Sync from scratch |
+| **Update Mode** (`--update`) | Expliziter Alias für Default-Sync, loggt Mode als "update" statt "sync" |
+| **Force** (`--force`) | Überspringt Bestätigungsprompt bei `--clean` |
+| **Meta-Repo Docs** | Auto-generiert PATTERNS.md, LEARNINGS.md, CONVENTIONS.md wenn `meta-repo: true` |
+
 ## Neue Features in v0.17.0
 
 | Feature | Was sync.py tut |

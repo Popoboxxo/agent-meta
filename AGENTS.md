@@ -9,7 +9,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 Generiert von agent-meta v0.41.0 — `2026-05-15`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
-> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
+> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für ALLE Aufgaben.
 
 | Agent | Zuständigkeit |
 |-------|--------------|
@@ -263,6 +263,7 @@ Datei nicht committen — sie ist gitignored (`.opencode/pending-tasks.md`).
 1. **Agent files live ONLY in the meta-repo root.**
    - Never create `.claude/`, `.opencode/`, `.continue/`, `.gemini/` directories in sibling repos.
    - All agent configuration is managed centrally in the meta-repo.
+   - **MUST:** When delegated to work on a sibling repo, the agent MUST NOT create or modify files in `.claude/`, `.opencode/`, `.continue/`, `.gemini/`, or similar directories. Use only the meta-repo for agent configuration.
 
 2. **Use absolute or relative paths from the meta-repo root.**
    - Sibling repos: `../sharkord-vid-with-friends/src/index.ts`
@@ -308,6 +309,28 @@ Aufgabe: Editiere ../sharkord-vid-with-friends/src/index.ts
 
 ---
 
+---
+
+# Submodule Boundary Rule
+
+**Gilt für alle Agenten.** Schützt die Integrität von Git-Submodules.
+
+## Pflicht
+
+Dateien innerhalb von Git-Submodules (z.B. `.agent-meta/`, `external/`) dürfen **NIE** erstellt, verändert oder gelöscht werden.
+
+## Wenn eine Submodule-Datei geändert werden muss
+
+1. Änderung als Issue im Upstream-Repository vorschlagen → `meta-feedback`
+2. ODER: Datei an einen projektspezifischen Ort **außerhalb** des Submodules kopieren
+3. ODER: Die vorhandene Datei unverändert verwenden
+
+## Warum
+
+Submodule-Dateien zu editieren erzeugt einen dirty-State im Parent-Repo und zerstört die Submodule-Integrität. Das Parent-Repo soll ausschließlich den Submodule-Zeiger aktualisieren (`git submodule update`), niemals Dateien darin modifizieren.
+
+---
+
 # Session-Abschluss — Erkenntnisse sichern
 
 Gilt für Hauptchat und Orchestrator.
@@ -343,24 +366,45 @@ Bei Bestätigung → `documenter` mit Session-Zusammenfassung delegieren:
 
 # Orchestrator — Pflichtnutzung
 
-Einstiegspunkt für alle Entwicklungsaufgaben: `orchestrator`-Agent.
+Einstiegspunkt für ALLE Aufgaben: `orchestrator`-Agent.
 
 ## Immer Orchestrator
 
-Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation
+Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation | Requirements | Code-Review | Log-Analyse | Performance
 
-## Routing-Signale — wann welcher Agent
+**Merkregel: Jede Aufgabe die Code ändert, analysiert, plant oder bewertet → orchestrator.**
+
+## Hauptchat — nur triviale Direktantworten
+
+Der Hauptchat darf NUR direkt antworten bei:
+
+| Erlaubt | Kriterium |
+|---------|-----------|
+| Kurze Wissensfragen | Kein Code-Bezug, ≤3 Sätze Antwort |
+| Triviale Lesevorgänge | 1 Datei lesen, nichts ändern |
+| Ein-Zeilen-Fixes | 1 Datei, 1 Zeile, User-Bestätigung liegt vor |
+| Direkt-Routing | Git-Commit → `git`, Feedback → `meta-feedback`, Erkenntnisse → `documenter` |
+
+**Alles andere MUSS an den `orchestrator` delegiert werden.** Keine Ausnahme.
+
+## Routing-Signale — wann welcher Agent (via orchestrator)
 
 ### Explorative / Research-Fragen → `ideation`
 
-Direkt an `ideation` delegieren (nicht inline beantworten) wenn:
+**MUSS an `ideation` delegiert werden** — NIE inline beantworten — wenn:
 
 - Frage beginnt mit "Wie könnte ich...", "Was wäre wenn...", "Welche Möglichkeiten gibt es..."
 - Expliziter Recherche-Wunsch: "Recherchiere...", "Suche Beispiele...", "Vergleiche Ansätze..."
 - WebSearch/WebFetch nötig (externe Quellen, Best Practices, andere Projekte)
 - Frage hat keinen konkreten Implementierungs-Scope (kein Ticket, kein Code-Pfad)
 
-**Grenze:** Wenn eine Frage direkt in einem laufenden Task beantwortet werden kann (≤2 Sätze, kein Research nötig) → inline. Sonst → `ideation`.
+**Grenze:** Nur wenn eine Frage in einem bereits laufenden Task mit ≤2 Sätzen und ohne externes Research beantwortbar ist → inline. Sonst **immer** → `ideation`.
+
+### Anforderungsdokumente → `requirements`
+
+**MUSS an `requirements` delegiert werden** — NIE direkt schreiben.
+
+Bei: REQ-IDs vergeben, REQUIREMENTS.md anlegen/pflegen, Anforderungsdokumente erstellen.
 
 ### Log-Analyse → `log-analyzer`
 
@@ -374,7 +418,7 @@ Bei: "ist langsam", "zu viel Memory", "Bottleneck finden", "profilen".
 
 Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem Merge.
 
-## Ausnahmen — direkt an
+## Ausnahmen — direkt an (ohne orchestrator)
 
 | Aufgabe | Agent |
 |---------|-------|
@@ -383,9 +427,11 @@ Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem M
 | agent-meta Upgrade / Sync | `agent-meta-manager` |
 | Feedback einreichen | `meta-feedback` |
 
-## Hauptchat ohne Orchestrator
+## Hauptchat ohne Orchestrator (Notfall)
 
-Branch-Guard manuell: `git branch --show-current` — auf `main` → Branch anlegen.
+Wenn der orchestrator nicht verfügbar ist:
+- Branch-Guard manuell: `git branch --show-current` — auf `main` → Branch anlegen.
+- Alle anderen Regeln gelten unverändert.
 
 ---
 
@@ -479,6 +525,16 @@ Dieses Feld aktuell halten wenn die Generic-Basis geändert wird.
 **3. Platzhalter immer `{{GROSS_MIT_UNTERSTRICH}}`.**
 Kleinbuchstaben oder gemischte Schreibweise funktioniert nicht — der Regex in `substitute()`
 erfasst nur `[A-Z0-9_]+`.
+
+**4. Jede Änderung MUSS für ALLE aktiven Provider funktionieren.**
+Der Sync-Pipeline-Code (`sync.py`, `lib/*.py`) arbeitet mit `resolve_providers()` und iteriert
+über Claude, Continue, Gemini, Opencode. Jede neue Logik in diesen Dateien muss provider-agnostisch
+sein oder alle Provider explizit behandeln. Template-Änderungen gehören nach `1-generic/`, niemals
+nur in einen Provider-spezifischen Pfad (z.B. nur `.claude/agents/`). Neue Variablen/Platzhalter
+müssen in `build_variables()` provider-neutral definiert werden.
+
+> **Prüfung vor Commit:** `python scripts/sync.py --dry-run` muss für alle Provider sauber
+> durchlaufen. Ein neues Flag/eine neue Funktion darf nicht nur für Claude funktionieren.
 
 ## Wenn du eine neue Agenten-Rolle hinzufügst
 

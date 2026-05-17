@@ -261,24 +261,49 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
     variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
+    # CI_POLL_*: CI/CD status polling after push (opt-in, default disabled)
+    user_vars = config.get("variables", {})
+    variables["CI_POLL_ENABLED"]    = user_vars.get("CI_POLL_ENABLED", "false")
+    variables["CI_POLL_INTERVAL"]   = user_vars.get("CI_POLL_INTERVAL", "30")
+    variables["CI_POLL_MAX_RETRIES"] = user_vars.get("CI_POLL_MAX_RETRIES", "10")
     return variables, unmapped
 
 
-def strip_inactive_dod_blocks(text: str, variables: dict) -> str:
-    """Remove DoD-conditional blocks that are inactive in this project.
+def strip_inactive_dod_blocks(text: str, variables: dict, extra_vars: list[str] | None = None) -> str:
+    """Remove conditional blocks that are inactive in this project.
 
-    Recognizes the pattern:
-        {{#if DOD_X}}
+    Recognizes two patterns:
+        {{#if VAR}}
         ...content...
         {{/if}}
 
-    If the corresponding DOD_X variable is "false", the entire block (including
-    markers) is removed. If "true", the markers are stripped but content kept.
-    This keeps generated agent files lean when DoD features are disabled.
-    """
-    dod_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
+        {{^VAR}}
+        ...content...
+        {{/if}}
 
-    for var in dod_vars:
+    For {{#if VAR}}: if VAR is "false", the entire block is removed.
+    For {{^VAR}} (inverse): if VAR is "true", the entire block is removed.
+
+    By default handles DOD_* variables. Pass extra_vars to handle additional
+    conditional variables (e.g. CI_POLL_ENABLED).
+    """
+    all_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
+    if extra_vars:
+        all_vars.update(extra_vars)
+
+    for var in all_vars:
+        # --- Inverse blocks: {{^VAR}}...{{/if}} ---
+        # Shown when VAR is "false", removed when VAR is "true"
+        def replace_inverse(m: re.Match, _var: str = var) -> str:
+            block_content = m.group(1)
+            if variables.get(_var, "false") == "true":
+                return ""
+            return block_content.strip("\n") + "\n"
+
+        inverse_pattern = rf"\{{{{\^{re.escape(var)}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+        text = re.sub(inverse_pattern, replace_inverse, text, flags=re.DOTALL)
+
+        # --- Standard blocks: {{#if VAR}}...{{/if}} ---
         def replace_block(m: re.Match, _var: str = var) -> str:
             block_content = m.group(1)
             if variables.get(_var, "true") == "false":

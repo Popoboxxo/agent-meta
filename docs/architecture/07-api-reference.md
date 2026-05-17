@@ -29,6 +29,12 @@ Verhindert Path-Traversal-Angriffe durch manipulierte Config-Werte.
 ### `content_hash(text)`
 Gibt die ersten 16 Zeichen des SHA-256-Hashes zurück (für Change-Detection).
 
+### `clean_generated_files(project_root, provider_config, providers, log, dry_run=False)`
+**Neu in v0.41.0.** Löscht alle generierten Output-Dateien aus Provider-Verzeichnissen.
+Geschützte Pfade: Settings, Local-Settings, Extensions, .meta-config/, CLAUDE.md/AGENTS.md.
+Interne `_resolve_dir()`-Hilfsfunktion löst implizite Verzeichnisse aus `has_*` Flags auf.
+Gibt `{"deleted": [...], "protected": [...]}` zurück.
+
 ### `_yaml`, `_YAML_AVAILABLE`
 Zentrale YAML-Verfügbarkeit. Alle anderen Module importieren diese statt eigene try/except-Blöcke.
 
@@ -52,15 +58,17 @@ Gibt `(variables, warnings)` zurück.
 
 ```python
 vars, warns = build_variables(config, agent_meta_root)
-# vars enthält: PROJECT_NAME, AGENT_HINTS, DOD_*, MAX_PARALLEL_AGENTS, ...
+# vars enthält: PROJECT_NAME, AGENT_HINTS, DOD_*, MAX_PARALLEL_AGENTS,
+#               CI_POLL_ENABLED, CI_POLL_INTERVAL, CI_POLL_MAX_RETRIES, ...
 ```
 
 ### `substitute(text, variables, source_label, log)`
 Ersetzt `{{VAR}}`-Platzhalter im Text. Unbekannte Variablen → Warnung im Log.
 `{{%VAR%}}` wird als `{{VAR}}` gerendert (Escape-Syntax für Dokumentation in Templates).
 
-### `strip_inactive_dod_blocks(text, variables)`
+### `strip_inactive_dod_blocks(text, variables, extra_vars=None)`
 Entfernt `{{#if DOD_*}}...{{/if}}`-Blöcke deren Variable nicht gesetzt ist.
+**Neu in v0.41.0:** Unterstützt `extra_vars` Parameter und inverse Blöcke `{{^VAR}}...{{/if}}`.
 
 ### `find_agent_meta_root(script_path)`
 Erkennt automatisch ob das Skript im Meta-Repo oder als Submodul läuft.
@@ -228,6 +236,20 @@ Lädt `config/ai-providers.yaml`. Gibt das vollständige Provider-Dict zurück.
 
 ### `get_active_providers(config, provider_config)`
 Gibt die im Projekt konfigurierten Provider zurück (via `ai-providers:` in `project.yaml`).
+
+---
+
+## setup.py — Setup-Wizard & Meta-Repo-Scaffolding
+
+**Neu in v0.41.0.** Interaktiver Setup-Wizard und Auto-Generierung von Meta-Repo-Dokumentation.
+
+### `scaffold_meta_repo_docs(agent_meta_root, project_root, log, dry_run=False)`
+Erstellt `docs/PATTERNS.md`, `docs/LEARNINGS.md`, `docs/CONVENTIONS.md` wenn `meta-repo: true`.
+Nutzt Starter-Templates aus `.agent-meta/templates/docs/` falls vorhanden, sonst Standard-Header.
+Gibt Liste der erstellten Dateipfade zurück.
+
+### `run_setup_wizard(agent_meta_root, project_root, target_config, dry_run)`
+7-Schritte-Wizard: Projekt-Identität, Provider, Plattform, DoD, Sprache, Git, Variablen.
 
 ---
 
