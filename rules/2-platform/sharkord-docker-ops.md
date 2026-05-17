@@ -4,6 +4,18 @@ description: Sharkord Docker-Betriebswissen — Port-Register, SYS_NICE, Binary-
 
 # Sharkord Docker-Konventionen
 
+## Version Pinning (KRITISCH)
+
+NIE `latest`-Tag für Sharkord Docker-Images verwenden. Immer auf konkrete Version pinnen. Version explizit nach Kompatibilitätstest aktualisieren.
+
+```yaml
+# RICHTIG — gepinnte Version
+image: ghcr.io/sharkord/sharkord:v0.0.20
+
+# FALSCH — nie verwenden
+image: ghcr.io/sharkord/sharkord:latest
+```
+
 ## Pflicht-Capability SYS_NICE
 
 ```yaml
