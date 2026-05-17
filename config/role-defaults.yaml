@@ -167,3 +167,28 @@ roles:
     memory: local
     workflow_tier: optional
     description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
+
+  multi-repo-refactor:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Standardisierte Refactorings parallel über mehrere Sibling-Repositories ausführen"
+
+  compliance-auditor:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: "Proaktive, wiederkehrende Auditierung von Repositories auf Einhaltung von Standards und Rules"
+
+  code-splitter:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Automatisierte Modularisierung monolithischer Dateien (>300 Zeilen) in standardkonforme Module"
+
+  bun-ci:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Builds und Tests im CI-ähnlichen Modus mit Bun ausführen — Install, Build, Test, Report"

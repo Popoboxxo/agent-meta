@@ -1,6 +1,6 @@
 ---
 name: sharkord-docker
-version: "1.2.2"
+version: "1.2.3"
 based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Baut auf template-docker auf und ergänzt Sharkord-Plattformwissen: Plugin-Mount-Pfade, Access-Token-Handling, Mediasoup-Ports, SYS_NICE, Image-Konventionen und Port-Register. Wird als Basis für konkrete Plugin-Instanzen verwendet."
 hint: "Sharkord Dev-Stack: Plugin-Mount, Access-Token, Mediasoup-Ports, Compose"
@@ -36,7 +36,7 @@ die Sharkord-Plattform-Besonderheiten.
 ### Image-Konvention
 
 ```yaml
-image: sharkord/sharkord:{{platform.sharkord.image_tag}}  # z.B. v0.0.16
+image: sharkord/sharkord:{{platform.sharkord.image_tag}}  # z.B. v0.0.20
 ```
 
 Der Image-Tag **muss** mit `peerDependencies` in `package.json` übereinstimmen.
@@ -333,7 +333,7 @@ Diese Datei ersetze durch eine Projekt-Instanz. Folgende `{{%PLATZHALTER%}}` aus
 |-------------|-------------|---------|
 | `{{PROJECT_NAME}}` | Vollständiger Plugin-Name | `sharkord-vid-with-friends` |
 | `{{PREFIX}}` | Agent-Präfix | `vwf` |
-| `{{platform.sharkord.image_tag}}` | Docker-Image-Tag des Kernsystems | `v0.0.16` |
+| `{{platform.sharkord.image_tag}}` | Docker-Image-Tag des Kernsystems | `v0.0.20` |
 | `{{SYSTEM_DEPENDENCIES}}` | Kern-Abhängigkeiten mit Versionen (Markdown-Liste) | `- @sharkord/plugin-sdk: \`0.0.16\`` |
 | `{{SYSTEM_URLS}}` | System-URLs (Markdown-Liste) | `- Sharkord Web-UI: \`http://localhost:3000\`` |
 | `{{PLUGIN_DIR_NAME}}` | Verzeichnisname = `package.json` name | `sharkord-vid-with-friends` |

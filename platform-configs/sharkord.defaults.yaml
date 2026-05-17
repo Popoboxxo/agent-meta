@@ -25,8 +25,8 @@ platform:
     # -------------------------------------------------------------------------
 
     # Docker image tag — must match peerDependencies in package.json
-    # Example: "v0.0.16"
-    image_tag: "v0.0.16"
+    # Example: "v0.0.20"
+    image_tag: "v0.0.20"
 
     # -------------------------------------------------------------------------
     # Release notes

@@ -15,6 +15,9 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 |-------|--------------|
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
 | `agent-meta-scout` | KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
+| `bun-ci` | Builds und Tests im CI-ähnlichen Modus mit Bun ausführen — Install, Build, Test, Report |
+| `code-splitter` | Automatisierte Modularisierung monolithischer Dateien (>300 Zeilen) in standardkonforme Module |
+| `compliance-auditor` | Proaktive, wiederkehrende Auditierung von Repositories auf Einhaltung von Standards und Rules |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
 | `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
@@ -24,6 +27,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `infrastructure-check` | Prerequisite-Check: fehlende CLIs/Runtimes in Hooks, MCP-Configs und Agent-Templates aller aktiven Provider erkennen und Installationsanleitung geben |
 | `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
+| `multi-repo-refactor` | Standardisierte Refactorings parallel über mehrere Sibling-Repositories ausführen |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
