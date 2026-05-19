@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.41.0`
+**Current version:** `0.42.0`
 
 ---
 
@@ -46,6 +46,76 @@ It provides:
 - **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
 - **An extension system** that lets projects add project-specific knowledge without touching generated files
 - **Agent visualization** (opt-in): auto-generated mindmaps of all agents + dynamic session tracking with event reports (Gantt, sequence diagrams, live watch)
+
+---
+
+## Feature Overview
+
+### Core Engine
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **sync.py** | Central CLI — generates provider-ready agents, rules, commands, hooks from templates. Supports `--dry-run`, `--clean`, `--init`, `--viz`, `--create-ext`, `--update-ext` | [sync.py Interface](agents/1-generic/_wf-sync-interface.md), [Sync Concept](howto/features/sync-concept.md) |
+| **Three-Layer Architecture** | `0-external` → `1-generic` → `2-platform` → `3-project` with override priority and additive extensions | [AGENTS.md — Schichten-Architektur](AGENTS.md#agent-meta--schichten-architektur), [Layer Model Deep-Dive](docs/architecture/01-layer-model.md) |
+| **Provider Support** | Claude Code, Gemini CLI, Opencode, Continue — single source, provider-specific output | [Provider Matrix](docs/architecture/08-provider-matrix.md), [Multi-Provider Guide](docs/providers/multi-provider.md) |
+| **Placeholder System** | `{{VARIABLE}}` substitution via `config.py` — project vars, DoD flags, platform values, agent hints | [Config Layout](howto/features/config-layout.md), [Platform Config](howto/features/platform-config.md) |
+| **Composition Syntax** | `extends:` + `patches:` (append-after, replace, delete, append) for partial agent overrides | [AGENTS.md — Composition](AGENTS.md#composition-syntax-2-platform-and-3-project), [Agent Composition](howto/features/agent-composition.md) |
+
+### Quality & Governance
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **DoD Presets** | `full`, `standard`, `rapid-prototyping` — configurable quality profiles (REQ traceability, tests, codebase overview, security audit) | [config/dod-presets.yaml](config/dod-presets.yaml), [DoD Criteria Rule](rules/1-generic/dod-criteria.md) |
+| **Rules System** | Auto-loaded rules: branch-guard, commit-conventions, language, session-conclusion, use-orchestrator, etc. | [rules/1-generic/](rules/1-generic/), [Rules How-To](howto/features/rules.md) |
+| **Hooks System** | Pre-push DoD check, lifecycle triggers, viz event logging — shell scripts executed by Git | [hooks/1-generic/](hooks/1-generic/), [Hooks How-To](howto/features/hooks.md) |
+| **Speech Modes** | Configurable communication styles: short, childish, caveman, asozial, submissive, full | [speech/](speech/) |
+
+### Agent System
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **25+ Agent Roles** | orchestrator, developer, tester, validator, requirements, documenter, reviewer, feature, git, release, docker, ideation, log-analyzer, feedback, meta-feedback, agent-meta-manager, agent-meta-scout, infrastructure-check, performance, security-auditor, openscad-developer, code-splitter, multi-repo-refactor, compliance-auditor, bun-ci | [AGENTS.md — Agent Table](AGENTS.md), [Agent Roles Deep-Dive](docs/architecture/03-agent-roles.md), [config/role-defaults.yaml](config/role-defaults.yaml) |
+| **Agent Contracts** | `input`/`output` fields per role in `role-defaults.yaml` — documents what each agent expects and delivers | [config/role-defaults.yaml](config/role-defaults.yaml) |
+| **Agent Versioning** | Semantic versioning in frontmatter (Major/Minor/Patch) with `based-on` tracking for platform agents | [Agent Versioning How-To](howto/features/agent-versioning.md), [Versioning Architecture](docs/architecture/06-versioning.md) |
+| **Agent Memory** | Persistent memory across sessions — scopes: `project`, `local`, `user` | [Agent Memory How-To](howto/features/agent-memory.md) |
+| **Agent Isolation** | Memory and context isolation between agents | [Agent Isolation How-To](howto/features/agent-isolation.md) |
+
+### v0.42.0 — New Features
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **Evaluator-Optimizer Loop** | Generic generator-evaluator pairs with configurable criteria, max iterations, and auto-approve — not limited to developer↔reviewer | [Evaluator-Optimizer Architecture](docs/architecture/evaluator-optimizer-loop.md) |
+| **Map-Reduce / Parallelization** | Parallel worker execution with result aggregation — `∥` marker in workflows | [Orchestrator Template — Map-Reduce](agents/1-generic/orchestrator.md#map-reduce-parallele-worker) |
+| **Context Management** | Minimal context delegation to workers — prevents context bloat, improves accuracy | [Orchestrator Template — Context-Management](agents/1-generic/orchestrator.md#context-management) |
+| **Resilience & Error Handling** | Max 2 retries per agent, fallback to user, idempotency checks, integration validation | [Orchestrator Template — Resilienz](agents/1-generic/orchestrator.md#resilienz--fehlerbehandlung) |
+| **Fast Routing** | Keyword→Agent mapping table for instant delegation decisions | [Orchestrator Template — Schnell-Routing](agents/1-generic/orchestrator.md#schnell-routing-keyword--agent) |
+| **code-splitter Agent** | Automated modularization of monolithic files (>300 lines) into standard-compliant modules | [AGENTS.md — code-splitter](AGENTS.md) |
+| **update-meta Command** | Re-sync all agents without upgrading agent-meta version | [.opencode/commands/update-meta.md](.opencode/commands/update-meta.md) |
+
+### External Skills & MCP
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **External Skills (0-external)** | Git submodule-based skill packages with approval gate and pinned commits | [config/skills-registry.yaml](config/skills-registry.yaml), [External Skills How-To](howto/features/external-skills.md), [External Skills Architecture](docs/architecture/05-external-skills.md) |
+| **MCP Server Framework** | First-class MCP support: registry, activation, secret management, auto-generated rules and configs | [MCP Setup How-To](howto/mcp-setup.md), [MCP Agent Concept](docs/architecture/mcp-agent-concept.md), [config/mcp-registry.yaml](config/mcp-registry.yaml) |
+
+### Commands & Configuration
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **Commands System** | 22 built-in commands: commit, merge, feedback, viz-toggle, diagnose, what-is, parallel, etc. | [.opencode/commands/](.opencode/commands/) |
+| **Config System** | `project.yaml` (project values), `role-defaults.yaml` (role defaults), `ai-providers.yaml` (provider tiers), `project-config.schema.json` (validation) | [config/](config/), [Config Layout How-To](howto/features/config-layout.md), [project.yaml.example](howto/configs/project.yaml.example) |
+| **Lifecycle Triggers** | Auto-tasks on git events (release, merge, version-bump) — delegates to agents | [Lifecycle Triggers How-To](howto/features/lifecycle-triggers.md) |
+| **Delegation Map** | Visual agent delegation relationships | [Agent Delegation Map How-To](howto/features/agent-delegation-map.md) |
+
+### Visualization & Documentation
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **Agent Visualization** | Static mindmaps (Mermaid + HTML graph) and dynamic session tracking via `events.jsonl` | [Agent Visualization How-To](howto/agent-visualization.md), [Viz Architecture](docs/viz-architecture.md), [Viz Event Schema](docs/viz-event-schema.md) |
+| **Live Dashboard** | Browser-based real-time session watch with API | [viz-api.md](docs/viz-api.md), [live-dashboard.html](docs/live-dashboard.html) |
+| **Session Reports** | Terminal watch (`viz-report.py --watch`) and server mode (`viz-server.py`) | [Agent Visualization How-To](howto/agent-visualization.md) |
+| **Documentation** | Architecture deep-dives, daily conclusions, learnings, conventions, patterns | [docs/](docs/), [docs/architecture/](docs/architecture/), [docs/conclusions/](docs/conclusions/), [docs/LEARNINGS.md](docs/LEARNINGS.md) |
 
 ---
 
@@ -81,7 +151,7 @@ git submodule add <repo-url> .agent-meta
 ```
 
 ```bash
-cd .agent-meta && git checkout v0.28.1
+cd .agent-meta && git checkout v0.42.0
 ```
 
 ```bash
@@ -388,12 +458,14 @@ agent-meta/
 
 | Platform | Agents |
 |----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout, openscad-developer |
+| Generic | orchestrator, developer, tester, validator, requirements, documenter, reviewer, feature, git, release, docker, ideation, log-analyzer, feedback, meta-feedback, agent-meta-manager, agent-meta-scout, infrastructure-check, performance, security-auditor, openscad-developer, code-splitter, multi-repo-refactor, compliance-auditor, bun-ci |
 | Sharkord | sharkord-docker, sharkord-release |
 
 ---
 
 ## Agent Roles
+
+> For a complete list with all 25+ roles including input/output contracts, see [AGENTS.md](AGENTS.md) and [config/role-defaults.yaml](config/role-defaults.yaml).
 
 | Role | Responsibility |
 |------|---------------|
@@ -403,15 +475,22 @@ agent-meta/
 | `validator` | DoD check, traceability audit, code quality |
 | `requirements` | Requirement intake, REQ-IDs, REQUIREMENTS.md |
 | `documenter` | CODEBASE_OVERVIEW, architecture docs, conclusions |
-| `meta-feedback` | Collect framework feedback, create GitHub Issues in agent-meta |
-| `release` | Versioning, changelog, GitHub release |
-| `docker` | Dev stack, test stack, binary management |
+| `reviewer` | Code review before merge: quality, style, logic, security smells |
+| `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
 | `git` | Commits, branches, tags, push/pull and all Git operations |
 | `ideation` | Explore new ideas, sharpen vision, hand off to requirements |
-| `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
+| `release` | Versioning, changelog, GitHub release |
+| `docker` | Dev stack, test stack, binary management |
+| `meta-feedback` | Collect framework feedback, create GitHub Issues in agent-meta |
 | `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
-| `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
+| `agent-meta-scout` | Scout the AI ecosystem for new skills, roles, rules and patterns |
 | `log-analyzer` | Log analysis: error clustering, severity classification (RFC 5424), findings as issues |
 | `feedback` | Project feedback: bugs, features, improvements as standardized GitHub Issues |
 | `infrastructure-check` | Prerequisite check: missing CLIs/runtimes in hooks, MCP configs and agent templates |
 | `openscad-developer` | Parametric 3D models in OpenSCAD, render-inspect-refine via MCP, print optimization |
+| `performance` | Performance profiling and bottleneck analysis: CPU, memory, I/O |
+| `security-auditor` | Security audit: OWASP, secrets, dependencies, supply-chain |
+| `code-splitter` | Automated modularization of monolithic files (>300 lines) |
+| `multi-repo-refactor` | Standardized refactoring across multiple sibling repositories |
+| `compliance-auditor` | Proactive recurring audit of repositories for standards compliance |
+| `bun-ci` | CI-like builds and tests with Bun: install, build, test, report |
