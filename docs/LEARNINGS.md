@@ -41,4 +41,28 @@ Use `.agent-meta/templates/learning-capture.md` for new entries.
 
 ---
 
+## BUG-002: Windows-Inkompatibilitäten in globalen Node.js CLIs (`opencode-pixel-office` v1.2.2)
+
+**Context:** `opencode-pixel-office` — global installierte npm CLI (`bin/opencode-pixel-office.js`), ausgeführt auf Windows  
+**Problem:** Drei Unix-spezifische Aufrufe scheitern auf Windows mit ENOENT:
+
+1. **`spawn('tsx', ...)`** — `spawn()` kann Unix-Shebang-Skripte aus `node_modules/.bin/` auf Windows nicht ausführen
+   - **Fix:** Plattform-Prüfung: Windows nutzt `node --import <tsx/dist/loader.mjs> server/index.ts` statt `spawn('tsx', ...)`. Fallback: `cmd /c tsx.cmd`
+
+2. **`execSync('lsof -t -i :PORT')`** — `lsof` existiert nicht auf Windows
+   - **Fix:** Neue Funktion `getPidsOnPort()`: Auf Windows `Get-NetTCPConnection -LocalPort PORT` via PowerShell. Betroffen: `stopServer`, `status`, `start` already-running-check
+
+3. **`execSync('start URL')`** — `start` ist ein cmd.exe-Builtin, kein Binary
+   - **Fix:** `execSync('start "" "URL"')` — leeres Titel-Argument ist bei URLs Pflicht
+
+4. **Zusätzlich:** Import von `pathToFileURL` aus `node:url` für `--import` Flag benötigt
+
+**Solution:** Alle vier Stellen plattformabhängig machen (`process.platform === 'win32'`). Import: `import { pathToFileURL } from 'node:url'`  
+**Applies to:** ALLE Node.js CLIs die `spawn()`, `lsof`, oder `start` verwenden — insbesondere globale npm-Pakete mit Unix-Annahmen  
+**Date:** 2026-05-19  
+**Source:** opencode-pixel-office@local-fix (globales npm-Paket, noch kein Upstream-PR)  
+**Follow-up:** GitHub Issue + PR an https://github.com/ddx-510/opencode-pixel-office erforderlich. Lokale Fixes werden bei `npm update -g` überschrieben.
+
+---
+
 *Add new learnings via PR against this file. Reference the originating plugin and commit for traceability.*
