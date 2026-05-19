@@ -278,7 +278,24 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             if isinstance(val, list):
                 val = ",".join(str(v) for v in val)
             variables[f"EVALUATOR_OPTIMIZER_PAIR_{i}_{key.upper()}"] = str(val)
+    # EVALUATOR_CRITERIA_TABLE: central criteria definitions from config/evaluator-criteria.yaml
+    variables["EVALUATOR_CRITERIA_TABLE"] = _build_criteria_table(agent_meta_root)
     return variables, unmapped
+
+
+def _build_criteria_table(agent_meta_root: Path) -> str:
+    """Build markdown table from config/evaluator-criteria.yaml."""
+    criteria_path = agent_meta_root / "config" / "evaluator-criteria.yaml"
+    if not criteria_path.is_file():
+        return "| (no criteria defined) | |"
+    try:
+        raw = _yaml.safe_load(criteria_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return "| (error loading criteria) | |"
+    lines = ["| Kriterium | Was prüfen? |", "|-----------|-------------|"]
+    for name, desc in raw.items():
+        lines.append(f"| `{name}` | {desc} |")
+    return "\n".join(lines)
 
 
 def strip_inactive_dod_blocks(text: str, variables: dict, extra_vars: list[str] | None = None) -> str:

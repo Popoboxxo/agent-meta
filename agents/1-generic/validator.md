@@ -76,14 +76,7 @@ Wenn du als **Evaluator** in einem Evaluator-Optimizer-Pair agierst (z.B. tester
 
 ### Kriterien-Referenz (Validator als Evaluator)
 
-| Kriterium | Was prüfen |
-|-----------|-----------|
-| `coverage` | Alle REQs/Aspekte durch Tests abgedeckt? |
-| `correctness` | Tests prüfen das richtige Verhalten? |
-| `edge_cases` | Randfälle berücksichtigt? |
-| `changelog_complete` | CHANGELOG.md enthält alle Änderungen? |
-| `version_consistent` | Version überall konsistent? |
-| `artifacts_valid` | Build-Artifakte valide? |
+{{EVALUATOR_CRITERIA_TABLE}}
 
 {{/if}}
 

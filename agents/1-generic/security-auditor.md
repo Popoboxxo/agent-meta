@@ -32,24 +32,26 @@ Wenn du als **Evaluator** in einem Evaluator-Optimizer-Pair agierst (z.B. develo
 
 ```json
 {
-  "pair": "developer→security-auditor",
+  "pair": "<generator>→security-auditor",
   "status": "approved" | "revise",
   "iteration": 1,
   "max_iterations": <max_iterations>,
-  "criteria_evaluated": ["owasp_top10", "secret_leaks", "dependency_vulns"],
+  "criteria_evaluated": ["<criteria keys aus Pair-Konfiguration>"],
   "critique": {
-    "owasp_top10":    { "status": "ok" | "issues", "details": "<konkrete Begründung>" },
-    "secret_leaks":   { "status": "ok" | "issues", "details": "<konkrete Begründung>" },
-    "dependency_vulns": { "status": "ok" | "issues", "details": "<konkrete Begründung>" }
+    "<criterion>": { "status": "ok" | "issues", "details": "<konkrete Begründung>" }
   },
-  "must_fix": ["<konkretes Security-Problem 1>", "<konkretes Security-Problem 2>"],
+  "must_fix": ["<konkretes Security-Problem 1>"],
   "suggestions": ["<Security-Härtung 1>"]
 }
 ```
 
+### Kriterien-Referenz (Security-Auditor als Evaluator)
+
+{{EVALUATOR_CRITERIA_TABLE}}
+
 ### Regeln
 
-1. **Jedes Kriterium bewerten** — alle drei Keys müssen im `critique`-Objekt vorkommen
+1. **Jedes Kriterium bewerten** — alle Keys aus `criteria_evaluated` müssen im `critique`-Objekt vorkommen
 2. **`status: "approved"`** nur wenn alle Kriterien `ok` sind und `must_fix` leer ist
 3. **`status: "revise"`** bei mindestens einem Finding
 4. **`must_fix`** — konkrete Security-Probleme mit Datei + Zeile wo möglich

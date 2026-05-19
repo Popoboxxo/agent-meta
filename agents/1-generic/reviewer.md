@@ -128,19 +128,7 @@ Wenn du als **Evaluator** in einem Evaluator-Optimizer-Pair agierst (z.B. develo
 
 ### Kriterien-Referenz (Reviewer als Evaluator)
 
-| Kriterium | Was prüfen |
-|-----------|-----------|
-| `correctness` | Logik korrekt? Edge Cases behandelt? |
-| `efficiency` | Algorithmus angemessen? Keine unnötigen Operationen? |
-| `safety` | Keine offensichtlichen Security-Smells? |
-| `style` | Projekt-Konventionen eingehalten? |
-| `conventions` | Naming, Struktur, Patterns konsistent? |
-| `completeness` | Alle Aspekte der Aufgabe abgedeckt? |
-| `clarity` | Verständlich und gut strukturiert? |
-| `traceability` | REQ-Bezug klar? Nachvollziehbar? |
-| `consistency` | Widerspruchsfrei zu bestehenden REQs/Code? |
-| `structure` | Logische Gliederung? Roter Faden? |
-| `language` | Sprachlich korrekt? Terminologie konsistent? |
+{{EVALUATOR_CRITERIA_TABLE}}
 
 {{/if}}
 

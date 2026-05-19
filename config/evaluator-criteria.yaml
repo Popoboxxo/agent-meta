@@ -1,0 +1,23 @@
+# Zentrale Definition aller Evaluator-Kriterien für den Evaluator-Optimizer-Loop.
+# Jeder Eintrag: Name = ID (im Template referenziert), Beschreibung = was der Evaluator prüft.
+# sync.py generiert aus dieser Datei die Variable {{EVALUATOR_CRITERIA_TABLE}}.
+
+correctness:     "Logik korrekt? Edge Cases behandelt?"
+efficiency:      "Algorithmus angemessen? Keine unnötigen Operationen?"
+safety:          "Keine offensichtlichen Security-Smells?"
+style:           "Projekt-Konventionen eingehalten?"
+conventions:     "Naming, Struktur, Patterns konsistent?"
+completeness:    "Alle Aspekte der Aufgabe abgedeckt?"
+clarity:         "Verständlich und gut strukturiert?"
+traceability:    "REQ-Bezug klar? Nachvollziehbar?"
+consistency:     "Widerspruchsfrei zu bestehenden REQs/Code?"
+structure:       "Logische Gliederung? Roter Faden?"
+language:        "Sprachlich korrekt? Terminologie konsistent?"
+coverage:        "Ausreichende Testabdeckung? Alle REQs/Aspekte durch Tests abgedeckt?"
+edge_cases:      "Grenzfälle und Fehlerpfade getestet?"
+owasp_top10:     "OWASP Top 10 Risiken geprüft?"
+secret_leaks:    "Secrets/Tokens/Keys im Code?"
+dependency_vulns: "Abhängigkeiten aktuell und sicher?"
+changelog_complete: "CHANGELOG.md enthält alle Änderungen?"
+version_consistent: "Versionen konsistent in allen Dateien?"
+artifacts_valid: "Build-Artefakte valide und vollständig?"
