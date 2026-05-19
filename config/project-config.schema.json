@@ -75,7 +75,8 @@
           "openscad-developer",
           "log-analyzer",
           "feedback",
-          "infrastructure-check"
+          "infrastructure-check",
+          "code-splitter"
         ]
       },
       "uniqueItems": true
