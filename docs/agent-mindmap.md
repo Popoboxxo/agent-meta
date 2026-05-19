@@ -59,6 +59,21 @@ mindmap
 - **Beschreibung:** Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta.
 - **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
+### bun-ci
+- **Tier:** optional
+- **Beschreibung:** Executes builds and tests in a CI-like manner using Bun — install, build, test, and report.
+- **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+
+### code-splitter
+- **Tier:** optional
+- **Beschreibung:** Automated modularization of monolithic files (>300 lines) into standard-compliant modules.
+- **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+
+### compliance-auditor
+- **Tier:** optional
+- **Beschreibung:** Proactive, recurring audit of repositories for compliance with AGENTS.md rules and project standards.
+- **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+
 ### developer
 - **Tier:** optional
 - **Beschreibung:** Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface.
@@ -111,6 +126,11 @@ mindmap
 - **Tier:** optional
 - **Beschreibung:** Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen.
 - **Model:** Claude: claude-haiku-4-5-20251001, Continue: codellama:7b, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+
+### multi-repo-refactor
+- **Tier:** optional
+- **Beschreibung:** Executes standardized refactorings in parallel across multiple sibling repositories in a workspace.
+- **Model:** Claude: claude-sonnet-4-6, Continue: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
 
 ### openscad-developer
 - **Tier:** optional

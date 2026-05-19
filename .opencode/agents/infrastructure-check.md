@@ -3,7 +3,7 @@ name: infrastructure-check
 description: "Prüft alle generierten Artefakte auf fehlende externe Voraussetzungen (CLIs, Runtimes, Binaries) — provider-übergreifend für alle aktiven AI-Provider."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
-generated-from: "1-generic/infrastructure-check.md@2.0.0"
+generated-from: "1-generic/infrastructure-check.md@2.1.0"
 ---
 # Infrastructure-Check — agent-meta
 
@@ -157,6 +157,7 @@ which python 2>/dev/null || python --version 2>/dev/null || echo "MISSING: pytho
 which gh 2>/dev/null || echo "MISSING: gh"
 which docker 2>/dev/null || echo "MISSING: docker"
 which uvx 2>/dev/null || echo "MISSING: uvx"
+which bun 2>/dev/null || echo "MISSING: bun"
 ```
 
 Für jedes Binary auch Version prüfen wenn relevant:
@@ -164,6 +165,7 @@ Für jedes Binary auch Version prüfen wenn relevant:
 node --version 2>/dev/null
 python --version 2>/dev/null
 gh --version 2>/dev/null
+bun --version 2>/dev/null
 ```
 
 ---
@@ -181,6 +183,21 @@ Ein Report-Block pro fehlendem Prerequisite:
   Windows:  winget install <package> | scoop install <package>
   macOS:    brew install <package>
   Linux:    apt install <package> | pip install <package>
+```
+
+**Spezialfall `bun`:** Viele Projekte (insb. JavaScript/TypeScript-Stacks) verwenden `bun` als Runtime. Falls `bun` fehlt:
+```
+## Missing: bun
+**Severity:** WARNING (BLOCKING wenn BUILD_COMMAND oder TEST_COMMAND auf bun basiert)
+**Required by:** <Projekt> — BUILD_COMMAND / TEST_COMMAND in project.yaml
+**Purpose:** JavaScript/TypeScript-Runtime und Package-Manager für Build, Test und Dependency-Management.
+**Install:**
+  Windows:  scoop install bun
+            npm install -g bun
+  macOS:    brew install oven-sh/bun/bun
+            curl -fsSL https://bun.sh/install | bash
+  Linux:    curl -fsSL https://bun.sh/install | bash
+**Mindestversion:** >= 1.0.0
 ```
 
 Severity-Definition:

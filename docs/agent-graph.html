@@ -171,7 +171,7 @@ graph TD
     classDef required fill:#e03131,stroke:#fff,stroke-width:2px,color:#fff
     classDef recommended fill:#1971c2,stroke:#fff,stroke-width:2px,color:#fff
     classDef optional fill:#868e96,stroke:#fff,stroke-width:2px,color:#fff
-    class agent-meta-manager,agent-meta-scout,developer,docker,documenter,feature,feedback,git,ideation,infrastructure-check,log-analyzer,meta-feedback,openscad-developer,orchestrator,performance,release,requirements,reviewer,security-auditor,tester,validator optional
+    class agent-meta-manager,agent-meta-scout,bun-ci,code-splitter,compliance-auditor,developer,docker,documenter,feature,feedback,git,ideation,infrastructure-check,log-analyzer,meta-feedback,multi-repo-refactor,openscad-developer,orchestrator,performance,release,requirements,reviewer,security-auditor,tester,validator optional
                 </div>
                 <div class="legend">
                     <div class="legend-item">
@@ -212,6 +212,48 @@ graph TD
                 <span class="tier-badge">optional</span>
             </div>
             <p class="description">Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="bun-ci">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>bun-ci</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Executes builds and tests in a CI-like manner using Bun — install, build, test, and report.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-haiku-4-5-20251001</span><br><span>Continue: codellama:7b</span><br><span>Gemini: gemini-2.5-flash</span><br><span>Opencode: opencode-go/deepseek-v4-flash</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="code-splitter">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>code-splitter</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Automated modularization of monolithic files (>300 lines) into standard-compliant modules.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="compliance-auditor">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>compliance-auditor</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Proactive, recurring audit of repositories for compliance with AGENTS.md rules and project standards.</p>
             <div class="meta">
                 <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
                 <span><strong>Memory:</strong> -</span>
@@ -354,6 +396,20 @@ graph TD
             <p class="description">Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen.</p>
             <div class="meta">
                 <span><strong>Model:</strong> <span>Claude: claude-haiku-4-5-20251001</span><br><span>Continue: codellama:7b</span><br><span>Gemini: gemini-2.5-flash</span><br><span>Opencode: opencode-go/deepseek-v4-flash</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="multi-repo-refactor">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>multi-repo-refactor</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Executes standardized refactorings in parallel across multiple sibling repositories in a workspace.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Continue: claude-sonnet-4-6</span><br><span>Gemini: gemini-2.5-pro</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
                 <span><strong>Memory:</strong> -</span>
             </div>
             

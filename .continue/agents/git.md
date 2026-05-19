@@ -53,6 +53,14 @@ Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 
 ---
 
+## CI/CD Status Polling (after push)
+
+{{^CI_POLL_ENABLED}}
+CI polling is disabled. Set `CI_POLL_ENABLED: true` in `.meta-config/project.yaml` to enable.
+{{/CI_POLL_ENABLED}}
+
+---
+
 ## Gefahrenzonen — immer bestätigen
 
 - `git reset --hard` → Alternative: `git stash`

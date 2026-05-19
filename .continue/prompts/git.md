@@ -56,6 +56,72 @@ Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 
 ---
 
+## CI/CD Status Polling (after push)
+
+{{#if CI_POLL_ENABLED}}
+After `git push`, automatically poll CI/CD pipeline status and report back.
+
+**Configuration:**
+- Poll interval: 30 seconds
+- Max retries: 10
+
+**Workflow:**
+
+1. After successful push, announce: `"Pushed! Checking CI status..."`
+
+2. Poll CI status using the appropriate CLI:
+
+   **GitHub** (via `gh` CLI):
+   ```bash
+   # Get the latest workflow run for the current branch
+   gh run list --branch <branch> --limit 1 --json status,conclusion,url,databaseId
+   ```
+
+   Alternatively, for PR checks:
+   ```bash
+   gh pr checks --repo <owner>/<repo>
+   ```
+
+3. Interpret the result:
+
+   | status     | conclusion | Message                                    |
+   |------------|------------|--------------------------------------------|
+   | `completed`| `success`  | `"CI passed — pipeline green — [Link]"`    |
+   | `completed`| `failure`  | `"CI failed — pipeline red — [Link]"`      |
+   | `completed`| `cancelled`| `"CI cancelled — [Link]"`                  |
+   | `in_progress`| —       | Continue polling (count toward max retries)|
+   | `queued`   | —          | Continue polling (count toward max retries)|
+   | `waiting`  | —          | Continue polling (count toward max retries)|
+
+4. If max retries reached and CI is still running:
+   `"CI still running after 10 attempts — check manually: [Link]"`
+
+5. If CI failed, offer to show failure details:
+   ```bash
+   gh run view <run-id> --log-failed
+   ```
+
+**Polling loop (pseudocode):**
+```
+retry = 0
+while retry < 10:
+    wait 30 seconds
+    result = gh run list --branch <branch> --limit 1 --json status,conclusion,url
+    if result.status == "completed":
+        report conclusion (success/failure/cancelled) + URL
+        break
+    retry += 1
+if retry == 10:
+    report timeout + URL
+```
+
+{{/if}}
+{{^CI_POLL_ENABLED}}
+CI polling is disabled. Set `CI_POLL_ENABLED: true` in `.meta-config/project.yaml` to enable.
+{{/CI_POLL_ENABLED}}
+
+---
+
 ## Gefahrenzonen — immer bestätigen
 
 - `git reset --hard` → Alternative: `git stash`

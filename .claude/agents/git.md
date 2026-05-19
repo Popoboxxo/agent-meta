@@ -3,9 +3,9 @@ name: git
 model: claude-haiku-4-5-20251001
 temperature: 0.1
 maxTokens: 2048
-version: "2.2.1"
+version: "2.3.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-generated-from: "1-generic/git.md@2.2.1"
+generated-from: "1-generic/git.md@2.3.0"
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
   - Bash
@@ -63,6 +63,14 @@ git push origin <branch>
 
 Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 → Lies `.agent-meta/agents/1-generic/_wf-git-ops.md`
+
+---
+
+## CI/CD Status Polling (after push)
+
+{{^CI_POLL_ENABLED}}
+CI polling is disabled. Set `CI_POLL_ENABLED: true` in `.meta-config/project.yaml` to enable.
+{{/CI_POLL_ENABLED}}
 
 ---
 

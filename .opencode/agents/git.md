@@ -3,7 +3,7 @@ name: git
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
-generated-from: "1-generic/git.md@2.2.1"
+generated-from: "1-generic/git.md@2.3.0"
 ---
 # Git Agent — agent-meta
 
@@ -52,6 +52,14 @@ git push origin <branch>
 
 Für erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI):
 → Lies `.agent-meta/agents/1-generic/_wf-git-ops.md`
+
+---
+
+## CI/CD Status Polling (after push)
+
+{{^CI_POLL_ENABLED}}
+CI polling is disabled. Set `CI_POLL_ENABLED: true` in `.meta-config/project.yaml` to enable.
+{{/CI_POLL_ENABLED}}
 
 ---
 

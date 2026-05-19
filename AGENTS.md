@@ -382,8 +382,7 @@ Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem M
 | Git-Commit / Push / Tag / Frage | `git` |
 | Erkenntnisse speichern | `documenter` |
 | agent-meta Upgrade / Sync | `agent-meta-manager` |
-| Projekt-Feedback einreichen (Bugs, Features) | `feedback` |
-| agent-meta-Feedback einreichen | `meta-feedback` |
+| Feedback einreichen | `meta-feedback` |
 
 ## Hauptchat ohne Orchestrator
 
