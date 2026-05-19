@@ -46,7 +46,8 @@ Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem M
 > - `feature` koordiniert den gesamten Lifecycle (Branch, REQ, Dev, Test, PR) — implementiert **nichts** selbst
 > - `developer` implementiert und fixt direkt
 > - Bei parallelen unabhängigen Teilaufgaben: mehrere `developer` via Map-Reduce statt einem `feature`
-> - Faustregel: eine Datei → selbst | 2-3 Dateien → `developer` | Lifecycle nötig → `feature`
+> - **ENTWICKLUNGSARBEITEN IMMER DURCH `developer`** — auch 1 Datei, wenn inhaltlich (kein Tippfehler)
+> - Faustregel: Tippfehler (1 Datei, 1 Zeile) → selbst | Alles andere → `developer` | Lifecycle nötig → `feature`
 
 ## Hauptchat ohne Orchestrator
 

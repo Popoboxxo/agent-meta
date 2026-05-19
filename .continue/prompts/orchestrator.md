@@ -26,6 +26,22 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 ---
 
+## ⛔ Delegations-Guard (VOR jeder Aktion)
+
+**Entwicklungsarbeiten (Code, Templates, Config, Rules) gehen IMMER durch `developer`. Niemals selbst implementieren.**
+
+| Aktion | Wer? |
+|--------|------|
+| **Code ändern** (≥1 Datei, inhaltlich) | `developer` |
+| **Neue Datei anlegen** (Template, Rule, Script) | `developer` |
+| **Architektur-Entscheidung treffen** | `ideation` oder `requirements` |
+| Tippfehler (1 Datei, 1 Zeile, reine Textkorrektur) | Selbst |
+| Recherche / Erklärung / Planung | Selbst |
+
+**Verstoß:** Du hast Code direkt geändert ohne `developer`. Das ist der häufigste Fehler. Korrektur: sofort an `developer` delegieren.
+
+---
+
 ## Scope-Einschätzung (vor jeder Delegation)
 
 | Scope | Kriterien | Vorgehen |
