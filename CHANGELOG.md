@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.42.0] — 2026-05-19
+
+### Added
+
+- **`code-splitter` agent** (`agents/1-generic/code-splitter.md` v1.0.0): New agent for splitting large files into smaller modules, modularizing monolithic code, and refactoring oversized files. Registered in `config/role-defaults.yaml`, schema enum, and deployed roles in `project.yaml`. Generated for all 4 providers (Claude, Continue, Gemini, Opencode).
+- **`/update-meta` command** (`commands/1-generic/update-meta.md`): New slash-command for re-syncing agents without a version upgrade. Allows projects to pick up template changes without bumping their `agent-meta-version`. Generated for all active providers.
+- **Module splits in `scripts/lib/`**: `agents.py` (886→536 lines) and `context.py` (763→257 lines) refactored into smaller, focused modules for better readability and LLM-assisted development.
+- **REQUIREMENTS.md extended**: 30 new requirements added across 3 categories (framework features, agent templates, developer experience).
+
+### Fixed
+
+- **VERSION mismatch in `project.yaml`**: `agent-meta-version` was stuck at `0.39.0` while the repo was at `0.41.0`. Updated to match current version.
+- **Issue #162 — Feedback routing**: Split feedback instructions in `AGENTS.md` into separate sections for project-feedback (project issues) and agent-meta-feedback (framework issues). Previously conflated, causing confusion about which feedback channel to use.
+- **`code-splitter` missing from schema enum**: Added `code-splitter` to `config/project-config.schema.json` roles enum to suppress config validation warning.
+
+---
+
 ## [Unreleased]
 
 ---
