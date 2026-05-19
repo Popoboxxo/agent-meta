@@ -21,6 +21,7 @@ platforms:
   - agent-meta
 
 roles:
+  - code-splitter
   - orchestrator
   - developer
   - requirements
