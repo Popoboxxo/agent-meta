@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.43.0] — 2026-05-19
+
+### Added
+
+- **Evaluator-Optimizer-Loop**: Generic quality-loop system with 6 configurable generator-evaluator pairs (`config/evaluator-criteria.yaml` — 19 criteria, injected into templates via `EVALUATOR_CRITERIA_TABLE`). Pairs cover developer↔reviewer, requirements↔reviewer, documenter↔reviewer, tester↔validator, developer↔security-auditor, release↔validator. Configurable max iterations, modes, and criteria per pair.
+- **Orchestrator v3.2.0**: Major overhaul with delegation guard (code work always via `developer`), Map-Reduce for parallel independent tasks, context management, resilience patterns, and fast-routing for trivial questions.
+- **README.md**: Complete feature overview with 35+ links to documentation, howtos, and architecture docs.
+
+### Changed
+
+- **Feature vs Developer routing clarification** in `AGENTS.md` and `use-orchestrator` rule — explicit decision tree for when to use `feature` (lifecycle coordination) vs `developer` (direct implementation).
+- **10 Orchestrator optimization issues** created (#163–#172) tracking follow-up improvements.
+
+---
+
+## [Unreleased]
+
+---
+
 ## [0.42.0] — 2026-05-19
 
 ### Added
