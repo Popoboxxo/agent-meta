@@ -172,6 +172,84 @@ der richtige Weg — nicht alles in CLAUDE.md packen).
 
 ---
 
+## 11. Evaluator-Optimizer-Loop Konfiguration
+
+Der Evaluator-Optimizer-Loop ist ein iterativer Qualitäts-Workflow zwischen Agenten-Paaren. Ein Generator erzeugt Output, ein Evaluator bewertet ihn gegen konfigurierbare Kriterien, der Generator iteriert — bis "approved" oder max_iterations erreicht.
+
+### Konfiguration in `.meta-config/project.yaml`
+
+```yaml
+evaluator-optimizer:
+  enabled: false          # Master-Schalter (default: aus)
+  auto_approve: false     # Nach max_iterations automatisch akzeptieren? (default: nein)
+  pairs:                  # Liste der Generator-Evaluator-Paare
+    - generator: developer
+      evaluator: reviewer
+      max_iterations: 3
+      modes: [feature, bugfix, refactor]
+      criteria: [correctness, efficiency, safety, style, conventions]
+```
+
+### Vorkonfigurierte Pairs
+
+| # | Generator | Evaluator | Sinn | Default Modes |
+|---|-----------|-----------|------|---------------|
+| 0 | developer | reviewer | Code-Qualität | feature, bugfix, refactor |
+| 1 | requirements | reviewer | Anforderungs-Qualität | feature |
+| 2 | documenter | reviewer | Dokumentations-Qualität | feature, refactor |
+| 3 | tester | validator | Test-Qualität | feature, bugfix |
+| 4 | developer | security-auditor | Security im Code | feature, bugfix |
+| 5 | release | validator | Release-Qualität | feature |
+
+**Alle Pairs sind per default `enabled: false`** — der Nutzer muss explizit aktivieren.
+
+### Beratung: Welche Pairs für welchen Projekttyp?
+
+| Projekttyp | Empfohlene Pairs | Begründung |
+|------------|-----------------|------------|
+| **Web-App** | 0 (dev→reviewer), 4 (dev→security) | Code-Qualität + Security kritisch |
+| **CLI-Tool** | 0 (dev→reviewer) | Code-Qualität ausreichend |
+| **API-Service** | 0, 3, 4 | Code + Tests + Security |
+| **Dokumentations-Projekt** | 2 (doc→reviewer) | Doku-Qualität im Fokus |
+| **Library/SDK** | 0, 3, 5 | Code + Tests + Release-Qualität |
+
+### Tradeoffs erklären
+
+| Aspekt | enabled: true | enabled: false |
+|--------|--------------|----------------|
+| Token-Kosten | Höher (2–3x pro Pair) | Normal |
+| Qualität | Iterativ verbessert | Einmaliger Durchlauf |
+| Geschwindigkeit | Langsamer (mehr Runden) | Schnell |
+| User-Interaktion | Bei auto_approve=false: User-Fallback | Keine |
+
+### Nutzer bei der Konfiguration helfen
+
+```yaml
+# Einzelnes Pair aktivieren:
+evaluator-optimizer:
+  enabled: true
+  pairs:
+    - generator: developer      # Nur dieses Pair aktivieren
+      evaluator: reviewer
+      max_iterations: 3
+      modes: [feature, bugfix, refactor]
+      criteria: [correctness, efficiency, safety, style, conventions]
+
+# Auto-Approve nach max_iterations:
+evaluator-optimizer:
+  enabled: true
+  auto_approve: true            # Keine User-Frage bei max_iterations
+  pairs: [...]
+```
+
+### Sync nach Konfigurationsänderung
+
+```bash
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+```
+
+---
+
 ## 10. Don'ts
 
 - KEIN Upgrade ohne Changelog-Check und User-Bestätigung bei Major

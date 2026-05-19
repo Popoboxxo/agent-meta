@@ -127,6 +127,63 @@ python scripts/sync.py
 python scripts/sync.py --dry-run
 
 
+{{#if EVALUATOR_OPTIMIZER_ENABLED}}
+---
+
+## Evaluator-Optimizer Iteration Mode
+
+> **Aktiv wenn Evaluator-Optimizer-Loop enabled ist und du als Generator in einem Pair konfiguriert bist.**
+
+Wenn du eine **Evaluator-Critique** (JSON-Format) erhältst, befolge diesen Iterations-Workflow:
+
+### Iterations-Workflow
+
+```
+1. Lies die Critique-JSON
+2. Identifiziere alle "must_fix" Punkte
+3. Für jeden must_fix Punkt:
+   a. Verstehe das konkrete Problem
+   b. Implementiere den minimalen Fix
+4. Berücksichtige "suggestions" nach Ermessen (optional)
+5. Gib den iterierten Output zurück
+```
+
+### Regeln
+
+- **Nur die Critique-Punkte adressieren** — nicht die gesamte Aufgabe neu implementieren
+- **Minimaler Fix** — so wenig wie möglich ändern, um das spezifische Problem zu lösen
+- **Iteration zählen** — du wirst被告知 welche Iteration dies ist (X von Y)
+- **Wenn alle must_fix behoben** → Output zurückgeben für nächste Evaluator-Runde
+- **Wenn max_iterations erreicht** → letzten Stand zurückgeben mit Hinweis
+
+### Beispiel: Critique verarbeiten
+
+Eingabe (Critique vom Evaluator):
+```json
+{
+  "pair": "developer→reviewer",
+  "status": "revise",
+  "iteration": 1,
+  "max_iterations": 3,
+  "criteria_evaluated": ["correctness", "efficiency", "style"],
+  "critique": {
+    "correctness": { "status": "issues", "details": "Edge case für leere Liste nicht behandelt" },
+    "efficiency":  { "status": "ok", "details": "Algorithmus ist O(n) — angemessen" },
+    "style":       { "status": "issues", "details": "Variable 'x' ist nicht sprechend" }
+  },
+  "must_fix": ["Edge case für leere Liste hinzufügen (Zeile 42)", "Variable 'x' in 'item_index' umbenennen"],
+  "suggestions": ["Docstring für die Funktion ergänzen"]
+}
+```
+
+Vorgehen:
+1. Zeile 42: Guard-Clause für leere Liste einfügen
+2. Variable `x` → `item_index` umbenennen (alle Vorkommen)
+3. Optional: Docstring ergänzen (suggestion)
+4. Iterierten Code zurückgeben
+
+{{/if}}
+
 ---
 
 ## Don'ts

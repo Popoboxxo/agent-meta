@@ -176,3 +176,61 @@ viz:
   server:
     port: 8765
     timeout_sec: 300
+
+# Evaluator-Optimizer-Loop — Generator-Evaluator quality loops (all pairs disabled by default)
+evaluator-optimizer:
+  enabled: false
+  auto_approve: false
+  pairs:
+    - generator: developer
+      evaluator: reviewer
+      max_iterations: 3
+      modes: [feature, bugfix, refactor]
+      criteria:
+        - correctness
+        - efficiency
+        - safety
+        - style
+        - conventions
+    - generator: requirements
+      evaluator: reviewer
+      max_iterations: 2
+      modes: [feature]
+      criteria:
+        - completeness
+        - clarity
+        - traceability
+        - consistency
+    - generator: documenter
+      evaluator: reviewer
+      max_iterations: 2
+      modes: [feature, refactor]
+      criteria:
+        - completeness
+        - clarity
+        - structure
+        - language
+    - generator: tester
+      evaluator: validator
+      max_iterations: 2
+      modes: [feature, bugfix]
+      criteria:
+        - coverage
+        - correctness
+        - edge_cases
+    - generator: developer
+      evaluator: security-auditor
+      max_iterations: 2
+      modes: [feature, bugfix]
+      criteria:
+        - owasp_top10
+        - secret_leaks
+        - dependency_vulns
+    - generator: release
+      evaluator: validator
+      max_iterations: 2
+      modes: [feature]
+      criteria:
+        - changelog_complete
+        - version_consistent
+        - artifacts_valid

@@ -586,6 +586,64 @@
         ],
         "additionalProperties": false
       }
+    },
+    "evaluator-optimizer": {
+      "type": "object",
+      "description": "Generator-Evaluator quality loops. Any agent pair can be configured. Master switch: enabled (default false).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master switch for the evaluator-optimizer loop. When false, no loop behavior is activated.",
+          "default": false
+        },
+        "auto_approve": {
+          "type": "boolean",
+          "description": "When true, automatically accept output after max_iterations reached. When false, ask user for decision.",
+          "default": false
+        },
+        "pairs": {
+          "type": "array",
+          "description": "List of generator-evaluator pairs. Each pair defines which agents participate and under what conditions.",
+          "items": {
+            "type": "object",
+            "required": ["generator", "evaluator"],
+            "properties": {
+              "generator": {
+                "type": "string",
+                "description": "Agent role that produces output (e.g. 'developer', 'documenter', 'requirements')."
+              },
+              "evaluator": {
+                "type": "string",
+                "description": "Agent role that evaluates output (e.g. 'reviewer', 'validator', 'security-auditor')."
+              },
+              "max_iterations": {
+                "type": "integer",
+                "description": "Maximum number of iteration rounds before fallback.",
+                "minimum": 1,
+                "maximum": 5,
+                "default": 3
+              },
+              "modes": {
+                "type": "array",
+                "description": "Workflow modes that trigger this pair. Only active when current workflow matches.",
+                "items": {
+                  "type": "string",
+                  "enum": ["feature", "bugfix", "refactor"]
+                }
+              },
+              "criteria": {
+                "type": "array",
+                "description": "Evaluation criteria keys used in the structured critique JSON.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

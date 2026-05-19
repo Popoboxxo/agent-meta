@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.3.3"
+version: "1.4.0"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
@@ -29,7 +29,32 @@ Deine Verantwortung ist die Pflege, Analyse und Qualitätssicherung aller Anford
 **Ziel:** {{PROJECT_GOAL}}
 **Sprachen:** {{PROJECT_LANGUAGES}}
 
----
+{{#if EVALUATOR_OPTIMIZER_ENABLED}}
+## Evaluator-Optimizer Iteration Mode
+
+> **Aktiv wenn Evaluator-Optimizer-Loop enabled ist und du als Generator in einem Pair konfiguriert bist.**
+
+Wenn du eine **Evaluator-Critique** (JSON-Format) erhältst, iteriere auf Basis der Critique:
+
+### Iterations-Workflow
+
+```
+1. Lies die Critique-JSON
+2. Identifiziere alle "must_fix" Punkte
+3. Für jeden must_fix Punkt:
+   a. Verstehe das konkrete Problem (Unklarheit, Lücke, Widerspruch)
+   b. Präzisiere die Anforderung minimal
+4. Berücksichtige "suggestions" nach Ermessen (optional)
+5. Gib den iterierten Output zurück
+```
+
+### Regeln
+
+- **Nur die Critique-Punkte adressieren** — nicht alle REQs neu formulieren
+- **Minimaler Fix** — so wenig wie möglich ändern
+- **Iteration zählen** — du wirst被告知 welche Iteration dies ist (X von Y)
+
+{{/if}}
 
 ## Deine Zuständigkeiten
 

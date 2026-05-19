@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.0.0"
+version: "3.1.0"
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
@@ -190,6 +190,77 @@ P  Projekt-Issue:   feedback → Issue aufbereiten + gh issue create (nie direkt
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).
+
+---
+
+{{#if EVALUATOR_OPTIMIZER_ENABLED}}
+## Evaluator-Optimizer-Loop (Iterative Quality)
+
+> **Aktiv wenn `evaluator-optimizer.enabled: true` in `.meta-config/project.yaml`.**
+> Führt nach der Implementierung (Schritt 3.dev) einen iterativen Qualitäts-Loop durch.
+
+### Workflow-Fork
+
+Nach dem Generator-Schritt (dev/req/doc/test/release) prüfe:
+
+```
+  Für jedes konfigurierte Pair dessen modes den aktuellen Workflow匹配:
+    1. Delegiere an <evaluator> mit: Output des Generators + Kriterien-Liste
+    2. Evaluator bewertet → Critique-JSON zurück
+    3. Wenn status == "approved" → nächstes Pair
+    4. Wenn status == "revise" und iteration < max_iterations:
+       → Delegiere Critique an <generator> zur Iteration
+       → Zurück zu Schritt 1
+    5. Wenn status == "revise" und iteration == max_iterations:
+       → Wenn auto_approve: akzeptieren
+       → Sonst: User fragen ob akzeptiert oder abgebrochen
+```
+
+### Pair-Filterung nach Modes
+
+| Aktueller Workflow | Aktive Pairs (Beispiel) |
+|-------------------|------------------------|
+| Feature | developer→reviewer, requirements→reviewer, documenter→reviewer, tester→validator, developer→security-auditor, release→validator |
+| Bugfix | developer→reviewer, tester→validator, developer→security-auditor |
+| Refactor | developer→reviewer, documenter→reviewer |
+
+### Pair-Konfiguration (verfügbar via Variablen)
+
+- `EVALUATOR_OPTIMIZER_PAIR_COUNT` = {{EVALUATOR_OPTIMIZER_PAIR_COUNT}}
+- Pro Pair: `EVALUATOR_OPTIMIZER_PAIR_0_GENERATOR`, `EVALUATOR_OPTIMIZER_PAIR_0_EVALUATOR`, `EVALUATOR_OPTIMIZER_PAIR_0_MAX_ITERATIONS`, `EVALUATOR_OPTIMIZER_PAIR_0_MODES`, `EVALUATOR_OPTIMIZER_PAIR_0_CRITERIA`
+
+### Token-Kosten-Kontrolle
+
+- **Max. 3 Pairs pro Workflow** — nicht alle Pairs triggern bei jedem Task
+- **Modes-Whitelist** — nur Pairs deren `modes` den aktuellen Workflow enthalten
+- **max_iterations** — pro Pair begrenzt (default 2–3)
+- **auto_approve** — globaler Fallback nach max_iterations
+
+### Critique-JSON vom Evaluator empfangen
+
+Der Evaluator liefert ein JSON mit:
+```json
+{
+  "pair": "<generator>→<evaluator>",
+  "status": "approved" | "revise",
+  "iteration": 1,
+  "max_iterations": 3,
+  "criteria_evaluated": [...],
+  "critique": { "<criterion>": { "status": "ok|issues", "details": "..." } },
+  "must_fix": ["..."],
+  "suggestions": ["..."]
+}
+```
+
+Bei `status: "revise"` → Critique an Generator delegieren mit Anweisung:
+```
+Delegiere an: <generator>
+Aufgabe: Iteriere auf Basis der Evaluator-Critique (Iteration X von Y).
+         Fixe alle must_fix-Punkte. Berücksichtige suggestions nach Ermessen.
+         Critique: <JSON hier einfügen>
+```
+
+{{/if}}
 
 ---
 

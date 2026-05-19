@@ -1,9 +1,9 @@
 ---
 name: documenter
 model: gemini-2.5-pro
-version: "1.3.3"
+version: "1.4.0"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
-generated-from: "1-generic/documenter.md@1.3.3"
+generated-from: "1-generic/documenter.md@1.4.0"
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
   - Read
@@ -30,7 +30,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 **Sprachen:** Python, Markdown, YAML
 
----
 
 ## Deine Zuständigkeiten
 

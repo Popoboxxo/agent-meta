@@ -266,6 +266,18 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["CI_POLL_ENABLED"]    = user_vars.get("CI_POLL_ENABLED", "false")
     variables["CI_POLL_INTERVAL"]   = user_vars.get("CI_POLL_INTERVAL", "30")
     variables["CI_POLL_MAX_RETRIES"] = user_vars.get("CI_POLL_MAX_RETRIES", "10")
+    # EVALUATOR_OPTIMIZER_*: Generator-Evaluator quality loops
+    eo_config = config.get("evaluator-optimizer", {})
+    variables["EVALUATOR_OPTIMIZER_ENABLED"] = "true" if eo_config.get("enabled", False) else "false"
+    variables["EVALUATOR_OPTIMIZER_AUTO_APPROVE"] = "true" if eo_config.get("auto_approve", False) else "false"
+    pairs = eo_config.get("pairs", [])
+    variables["EVALUATOR_OPTIMIZER_PAIR_COUNT"] = str(len(pairs))
+    for i, pair in enumerate(pairs):
+        for key in ["generator", "evaluator", "max_iterations", "modes", "criteria"]:
+            val = pair.get(key, "")
+            if isinstance(val, list):
+                val = ",".join(str(v) for v in val)
+            variables[f"EVALUATOR_OPTIMIZER_PAIR_{i}_{key.upper()}"] = str(val)
     return variables, unmapped
 
 

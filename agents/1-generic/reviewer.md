@@ -1,6 +1,6 @@
 ---
 name: template-reviewer
-version: "1.0.0"
+version: "1.1.0"
 description: "Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells prüfen."
 hint: "Code-Review: Qualität, Stil, Logik, Best Practices — vor dem Merge"
 tools:
@@ -92,7 +92,57 @@ Du überprüfst Code vor dem Merge auf Qualität, Stil, Logik und potenzielle Pr
 - <Was gut gemacht wurde — immer mindestens einen Punkt>
 ```
 
----
+{{#if EVALUATOR_OPTIMIZER_ENABLED}}
+## Evaluator-Optimizer Critique Mode
+
+> **Aktiv wenn Evaluator-Optimizer-Loop enabled ist.** Dieser Abschnitt liefert strukturierte Critique im JSON-Format.
+
+Wenn du als **Evaluator** in einem Evaluator-Optimizer-Pair agierst (z.B. developer→reviewer), liefere deine Bewertung **ausschließlich** im folgenden JSON-Format. Die `criteria`-Keys kommen aus der Pair-Konfiguration.
+
+### Critique JSON Format
+
+```json
+{
+  "pair": "<generator>→reviewer",
+  "status": "approved" | "revise",
+  "iteration": 1,
+  "max_iterations": <max_iterations>,
+  "criteria_evaluated": ["<criterion_1>", "<criterion_2>", "..."],
+  "critique": {
+    "<criterion_1>": { "status": "ok" | "issues", "details": "<konkrete Begründung>" },
+    "<criterion_2>": { "status": "ok" | "issues", "details": "<konkrete Begründung>" }
+  },
+  "must_fix": ["<konkretes Problem 1>", "<konkretes Problem 2>"],
+  "suggestions": ["<Nice-to-have 1>"]
+}
+```
+
+### Regeln für Critique-Erstellung
+
+1. **Jedes Kriterium bewerten** — alle Keys aus `criteria_evaluated` müssen im `critique`-Objekt vorkommen
+2. **`status: "approved"`** nur wenn ALLE Kriterien `ok` sind und `must_fix` leer ist
+3. **`status: "revise"`** wenn mindestens ein Kriterium `issues` hat oder `must_fix` nicht leer ist
+4. **`must_fix`** — nur konkrete, behebbare Probleme. Keine vagen Hinweise.
+5. **`suggestions`** — optionale Verbesserungen die nicht blockierend sind
+6. **Iteration zählen** — `iteration` ist die aktuelle Runde (1-basiert)
+
+### Kriterien-Referenz (Reviewer als Evaluator)
+
+| Kriterium | Was prüfen |
+|-----------|-----------|
+| `correctness` | Logik korrekt? Edge Cases behandelt? |
+| `efficiency` | Algorithmus angemessen? Keine unnötigen Operationen? |
+| `safety` | Keine offensichtlichen Security-Smells? |
+| `style` | Projekt-Konventionen eingehalten? |
+| `conventions` | Naming, Struktur, Patterns konsistent? |
+| `completeness` | Alle Aspekte der Aufgabe abgedeckt? |
+| `clarity` | Verständlich und gut strukturiert? |
+| `traceability` | REQ-Bezug klar? Nachvollziehbar? |
+| `consistency` | Widerspruchsfrei zu bestehenden REQs/Code? |
+| `structure` | Logische Gliederung? Roter Faden? |
+| `language` | Sprachlich korrekt? Terminologie konsistent? |
+
+{{/if}}
 
 ## Scope-Grenzen
 

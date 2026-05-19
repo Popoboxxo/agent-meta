@@ -89,3 +89,33 @@ Use `.agent-meta/templates/learning-capture.md` for new entries.
 
 **Applies to:** Alle Projekte die agent-meta Orchestrator nutzen  
 **Architecture-Decision:** Keine strukturellen Änderungen an sync.py nötig — alle Optimierungen sind Template-Text. input/output-Felder sind rein dokumentarisch (keine automatisierte Validierung).
+
+---
+
+## DISCOVERY-004: Generischer Evaluator-Optimizer-Loop
+
+**Context:** agent-meta v0.42.0 — Evaluator-Optimizer-Loop Feature  
+**Source:** Issue #163 — Konzept für generische Generator-Evaluator-Pairs  
+**Date:** 2026-05-19
+
+**Problem:** Bisher war Quality-Loop nur als starres Developer↔Reviewer-Pattern denkbar. Nicht erweiterbar, keine konfigurierbaren Kriterien, kein generischer Ansatz.
+
+**Lösung:** Generisches Evaluator-Optimizer-Loop-System implementiert:
+- **Config-basiert:** `evaluator-optimizer:` Sektion in `.meta-config/project.yaml` mit `enabled`, `auto_approve`, und `pairs`-Array
+- **6 vorkonfigurierte Pairs** (alle default `enabled: false`): developer→reviewer, requirements→reviewer, documenter→reviewer, tester→validator, developer→security-auditor, release→validator
+- **Schema-Validierung:** `project-config.schema.json` erweitert um `evaluator-optimizer`-Objekt
+- **Variablen-Injektion:** `build_variables()` generiert `EVALUATOR_OPTIMIZER_ENABLED`, `EVALUATOR_OPTIMIZER_AUTO_APPROVE`, `EVALUATOR_OPTIMIZER_PAIR_COUNT`, und pro Pair `EVALUATOR_OPTIMIZER_PAIR_N_GENERATOR` etc.
+- **Bedingte Template-Sektionen:** `{{#if EVALUATOR_OPTIMIZER_ENABLED}}` — bei `enabled: false` KEIN Verhalten geändert
+- **Evaluator-Critique-JSON:** Strukturiertes Format mit `criteria_evaluated`, `critique`-Objekt, `must_fix`, `suggestions`
+- **Generator-Iteration-Mode:** Jeder Generator-Agent kann Critique-JSON verarbeiten und iterieren
+- **Orchestrator-Workflow-Fork:** Iteriert über Pairs, filtert nach `modes`, führt Loop durch
+
+**Architektur-Entscheidungen:**
+1. **Bedingte Sektionen via `{{#if}}`** — Zero-Impact wenn deaktiviert
+2. **JSON-basierte Critique** — maschinenlesbar, konsistent zwischen allen Evaluator-Agenten
+3. **Modes-Filterung** — nicht alle Pairs triggern bei jedem Workflow-Typ
+4. **max_iterations pro Pair** — Token-Kosten kontrollierbar
+5. **auto_approve als globaler Fallback** — User hat letzte Entscheidung
+
+**Applies to:** Alle Projekte die agent-meta nutzen  
+**Architecture-Decision:** Keine Breaking Changes — alle neuen Sektionen sind conditional. sync.py benötigt keine strukturellen Änderungen außer `build_variables()`-Erweiterung.

@@ -1,9 +1,9 @@
 ---
 name: release
 model: gemini-2.5-pro
-version: "1.3.3"
+version: "1.4.0"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
-generated-from: "1-generic/release.md@1.3.3"
+generated-from: "1-generic/release.md@1.4.0"
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
   - Bash
@@ -31,7 +31,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 **Sprachen:** Python, Markdown, YAML
 
----
 
 ## Deine Zuständigkeiten
 

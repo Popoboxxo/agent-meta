@@ -188,3 +188,47 @@ variables:
   GH_ASSETS: ""
   BUILD_SYSTEM_NOTES: ""
   VERSION_DIST_BEHAVIOUR: ""
+
+# ---------------------------------------------------------------------------
+# Evaluator-Optimizer-Loop — Iterative Quality zwischen Agenten-Paaren
+# ---------------------------------------------------------------------------
+# Ein Generator-Agent erzeugt Output, ein Evaluator bewertet ihn gegen
+# konfigurierbare Kriterien, der Generator iteriert — bis "approved"
+# oder max_iterations erreicht.
+#
+# Alle Pairs sind per default deaktiviert. Einzeln aktivieren nach Bedarf.
+#
+# evaluator-optimizer:
+#   enabled: false              # Master-Schalter
+#   auto_approve: false         # Nach max_iterations automatisch akzeptieren?
+#   pairs:
+#     - generator: developer    # Pair 0: Code-Qualität
+#       evaluator: reviewer
+#       max_iterations: 3
+#       modes: [feature, bugfix, refactor]
+#       criteria: [correctness, efficiency, safety, style, conventions]
+#     - generator: requirements # Pair 1: Anforderungs-Qualität
+#       evaluator: reviewer
+#       max_iterations: 2
+#       modes: [feature]
+#       criteria: [completeness, clarity, traceability, consistency]
+#     - generator: documenter   # Pair 2: Dokumentations-Qualität
+#       evaluator: reviewer
+#       max_iterations: 2
+#       modes: [feature, refactor]
+#       criteria: [completeness, clarity, structure, language]
+#     - generator: tester       # Pair 3: Test-Qualität
+#       evaluator: validator
+#       max_iterations: 2
+#       modes: [feature, bugfix]
+#       criteria: [coverage, correctness, edge_cases]
+#     - generator: developer    # Pair 4: Security im Code
+#       evaluator: security-auditor
+#       max_iterations: 2
+#       modes: [feature, bugfix]
+#       criteria: [owasp_top10, secret_leaks, dependency_vulns]
+#     - generator: release      # Pair 5: Release-Qualität
+#       evaluator: validator
+#       max_iterations: 2
+#       modes: [feature]
+#       criteria: [changelog_complete, version_consistent, artifacts_valid]

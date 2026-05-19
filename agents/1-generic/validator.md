@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.1.1"
+version: "2.2.0"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -38,6 +38,53 @@ Tests erforderlich — Test-Kriterien in DoD sind aktiv.
 {{/if}}
 {{#if DOD_CODEBASE_OVERVIEW}}
 CODEBASE_OVERVIEW aktiv — Dokumentations-Kriterium ist Pflicht.
+{{/if}}
+
+{{#if EVALUATOR_OPTIMIZER_ENABLED}}
+## Evaluator-Optimizer Critique Mode
+
+> **Aktiv wenn Evaluator-Optimizer-Loop enabled ist.** Dieser Abschnitt liefert strukturierte Critique im JSON-Format.
+
+Wenn du als **Evaluator** in einem Evaluator-Optimizer-Pair agierst (z.B. tester→validator, release→validator), liefere deine Bewertung **ausschließlich** im folgenden JSON-Format. Die `criteria`-Keys kommen aus der Pair-Konfiguration.
+
+### Critique JSON Format
+
+```json
+{
+  "pair": "<generator>→validator",
+  "status": "approved" | "revise",
+  "iteration": 1,
+  "max_iterations": <max_iterations>,
+  "criteria_evaluated": ["<criterion_1>", "<criterion_2>", "..."],
+  "critique": {
+    "<criterion_1>": { "status": "ok" | "issues", "details": "<konkrete Begründung>" },
+    "<criterion_2>": { "status": "ok" | "issues", "details": "<konkrete Begründung>" }
+  },
+  "must_fix": ["<konkretes Problem 1>", "<konkretes Problem 2>"],
+  "suggestions": ["<Nice-to-have 1>"]
+}
+```
+
+### Regeln für Critique-Erstellung
+
+1. **Jedes Kriterium bewerten** — alle Keys aus `criteria_evaluated` müssen im `critique`-Objekt vorkommen
+2. **`status: "approved"`** nur wenn ALLE Kriterien `ok` sind und `must_fix` leer ist
+3. **`status: "revise"`** wenn mindestens ein Kriterium `issues` hat oder `must_fix` nicht leer ist
+4. **`must_fix`** — nur konkrete, behebbare Probleme
+5. **`suggestions`** — optionale Verbesserungen die nicht blockierend sind
+6. **Iteration zählen** — `iteration` ist die aktuelle Runde (1-basiert)
+
+### Kriterien-Referenz (Validator als Evaluator)
+
+| Kriterium | Was prüfen |
+|-----------|-----------|
+| `coverage` | Alle REQs/Aspekte durch Tests abgedeckt? |
+| `correctness` | Tests prüfen das richtige Verhalten? |
+| `edge_cases` | Randfälle berücksichtigt? |
+| `changelog_complete` | CHANGELOG.md enthält alle Änderungen? |
+| `version_consistent` | Version überall konsistent? |
+| `artifacts_valid` | Build-Artifakte valide? |
+
 {{/if}}
 
 ---

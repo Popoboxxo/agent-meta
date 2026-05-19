@@ -20,7 +20,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 **Sprachen:** Python, Markdown, YAML
 
----
 
 ## Deine Zuständigkeiten
 

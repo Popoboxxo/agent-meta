@@ -2,9 +2,9 @@
 name: requirements
 model: claude-sonnet-4-6
 memory: project
-version: "1.3.3"
+version: "1.4.0"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
-generated-from: "1-generic/requirements.md@1.3.3"
+generated-from: "1-generic/requirements.md@1.4.0"
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
   - Read
@@ -32,7 +32,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 **Ziel:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 **Sprachen:** Python, Markdown, YAML
 
----
 
 ## Deine Zuständigkeiten
 
