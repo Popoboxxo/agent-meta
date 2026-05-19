@@ -1,18 +1,57 @@
 """Agent file generation: frontmatter, composition, sync logic."""
 
-import re
 from pathlib import Path
 
 from .log import SyncLog
-from .io import safe_path, write_checked, _yaml, _YAML_AVAILABLE
+from .io import safe_path, write_checked
+from .agents_frontmatter import (
+    extract_frontmatter_field,
+    build_frontmatter,
+    inject_model_field,
+    inject_memory_field,
+    inject_permission_mode_field,
+    inject_temperature_field,
+    inject_max_tokens_field,
+    inject_agent_fields,
+    _strip_frontmatter,
+    _remove_frontmatter_fields,
+    _transform_frontmatter_for_opencode,
+    _strip_claude_specific_lines,
+)
+from .agents_template import (
+    target_filename,
+    ext_target_filename,
+    role_from_platform_file,
+    apply_patch,
+    compose_agent,
+    collect_sources,
+    AGENTS_DIR,
+    EXTERNAL_DIR,
+    SKILL_WRAPPER,
+)
 
-AGENTS_DIR = "agents"
-GENERIC_DIR = "1-generic"
-PLATFORM_DIR = "2-platform"
-PROJECT_DIR = "3-project"
-EXTERNAL_DIR = "0-external"
-SKILL_WRAPPER = "_skill-wrapper.md"
-EXT_SUFFIX = "-ext"
+# Re-export public API so external callers (tests, sync.py) don't break
+__all__ = [
+    "extract_frontmatter_field",
+    "build_frontmatter",
+    "inject_model_field",
+    "inject_memory_field",
+    "inject_permission_mode_field",
+    "inject_temperature_field",
+    "inject_max_tokens_field",
+    "inject_agent_fields",
+    "target_filename",
+    "ext_target_filename",
+    "role_from_platform_file",
+    "apply_patch",
+    "compose_agent",
+    "collect_sources",
+    "sync_agents",
+    "sync_agents_for_provider",
+    "build_agent_hints",
+    "build_agent_table",
+    "inject_debug_block",
+]
 
 # Provider-specific parallel execution patterns (injected as {{PARALLEL_PATTERN}})
 _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
@@ -43,505 +82,6 @@ _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
         "Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
     ),
 }
-
-
-def extract_frontmatter_field(content: str, field: str) -> str | None:
-    """Extract a YAML frontmatter field value.
-
-    Handles three forms:
-      field: single line value
-      field: "quoted value that may wrap\n  across lines"
-      field: 'single-quoted value'
-    """
-    # First try: quoted value that may span multiple lines (YAML block scalar after yaml.dump)
-    # Matches: field: "...\n  ..." collecting continuation lines indented with 2+ spaces
-    multi = re.search(
-        rf'^{re.escape(field)}:\s+"((?:[^"\\]|\\.|\n  )*)"',
-        content, flags=re.MULTILINE,
-    )
-    if multi:
-        val = multi.group(1).replace('\n  ', ' ').strip()
-        return val if val else None
-
-    # Second try: single-line (quoted or unquoted)
-    single = re.search(
-        rf"^{re.escape(field)}:\s*['\"]?([^'\"\n]+)['\"]?\s*$",
-        content, flags=re.MULTILINE,
-    )
-    return single.group(1).strip() if single else None
-
-
-def build_frontmatter(content: str, name: str, description: str,
-                      generated_from: str | None = None) -> str:
-    """Replace name and description in YAML frontmatter.
-
-    Preserves existing version/based-on fields.
-    Inserts/updates generated-from when generated_from is provided.
-    """
-    content = re.sub(
-        r"(^---\n.*?^name:\s*)(.+?)(\n)",
-        lambda m: f"{m.group(1)}{name}{m.group(3)}",
-        content, count=1, flags=re.MULTILINE | re.DOTALL,
-    )
-    content = re.sub(
-        r"(^description:\s*\")(.+?)(\"\n)",
-        lambda m: f'{m.group(1)}{description}{m.group(3)}',
-        content, count=1, flags=re.MULTILINE,
-    )
-    if generated_from is not None:
-        # Update existing generated-from field, or insert after description line
-        if re.search(r"^generated-from:", content, flags=re.MULTILINE):
-            content = re.sub(
-                r'^generated-from:.*$',
-                f'generated-from: "{generated_from}"',
-                content, count=1, flags=re.MULTILINE,
-            )
-        else:
-            # Match the full description field including multiline YAML continuations
-            # (continuation lines start with whitespace in YAML)
-            content = re.sub(
-                r'(^description:(?:.*\n)(?:[ \t]+.*\n)*)',
-                rf'\1generated-from: "{generated_from}"\n',
-                content, count=1, flags=re.MULTILINE,
-            )
-    return content
-
-
-def inject_permission_mode_field(content: str, permission_mode: str) -> str:
-    """Insert or update the permissionMode: field in YAML frontmatter.
-
-    If permission_mode is empty, removes any existing permissionMode: field.
-    If set, inserts/updates after the memory: line (or model: or name: as fallback).
-    """
-    if not permission_mode:
-        content = re.sub(r"^permissionMode:.*\n", "", content, count=1, flags=re.MULTILINE)
-        return content
-
-    if re.search(r"^permissionMode:", content, flags=re.MULTILINE):
-        return re.sub(
-            r"^permissionMode:.*$",
-            f"permissionMode: {permission_mode}",
-            content, count=1, flags=re.MULTILINE,
-        )
-
-    # Insert after memory: if present, else after model:, else after name:
-    if re.search(r"^memory:", content, flags=re.MULTILINE):
-        anchor = r"^memory:.*$"
-    elif re.search(r"^model:", content, flags=re.MULTILINE):
-        anchor = r"^model:.*$"
-    else:
-        anchor = r"^name:.*$"
-
-    return re.sub(
-        rf"({anchor}\n)",
-        rf"\1permissionMode: {permission_mode}\n",
-        content, count=1, flags=re.MULTILINE,
-    )
-
-
-def inject_memory_field(content: str, memory: str) -> str:
-    """Insert or update the memory: field in YAML frontmatter.
-
-    If memory is empty, removes any existing memory: field.
-    If memory is set, inserts/updates after the model: line (or name: if no model:).
-    """
-    if not memory:
-        content = re.sub(r"^memory:.*\n", "", content, count=1, flags=re.MULTILINE)
-        return content
-
-    # Update existing memory: field
-    if re.search(r"^memory:", content, flags=re.MULTILINE):
-        return re.sub(
-            r"^memory:.*$",
-            f"memory: {memory}",
-            content, count=1, flags=re.MULTILINE,
-        )
-
-    # Insert after model: if present, else after name:
-    anchor = r"^model:.*$" if re.search(r"^model:", content, flags=re.MULTILINE) else r"^name:.*$"
-    return re.sub(
-        rf"({anchor}\n)",
-        rf"\1memory: {memory}\n",
-        content, count=1, flags=re.MULTILINE,
-    )
-
-
-def inject_model_field(content: str, model: str) -> str:
-    """Insert or update the model: field in YAML frontmatter.
-
-    If model is empty, removes any existing model: field (clean slate).
-    If model is set, inserts/updates after the name: line.
-    """
-    if not model:
-        # Remove existing model: field if present
-        content = re.sub(r"^model:.*\n", "", content, count=1, flags=re.MULTILINE)
-        return content
-
-    # Update existing model: field
-    if re.search(r"^model:", content, flags=re.MULTILINE):
-        return re.sub(
-            r"^model:.*$",
-            f"model: {model}",
-            content, count=1, flags=re.MULTILINE,
-        )
-
-    # Insert after name: line
-    return re.sub(
-        r"(^name:.*\n)",
-        rf"\1model: {model}\n",
-        content, count=1, flags=re.MULTILINE,
-    )
-
-
-def inject_temperature_field(content: str, temperature: str) -> str:
-    """Insert or update the temperature: field in YAML frontmatter.
-
-    If temperature is empty, removes any existing temperature: field.
-    Inserted after permissionMode: (or memory:, model:, name: as fallback).
-    """
-    if not temperature:
-        content = re.sub(r"^temperature:.*\n", "", content, count=1, flags=re.MULTILINE)
-        return content
-    if re.search(r"^temperature:", content, flags=re.MULTILINE):
-        return re.sub(r"^temperature:.*$", f"temperature: {temperature}",
-                      content, count=1, flags=re.MULTILINE)
-    for anchor in (r"^permissionMode:.*$", r"^memory:.*$", r"^model:.*$", r"^name:.*$"):
-        if re.search(anchor, content, flags=re.MULTILINE):
-            return re.sub(anchor, rf"\g<0>\ntemperature: {temperature}",
-                          content, count=1, flags=re.MULTILINE)
-    return content
-
-
-def inject_max_tokens_field(content: str, max_tokens: str) -> str:
-    """Insert or update the maxTokens: field in YAML frontmatter.
-
-    If max_tokens is empty, removes any existing maxTokens: field.
-    Inserted after temperature: (or permissionMode:, memory:, model:, name:).
-    """
-    if not max_tokens:
-        content = re.sub(r"^maxTokens:.*\n", "", content, count=1, flags=re.MULTILINE)
-        return content
-    if re.search(r"^maxTokens:", content, flags=re.MULTILINE):
-        return re.sub(r"^maxTokens:.*$", f"maxTokens: {max_tokens}",
-                      content, count=1, flags=re.MULTILINE)
-    for anchor in (r"^temperature:.*$", r"^permissionMode:.*$", r"^memory:.*$",
-                   r"^model:.*$", r"^name:.*$"):
-        if re.search(anchor, content, flags=re.MULTILINE):
-            return re.sub(anchor, rf"\g<0>\nmaxTokens: {max_tokens}",
-                          content, count=1, flags=re.MULTILINE)
-    return content
-
-
-def inject_agent_fields(
-    content: str,
-    role: str,
-    config: dict,
-    agent_meta_root: "Path",
-    provider: str = "Claude",
-    provider_config: dict | None = None,
-    log: "SyncLog | None" = None,
-    project_root: "Path | None" = None,
-) -> str:
-    """Inject all resolved frontmatter fields (model, memory, permissionMode, temperature, maxTokens).
-
-    Consolidates the five inject_*_field() + resolve_*() call pairs that appear
-    identically in sync_agents_for_claude() and sync_agents_for_provider().
-    Only memory and permissionMode are injected for non-Claude providers.
-    """
-    from .roles import resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
-
-    model = resolve_model(role, config, agent_meta_root, provider=provider,
-                          provider_config=provider_config or {})
-    content = inject_model_field(content, model)
-    if model and log and project_root:
-        src = "project override" if role in config.get("model-overrides", {}) else "meta default"
-        log.info(str(project_root), f"model: {model} (from {src})")
-
-    memory = resolve_memory(role, config, agent_meta_root)
-    content = inject_memory_field(content, memory)
-    if memory and log and project_root:
-        src = "project override" if role in config.get("memory-overrides", {}) else "meta default"
-        log.info(str(project_root), f"memory: {memory} (from {src})")
-
-    permission_mode = resolve_permission_mode(role, config, agent_meta_root)
-    content = inject_permission_mode_field(content, permission_mode)
-    if permission_mode and log and project_root:
-        src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
-        log.info(str(project_root), f"permissionMode: {permission_mode} (from {src})")
-
-    temperature = resolve_temperature(role, config, agent_meta_root)
-    content = inject_temperature_field(content, temperature)
-    if temperature and log and project_root:
-        src = "project override" if role in config.get("temperature-overrides", {}) else "meta default"
-        log.info(str(project_root), f"temperature: {temperature} (from {src})")
-
-    max_tokens = resolve_max_tokens(role, config, agent_meta_root)
-    content = inject_max_tokens_field(content, max_tokens)
-    if max_tokens and log and project_root:
-        src = "project override" if role in config.get("max-tokens-overrides", {}) else "meta default"
-        log.info(str(project_root), f"maxTokens: {max_tokens} (from {src})")
-
-    return content
-
-
-def target_filename(role: str, role_map: dict) -> str | None:
-    """Return the output filename for a role, or None if not in role_map."""
-    name = role_map.get(role)
-    return (name + ".md") if name else None
-
-
-def ext_target_filename(role: str, prefix: str) -> str:
-    """Extension file name: <prefix>-<role>-ext.md (or <role>-ext.md if no prefix)."""
-    if prefix:
-        return f"{prefix}-{role}{EXT_SUFFIX}.md"
-    return f"{role}{EXT_SUFFIX}.md"
-
-
-def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
-    stem = Path(filename).stem
-    for platform in platforms:
-        if stem.startswith(f"{platform}-"):
-            return stem[len(platform) + 1:]
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Composition engine (extends: / patches: system)
-# ---------------------------------------------------------------------------
-
-def _split_frontmatter(content: str) -> tuple[str, str]:
-    """Split content into (frontmatter_block, body).
-
-    Returns ('', content) if no frontmatter found.
-    frontmatter_block includes the surrounding '---' delimiters.
-    """
-    if not content.startswith("---"):
-        return "", content
-    end = content.find("\n---", 3)
-    if end == -1:
-        return "", content
-    fm_block = content[: end + 4]   # includes closing ---
-    body = content[end + 4:]        # everything after closing ---
-    return fm_block, body
-
-
-def _parse_frontmatter_yaml(content: str) -> dict:
-    """Parse YAML frontmatter into a dict. Returns {} on failure or missing yaml."""
-    if not _YAML_AVAILABLE:
-        return {}
-    fm_block, _ = _split_frontmatter(content)
-    if not fm_block:
-        return {}
-    # Strip the --- delimiters for yaml.safe_load
-    inner = re.sub(r"^---\n?", "", fm_block)
-    inner = re.sub(r"\n?---\s*$", "", inner)
-    try:
-        result = _yaml.safe_load(inner)
-        return result if isinstance(result, dict) else {}
-    except _yaml.YAMLError:
-        return {}
-
-
-def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | None:
-    """Find (start, end) line indices for a Markdown section.
-
-    anchor must match the heading line exactly (e.g. '## Don\\'ts').
-    start is inclusive (the heading line).
-    end is exclusive (first line of next section at same or higher level, or len(lines)).
-    """
-    anchor_stripped = anchor.strip()
-    anchor_level = len(anchor_stripped) - len(anchor_stripped.lstrip("#"))
-
-    start_idx = None
-    for i, line in enumerate(lines):
-        if line.rstrip() == anchor_stripped:
-            start_idx = i
-            break
-
-    if start_idx is None:
-        return None
-
-    for i in range(start_idx + 1, len(lines)):
-        line = lines[i]
-        if line.startswith("#"):
-            level = len(line) - len(line.lstrip("#"))
-            if level <= anchor_level:
-                return (start_idx, i)
-
-    return (start_idx, len(lines))
-
-
-def _patch_append_after(content: str, anchor: str, patch_content: str,
-                        log: SyncLog, source_label: str) -> str:
-    """Insert patch_content after the section identified by anchor."""
-    lines = content.splitlines(keepends=True)
-    bounds = _find_section_bounds(lines, anchor)
-    if bounds is None:
-        log.warn(f"Composition patch 'append-after': anchor '{anchor}' not found in {source_label}")
-        return content
-    _, end_idx = bounds
-    patch_lines = ("\n\n" + patch_content.rstrip("\n") + "\n\n").splitlines(keepends=True)
-    result_lines = lines[:end_idx] + patch_lines + lines[end_idx:]
-    return "".join(result_lines)
-
-
-def _patch_replace(content: str, anchor: str, patch_content: str,
-                   log: SyncLog, source_label: str) -> str:
-    """Replace the entire section identified by anchor with patch_content."""
-    lines = content.splitlines(keepends=True)
-    bounds = _find_section_bounds(lines, anchor)
-    if bounds is None:
-        log.warn(f"Composition patch 'replace': anchor '{anchor}' not found in {source_label}")
-        return content
-    start_idx, end_idx = bounds
-    patch_lines = (patch_content.rstrip("\n") + "\n").splitlines(keepends=True)
-    result_lines = lines[:start_idx] + patch_lines + lines[end_idx:]
-    return "".join(result_lines)
-
-
-def _patch_delete(content: str, anchor: str, log: SyncLog, source_label: str) -> str:
-    """Delete the entire section identified by anchor."""
-    lines = content.splitlines(keepends=True)
-    bounds = _find_section_bounds(lines, anchor)
-    if bounds is None:
-        log.warn(f"Composition patch 'delete': anchor '{anchor}' not found in {source_label}")
-        return content
-    start_idx, end_idx = bounds
-    # Also remove leading blank line before section if present
-    trim_start = start_idx
-    if trim_start > 0 and lines[trim_start - 1].strip() == "":
-        trim_start -= 1
-    result_lines = lines[:trim_start] + lines[end_idx:]
-    return "".join(result_lines)
-
-
-def apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) -> str:
-    """Apply a single composition patch to content."""
-    op = patch.get("op", "")
-    anchor = patch.get("anchor", "")
-    patch_content = patch.get("content", "")
-
-    if op == "append":
-        return content.rstrip("\n") + "\n\n" + patch_content.rstrip("\n") + "\n"
-    elif op == "append-after":
-        return _patch_append_after(content, anchor, patch_content, log, source_label)
-    elif op == "replace":
-        return _patch_replace(content, anchor, patch_content, log, source_label)
-    elif op == "delete":
-        return _patch_delete(content, anchor, log, source_label)
-    else:
-        log.warn(f"Composition: unknown patch op '{op}' in {source_label}")
-        return content
-
-
-def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
-    """Replace the frontmatter block in base_content with values from override_fm.
-
-    Fields 'extends' and 'patches' are stripped (composition metadata).
-    All other override fields (name, version, description, hint, tools, based-on) win.
-    """
-    fm_block, body = _split_frontmatter(base_content)
-    if not _YAML_AVAILABLE:
-        return base_content  # Cannot merge without yaml — return base unchanged
-
-    # Parse base frontmatter
-    base_fm = _parse_frontmatter_yaml(base_content)
-
-    # Merge: base first, then override wins
-    merged = {**base_fm, **override_fm}
-
-    # Strip composition-only keys from the output frontmatter
-    for key in ("extends", "patches"):
-        merged.pop(key, None)
-
-    # Serialize back to YAML
-    try:
-        new_fm_inner = _yaml.dump(merged, allow_unicode=True, default_flow_style=False,
-                                  sort_keys=False).rstrip("\n")
-    except _yaml.YAMLError:
-        return base_content
-
-    new_fm_block = f"---\n{new_fm_inner}\n---"
-    return new_fm_block + body
-
-
-def compose_agent(
-    base_path: Path,
-    override_content: str,
-    log: SyncLog,
-) -> str:
-    """Load base template, apply patches from override frontmatter, merge frontmatter.
-
-    Returns the composed document ready for variable substitution.
-    """
-    if not _YAML_AVAILABLE:
-        log.warn(
-            "PyYAML not available — composition skipped. "
-            "Install it with: pip install pyyaml"
-        )
-        return override_content
-
-    if not base_path.exists():
-        log.warn(f"Composition: base template not found: {base_path}")
-        return override_content
-
-    base_content = base_path.read_text(encoding="utf-8")
-    override_fm = _parse_frontmatter_yaml(override_content)
-    patches = override_fm.get("patches") or []
-
-    # Start from base, apply each patch
-    result = base_content
-    source_label = base_path.name
-    for patch in patches:
-        result = apply_patch(result, patch, log, source_label)
-
-    # Merge frontmatter: override fields win over base fields
-    result = _merge_frontmatter(result, override_fm)
-
-    return result
-
-
-def collect_sources(
-    agent_meta_root: Path, platforms: list[str]
-) -> tuple[dict[str, Path], set[str]]:
-    """
-    Returns (overrides, known_ext_roles).
-
-    overrides: role → source_path for generated agents (.claude/agents/)
-      Priority: 1-generic < 2-platform < 3-project/<role>.md (full override)
-
-    known_ext_roles: roles that have a 3-project/<role>-ext.md in meta-repo.
-      These are NOT used as templates — just signals that the role supports extensions.
-      (Currently unused since 3-project/ in meta-repo has no templates by design.)
-    """
-    overrides: dict[str, Path] = {}
-    known_ext_roles: set[str] = set()
-
-    # 1. Generic agents (skip files starting with _ — reserved for resources/templates)
-    generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
-    for f in sorted(generic_dir.glob("*.md")):
-        if not f.name.startswith("_"):
-            overrides[f.stem] = f
-
-    # 2. Platform agents
-    platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
-    for platform in platforms:
-        for f in sorted(platform_dir.glob(f"{platform}-*.md")):
-            role = role_from_platform_file(f.name, platforms)
-            if role:
-                overrides[role] = f
-
-    # 3. Project-level agents (in meta-repo 3-project/)
-    project_dir = agent_meta_root / AGENTS_DIR / PROJECT_DIR
-    if project_dir.exists():
-        for f in sorted(project_dir.glob("*.md")):
-            stem = f.stem
-            if stem.endswith(EXT_SUFFIX):
-                known_ext_roles.add(stem[: -len(EXT_SUFFIX)])
-            else:
-                overrides[stem] = f
-
-    return overrides, known_ext_roles
 
 
 def sync_agents(
@@ -651,26 +191,6 @@ def sync_agents(
                            "role removed from config")
                 if not dry_run:
                     existing_file.unlink()
-
-
-def _strip_frontmatter(content: str) -> str:
-    """Remove the YAML frontmatter block from content entirely."""
-    if not content.startswith('---'):
-        return content
-    end = content.find('\n---', 3)
-    if end == -1:
-        return content
-    return content[end + 4:].lstrip('\n')
-
-
-def _remove_frontmatter_fields(content: str, fields: list) -> str:
-    """Remove specific fields from YAML frontmatter."""
-    import re as _re
-    for field in fields:
-        content = _re.sub(
-            rf'^{_re.escape(field)}:.*\n', '', content, count=1, flags=_re.MULTILINE,
-        )
-    return content
 
 
 def sync_agents_for_provider(
@@ -904,51 +424,6 @@ def inject_debug_block(content: str, agent_name: str) -> str:
         marker=_DEBUG_BLOCK_MARKER,
         agent_name=agent_name,
     )
-
-
-def _transform_frontmatter_for_opencode(
-    content: str,
-    name: str,
-    description: str,
-    model: str,
-    generated_from: str,
-) -> str:
-    """Build opencode-native agent frontmatter.
-
-    opencode frontmatter schema (all others stripped):
-      name: <role>             (required — used to invoke the agent)
-      description: "..."       (required)
-      mode: subagent           (all agent-meta agents are subagents)
-      model: provider/model-id (optional — only when tier maps to a model ID)
-      generated-from: "..."    (traceability, kept for diffability)
-    """
-    body = _strip_frontmatter(content)
-    body = _strip_claude_specific_lines(body)
-
-    lines = [f'name: {name}', f'description: "{description}"', 'mode: subagent']
-    if model:
-        lines.append(f'model: {model}')
-    if generated_from:
-        lines.append(f'generated-from: "{generated_from}"')
-
-    return '---\n' + '\n'.join(lines) + '\n---\n' + body
-
-
-def _strip_claude_specific_lines(content: str) -> str:
-    """Remove Claude Code-specific lines that are meaningless in other providers.
-
-    Currently strips:
-    - Extension-Hook lines: > **Extension:** Falls `.claude/3-project/...` existiert → ...
-    - Read-Tool instructions referencing .claude/ paths
-    """
-    lines = content.splitlines(keepends=True)
-    out = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("> **Extension:**") and ".claude/3-project/" in stripped:
-            continue
-        out.append(line)
-    return "".join(out)
 
 
 def _make_slim_body(content: str) -> str:
