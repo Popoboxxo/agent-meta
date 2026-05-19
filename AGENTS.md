@@ -382,7 +382,15 @@ Bei: PR-Review, "schau dir den Code an", "ist das gut implementiert?", vor dem M
 | Git-Commit / Push / Tag / Frage | `git` |
 | Erkenntnisse speichern | `documenter` |
 | agent-meta Upgrade / Sync | `agent-meta-manager` |
-| Feedback einreichen | `meta-feedback` |
+| Projekt-Feedback einreichen (Bugs, Features) | `feedback` |
+| agent-meta-Feedback einreichen | `meta-feedback` |
+| Neues Feature (≥3 Dateien, Lifecycle) | `feature` → delegiert an `developer` |
+
+> **`feature` vs. `developer`:**
+> - `feature` koordiniert den gesamten Lifecycle (Branch, REQ, Dev, Test, PR) — implementiert **nichts** selbst
+> - `developer` implementiert und fixt direkt
+> - Bei parallelen unabhängigen Teilaufgaben: mehrere `developer` via Map-Reduce statt einem `feature`
+> - Faustregel: eine Datei → selbst | 2-3 Dateien → `developer` | Lifecycle nötig → `feature`
 
 ## Hauptchat ohne Orchestrator
 
