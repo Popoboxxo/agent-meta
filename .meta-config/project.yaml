@@ -1,7 +1,7 @@
 # agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.
 # Schema-Validierung: agent-meta.schema.json (JSON Schema bleibt JSON — IDE-Standard)
 
-agent-meta-version: 0.42.0
+agent-meta-version: 0.43.0
 
 # agent-meta manages all provider directories itself (1-generic, 2-platform, etc.)
 # Provider isolation must be disabled here — the meta-repo intentionally
