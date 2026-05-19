@@ -66,3 +66,26 @@ Use `.agent-meta/templates/learning-capture.md` for new entries.
 ---
 
 *Add new learnings via PR against this file. Reference the originating plugin and commit for traceability.*
+
+---
+
+## DISCOVERY-003: Orchestrator-Optimierung nach Agent-Orchestration-Best-Practices
+
+**Context:** agent-meta Orchestrator-Template v2.9.0 → v3.0.0  
+**Source:** Forbes Technology Council — "Agent Orchestration: Best Practices And Pitfalls" + Multi-Agent-Design-Patterns  
+**Date:** 2026-05-19
+
+**Fünf Adaptionen implementiert:**
+
+1. **Map-Reduce-Pattern:** Orchestrator kann jetzt unabhängige Teilaufgaben parallel an Worker delegieren und Ergebnisse aggregieren. Reduziert sequenzielle Latenz bei Splits/Analysen.
+
+2. **Context-Management:** Regel "Übergib Workern nur das Nötigste" explizit dokumentiert. Verhindert Context Bloat — Worker bekommen nur Task + Dateipfade, nie den gesamten Session-Verlauf.
+
+3. **Resilienz & Fehlerbehandlung:** Max. 2 Retries pro Worker, Fallback an User bei wiederholtem Scheitern. Idempotenz-Prüfung vor Retry. Validierung vor Merge/Commit.
+
+4. **Schnell-Routing (Keyword→Agent):** Explizite Keyword-Tabelle für deterministisches Routing. Reduziert LLM-Aufrufe für triviale Routing-Entscheidungen. Confidence < 85% → Rückfrage statt Fehlrouting.
+
+5. **Agenten-Contracts (input/output):** Optionale Felder in `role-defaults.yaml` dokumentieren Ein-/Ausgangsverträge von Agenten. Orchestrator liest diese vor erster Delegation.
+
+**Applies to:** Alle Projekte die agent-meta Orchestrator nutzen  
+**Architecture-Decision:** Keine strukturellen Änderungen an sync.py nötig — alle Optimierungen sind Template-Text. input/output-Felder sind rein dokumentarisch (keine automatisierte Validierung).

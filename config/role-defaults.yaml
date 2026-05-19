@@ -26,6 +26,10 @@
 #
 # workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
 #   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
+#
+# input: (optional) Was erwartet der Agent vom Orchestrator? Kurzbeschreibung des Eingangsvertrags.
+# output: (optional) Was produziert der Agent? Kurzbeschreibung des Ausgangsvertrags.
+#   Felder dienen als Dokumentation — keine automatisierte Validierung.
 
 roles:
 
@@ -33,6 +37,8 @@ roles:
     model: fast         # quick delegation — does not do heavy reasoning itself
     memory: ""
     workflow_tier: required
+    input: "Nutzer-Anfrage oder Task-Beschreibung"
+    output: "Delegierte und abgeschlossene Teilaufgaben, aggregierte Ergebnisse"
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 
   developer:
@@ -41,6 +47,8 @@ roles:
     temperature: 0.2    # deterministic code generation
     max_tokens: 8192
     workflow_tier: required
+    input: "Task-Beschreibung, betroffene Dateipfade, REQ-ID (falls traceability aktiv)"
+    output: "Implementierter Code, ggf. Commit SHA oder Diff"
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
@@ -90,6 +98,8 @@ roles:
     model: balanced
     memory: ""
     workflow_tier: recommended
+    input: "PR-Nummer oder Branch-Name, zu reviewende Dateien"
+    output: "Review-Bericht mit Findings (Bugs, Style, Security), Approval oder Change-Request"
     description: "Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells"
 
   performance:
@@ -129,6 +139,8 @@ roles:
     temperature: 0.1    # deterministic commit messages and git operations
     max_tokens: 2048
     workflow_tier: required
+    input: "Auszuführende Git-Operation (commit/push/merge/tag/pr), Commit-Message, betroffene Dateien"
+    output: "Commit SHA, Branch-Name, PR-URL"
     description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 
   meta-feedback:
