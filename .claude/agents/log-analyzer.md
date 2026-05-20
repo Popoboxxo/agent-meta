@@ -3,7 +3,6 @@ name: log-analyzer
 model: claude-sonnet-4-6
 version: "1.0.0"
 description: "Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing."
-generated-from: "1-generic/log-analyzer.md@1.0.0"
 hint: "Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren"
 tools:
   - Bash

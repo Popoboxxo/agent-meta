@@ -3,7 +3,6 @@ name: agent-meta-scout
 model: gemini-2.5-pro
 version: "1.0.2"
 description: "Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
-generated-from: "1-generic/agent-meta-scout.md@1.0.2"
 hint: "KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken"
 tools:
   - Read

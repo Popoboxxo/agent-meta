@@ -3,7 +3,6 @@ name: meta-feedback
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
-generated-from: "1-generic/meta-feedback.md@2.0.1"
 ---
 # Meta-Feedback — agent-meta
 

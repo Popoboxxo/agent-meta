@@ -3,7 +3,6 @@ name: feedback
 model: gemini-2.5-pro
 version: "1.0.0"
 description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
-generated-from: "1-generic/feedback.md@1.0.0"
 hint: "Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git"
 tools:
   - Bash

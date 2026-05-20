@@ -82,7 +82,8 @@ def build_frontmatter(content: str, name: str, description: str,
     """Replace name and description in YAML frontmatter.
 
     Preserves existing version/based-on fields.
-    Inserts/updates generated-from when generated_from is provided.
+    The generated_from parameter is kept for API compatibility but is no longer
+    emitted as a frontmatter field because opencode rejects it.
     """
     content = re.sub(
         r"(^---\n.*?^name:\s*)(.+?)(\n)",
@@ -94,22 +95,12 @@ def build_frontmatter(content: str, name: str, description: str,
         lambda m: f'{m.group(1)}{description}{m.group(3)}',
         content, count=1, flags=re.MULTILINE,
     )
-    if generated_from is not None:
-        # Update existing generated-from field, or insert after description line
-        if re.search(r"^generated-from:", content, flags=re.MULTILINE):
-            content = re.sub(
-                r'^generated-from:.*$',
-                f'generated-from: "{generated_from}"',
-                content, count=1, flags=re.MULTILINE,
-            )
-        else:
-            # Match the full description field including multiline YAML continuations
-            # (continuation lines start with whitespace in YAML)
-            content = re.sub(
-                r'(^description:(?:.*\n)(?:[ \t]+.*\n)*)',
-                rf'\1generated-from: "{generated_from}"\n',
-                content, count=1, flags=re.MULTILINE,
-            )
+    # Remove any legacy generated-from field that might exist in templates
+    content = re.sub(
+        r'^generated-from:.*\n',
+        '',
+        content, count=1, flags=re.MULTILINE,
+    )
     return content
 
 
@@ -873,8 +864,8 @@ def _transform_frontmatter_for_opencode(
     lines = [f'name: {name}', f'description: "{description}"', 'mode: subagent']
     if model:
         lines.append(f'model: {model}')
-    if generated_from:
-        lines.append(f'generated-from: "{generated_from}"')
+    # NOTE: generated-from is intentionally omitted because opencode rejects
+    # unknown frontmatter fields (Extra inputs are not permitted).
 
     return '---\n' + '\n'.join(lines) + '\n---\n' + body
 

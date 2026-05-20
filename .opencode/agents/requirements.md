@@ -2,7 +2,6 @@
 name: requirements
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 mode: subagent
-generated-from: "1-generic/requirements.md@1.3.3"
 ---
 # Requirements Engineer — agent-meta
 
