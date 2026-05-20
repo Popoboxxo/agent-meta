@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.45.0] — 2026-05-20
+
+### Added
+
+- **Structured Output Contracts** (`config/output-schemas/`): JSON-Schema-definierte Agenten-Outputs mit 6 Cluster-Schemas (`base`, `execution-result`, `findings-report`, `coordination-output`, `knowledge-output`, `issue-created`) die alle 24 Agenten abdecken. Reduktion von 25 auf 6 Schema-Dateien. Schema-Injection via `sync.py` in alle generierten Agenten. Closes #165.
+- **Schema injection in `scripts/lib/config.py`**: 3 neue Funktionen (`load_output_schemas()`, `resolve_output_schema()`, `inject_schema_block()`) laden Cluster-Schemas und injizieren conditional JSON-Schema-Blöcke in Agent-Templates.
+- **Schema variable stripping in `scripts/lib/agents.py`**: Entfernt Schema-Platzhalter aus generierten Agenten wenn kein Schema zugewiesen ist.
+- **Conditional schema blocks in 24 Agent-Templates**: Jeder Agent erhält einen `{{#if OUTPUT_SCHEMA}}...{{/if}}` Block mit seinem zugewiesenen Cluster-Schema.
+- **Validation section in Orchestrator-Template**: Orchestrator validiert Agenten-Outputs gegen die definierten Schemas.
+- **`output_schema` in `config/role-defaults.yaml`**: 24 Agenten mit ihrem jeweiligen Cluster-Schema verknüpft.
+- **Architecture documentation** (`docs/architecture/09-structured-output-contracts.md`): Vollständige Dokumentation des Schema-Systems, Cluster-Design, Injection-Mechanismus und Validierungs-Workflow.
+- **`CODEBASE_OVERVIEW.md` updated**: Neue Schemas und Injection-Logik dokumentiert.
+
+---
+
 ## [0.44.0] — 2026-05-20
 
 ### Added
