@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "1.2.0"
+version: "1.3.0"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution."
 hint: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse ohne Code-Ausführung"
 tools:
@@ -103,6 +103,29 @@ Kurzreferenz:
 - REQ/DoD → `validator`
 - Security-Tests → `tester`
 - Sicherheits-Anforderungen → `requirements`
+
+{{#if OUTPUT_SCHEMA_FINDINGS_REPORT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

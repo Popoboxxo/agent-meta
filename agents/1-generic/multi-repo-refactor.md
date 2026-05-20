@@ -1,6 +1,6 @@
 ---
 name: template-multi-repo-refactor
-version: "1.0.0"
+version: "1.1.0"
 description: "Executes standardized refactorings in parallel across multiple sibling repositories in a workspace."
 hint: "Standardize all repos, run template sync across plugins, cross-repo refactoring"
 tools:
@@ -157,6 +157,29 @@ Wenn mehrere Repos unabhängig voneinander bearbeitet werden können:
 - Git-Operationen pro Repo → `git` (mit `workdir`-Parameter)
 - Template-Updates → `sync.py` via `developer`
 - Test-Ausführung → `tester`
+
+{{#if OUTPUT_SCHEMA_EXECUTION_RESULT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

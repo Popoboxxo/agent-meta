@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.2.3"
+version: "1.3.0"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -165,7 +165,28 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 - NICHT in die Implementierung abdriften — Ideen zuerst, Code später
 - NIEMALS Code schreiben
 
----
+{{#if OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

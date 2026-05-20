@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.6.0"
+version: "1.7.0"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -271,3 +271,26 @@ py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 - KEINE manuellen Änderungen in `.claude/agents/`
 - NIE in den managed block von CLAUDE.md schreiben
 - Bei Multi-Tool-Teams (Cursor, OpenAI, etc.): auf Symlink-Strategie hinweisen — `AGENTS.md` ↔ `CLAUDE.md` Symlink, nicht zwei separate Dateien pflegen
+
+{{#if OUTPUT_SCHEMA_EXECUTION_RESULT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}

@@ -49,12 +49,14 @@ roles:
     workflow_tier: required
     input: "Task-Beschreibung, betroffene Dateipfade, REQ-ID (falls traceability aktiv)"
     output: "Implementierter Code, ggf. Commit SHA oder Diff"
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
     model: balanced     # REQ analysis needs solid context understanding
     memory: project
     workflow_tier: recommended
+    output_schema: "config/output-schemas/coordination-output.schema.json"
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 
   ideation:
@@ -63,12 +65,14 @@ roles:
     temperature: 0.7    # higher creativity for exploration
     max_tokens: 4096
     workflow_tier: optional
+    output_schema: "config/output-schemas/knowledge-output.schema.json"
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 
   feature:
     model: balanced     # end-to-end coordination needs reliable reasoning
     memory: ""
     workflow_tier: recommended
+    output_schema: "config/output-schemas/coordination-output.schema.json"
     description: "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"
 
   tester:
@@ -77,6 +81,7 @@ roles:
     temperature: 0.2    # deterministic test generation
     max_tokens: 4096
     workflow_tier: recommended
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
 
   validator:
@@ -86,12 +91,14 @@ roles:
     temperature: 0.1    # highly deterministic validation
     max_tokens: 4096
     workflow_tier: recommended
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 
   documenter:
     model: balanced
     memory: project
     workflow_tier: recommended
+    output_schema: "config/output-schemas/knowledge-output.schema.json"
     description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
 
   reviewer:
@@ -100,12 +107,14 @@ roles:
     workflow_tier: recommended
     input: "PR-Nummer oder Branch-Name, zu reviewende Dateien"
     output: "Review-Bericht mit Findings (Bugs, Style, Security), Approval oder Change-Request"
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells"
 
   performance:
     model: powerful
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "Performance-Profiling und Bottleneck-Analyse: CPU, Memory, I/O — mit Optimierungsempfehlungen"
 
   security-auditor:
@@ -113,24 +122,28 @@ roles:
     memory: project
     permission_mode: plan
     workflow_tier: optional
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
 
   agent-meta-scout:
     model: balanced
     memory: local
     workflow_tier: optional
+    output_schema: "config/output-schemas/knowledge-output.schema.json"
     description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
 
   agent-meta-manager:
     model: balanced
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 
   release:
     model: balanced
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/coordination-output.schema.json"
     description: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 
   git:
@@ -141,30 +154,35 @@ roles:
     workflow_tier: required
     input: "Auszuführende Git-Operation (commit/push/merge/tag/pr), Commit-Message, betroffene Dateien"
     output: "Commit SHA, Branch-Name, PR-URL"
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 
   meta-feedback:
     model: fast
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/issue-created.schema.json"
     description: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 
   docker:
     model: fast
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
 
   log-analyzer:
     model: balanced
     memory: ""
     workflow_tier: required
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
 
   feedback:
     model: balanced
     memory: ""
     workflow_tier: required
+    output_schema: "config/output-schemas/issue-created.schema.json"
     description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
 
   infrastructure-check:
@@ -172,18 +190,21 @@ roles:
     memory: ""
     permission_mode: plan
     workflow_tier: optional
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "On-demand Prerequisite-Check: fehlende CLIs/Runtimes in Hooks, MCP-Configs und Agent-Templates erkennen und Installationsanleitung geben"
 
   openscad-developer:
     model: balanced
     memory: local
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
 
   multi-repo-refactor:
     model: balanced
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Standardisierte Refactorings parallel über mehrere Sibling-Repositories ausführen"
 
   compliance-auditor:
@@ -191,16 +212,19 @@ roles:
     memory: project
     permission_mode: plan
     workflow_tier: optional
+    output_schema: "config/output-schemas/findings-report.schema.json"
     description: "Proaktive, wiederkehrende Auditierung von Repositories auf Einhaltung von Standards und Rules"
 
   code-splitter:
     model: balanced
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Automatisierte Modularisierung monolithischer Dateien (>300 Zeilen) in standardkonforme Module"
 
   bun-ci:
     model: fast
     memory: ""
     workflow_tier: optional
+    output_schema: "config/output-schemas/execution-result.schema.json"
     description: "Builds und Tests im CI-ähnlichen Modus mit Bun ausführen — Install, Build, Test, Report"

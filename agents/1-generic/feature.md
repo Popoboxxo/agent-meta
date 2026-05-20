@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.3.1"
+version: "1.4.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -208,3 +208,26 @@ Berichte dem User:
 - NICHT Schritt überspringen — auch wenn der User drängt
 - KEIN Commit ohne grüne Tests und bestandene Validierung
 - KEINE PR ohne REQ-ID in der Commit-Message
+
+{{#if OUTPUT_SCHEMA_COORDINATION_OUTPUT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_COORDINATION_OUTPUT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_COORDINATION_OUTPUT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "base.schema.json",
+  "title": "Base Agent Output",
+  "description": "Common fields shared by all agent output schemas.",
+  "type": "object",
+  "required": ["status", "message"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failure"],
+      "description": "Execution status of the agent task."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable summary of what was done."
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional warnings encountered during execution."
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Errors if status is failure or partial."
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Task duration in milliseconds."
+    }
+  },
+  "additionalProperties": false
+}

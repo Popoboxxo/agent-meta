@@ -280,6 +280,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             variables[f"EVALUATOR_OPTIMIZER_PAIR_{i}_{key.upper()}"] = str(val)
     # EVALUATOR_CRITERIA_TABLE: central criteria definitions from config/evaluator-criteria.yaml
     variables["EVALUATOR_CRITERIA_TABLE"] = _build_criteria_table(agent_meta_root)
+    # OUTPUT_SCHEMA_*: inject structured output schemas for each agent
+    _inject_output_schema_variables(variables, config, agent_meta_root)
     return variables, unmapped
 
 
@@ -298,6 +300,152 @@ def _build_criteria_table(agent_meta_root: Path) -> str:
     return "\n".join(lines)
 
 
+def _load_role_defaults(agent_meta_root: Path) -> dict:
+    """Load role-defaults.yaml and return the roles dict, or empty dict on failure."""
+    defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
+    if not defaults_path.is_file():
+        return {}
+    try:
+        raw = _yaml.safe_load(defaults_path.read_text(encoding="utf-8")) or {}
+        return raw.get("roles", {})
+    except Exception:
+        return {}
+
+
+def _generate_example_from_schema(schema: dict) -> dict:
+    """Generate a plausible example JSON object from a JSON schema."""
+    props = schema.get("properties", {})
+    # Merge base schema properties if allOf is used
+    for clause in schema.get("allOf", []):
+        if "$ref" in clause:
+            # $ref handled by caller - base props already merged in
+            continue
+        if "properties" in clause:
+            for k, v in clause["properties"].items():
+                if k not in props:
+                    props[k] = v
+    example = {}
+    for key, prop in props.items():
+        if key in ("status",):
+            example[key] = "success"
+        elif key in ("message",):
+            example[key] = "Task completed successfully."
+        elif key in ("warnings", "errors"):
+            example[key] = []
+        elif prop.get("type") == "string":
+            if "enum" in prop:
+                example[key] = prop["enum"][0]
+            else:
+                example[key] = f"<{key}>"
+        elif prop.get("type") == "integer":
+            example[key] = 0
+        elif prop.get("type") == "number":
+            example[key] = 0.0
+        elif prop.get("type") == "boolean":
+            example[key] = False
+        elif prop.get("type") == "array":
+            items = prop.get("items", {})
+            if isinstance(items, dict) and items.get("type") == "object":
+                inner_props = items.get("properties", {})
+                inner_example = {}
+                for ik, ip in inner_props.items():
+                    if ip.get("type") == "string":
+                        inner_example[ik] = ip.get("enum", ["<value>"])[0] if "enum" in ip else f"<{ik}>"
+                    elif ip.get("type") == "integer":
+                        inner_example[ik] = 0
+                    elif ip.get("type") == "number":
+                        inner_example[ik] = 0.0
+                    elif ip.get("type") == "boolean":
+                        inner_example[ik] = False
+                    else:
+                        inner_example[ik] = f"<{ik}>"
+                example[key] = [inner_example]
+            elif isinstance(items, dict) and items.get("type") == "string":
+                example[key] = ["<value>"]
+            else:
+                example[key] = []
+        elif prop.get("type") == "object":
+            example[key] = {}
+    return example
+
+
+def _inject_output_schema_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
+    """Inject OUTPUT_SCHEMA_<CLUSTER> variables from role-defaults.yaml output_schema entries.
+
+    Groups roles by their output_schema path (cluster schemas), deduplicates,
+    and injects one variable per unique schema. Variable name is derived from
+    the schema file stem (e.g. execution-result → OUTPUT_SCHEMA_EXECUTION_RESULT).
+    Also injects per-role variables for backward compatibility.
+    Sets HAS_OUTPUT_SCHEMAS to "true" if any schemas were loaded.
+    """
+    roles = _load_role_defaults(agent_meta_root)
+    schemas_dir = agent_meta_root / "config" / "output-schemas"
+    has_any = False
+    processed_schemas: dict[str, str] = {}  # schema_stem → role_var_name
+
+    for role_name, role_def in roles.items():
+        schema_rel = role_def.get("output_schema", "")
+        if not schema_rel:
+            continue
+        schema_path = agent_meta_root / schema_rel
+        if not schema_path.is_file():
+            continue
+        schema_stem = schema_path.name.replace(".schema.json", "")  # "execution-result"
+
+        # Skip if already processed this cluster schema
+        if schema_stem in processed_schemas:
+            # Still inject per-role alias for backward compat
+            role_var = role_name.upper().replace("-", "_")
+            cluster_var = processed_schemas[schema_stem]
+            variables[f"OUTPUT_SCHEMA_{role_var}"] = variables[f"OUTPUT_SCHEMA_{cluster_var}"]
+            variables[f"OUTPUT_SCHEMA_{role_var}_EXAMPLE"] = variables[f"OUTPUT_SCHEMA_{cluster_var}_EXAMPLE"]
+            continue
+
+        try:
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        # Merge base schema properties if allOf is used
+        merged_props = dict(schema.get("properties", {}))
+        for clause in schema.get("allOf", []):
+            ref = clause.get("$ref", "")
+            if ref:
+                ref_path = schemas_dir / ref
+                if ref_path.is_file():
+                    try:
+                        base = json.loads(ref_path.read_text(encoding="utf-8"))
+                        for k, v in base.get("properties", {}).items():
+                            if k not in merged_props:
+                                merged_props[k] = v
+                    except (json.JSONDecodeError, OSError):
+                        pass
+
+        # Derive variable name from schema stem (cluster name)
+        cluster_var = schema_stem.upper().replace("-", "_")
+        display_schema = {
+            "title": schema.get("title", f"{cluster_var} Output"),
+            "description": schema.get("description", ""),
+            "required": schema.get("required", []),
+            "properties": merged_props,
+        }
+        variables[f"OUTPUT_SCHEMA_{cluster_var}"] = json.dumps(display_schema, indent=2, ensure_ascii=False)
+
+        # Generate example
+        example = _generate_example_from_schema(schema)
+        variables[f"OUTPUT_SCHEMA_{cluster_var}_EXAMPLE"] = json.dumps(example, indent=2, ensure_ascii=False)
+
+        # Also inject per-role aliases for backward compatibility
+        role_var = role_name.upper().replace("-", "_")
+        variables[f"OUTPUT_SCHEMA_{role_var}"] = variables[f"OUTPUT_SCHEMA_{cluster_var}"]
+        variables[f"OUTPUT_SCHEMA_{role_var}_EXAMPLE"] = variables[f"OUTPUT_SCHEMA_{cluster_var}_EXAMPLE"]
+
+        processed_schemas[schema_stem] = cluster_var
+        has_any = True
+
+    variables["HAS_OUTPUT_SCHEMAS"] = "true" if has_any else "false"
+
+
 def strip_inactive_dod_blocks(text: str, variables: dict, extra_vars: list[str] | None = None) -> str:
     """Remove conditional blocks that are inactive in this project.
 
@@ -310,22 +458,30 @@ def strip_inactive_dod_blocks(text: str, variables: dict, extra_vars: list[str] 
         ...content...
         {{/if}}
 
-    For {{#if VAR}}: if VAR is "false", the entire block is removed.
+    For {{#if VAR}}: if VAR is "false" or empty/missing, the entire block is removed.
     For {{^VAR}} (inverse): if VAR is "true", the entire block is removed.
 
     By default handles DOD_* variables. Pass extra_vars to handle additional
-    conditional variables (e.g. CI_POLL_ENABLED).
+    conditional variables (e.g. CI_POLL_ENABLED, OUTPUT_SCHEMA_*).
+
+    For DOD_* variables: missing = "true" (show block by default).
+    For OUTPUT_SCHEMA_* and other extra_vars: missing = "false" (hide block by default).
     """
-    all_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
-    if extra_vars:
-        all_vars.update(extra_vars)
+    dod_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
+    extra_vars_set = set(extra_vars) if extra_vars else set()
+    all_vars = dod_vars | extra_vars_set
 
     for var in all_vars:
+        # Determine default value based on variable type
+        is_extra = var in extra_vars_set
+        default_when_missing = "false" if is_extra else "true"
+
         # --- Inverse blocks: {{^VAR}}...{{/if}} ---
         # Shown when VAR is "false", removed when VAR is "true"
-        def replace_inverse(m: re.Match, _var: str = var) -> str:
+        def replace_inverse(m: re.Match, _var: str = var, _def: str = default_when_missing) -> str:
             block_content = m.group(1)
-            if variables.get(_var, "false") == "true":
+            val = variables.get(_var, _def)
+            if val == "true":
                 return ""
             return block_content.strip("\n") + "\n"
 
@@ -333,9 +489,10 @@ def strip_inactive_dod_blocks(text: str, variables: dict, extra_vars: list[str] 
         text = re.sub(inverse_pattern, replace_inverse, text, flags=re.DOTALL)
 
         # --- Standard blocks: {{#if VAR}}...{{/if}} ---
-        def replace_block(m: re.Match, _var: str = var) -> str:
+        def replace_block(m: re.Match, _var: str = var, _def: str = default_when_missing) -> str:
             block_content = m.group(1)
-            if variables.get(_var, "true") == "false":
+            val = variables.get(_var, _def)
+            if val in ("false", ""):
                 return ""
             return block_content.strip("\n") + "\n"
 

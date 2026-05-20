@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.1.0"
+version: "2.2.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -188,6 +188,29 @@ Vorgehen:
 - Tests schreiben? → Verweise an `tester`
 - Dokumentation updaten? → Verweise an `documenter`
 - Validierung gegen REQs? → Verweise an `validator`
+
+{{#if OUTPUT_SCHEMA_EXECUTION_RESULT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

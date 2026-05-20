@@ -1,6 +1,6 @@
 ---
 name: template-compliance-auditor
-version: "1.0.0"
+version: "1.1.0"
 description: "Proactive, recurring audit of repositories for compliance with AGENTS.md rules and project standards."
 hint: "Check all repos for standard compliance, audit compliance, rule enforcement verification"
 tools:
@@ -187,6 +187,29 @@ Informiere den User über Critical Findings sofort.
 - Template-Updates → `sync.py` via `developer`
 - Git-Operationen → `git`
 - Report-Archivierung → `documenter`
+
+{{#if OUTPUT_SCHEMA_FINDINGS_REPORT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

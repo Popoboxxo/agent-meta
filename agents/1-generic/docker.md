@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.3.3"
+version: "1.4.0"
 description: "Docker-Operationen: Compose-Stacks, Binary-Management, Test-Umgebungen und Diagnose — plattformunabhängig."
 hint: "Dev-Stack starten/stoppen, Dockerfiles, Binary-Management"
 tools:
@@ -346,6 +346,29 @@ docker inspect {{CONTAINER_NAME}}
 - KEINE Secrets/Tokens in `docker-compose.yml` hardcoden — Environment-Variablen nutzen
 - KEIN `down --volumes` ohne ausdrückliche Warnung an den Nutzer (löscht alle Daten!)
 - KEIN `--no-cache` Build ohne Grund (sehr langsam)
+
+{{#if OUTPUT_SCHEMA_EXECUTION_RESULT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

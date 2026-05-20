@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "2.2.0"
+version: "2.3.0"
 description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
 hint: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 tools:
@@ -254,6 +254,29 @@ Prüfe Konsistenz zwischen Dokumenten:
 - Tests fehlen? → Verweise an `tester`
 - Anforderung unklar/fehlend? → Verweise an `requirements`
 - Dokumentation veraltet? → Verweise an `documenter`
+
+{{#if OUTPUT_SCHEMA_FINDINGS_REPORT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

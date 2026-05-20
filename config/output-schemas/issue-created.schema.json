@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "issue-created.schema.json",
+  "title": "Issue Created",
+  "description": "Output for agents that create GitHub issues. Used by: feedback, meta-feedback.",
+  "allOf": [{ "$ref": "base.schema.json" }],
+  "type": "object",
+  "required": ["issue_type", "issue_title"],
+  "properties": {
+    "issue_type": {
+      "type": "string",
+      "enum": ["bug", "improvement", "feature", "new-agent", "new-command", "new-skill", "new-platform", "new-speech", "docs", "design"],
+      "description": "Type of feedback issue."
+    },
+    "issue_title": { "type": "string", "description": "Issue title (English)." },
+    "issue_url": { "type": "string", "description": "Created issue URL." },
+    "issue_number": { "type": "integer", "minimum": 1, "description": "GitHub issue number." },
+    "category": { "type": "string", "description": "Category (e.g. template, config, rule, component)." },
+    "related_component": { "type": "string", "description": "Affected component or agent." }
+  },
+  "additionalProperties": false
+}

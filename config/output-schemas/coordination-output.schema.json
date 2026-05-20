@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "coordination-output.schema.json",
+  "title": "Coordination Output",
+  "description": "Output for agents that manage lifecycle phases and coordinate processes. Used by: feature, release, requirements.",
+  "allOf": [{ "$ref": "base.schema.json" }],
+  "type": "object",
+  "required": ["phase"],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "description": "Current lifecycle phase or action taken.",
+      "examples": ["created", "updated", "branch", "req", "dev", "validate", "pr", "merged", "major", "minor", "patch", "reviewed", "closed"]
+    },
+    "feature_name": { "type": "string", "description": "Feature name (feature agent)." },
+    "branch": { "type": "string", "description": "Feature or release branch." },
+    "req_id": { "type": "string", "description": "REQ-ID." },
+    "req_ids": { "type": "array", "items": { "type": "string" }, "description": "Associated REQ-IDs." },
+    "title": { "type": "string", "description": "Requirement or feature title." },
+    "description": { "type": "string", "description": "Full requirement description." },
+    "priority": { "type": "string", "enum": ["P0", "P1", "P2", "P3"], "description": "Priority level." },
+    "dependencies": { "type": "array", "items": { "type": "string" }, "description": "REQ-IDs this depends on." },
+    "traceability_map": { "type": "object", "description": "Map of related REQ-IDs and relationships." },
+    "version": { "type": "string", "description": "Version string." },
+    "previous_version": { "type": "string", "description": "Previous version string." },
+    "bump_type": { "type": "string", "enum": ["major", "minor", "patch"], "description": "Semver bump type." },
+    "tag": { "type": "string", "description": "Git tag created." },
+    "changelog_updated": { "type": "boolean", "description": "Whether CHANGELOG was updated." },
+    "release_url": { "type": "string", "description": "GitHub/GitLab release URL." },
+    "pr_url": { "type": "string", "description": "Pull request URL." },
+    "summary": { "type": "string", "description": "Brief summary of current state." },
+    "steps_completed": { "type": "array", "items": { "type": "string" }, "description": "Completed lifecycle steps." },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "description": "Build or release artifacts."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,6 +1,6 @@
 ---
 name: template-reviewer
-version: "1.1.0"
+version: "1.2.0"
 description: "Code-Review vor dem Merge: Qualität, Stil, Logik, Best Practices und Security-Smells prüfen."
 hint: "Code-Review: Qualität, Stil, Logik, Best Practices — vor dem Merge"
 tools:
@@ -154,6 +154,29 @@ Der Reviewer **empfiehlt** — der Developer entscheidet und implementiert Fixes
 - Security-Audit nötig? → `security-auditor`
 - Performance-Probleme vermutet? → `performance`
 - REQ-Abweichung? → `validator`
+
+{{#if OUTPUT_SCHEMA_FINDINGS_REPORT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

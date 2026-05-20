@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.4.0"
+version: "1.5.0"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
@@ -166,6 +166,29 @@ Wenn eine bestehende Anforderung geändert wird:
 - KEINE vagen Formulierungen ("sollte gut funktionieren")
 - KEINE Implementierungsdetails in Anforderungen (WAS, nicht WIE)
 - NIEMALS Code schreiben — nur Anforderungen formulieren
+
+{{#if OUTPUT_SCHEMA_COORDINATION_OUTPUT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_COORDINATION_OUTPUT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_COORDINATION_OUTPUT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

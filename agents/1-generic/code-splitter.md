@@ -1,6 +1,6 @@
 ---
 name: template-code-splitter
-version: "1.0.0"
+version: "1.1.0"
 description: "Automated modularization of monolithic files (>300 lines) into standard-compliant modules."
 hint: "Split large files into modules, modularize monolithic code, refactor oversized files"
 tools:
@@ -212,6 +212,29 @@ server/
 - Type-Errors nach Split → `developer`
 - Test-Anpassungen → `tester`
 - Git-Operationen → `git`
+
+{{#if OUTPUT_SCHEMA_EXECUTION_RESULT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_EXECUTION_RESULT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

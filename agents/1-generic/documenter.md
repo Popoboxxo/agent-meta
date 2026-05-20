@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.4.0"
+version: "1.5.0"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
@@ -219,6 +219,29 @@ Periodically review sub-project changelogs and architecture docs for decisions t
 - Tests fehlen? → Verweise an `tester`
 - Anforderung unklar? → Verweise an `requirements`
 - Validierung nötig? → Verweise an `validator`
+
+{{#if OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_KNOWLEDGE_OUTPUT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 

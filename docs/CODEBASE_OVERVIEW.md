@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> **Stand:** 2026-05-17 | **Version:** 0.41.0
+> **Stand:** 2026-05-20 | **Version:** 0.44.0
 > Codegenaue Bestandsaufnahme aller `scripts/` Dateien.
 
 ---
@@ -165,12 +165,31 @@
 ### `build_variables(config, agent_meta_root) → tuple[dict, list[str]]`
 - **Signatur:** `(dict, Path) → (variables_dict, pre_warnings)`
 - **Zweck:** Baut das Substitutions-Dict für `{{VAR}}`-Platzhalter.
-- **Enthält:** PREFIX, PROJECT_SHORT, PROJECT_NAME, AGENT_META_VERSION, AGENT_META_DATE, AGENT_TABLE, AGENT_HINTS, AI_PROVIDER, MAX_PARALLEL_AGENTS, WORKSPACE_REPOS, SUB_PROJECTS, META_REPO, DOD_*, DOD_PRESET, CI_POLL_ENABLED, CI_POLL_INTERVAL, CI_POLL_MAX_RETRIES + alle `config["variables"]`
+- **Enthält:** PREFIX, PROJECT_SHORT, PROJECT_NAME, AGENT_META_VERSION, AGENT_META_DATE, AGENT_TABLE, AGENT_HINTS, AI_PROVIDER, MAX_PARALLEL_AGENTS, WORKSPACE_REPOS, SUB_PROJECTS, META_REPO, DOD_*, DOD_PRESET, CI_POLL_*, EVALUATOR_OPTIMIZER_*, EVALUATOR_CRITERIA_TABLE + alle `config["variables"]` + **OUTPUT_SCHEMA_*** (REQ #165)
+
+### `_inject_output_schema_variables(variables, config, agent_meta_root) → None` (intern)
+- **REQ:** #165
+- **Signatur:** `(dict, dict, Path) → None`
+- **Zweck:** Liest `output_schema` Pfade aus `config/role-defaults.yaml` pro Rolle, lädt die JSON-Schema-Datei aus `config/output-schemas/`, merged `allOf.$ref` auf `base.schema.json` und injiziert zwei Template-Variablen pro Rolle:
+  - `OUTPUT_SCHEMA_<ROLE>` — bereinigtes Schema-JSON (title, description, required, properties)
+  - `OUTPUT_SCHEMA_<ROLE>_EXAMPLE` — generiertes Beispiel-JSON via `_generate_example_from_schema()`
+  - Setzt `HAS_OUTPUT_SCHEMAS` auf `"true"` wenn mindestens ein Schema geladen wurde.
+
+### `_generate_example_from_schema(schema) → dict` (intern)
+- **REQ:** #165
+- **Signatur:** `(dict) → dict`
+- **Zweck:** Generiert ein plausibles Beispiel-JSON aus einem JSON-Schema. Erkennt Typen (string, integer, number, boolean, array, object), Enum-Werte, und merged `allOf`-Properties. Spezielle Behandlung für `status` → `"success"`, `message` → `"Task completed successfully."`, `warnings`/`errors` → `[]`.
+
+### `_load_role_defaults(agent_meta_root) → dict` (intern)
+- **REQ:** #165
+- **Signatur:** `(Path) → dict`
+- **Zweck:** Lädt `config/role-defaults.yaml` und returniert den `roles`-Dict. Wird von `_inject_output_schema_variables()` genutzt um `output_schema` Pfade pro Rolle zu lesen.
 
 ### `strip_inactive_dod_blocks(text, variables, extra_vars=None) → str`
 - **Signatur:** `(str, dict, list[str] | None) → str`
 - **Zweck:** Entfernt konditionale Blöcke `{{#if VAR}}...{{/if}}` und `{{^VAR}}...{{/if}}`.
 - **Neu (REQ #160):** Unterstützt `extra_vars` Parameter für inverse Blöcke (z.B. `CI_POLL_ENABLED`).
+- **Erweitert (REQ #165):** `extra_vars` wird jetzt auch mit `OUTPUT_SCHEMA_*` und `HAS_OUTPUT_SCHEMAS` befüllt — sowohl im Legacy-Pfad (`sync_agents`) als auch im Multi-Provider-Pfad (`sync_agents_for_provider`). Default für extra_vars bei fehlendem Wert: `"false"` (Block wird entfernt).
 
 ### `substitute(text, variables, source_label, log) → str`
 - **Zweck:** Ersetzt `{{VAR}}` im Text. `{{%VAR%}}` → `{{VAR}}` (Escape-Syntax).
@@ -224,7 +243,7 @@
 | `_transform_frontmatter_for_opencode` | `(content, name, description, model, generated_from) → str` | Opencode-natives Frontmatter |
 | `_strip_claude_specific_lines` | `(content) → str` | Entfernt Claude-spezifische Zeilen |
 
-**Wichtig:** `strip_inactive_dod_blocks()` wird mit `extra_vars=["CI_POLL_ENABLED"]` aufgerufen — sowohl im Legacy-Pfad (`sync_agents`) als auch im Multi-Provider-Pfad (`sync_agents_for_provider`).
+**Wichtig:** `strip_inactive_dod_blocks()` wird mit `extra_vars=["CI_POLL_ENABLED", "EVALUATOR_OPTIMIZER_ENABLED"] + output_schema_vars` aufgerufen — sowohl im Legacy-Pfad (`sync_agents`) als auch im Multi-Provider-Pfad (`sync_agents_for_provider`). Die `output_schema_vars` werden dynamisch aus allen `OUTPUT_SCHEMA_*` Keys + `HAS_OUTPUT_SCHEMAS` gebildet (REQ #165).
 
 ---
 
@@ -422,3 +441,98 @@
 
 ### `scan_for_secrets(content) → list[str]`
 - **Zweck:** Scannt auf API-Keys, Tokens, Passwörter etc.
+
+---
+
+## config/output-schemas/
+
+**Zweck:** JSON-Schema-Dateien für strukturierte Agent-Output-Verträge (REQ #165).
+
+### Cluster-Struktur (6 Schemas statt 25)
+
+Die ursprünglich 25 agent-spezifischen Schemas wurden auf **6 Cluster-Schemas** reduziert. Agenten mit ähnlichem Output-Verhalten teilen sich ein Schema. Jedes Cluster-Schema erbt via `allOf: [{ "$ref": "base.schema.json" }]` die Basis-Felder.
+
+| Cluster | Schema-Datei | Agenten (Anzahl) |
+|---------|-------------|------------------|
+| **Base** | `base.schema.json` | Alle (24) — gemeinsame Basis-Felder |
+| **Execution** | `execution-result.schema.json` | developer, git, tester, docker, bun-ci, code-splitter, multi-repo-refactor, openscad-developer, agent-meta-manager (9) |
+| **Findings** | `findings-report.schema.json` | reviewer, validator, security-auditor, performance, log-analyzer, compliance-auditor, infrastructure-check (7) |
+| **Coordination** | `coordination-output.schema.json` | feature, release, requirements (3) |
+| **Knowledge** | `knowledge-output.schema.json` | documenter, ideation, agent-meta-scout (3) |
+| **Issue** | `issue-created.schema.json` | feedback, meta-feedback (2) |
+
+### Base-Schema (`base.schema.json`)
+
+Gemeinsame Felder die **alle** Agenten liefern:
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `status` | enum: `success`, `partial`, `failure` | Ausführungsstatus |
+| `message` | string | Menschlich-lesbare Zusammenfassung |
+| `warnings` | string[] | Optionale Warnungen |
+| `errors` | string[] | Fehler bei `failure` oder `partial` |
+| `duration_ms` | integer | Ausführungsdauer in Millisekunden |
+
+### Cluster-Schemas im Detail
+
+#### execution-result.schema.json
+**Used by:** developer, git, tester, docker, bun-ci, code-splitter, multi-repo-refactor, openscad-developer, agent-meta-manager
+
+Zusätzliche Felder: `operation`, `files_changed[]`, `commit_sha`, `branch`, `tag`, `target_url`, `pr_url`, `tests_passed`, `tests_total`, `tests_failed`, `coverage`, `build_status`, `lint_status`, `artifacts[]`, `repos_affected[]`, `breaking_changes`, `versions`, `req_id`
+
+#### findings-report.schema.json
+**Used by:** reviewer, validator, security-auditor, performance, log-analyzer, compliance-auditor, infrastructure-check
+
+Zusätzliche Felder: `scope`, `files_reviewed[]`, `checks_performed`, `passed_checks`, `failed_checks`, `findings[]`, `score`, `must_fix_count`, `should_fix_count`, `severity_counts`, `dod_compliant`, `overall_risk`, `recommendations[]`, `root_causes[]`
+
+#### coordination-output.schema.json
+**Used by:** feature, release, requirements
+
+Zusätzliche Felder: `phase`, `feature_name`, `branch`, `req_id`, `req_ids[]`, `title`, `priority`, `dependencies[]`, `traceability_map`, `version`, `bump_type`, `tag`, `changelog_updated`, `release_url`, `steps_completed[]`
+
+#### knowledge-output.schema.json
+**Used by:** documenter, ideation, agent-meta-scout
+
+Zusätzliche Felder: `topic`, `files_updated[]`, `doc_type`, `sections_added`, `sections_modified`, `options[]`, `recommended_approach`, `risks[]`, `next_steps[]`, `discoveries[]`, `recommendations[]`, `confidence`
+
+#### issue-created.schema.json
+**Used by:** feedback, meta-feedback
+
+Zusätzliche Felder: `issue_type` (enum), `issue_title`, `issue_url`, `issue_number`, `category`, `related_component`
+
+### 5-Stufen-Einführungsplan
+
+Die Cluster-Schemas werden schrittweise aktiviert:
+
+| Stufe | Aktive Cluster | Agenten |
+|-------|---------------|---------|
+| **1. Core** | base + execution-result + issue-created | developer, git, tester, feedback, meta-feedback |
+| **2. Quality** | + findings-report | reviewer, validator |
+| **3. Lifecycle** | + coordination-output | feature, release, requirements |
+| **4. Knowledge** | + knowledge-output | documenter, ideation, agent-meta-scout |
+| **5. Full** | execution-result + findings-report erweitert | docker, bun-ci, code-splitter, multi-repo-refactor, openscad-developer, agent-meta-manager, security-auditor, performance, log-analyzer, compliance-auditor, infrastructure-check |
+
+### Schema-Inheritance
+
+Jedes Cluster-Schema nutzt JSON-Schema `allOf` mit `$ref` auf `base.schema.json`:
+```json
+{
+  "allOf": [{ "$ref": "base.schema.json" }],
+  "properties": { ... cluster-spezifische Felder ... }
+}
+```
+
+### Integration in Templates
+
+Jedes Agent-Template (außer `orchestrator`) enthält einen konditionalen Block:
+```
+{{#if OUTPUT_SCHEMA_<ROLE>}}
+## Structured Output Contract
+...
+{{OUTPUT_SCHEMA_<ROLE>}}
+...
+{{OUTPUT_SCHEMA_<ROLE>_EXAMPLE}}
+{{/if}}
+```
+
+Der `orchestrator`-Template enthält eine `{{#if HAS_OUTPUT_SCHEMAS}}` Sektion mit Validierungsregeln, Merge-Logik und Schema-Aware Delegation.

@@ -146,10 +146,8 @@ def sync_agents(
         description = (template_description or f"Agent for {project_name}.")
         description = description.replace("{{PROJECT_NAME}}", project_name)
         content = substitute(content, variables, rel_source, log)
-        content = strip_inactive_dod_blocks(content, variables, extra_vars=["CI_POLL_ENABLED", "EVALUATOR_OPTIMIZER_ENABLED"])
-        name = Path(filename).stem
-        layer = source_path.parts[-2]
-        source_label = f"{layer}/{source_path.name}"
+        output_schema_vars = [k for k in variables if k.startswith("OUTPUT_SCHEMA_")] + ["HAS_OUTPUT_SCHEMAS"]
+        content = strip_inactive_dod_blocks(content, variables, extra_vars=["CI_POLL_ENABLED", "EVALUATOR_OPTIMIZER_ENABLED"] + output_schema_vars)
         generated_from = f"{source_label}@{source_version}" if source_version else source_label
         content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
@@ -280,7 +278,8 @@ def sync_agents_for_provider(
         }
         merged_vars = {**variables, **provider_vars}
         content = substitute(content, merged_vars, rel_source, log)
-        content = strip_inactive_dod_blocks(content, variables, extra_vars=["CI_POLL_ENABLED", "EVALUATOR_OPTIMIZER_ENABLED"])
+        output_schema_vars = [k for k in variables if k.startswith("OUTPUT_SCHEMA_")] + ["HAS_OUTPUT_SCHEMAS"]
+        content = strip_inactive_dod_blocks(content, variables, extra_vars=["CI_POLL_ENABLED", "EVALUATOR_OPTIMIZER_ENABLED"] + output_schema_vars)
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)

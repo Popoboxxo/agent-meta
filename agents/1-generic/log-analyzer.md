@@ -1,6 +1,6 @@
 ---
 name: template-log-analyzer
-version: "1.0.0"
+version: "1.1.0"
 description: "Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing."
 hint: "Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren"
 tools:
@@ -171,7 +171,28 @@ Nach Schritt 5:
 - KEINE Online-Recherche im `--quick`-Modus ohne explizite Anfrage
 - KEIN Anzeigen von INFO/DEBUG ohne Nutzer-Anfrage
 
----
+{{#if OUTPUT_SCHEMA_FINDINGS_REPORT}}
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT}}
+```
+
+**Example output:**
+```json
+{{OUTPUT_SCHEMA_FINDINGS_REPORT_EXAMPLE}}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
+{{/if}}
 
 ## Sprache
 
