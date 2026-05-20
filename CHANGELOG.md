@@ -8,6 +8,14 @@
 
 ---
 
+## [0.46.2] — 2026-05-21
+
+### Fixed
+
+- **Opencode orchestrator permission mapping**: Added missing permission mapping for subagent task tool in opencode orchestrator agent. (#190)
+
+---
+
 ## [Unreleased]
 
 ---
