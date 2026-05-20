@@ -114,7 +114,7 @@ mindmap
 
 ### orchestrator
 - **Tier:** required
-- **Beschreibung:** Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation.
+- **Beschreibung:** Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation. Mit Evaluator-Optimizer Loop, Task Guardrails und Reflection Pattern für iterative Qualität.
 - **Model:** inherited
 - **Delegiert an:** developer, feature, git, documenter, ideation, release, security-auditor, docker, log-analyzer, feedback, agent-meta-manager, agent-meta-scout, meta-feedback, requirements, validator, tester
 
@@ -141,5 +141,5 @@ mindmap
 
 ### validator
 - **Tier:** recommended
-- **Beschreibung:** Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen.
+- **Beschreibung:** Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen. Unterstützt iteratives Feedback und strukturierte Code-Reviews im JSON-Format.
 - **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus

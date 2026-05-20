@@ -1,8 +1,8 @@
 ---
 name: orchestrator
-version: "2.10.0"
-description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
-generated-from: "1-generic/orchestrator.md@2.10.0"
+version: "2.11.0"
+description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation. Mit Evaluator-Optimizer Loop, Task Guardrails und Reflection Pattern für iterative Qualität."
+generated-from: "1-generic/orchestrator.md@2.11.0"
 hint: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
 tools:
   - Agent
@@ -258,6 +258,63 @@ Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedba
 python scripts/sync.py
 python scripts/sync.py --dry-run
 
+
+---
+
+## Evaluator-Optimizer Loop (Iterative Qualität)
+
+Nach jeder `developer`-Delegation:
+
+1. Warte auf Ergebnis vom developer
+2. Delegiere an `validator` mit explizitem Feedback-Request:
+   "Prüfe diese Implementierung. Wenn sie nicht passt, gib konkrete Revision-Anweisungen zurück (nicht nur 'fail')."
+3. Wenn validator sagt "approved" → weiter zum nächsten Schritt
+4. Wenn validator sagt "revise: [konkrete Anweisungen]" → gehe zurück zu `developer` mit den Anweisungen
+5. Max. 3 Iterationen pro Task
+
+**Verbot:** Nie eine Implementierung als "fertig" betrachten ohne validator-Feedback.
+
+---
+
+## Task Guardrails (Validations-Pipeline)
+
+Vor und nach jeder Agenten-Delegation prüfe:
+
+| Guardrail | Prüfung | Fehler-Aktion |
+|-----------|---------|---------------|
+| Code-Größe | < 500 Zeilen pro Datei | "Datei zu groß. Bitte aufteilen." |
+| Secrets | Keine API-Keys/Passwörter im Output | "Secrets gefunden. Bitte entfernen." |
+| Gültigkeit | Gültiges JSON/YAML/Markdown | "Format ungültig. Bitte korrigieren." |
+| Scope | Nur geänderte Dateien aus dem Plan | "Scope-Creep erkannt. Bitte fokussieren." |
+
+Wenn ein Guardrail fehlschlägt:
+1. Agenten beenden
+2. Konkretes Feedback an den Agenten geben
+3. Agent mit korrigiertem Input erneut starten
+4. Max. 2 Retries pro Guardrail
+
+---
+
+## Reflection Pattern (Structured Code Review)
+
+Nach jeder Implementierung durch `developer`:
+
+1. Starte `reviewer` (oder `validator` im Review-Modus)
+2. Reviewer erstellt strukturierte Kritik im JSON-Format:
+
+```json
+{
+  "correctness": {"score": 1-5, "issues": ["..."]},
+  "efficiency": {"score": 1-5, "issues": ["..."]},
+  "safety": {"score": 1-5, "issues": ["..."]},
+  "decision": "approve" | "revise",
+  "feedback": "Konkrete Verbesserungsvorschläge..."
+}
+```
+
+3. Wenn "approve" → weiter
+4. Wenn "revise" → zurück an `developer` mit JSON-Feedback
+5. Max. 2 Review-Runden
 
 ---
 

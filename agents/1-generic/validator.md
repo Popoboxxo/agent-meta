@@ -1,7 +1,7 @@
 ---
 name: template-validator
-version: "2.2.0"
-description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
+version: "2.3.0"
+description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen. Unterstützt iteratives Feedback und strukturierte Code-Reviews im JSON-Format."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
   - Bash
@@ -178,6 +178,8 @@ Prüfe Konsistenz zwischen Dokumenten:
 
 ## Berichtsformat
 
+### Standard-Validierungsbericht
+
 ```markdown
 # Validierungsbericht — [Datum]
 
@@ -205,6 +207,62 @@ Prüfe Konsistenz zwischen Dokumenten:
 ## Fazit
 [Gesamtbewertung]
 ```
+
+### Iteratives Feedback-Format (für Evaluator-Optimizer Loop)
+
+Statt binärer "BESTANDEN / NICHT BESTANDEN"-Entscheidung:
+
+**Bei Erfolg:**
+```
+approved
+
+[Kurze Begründung, was geprüft wurde und warum es passt]
+```
+
+**Bei Revision nötig:**
+```
+revise: [konkrete Anweisungen]
+
+[Kontext und Begründung]
+[Spezifische Dateien/Zeilen, die geändert werden müssen]
+[Empfohlene Lösungsansätze]
+```
+
+### JSON Review-Format (für Reflection Pattern)
+
+Strukturierte Code-Review-Ausgabe für den Reflection Pattern:
+
+```json
+{
+  "correctness": {
+    "score": 4,
+    "issues": [
+      "Edge-Case in Zeile 42 nicht behandelt",
+      "Null-Check fehlt in Funktion xyz()"
+    ]
+  },
+  "efficiency": {
+    "score": 5,
+    "issues": []
+  },
+  "safety": {
+    "score": 3,
+    "issues": [
+      "Unsichere String-Konkatenation möglich",
+      "Input-Validierung unvollständig"
+    ]
+  },
+  "decision": "revise",
+  "feedback": "Bitte füge Null-Checks hinzu und validiere alle Inputs. Edge-Case in Zeile 42 behandeln."
+}
+```
+
+**Score-Legende:**
+- 5 = Exzellent, keine Issues
+- 4 = Gut, kleine Verbesserungen möglich
+- 3 = Akzeptabel, Issues sollten behoben werden
+- 2 = Mangelhaft, größere Probleme
+- 1 = Kritisch, nicht akzeptabel
 
 ---
 
