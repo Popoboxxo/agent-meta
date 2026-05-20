@@ -57,7 +57,7 @@ roles:
     model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
     memory: ""
     workflow_tier: recommended
-    description: "Neues Feature end-to-end: Branch → REQ → TDD → Dev → Validate → PR"
+    description: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 
   tester:
     model: balanced
