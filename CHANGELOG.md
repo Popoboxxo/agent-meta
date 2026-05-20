@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.44.0] — 2026-05-20
+
+### Added
+
+- **Orchestrator v3.3.0**: New "Aufgaben-Kontext orchestrieren" section with task-depth classification (surface/structure/architecture), context tailoring by depth level, worker-to-tier matching, and cost-awareness for delegation decisions.
+- **4 new model aliases** in `config/ai-providers.yaml`: `deepseek-pro`, `glm`, `mimo`, `minimax` — easier shorthand references for opencode-go models.
+
+### Changed
+
+- **Opencode powerful tier**: `kimi-k2.5` → `deepseek-v4-pro` (frontier reasoning model).
+- **All 12 opencode-go models documented** in `config/ai-providers.yaml` with strengths and req/5h limits.
+
+---
+
 ## [0.43.0] — 2026-05-19
 
 ### Added
