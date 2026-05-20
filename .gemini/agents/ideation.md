@@ -2,7 +2,6 @@
 name: ideation
 version: "1.2.3"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
-generated-from: "1-generic/ideation.md@1.2.3"
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
   - Read

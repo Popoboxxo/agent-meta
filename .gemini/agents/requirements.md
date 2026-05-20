@@ -2,7 +2,6 @@
 name: requirements
 version: "1.3.3"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
-generated-from: "1-generic/requirements.md@1.3.3"
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
   - Read

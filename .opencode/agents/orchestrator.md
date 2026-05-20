@@ -2,7 +2,6 @@
 name: orchestrator
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 mode: subagent
-generated-from: "1-generic/orchestrator.md@2.10.0"
 ---
 # Orchestrator — agent-meta
 

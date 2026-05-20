@@ -2,7 +2,6 @@
 name: feature
 version: "1.4.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.4.0"
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
 #                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.

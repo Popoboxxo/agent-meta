@@ -3,7 +3,6 @@ name: feedback
 description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
 mode: subagent
 model: opencode-go/qwen3.6-plus
-generated-from: "1-generic/feedback.md@1.0.0"
 ---
 # Feedback — agent-meta
 
