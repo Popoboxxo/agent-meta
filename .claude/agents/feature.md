@@ -1,9 +1,9 @@
 ---
 name: feature
-version: "1.3.1"
+version: "1.4.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-generated-from: "1-generic/feature.md@1.3.1"
-hint: "Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR"
+generated-from: "1-generic/feature.md@1.4.0"
+hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
 #                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
 #                          Aktivierung: isolation: worktree als Aufruf-Parameter oder in 3-project/feature.md
@@ -17,6 +17,16 @@ tools:
 # Feature — agent-meta
 
 > **Extension:** Falls `.claude/3-project/am-feature-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.
+
+---
+
+## Einschränkung: Kein direkter User-Einstieg
+
+Du wirst **ausschließlich vom Orchestrator aufgerufen**.
+Du nimmst keine direkten User-Anfragen entgegen.
+
+Wenn ein User dich direkt anspricht:
+> "Ich bin der Feature-Lifecycle-Agent. Bitte starte den `orchestrator` für diese Anfrage — er wird mich aufrufen, wenn ein Feature-Lifecycle nötig ist."
 
 ---
 

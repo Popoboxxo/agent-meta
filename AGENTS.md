@@ -17,7 +17,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `agent-meta-scout` | KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
-| `feature` | Neues Feature end-to-end durchführen: Branch → REQ → TDD → Dev → Validate → PR |
+| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. |
 | `feedback` | Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git |
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
@@ -292,16 +292,27 @@ Einstiegspunkt für alle Entwicklungsaufgaben: `orchestrator`-Agent.
 
 ## Immer Orchestrator
 
-Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation
+Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation | Analyse | Design
 
 ## Ausnahmen — direkt an
 
 | Aufgabe | Agent |
 |---------|-------|
-| Git-Commit / Push / Tag / Frage | `git` |
-| Erkenntnisse speichern | `documenter` |
-| agent-meta Upgrade / Sync | `agent-meta-manager` |
-| Feedback einreichen | `meta-feedback` |
+| Git-Operationen (Commit, Push, Branch, Tag, PR) | `git` |
+| Erkenntnisse speichern (Session-Ende) | `documenter` |
+| agent-meta Upgrade / Sync / Extension / Meta-Fragen | `agent-meta-manager` |
+| Projekt-Feedback als GitHub Issue einreichen | `feedback` |
+
+## Was NIE direkt an andere Agenten geht
+
+| Falsch | Richtig |
+|--------|---------|
+| "Wie funktioniert der Sync?" → `git` | → `agent-meta-manager` |
+| "Ist mein Code gut?" → `validator` | → `orchestrator` (der entscheidet ob/wann `validator`) |
+| "Erstelle ein Feature" → `feature` (direkt) | → `orchestrator` (der startet `feature`) |
+| "Was bedeutet diese Rule?" → `validator` | → `agent-meta-manager` |
+| "Analysiere die Codebase" → im Hauptchat | → `orchestrator` → `ideation` |
+| "Entwirf ein Konzept" → im Hauptchat | → `orchestrator` → `ideation` |
 
 ## Hauptchat ohne Orchestrator
 
