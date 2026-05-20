@@ -2,6 +2,14 @@
 name: developer
 description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen"
 mode: subagent
+permission:
+  bash: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  task: allow
+  todowrite: allow
 ---
 # Developer — agent-meta
 

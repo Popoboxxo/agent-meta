@@ -2,6 +2,12 @@
 name: requirements
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 mode: subagent
+permission:
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  todowrite: allow
 ---
 # Requirements Engineer — agent-meta
 

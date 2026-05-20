@@ -3,6 +3,13 @@ name: release
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 mode: subagent
 model: opencode-go/qwen3.6-plus
+permission:
+  bash: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  todowrite: allow
 ---
 # Release Manager — agent-meta
 

@@ -2,6 +2,9 @@
 name: orchestrator
 description: "Koordiniert alle Agenten durch den Entwicklungsprozess: Requirements → Development → Testing → Validation → Documentation."
 mode: subagent
+permission:
+  task: allow
+  todowrite: allow
 ---
 # Orchestrator — agent-meta
 
@@ -211,7 +214,7 @@ Parallel: max. 4 Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
 
 **Parallel-Pattern (konkret):**
-Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `Agent`-Tool-Aufrufe.
+Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `task`-Tool-Aufrufe.
 Starte unabhängige Agenten nacheinander im selben Kontext — sie laufen implizit parallel.
 
 

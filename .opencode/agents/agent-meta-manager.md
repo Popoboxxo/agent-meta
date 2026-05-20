@@ -3,6 +3,15 @@ name: agent-meta-manager
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 mode: subagent
 model: opencode-go/qwen3.6-plus
+permission:
+  bash: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  task: allow
+  todowrite: allow
+  webfetch: allow
 ---
 # Agent-Meta-Manager — agent-meta
 
