@@ -1,9 +1,9 @@
 ---
 name: feedback
 model: gemini-2.5-pro
-version: "1.0.0"
+version: "1.1.0"
 description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
-generated-from: "1-generic/feedback.md@1.0.0"
+generated-from: "1-generic/feedback.md@1.1.0"
 hint: "Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git"
 tools:
   - Bash
@@ -215,7 +215,110 @@ Bestätigung liegt beim aufrufenden Chat.
 - KEIN neuen Agent-Spawn für Bestätigung — Kontext geht verloren
 - KEINE vagen Titel ("Problem", "Verbesserung")
 
----
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{
+  "title": "Issue Created",
+  "description": "Output for agents that create GitHub issues. Used by: feedback, meta-feedback.",
+  "required": [
+    "issue_type",
+    "issue_title"
+  ],
+  "properties": {
+    "issue_type": {
+      "type": "string",
+      "enum": [
+        "bug",
+        "improvement",
+        "feature",
+        "new-agent",
+        "new-command",
+        "new-skill",
+        "new-platform",
+        "new-speech",
+        "docs",
+        "design"
+      ],
+      "description": "Type of feedback issue."
+    },
+    "issue_title": {
+      "type": "string",
+      "description": "Issue title (English)."
+    },
+    "issue_url": {
+      "type": "string",
+      "description": "Created issue URL."
+    },
+    "issue_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "GitHub issue number."
+    },
+    "category": {
+      "type": "string",
+      "description": "Category (e.g. template, config, rule, component)."
+    },
+    "related_component": {
+      "type": "string",
+      "description": "Affected component or agent."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial",
+        "failure"
+      ],
+      "description": "Execution status of the agent task."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable summary of what was done."
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional warnings encountered during execution."
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Errors if status is failure or partial."
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Task duration in milliseconds."
+    }
+  }
+}
+```
+
+**Example output:**
+```json
+{
+  "issue_type": "bug",
+  "issue_title": "<issue_title>",
+  "issue_url": "<issue_url>",
+  "issue_number": 0,
+  "category": "<category>",
+  "related_component": "<related_component>"
+}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
 
 ## Sprache
 

@@ -2,9 +2,9 @@
 name: documenter
 model: claude-sonnet-4-6
 memory: project
-version: "1.4.0"
+version: "1.5.0"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
-generated-from: "1-generic/documenter.md@1.4.0"
+generated-from: "1-generic/documenter.md@1.5.0"
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
   - Read
@@ -196,6 +196,320 @@ Periodically review sub-project changelogs and architecture docs for decisions t
 - Tests fehlen? → Verweise an `tester`
 - Anforderung unklar? → Verweise an `requirements`
 - Validierung nötig? → Verweise an `validator`
+
+## Structured Output Contract
+
+You MUST produce a JSON object at the end of your response that conforms to this schema:
+
+```json
+{
+  "title": "Knowledge Output",
+  "description": "Output for agents that produce documentation, ideas, or discover new information. Used by: documenter, ideation, agent-meta-scout.",
+  "required": [
+    "topic"
+  ],
+  "properties": {
+    "topic": {
+      "type": "string",
+      "description": "Topic explored or documented."
+    },
+    "files_updated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Documentation file path."
+          },
+          "section": {
+            "type": "string",
+            "description": "Section modified."
+          },
+          "summary": {
+            "type": "string",
+            "description": "What was changed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Documentation files updated (documenter)."
+    },
+    "doc_type": {
+      "type": "string",
+      "enum": [
+        "CODEBASE_OVERVIEW",
+        "ARCHITECTURE",
+        "README",
+        "LEARNINGS",
+        "session",
+        "other"
+      ],
+      "description": "Type of documentation."
+    },
+    "sections_added": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new sections."
+    },
+    "sections_modified": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of modified sections."
+    },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Option name."
+          },
+          "pros": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "feasibility": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Explored options with analysis (ideation)."
+    },
+    "recommended_approach": {
+      "type": "string",
+      "description": "Name of the recommended option (ideation)."
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Identified risks."
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Concrete next steps."
+    },
+    "discoveries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "relevance",
+          "quality_score"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "pattern",
+              "rule",
+              "workflow",
+              "tool"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "relevance": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "quality_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Discovered candidates (agent-meta-scout)."
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "action",
+          "rationale",
+          "priority"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Concrete recommendations (scout)."
+    },
+    "sources_scouted": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Sources that were scouted."
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Overall confidence 0-10."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial",
+        "failure"
+      ],
+      "description": "Execution status of the agent task."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable summary of what was done."
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional warnings encountered during execution."
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Errors if status is failure or partial."
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Task duration in milliseconds."
+    }
+  }
+}
+```
+
+**Example output:**
+```json
+{
+  "topic": "<topic>",
+  "files_updated": [
+    {
+      "path": "<path>",
+      "section": "<section>",
+      "summary": "<summary>"
+    }
+  ],
+  "doc_type": "CODEBASE_OVERVIEW",
+  "sections_added": 0,
+  "sections_modified": 0,
+  "options": [
+    {
+      "name": "<name>",
+      "pros": "<pros>",
+      "cons": "<cons>",
+      "feasibility": "high",
+      "effort": "small"
+    }
+  ],
+  "recommended_approach": "<recommended_approach>",
+  "risks": [
+    "<value>"
+  ],
+  "next_steps": [
+    "<value>"
+  ],
+  "discoveries": [
+    {
+      "name": "<name>",
+      "type": "skill",
+      "url": "<url>",
+      "relevance": "high",
+      "quality_score": 0,
+      "description": "<description>"
+    }
+  ],
+  "recommendations": [
+    {
+      "action": "<action>",
+      "rationale": "<rationale>",
+      "priority": "high"
+    }
+  ],
+  "sources_scouted": [
+    "<value>"
+  ],
+  "confidence": 0
+}
+```
+
+**Rules:**
+- Wrap the JSON in a ```json code block at the END of your response
+- All required fields MUST be present
+- Use the exact field names and types from the schema
+- If a field is not applicable, use null or an empty value
+- The JSON summary does NOT replace your free-text response — it supplements it
 
 ## Sprache
 
