@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: "1.0.1"
 
 # agent-meta MCP Registry
 # ========================
@@ -42,7 +42,7 @@ mcp-servers:
       Gerätesteuerung nur über HA-App, Dashboard oder Sprachassistent.
     connection:
       type: sse
-      url: "{{MCP_HA_URL}}/api/mcp_server/sse"
+      url: "{{MCP_HA_URL}}/api/mcp"
       headers:
         Authorization: "Bearer {{MCP_HA_TOKEN}}"
     secrets:
