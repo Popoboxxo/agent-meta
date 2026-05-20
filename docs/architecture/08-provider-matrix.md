@@ -84,7 +84,7 @@ Abstrakte Tier-Namen → Provider-spezifische Modell-IDs.
 | `nano` | `claude-haiku-4-5-20251001` | `gemini-2.5-flash` | `opencode-go/deepseek-v4-flash` | `codellama:7b` |
 | `fast` | `claude-haiku-4-5-20251001` | `gemini-2.5-flash` | `opencode-go/deepseek-v4-flash` | `codellama:7b` |
 | `balanced` | `claude-sonnet-4-6` | `gemini-2.5-pro` | `opencode-go/qwen3.6-plus` | `claude-sonnet-4-6` |
-| `powerful` | `claude-opus-4-7` | `gemini-2.5-pro` | `opencode-go/kimi-k2.5` | `claude-opus-4-7` |
+| `powerful` | `claude-opus-4-7` | `gemini-2.5-pro` | `opencode-go/deepseek-v4-pro` | `claude-opus-4-7` |
 | `max` | `claude-opus-4-7` | `gemini-2.5-pro` | `opencode-go/kimi-k2.6` | `claude-opus-4-7` |
 
 > Legacy-Aliases: `haiku` → `fast`, `sonnet` → `balanced`, `opus` → `powerful`

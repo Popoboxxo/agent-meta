@@ -146,7 +146,7 @@ mindmap
 ### performance
 - **Tier:** optional
 - **Beschreibung:** Performance-Profiling und Bottleneck-Analyse: CPU, Memory, I/O — mit konkreten Optimierungsempfehlungen.
-- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.5
+- **Model:** Claude: claude-opus-4-7, Continue: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/deepseek-v4-pro
 
 ### release
 - **Tier:** optional

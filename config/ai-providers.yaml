@@ -107,16 +107,36 @@ providers:
     extension_dir: .opencode/3-project
     # opencode-go model IDs — format: opencode-go/<model-id>
     # Full list: https://opencode.ai/docs/go/
+    #
+    # Tier-to-model rationale (based on strength profiles + cost):
+    #   nano/fast → DeepSeek V4 Flash   : fastest+cheapest, ideal for routing & simple ops (31,650 req/5h)
+    #   balanced  → Qwen 3.6 Plus       : balanced tool-calling, stable agent loops, low dropout (3,300 req/5h)
+    #   powerful  → DeepSeek V4 Pro      : frontier-level reasoning, complex algorithms, architecture (3,450 req/5h)
+    #   max       → Kimi K2.6           : surgical code editing, 256k context, strict pattern adherence (1,150 req/5h)
+    #
+    # Additional models available via model-overrides in project.yaml:
+    #   opencode-go/qwen3.5-plus          — budget tool-caller, legacy deployments (10,200 req/5h)
+    #   opencode-go/kimi-k2.5             — cost-sensitive RAG pipelines, simpler edits (1,850 req/5h)
+    #   opencode-go/glm-5.1               — MIT-licensed, 600+ loop stability, enterprise agents (880 req/5h)
+    #   opencode-go/glm-5                 — text-only fallback, not recommended for coding (1,150 req/5h)
+    #   opencode-go/mimo-v2.5-pro         — extreme endurance (>1000 tool calls), greenfield apps (1,290 req/5h)
+    #   opencode-go/mimo-v2.5             — fast iterations in MiMo ecosystem (2,150 req/5h)
+    #   opencode-go/minimax-m2.7          — multi-agent collab, native Office doc generation (3,400 req/5h)
+    #   opencode-go/minimax-m2.5          — text-based RAG, cheapest non-flash option (6,300 req/5h)
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash   # fast & cheap: batch, throughput
-      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback
-      balanced: opencode-go/qwen3.6-plus        # default workhorse: dev, docs, review
-      powerful: opencode-go/kimi-k2.5           # complex reasoning: architecture, security
-      max:      opencode-go/kimi-k2.6           # maximum capability
+      nano:     opencode-go/deepseek-v4-flash   # fastest & cheapest: routing, batch, throughput
+      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback, formatting
+      balanced: opencode-go/qwen3.6-plus        # balanced tool-calling: dev execution, review, docs
+      powerful: opencode-go/deepseek-v4-pro     # frontier reasoning: architecture, complex algorithms, security
+      max:      opencode-go/kimi-k2.6           # surgical code editing: 256k context, strict conventions
     model-aliases:
       flash:  opencode-go/deepseek-v4-flash
       qwen:   opencode-go/qwen3.6-plus
       kimi:   opencode-go/kimi-k2.6
+      deepseek-pro: opencode-go/deepseek-v4-pro
+      glm:    opencode-go/glm-5.1
+      mimo:   opencode-go/mimo-v2.5-pro
+      minimax: opencode-go/minimax-m2.7
 
   Continue:
     agents_dir: .continue/agents
