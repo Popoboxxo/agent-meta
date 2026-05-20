@@ -102,23 +102,25 @@ Zentraler Secret-Store: `.meta-config/secrets.local.yaml` (gitignored, einmalig 
 
 ### Opencode — `opencode.json` (committed, keine Secrets)
 
+> **Hinweis:** Opencode verwendet `{env:VARIABLE_NAME}`-Syntax (nicht `${VAR}`) und den Key `"environment"` (nicht `"env"`).
+> Das `command`-Feld ist ein Array: `["command", "arg1", "arg2"]`.
+
 ```json
 {
   "mcp": {
     "home-assistant": {
-      "type": "sse",
-      "url": "${MCP_HA_URL}/api/mcp_server/sse",
-      "headers": { "Authorization": "Bearer ${MCP_HA_TOKEN}" }
+      "type": "streamable-http",
+      "url": "{env:MCP_HA_URL}/api/mcp",
+      "headers": { "Authorization": "Bearer {env:MCP_HA_TOKEN}" }
     },
     "influxdb": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "influxdb-mcp-server"],
-      "env": {
-        "INFLUXDB_URL": "${MCP_INFLUXDB_URL}",
-        "INFLUXDB_TOKEN": "${MCP_INFLUXDB_TOKEN}",
-        "INFLUXDB_ORG": "${MCP_INFLUXDB_ORG}",
-        "INFLUXDB_BUCKET": "${MCP_INFLUXDB_BUCKET}"
+      "command": ["npx", "-y", "influxdb-mcp-server"],
+      "environment": {
+        "INFLUXDB_URL": "{env:MCP_INFLUXDB_URL}",
+        "INFLUXDB_TOKEN": "{env:MCP_INFLUXDB_TOKEN}",
+        "INFLUXDB_ORG": "{env:MCP_INFLUXDB_ORG}",
+        "INFLUXDB_BUCKET": "{env:MCP_INFLUXDB_BUCKET}"
       }
     }
   }

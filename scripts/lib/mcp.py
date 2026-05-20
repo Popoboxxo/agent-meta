@@ -139,23 +139,60 @@ def _subst(value: str, secrets: dict | None) -> str:
     return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
 
 
-def _build_connection_entry(conn: dict, secrets: dict | None) -> dict:
-    """Convert a registry connection block to a provider-config dict."""
+def _subst_opencode(value: str, secrets: dict | None) -> str:
+    """Replace {{VAR}} placeholders with opencode {env:VAR} syntax.
+
+    secrets=None  → {env:VAR}  (committed config — env var reference)
+    secrets=dict  → actual value from dict, or {env:VAR} if key absent
+    """
+    def _replace(m: re.Match) -> str:
+        var_name = m.group(1)
+        if secrets is not None and var_name in secrets:
+            return str(secrets[var_name])
+        return f"{{env:{var_name}}}"
+    return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
+
+
+def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
+    """Convert a registry connection block to a provider-config dict.
+
+    fmt="opencode-json" uses opencode-specific syntax:
+      - command as array (not command + args)
+      - "environment" key (not "env")
+      - {env:VAR} interpolation (not ${VAR})
+    """
     conn_type = conn.get("type", "")
     entry: dict = {"type": conn_type}
 
+    is_opencode = fmt == "opencode-json"
+
     if conn_type == "sse":
-        entry["url"] = _subst(conn.get("url", ""), secrets)
+        raw_url = conn.get("url", "")
+        if is_opencode:
+            entry["url"] = _subst_opencode(raw_url, secrets)
+        else:
+            entry["url"] = _subst(raw_url, secrets)
         headers = conn.get("headers", {})
         if headers:
-            entry["headers"] = {k: _subst(str(v), secrets) for k, v in headers.items()}
+            if is_opencode:
+                entry["headers"] = {k: _subst_opencode(str(v), secrets) for k, v in headers.items()}
+            else:
+                entry["headers"] = {k: _subst(str(v), secrets) for k, v in headers.items()}
 
     elif conn_type == "stdio":
-        entry["command"] = conn.get("command", "")
-        entry["args"] = list(conn.get("args", []))
+        cmd = conn.get("command", "")
+        args = list(conn.get("args", []))
         env = conn.get("env", {})
-        if env:
-            entry["env"] = {k: _subst(str(v), secrets) for k, v in env.items()}
+
+        if is_opencode:
+            entry["command"] = [cmd] + args
+            if env:
+                entry["environment"] = {k: _subst_opencode(str(v), secrets) for k, v in env.items()}
+        else:
+            entry["command"] = cmd
+            entry["args"] = args
+            if env:
+                entry["env"] = {k: _subst(str(v), secrets) for k, v in env.items()}
 
     return entry
 
@@ -164,6 +201,7 @@ def _build_mcp_entries(
     active_servers: list[str],
     registry: dict,
     secrets: dict | None,
+    fmt: str | None = None,
 ) -> dict:
     """Build a {server_name: config_dict} map for insertion into provider configs."""
     entries: dict = {}
@@ -174,7 +212,7 @@ def _build_mcp_entries(
         conn = server_def.get("connection")
         if not conn:
             continue
-        entries[server_name] = _build_connection_entry(conn, secrets)
+        entries[server_name] = _build_connection_entry(conn, secrets, fmt)
     return entries
 
 
@@ -367,8 +405,8 @@ def generate_provider_configs(
         secrets_data, _ = _load_yaml_or_json(secrets_path)
         secrets = secrets_data or {}
 
-    committed_entries = _build_mcp_entries(active_servers, registry, secrets=None)
-    local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets) if secrets else {}
+    committed_entries = _build_mcp_entries(active_servers, registry, secrets=None, fmt=fmt)
+    local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets, fmt=fmt) if secrets else {}
 
     # --- Committed provider config ---
     committed_path = safe_path(project_root, committed_file)
