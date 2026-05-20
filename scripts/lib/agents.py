@@ -35,7 +35,7 @@ _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
     ),
     "Opencode": (
         "**Parallel-Pattern (konkret):**\n"
-        "Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `Agent`-Tool-Aufrufe.\n"
+        "Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `task`-Tool-Aufrufe.\n"
         "Starte unabhängige Agenten nacheinander im selben Kontext — sie laufen implizit parallel.\n"
     ),
     "Gemini": (
@@ -842,6 +842,42 @@ def inject_debug_block(content: str, agent_name: str) -> str:
     )
 
 
+def _map_claude_tools_to_opencode_permissions(tools: list) -> dict[str, str]:
+    """Map Claude Code tool names to opencode permission keys.
+
+    opencode uses a permission-based model (tools frontmatter is deprecated).
+    Each mapped key is set to 'allow'. Unknown tools are ignored.
+
+    Known mappings:
+      Bash -> bash
+      Read -> read
+      Write / Edit -> edit  (write/edit/apply_patch gated by edit permission)
+      Glob -> glob
+      Grep -> grep
+      WebFetch -> webfetch
+      WebSearch -> websearch
+      Agent -> task          (subagent invocation via task tool)
+      TodoWrite -> todowrite
+    """
+    mapping = {
+        "Agent": "task",
+        "TodoWrite": "todowrite",
+        "Bash": "bash",
+        "Read": "read",
+        "Write": "edit",
+        "Edit": "edit",
+        "Glob": "glob",
+        "Grep": "grep",
+        "WebFetch": "webfetch",
+        "WebSearch": "websearch",
+    }
+    perms: dict[str, str] = {}
+    for t in tools:
+        if isinstance(t, str) and t in mapping:
+            perms[mapping[t]] = "allow"
+    return perms
+
+
 def _transform_frontmatter_for_opencode(
     content: str,
     name: str,
@@ -851,12 +887,13 @@ def _transform_frontmatter_for_opencode(
 ) -> str:
     """Build opencode-native agent frontmatter.
 
-    opencode frontmatter schema (all others stripped):
-      name: <role>             (required — used to invoke the agent)
-      description: "..."       (required)
-      mode: subagent           (all agent-meta agents are subagents)
-      model: provider/model-id (optional — only when tier maps to a model ID)
-      generated-from: "..."    (traceability, kept for diffability)
+    opencode frontmatter schema:
+      name: <role>
+      description: "..."
+      mode: subagent
+      model: provider/model-id (optional)
+      permission:             (mapped from template frontmatter tools)
+        <key>: allow
     """
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
@@ -864,8 +901,16 @@ def _transform_frontmatter_for_opencode(
     lines = [f'name: {name}', f'description: "{description}"', 'mode: subagent']
     if model:
         lines.append(f'model: {model}')
-    # NOTE: generated-from is intentionally omitted because opencode rejects
-    # unknown frontmatter fields (Extra inputs are not permitted).
+
+    # Map template tools to opencode permission block
+    template_fm = _parse_frontmatter_yaml(content)
+    template_tools = template_fm.get("tools")
+    if isinstance(template_tools, list) and template_tools:
+        perms = _map_claude_tools_to_opencode_permissions(template_tools)
+        if perms:
+            lines.append("permission:")
+            for key in sorted(perms):
+                lines.append(f"  {key}: {perms[key]}")
 
     return '---\n' + '\n'.join(lines) + '\n---\n' + body
 

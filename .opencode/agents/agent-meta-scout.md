@@ -3,6 +3,10 @@ name: agent-meta-scout
 description: "Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 mode: subagent
 model: opencode-go/qwen3.6-plus
+permission:
+  read: allow
+  webfetch: allow
+  websearch: allow
 ---
 # Agent-Meta Scout — agent-meta
 

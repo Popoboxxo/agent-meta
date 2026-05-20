@@ -2,6 +2,11 @@
 name: feature
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 mode: subagent
+permission:
+  bash: allow
+  read: allow
+  task: allow
+  todowrite: allow
 ---
 # Feature — agent-meta
 

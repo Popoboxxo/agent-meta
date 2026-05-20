@@ -3,6 +3,12 @@ name: documenter
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 mode: subagent
 model: opencode-go/qwen3.6-plus
+permission:
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  todowrite: allow
 ---
 # Documenter — agent-meta
 

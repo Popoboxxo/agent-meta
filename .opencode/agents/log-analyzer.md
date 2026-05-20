@@ -3,6 +3,15 @@ name: log-analyzer
 description: "Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing."
 mode: subagent
 model: opencode-go/qwen3.6-plus
+permission:
+  bash: allow
+  glob: allow
+  grep: allow
+  read: allow
+  task: allow
+  todowrite: allow
+  webfetch: allow
+  websearch: allow
 ---
 # Log-Analyzer — agent-meta
 

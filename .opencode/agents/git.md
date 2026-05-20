@@ -3,6 +3,13 @@ name: git
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 mode: subagent
 model: opencode-go/deepseek-v4-flash
+permission:
+  bash: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  read: allow
+  todowrite: allow
 ---
 # Git Agent — agent-meta
 
