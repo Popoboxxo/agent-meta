@@ -294,6 +294,8 @@ Einstiegspunkt für alle Entwicklungsaufgaben: `orchestrator`-Agent.
 
 Feature | Bugfix | Refactoring | Anforderungen | Tests | Audit | Release | Docker | Ideation | Analyse | Design
 
+> **Der Orchestrator wählt automatisch das kosteneffizienteste Model-Tier** für jede Delegation (nano → fast → balanced → powerful → max). Nie direkt an teurere Agenten delegieren als nötig.
+
 ## Ausnahmen — direkt an
 
 | Aufgabe | Agent |

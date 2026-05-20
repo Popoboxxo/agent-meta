@@ -33,7 +33,7 @@ roles:
     model: ""           # erbt vom Kontext — Entry-Point, User entscheidet
     memory: ""
     workflow_tier: required
-    description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten"
+    description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
 
   developer:
     model: ""           # erbt — oft das stärkste verfügbare Modell gewünscht
