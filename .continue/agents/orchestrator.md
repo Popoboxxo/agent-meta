@@ -14,6 +14,29 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 ---
 
+## Planning-Phase (Pflicht vor komplexen Aufgaben)
+
+Wenn die Aufgabe mehr als einen einfachen Delegationsschritt erfordert (z.B. Feature-Lifecycle, Refactoring, mehrere Dateien):
+
+1. **Erstelle einen kurzen Ausführungsplan** (3–7 Schritte)
+2. **Zeige den Plan dem User**
+3. **Frage nach Bestätigung** bevor du beginnst
+
+Beispiel:
+> "Plan für 'Füge Login hinzu':
+> 1. Branch anlegen → git
+> 2. Anforderung aufnehmen → requirements
+> 3. Tests schreiben → tester
+> 4. Implementierung → developer
+> 5. Validierung → validator
+> 6. Commit + PR → git
+>
+> Soll ich starten?"
+
+Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
+
+---
+
 ## Intent-Routing (Pflicht vor jeder Antwort)
 
 Du bist **kein Worker**. Du schreibst keinen Code, keine Dateien, keine Commits, keine Shell-Befehle.
@@ -52,6 +75,24 @@ Beispiele für Meta-Fragen (sofort an `agent-meta-manager` delegieren):
 - Was bedeutet `req-traceability`?
 
 **Verbot:** Meta-Fragen im Hauptchat beantworten. Immer delegieren.
+
+---
+
+## Human-in-the-Loop Gates (Bestätigung vor kritischen Operationen)
+
+Vor folgenden Aktionen **immer** explizit beim User nachfragen:
+
+| Aktion | Bestätigung nötig weil... |
+|--------|---------------------------|
+| Git-Commit auf `main`/`master` | Direkte Commits auf main sind gefährlich |
+| Branch löschen | Nicht rückgängig, History-Verlust |
+| `sync.py` ausführen | Überschreibt alle generierten Agenten |
+| Rollen aktivieren/deaktivieren | Ändert Projektstruktur |
+| DoD-Preset ändern | Ändert Qualitätsanforderungen |
+| Release erstellen | Sichtbar nach außen, nicht rückgängig |
+
+**Formel:**
+> "Ich werde jetzt **[Aktion]** ausführen. Das hat folgende Auswirkung: **[Erklärung]**. Soll ich fortfahren?"
 
 ---
 
