@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.46.1] — 2026-05-21
+
+### Fixed
+
+- **Opencode frontmatter schema validation**: Removed `generated-from` field from Opencode agent frontmatter — caused schema validation error (`Extra inputs are not permitted`) in opencode. (#188)
+
+---
+
 ## [Unreleased]
 
 ---
