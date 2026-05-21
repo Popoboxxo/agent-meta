@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.47.1-beta] — 2026-05-21
+
+### Added
+
+- **Dry-Run Engine improvements**: Enhanced dry-run engine with German keyword support, word boundary matching, and better FANOUT splitting for more accurate orchestration simulation.
+
+### Changed
+
+- **README.md updated**: Added comprehensive documentation for orchestrator-first architecture v3.0.0 beta features.
+- **Version bump**: Upgraded agent-meta to v0.47.0-beta in preparation for this release.
+
+---
+
 ## [0.47.0-beta] — 2026-05-21
 
 ### Added
