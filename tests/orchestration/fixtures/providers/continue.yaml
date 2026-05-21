@@ -1,0 +1,43 @@
+# Continue Provider Syntax Fixture for Orchestration Dry-Run
+
+provider: Continue
+parallel_support: false
+
+syntax:
+  fanout:
+    description: "NOT SUPPORTED. Continue does not support native parallel sub-agent execution."
+    example: |
+      # Sequential fallback:
+      # 1. Delegate task A → wait
+      # 2. Delegate task B → wait
+      # 3. ...
+    notes:
+      - "FANOUT falls back to sequential execution"
+      - "Inform user: 'Continue cannot parallelize — executing tasks sequentially.'"
+  parallel_group:
+    description: "NOT SUPPORTED. Falls back to sequential execution."
+    example: "See FANOUT fallback"
+    notes:
+      - "Different agent types executed sequentially"
+  barrier:
+    description: "Not applicable — sequential execution has implicit barrier after each step."
+    example: "N/A"
+  sequential_fallback:
+    description: "Default mode for Continue. Execute tasks one by one."
+    example: |
+      # Step 1
+      (Delegate to agent A)
+      # Wait for result...
+      # Step 2
+      (Delegate to agent B)
+
+limitations:
+  - "No native parallel sub-agent support"
+  - "All parallel operations fall back to sequential"
+  - "User informed about sequential execution"
+
+validation_checks:
+  - "FANOUT not supported → sequential fallback warning"
+  - "PARALLEL_GROUP not supported → sequential fallback warning"
+  - "No parallel syntax generated"
+  - "User notification about sequential execution"

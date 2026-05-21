@@ -246,6 +246,25 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         )
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
+    # ORCHESTRATOR_MODE: auto-inject from orchestrator block in project.yaml
+    orch_config = config.get("orchestrator", {})
+    variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
+    variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
+    # UNKNOWN_FALLBACK: granular flags (new object format) or legacy string
+    unknown_fallback = orch_config.get("unknown-fallback", {})
+    if isinstance(unknown_fallback, str):
+        # Legacy string format: backward compatibility
+        variables["UNKNOWN_FALLBACK_META_FEEDBACK"] = "true" if unknown_fallback == "meta-feedback" else "false"
+        variables["UNKNOWN_FALLBACK_MAIN_CHAT"] = "true" if unknown_fallback == "main-chat" else "false"
+        variables["UNKNOWN_FALLBACK_ASK_USER"] = "true" if unknown_fallback == "ask-user" else "false"
+    else:
+        # New object format: individual boolean flags
+        variables["UNKNOWN_FALLBACK_META_FEEDBACK"] = "true" if unknown_fallback.get("meta-feedback", True) else "false"
+        variables["UNKNOWN_FALLBACK_MAIN_CHAT"] = "true" if unknown_fallback.get("main-chat", True) else "false"
+        variables["UNKNOWN_FALLBACK_ASK_USER"] = "true" if unknown_fallback.get("ask-user", False) else "false"
+    # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
+    # Currently empty — will be populated when project-specific agent discovery is implemented
+    variables["PROJECT_SPECIFIC_AGENTS"] = ""
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)

@@ -1,0 +1,93 @@
+# Example: Orchestrator Configuration in project.yaml
+# Add this block to your .meta-config/project.yaml to configure
+# the Orchestrator-First Architecture behavior.
+
+# ============================================================
+# ORCHESTRATOR CONFIGURATION (Beta — Orchestrator-First v3.0.0)
+# ============================================================
+
+orchestrator:
+  # enabled: true  → Orchestrator is active (default)
+  # enabled: false → Main-Chat mode, no orchestration
+  enabled: true
+
+  # strict: true  → Always delegate, unknown intents → meta-feedback
+  # strict: false → Fallback to main-chat for unknown intents
+  strict: true
+
+  # unknown-fallback: Granular flags for unknown intent handling
+  #   meta-feedback: true → Send anonymized feedback to agent-meta (default: true)
+  #   main-chat: true     → Allow main chat to handle the task (default: true)
+  #   ask-user: false     → Ask user for preference (default: false)
+  unknown-fallback:
+    meta-feedback: true
+    main-chat: true
+    ask-user: false
+
+# ============================================================
+# PARALLEL EXECUTION
+# ============================================================
+
+# Maximum number of agents that can run simultaneously
+# Default: 2 (conservative) | Recommended for dev: 4
+max-parallel-agents: 4
+
+# ============================================================
+# EXAMPLE: Full project.yaml with Orchestrator-First
+# ============================================================
+
+# agent-meta-version: 0.47.0
+#
+# provider-isolation: disabled
+#
+# ai-providers:
+#   - Claude
+#   - Opencode
+#   - Gemini
+#   - Continue
+#
+# dod-preset: rapid-prototyping
+# rules-preset: minimal
+#
+# platforms:
+#   - agent-meta
+#
+# roles:
+#   - orchestrator
+#   - developer
+#   - requirements
+#   - documenter
+#   - git
+#   - release
+#   - meta-feedback
+#   - ideation
+#   - agent-meta-manager
+#   - feature
+#   - agent-meta-scout
+#   - log-analyzer
+#   - feedback
+#
+# project:
+#   name: my-project
+#   prefix: mp
+#   short: my-project
+#
+# orchestrator:
+#   enabled: true
+#   strict: true
+#   unknown-fallback:
+#     meta-feedback: true
+#     main-chat: true
+#     ask-user: false
+#
+# max-parallel-agents: 4
+#
+# hooks:
+#   dod-push-check:
+#     enabled: true
+#
+# speech-mode: submissive
+#
+# variables:
+#   PROJECT_NAME: my-project
+#   # ... (other variables)

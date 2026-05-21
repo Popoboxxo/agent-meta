@@ -10,7 +10,9 @@ feedback.toml
 merge.toml
 report-bug.toml
 set-preset.toml
+test-orchestration.toml
 update-extensions.toml
+update-meta.toml
 upgrade-meta.toml
 viz-mindmap.toml
 viz-report.toml

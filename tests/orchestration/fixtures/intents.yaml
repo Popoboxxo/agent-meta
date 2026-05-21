@@ -1,0 +1,138 @@
+# Test Fixtures: Intents for Orchestration Dry-Run
+# Provider-agnostic: Tests for all providers, executed only on active provider
+
+intents:
+  # Basic single-task intents
+  - input: "Füge Login hinzu"
+    expected_agent: developer
+    expected_tier: balanced
+    expected_parallel: false
+    category: single_task
+
+  - input: "Fix den Crash in der API"
+    expected_agent: developer
+    expected_tier: balanced
+    expected_parallel: false
+    category: single_task
+
+  - input: "Commit die Änderungen"
+    expected_agent: git
+    expected_tier: fast
+    expected_parallel: false
+    category: single_task
+
+  - input: "Analysiere die Architektur"
+    expected_agent: ideation
+    expected_tier: balanced
+    expected_parallel: false
+    category: single_task
+
+  - input: "Erstelle Release v1.2.0"
+    expected_agent: release
+    expected_tier: balanced
+    expected_parallel: false
+    category: single_task
+
+  # Multi-task intents (FANOUT eligible)
+  - input: "Fix Bug A in parser, Bug B in renderer, Bug C in validator"
+    expected_agent: developer
+    expected_tier: balanced
+    expected_parallel: true
+    expected_pattern: FANOUT
+    expected_fanout: 3
+    category: multi_task
+
+  - input: "Fix die Bugs A, B, C, D, E"
+    expected_agent: developer
+    expected_tier: balanced
+    expected_parallel: true
+    expected_pattern: FANOUT
+    expected_fanout: 5
+    expected_batches: 2
+    category: multi_task
+
+  - input: "Schreib Tests für Modul A, B und C"
+    expected_agent: tester
+    expected_tier: balanced
+    expected_parallel: true
+    expected_pattern: FANOUT
+    expected_fanout: 3
+    category: multi_task
+
+  - input: "Update die Doku für API, README und Deployment"
+    expected_agent: documenter
+    expected_tier: balanced
+    expected_parallel: true
+    expected_pattern: FANOUT
+    expected_fanout: 3
+    category: multi_task
+
+  - input: "Analysiere Modul A und Modul B"
+    expected_agent: ideation
+    expected_tier: balanced
+    expected_parallel: true
+    expected_pattern: FANOUT
+    expected_fanout: 2
+    category: multi_task
+
+  # Mixed parallel intents (PARALLEL_GROUP)
+  - input: "Fix Bug A und schreib Tests für Modul B"
+    expected_pattern: PARALLEL_GROUP
+    expected_parallel: true
+    expected_agents:
+      - developer
+      - tester
+    category: mixed_parallel
+
+  # Pipeline intents (sequential)
+  - input: "Implementiere Feature X mit Tests und Dokumentation"
+    expected_pattern: PIPELINE
+    expected_parallel: false
+    expected_sequence:
+      - requirements
+      - tester
+      - developer
+      - tester
+      - validator
+      - documenter
+    category: pipeline
+
+  # Lifecycle intents
+  - input: "Feature Y komplett umsetzen"
+    expected_agent: feature
+    expected_pattern: LIFECYCLE
+    expected_parallel: false
+    category: lifecycle
+
+  # Unknown intents
+  - input: "Mache etwas mit dem Ding"
+    expected_agent: UNKNOWN
+    expected_fallback: meta-feedback
+    category: unknown
+
+  - input: "Was ist das für ein Kram da?"
+    expected_agent: UNKNOWN
+    expected_fallback: meta-feedback
+    category: unknown
+
+  # User override triggers
+  - input: "Mach das hier, nicht delegieren"
+    expected_agent: USER_OVERRIDE
+    expected_behavior: main_chat_self_execute
+    category: user_override
+
+  - input: "Im Hauptchat bitte"
+    expected_agent: USER_OVERRIDE
+    expected_behavior: main_chat_self_execute
+    category: user_override
+
+  # Meta questions
+  - input: "Wie funktioniert der Sync?"
+    expected_agent: agent-meta-manager
+    expected_tier: fast
+    category: meta
+
+  - input: "Soll ich einen Override anlegen?"
+    expected_agent: agent-meta-manager
+    expected_tier: balanced
+    category: meta

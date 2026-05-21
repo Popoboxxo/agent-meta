@@ -1,7 +1,7 @@
 # agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.
 # Schema-Validierung: agent-meta.schema.json (JSON Schema bleibt JSON — IDE-Standard)
 
-agent-meta-version: 0.46.1
+agent-meta-version: 0.47.2-beta
 
 # agent-meta manages all provider directories itself (1-generic, 2-platform, etc.)
 # Provider isolation must be disabled here — the meta-repo intentionally
@@ -160,6 +160,16 @@ variables:
   VERSION_DIST_BEHAVIOUR: Keine Dist. Releases sind Git-Tags auf main.
 
 max-parallel-agents: 4
+
+# Orchestrator-First Architecture (Beta v3.0.0)
+# Steuert das Verhalten des Orchestrator-Delegations-Systems.
+orchestrator:
+  enabled: true        # true = Orchestrator aktiv, false = Main-Chat-Modus
+  strict: true         # true = Immer delegieren, false = Fallback erlaubt
+  unknown-fallback:
+    meta-feedback: true   # Send anonymized feedback to agent-meta
+    main-chat: true       # Allow main chat to handle the task
+    ask-user: false       # Ask user for preference
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:

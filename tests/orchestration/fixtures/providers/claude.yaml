@@ -1,0 +1,44 @@
+# Claude Provider Syntax Fixture for Orchestration Dry-Run
+
+provider: Claude
+parallel_support: true
+max_agents_hint: "Limited by MAX_PARALLEL_AGENTS config value"
+
+syntax:
+  fanout:
+    description: "N agents starten — N-1 im Hintergrund (run_in_background=True), 1 im Vordergrund."
+    example: |
+      Agent(subagent_type="developer", prompt="Fix Bug A: ...", run_in_background=True)
+      Agent(subagent_type="developer", prompt="Fix Bug B: ...", run_in_background=True)
+      Agent(subagent_type="developer", prompt="Fix Bug C: ...")  # Vordergrund
+    notes:
+      - "run_in_background=True for background agents"
+      - "One agent in foreground (no flag)"
+      - "Wait for foreground to complete → background results are ready"
+  parallel_group:
+    description: "Different agent types — all but one in background."
+    example: |
+      Agent(subagent_type="developer", prompt="Fix Bug A: ...", run_in_background=True)
+      Agent(subagent_type="tester", prompt="Write Tests B: ...")  # Vordergrund
+    notes:
+      - "Mixed types supported"
+  barrier:
+    description: "Wait for foreground agent to finish → all background results are ready."
+    example: "N/A — implicit after foreground Agent() call completes"
+    notes:
+      - "No explicit barrier call needed"
+      - "Background results available when foreground returns"
+  sequential_fallback:
+    description: "Execute tasks one by one when parallel is not possible."
+    example: |
+      Agent(subagent_type="developer", prompt="Fix A: ...")
+      Agent(subagent_type="developer", prompt="Fix B: ...")
+
+limitations:
+  - "Requires run_in_background=True for parallel execution"
+  - "One agent must be in foreground (no flag)"
+
+validation_checks:
+  - "FANOUT uses run_in_background=True for N-1 agents"
+  - "PARALLEL_GROUP uses run_in_background=True for all but one"
+  - "run_in_background parameter present"

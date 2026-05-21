@@ -1,0 +1,159 @@
+# Test Fixtures: Multi-Task Scenarios for Orchestration Dry-Run
+# Provider-agnostic decomposition test cases
+
+scenarios:
+  # FANOUT scenarios
+  - description: "3 independent bugfixes"
+    input: "Fix parser crash, renderer leak, validator error"
+    expected:
+      decomposition: FANOUT
+      agent_type: developer
+      count: 3
+      independent: true
+      parallel: true
+      batches: 1
+    category: fanout
+
+  - description: "5 independent bugfixes (batching)"
+    input: "Fix A, B, C, D, E"
+    expected:
+      decomposition: FANOUT
+      agent_type: developer
+      count: 5
+      independent: true
+      parallel: true
+      batches: 2
+    category: fanout
+
+  - description: "8 independent bugfixes (2 batches of 4)"
+    input: "Fix bugs A through H"
+    expected:
+      decomposition: FANOUT
+      agent_type: developer
+      count: 8
+      independent: true
+      parallel: true
+      batches: 2
+    category: fanout
+
+  - description: "3 independent test suites"
+    input: "Write tests for parser, renderer, and API"
+    expected:
+      decomposition: FANOUT
+      agent_type: tester
+      count: 3
+      independent: true
+      parallel: true
+      batches: 1
+    category: fanout
+
+  - description: "2 independent documentation updates"
+    input: "Update README and API docs"
+    expected:
+      decomposition: FANOUT
+      agent_type: documenter
+      count: 2
+      independent: true
+      parallel: true
+      batches: 1
+    category: fanout
+
+  # PARALLEL_GROUP scenarios
+  - description: "Fix + Test (different types)"
+    input: "Fix Bug A and write tests for Module B"
+    expected:
+      decomposition: PARALLEL_GROUP
+      agents:
+        - type: developer
+          count: 1
+        - type: tester
+          count: 1
+      independent: true
+      parallel: true
+    category: parallel_group
+
+  - description: "Fix + Doc + Test (3 different types)"
+    input: "Fix Bug A, update docs, and write tests"
+    expected:
+      decomposition: PARALLEL_GROUP
+      agents:
+        - type: developer
+          count: 1
+        - type: documenter
+          count: 1
+        - type: tester
+          count: 1
+      independent: true
+      parallel: true
+    category: parallel_group
+
+  # PIPELINE scenarios (sequential)
+  - description: "Feature with tests (TDD)"
+    input: "Add user login with tests"
+    expected:
+      decomposition: PIPELINE
+      sequence:
+        - agent: requirements
+        - agent: tester
+        - agent: developer
+        - agent: tester
+        - agent: validator
+      independent: false
+      parallel: false
+    category: pipeline
+
+  - description: "Complete feature lifecycle"
+    input: "Implement full authentication system"
+    expected:
+      decomposition: LIFECYCLE
+      agent: feature
+      steps: 8
+      independent: false
+      parallel: false
+    category: lifecycle
+
+  # Negative cases (not parallelizable)
+  - description: "Sequential refactoring with validation"
+    input: "Refactor database layer and validate"
+    expected:
+      decomposition: PIPELINE
+      sequence:
+        - agent: developer
+        - agent: validator
+      independent: false
+      parallel: false
+    category: pipeline
+
+  - description: "Single atomic task"
+    input: "Commit the changes"
+    expected:
+      decomposition: DIRECT
+      agent_type: git
+      count: 1
+      independent: true
+      parallel: false
+    category: direct
+
+  # Edge cases
+  - description: "Dependent tasks on same file"
+    input: "Refactor parser and then add error handling to parser"
+    expected:
+      decomposition: PIPELINE
+      sequence:
+        - agent: developer
+        - agent: developer
+      independent: false
+      parallel: false
+      reason: "Same file dependency"
+    category: edge_case
+
+  - description: "Single task disguised as multi"
+    input: "Fix everything"
+    expected:
+      decomposition: DIRECT
+      agent_type: developer
+      count: 1
+      independent: true
+      parallel: false
+      reason: "Vague input, cannot decompose"
+    category: edge_case

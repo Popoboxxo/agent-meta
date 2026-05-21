@@ -1,0 +1,43 @@
+# Gemini Provider Syntax Fixture for Orchestration Dry-Run
+
+provider: Gemini
+parallel_support: true
+max_agents_hint: "Limited by MAX_PARALLEL_AGENTS config value"
+
+syntax:
+  fanout:
+    description: "All N Agent-Calls in one response. Gemini parallelizes automatically."
+    example: |
+      (Three separate Agent tool calls in one response)
+      # Gemini executes them automatically in parallel
+    notes:
+      - "No special syntax needed"
+      - "Multiple tool calls in one message = automatic parallelization"
+  parallel_group:
+    description: "Functions identically to FANOUT — Gemini recognizes different types."
+    example: |
+      (Multiple Agent tool calls with different types in one response)
+    notes:
+      - "Different agent types work automatically"
+  barrier:
+    description: "Automatic — response arrives after all results complete."
+    example: "N/A — implicit in Gemini tool system"
+    notes:
+      - "No explicit barrier needed"
+  sequential_fallback:
+    description: "Execute tasks sequentially when parallel is not desired."
+    example: |
+      # Task 1
+      (Agent call)
+      # Wait...
+      # Task 2
+      (Agent call)
+
+limitations:
+  - "No explicit parallel flag needed"
+  - "Automatic parallelization for multiple tool calls"
+
+validation_checks:
+  - "FANOUT uses multiple Agent tool calls in one response"
+  - "PARALLEL_GROUP uses different agent types in same response"
+  - "No run_in_background parameter (unlike Claude)"

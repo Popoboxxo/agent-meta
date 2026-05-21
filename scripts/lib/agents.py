@@ -34,9 +34,21 @@ _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
         "```\n"
     ),
     "Opencode": (
-        "**Parallel-Pattern (konkret):**\n"
-        "Opencode unterstützt parallele Subagent-Ausführung via mehrfacher `task`-Tool-Aufrufe.\n"
-        "Starte unabhängige Agenten nacheinander im selben Kontext — sie laufen implizit parallel.\n"
+        "**Parallel-Dispatch (Opencode):**\n"
+        "FANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\n"
+        "PARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\n"
+        "BARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n"
+        "\n"
+        "```\n"
+        "# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\n"
+        "task(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\n"
+        "task(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\n"
+        "task(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n"
+        "# Alle drei Calls in derselben Antwort → parallele Ausführung\n"
+        "# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n"
+        "```\n"
+        "\n"
+        "Limit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
     ),
     "Gemini": (
         "**Parallel-Pattern (konkret):**\n"
