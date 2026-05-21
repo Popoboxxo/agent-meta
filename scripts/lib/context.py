@@ -415,7 +415,10 @@ def _collect_embedded_rules_md(
         # Phase 2: Selective Rule Embedding
         # embed: false → Rule wird nicht in den Managed Block eingebettet
         # (nur als separate Datei verfügbar, z.B. .claude/rules/)
-        if opts.get('embed') == False:
+        # Fallback B: Provider ohne native rules dir (has_rules: false) müssen
+        # die Rule trotzdem embedden, sonst geht sie verloren.
+        provider_has_native_rules = pc.get('has_rules', False)
+        if opts.get('embed') == False and provider_has_native_rules:
             skipped_count += 1
             continue
         content = source_path.read_text(encoding='utf-8')
