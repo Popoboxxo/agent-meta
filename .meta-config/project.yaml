@@ -166,7 +166,10 @@ max-parallel-agents: 4
 orchestrator:
   enabled: true        # true = Orchestrator aktiv, false = Main-Chat-Modus
   strict: true         # true = Immer delegieren, false = Fallback erlaubt
-  unknown-fallback: meta-feedback  # meta-feedback | main-chat | ask-user
+  unknown-fallback:
+    meta-feedback: true   # Send anonymized feedback to agent-meta
+    main-chat: true       # Allow main chat to handle the task
+    ask-user: false       # Ask user for preference
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:

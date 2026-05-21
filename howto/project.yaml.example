@@ -15,11 +15,14 @@ orchestrator:
   # strict: false → Fallback to main-chat for unknown intents
   strict: true
 
-  # unknown-fallback: What to do when intent cannot be classified
-  #   - "meta-feedback" → Send anonymized feedback to agent-meta (default for strict)
-  #   - "main-chat"     → Let main chat handle it (default for relaxed)
-  #   - "ask-user"      → Ask user: "Here or feedback?"
-  unknown-fallback: meta-feedback
+  # unknown-fallback: Granular flags for unknown intent handling
+  #   meta-feedback: true → Send anonymized feedback to agent-meta (default: true)
+  #   main-chat: true     → Allow main chat to handle the task (default: true)
+  #   ask-user: false     → Ask user for preference (default: false)
+  unknown-fallback:
+    meta-feedback: true
+    main-chat: true
+    ask-user: false
 
 # ============================================================
 # PARALLEL EXECUTION
@@ -72,7 +75,10 @@ max-parallel-agents: 4
 # orchestrator:
 #   enabled: true
 #   strict: true
-#   unknown-fallback: meta-feedback
+#   unknown-fallback:
+#     meta-feedback: true
+#     main-chat: true
+#     ask-user: false
 #
 # max-parallel-agents: 4
 #
