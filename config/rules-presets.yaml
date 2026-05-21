@@ -6,8 +6,10 @@
 # Rule-Optionen:
 #   alwaysApply: false  → Claude + Continue: Rule nur bei Keyword-Match laden (nicht immer)
 #   gemini: skip        → Gemini: Rule wird gar nicht generiert
+#   embed: false        → Rule wird nicht in den Managed Block eingebettet
+#                        (nur als separate Datei verfügbar, z.B. .claude/rules/)
 #
-# Kein Eintrag = alwaysApply: true für alle Provider (Standardverhalten).
+# Kein Eintrag = alwaysApply: true, embed: true für alle Provider (Standardverhalten).
 
 presets:
 
@@ -27,6 +29,7 @@ presets:
 
   # Maximale Token-Einsparung — nur absolut essenzielle Rules immer aktiv.
   # Empfohlen für rapid-prototyping Projekte.
+  # Phase 2: Selective Rule Embedding — non-essential rules als separate Dateien.
   silent:
     lifecycle-tasks:
       alwaysApply: false
@@ -36,5 +39,7 @@ presets:
       alwaysApply: false
     dod-criteria:
       alwaysApply: false
+      embed: false
     sync-interface:
       alwaysApply: false
+      embed: false

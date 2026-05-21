@@ -404,10 +404,19 @@ def _collect_embedded_rules_md(
 
     sections: list[str] = []
 
+    embedded_count = 0
+    skipped_count = 0
+    
     for source_path, output_name in sources:
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
         if opts.get('opencode') == 'skip':
+            continue
+        # Phase 2: Selective Rule Embedding
+        # embed: false → Rule wird nicht in den Managed Block eingebettet
+        # (nur als separate Datei verfügbar, z.B. .claude/rules/)
+        if opts.get('embed') == False:
+            skipped_count += 1
             continue
         content = source_path.read_text(encoding='utf-8')
         rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
@@ -415,6 +424,10 @@ def _collect_embedded_rules_md(
         body = _strip_rule_frontmatter(content).strip()
         if body:
             sections.append(body)
+            embedded_count += 1
+    
+    if skipped_count > 0:
+        log.info(f"Selective Embedding: {skipped_count} rules with embed:false skipped, {embedded_count} rules embedded", "embed filter")
 
     # Include speech-mode rule if configured (not handled by collect_rule_sources)
     mode = config.get('speech-mode', 'full')
@@ -447,7 +460,13 @@ def _build_opencode_managed_block(
     if rules_md:
         managed = managed.replace(
             '<!-- agent-meta:managed-end -->',
-            f'\n## Regeln\n\n{rules_md}\n<!-- agent-meta:managed-end -->',
+            f'\n## Regeln\n\n{rules_md}\n\n<!-- agent-meta:managed-end -->',
+        )
+    else:
+        # Phase 2: All rules are embed:false → thinner managed block
+        managed = managed.replace(
+            '<!-- agent-meta:managed-end -->',
+            '\n<!-- agent-meta:managed-end -->',
         )
 
     return managed
