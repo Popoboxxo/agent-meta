@@ -87,17 +87,27 @@ Das Verhalten wird zentral in `.meta-config/project.yaml` gesteuert:
 
 ```yaml
 orchestrator:
-  enabled: true               # true = Orchestrator aktiv, false = Main-Chat-Modus
-  strict: true                # true = Immer delegieren, false = Fallback erlaubt
-  unknown-fallback: ask-user  # meta-feedback | main-chat | ask-user
+  enabled: true        # true = Orchestrator aktiv, false = Main-Chat-Modus
+  strict: true         # true = Immer delegieren, false = Fallback erlaubt
+  unknown-fallback:
+    meta-feedback: true   # Send anonymized feedback to agent-meta (default: true)
+    main-chat: true       # Allow main chat to handle task (default: true)
+    ask-user: false       # Ask user for preference (default: false)
 ```
 
-| Modus | enabled | strict | unknown-fallback | Verhalten bei unbekanntem Intent |
-|-------|---------|--------|------------------|-----------------------------------|
-| **Strict** | true | true | meta-feedback | Meta-Feedback, NICHT selbst ausführen |
-| **Relaxed** | true | false | main-chat | Main-Chat arbeitet selbst + Meta-Feedback |
-| **Ask** | true | true/false | ask-user | User gefragt: "Hier oder Feedback?" |
-| **Disabled** | false | — | — | Kein Orchestrator, Main-Chat macht alles selbst |
+| Modus | enabled | strict | meta-feedback | main-chat | ask-user | Verhalten bei unbekanntem Intent |
+|-------|---------|--------|---------------|-----------|----------|-----------------------------------|
+| **Strict** | true | true | true | false | false | Meta-Feedback, NICHT selbst ausführen |
+| **Relaxed** | true | false | true | true | false | Main-Chat arbeitet selbst + Meta-Feedback |
+| **Ask-First** | true | — | — | — | true | User gefragt: "Hier oder Feedback?" |
+| **Disabled** | false | — | — | — | — | Kein Orchestrator, Main-Chat macht alles selbst |
+| **Custom** | true | false | true | true | true | User gefragt → dann entscheiden |
+
+**Fallback-Priorität:**
+1. `ask-user=true` → Immer User fragen (höchste Priorität)
+2. `strict=true` + `meta-feedback=true` → Feedback + Nachfrage
+3. `strict=false` + `main-chat=true` → Main-Chat selbst + ggf. Feedback
+4. Kein Fallback aktiv → Klärungsfrage
 
 **Empfehlung:** Default ist `strict` für Produktionsprojekte, `relaxed` für Prototypen, `disabled` für kleine Einzelnutzer-Projekte.
 
