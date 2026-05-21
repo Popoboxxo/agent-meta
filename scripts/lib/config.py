@@ -246,6 +246,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         )
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
+    # ORCHESTRATOR_MODE: auto-inject from orchestrator block in project.yaml
+    orch_config = config.get("orchestrator", {})
+    variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
+    variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
+    variables["ORCHESTRATOR_UNKNOWN_FALLBACK"] = orch_config.get("unknown-fallback", "meta-feedback")
+    # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
+    # Currently empty — will be populated when project-specific agent discovery is implemented
+    variables["PROJECT_SPECIFIC_AGENTS"] = ""
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)

@@ -1,0 +1,49 @@
+# Opencode Provider Syntax Fixture for Orchestration Dry-Run
+# Used by test_provider_syntax.py to validate generated dispatch plans
+
+provider: Opencode
+parallel_support: true
+max_agents_hint: "Limited by MAX_PARALLEL_AGENTS config value"
+
+syntax:
+  fanout:
+    description: "All N task()-Calls in ONE response message. No separate background marker."
+    example: |
+      task(subagent_type="developer", description="Fix Bug A", prompt="...")
+      task(subagent_type="developer", description="Fix Bug B", prompt="...")
+      task(subagent_type="developer", description="Fix Bug C", prompt="...")
+    notes:
+      - "All three calls in the same response → parallel execution"
+      - "Results returned as task_results array"
+  parallel_group:
+    description: "Multiple task()-Calls with different subagent_type in one response."
+    example: |
+      task(subagent_type="developer", description="Fix Bug A", prompt="...")
+      task(subagent_type="tester", description="Write Tests B", prompt="...")
+    notes:
+      - "Different agent types run in parallel automatically"
+  barrier:
+    description: "Automatic — response only arrives when all tasks complete."
+    example: "N/A — implicit in Opencode task system"
+    notes:
+      - "No explicit barrier needed"
+      - "Wait for task_results array in response"
+  sequential_fallback:
+    description: "When parallel is not possible or desired, execute tasks sequentially."
+    example: |
+      # Task 1
+      task(subagent_type="developer", description="Fix A", prompt="...")
+      # Wait for result...
+      # Task 2
+      task(subagent_type="developer", description="Fix B", prompt="...")
+
+limitations:
+  - "No explicit run_in_background flag (unlike Claude)"
+  - "Parallelism achieved by multiple task() calls in single message"
+  - "Provider must support concurrent task execution"
+
+validation_checks:
+  - "FANOUT generates multiple task() calls"
+  - "PARALLEL_GROUP uses different subagent_type values"
+  - "No run_in_background parameter present"
+  - "BARRIER is implicit (no explicit wait call)"

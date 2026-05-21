@@ -34,8 +34,6 @@ presets:
       alwaysApply: false
     security-audit:
       alwaysApply: false
-    use-orchestrator:
-      alwaysApply: false
     dod-criteria:
       alwaysApply: false
     sync-interface:

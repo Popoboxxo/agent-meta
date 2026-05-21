@@ -1,0 +1,5 @@
+# Test requirements for orchestration dry-run
+# Install: pip install -r tests/requirements.txt
+
+pytest>=7.0
+pyyaml>=6.0
