@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.47.0-beta] — 2026-05-21
+
+### Added
+
+- **Orchestrator-First Architecture v3.0.0 (Beta)**: Universal router for all development tasks with task decomposition protocol (FANOUT/PARALLEL_GROUP/BARRIER). The orchestrator becomes the primary entry point, replacing direct main-chat code work.
+- **Provider-Agnostic Parallel Execution Engine**: Supports 4 providers (Claude, Opencode, Gemini, Continue) with precise PARALLEL patterns per provider.
+- **Unknown Intent Protocol**: Meta-Feedback Loop for unrecognized user intents with configurable fallback behavior.
+- **User-Override Mechanism**: Trigger phrases ("Nicht delegieren", "Mach das hier", "Kein Orchestrator", etc.) allow users to bypass the orchestrator and work directly in main chat.
+- **Orchestrator Configuration Switch**: Granular `enabled`/`strict`/`unknown-fallback` settings in `project.yaml` with three boolean flags (`meta-feedback`, `main-chat`, `ask-user`).
+- **Orchestration Test Infrastructure**: Dry-run engine, fixtures, and test commands for validating orchestration behavior.
+- **Trilingual Glossary** (EN/DE/Explanation): Comprehensive terminology reference for the meta-agent framework.
+
+### Changed
+
+- **`use-orchestrator` rule removed from `silent` preset**: Orchestrator usage is now always active, not preset-dependent.
+- **Agent templates regenerated** with orchestrator-first architecture.
+
+### Deferred (Phase 2 & 3)
+
+- Phase 2: Selective Rule Embedding, Main Session Thinning
+- Phase 3: Result Caching, Dynamic Batching, Agent Pooling
+- See Issue #192 for tracking.
+
+---
+
 ## [0.46.1] — 2026-05-21
 
 ### Fixed
