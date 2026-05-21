@@ -58,6 +58,19 @@
 
 ---
 
+## [0.47.2-beta] — 2026-05-21
+
+### Added
+
+- **Phase 2: Selective Rule Embedding** (`config/rules-presets.yaml`, `scripts/lib/context.py`, `scripts/lib/rules.py`): Rules can now be excluded from the Opencode managed block with `embed: false`. Excluded rules remain available as separate files (e.g. `.claude/rules/dod-criteria.md`). Default behavior unchanged (`embed: true`). Activated for `dod-criteria` and `sync-interface` in the `silent` preset.
+
+### Changed
+
+- **AGENTS.md thinning**: Main Session managed block reduced from ~580 to ~370 lines (-36%, -210 lines). 2 rules (`dod-criteria`, `sync-interface`) moved from embedded to file-only.
+- **`/update-meta` command**: New command for syncing agent-meta without version upgrade.
+
+---
+
 ## [0.46.0] — 2026-05-21
 
 ---
