@@ -103,29 +103,59 @@ class DryRunReport:
 class OrchestratorDryRun:
     """Simulates Orchestrator decisions without real agent execution."""
 
-    # Known intents mapping
+    # Known intents mapping: keyword -> agent
+    # Order matters: longer keywords should be checked first to avoid partial matches
+    # e.g. "login" should not match "log"
     INTENT_MAP = {
-        "fix": "developer",
-        "bug": "developer",
-        "implement": "developer",
+        # German keywords (longer first)
+        "implementieren": "developer",
+        "hinzufügen": "developer",
+        "analysiere": "ideation",
+        "analysieren": "ideation",
+        "architektur": "ideation",
+        "dokumentation": "documenter",
+        "dokumentiere": "documenter",
+        "anforderung": "requirements",
+        "anforderungen": "requirements",
         "feature": "feature",
+        "erstelle": "feature",
+        "schreibe": "developer",
+        "test": "tester",
+        "tests": "tester",
+        "validiere": "validator",
+        "validieren": "validator",
+        "release": "release",
+        "feedback": "feedback",
+        "upgrade": "agent-meta-manager",
+        "meta": "agent-meta-manager",
+        "log": "log-analyzer",
+        "füge": "developer",
+        # English keywords (longer first)
+        "implement": "developer",
+        "analyze": "ideation",
+        "analyse": "ideation",
+        "architecture": "ideation",
+        "document": "documenter",
+        "requirement": "requirements",
+        "requirements": "requirements",
         "commit": "git",
         "push": "git",
         "branch": "git",
-        "analyze": "ideation",
-        "analyse": "ideation",
+        "fix": "developer",
+        "bug": "developer",
         "design": "ideation",
-        "test": "tester",
-        "release": "release",
-        "document": "documenter",
         "doc": "documenter",
-        "meta": "agent-meta-manager",
         "sync": "agent-meta-manager",
-        "upgrade": "agent-meta-manager",
-        "log": "log-analyzer",
-        "feedback": "feedback",
         "issue": "feedback",
     }
+
+    @classmethod
+    def _word_boundary_search(cls, text: str, keyword: str) -> bool:
+        """Search for keyword with word boundaries to avoid partial matches."""
+        import re
+        # Use word boundary regex: \bkeyword\b
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        return bool(re.search(pattern, text, re.IGNORECASE))
 
     def __init__(self, provider: str, config: dict):
         self.provider = provider
@@ -152,6 +182,7 @@ class OrchestratorDryRun:
             "nicht delegieren", "mach das hier", "im hauptchat",
             "kein orchestrator", "ohne orchestrator", "ich will hier arbeiten",
             "delegiere nicht", "not delegate", "do it here", "no orchestrator",
+            "without orchestrator", "main chat", "hauptchat",
         ]
         for trigger in override_triggers:
             if trigger in user_lower:
@@ -159,13 +190,16 @@ class OrchestratorDryRun:
                 return "USER_OVERRIDE"
         
         # Check for unknown (very vague input)
-        if len(user_input.split()) <= 3 and any(word in user_lower for word in ["ding", "kram", "something", "etwas"]):
+        if len(user_input.split()) <= 3 and any(word in user_lower for word in ["ding", "kram", "something", "etwas", "irgendwas"]):
             self.log_event("intent_classified", {"input": user_input, "intent": "UNKNOWN"})
             return "UNKNOWN"
         
-        # Map intent
-        for keyword, agent in self.INTENT_MAP.items():
-            if keyword in user_lower:
+        # Map intent: sort keywords by length descending to prefer longer matches
+        # e.g. "login" should not match "log", "analysiere" should not match "analyse"
+        sorted_keywords = sorted(self.INTENT_MAP.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for keyword, agent in sorted_keywords:
+            if self._word_boundary_search(user_lower, keyword):
                 self.log_event("intent_classified", {"input": user_input, "intent": agent})
                 return agent
         
@@ -174,25 +208,64 @@ class OrchestratorDryRun:
 
     def decompose_task(self, user_input: str, intent: str) -> List[SubTask]:
         """Decompose multi-tasks into sub-tasks."""
-        # Simple heuristic: if commas or "and" present, might be multi-task
         import re
         
-        # Extract items after commas or "and" for known parallel patterns
-        if intent in ["developer", "tester", "documenter", "ideation"]:
-            # Split by comma or "and" (English/German)
-            parts = re.split(r',|und|und', user_input)
-            parts = [p.strip() for p in parts if p.strip() and len(p.strip()) > 3]
+        # Known parallelizable intents: can FANOUT if multiple independent sub-tasks
+        parallelizable = ["developer", "tester", "documenter", "ideation"]
+        
+        if intent in parallelizable:
+            # Split by comma or "and" / "und" (English/German)
+            # Pattern: comma, or " and " / " und " with word boundaries
+            parts = re.split(r',\s*|\bund\b|\band\b', user_input, flags=re.IGNORECASE)
+            parts = [p.strip() for p in parts if p.strip() and len(p.strip()) > 2]
             
             if len(parts) > 1:
-                subtasks = []
-                for i, part in enumerate(parts, 1):
-                    subtasks.append(SubTask(
-                        name=f"task_{i}",
-                        agent_type=intent,
-                        description=part,
-                    ))
-                self.log_event("task_decomposed", {"subtasks": len(subtasks), "decomposition": "FANOUT"})
-                return subtasks
+                # Further split by "für" / "for" if present to extract target modules
+                # e.g. "Schreib Tests für Modul A, B und C" -> extract A, B, C
+                final_parts = []
+                for part in parts:
+                    # Check if part contains "für" / "for" + list of items
+                    for prep in [r'für', r'for']:
+                        if re.search(rf'\b{prep}\b', part, re.IGNORECASE):
+                            # Split the part after the preposition
+                            match = re.search(rf'(.*?)\b{prep}\b\s*(.+)', part, re.IGNORECASE)
+                            if match:
+                                prefix = match.group(1).strip()
+                                items_text = match.group(2).strip()
+                                # Try to split items by comma or "and"/"und"
+                                items = re.split(r',\s*|\bund\b|\band\b', items_text, flags=re.IGNORECASE)
+                                items = [it.strip() for it in items if it.strip() and len(it.strip()) > 0]
+                                if len(items) > 1:
+                                    for item in items:
+                                        final_parts.append(f"{prefix} {item}".strip() if prefix else item)
+                                    break
+                                    
+                    if not final_parts or part not in [fp.split()[-1] if ' ' in fp else fp for fp in final_parts]:
+                        final_parts.append(part)
+                
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_parts = []
+                for p in final_parts:
+                    key = p.lower()
+                    if key not in seen:
+                        seen.add(key)
+                        unique_parts.append(p)
+                
+                if len(unique_parts) > 1:
+                    subtasks = []
+                    for i, part in enumerate(unique_parts, 1):
+                        subtasks.append(SubTask(
+                            name=f"task_{i}",
+                            agent_type=intent,
+                            description=part,
+                        ))
+                    self.log_event("task_decomposed", {
+                        "subtasks": len(subtasks),
+                        "decomposition": "FANOUT",
+                        "original": user_input,
+                    })
+                    return subtasks
         
         # Single task
         self.log_event("task_decomposed", {"subtasks": 1, "decomposition": "DIRECT"})
