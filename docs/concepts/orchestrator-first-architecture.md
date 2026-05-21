@@ -914,7 +914,455 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 
 ---
 
-## 9. File Change Impact Matrix
+## 9. Orchestration Testing & Dry-Run Framework
+
+### 9.1 Ziel
+
+Sicherstellen, dass die Orchestrator-First-Architektur auf jedem Provider korrekt funktioniert — bevor echte Aufgaben delegiert werden. Ein Dry-Run simuliert die Orchestrierung ohne echte Agent-Ausführung und validiert:
+
+1. **Intent-Routing:** Wird jeder Intent korrekt zugeordnet?
+2. **Task Decomposition:** Werden Multi-Tasks korrekt zerlegt?
+3. **Parallel Dispatch:** Werden FANOUT/PARALLEL_GROUP korrekt generiert?
+4. **Provider-Kompatibilität:** Funktioniert die Syntax für den aktiven Provider?
+5. **BARRIER-Synchronisation:** Werden Ergebnisse korrekt aggregiert?
+6. **Viz-Log-Integration:** Werden Events korrekt ins Viz-Log geschrieben?
+
+### 9.2 Test-Package-Struktur
+
+```
+tests/orchestration/
+├── __init__.py
+├── conftest.py                 # Pytest-Fixtures für alle Provider
+├── test_intent_routing.py      # Intent-Klassifikation
+├── test_task_decomposition.py  # Task-Zerlegung
+├── test_parallel_dispatch.py   # FANOUT/PARALLEL_GROUP/BARRIER
+├── test_provider_syntax.py     # Provider-spezifische Syntax-Validierung
+├── test_viz_integration.py     # Viz-Log-Events
+├── test_unknown_intent.py      # Unknown Intent Protocol + Meta-Feedback
+├── test_user_override.py       # User-Override-Mechanismus
+├── fixtures/
+│   ├── intents.yaml            # 50+ Test-Intents mit erwarteten Ziel-Agenten
+│   ├── multi_tasks.yaml        # 30+ Multi-Task-Szenarien mit erwarteter Zerlegung
+│   └── providers/
+│       ├── claude.json         # Erwartete Syntax für Claude
+│       ├── opencode.json       # Erwartete Syntax für Opencode
+│       ├── gemini.json         # Erwartete Syntax für Gemini
+│       └── continue.json       # Erwartete Syntax für Continue (sequentiel)
+└── dry_run/
+    ├── __init__.py
+    ├── engine.py               # Dry-Run-Engine (simuliert Orchestrator)
+    ├── validators.py           # Validierungs-Logik für Zerlegung/Dispatch
+    └── reporters.py            # Report-Generierung (Markdown, JSON)
+```
+
+### 9.3 Dry-Run-Engine
+
+Die Engine simuliert den Orchestrator ohne echte Agent-Ausführung:
+
+```python
+# tests/orchestration/dry_run/engine.py
+
+class OrchestratorDryRun:
+    """Simuliert Orchestrator-Entscheidungen ohne echte Delegation."""
+
+    def __init__(self, provider: str, config: dict):
+        self.provider = provider
+        self.config = config
+        self.events = []  # Für Viz-Log
+
+    def classify_intent(self, user_input: str) -> str:
+        """Klassifiziert Intent und gibt Ziel-Agent zurück."""
+        # Nutzt Intent-Routing-Tabelle aus orchestrator.md
+        # Return: agent_name oder "UNKNOWN"
+
+    def decompose_task(self, user_input: str) -> list[SubTask]:
+        """Zerlegt Multi-Tasks in Sub-Tasks."""
+        # Prüft Unabhängigkeit, Gruppiert nach Agent-Typ
+        # Return: Liste von SubTask(name, agent_type, dependencies)
+
+    def generate_dispatch_plan(self, subtasks: list[SubTask]) -> DispatchPlan:
+        """Erzeugt Dispatch-Plan mit FANOUT/PARALLEL_GROUP/sequentiell."""
+        # Berücksichtigt MAX_PARALLEL_AGENTS, Provider-Fähigkeiten
+        # Return: DispatchPlan mit Operationen und Reihenfolge
+
+    def validate_syntax(self, plan: DispatchPlan) -> SyntaxReport:
+        """Validiert generierte Syntax gegen Provider-Spezifikation."""
+        # Vergleicht mit tests/fixtures/providers/{provider}.json
+
+    def run(self, user_input: str) -> DryRunReport:
+        """Führt kompletten Dry-Run durch."""
+        intent = self.classify_intent(user_input)
+        self.log_event("intent_classified", {"input": user_input, "intent": intent})
+
+        if intent == "UNKNOWN":
+            return self.handle_unknown_intent(user_input)
+
+        subtasks = self.decompose_task(user_input)
+        self.log_event("task_decomposed", {"subtasks": len(subtasks)})
+
+        plan = self.generate_dispatch_plan(subtasks)
+        self.log_event("dispatch_plan_generated", {"plan": plan.to_dict()})
+
+        syntax_report = self.validate_syntax(plan)
+        self.log_event("syntax_validated", {"valid": syntax_report.valid})
+
+        return DryRunReport(
+            intent=intent,
+            subtasks=subtasks,
+            plan=plan,
+            syntax=syntax_report,
+            provider=self.provider,
+            events=self.events,
+        )
+```
+
+### 9.4 Test-Szenarien
+
+#### A. Intent-Routing-Tests (test_intent_routing.py)
+
+```yaml
+# tests/fixtures/intents.yaml
+- input: "Füge Login hinzu"
+  expected_agent: developer
+  expected_tier: balanced
+  provider: all
+
+- input: "Commit die Änderungen"
+  expected_agent: git
+  expected_tier: fast
+  provider: all
+
+- input: "Analysiere die Architektur"
+  expected_agent: ideation
+  expected_tier: balanced
+  provider: all
+
+- input: "Fix Bug A in parser und Bug B in renderer"
+  expected_agent: developer  # Nach Decomposition
+  expected_tier: balanced
+  expected_parallel: true
+  expected_fanout: 2
+  provider: all
+
+- input: "Mache etwas mit dem Ding"
+  expected_agent: UNKNOWN
+  expected_fallback: meta-feedback  # strict=true
+  provider: all
+
+- input: "Mach das hier, nicht delegieren"
+  expected_agent: USER_OVERRIDE
+  expected_behavior: main_chat_self_execute
+  provider: all
+
+- input: "Erstelle Dashboard-Kachel für Temperatur"
+  expected_agent: dashboard-designer  # Projekt-spezifisch
+  provider: all
+  project: sharkord
+```
+
+#### B. Task-Decomposition-Tests (test_task_decomposition.py)
+
+```yaml
+# tests/fixtures/multi_tasks.yaml
+- description: "3 unabhängige Bugfixes"
+  input: "Fix parser crash, renderer leak, validator error"
+  expected:
+    decomposition: FANOUT
+    agent_type: developer
+    count: 3
+    independent: true
+    batches: 1  # 3 <= MAX_PARALLEL(4)
+
+- description: "5 unabhängige Bugfixes (Batching)"
+  input: "Fix A, B, C, D, E"
+  expected:
+    decomposition: FANOUT
+    agent_type: developer
+    count: 5
+    independent: true
+    batches: 2  # Batch 1: A,B,C,D | Batch 2: E
+
+- description: "Abhängige Tasks (Pipeline)"
+  input: "Feature X implementieren mit Tests"
+  expected:
+    decomposition: PIPELINE
+    sequence:
+      - agent: requirements
+      - agent: tester
+      - agent: developer
+      - agent: tester
+    parallel: false
+
+- description: "Gemischte parallele Tasks"
+  input: "Fix Bug A und schreib Tests für Modul B"
+  expected:
+    decomposition: PARALLEL_GROUP
+    agents:
+      - type: developer
+        count: 1
+      - type: tester
+        count: 1
+    parallel: true
+
+- description: "Lifecycle (Feature komplett)"
+  input: "Feature Y komplett umsetzen"
+  expected:
+    decomposition: LIFECYCLE
+    agent: feature
+    internal_steps: 8
+    parallel: false  # feature-Agent orchestriert intern
+```
+
+#### C. Parallel-Dispatch-Tests (test_parallel_dispatch.py)
+
+Für jeden Provider wird geprüft:
+
+```python
+@pytest.mark.parametrize("provider", ["Claude", "Opencode", "Gemini", "Continue"])
+def test_fanout_syntax(provider):
+    """Validiert FANOUT-Syntax für jeden Provider."""
+    plan = generate_plan(provider, "Fix A, B, C")
+    syntax = validate_syntax(plan, provider)
+
+    if provider in ["Claude", "Opencode", "Gemini"]:
+        assert syntax.valid
+        assert syntax.parallel_supported
+        assert syntax.operation == "FANOUT"
+        assert syntax.agent_count == 3
+    else:  # Continue
+        assert not syntax.parallel_supported
+        assert syntax.fallback == "sequential"
+        assert syntax.agent_count == 3
+```
+
+#### D. Provider-Syntax-Validierung (test_provider_syntax.py)
+
+```json
+// tests/fixtures/providers/opencode.json
+{
+  "provider": "Opencode",
+  "parallel_support": true,
+  "syntax": {
+    "fanout": "Multiple task() calls in single message",
+    "barrier": "Automatic — response waits for all tasks",
+    "parallel_group": "Multiple task() with different subagent_type in single message",
+    "max_agents": "Limited by MAX_PARALLEL_AGENTS config"
+  },
+  "example": "task(subagent_type='developer', ...)\ntask(subagent_type='developer', ...)\ntask(subagent_type='developer', ...)",
+  "expected_output": "task_results as array [result_A, result_B, result_C]"
+}
+```
+
+### 9.5 Viz-Log-Integration
+
+Jeder Dry-Run schreibt Events ins Viz-Log:
+
+```python
+# tests/orchestration/test_viz_integration.py
+
+def test_dry_run_logs_events():
+    """Prüft ob alle Dry-Run-Schritte im Viz-Log landen."""
+    engine = OrchestratorDryRun(provider="Opencode", config={"max-parallel-agents": 4})
+    report = engine.run("Fix A, B, C")
+
+    events = report.events
+    assert events[0]["type"] == "intent_classified"
+    assert events[1]["type"] == "task_decomposed"
+    assert events[2]["type"] == "dispatch_plan_generated"
+    assert events[3]["type"] == "syntax_validated"
+    assert events[4]["type"] == "dry_run_complete"
+
+    # Viz-Log-Format prüfen
+    for event in events:
+        assert "timestamp" in event
+        assert "provider" in event
+        assert "session_id" in event
+```
+
+**Viz-Log-Event-Struktur:**
+
+```json
+{
+  "timestamp": "2026-05-21T19:40:17Z",
+  "session_id": "dry-run-abc123",
+  "provider": "Opencode",
+  "type": "task_decomposed",
+  "data": {
+    "input": "Fix A, B, C",
+    "subtasks": 3,
+    "decomposition": "FANOUT",
+    "agent_type": "developer",
+    "parallel": true
+  }
+}
+```
+
+### 9.6 Trigger-Mechanismen
+
+#### A. Manuell: Command-basiert
+
+```bash
+# Generierter Command für jeden Provider (via sync.py)
+# .claude/commands/test-orchestration.md
+# .opencode/commands/test-orchestration.md
+# .gemini/commands/test-orchestration.toml
+# .continue/commands/test-orchestration.md
+```
+
+**Command-Text (Beispiel Opencode):**
+
+```markdown
+# test-orchestration
+
+Führt einen Orchestration-Dry-Run durch und validiert:
+- Intent-Routing
+- Task-Decomposition
+- Parallel-Dispatch
+- Provider-Syntax
+- Viz-Log-Integration
+
+## Parameter
+
+--provider    Aktiver Provider (auto-detected)
+--scenario    Test-Szenario: all | routing | decomposition | parallel | unknown | override
+--verbose     Detaillierte Ausgabe
+--viz         Viz-Log-Events anzeigen
+
+## Beispiele
+
+/test-orchestration                    # Alle Tests für aktiven Provider
+/test-orchestration --scenario=parallel # Nur Parallel-Dispatch-Tests
+/test-orchestration --verbose --viz     # Alle Tests mit Viz-Log
+```
+
+#### B. Automatisiert: Pre-Commit / Pre-Push
+
+```bash
+# .claude/hooks/orchestration-test.sh (optional)
+# Wird vor jedem Commit ausgeführt
+
+#!/bin/bash
+# Prüft ob Orchestrator-Templates syntaktisch korrekt sind
+python tests/orchestration/dry_run/engine.py --provider=$(detect_provider) --quick
+
+# Exit 0 = OK, Exit 1 = Fehler (blockt Commit)
+```
+
+#### C. Automatisiert: Post-Sync
+
+```python
+# In sync.py integriert (optional, via Flag --test-orchestration)
+
+# Nach jedem sync.py-Lauf:
+# "Möchtest du einen Orchestration-Dry-Run durchführen?"
+# → Ja → Führt Tests für alle aktiven Provider durch
+```
+
+#### D. Automatisiert: CI/CD
+
+```yaml
+# .github/workflows/orchestration-test.yml (optional)
+name: Orchestration Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: [Claude, Opencode, Gemini, Continue]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Run Orchestration Tests
+        run: |
+          pip install -r tests/requirements.txt
+          python -m pytest tests/orchestration/ -v --provider=${{ matrix.provider }}
+```
+
+### 9.7 Test-Report
+
+Der Dry-Run generiert einen strukturierten Report:
+
+```markdown
+# Orchestration Dry-Run Report
+
+**Provider:** Opencode
+**Datum:** 2026-05-21 19:40:17
+**Config:** max-parallel-agents=4, orchestrator.enabled=true, strict=true
+
+---
+
+## Zusammenfassung
+
+| Metrik | Wert |
+|--------|------|
+| Tests ausgeführt | 47 |
+| Bestanden | 45 |
+| Warnungen | 2 |
+| Fehler | 0 |
+
+## Intent-Routing
+
+| Input | Erwartet | Tatsächlich | Status |
+|-------|----------|-------------|--------|
+| "Füge Login hinzu" | developer | developer | ✅ |
+| "Commit die Änderungen" | git | git | ✅ |
+| "Mache etwas mit dem Ding" | UNKNOWN | UNKNOWN | ✅ |
+| "Mach das hier" | USER_OVERRIDE | USER_OVERRIDE | ✅ |
+
+## Task-Decomposition
+
+| Szenario | Zerlegung | Agent | Anzahl | Parallel | Status |
+|----------|-----------|-------|--------|----------|--------|
+| "Fix A, B, C" | FANOUT | developer | 3 | Ja | ✅ |
+| "Fix A..E" | FANOUT(2 Batches) | developer | 5 | Ja | ✅ |
+| "Feature X mit Tests" | PIPELINE | — | 4 | Nein | ✅ |
+| "Fix A + Test B" | PARALLEL_GROUP | dev+tester | 2 | Ja | ✅ |
+
+## Parallel-Dispatch (Opencode)
+
+| Operation | Syntax | Valid | Status |
+|-----------|--------|-------|--------|
+| FANOUT(3) | 3× task() in einer Nachricht | ✅ | ✅ |
+| PARALLEL_GROUP(2) | 2× task() verschiedene Typen | ✅ | ✅ |
+| BARRIER | Automatisch | ✅ | ✅ |
+
+## Viz-Log-Events
+
+| # | Typ | Timestamp | Status |
+|---|-----|-----------|--------|
+| 1 | intent_classified | 19:40:17 | ✅ |
+| 2 | task_decomposed | 19:40:18 | ✅ |
+| 3 | dispatch_plan_generated | 19:40:18 | ✅ |
+
+## Warnungen
+
+- `test_fanout_batching`: "Continue-Nutzer: FANOUT fällt auf sequentiellen Modus zurück."
+- `test_unknown_fallback`: "ask-user-Modus erfordert User-Interaktion — nicht für CI geeignet."
+```
+
+### 9.8 File Change Impact Matrix (Testing)
+
+| Datei | Änderung | Typ | Risiko |
+|-------|---------|-----|--------|
+| `tests/orchestration/` | Neues Test-Package | Code | Niedrig |
+| `tests/fixtures/` | Test-Daten (Intents, Multi-Tasks, Provider-Syntax) | Config | Niedrig |
+| `tests/orchestration/dry_run/engine.py` | Dry-Run-Engine | Code | Mittel |
+| `.claude/commands/test-orchestration.md` | Command für Claude | Text | Niedrig |
+| `.opencode/commands/test-orchestration.md` | Command für Opencode | Text | Niedrig |
+| `.gemini/commands/test-orchestration.toml` | Command für Gemini | Text | Niedrig |
+| `.continue/commands/test-orchestration.md` | Command für Continue | Text | Niedrig |
+| `.claude/hooks/orchestration-test.sh` | Optionaler Pre-Commit-Hook | Script | Niedrig |
+| `tests/requirements.txt` | Test-Dependencies (pytest, yaml) | Config | Niedrig |
+
+---
+
+## 10. File Change Impact Matrix
 
 ### Phase 1 (Core — Orchestrator v3.0.0 + Rules)
 
@@ -925,6 +1373,10 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 | `agents/1-generic/orchestrator.md` | v2.10.0 → v3.0.0: neue Sections, erweiterte Workflows, Unknown Intent Protocol, User-Override | Major | Mittel |
 | `scripts/lib/agents.py` | `_PROVIDER_PARALLEL_PATTERNS` für alle 4 Provider präzisieren | Code | Niedrig |
 | `scripts/lib/config.py` | Neue Variable `ORCHESTRATOR_MODE` injizieren (enabled/strict/unknown-fallback) | Code | Niedrig |
+| `commands/1-generic/test-orchestration.md` | Neuer Command: Orchestration-Dry-Run | Text | Niedrig |
+| `tests/orchestration/` | Neues Test-Package mit Dry-Run-Engine | Code | Mittel |
+| `tests/fixtures/` | Testdaten: Intents, Multi-Tasks, Provider-Syntax | Config | Niedrig |
+| `tests/requirements.txt` | Test-Dependencies (pytest, pyyaml) | Config | Niedrig |
 
 ### Phase 2 (Thinning — Selective Embedding)
 
@@ -944,7 +1396,7 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 
 ---
 
-## 10. Rückwärtskompatibilität
+## 11. Rückwärtskompatibilität
 
 ### Garantiert
 
@@ -969,7 +1421,7 @@ Projekte mit `rules-preset: silent` erhalten `use-orchestrator` nach dem Update 
 
 ---
 
-## 11. Risiken & Mitigation
+## 12. Risiken & Mitigation
 
 | Risiko | W'keit | Schwere | Mitigation |
 |--------|--------|---------|-----------|
@@ -979,10 +1431,13 @@ Projekte mit `rules-preset: silent` erhalten `use-orchestrator` nach dem Update 
 | **Orchestrator wird Bottleneck bei trivialen Tasks** | Mittel | Niedrig | Ausnahmen-Liste für atomare Ops bleibt. "Fix typo in one line" geht direkt an developer. |
 | **Orchestrator v3.0.0 sprengt Kontext-Limit** | Niedrig | Mittel | Neue Sections sind kompakt (<150 Zeilen gesamt). Bestehende Logik unverändert. |
 | **User lehnt parallele Ausführung ab** | Mittel | Niedrig | Human-in-the-Loop-Gate: User bestätigt FANOUT > 2. User kann jederzeit `max-parallel-agents: 1` setzen. |
+| **Test-Package erhöht Wartungsaufwand** | Mittel | Mittel | Fixtures sind statisch (YAML/JSON), keine Logik. Tests sind deterministisch. Trennung von Dry-Run-Engine und Testdaten. |
+| **Dry-Run-Engine driftet vom echten Orchestrator ab** | Mittel | Hoch | Engine liest dasselbe Template (orchestrator.md). Bei Template-Änderung → Tests failen sofort (wünschenswert). |
+| **Provider-Syntax-Tests veralten** | Niedrig | Mittel | Fixtures/providers/*.json werden bei jeder PARALLEL_PATTERN-Änderung mitaktualisiert. CI prüft Konsistenz. |
 
 ---
 
-## 12. Phasen-Plan
+## 13. Phasen-Plan
 
 ```
 Phase 1 — Core (jetzt)
@@ -997,6 +1452,12 @@ Phase 1 — Core (jetzt)
 ├── scripts/lib/agents.py: PARALLEL_PATTERNs präzisieren
 ├── scripts/lib/config.py: ORCHESTRATOR_MODE Variable injizieren
 ├── howto/project.yaml.example: orchestrator-Block dokumentieren
+├── tests/orchestration/ → Test-Package anlegen
+│   ├── dry_run/engine.py
+│   ├── fixtures/intents.yaml, multi_tasks.yaml
+│   ├── fixtures/providers/*.json
+│   └── test_*.py (Intent, Decomposition, Parallel, Provider, Viz, Unknown, Override)
+├── commands/test-orchestration.md (1-generic) → für alle Provider generieren
 ├── sync.py --dry-run → verifizieren
 └── Commit + PR
 
@@ -1014,7 +1475,7 @@ Phase 3 — Advanced (optional, später)
 
 ---
 
-## 13. Glossar
+## 14. Glossar
 
 | Begriff | Definition |
 |---------|-----------|
@@ -1029,3 +1490,13 @@ Phase 3 — Advanced (optional, später)
 | **Orchestrator-Schalter** | Konfiguration in project.yaml (enabled/strict/unknown-fallback) |
 | **Meta-Feedback Loop** | Anonymisiertes Feedback an agent-meta bei unbekannten Intents zur System-Verbesserung |
 | **Unknown-Fallback** | Verhalten bei nicht klassifizierbarem Intent: meta-feedback / main-chat / ask-user |
+| **Dry-Run** | Simulation der Orchestration ohne echte Agent-Ausführung |
+| **Test-Fixtures** | Statische Testdaten (YAML/JSON) für Intent-Routing, Task-Decomposition, Provider-Syntax |
+| **FANOUT** | N Instanzen des gleichen Agent-Typs parallel starten |
+| **PARALLEL_GROUP** | Mehrere verschiedene Agent-Typen parallel starten |
+| **BARRIER** | Synchronisationspunkt: auf alle parallelen Ergebnisse warten |
+| **Thin Router** | Main Session die nur routet, keine Arbeit verrichtet |
+| **Task Decomposition** | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks |
+| **Selective Embedding** | Nur bestimmte Rules in den Managed Block einbetten, andere als separate Dateien |
+| **Viz-Log** | Event-Log für Agenten-Visualisierung und Session-Tracking |
+| **Orchestration-Test** | Automatisierter Test der gesamten Delegations-Pipeline |
