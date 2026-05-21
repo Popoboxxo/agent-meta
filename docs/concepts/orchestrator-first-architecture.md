@@ -1475,28 +1475,153 @@ Phase 3 — Advanced (optional, später)
 
 ---
 
-## 14. Glossar
+## 14. Glossar: Meta-Agent Framework
 
-| Begriff | Definition |
-|---------|-----------|
-| **FANOUT** | N Instanzen des gleichen Agent-Typs parallel starten |
-| **PARALLEL_GROUP** | Mehrere verschiedene Agent-Typen parallel starten |
-| **BARRIER** | Synchronisationspunkt: auf alle parallelen Ergebnisse warten |
-| **Thin Router** | Main Session die nur routet, keine Arbeit verrichtet |
-| **Task Decomposition** | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks |
-| **Selective Embedding** | Nur bestimmte Rules in den Managed Block einbetten, andere als separate Dateien |
-| **Graceful Degradation** | Automatischer Fallback auf sequentielle Ausführung bei Providern ohne Parallel-Fähigkeit |
-| **User-Override** | Bewusste Umgehung der Orchestrator-Pflicht durch expliziten User-Befehl |
-| **Orchestrator-Schalter** | Konfiguration in project.yaml (enabled/strict/unknown-fallback) |
-| **Meta-Feedback Loop** | Anonymisiertes Feedback an agent-meta bei unbekannten Intents zur System-Verbesserung |
-| **Unknown-Fallback** | Verhalten bei nicht klassifizierbarem Intent: meta-feedback / main-chat / ask-user |
-| **Dry-Run** | Simulation der Orchestration ohne echte Agent-Ausführung |
-| **Test-Fixtures** | Statische Testdaten (YAML/JSON) für Intent-Routing, Task-Decomposition, Provider-Syntax |
-| **FANOUT** | N Instanzen des gleichen Agent-Typs parallel starten |
-| **PARALLEL_GROUP** | Mehrere verschiedene Agent-Typen parallel starten |
-| **BARRIER** | Synchronisationspunkt: auf alle parallelen Ergebnisse warten |
-| **Thin Router** | Main Session die nur routet, keine Arbeit verrichtet |
-| **Task Decomposition** | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks |
-| **Selective Embedding** | Nur bestimmte Rules in den Managed Block einbetten, andere als separate Dateien |
-| **Viz-Log** | Event-Log für Agenten-Visualisierung und Session-Tracking |
-| **Orchestration-Test** | Automatisierter Test der gesamten Delegations-Pipeline |
+> Zentrale Begriffssammlung für das agent-meta Ökosystem.
+> Dreisprachig: Englisch (Fachbegriff), Deutsch (Übersetzung), Erklärung (Kontext).
+
+---
+
+### 14.1 Kern-Architektur
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Agent** | Agent | Spezialisierte KI-Rolle mit definiertem Scope, Tools und Verhaltensregeln. Beispiele: `developer`, `orchestrator`, `git`. |
+| **Orchestrator** | Orchestrator | Zentraler Koordinator, der User-Intents klassifiziert, Tasks zerlegt und an Worker-Agenten delegiert. Einstiegspunkt für ALLE Entwicklungsaufgaben. |
+| **Worker Agent** | Worker-Agent | Spezialist, der konkrete Arbeit verrichtet (Code schreiben, Tests ausführen, Git-Operationen). Wird vom Orchestrator gestartet. |
+| **Subagent** | Sub-Agent | Ein von einem anderen Agenten gestarteter Agent. Beispiel: Orchestrator startet `developer` als Sub-Agent. |
+| **Main Session** | Hauptsession | Die initiale Konversation zwischen User und KI. Soll als Thin Router fungieren und an den Orchestrator delegieren. |
+| **Thin Router** | Dünner Router | Main Session, die nur routet (Intents erkennt, an Orchestrator weiterleitet) aber keine Domänenarbeit selbst verrichtet. |
+| **Intent Routing** | Intent-Routing | Zuordnung eines User-Wunsches zum passenden Agenten. Der Orchestrator klassifiziert: "Feature → feature-Agent", "Git-Op → git-Agent". |
+| **Delegation** | Delegation | Übergabe einer Aufgabe von einem Agenten an einen anderen mit vollständigem Kontext im Prompt. |
+| **Human-in-the-Loop** | Mensch-im-Kreislauf | Benutzerbestätigung vor kritischen Operationen (z.B. FANOUT > 2, Commits auf main, Branch löschen). |
+
+### 14.2 Task & Workflow
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Task** | Aufgabe | Ein konkreter Arbeitsauftrag, den ein Agent ausführt. Kann atomar (einfach) oder komplex (Multi-Step) sein. |
+| **Sub-Task** | Sub-Aufgabe | Ein Teil einer zerlegten Aufgabe. Mehrere Sub-Tasks können parallel oder sequentiell abgearbeitet werden. |
+| **Task Decomposition** | Aufgabenzerlegung | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks, die parallel oder sequentiell dispatched werden. |
+| **Workflow** | Workflow | Vordefinierter Ablauf von Schritten mit festgelegten Agent-Zuordnungen. Beispiel: Feature-Lifecycle (Branch → REQ → TDD → Dev → Validate → PR). |
+| **Lifecycle** | Lebenszyklus | End-to-End-Prozess für eine Aufgabenklasse. Der `feature`-Agent führt den kompletten Feature-Lifecycle durch. |
+| **Pipeline** | Pipeline | Sequentieller Ablauf von Tasks mit Abhängigkeiten (A → B → C). Nicht parallelisierbar. |
+| **DoD (Definition of Done)** | Erledigungskriterien | Checkliste, die erfüllt sein muss bevor eine Aufgabe als abgeschlossen gilt. Konfigurierbar per Preset. |
+
+### 14.3 Parallelisierung
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **FANOUT** | Fanout / Auffächern | Starten von N Instanzen des gleichen Agent-Typs parallel. Beispiel: 3× `developer` gleichzeitig für 3 Bugfixes. |
+| **PARALLEL_GROUP** | Parallel-Gruppe | Starten verschiedener Agent-Typen gleichzeitig. Beispiel: `developer` ∥ `tester` für unabhängige Aufgaben. |
+| **BARRIER** | Barriere / Synchronisationspunkt | Wartepunkt, an dem alle parallelen Sub-Tasks beendet sein müssen, bevor der nächste Schritt beginnt. |
+| **Batching** | Batching | Aufteilung von N Sub-Tasks in Gruppen à `MAX_PARALLEL_AGENTS`, wenn N das Limit überschreitet. |
+| **MAX_PARALLEL_AGENTS** | Maximale parallele Agenten | Konfigurationswert (Default: 2–4), der die maximale Anzahl gleichzeitig laufender Agenten begrenzt. |
+| **Parallel Pattern** | Parallel-Muster | Provider-spezifische Syntax-Anweisung, die dem Orchestrator zeigt, wie parallele Agenten gestartet werden. |
+| **Graceful Degradation** | Anmutige Herabstufung | Automatischer Fallback auf sequentielle Ausführung, wenn der Provider keine Parallele Unterstützung bietet (z.B. Continue). |
+
+### 14.4 Agent-meta System
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **agent-meta** | agent-meta | Das Meta-Repository für Agenten-Standards. Wird als Git-Submodul in Projekte eingebunden. Generiert Agenten-Dateien via `sync.py`. |
+| **Sync (sync.py)** | Synchronisation | Prozess, bei dem agent-meta Templates in projektfertige Agenten-Dateien transformiert. Ersetzt Platzhalter, resolved Overrides, generiert Provider-Configs. |
+| **Template** | Template | Quelldatei unter `agents/1-generic/` oder `agents/2-platform/`, die als Basis für generierte Agenten dient. Enthält Platzhalter wie `{{PROJECT_NAME}}`. |
+| **Generated Output** | Generierter Output | Dateien unter `.claude/agents/`, `.opencode/agents/`, etc. — werden von `sync.py` erzeugt und dürfen nie manuell editiert werden. |
+| **Override** | Override | Projekt- oder plattformspezifische Ersetzung eines generischen Templates. `3-project/orchestrator.md` ersetzt `1-generic/orchestrator.md` komplett. |
+| **Extension** | Erweiterung | Additive Ergänzung zu einem generierten Agenten. `3-project/am-orchestrator-ext.md` wird vom Agenten zur Laufzeit gelesen. |
+| **Composition** | Komposition | Mechanismus, bei dem ein Plattform-Agent ein generisches Template erweitert (`extends:` + `patches:`) statt es zu ersetzen. |
+| **Layer / Schicht** | Schicht | Ebenen des agent-meta Schichtenmodells: 0-external (Skills), 1-generic (Universal), 2-platform (Plattform), 3-project (Projekt). |
+| **Placeholder** | Platzhalter | Variable im Template, die zur Sync-Zeit substituiert wird. Syntax: `{{GROSS_MIT_UNTERSTRICH}}`. Beispiel: `{{PROJECT_NAME}}`. |
+| **Frontmatter** | Frontmatter | YAML-Metadaten-Block am Anfang jeder Agenten-Template-Datei. Enthält `name`, `version`, `description`, `tools`. |
+| **Managed Block** | Verwalteter Block | Bereich in `CLAUDE.md` / `AGENTS.md`, der von `sync.py` automatisch aktualisiert wird. Manuelle Änderungen werden überschrieben. |
+
+### 14.5 Konfiguration & Rules
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **project.yaml** | Projekt-Konfiguration | Zentrale Konfigurationsdatei `.meta-config/project.yaml`. Definiert Rollen, Provider, Presets, Variablen. |
+| **Role** | Rolle | Agenten-Rolle, die in einem Projekt aktiv ist. Konfiguriert in `project.yaml` unter `roles:`. |
+| **Provider** | Provider | KI-Plattform, die Agenten ausführt. Unterstützt: Claude, Opencode, Gemini, Continue. |
+| **Rule** | Regel | Verhaltensvorschrift für Agenten. Gespeichert in `rules/1-generic/` oder `rules/2-platform/`. |
+| **Rule Preset** | Regel-Preset | Vordefinierte Regel-Konfiguration (`default`, `minimal`, `silent`). Steuert welche Rules geladen werden. |
+| **alwaysApply** | Immer anwenden | Rule-Attribut: `true` = Rule ist immer aktiv, `false` = Rule wird nur bei Keyword-Match geladen. |
+| **Speech Mode** | Kommunikationsstil | Gesprächsstil aller Agenten (z.B. `submissive`, `full`, `short`). Konfiguriert in `project.yaml`. |
+| **Model Tier** | Modell-Stufe | Kosteneffizienz-Stufe für Agenten: `nano` → `fast` → `balanced` → `powerful` → `max`. |
+
+### 14.6 Provider-Spezifisch
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Claude** | Claude | Anthropic Claude (Claude Code). Unterstützt `Agent(run_in_background=True)` für parallele Sub-Agenten. |
+| **Opencode** | Opencode | Opencode AI. Parallele Ausführung via mehrere `task()`-Calls in einer Nachricht. Aktueller Provider. |
+| **Gemini** | Gemini | Google Gemini Code Assist. Parallele Ausführung automatisch bei mehreren Tool-Calls in einer Antwort. |
+| **Continue** | Continue | Continue.dev IDE-Extension. Keine native parallele Subagent-Ausführung — sequentieller Fallback. |
+| **Provider Isolation** | Provider-Isolation | Mechanismus, der verhindert, dass ein Provider die Verzeichnisse eines anderen Providers liest/schreibt. |
+
+### 14.7 Testing & Qualität
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Dry-Run** | Probelauf | Simulation der Orchestrierung ohne echte Agent-Ausführung. Validiert Routing, Zerlegung, Syntax. |
+| **Test Fixture** | Test-Daten | Statische YAML/JSON-Dateien mit Testfällen für Intent-Routing, Task-Decomposition, Provider-Syntax. |
+| **Fixture** | Fixture | Wiederverwendbare Test-Ressource (Daten, Mock, Konfiguration), die für mehrere Tests genutzt wird. |
+| **Orchestration Test** | Orchestrierungs-Test | Automatisierter Test der gesamten Delegations-Pipeline: Intent → Decomposition → Dispatch → Aggregation. |
+| **Viz-Log** | Visualisierungs-Log | Event-Log für Agenten-Visualisierung. Speichert Delegations-Events, Timestamps, Ergebnisse. |
+| **Scenario** | Szenario | Einzelner Testfall mit definiertem Input, erwartetem Verhalten und erwartetem Output. |
+| **Regression** | Regression | Unbeabsichtigtes Wiederauftreten eines bereits behobenen Fehlers durch eine neue Änderung. |
+
+### 14.8 Git & Projekt-Management
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Branch-Guard** | Branch-Schutz | Regel: Vor Code-Änderungen prüfen, ob auf `main`/`master` — dann Branch anlegen. |
+| **Feature Branch** | Feature-Branch | Isolierter Git-Branch für eine einzelne Aufgabe. Naming: `feat/<thema>`, `fix/<thema>`. |
+| **Conventional Commit** | Konventioneller Commit | Standardisiertes Commit-Format: `<type>(REQ-xxx): <Beschreibung>`. |
+| **REQ-ID** | Anforderungs-ID | Eindeutige Kennung für eine Anforderung (z.B. `REQ-042`). Wird vom `requirements`-Agent vergeben. |
+| **Traceability** | Rückverfolgbarkeit | Verknüpfung von REQ-ID → Code → Test → Commit. Pflicht bei aktiviertem `req-traceability`. |
+| **Meta-Feedback** | Meta-Feedback | Verbesserungsvorschläge für das agent-meta Framework selbst. Wird als GitHub Issue eingereicht. |
+| **Meta-Feedback Loop** | Meta-Feedback-Schleife | Automatisches Sammeln von Feedback bei unbekannten Intents, um das System kontinuierlich zu verbessern. |
+
+### 14.9 Orchestrator-First spezifisch
+
+| English | Deutsch | Erklärung |
+|---------|---------|-----------|
+| **Orchestrator-First** | Orchestrator-zuerst | Architektur-Prinzip: Jede Aufgabe fließt durch den Orchestrator, der delegiert und parallelisiert. |
+| **Orchestrator-Schalter** | Orchestrator-Schalter | Konfiguration in `project.yaml` (enabled/strict/unknown-fallback), die das Orchestrator-Verhalten steuert. |
+| **User-Override** | User-Override | Bewusste Umgehung der Orchestrator-Pflicht durch expliziten User-Befehl ("Mach das hier", "Kein Orchestrator"). |
+| **Unknown Intent** | Unbekannter Intent | User-Input, der in keine bekannte Intent-Kategorie passt. Löst Meta-Feedback oder User-Override aus. |
+| **Unknown-Fallback** | Unbekannt-Fallback | Verhalten bei unbekanntem Intent: `meta-feedback` (strict), `main-chat` (relaxed), `ask-user` (fragen). |
+| **Intent-Klassifikation** | Intent-Klassifikation | Zuordnung eines User-Inputs zu einer bekannten Kategorie (Feature, Bugfix, Analyse, Git-Op, ...). |
+| **Dispatch-Plan** | Dispatch-Plan | Ausführungsplan, der definiert welche Agenten in welcher Reihenfolge gestartet werden (FANOUT, sequentiell, gemischt). |
+| **Result Aggregation** | Ergebnis-Aggregation | Sammeln und Kombinieren der Ergebnisse mehrerer paralleler Agenten zu einer Gesamtaussage. |
+| **Anonymization** | Anonymisierung | Entfernung projektspezifischer Details (Namen, Pfade, Secrets) vor dem Senden von Meta-Feedback. |
+
+### 14.10 Zusammenfassung: Wichtigste Begriffe
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  USER          →  MAIN SESSION (Thin Router)  →  ORCHESTRATOR       │
+│                                                                      │
+│  Intent ──────→  Routing  ───────────────→  Klassifikation        │
+│                    (use-orchestrator Rule)      (Intent-Routing)      │
+│                                                                      │
+│                                               ↓                      │
+│                                          Decomposition               │
+│                                          (Task-Zerlegung)            │
+│                                               ↓                      │
+│                                          FANOUT / PIPELINE           │
+│                                          (Parallel / Sequentiell)    │
+│                                               ↓                      │
+│                                          WORKER AGENTS              │
+│                                          (developer, git, ...)      │
+│                                               ↓                      │
+│                                          BARRIER                     │
+│                                          (Synchronisation)           │
+│                                               ↓                      │
+│                                          Result Aggregation         │
+│                                          (Ergebnisse sammeln)        │
+│                                               ↓                      │
+│                                          USER (Zusammenfassung)     │
+└─────────────────────────────────────────────────────────────────────┘
+```
