@@ -192,6 +192,76 @@ Zwei Sub-Tasks tᵢ und tⱼ sind **unabhängig** wenn:
 
 **Faustregel:** Wenn der Orchestrator unsicher ist → sequentiell. Falsche Parallelisierung ist schlimmer als fehlende.
 
+### 3.4 Unknown Task Handling & Meta-Feedback Loop
+
+**Problem:** Der Orchestrator kann einen User-Intent nicht klassifizieren — er taucht in keiner Intent-Routing-Tabelle auf und passt zu keinem bekannten Muster.
+
+**Verboten:** Der Orchestrator arbeitet NIEMALS selbst. Auch bei unklaren Intents darf er nicht "Ich mache es selbst" sagen.
+
+**Protokoll bei nicht verortbarem Task:**
+
+```
+Schritt 1 — Analyseversuch (max. 1 Frage):
+  "Ich bin mir unsicher: Meint Ihr [Option A] oder [Option B]?"
+  ODER: "Könnt Ihr das präzisieren?"
+  → Wenn User klärt → normaler Intent-Routing
+
+Schritt 2 — Wenn User nicht klärt oder 2+ Versuche gescheitert:
+  NICHT selbst ausführen.
+  NICHT "Sorry, ich verstehe das nicht" abbrechen.
+
+Schritt 3 — Anonymisiertes Meta-Feedback erstellen:
+  Inhalte anonymisieren:
+    - Projektname → "[PROJECT]"
+    - Pfade → "[PATH]"
+    - Dateinamen → "[FILE]"
+    - API-Keys/Secrets → "[REDACTED]"
+    - Domain-spezifische Begriffe → bleiben (sind relevant für Klassifikation)
+  Kurze Beschreibung: "Unbekannter Intent: [Kategorie-Guess]. User wollte [Zusammenfassung]."
+
+Schritt 4 — Delegation an meta-feedback:
+  Delegiere anonymisiertes Feedback an meta-feedback-Agent:
+    "Erstelle ein GitHub Issue in agent-meta mit Titel:
+    'Orchestrator: Unknown Intent — [Kategorie-Guess]'
+    Body: Beschreibung + Kontext + Vorschlag für neue Intent-Kategorie."
+
+Schritt 5 — User informieren:
+  "Ich konnte den Auftrag nicht zuordnen. Ich habe ein Verbesserungsvorschlag
+   an das agent-meta Team gesendet, damit solche Anfragen zukünftig besser
+   geroutet werden können. Möchtet Ihr den Auftrag anders formulieren?"
+```
+
+**Regeln für Anonymisierung:**
+
+| Was | Beispiel | Anonymisiert zu |
+|-----|----------|-----------------|
+| Projektname | "agent-meta" | `[PROJECT]` |
+| Dateipfade | "scripts/sync.py" | `[PATH]/sync.py` oder `[FILE]` |
+| URLs | "github.com/Popoboxxo/..." | `[URL]` |
+| API-Keys, Tokens | "sk-abc123" | `[REDACTED]` |
+| Domain-Begriffe | "MBSE", "StrictDoc", "Sharkord" | bleiben (relevant für Klassifikation) |
+| Anfragetyp | "Füge eine neue Sensor-Klasse hinzu" | bleiben (das ist der eigentliche Intent) |
+
+**Warum anonymisiert?**
+- Datenschutz: Projekt-interne Details bleiben im Projekt
+- agent-meta erhält nur den Intent-Typ, nicht den konkreten Inhalt
+- Das Feedback-Loop ist rein strukturell: "Wir brauchen einen neuen Intent-Kategorie X"
+
+**Integration in Orchestrator-Template:**
+
+Neue Section im Orchestrator (nach Intent-Routing):
+```
+## Unknown Intent Protocol
+
+Wenn der Intent in keiner bekannten Kategorie landet:
+1. Versuche mit max. 1 Klärungsfrage
+2. Wenn nicht geklärt → anonymisiere Inhalte
+3. Delegiere an meta-feedback (neuer Intent-Typ vorschlagen)
+4. Frage User nach alternativer Formulierung
+
+Verboten: Selbst ausführen, selbst raten, abbrechen.
+```
+
 ---
 
 ## 4. Provider-Agnostic Parallel Model
@@ -307,9 +377,139 @@ Implizite Capability-Erkennung:
 
 ---
 
-## 5. Main Session Thinning
+## 5. Projektspezifische Agenten & Platform-Agenten — 100% Kompatibilität
 
-### 5.1 Vorher/Nachher — Managed Block
+### 5.1 Die Override-Hierarchie
+
+```
+1-generic/orchestrator.md          ← Template mit Task Decomposition
+      │
+      ▼
+2-platform/<plattform>-orchestrator.md  ← Full-Replacement oder Composition
+      │                                    (z.B. sharkord-spezifische Workflows)
+      ▼
+3-project/orchestrator.md               ← Full-Override (komplett ersetzt)
+      │
+      ▼
+3-project/am-orchestrator-ext.md        ← Extension (additiv, nie von sync.py berührt)
+```
+
+### 5.2 Projektspezifische Agenten (3-project/)
+
+**Problem:** Ein Projekt definiert eigene Agenten (z.B. `openscad-developer`, `home-organization-specialist`). Diese tauchten nicht in der Orchestrator-Intent-Routing-Tabelle auf.
+
+**Lösung:** Der Orchestrator muss projektspezifische Agenten erkennen können. Das geschieht über die `roles`-Liste aus `.meta-config/project.yaml`.
+
+**Mechanismus:**
+
+```yaml
+# .meta-config/project.yaml
+roles:
+  - orchestrator
+  - developer
+  - openscad-developer      # ← Projekt-spezifisch
+  - home-organization-specialist  # ← Projekt-spezifisch
+```
+
+`sync.py` generiert aus der `roles`-Liste eine dynamische Intent-Routing-Erweiterung, die dem Orchestrator injiziert wird:
+
+```
+{{#if PROJECT_SPECIFIC_AGENTS}}
+## Projektspezifische Agenten
+
+| Agent | Zuständigkeit | Routing-Trigger |
+|-------|--------------|-----------------|
+| openscad-developer | Parametrische 3D-Modelle | "OpenSCAD", "3D-Druck", "STL" |
+| home-organization-specialist | Home-Assistant Automation | "Home", "Haus", "Automation" |
+{{/if}}
+```
+
+**Varibale `PROJECT_SPECIFIC_AGENTS`:**
+- Wird von `sync.py` aus `roles` minus `role-defaults.yaml` bekannten Rollen generiert
+- Enthält Name, Beschreibung, Routing-Keywords
+- Wird in den Orchestrator injiziert (nach der Standard-Intent-Routing-Tabelle)
+
+**Parallelisierung von projektspezifischen Agenten:**
+- Identisch zu generischen Agenten: FANOUT, PARALLEL_GROUP, BARRIER funktionieren gleich
+- `MAX_PARALLEL_AGENTS` gilt auch für projektspezifische Agenten
+- Batching-Logik: 5× openscad-developer gleichzeitig → zwei Batches (4 + 1)
+
+### 5.3 Platform-Agenten (2-platform/)
+
+**Plattform-Overrides können:**
+
+1. **Full-Replacement:** `2-platform/sharkord-orchestrator.md` ersetzt den generischen Orchestrator komplett → Die Plattform-Version enthält die Task Decomposition und Parallel Engine selbst
+2. **Composition:** `2-platform/sharkord-orchestrator.md` mit `extends: "1-generic/orchestrator.md"` + `patches:` → Die Parallel Engine wird aus 1-generic geerbt und um plattformspezifische Intents erweitert
+
+**Kompatibilitätstabelle:**
+
+| Override-Typ | Task Decomposition | Parallel Engine | Meta-Feedback Loop | Kompatibel? |
+|--------------|--------------------|-----------------|--------------------|-------------|
+| Full-Replacement (kein extends:) | Muss selbst implementieren | Muss selbst implementieren | Muss selbst implementieren | **Ja** — Plattform ist frei |
+| Composition (extends: + patches:) | Wird von 1-generic geerbt | Wird von 1-generic geerbt | Wird von 1-generic geerbt | **Ja** — automatisch |
+| Kein Override | 1-generic verwendet | 1-generic verwendet | 1-generic verwendet | **Ja** — Standard |
+
+**Plattform-spezifische Intents:**
+
+Eine Plattform (z.B. Sharkord) kann ihre eigenen Intents hinzufügen:
+
+```yaml
+# 2-platform/sharkord-orchestrator.md (Composition)
+extends: "1-generic/orchestrator.md"
+patches:
+  - op: append-after
+    anchor: "## Intent-Routing"
+    content: |
+      ### Sharkord-spezifische Intents
+      
+      | User-Intent | Ziel-Agent | Tier |
+      |-------------|-----------|------|
+      | "Erstelle eine Dashboard-Kachel" | `dashboard-designer` | balanced |
+      | "Füge MQTT-Sensor hinzu" | `sensor-developer` | fast |
+      | "Update Sharkord-Config" | `sharkord-manager` | fast |
+      
+      > Diese Intents werden parallelisiert wie alle anderen (FANOUT bei Multi-Tasks).
+```
+
+### 5.4 External Skills (0-external/)
+
+**Skill-Agenten** (via `config/skills-registry.yaml`) werden als eigenständige Rollen behandelt:
+
+```yaml
+# config/skills-registry.yaml
+skills:
+  home-organization:
+    repo: "https://github.com/..."
+    agent: "home-organization-specialist"
+    approved: true
+```
+
+- Skill-Agenten tauchen automatisch in der generierten Agenten-Tabelle auf
+- Der Orchestrator kann sie über die dynamische `PROJECT_SPECIFIC_AGENTS`-Variable erkennen
+- Parallelisierung: `FANOUT(2, home-organization-specialist)` funktioniert identisch zu generischen Agenten
+
+### 5.5 Zusammenfassung Kompatibilität
+
+| Agent-Typ | Task Decomp. | Parallel Engine | Meta-Feedback | Routing |
+|-----------|-------------|-----------------|----------------|---------|
+| 1-generic (generisch) | ✓ v3.0.0 | ✓ abstrakt + PARALLEL_PATTERN | ✓ automatisch | ✓ feste Tabelle |
+| 2-platform (Full-Replace) | ✓ plattform-eigen | ✓ plattform-eigen | ✓ plattform-eigen | ✓ plattform-eigen |
+| 2-platform (Composition) | ✓ geerbt | ✓ geerbt | ✓ geerbt | ✓ erweitert |
+| 3-project (Override) | ✓ projekt-eigen | ✓ projekt-eigen | ✓ projekt-eigen | ✓ projekt-eigen |
+| 3-project (Extension) | ✓ geerbt + additiv | ✓ geerbt | ✓ geerbt | ✓ erweitert |
+| 0-external (Skill) | ✓ dynamisch | ✓ dynamisch | ✓ dynamisch | ✓ dynamisch |
+
+**100% Kompatibilität ist garantiert**, weil:**
+1. Die Override-Hierarchie unverändert bleibt (1-generic → 2-platform → 3-project → 0-external)
+2. Full-Replacements sind frei, ihre eigene Logik zu implementieren
+3. Compositions erben automatisch alle neuen Features
+4. Neue Variablen (`PROJECT_SPECIFIC_AGENTS`) werden injiziert — bestehende Templates ignorieren sie einfach
+
+---
+
+## 6. Main Session Thinning
+
+### 6.1 Vorher/Nachher — Managed Block
 
 **Vorher** (heute, ~380 Zeilen Rules + Agent-Tabelle im Managed Block):
 
@@ -392,7 +592,7 @@ DoD-Preset: rapid-prototyping | REQ-Traceability: false | Tests: false | ...
 
 Die Rules selbst bleiben als separate Dateien in `.claude/rules/`, `.opencode/rules/` etc. bestehen — sie werden vom Provider-Runtime geladen, nicht mehr in den Managed Block eingebettet.
 
-### 5.2 Selective Rule Embedding (Phase 2)
+### 6.2 Selective Rule Embedding (Phase 2)
 
 Nicht alle Rules müssen aus dem Managed Block entfernt werden. Einige sind fundamental und sollten immer sichtbar sein:
 
@@ -427,7 +627,7 @@ presets:
 
 ---
 
-## 6. use-orchestrator Rule — Vollständiger neuer Text
+## 7. use-orchestrator Rule — Vollständiger neuer Text
 
 ```markdown
 # Orchestrator — Universal Router
@@ -482,9 +682,9 @@ Wenn der Orchestrator nicht verfügbar ist:
 
 ---
 
-## 7. Orchestrator v3.0.0 — Neue Template-Struktur
+## 8. Orchestrator v3.0.0 — Neue Template-Struktur
 
-### 7.1 Version-Bump
+### 8.1 Version-Bump
 
 ```yaml
 ---
@@ -498,7 +698,7 @@ tools:
 ---
 ```
 
-### 7.2 Neue Sections
+### 8.2 Neue Sections
 
 ```
 ## Planning-Phase (Pflicht vor komplexen Aufgaben)     [erweitert]
@@ -548,7 +748,7 @@ tools:
   + KEIN automatisches Mergen paralleler Ergebnisse ohne User-Prüfung
 ```
 
-### 7.3 Workflow-Erweiterungen
+### 8.3 Workflow-Erweiterungen
 
 ```
 A  Neues Feature:    0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
@@ -562,7 +762,7 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 
 ---
 
-## 8. File Change Impact Matrix
+## 9. File Change Impact Matrix
 
 ### Phase 1 (Core — Orchestrator v3.0.0 + Rules)
 
@@ -591,7 +791,7 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 
 ---
 
-## 9. Rückwärtskompatibilität
+## 10. Rückwärtskompatibilität
 
 ### Garantiert
 
@@ -616,7 +816,7 @@ Projekte mit `rules-preset: silent` erhalten `use-orchestrator` nach dem Update 
 
 ---
 
-## 10. Risiken & Mitigation
+## 11. Risiken & Mitigation
 
 | Risiko | W'keit | Schwere | Mitigation |
 |--------|--------|---------|-----------|
@@ -629,7 +829,7 @@ Projekte mit `rules-preset: silent` erhalten `use-orchestrator` nach dem Update 
 
 ---
 
-## 11. Phasen-Plan
+## 12. Phasen-Plan
 
 ```
 Phase 1 — Core (jetzt)
@@ -657,7 +857,7 @@ Phase 3 — Advanced (optional, später)
 
 ---
 
-## 12. Glossar
+## 13. Glossar
 
 | Begriff | Definition |
 |---------|-----------|
