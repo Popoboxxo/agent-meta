@@ -1478,150 +1478,150 @@ Phase 3 — Advanced (optional, später)
 ## 14. Glossar: Meta-Agent Framework
 
 > Zentrale Begriffssammlung für das agent-meta Ökosystem.
-> Dreisprachig: Englisch (Fachbegriff), Deutsch (Übersetzung), Erklärung (Kontext).
+> Viersprachig: English (Term), Deutsch (Begriff), English Explanation, Deutsche Erklärung.
 
 ---
 
-### 14.1 Kern-Architektur
+### 14.1 Core Architecture
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Agent** | Agent | Spezialisierte KI-Rolle mit definiertem Scope, Tools und Verhaltensregeln. Beispiele: `developer`, `orchestrator`, `git`. |
-| **Orchestrator** | Orchestrator | Zentraler Koordinator, der User-Intents klassifiziert, Tasks zerlegt und an Worker-Agenten delegiert. Einstiegspunkt für ALLE Entwicklungsaufgaben. |
-| **Worker Agent** | Worker-Agent | Spezialist, der konkrete Arbeit verrichtet (Code schreiben, Tests ausführen, Git-Operationen). Wird vom Orchestrator gestartet. |
-| **Subagent** | Sub-Agent | Ein von einem anderen Agenten gestarteter Agent. Beispiel: Orchestrator startet `developer` als Sub-Agent. |
-| **Main Session** | Hauptsession | Die initiale Konversation zwischen User und KI. Soll als Thin Router fungieren und an den Orchestrator delegieren. |
-| **Thin Router** | Dünner Router | Main Session, die nur routet (Intents erkennt, an Orchestrator weiterleitet) aber keine Domänenarbeit selbst verrichtet. |
-| **Intent Routing** | Intent-Routing | Zuordnung eines User-Wunsches zum passenden Agenten. Der Orchestrator klassifiziert: "Feature → feature-Agent", "Git-Op → git-Agent". |
-| **Delegation** | Delegation | Übergabe einer Aufgabe von einem Agenten an einen anderen mit vollständigem Kontext im Prompt. |
-| **Human-in-the-Loop** | Mensch-im-Kreislauf | Benutzerbestätigung vor kritischen Operationen (z.B. FANOUT > 2, Commits auf main, Branch löschen). |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Agent** | Agent | A specialized AI role with defined scope, tools, and behavior rules. Examples: `developer`, `orchestrator`, `git`. | Spezialisierte KI-Rolle mit definiertem Scope, Tools und Verhaltensregeln. Beispiele: `developer`, `orchestrator`, `git`. |
+| **Orchestrator** | Orchestrator | Central coordinator that classifies user intents, decomposes tasks, and delegates to worker agents. Entry point for ALL development tasks. | Zentraler Koordinator, der User-Intents klassifiziert, Tasks zerlegt und an Worker-Agenten delegiert. Einstiegspunkt für ALLE Entwicklungsaufgaben. |
+| **Worker Agent** | Worker-Agent | Specialist that performs concrete work (writing code, running tests, Git operations). Started by the Orchestrator. | Spezialist, der konkrete Arbeit verrichtet (Code schreiben, Tests ausführen, Git-Operationen). Wird vom Orchestrator gestartet. |
+| **Subagent** | Sub-Agent | An agent started by another agent. Example: Orchestrator starts `developer` as a sub-agent. | Ein von einem anderen Agenten gestarteter Agent. Beispiel: Orchestrator startet `developer` als Sub-Agent. |
+| **Main Session** | Hauptsession | The initial conversation between user and AI. Should act as a Thin Router and delegate to the Orchestrator. | Die initiale Konversation zwischen User und KI. Soll als Thin Router fungieren und an den Orchestrator delegieren. |
+| **Thin Router** | Dünner Router | Main Session that only routes (recognizes intents, forwards to Orchestrator) but performs no domain work itself. | Main Session, die nur routet (Intents erkennt, an Orchestrator weiterleitet) aber keine Domänenarbeit selbst verrichtet. |
+| **Intent Routing** | Intent-Routing | Mapping of a user request to the appropriate agent. The Orchestrator classifies: "Feature → feature agent", "Git-Op → git agent". | Zuordnung eines User-Wunsches zum passenden Agenten. Der Orchestrator klassifiziert: "Feature → feature-Agent", "Git-Op → git-Agent". |
+| **Delegation** | Delegation | Handing over a task from one agent to another with complete context in the prompt. | Übergabe einer Aufgabe von einem Agenten an einen anderen mit vollständigem Kontext im Prompt. |
+| **Human-in-the-Loop** | Mensch-im-Kreislauf | User confirmation before critical operations (e.g., FANOUT > 2, commits on main, branch deletion). | Benutzerbestätigung vor kritischen Operationen (z.B. FANOUT > 2, Commits auf main, Branch löschen). |
 
 ### 14.2 Task & Workflow
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Task** | Aufgabe | Ein konkreter Arbeitsauftrag, den ein Agent ausführt. Kann atomar (einfach) oder komplex (Multi-Step) sein. |
-| **Sub-Task** | Sub-Aufgabe | Ein Teil einer zerlegten Aufgabe. Mehrere Sub-Tasks können parallel oder sequentiell abgearbeitet werden. |
-| **Task Decomposition** | Aufgabenzerlegung | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks, die parallel oder sequentiell dispatched werden. |
-| **Workflow** | Workflow | Vordefinierter Ablauf von Schritten mit festgelegten Agent-Zuordnungen. Beispiel: Feature-Lifecycle (Branch → REQ → TDD → Dev → Validate → PR). |
-| **Lifecycle** | Lebenszyklus | End-to-End-Prozess für eine Aufgabenklasse. Der `feature`-Agent führt den kompletten Feature-Lifecycle durch. |
-| **Pipeline** | Pipeline | Sequentieller Ablauf von Tasks mit Abhängigkeiten (A → B → C). Nicht parallelisierbar. |
-| **DoD (Definition of Done)** | Erledigungskriterien | Checkliste, die erfüllt sein muss bevor eine Aufgabe als abgeschlossen gilt. Konfigurierbar per Preset. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Task** | Aufgabe | A concrete work assignment executed by an agent. Can be atomic (simple) or complex (multi-step). | Ein konkreter Arbeitsauftrag, den ein Agent ausführt. Kann atomar (einfach) oder komplex (Multi-Step) sein. |
+| **Sub-Task** | Sub-Aufgabe | A part of a decomposed task. Multiple sub-tasks can be executed in parallel or sequentially. | Ein Teil einer zerlegten Aufgabe. Mehrere Sub-Tasks können parallel oder sequentiell abgearbeitet werden. |
+| **Task Decomposition** | Aufgabenzerlegung | Breaking down a complex user task into independent sub-tasks that are dispatched in parallel or sequentially. | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks, die parallel oder sequentiell dispatched werden. |
+| **Workflow** | Workflow | Predefined sequence of steps with fixed agent assignments. Example: Feature-Lifecycle (Branch → REQ → TDD → Dev → Validate → PR). | Vordefinierter Ablauf von Schritten mit festgelegten Agent-Zuordnungen. Beispiel: Feature-Lifecycle (Branch → REQ → TDD → Dev → Validate → PR). |
+| **Lifecycle** | Lebenszyklus | End-to-end process for a task class. The `feature` agent executes the complete feature lifecycle. | End-to-End-Prozess für eine Aufgabenklasse. Der `feature`-Agent führt den kompletten Feature-Lifecycle durch. |
+| **Pipeline** | Pipeline | Sequential flow of tasks with dependencies (A → B → C). Not parallelizable. | Sequentieller Ablauf von Tasks mit Abhängigkeiten (A → B → C). Nicht parallelisierbar. |
+| **DoD (Definition of Done)** | Erledigungskriterien | Checklist that must be fulfilled before a task is considered complete. Configurable per preset. | Checkliste, die erfüllt sein muss bevor eine Aufgabe als abgeschlossen gilt. Konfigurierbar per Preset. |
 
-### 14.3 Parallelisierung
+### 14.3 Parallelization
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **FANOUT** | Fanout / Auffächern | Starten von N Instanzen des gleichen Agent-Typs parallel. Beispiel: 3× `developer` gleichzeitig für 3 Bugfixes. |
-| **PARALLEL_GROUP** | Parallel-Gruppe | Starten verschiedener Agent-Typen gleichzeitig. Beispiel: `developer` ∥ `tester` für unabhängige Aufgaben. |
-| **BARRIER** | Barriere / Synchronisationspunkt | Wartepunkt, an dem alle parallelen Sub-Tasks beendet sein müssen, bevor der nächste Schritt beginnt. |
-| **Batching** | Batching | Aufteilung von N Sub-Tasks in Gruppen à `MAX_PARALLEL_AGENTS`, wenn N das Limit überschreitet. |
-| **MAX_PARALLEL_AGENTS** | Maximale parallele Agenten | Konfigurationswert (Default: 2–4), der die maximale Anzahl gleichzeitig laufender Agenten begrenzt. |
-| **Parallel Pattern** | Parallel-Muster | Provider-spezifische Syntax-Anweisung, die dem Orchestrator zeigt, wie parallele Agenten gestartet werden. |
-| **Graceful Degradation** | Anmutige Herabstufung | Automatischer Fallback auf sequentielle Ausführung, wenn der Provider keine Parallele Unterstützung bietet (z.B. Continue). |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **FANOUT** | Fanout / Auffächern | Starting N instances of the same agent type in parallel. Example: 3× `developer` simultaneously for 3 bugfixes. | Starten von N Instanzen des gleichen Agent-Typs parallel. Beispiel: 3× `developer` gleichzeitig für 3 Bugfixes. |
+| **PARALLEL_GROUP** | Parallel-Gruppe | Starting different agent types simultaneously. Example: `developer` ∥ `tester` for independent tasks. | Starten verschiedener Agent-Typen gleichzeitig. Beispiel: `developer` ∥ `tester` für unabhängige Aufgaben. |
+| **BARRIER** | Barriere / Synchronisationspunkt | Synchronization point where all parallel sub-tasks must complete before the next step begins. | Wartepunkt, an dem alle parallelen Sub-Tasks beendet sein müssen, bevor der nächste Schritt beginnt. |
+| **Batching** | Batching | Splitting N sub-tasks into groups of `MAX_PARALLEL_AGENTS` when N exceeds the limit. | Aufteilung von N Sub-Tasks in Gruppen à `MAX_PARALLEL_AGENTS`, wenn N das Limit überschreitet. |
+| **MAX_PARALLEL_AGENTS** | Maximale parallele Agenten | Configuration value (default: 2–4) that limits the maximum number of simultaneously running agents. | Konfigurationswert (Default: 2–4), der die maximale Anzahl gleichzeitig laufender Agenten begrenzt. |
+| **Parallel Pattern** | Parallel-Muster | Provider-specific syntax instruction showing the Orchestrator how to start parallel agents. | Provider-spezifische Syntax-Anweisung, die dem Orchestrator zeigt, wie parallele Agenten gestartet werden. |
+| **Graceful Degradation** | Anmutige Herabstufung | Automatic fallback to sequential execution when the provider does not support parallel execution (e.g., Continue). | Automatischer Fallback auf sequentielle Ausführung, wenn der Provider keine Parallele Unterstützung bietet (z.B. Continue). |
 
 ### 14.4 Agent-meta System
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **agent-meta** | agent-meta | Das Meta-Repository für Agenten-Standards. Wird als Git-Submodul in Projekte eingebunden. Generiert Agenten-Dateien via `sync.py`. |
-| **Sync (sync.py)** | Synchronisation | Prozess, bei dem agent-meta Templates in projektfertige Agenten-Dateien transformiert. Ersetzt Platzhalter, resolved Overrides, generiert Provider-Configs. |
-| **Template** | Template | Quelldatei unter `agents/1-generic/` oder `agents/2-platform/`, die als Basis für generierte Agenten dient. Enthält Platzhalter wie `{{PROJECT_NAME}}`. |
-| **Generated Output** | Generierter Output | Dateien unter `.claude/agents/`, `.opencode/agents/`, etc. — werden von `sync.py` erzeugt und dürfen nie manuell editiert werden. |
-| **Override** | Override | Projekt- oder plattformspezifische Ersetzung eines generischen Templates. `3-project/orchestrator.md` ersetzt `1-generic/orchestrator.md` komplett. |
-| **Extension** | Erweiterung | Additive Ergänzung zu einem generierten Agenten. `3-project/am-orchestrator-ext.md` wird vom Agenten zur Laufzeit gelesen. |
-| **Composition** | Komposition | Mechanismus, bei dem ein Plattform-Agent ein generisches Template erweitert (`extends:` + `patches:`) statt es zu ersetzen. |
-| **Layer / Schicht** | Schicht | Ebenen des agent-meta Schichtenmodells: 0-external (Skills), 1-generic (Universal), 2-platform (Plattform), 3-project (Projekt). |
-| **Placeholder** | Platzhalter | Variable im Template, die zur Sync-Zeit substituiert wird. Syntax: `{{GROSS_MIT_UNTERSTRICH}}`. Beispiel: `{{PROJECT_NAME}}`. |
-| **Frontmatter** | Frontmatter | YAML-Metadaten-Block am Anfang jeder Agenten-Template-Datei. Enthält `name`, `version`, `description`, `tools`. |
-| **Managed Block** | Verwalteter Block | Bereich in `CLAUDE.md` / `AGENTS.md`, der von `sync.py` automatisch aktualisiert wird. Manuelle Änderungen werden überschrieben. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **agent-meta** | agent-meta | The meta-repository for agent standards. Embedded as a Git submodule in projects. Generates agent files via `sync.py`. | Das Meta-Repository für Agenten-Standards. Wird als Git-Submodul in Projekte eingebunden. Generiert Agenten-Dateien via `sync.py`. |
+| **Sync (sync.py)** | Synchronisation | Process where agent-meta transforms templates into project-ready agent files. Replaces placeholders, resolves overrides, generates provider configs. | Prozess, bei dem agent-meta Templates in projektfertige Agenten-Dateien transformiert. Ersetzt Platzhalter, resolved Overrides, generiert Provider-Configs. |
+| **Template** | Template | Source file under `agents/1-generic/` or `agents/2-platform/` serving as basis for generated agents. Contains placeholders like `{{PROJECT_NAME}}`. | Quelldatei unter `agents/1-generic/` oder `agents/2-platform/`, die als Basis für generierte Agenten dient. Enthält Platzhalter wie `{{PROJECT_NAME}}`. |
+| **Generated Output** | Generierter Output | Files under `.claude/agents/`, `.opencode/agents/`, etc. — created by `sync.py` and must never be manually edited. | Dateien unter `.claude/agents/`, `.opencode/agents/`, etc. — werden von `sync.py` erzeugt und dürfen nie manuell editiert werden. |
+| **Override** | Override | Project- or platform-specific replacement of a generic template. `3-project/orchestrator.md` replaces `1-generic/orchestrator.md` completely. | Projekt- oder plattformspezifische Ersetzung eines generischen Templates. `3-project/orchestrator.md` ersetzt `1-generic/orchestrator.md` komplett. |
+| **Extension** | Erweiterung | Additive addition to a generated agent. `3-project/am-orchestrator-ext.md` is read by the agent at runtime. | Additive Ergänzung zu einem generierten Agenten. `3-project/am-orchestrator-ext.md` wird vom Agenten zur Laufzeit gelesen. |
+| **Composition** | Komposition | Mechanism where a platform agent extends a generic template (`extends:` + `patches:`) instead of replacing it. | Mechanismus, bei dem ein Plattform-Agent ein generisches Template erweitert (`extends:` + `patches:`) statt es zu ersetzen. |
+| **Layer / Schicht** | Schicht | Layers of the agent-meta layer model: 0-external (Skills), 1-generic (Universal), 2-platform (Platform), 3-project (Project). | Ebenen des agent-meta Schichtenmodells: 0-external (Skills), 1-generic (Universal), 2-platform (Plattform), 3-project (Projekt). |
+| **Placeholder** | Platzhalter | Variable in a template substituted at sync time. Syntax: `{{UPPER_WITH_UNDERSCORE}}`. Example: `{{PROJECT_NAME}}`. | Variable im Template, die zur Sync-Zeit substituiert wird. Syntax: `{{GROSS_MIT_UNTERSTRICH}}`. Beispiel: `{{PROJECT_NAME}}`. |
+| **Frontmatter** | Frontmatter | YAML metadata block at the beginning of every agent template file. Contains `name`, `version`, `description`, `tools`. | YAML-Metadaten-Block am Anfang jeder Agenten-Template-Datei. Enthält `name`, `version`, `description`, `tools`. |
+| **Managed Block** | Verwalteter Block | Section in `CLAUDE.md` / `AGENTS.md` automatically updated by `sync.py`. Manual changes are overwritten. | Bereich in `CLAUDE.md` / `AGENTS.md`, der von `sync.py` automatisch aktualisiert wird. Manuelle Änderungen werden überschrieben. |
 
-### 14.5 Konfiguration & Rules
+### 14.5 Configuration & Rules
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **project.yaml** | Projekt-Konfiguration | Zentrale Konfigurationsdatei `.meta-config/project.yaml`. Definiert Rollen, Provider, Presets, Variablen. |
-| **Role** | Rolle | Agenten-Rolle, die in einem Projekt aktiv ist. Konfiguriert in `project.yaml` unter `roles:`. |
-| **Provider** | Provider | KI-Plattform, die Agenten ausführt. Unterstützt: Claude, Opencode, Gemini, Continue. |
-| **Rule** | Regel | Verhaltensvorschrift für Agenten. Gespeichert in `rules/1-generic/` oder `rules/2-platform/`. |
-| **Rule Preset** | Regel-Preset | Vordefinierte Regel-Konfiguration (`default`, `minimal`, `silent`). Steuert welche Rules geladen werden. |
-| **alwaysApply** | Immer anwenden | Rule-Attribut: `true` = Rule ist immer aktiv, `false` = Rule wird nur bei Keyword-Match geladen. |
-| **Speech Mode** | Kommunikationsstil | Gesprächsstil aller Agenten (z.B. `submissive`, `full`, `short`). Konfiguriert in `project.yaml`. |
-| **Model Tier** | Modell-Stufe | Kosteneffizienz-Stufe für Agenten: `nano` → `fast` → `balanced` → `powerful` → `max`. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **project.yaml** | Projekt-Konfiguration | Central configuration file `.meta-config/project.yaml`. Defines roles, providers, presets, variables. | Zentrale Konfigurationsdatei `.meta-config/project.yaml`. Definiert Rollen, Provider, Presets, Variablen. |
+| **Role** | Rolle | Agent role active in a project. Configured in `project.yaml` under `roles:`. | Agenten-Rolle, die in einem Projekt aktiv ist. Konfiguriert in `project.yaml` unter `roles:`. |
+| **Provider** | Provider | AI platform that executes agents. Supported: Claude, Opencode, Gemini, Continue. | KI-Plattform, die Agenten ausführt. Unterstützt: Claude, Opencode, Gemini, Continue. |
+| **Rule** | Regel | Behavioral rule for agents. Stored in `rules/1-generic/` or `rules/2-platform/`. | Verhaltensvorschrift für Agenten. Gespeichert in `rules/1-generic/` oder `rules/2-platform/`. |
+| **Rule Preset** | Regel-Preset | Predefined rule configuration (`default`, `minimal`, `silent`). Controls which rules are loaded. | Vordefinierte Regel-Konfiguration (`default`, `minimal`, `silent`). Steuert welche Rules geladen werden. |
+| **alwaysApply** | Immer anwenden | Rule attribute: `true` = rule is always active, `false` = rule only loaded on keyword match. | Rule-Attribut: `true` = Rule ist immer aktiv, `false` = Rule wird nur bei Keyword-Match geladen. |
+| **Speech Mode** | Kommunikationsstil | Communication style of all agents (e.g., `submissive`, `full`, `short`). Configured in `project.yaml`. | Gesprächsstil aller Agenten (z.B. `submissive`, `full`, `short`). Konfiguriert in `project.yaml`. |
+| **Model Tier** | Modell-Stufe | Cost-efficiency tier for agents: `nano` → `fast` → `balanced` → `powerful` → `max`. | Kosteneffizienz-Stufe für Agenten: `nano` → `fast` → `balanced` → `powerful` → `max`. |
 
-### 14.6 Provider-Spezifisch
+### 14.6 Provider-Specific
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Claude** | Claude | Anthropic Claude (Claude Code). Unterstützt `Agent(run_in_background=True)` für parallele Sub-Agenten. |
-| **Opencode** | Opencode | Opencode AI. Parallele Ausführung via mehrere `task()`-Calls in einer Nachricht. Aktueller Provider. |
-| **Gemini** | Gemini | Google Gemini Code Assist. Parallele Ausführung automatisch bei mehreren Tool-Calls in einer Antwort. |
-| **Continue** | Continue | Continue.dev IDE-Extension. Keine native parallele Subagent-Ausführung — sequentieller Fallback. |
-| **Provider Isolation** | Provider-Isolation | Mechanismus, der verhindert, dass ein Provider die Verzeichnisse eines anderen Providers liest/schreibt. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Claude** | Claude | Anthropic Claude (Claude Code). Supports `Agent(run_in_background=True)` for parallel sub-agents. | Anthropic Claude (Claude Code). Unterstützt `Agent(run_in_background=True)` für parallele Sub-Agenten. |
+| **Opencode** | Opencode | Opencode AI. Parallel execution via multiple `task()` calls in a single message. Current provider. | Opencode AI. Parallele Ausführung via mehrere `task()`-Calls in einer Nachricht. Aktueller Provider. |
+| **Gemini** | Gemini | Google Gemini Code Assist. Parallel execution automatically when multiple tool calls are in one response. | Google Gemini Code Assist. Parallele Ausführung automatisch bei mehreren Tool-Calls in einer Antwort. |
+| **Continue** | Continue | Continue.dev IDE extension. No native parallel sub-agent execution — sequential fallback. | Continue.dev IDE-Extension. Keine native parallele Subagent-Ausführung — sequentieller Fallback. |
+| **Provider Isolation** | Provider-Isolation | Mechanism preventing one provider from reading/writing another provider's directories. | Mechanismus, der verhindert, dass ein Provider die Verzeichnisse eines anderen Providers liest/schreibt. |
 
-### 14.7 Testing & Qualität
+### 14.7 Testing & Quality
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Dry-Run** | Probelauf | Simulation der Orchestrierung ohne echte Agent-Ausführung. Validiert Routing, Zerlegung, Syntax. |
-| **Test Fixture** | Test-Daten | Statische YAML/JSON-Dateien mit Testfällen für Intent-Routing, Task-Decomposition, Provider-Syntax. |
-| **Fixture** | Fixture | Wiederverwendbare Test-Ressource (Daten, Mock, Konfiguration), die für mehrere Tests genutzt wird. |
-| **Orchestration Test** | Orchestrierungs-Test | Automatisierter Test der gesamten Delegations-Pipeline: Intent → Decomposition → Dispatch → Aggregation. |
-| **Viz-Log** | Visualisierungs-Log | Event-Log für Agenten-Visualisierung. Speichert Delegations-Events, Timestamps, Ergebnisse. |
-| **Scenario** | Szenario | Einzelner Testfall mit definiertem Input, erwartetem Verhalten und erwartetem Output. |
-| **Regression** | Regression | Unbeabsichtigtes Wiederauftreten eines bereits behobenen Fehlers durch eine neue Änderung. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Dry-Run** | Probelauf | Simulation of orchestration without real agent execution. Validates routing, decomposition, syntax. | Simulation der Orchestrierung ohne echte Agent-Ausführung. Validiert Routing, Zerlegung, Syntax. |
+| **Test Fixture** | Test-Daten | Static YAML/JSON files with test cases for intent routing, task decomposition, provider syntax. | Statische YAML/JSON-Dateien mit Testfällen für Intent-Routing, Task-Decomposition, Provider-Syntax. |
+| **Fixture** | Fixture | Reusable test resource (data, mock, configuration) used by multiple tests. | Wiederverwendbare Test-Ressource (Daten, Mock, Konfiguration), die für mehrere Tests genutzt wird. |
+| **Orchestration Test** | Orchestrierungs-Test | Automated test of the complete delegation pipeline: Intent → Decomposition → Dispatch → Aggregation. | Automatisierter Test der gesamten Delegations-Pipeline: Intent → Decomposition → Dispatch → Aggregation. |
+| **Viz-Log** | Visualisierungs-Log | Event log for agent visualization. Stores delegation events, timestamps, results. | Event-Log für Agenten-Visualisierung. Speichert Delegations-Events, Timestamps, Ergebnisse. |
+| **Scenario** | Szenario | Individual test case with defined input, expected behavior, and expected output. | Einzelner Testfall mit definiertem Input, erwartetem Verhalten und erwartetem Output. |
+| **Regression** | Regression | Unintended reoccurrence of a previously fixed bug due to a new change. | Unbeabsichtigtes Wiederauftreten eines bereits behobenen Fehlers durch eine neue Änderung. |
 
-### 14.8 Git & Projekt-Management
+### 14.8 Git & Project Management
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Branch-Guard** | Branch-Schutz | Regel: Vor Code-Änderungen prüfen, ob auf `main`/`master` — dann Branch anlegen. |
-| **Feature Branch** | Feature-Branch | Isolierter Git-Branch für eine einzelne Aufgabe. Naming: `feat/<thema>`, `fix/<thema>`. |
-| **Conventional Commit** | Konventioneller Commit | Standardisiertes Commit-Format: `<type>(REQ-xxx): <Beschreibung>`. |
-| **REQ-ID** | Anforderungs-ID | Eindeutige Kennung für eine Anforderung (z.B. `REQ-042`). Wird vom `requirements`-Agent vergeben. |
-| **Traceability** | Rückverfolgbarkeit | Verknüpfung von REQ-ID → Code → Test → Commit. Pflicht bei aktiviertem `req-traceability`. |
-| **Meta-Feedback** | Meta-Feedback | Verbesserungsvorschläge für das agent-meta Framework selbst. Wird als GitHub Issue eingereicht. |
-| **Meta-Feedback Loop** | Meta-Feedback-Schleife | Automatisches Sammeln von Feedback bei unbekannten Intents, um das System kontinuierlich zu verbessern. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Branch-Guard** | Branch-Schutz | Rule: Before code changes, check if on `main`/`master` — then create a branch. | Regel: Vor Code-Änderungen prüfen, ob auf `main`/`master` — dann Branch anlegen. |
+| **Feature Branch** | Feature-Branch | Isolated Git branch for a single task. Naming: `feat/<topic>`, `fix/<topic>`. | Isolierter Git-Branch für eine einzelne Aufgabe. Naming: `feat/<thema>`, `fix/<thema>`. |
+| **Conventional Commit** | Konventioneller Commit | Standardized commit format: `<type>(REQ-xxx): <description>`. | Standardisiertes Commit-Format: `<type>(REQ-xxx): <Beschreibung>`. |
+| **REQ-ID** | Anforderungs-ID | Unique identifier for a requirement (e.g., `REQ-042`). Assigned by the `requirements` agent. | Eindeutige Kennung für eine Anforderung (z.B. `REQ-042`). Wird vom `requirements`-Agent vergeben. |
+| **Traceability** | Rückverfolgbarkeit | Linking REQ-ID → Code → Test → Commit. Mandatory when `req-traceability` is active. | Verknüpfung von REQ-ID → Code → Test → Commit. Pflicht bei aktiviertem `req-traceability`. |
+| **Meta-Feedback** | Meta-Feedback | Improvement suggestions for the agent-meta framework itself. Submitted as a GitHub issue. | Verbesserungsvorschläge für das agent-meta Framework selbst. Wird als GitHub Issue eingereicht. |
+| **Meta-Feedback Loop** | Meta-Feedback-Schleife | Automatic collection of feedback on unknown intents to continuously improve the system. | Automatisches Sammeln von Feedback bei unbekannten Intents, um das System kontinuierlich zu verbessern. |
 
-### 14.9 Orchestrator-First spezifisch
+### 14.9 Orchestrator-First Specific
 
-| English | Deutsch | Erklärung |
-|---------|---------|-----------|
-| **Orchestrator-First** | Orchestrator-zuerst | Architektur-Prinzip: Jede Aufgabe fließt durch den Orchestrator, der delegiert und parallelisiert. |
-| **Orchestrator-Schalter** | Orchestrator-Schalter | Konfiguration in `project.yaml` (enabled/strict/unknown-fallback), die das Orchestrator-Verhalten steuert. |
-| **User-Override** | User-Override | Bewusste Umgehung der Orchestrator-Pflicht durch expliziten User-Befehl ("Mach das hier", "Kein Orchestrator"). |
-| **Unknown Intent** | Unbekannter Intent | User-Input, der in keine bekannte Intent-Kategorie passt. Löst Meta-Feedback oder User-Override aus. |
-| **Unknown-Fallback** | Unbekannt-Fallback | Verhalten bei unbekanntem Intent: `meta-feedback` (strict), `main-chat` (relaxed), `ask-user` (fragen). |
-| **Intent-Klassifikation** | Intent-Klassifikation | Zuordnung eines User-Inputs zu einer bekannten Kategorie (Feature, Bugfix, Analyse, Git-Op, ...). |
-| **Dispatch-Plan** | Dispatch-Plan | Ausführungsplan, der definiert welche Agenten in welcher Reihenfolge gestartet werden (FANOUT, sequentiell, gemischt). |
-| **Result Aggregation** | Ergebnis-Aggregation | Sammeln und Kombinieren der Ergebnisse mehrerer paralleler Agenten zu einer Gesamtaussage. |
-| **Anonymization** | Anonymisierung | Entfernung projektspezifischer Details (Namen, Pfade, Secrets) vor dem Senden von Meta-Feedback. |
+| English | Deutsch | English Explanation | Deutsche Erklärung |
+|---------|---------|---------------------|-------------------|
+| **Orchestrator-First** | Orchestrator-zuerst | Architecture principle: Every task flows through the Orchestrator, which delegates and parallelizes. | Architektur-Prinzip: Jede Aufgabe fließt durch den Orchestrator, der delegiert und parallelisiert. |
+| **Orchestrator-Schalter** | Orchestrator-Schalter | Configuration in `project.yaml` (enabled/strict/unknown-fallback) controlling Orchestrator behavior. | Konfiguration in `project.yaml` (enabled/strict/unknown-fallback), die das Orchestrator-Verhalten steuert. |
+| **User-Override** | User-Override | Conscious bypass of the Orchestrator mandate via explicit user command ("Do it here", "No Orchestrator"). | Bewusste Umgehung der Orchestrator-Pflicht durch expliziten User-Befehl ("Mach das hier", "Kein Orchestrator"). |
+| **Unknown Intent** | Unbekannter Intent | User input that does not match any known intent category. Triggers Meta-Feedback or User-Override. | User-Input, der in keine bekannte Intent-Kategorie passt. Löst Meta-Feedback oder User-Override aus. |
+| **Unknown-Fallback** | Unbekannt-Fallback | Behavior on unknown intent: `meta-feedback` (strict), `main-chat` (relaxed), `ask-user` (ask). | Verhalten bei unbekanntem Intent: `meta-feedback` (strict), `main-chat` (relaxed), `ask-user` (fragen). |
+| **Intent-Klassifikation** | Intent-Klassifikation | Mapping a user input to a known category (Feature, Bugfix, Analysis, Git-Op, ...). | Zuordnung eines User-Inputs zu einer bekannten Kategorie (Feature, Bugfix, Analyse, Git-Op, ...). |
+| **Dispatch-Plan** | Dispatch-Plan | Execution plan defining which agents are started in which order (FANOUT, sequential, mixed). | Ausführungsplan, der definiert welche Agenten in welcher Reihenfolge gestartet werden (FANOUT, sequentiell, gemischt). |
+| **Result Aggregation** | Ergebnis-Aggregation | Collecting and combining the results of multiple parallel agents into a unified statement. | Sammeln und Kombinieren der Ergebnisse mehrerer paralleler Agenten zu einer Gesamtaussage. |
+| **Anonymization** | Anonymisierung | Removal of project-specific details (names, paths, secrets) before sending Meta-Feedback. | Entfernung projektspezifischer Details (Namen, Pfade, Secrets) vor dem Senden von Meta-Feedback. |
 
-### 14.10 Zusammenfassung: Wichtigste Begriffe
+### 14.10 Summary: Key Terms
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  USER          →  MAIN SESSION (Thin Router)  →  ORCHESTRATOR       │
 │                                                                      │
-│  Intent ──────→  Routing  ───────────────→  Klassifikation        │
-│                    (use-orchestrator Rule)      (Intent-Routing)      │
+│  Intent ──────→  Routing  ───────────────→  Classification        │
+│                    (use-orchestrator Rule)      (Intent-Routing)    │
 │                                                                      │
 │                                               ↓                      │
 │                                          Decomposition               │
-│                                          (Task-Zerlegung)            │
+│                                          (Task Splitting)            │
 │                                               ↓                      │
 │                                          FANOUT / PIPELINE           │
-│                                          (Parallel / Sequentiell)    │
+│                                          (Parallel / Sequential)     │
 │                                               ↓                      │
 │                                          WORKER AGENTS              │
 │                                          (developer, git, ...)      │
 │                                               ↓                      │
 │                                          BARRIER                     │
-│                                          (Synchronisation)           │
+│                                          (Synchronization)           │
 │                                               ↓                      │
 │                                          Result Aggregation         │
-│                                          (Ergebnisse sammeln)        │
+│                                          (Collect Results)           │
 │                                               ↓                      │
-│                                          USER (Zusammenfassung)     │
+│                                          USER (Summary)             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
