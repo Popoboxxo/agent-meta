@@ -42,6 +42,7 @@ Platform- and project-specific layers stack on top of the generic definitions �
 It provides:
 
 - **Generic agent templates** for orchestrator, developer, tester, validator, requirements engineer, documenter, release, and docker roles
+- **Orchestrator-First Architecture** (Beta): Universal task decomposition with parallel FANOUT/PARALLEL_GROUP dispatch, provider-agnostic across Claude, Opencode, Gemini, and Continue
 - **Platform-specific overrides** (e.g., Sharkord plugins) that extend generic agents
 - **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
 - **An extension system** that lets projects add project-specific knowledge without touching generated files
@@ -156,6 +157,67 @@ py scripts/viz-server.py toggle
 ```
 
 Sessions are gitignored and auto-cleaned after `retention_days`. See [howto/agent-visualization.md](howto/agent-visualization.md) for the full guide.
+
+---
+
+## Orchestrator-First Architecture (Beta v3.0.0)
+
+The orchestrator is the universal entry point for all development tasks. Instead of the main session handling work directly, every task flows through the orchestrator, which decomposes, parallelizes, and delegates to specialized worker agents.
+
+### Task Decomposition & Parallel Execution
+
+The orchestrator automatically splits multi-tasks into independent sub-tasks and dispatches them in parallel:
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| **FANOUT** | N instances of same agent type | "Fix bugs A, B, C" → 3× `developer` parallel |
+| **PARALLEL_GROUP** | Different agent types simultaneously | "Fix A + test B" → `developer` ∥ `tester` |
+| **PIPELINE** | Sequential with dependencies | "Feature with tests" → requirements → tester → dev → tester |
+| **LIFECYCLE** | Complete end-to-end workflow | "Feature Y complete" → `feature` agent orchestrates |
+| **BARRIER** | Synchronization point | Wait for all parallel agents before next step |
+
+**Provider-agnostic:** Same decision logic for Claude, Opencode, Gemini, and Continue (Continue falls back to sequential).
+
+### Unknown Intent Protocol
+
+When the orchestrator cannot classify an intent, it follows a configurable fallback chain:
+
+```yaml
+orchestrator:
+  enabled: true
+  strict: true
+  unknown-fallback:
+    meta-feedback: true   # Send anonymized feedback to agent-meta
+    main-chat: true      # Allow main chat to handle the task
+    ask-user: false      # Ask user for preference
+```
+
+**Fallback priority:**
+1. `ask-user=true` → Always ask user first
+2. `strict=true` + `meta-feedback=true` → Feedback + rephrase request
+3. `strict=false` + `main-chat=true` → Main-Chat handles it + optional feedback
+4. No fallback enabled → Ask for clarification
+
+### User Override
+
+Users can bypass the orchestrator at any time with explicit phrases:
+
+- "Not delegate" / "Do it here" / "No orchestrator" / "Without orchestrator"
+- "I want to work here" / "Don't delegate"
+
+The main chat then acts as a classical agent for that request. After completion, the user can choose whether to persist this preference.
+
+### Orchestration Testing
+
+Validate the entire delegation pipeline without real agent execution:
+
+```bash
+/test-orchestration                    # All tests for active provider
+/test-orchestration --scenario=parallel # Parallel dispatch tests only
+/test-orchestration --verbose --viz     # All tests with Viz-Log
+```
+
+Tests cover: Intent routing, task decomposition, parallel dispatch, provider syntax, Viz-Log integration.
 
 ---
 
@@ -346,7 +408,7 @@ agent-meta/
 | Location | Owned by | Purpose |
 |----------|----------|---------|
 | `.agent-meta/config/` | agent-meta framework | Role defaults, providers, DoD presets, skill registry — do not edit |
-| `.meta-config/project.yaml` | Your project | Project identity, variables, active roles, providers |
+| `.meta-config/project.yaml` | Your project | Project identity, variables, active roles, providers, orchestrator config |
 | `.claude/platform-config.yaml` | Your project | Platform-specific value overrides (`{{platform.*}}` placeholders) |
 
 ---
@@ -364,7 +426,7 @@ agent-meta/
 
 | Role | Responsibility |
 |------|---------------|
-| `orchestrator` | Coordinates all agents, enforces DoD, manages workflows |
+| `orchestrator` | Universal router — classifies intents, decomposes tasks, parallelizes with FANOUT/PARALLEL_GROUP, delegates to workers |
 | `developer` | REQ-driven implementation, code conventions |
 | `tester` | TDD, test suite, coverage per REQ-ID |
 | `validator` | DoD check, traceability audit, code quality |
