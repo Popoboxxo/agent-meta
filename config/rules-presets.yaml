@@ -24,8 +24,6 @@ presets:
       alwaysApply: false
     issue-lifecycle:
       alwaysApply: false
-    security-audit:
-      alwaysApply: false
 
   # Maximale Token-Einsparung — nur absolut essenzielle Rules immer aktiv.
   # Empfohlen für rapid-prototyping Projekte.
@@ -34,8 +32,6 @@ presets:
     lifecycle-tasks:
       alwaysApply: false
     issue-lifecycle:
-      alwaysApply: false
-    security-audit:
       alwaysApply: false
     dod-criteria:
       alwaysApply: false
