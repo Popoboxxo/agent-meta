@@ -192,46 +192,132 @@ Zwei Sub-Tasks tᵢ und tⱼ sind **unabhängig** wenn:
 
 **Faustregel:** Wenn der Orchestrator unsicher ist → sequentiell. Falsche Parallelisierung ist schlimmer als fehlende.
 
-### 3.4 Unknown Task Handling & Meta-Feedback Loop
+### 3.4 Orchestrator-Aktivierungs-Schalter
+
+**Neue Konfiguration in `.meta-config/project.yaml`:**
+
+```yaml
+# Orchestrator-Steuerung
+orchestrator:
+  enabled: true        # true = Orchestrator aktiv (Default), false = Main-Chat-Modus
+  strict: true         # true = Immer delegieren (Default), false = Fallback erlaubt
+  unknown-fallback: meta-feedback  # meta-feedback | main-chat | ask-user
+```
+
+| Feld | Default | Werte | Bedeutung |
+|------|---------|-------|-----------|
+| `enabled` | `true` | `true` / `false` | Ist der Orchestrator überhaupt aktiv? |
+| `strict` | `true` | `true` / `false` | Bei unbekanntem Intent: Meta-Feedback oder Main-Chat? |
+| `unknown-fallback` | `meta-feedback` | `meta-feedback` / `main-chat` / `ask-user` | Was passiert bei nicht verortbarem Task? |
+
+### 3.5 Unknown Task Handling & Meta-Feedback Loop
 
 **Problem:** Der Orchestrator kann einen User-Intent nicht klassifizieren — er taucht in keiner Intent-Routing-Tabelle auf und passt zu keinem bekannten Muster.
 
-**Verboten:** Der Orchestrator arbeitet NIEMALS selbst. Auch bei unklaren Intents darf er nicht "Ich mache es selbst" sagen.
-
-**Protokoll bei nicht verortbarem Task:**
+**Lösung: Vier Modi, steuerbar via Konfig + User-Override**
 
 ```
-Schritt 1 — Analyseversuch (max. 1 Frage):
+User-Input empfangen
+│
+├─ User sagt explizit: "Nicht delegieren" / "Mach hier" / "Kein Orchestrator"
+│   → User-Override: Main-Chat arbeitet selbst (ignoriert alle Regeln)
+│   → Nach Abschluss: Frage ob das für zukünftige ähnliche Anfragen beibehalten werden soll
+│
+├─ orchestrator.enabled: false
+│   → Main-Chat-Modus: Kein Orchestrator, alles wird im Hauptchat erledigt
+│   → Wie heute, aber bewusst konfiguriert
+│
+├─ orchestrator.enabled: true  AND  Intent bekannt
+│   → Normaler Orchestrator-Flow (Intent-Routing → Delegation)
+│
+└─ orchestrator.enabled: true  AND  Intent UNBEKANNT
+    ├─ unknown-fallback: meta-feedback
+    │   → Anonymisiertes Meta-Feedback + User-Frage nach alternativer Formulierung
+    │   → Verboten: Selbst ausführen
+    │
+    ├─ unknown-fallback: main-chat
+    │   → Main-Chat arbeitet selbst (wie heute)
+    │   → Gleichzeitig: Meta-Feedback erstellen (für Verbesserung)
+    │
+    └─ unknown-fallback: ask-user
+        → "Soll ich das hier im Hauptchat erledigen oder ein Feedback senden?"
+        → User entscheidet → Main-Chat oder Meta-Feedback
+```
+
+#### Modus A: strict=true, unknown-fallback=meta-feedback (Default)
+
+```
+Schritt 1 — Analyseversuch (max. 1 Klärungsfrage):
   "Ich bin mir unsicher: Meint Ihr [Option A] oder [Option B]?"
-  ODER: "Könnt Ihr das präzisieren?"
   → Wenn User klärt → normaler Intent-Routing
 
-Schritt 2 — Wenn User nicht klärt oder 2+ Versuche gescheitert:
+Schritt 2 — Wenn nicht geklärt:
   NICHT selbst ausführen.
   NICHT "Sorry, ich verstehe das nicht" abbrechen.
 
 Schritt 3 — Anonymisiertes Meta-Feedback erstellen:
-  Inhalte anonymisieren:
-    - Projektname → "[PROJECT]"
-    - Pfade → "[PATH]"
-    - Dateinamen → "[FILE]"
-    - API-Keys/Secrets → "[REDACTED]"
-    - Domain-spezifische Begriffe → bleiben (sind relevant für Klassifikation)
-  Kurze Beschreibung: "Unbekannter Intent: [Kategorie-Guess]. User wollte [Zusammenfassung]."
+  Projektname → "[PROJECT]", Pfade → "[PATH]", Secrets → "[REDACTED]"
+  Kurze Beschreibung: "Unbekannter Intent: [Kategorie-Guess]."
 
 Schritt 4 — Delegation an meta-feedback:
-  Delegiere anonymisiertes Feedback an meta-feedback-Agent:
-    "Erstelle ein GitHub Issue in agent-meta mit Titel:
-    'Orchestrator: Unknown Intent — [Kategorie-Guess]'
-    Body: Beschreibung + Kontext + Vorschlag für neue Intent-Kategorie."
+  "Erstelle ein GitHub Issue in agent-meta: 'Orchestrator: Unknown Intent'"
 
 Schritt 5 — User informieren:
   "Ich konnte den Auftrag nicht zuordnen. Ich habe ein Verbesserungsvorschlag
-   an das agent-meta Team gesendet, damit solche Anfragen zukünftig besser
-   geroutet werden können. Möchtet Ihr den Auftrag anders formulieren?"
+   an das agent-meta Team gesendet. Möchtet Ihr den Auftrag anders formulieren?"
 ```
 
-**Regeln für Anonymisierung:**
+#### Modus B: strict=false, unknown-fallback=main-chat
+
+```
+Schritt 1 — Analyseversuch (max. 1 Klärungsfrage)
+Schritt 2 — Wenn nicht geklärt:
+  MAIN-CHAT ARBEITET SELBST (wie heute ohne Orchestrator)
+  → Dateien lesen, Code schreiben, Befehle ausführen
+  → Parallel: Anonymisiertes Meta-Feedback erstellen (kein Blocker)
+Schritt 3 — User informieren:
+  "Ich habe den Auftrag im Hauptchat erledigt. Gleichzeitig habe ich ein
+   Verbesserungsvorschlag gesendet, damit solche Anfragen zukünftig besser
+   geroutet werden können."
+```
+
+#### Modus C: enabled=false (Main-Chat-Modus)
+
+```
+Der Orchestrator ist komplett deaktiviert. Der Hauptchat verhält sich wie ein
+klassischer Agent ohne Routing:
+- Liest Dateien selbst
+- Analysiert Code selbst
+- Schreibt und editiert selbst
+- Führt Befehle aus
+
+Verhalten: Identisch zu agent-meta vor Orchestrator-First.
+Use-Case: Kleine Projekte, Prototypen, Nutzer die den Orchestrator nicht wollen.
+```
+
+#### Modus D: User-Override (bewusste Hauptchat-Ausführung)
+
+**Trigger-Sätze:**
+- "Nicht delegieren"
+- "Mach das hier"
+- "Im Hauptchat bitte"
+- "Kein Orchestrator"
+- "Ohne Orchestrator"
+- "Ich will hier arbeiten"
+
+**Verhalten:**
+```
+1. User sagt einen Trigger-Satz
+2. Bestätigung: "Ich arbeite den Auftrag im Hauptchat selbst ab."
+3. Main-Chat führt die Aufgabe aus (wie Modus C)
+4. Nach Abschluss:
+   → "Soll ich für zukünftige ähnliche Anfragen ebenfalls im Hauptchat
+      arbeiten, oder wieder über den Orchestrator routen?"
+   → Optionen: "Immer Hauptchat" | "Immer Orchestrator" | "Frag jedes Mal"
+   → Wenn User "Immer Hauptchat" wählt → setze unknown-fallback=main-chat
+```
+
+**Regeln für Anonymisierung (nur für Meta-Feedback):**
 
 | Was | Beispiel | Anonymisiert zu |
 |-----|----------|-----------------|
@@ -254,12 +340,16 @@ Neue Section im Orchestrator (nach Intent-Routing):
 ## Unknown Intent Protocol
 
 Wenn der Intent in keiner bekannten Kategorie landet:
-1. Versuche mit max. 1 Klärungsfrage
-2. Wenn nicht geklärt → anonymisiere Inhalte
-3. Delegiere an meta-feedback (neuer Intent-Typ vorschlagen)
-4. Frage User nach alternativer Formulierung
+1. Prüfe ob orchestrator.enabled = false → Main-Chat-Modus, selbst ausführen
+2. Prüfe ob User-Override aktiv → Main-Chat, selbst ausführen
+3. Versuche mit max. 1 Klärungsfrage
+4. Wenn nicht geklärt:
+   - strict=true → Anonymisiere Inhalte → Delegiere an meta-feedback
+   - strict=false → Main-Chat arbeitet selbst + Meta-Feedback im Hintergrund
+   - unknown-fallback=ask-user → Frage User nach Präferenz
+5. Frage User nach alternativer Formulierung (bei meta-feedback)
 
-Verboten: Selbst ausführen, selbst raten, abbrechen.
+Verboten (nur in strict=true): Selbst ausführen, selbst raten, abbrechen.
 ```
 
 ---
@@ -671,6 +761,68 @@ NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeite
 > **Der Hauptchat ist ein Thin Router.** Er hat keine Domänenkompetenz.
 > Seine einzige Aufgabe: User-Intent erkennen und korrekt routen.
 
+## User-Override: Bewusste Hauptchat-Ausführung
+
+Der User hat jederzeit das Recht, die Orchestrator-Pflicht zu umgehen und den Auftrag direkt im Hauptchat ausführen zu lassen.
+
+### Trigger-Sätze (User sagt explizit)
+
+- "Nicht delegieren"
+- "Mach das hier"
+- "Im Hauptchat bitte"
+- "Kein Orchestrator"
+- "Ohne Orchestrator"
+- "Ich will hier arbeiten"
+- "Delegiere nicht"
+
+### Verhalten bei User-Override
+
+```
+1. Trigger-Satz erkannt
+2. Bestätigung: "Ich arbeite den Auftrag im Hauptchat selbst ab."
+3. Main-Chat führt die Aufgabe aus:
+   - Liest Dateien selbst
+   - Schreibt Code selbst
+   - Führt Befehle aus
+   - Führt Multi-Step-Workflows aus
+   → Kurzfristig verhält sich der Hauptchat wie ein klassischer Agent
+4. Nach Abschluss:
+   → "Soll ich für zukünftige ähnliche Anfragen ebenfalls im Hauptchat
+      arbeiten, oder wieder über den Orchestrator routen?"
+   → Optionen:
+      - "Immer Hauptchat" → setze unknown-fallback=main-chat (project.yaml)
+      - "Immer Orchestrator" → strict=true bleibt
+      - "Frag jedes Mal" → unknown-fallback=ask-user
+      - "Nur dieses Mal" → Einzel-Override, kein Persistenz
+```
+
+### Regeln für den Override
+
+- Der Override gilt NUR für die aktuelle Anfrage (oder persistiert wenn User das wünscht)
+- Der Override hebt die "Verboten im Hauptchat"-Regel auf
+- Alle anderen Rules (branch-guard, commit-conventions, language, etc.) bleiben aktiv
+- Meta-Feedback wird trotzdem erstellt: "User wollte Hauptchat-Modus für: [anonymisierter Intent]"
+
+## Konfiguration: Orchestrator-Schalter
+
+Das Verhalten wird zentral in `.meta-config/project.yaml` gesteuert:
+
+```yaml
+orchestrator:
+  enabled: true               # true = Orchestrator aktiv, false = Main-Chat-Modus
+  strict: true                # true = Immer delegieren, false = Fallback erlaubt
+  unknown-fallback: ask-user  # meta-feedback | main-chat | ask-user
+```
+
+| Modus | enabled | strict | unknown-fallback | Verhalten bei unbekanntem Intent |
+|-------|---------|--------|------------------|-----------------------------------|
+| **Strict** | true | true | meta-feedback | Meta-Feedback, NICHT selbst ausführen |
+| **Relaxed** | true | false | main-chat | Main-Chat arbeitet selbst + Meta-Feedback |
+| **Ask** | true | true/false | ask-user | User gefragt: "Hier oder Feedback?" |
+| **Disabled** | false | — | — | Kein Orchestrator, Main-Chat macht alles selbst |
+
+**Empfehlung:** Default ist `strict` für Produktionsprojekte, `relaxed` für Prototypen, `disabled` für kleine Einzelnutzer-Projekte.
+
 ## Hauptchat ohne Orchestrator (Fallback)
 
 Wenn der Orchestrator nicht verfügbar ist:
@@ -770,8 +922,9 @@ T  Multi-Docs:       FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 |-------|---------|-----|--------|
 | `rules/1-generic/use-orchestrator.md` | Komplett neu schreiben | Text | Niedrig |
 | `config/rules-presets.yaml` | `use-orchestrator` aus `silent` entfernen | Config | Niedrig |
-| `agents/1-generic/orchestrator.md` | v2.10.0 → v3.0.0: neue Sections, erweiterte Workflows | Major | Mittel |
+| `agents/1-generic/orchestrator.md` | v2.10.0 → v3.0.0: neue Sections, erweiterte Workflows, Unknown Intent Protocol, User-Override | Major | Mittel |
 | `scripts/lib/agents.py` | `_PROVIDER_PARALLEL_PATTERNS` für alle 4 Provider präzisieren | Code | Niedrig |
+| `scripts/lib/config.py` | Neue Variable `ORCHESTRATOR_MODE` injizieren (enabled/strict/unknown-fallback) | Code | Niedrig |
 
 ### Phase 2 (Thinning — Selective Embedding)
 
@@ -833,13 +986,17 @@ Projekte mit `rules-preset: silent` erhalten `use-orchestrator` nach dem Update 
 
 ```
 Phase 1 — Core (jetzt)
-├── use-orchestrator Rule neu schreiben
+├── use-orchestrator Rule neu schreiben (inkl. User-Override, Orchestrator-Schalter)
 ├── rules-presets.yaml: use-orchestrator aus silent entfernen
 ├── agents/1-generic/orchestrator.md → v3.0.0
 │   ├── Task Decomposition Protocol
 │   ├── Parallel Execution Engine (abstrakt)
-│   └── Result Aggregation
+│   ├── Result Aggregation
+│   ├── Unknown Intent Protocol (mit Meta-Feedback Loop)
+│   └── User-Override Handler
 ├── scripts/lib/agents.py: PARALLEL_PATTERNs präzisieren
+├── scripts/lib/config.py: ORCHESTRATOR_MODE Variable injizieren
+├── howto/project.yaml.example: orchestrator-Block dokumentieren
 ├── sync.py --dry-run → verifizieren
 └── Commit + PR
 
@@ -868,3 +1025,7 @@ Phase 3 — Advanced (optional, später)
 | **Task Decomposition** | Zerlegung eines komplexen User-Tasks in unabhängige Sub-Tasks |
 | **Selective Embedding** | Nur bestimmte Rules in den Managed Block einbetten, andere als separate Dateien |
 | **Graceful Degradation** | Automatischer Fallback auf sequentielle Ausführung bei Providern ohne Parallel-Fähigkeit |
+| **User-Override** | Bewusste Umgehung der Orchestrator-Pflicht durch expliziten User-Befehl |
+| **Orchestrator-Schalter** | Konfiguration in project.yaml (enabled/strict/unknown-fallback) |
+| **Meta-Feedback Loop** | Anonymisiertes Feedback an agent-meta bei unbekannten Intents zur System-Verbesserung |
+| **Unknown-Fallback** | Verhalten bei nicht klassifizierbarem Intent: meta-feedback / main-chat / ask-user |
