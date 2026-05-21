@@ -1,0 +1,21 @@
+# test-orchestration
+
+Führt einen Orchestration-Dry-Run durch und validiert:
+- Intent-Routing
+- Task-Decomposition
+- Parallel-Dispatch
+- Provider-Syntax
+- Viz-Log-Integration
+
+## Parameter
+
+--provider    Aktiver Provider (auto-detected)
+--scenario    Test-Szenario: all | routing | decomposition | parallel | unknown | override
+--verbose     Detaillierte Ausgabe
+--viz         Viz-Log-Events anzeigen
+
+## Beispiele
+
+/test-orchestration                    # Alle Tests für aktiven Provider
+/test-orchestration --scenario=parallel # Nur Parallel-Dispatch-Tests
+/test-orchestration --verbose --viz     # Alle Tests mit Viz-Log

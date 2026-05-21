@@ -23,7 +23,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
 | `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
-| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten |
+| `orchestrator` | Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 <!-- agent-meta:managed-end -->

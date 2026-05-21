@@ -161,6 +161,13 @@ variables:
 
 max-parallel-agents: 4
 
+# Orchestrator-First Architecture (Beta v3.0.0)
+# Steuert das Verhalten des Orchestrator-Delegations-Systems.
+orchestrator:
+  enabled: true        # true = Orchestrator aktiv, false = Main-Chat-Modus
+  strict: true         # true = Immer delegieren, false = Fallback erlaubt
+  unknown-fallback: meta-feedback  # meta-feedback | main-chat | ask-user
+
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:
   enabled: true
