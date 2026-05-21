@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.48.0-beta] — 2026-05-22
+## [0.48.0] — 2026-05-22
 
 - Introduce Orchestrator-First Architecture with FANOUT, PARALLEL_GROUP, and BARRIER patterns for multi-agent orchestration.
 
