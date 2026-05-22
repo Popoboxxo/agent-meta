@@ -17,6 +17,9 @@ ai-providers:
 dod-preset: rapid-prototyping
 rules-preset: silent
 
+systems-engineering:
+  enabled: true
+
 platforms:
   - agent-meta
 
@@ -34,6 +37,12 @@ roles:
   - agent-meta-scout
   - log-analyzer
   - feedback
+  - se-requirements
+  - se-architect
+  - se-critic
+  - se-interface-mgr
+  - se-termination
+  - se-orchestrator
 
 project:
   name: agent-meta

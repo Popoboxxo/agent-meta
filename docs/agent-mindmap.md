@@ -129,6 +129,36 @@ mindmap
 - **Beschreibung:** Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen.
 - **Model:** inherited
 
+### se-architect
+- **Tier:** optional
+- **Beschreibung:** Designs system architecture using generic laws, CQRS routing, and defines L1/L2 whiteboxes.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
+### se-critic
+- **Tier:** optional
+- **Beschreibung:** Audits architecture against generic laws (orthogonality, testability, traceability).
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
+### se-interface-mgr
+- **Tier:** optional
+- **Beschreibung:** Manages generic signal flow and deterministic synchronization across systems.
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
+
+### se-orchestrator
+- **Tier:** optional
+- **Beschreibung:** Coordinates the 6-level recursive breakdown.
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
+
+### se-requirements
+- **Tier:** optional
+- **Beschreibung:** Elicits stakeholder needs and uses a 6-level template for requirements engineering.
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
+
+### se-termination
+- **Tier:** optional
+- **Beschreibung:** Deterministic termination at L3 (Component Requirement).
+- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
+
 ### security-auditor
 - **Tier:** optional
 - **Beschreibung:** Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution.

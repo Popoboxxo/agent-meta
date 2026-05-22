@@ -37,3 +37,6 @@ sync.log
 .meta-viz/
 .meta-viz/events-*.jsonl
 .meta-viz/session-reports/
+docs/concepts/.local-Inputs/architecture_law.md
+docs/concepts/.local-Inputs/featuretemplate.md
+docs/concepts/.local-Inputs/reqmanager-se.md

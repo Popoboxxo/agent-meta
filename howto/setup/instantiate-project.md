@@ -204,6 +204,12 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
 | `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
 | `.claude/agents/feedback.md` | `1-generic/feedback.md` |
+| `.claude/agents/se-requirements.md` | `1-generic/se-requirements.md` |
+| `.claude/agents/se-architect.md` | `1-generic/se-architect.md` |
+| `.claude/agents/se-critic.md` | `1-generic/se-critic.md` |
+| `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
+| `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
+| `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
 
 ---
 
@@ -399,6 +405,12 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
 - [ ] `.claude/agents/log-analyzer.md` vorhanden
 - [ ] `.claude/agents/feedback.md` vorhanden
+- [ ] `.claude/agents/se-requirements.md` vorhanden
+- [ ] `.claude/agents/se-architect.md` vorhanden
+- [ ] `.claude/agents/se-critic.md` vorhanden
+- [ ] `.claude/agents/se-interface-mgr.md` vorhanden
+- [ ] `.claude/agents/se-termination.md` vorhanden
+- [ ] `.claude/agents/se-orchestrator.md` vorhanden
 - [ ] `.claude/commands/analyze-logs.md` vorhanden (nach Sync)
 - [ ] `.claude/commands/feedback.md` vorhanden (nach Sync)
 - [ ] Bei `"Gemini"` in `ai-providers`: `.gemini/GEMINI.md` vorhanden, `.gemini/agents/` befüllt

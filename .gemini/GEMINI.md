@@ -26,6 +26,12 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `orchestrator` | Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+| `se-architect` | Use this agent to design L1 and L2 architectures from requirements. |
+| `se-critic` | Use this agent to validate and audit architectural decompositions. |
+| `se-interface-mgr` | Manages generic signal flow, deterministic sync across systems |
+| `se-orchestrator` | Coordinates the 6-level recursive breakdown |
+| `se-requirements` | Use this agent to clarify requirements and start the SE cascade. |
+| `se-termination` | Deterministic termination at L3 (Component Requirement) |
 <!-- agent-meta:managed-end -->
 
 ## Agents

@@ -173,7 +173,7 @@ graph TD
     classDef optional fill:#868e96,stroke:#fff,stroke-width:2px,color:#fff
     class developer,feedback,git,log-analyzer,orchestrator required
     class documenter,feature,requirements,tester,validator recommended
-    class agent-meta-manager,agent-meta-scout,docker,ideation,meta-feedback,openscad-developer,release,security-auditor optional
+    class agent-meta-manager,agent-meta-scout,docker,ideation,meta-feedback,openscad-developer,release,se-architect,se-critic,se-interface-mgr,se-orchestrator,se-requirements,se-termination,security-auditor optional
                 </div>
                 <div class="legend">
                     <div class="legend-item">
@@ -398,6 +398,90 @@ graph TD
             <p class="description">Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen.</p>
             <div class="meta">
                 <span><strong>Model:</strong> inherited</span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-architect">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-architect</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Designs system architecture using generic laws, CQRS routing, and defines L1/L2 whiteboxes.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-critic">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-critic</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Audits architecture against generic laws (orthogonality, testability, traceability).</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-interface-mgr">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-interface-mgr</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Manages generic signal flow and deterministic synchronization across systems.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Gemini: gemini-3.1-pro-low</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-orchestrator">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-orchestrator</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Coordinates the 6-level recursive breakdown.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Gemini: gemini-3.1-pro-low</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-requirements">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-requirements</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Elicits stakeholder needs and uses a 6-level template for requirements engineering.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Gemini: gemini-3.1-pro-low</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="se-termination">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>se-termination</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Deterministic termination at L3 (Component Requirement).</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-haiku-4-5-20251001</span><br><span>Gemini: gemini-3.5-flash-high</span><br><span>Opencode: opencode-go/deepseek-v4-flash</span></span>
                 <span><strong>Memory:</strong> -</span>
             </div>
             

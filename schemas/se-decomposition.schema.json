@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Systems Engineering Decomposition Schema",
+  "description": "Structured output schema for the generic L1-L3 layers, CQRS events, and the SE-Agent-Concept recursive cell outputs (architect, critic, interface manager, termination).",
+  "type": "object",
+  "required": [
+    "feature_id",
+    "stakeholder_requirement",
+    "l1_system",
+    "l2_subsystems",
+    "l3_components",
+    "cqrs_interfaces"
+  ],
+  "properties": {
+    "feature_id": {
+      "type": "string",
+      "description": "The unique identifier for the feature being decomposed (e.g., REQ-L1-SH-001)."
+    },
+    "stakeholder_requirement": {
+      "type": "string",
+      "description": "The formalized stakeholder requirement driving this decomposition."
+    },
+    "l1_system": {
+      "type": "object",
+      "required": ["blackbox", "whitebox"],
+      "properties": {
+        "blackbox": {
+          "type": "string",
+          "description": "Abstract definition of the L1 system without internal details."
+        },
+        "whitebox": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The abstract sub-systems identified within the L1 system."
+        }
+      }
+    },
+    "l2_subsystems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["subsystem_id", "blackbox", "whitebox"],
+        "properties": {
+          "subsystem_id": {
+            "type": "string"
+          },
+          "blackbox": {
+            "type": "string"
+          },
+          "whitebox": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Concrete components identified within this L2 subsystem."
+          }
+        }
+      }
+    },
+    "l3_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component_id", "description", "refines"],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "description": "Unique ID for the L3 component (e.g., REQ-XY-CP-001)."
+          },
+          "description": {
+            "type": "string"
+          },
+          "refines": {
+            "type": "string",
+            "description": "Traceability link to the parent L2 subsystem."
+          }
+        }
+      }
+    },
+    "cqrs_interfaces": {
+      "type": "object",
+      "required": ["commands", "events", "queries"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source", "target"],
+            "properties": {
+              "name": { "type": "string" },
+              "source": { "type": "string" },
+              "target": { "type": "string" },
+              "payload": { "type": "object" }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source"],
+            "properties": {
+              "name": { "type": "string" },
+              "source": { "type": "string" },
+              "payload": { "type": "object" }
+            }
+          }
+        },
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source", "target"],
+            "properties": {
+              "name": { "type": "string" },
+              "source": { "type": "string" },
+              "target": { "type": "string" },
+              "return_type": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "parent_req_id": {
+      "type": "string",
+      "description": "The parent requirement ID this decomposition derives from."
+    },
+    "sub_components": {
+      "type": "array",
+      "description": "Sub-components synthesized by the Architect agent.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "domain", "black_box_requirement"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique component identifier (e.g., COMP-001-01)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable component name."
+          },
+          "domain": {
+            "type": "string",
+            "enum": ["system", "software", "hardware", "mechanics"],
+            "description": "Engineering domain of the component."
+          },
+          "black_box_requirement": {
+            "type": "string",
+            "description": "Measurable black-box requirement for this component."
+          },
+          "assigned_external_interfaces": {
+            "type": "array",
+            "description": "External interfaces assigned to this component from the parent level.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "internal_interfaces": {
+      "type": "array",
+      "description": "Internal interfaces between sub-components.",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "target_id", "interface_type", "data_payload"],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "description": "ID of the source sub-component."
+          },
+          "target_id": {
+            "type": "string",
+            "description": "ID of the target sub-component."
+          },
+          "interface_type": {
+            "type": "string",
+            "description": "Type of the interface (e.g., analog_signal, thermal, API, I2C)."
+          },
+          "data_payload": {
+            "type": "string",
+            "description": "Description of the data or energy exchanged."
+          }
+        }
+      }
+    },
+    "propagation_map": {
+      "type": "object",
+      "description": "Per-component mapping of inherited external and new internal interfaces.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "inherited_external": {
+            "type": "array",
+            "description": "External interfaces inherited from the parent black-box.",
+            "items": { "type": "string" }
+          },
+          "new_internal_incoming": {
+            "type": "array",
+            "description": "New internal interfaces where this component is the target.",
+            "items": { "type": "string" }
+          },
+          "new_internal_outgoing": {
+            "type": "array",
+            "description": "New internal interfaces where this component is the source.",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "architectural_rationale": {
+      "type": "string",
+      "description": "Short rationale for the architectural decisions including trade-offs and alternatives considered."
+    },
+    "decomposition_completeness": {
+      "type": "string",
+      "description": "Statement confirming that the sub-components fully cover the parent requirement and that external interfaces are correctly assigned."
+    },
+    "termination_decisions": {
+      "type": "array",
+      "description": "Per-component termination decisions produced by the Termination agent.",
+      "items": {
+        "type": "object",
+        "required": ["component_id", "decision", "rationale"],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "description": "ID of the sub-component being evaluated."
+          },
+          "decision": {
+            "type": "string",
+            "enum": ["leaf", "continue"],
+            "description": "Leaf node (stop decomposition) or continue to next level."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Reasoning for the termination decision."
+          }
+        }
+      }
+    },
+    "termination_summary": {
+      "type": "object",
+      "description": "Summary statistics for the termination evaluation.",
+      "properties": {
+        "total": { "type": "integer" },
+        "leaf_nodes": { "type": "integer" },
+        "continue_nodes": { "type": "integer" },
+        "current_depth": { "type": "integer" },
+        "max_depth": { "type": "integer" }
+      }
+    },
+    "critic_status": {
+      "type": "object",
+      "description": "Quality gate result produced by the Critic agent.",
+      "required": ["status", "checks", "correction_hints", "iteration"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["approved", "rejected", "blocked"],
+          "description": "Overall critic verdict."
+        },
+        "checks": {
+          "type": "object",
+          "required": ["completeness", "consistency", "verifiability", "traceability"],
+          "properties": {
+            "completeness": {
+              "$ref": "#/definitions/checkResult"
+            },
+            "consistency": {
+              "$ref": "#/definitions/checkResult"
+            },
+            "verifiability": {
+              "$ref": "#/definitions/checkResult"
+            },
+            "traceability": {
+              "$ref": "#/definitions/checkResult"
+            }
+          }
+        },
+        "correction_hints": {
+          "type": "array",
+          "description": "Actionable hints to fix rejected or blocked issues.",
+          "items": { "type": "string" }
+        },
+        "iteration": {
+          "type": "integer",
+          "description": "Current critic iteration count."
+        },
+        "max_iterations": {
+          "type": "integer",
+          "description": "Maximum allowed critic iterations."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "checkResult": {
+      "type": "object",
+      "required": ["passed"],
+      "properties": {
+        "passed": {
+          "type": "boolean",
+          "description": "Whether this check category passed."
+        },
+        "issues": {
+          "type": "array",
+          "description": "List of issues found in this category.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

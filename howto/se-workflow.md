@@ -1,0 +1,181 @@
+# SE-Workflow: Die rekursive Systems-Engineering-Kaskade
+
+Dieses Dokument beschreibt den vollständigen Ablauf des fraktalen SE-Workflows in agent-meta.
+
+---
+
+## Grundprinzip: Die System-Zelle
+
+Anstatt alles auf einmal zu lösen, durchläuft jede Ebene — egal wie tief — exakt denselben systematischen Ablauf. Die **System-Zelle** ist die kleinste wiederholbare Einheit des Workflows.
+
+### Eingabe (Black-Box)
+"Das System muss X leisten"
+
+### Ablauf
+1. **Architect** — Synthese der White-Box-Architektur
+2. **Critic** — Quality Gate (Vollständigkeit, Konsistenz, Testbarkeit)
+3. **Interface Manager** — Verträge sichern und propagieren
+4. **Terminator** — Entscheid: Leaf Node oder neue Zelle?
+
+### Ausgabe
+- Sub-Komponenten + Interface Contracts
+- Oder: Fertige, atomare Arbeitsaufträge
+
+---
+
+## Rekursiver Fluss (Mermaid)
+
+```mermaid
+graph TD
+    START["Stakeholder Input<br/>unstrukturierter Bedarf"] --> REQ["se-requirements<br/>formale L1 Black-Box-REQ"]
+
+    subgraph "System-Zelle (Ebene n)"
+        REQ --> ARCH["se-architect<br/>White-Box-Synthese"]
+        ARCH --> CRIT["se-critic<br/>Quality Gate"]
+        CRIT -->|approved| IFM["se-interface-mgr<br/>Verträge sichern"]
+        CRIT -->|rejected| ARCH
+        CRIT -->|blocked| REQ
+        IFM --> TERM["se-termination<br/>Leaf oder Continue?"]
+    end
+
+    TERM -->|Leaf| LEAF["Leaf Node<br/>atomarer Auftrag"]
+    TERM -->|Continue| NEXT["Neue Zelle (Ebene n+1)<br/>BB wird zu WB"]
+
+    NEXT --> ARCH
+
+    LEAF --> ENDE["SE-Ende<br/>Traceability-Matrix"]
+
+    style START fill:#e1f5e1
+    style ENDE fill:#e1f5e1
+    style ARCH fill:#fff4e1
+    style CRIT fill:#ffe1e1
+    style IFM fill:#e1eaff
+    style TERM fill:#f0e1ff
+```
+
+---
+
+## Die 5 Rollen im Detail
+
+### se-requirements
+- Nimmt unstrukturierte Stakeholder-Bedarfe entgegen
+- Formuliert messbare Black-Box-Anforderungen mit REQ-ID
+- Definiert externe Schnittstellen und Domänen
+
+### se-architect
+- Zerlegt Black-Box in White-Box-Architektur
+- Weist Domänen zu (software, hardware, mechanics, system)
+- Definiert interne Schnittstellen und Sub-Komponenten
+- Begründet Architekturentscheidungen (Trade-offs)
+
+### se-critic
+- Prüft auf Vollständigkeit (Completeness)
+- Prüft auf Konsistenz (Consistency)
+- Prüft auf Testbarkeit (Verifiability)
+- Prüft auf Traceability
+- Erzwingt Korrekturschleifen bei Mängeln (max. 3 Iterationen)
+
+### se-interface-mgr
+- Zentrale Registry für alle Interface Contracts
+- Erzeugt die Propagations-Map für jede Sub-Komponente
+- Validiert gegen bestehende Verträge aus parallelen Zweigen
+- Verhindert Interface-Drift über Ebenen hinweg
+
+### se-termination
+- Entscheidet pro Sub-Komponente: Leaf oder Continue
+- Leaf-Kriterien: atomare Code-Einheit, Standard-Bauteil, ausgereizte Domäne, explizite Grenze
+- Schutzregeln: max_depth, max_total_cells, Zirkular-Check
+
+---
+
+## Rekursion und Terminierung
+
+### Übergang n → n+1
+White-Box-Elemente der Ebene n werden zu Black-Box-Anforderungen der Ebene n+1.
+Jede Sub-Komponente erhält:
+- Ihre eigene Black-Box-Anforderung
+- Alle Interfaces aus der Propagations-Map
+- Die Parent-REQ-ID für Traceability
+
+### Terminierungs-Bedingungen
+- **Atomare Einheit:** Als einzelne Funktion/Klasse/Modul umsetzbar
+- **COTS:** Commercial Off-The-Shelf, kaufbar
+- **Domänengrenze:** Keine sinnvolle weitere Zerlegung möglich
+- **Explizite Grenze:** Anforderung definiert Zukaufteil
+- **max_depth:** Hartes Limit der Rekursionstiefe
+- **max_total_cells:** Gesamtanzahl Zellen überschritten
+
+---
+
+## Parallelisierung
+
+Zellen auf gleicher Ebene, die unabhängige Sub-Komponenten bearbeiten, laufen parallel:
+
+```
+Ebene 2:
+├── Zelle A (Heizelement-Steuerung)     → parallel
+├── Zelle B (Temperatur-Regelalgorithmus) → parallel
+└── Zelle C (Wasserbehälter)            → parallel (terminiert sofort als Leaf)
+```
+
+Maximal `max_parallel_cells` gleichzeitige Zellen.
+
+---
+
+## Artefakte pro Ebene
+
+| Artefakt | Format | Zweck |
+|----------|--------|-------|
+| STRATEGY.md | Markdown | Durable Anchor: Ziel, Constraints, Risks |
+| requirements.md | Markdown | Flache Liste aller REQ-IDs |
+| architecture.md | Markdown + Mermaid | Gesamtarchitektur |
+| interface-registry.md | Markdown + Tabelle | Zentrale Interface-Tabelle |
+| traceability-matrix.md | Markdown | Parent-Child-Matrix |
+| REQ-xxx.md | Markdown | Einzelne Anforderung mit BB + WB |
+
+---
+
+## Korrekturschleifen
+
+```
+Architect → Critic
+                |
+                ├── approved → Interface Manager
+                |
+                ├── rejected → Architect (mit correction_hints, max 3x)
+                |
+                └── blocked → Parent-Zelle (Architektur auf Ebene n-1 revidieren)
+```
+
+---
+
+## Konfiguration
+
+Die Kaskade wird in `.meta-config/project.yaml` gesteuert:
+
+```yaml
+roles:
+  - se-orchestrator
+  - se-requirements
+  - se-architect
+  - se-critic
+  - se-interface-mgr
+  - se-termination
+
+variables:
+  SE_MAX_DEPTH: 5
+  SE_MAX_CELLS: 20
+  SE_MAX_CRITIC_ITERATIONS: 3
+  SE_MAX_PARALLEL_CELLS: 4
+```
+
+---
+
+## Zusammenfassung
+
+Der SE-Workflow ist ein **fraktaler, rekursiver Prozess**:
+- Jede Ebene arbeitet identisch
+- Die Granularität ändert sich, nicht die Methodik
+- Harte Schutzmechanismen verhindern Endlosschleifen und Kostenexplosion
+- Interface-Propagation sichert Konsistenz über alle Ebenen
+- Der Output ist menschenlesbar (Markdown + Mermaid) und optional exportierbar

@@ -138,3 +138,39 @@ roles:
     memory: local
     workflow_tier: optional
     description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
+
+  se-requirements:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement."
+
+  se-architect:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität)."
+
+  se-critic:
+    model: powerful
+    memory: ""
+    workflow_tier: optional
+    description: "Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit."
+
+  se-interface-mgr:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend."
+
+  se-termination:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde."
+
+  se-orchestrator:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch."

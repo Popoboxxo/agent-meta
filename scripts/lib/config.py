@@ -262,6 +262,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         variables["UNKNOWN_FALLBACK_META_FEEDBACK"] = "true" if unknown_fallback.get("meta-feedback", True) else "false"
         variables["UNKNOWN_FALLBACK_MAIN_CHAT"] = "true" if unknown_fallback.get("main-chat", True) else "false"
         variables["UNKNOWN_FALLBACK_ASK_USER"] = "true" if unknown_fallback.get("ask-user", False) else "false"
+    # SYSTEMS_ENGINEERING_ENABLED
+    se_config = config.get("systems-engineering", {})
+    variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
@@ -276,21 +279,22 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     return variables, unmapped
 
 
-def strip_inactive_dod_blocks(text: str, variables: dict) -> str:
-    """Remove DoD-conditional blocks that are inactive in this project.
+def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
+    """Remove conditional blocks that are inactive in this project.
 
     Recognizes the pattern:
-        {{#if DOD_X}}
+        {{#if VAR_NAME}}
         ...content...
         {{/if}}
 
-    If the corresponding DOD_X variable is "false", the entire block (including
+    Applies to DoD-variables (starting with DOD_) and SE_ENABLED.
+    If the corresponding variable is "false", the entire block (including
     markers) is removed. If "true", the markers are stripped but content kept.
-    This keeps generated agent files lean when DoD features are disabled.
+    This keeps generated agent files lean when features are disabled.
     """
-    dod_vars = {k for k in variables if k.startswith("DOD_") and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k == "SE_ENABLED") and k != "DOD_PRESET"}
 
-    for var in dod_vars:
+    for var in conditional_vars:
         def replace_block(m: re.Match, _var: str = var) -> str:
             block_content = m.group(1)
             if variables.get(_var, "true") == "false":

@@ -83,6 +83,9 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | Projekt-Feedback als GitHub Issue einreichen | `feedback` | `fast` | Nein | "Melde das als Bug" |
 | Log-Analyse / Fehler clustern | `log-analyzer` | `balanced` | Ja (Multi-Log-Quellen) | "Analysiere die Logs" |
 | Release erstellen / Version bump | `release` | `balanced` | Nein (sequentiell) | "Erstelle Release v1.2.0" |
+{{#if SE_ENABLED}}
+| **Systems Engineering / SE-Kaskade** | `se-orchestrator` | `balanced` → `powerful` | Nein (Orchestrator) | "Starte den SE-Prozess", "Breche Anforderungen herunter" |
+{{/if}}
 | **Batch-Operationen** (mehrere gleiche Tasks) | — | — | **Ja** | "Fix 3 Bugs", "Schreib Tests für A,B,C" |
 | **Nicht in Tabelle** | Frag den User | — | — | — |
 
@@ -442,6 +445,14 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* | ❌ (sequentiell) |
 | `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren | ✅ (Multi-Quellen) |
 | `feedback` | Bug/Feature/Verbesserung als GitHub Issue einreichen — **immer vor `git` für Issues** | ❌ (atomar) |
+{{#if SE_ENABLED}}
+| `se-orchestrator` | Koordiniert den 6-stufigen Systems-Engineering-Herunterbruch | ❌ (Meta-Orchestrator) |
+| `se-requirements`| Nimmt Stakeholder-Bedürfnisse auf (L1-Blackbox) | ❌ (sequentiell) |
+| `se-architect`   | Zerlegt Blackboxes in Whiteboxes nach Architekturgesetzen | ✅ (Multi-Systeme) |
+| `se-critic`      | Prüft Architekturentscheidungen (Orthogonalität, Testbarkeit) | ✅ (Multi-Prüfungen) |
+| `se-interface-mgr`| Verwaltet und validiert Schnittstellenverträge | ❌ (zentral) |
+| `se-termination` | Entscheidet über L3-Component-Leaf-Node-Erreichung | ❌ (schnell) |
+{{/if}}
 
 Parallel: max. 4 Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, validator→git, requirements→tester.
@@ -479,6 +490,9 @@ Q  Multi-Fix:       FANOUT(N, developer, [fix₁..fixₙ]) → BARRIER → git
 R  Multi-Test:      FANOUT(N, tester, [test₁..testₙ]) → BARRIER
 S  Multi-Analyse:   FANOUT(N, ideation, [analyze₁..analyzeₙ]) → BARRIER → report
 T  Multi-Docs:      FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
+{{#if SE_ENABLED}}
+U  SE-Kaskade:      se-orchestrator → koordiniert (se-requirements, se-architect, se-critic, se-interface-mgr, se-termination)
+{{/if}}
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).
