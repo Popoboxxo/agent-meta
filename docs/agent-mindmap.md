@@ -51,13 +51,13 @@ mindmap
 ### agent-meta-manager
 - **Tier:** optional
 - **Beschreibung:** agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 - **Delegiert an:** agent-meta-scout, developer, git
 
 ### agent-meta-scout
 - **Tier:** optional
 - **Beschreibung:** Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
 ### developer
 - **Tier:** required
@@ -68,12 +68,12 @@ mindmap
 ### docker
 - **Tier:** optional
 - **Beschreibung:** Docker-Operationen: Compose-Stacks, Binary-Management, Test-Umgebungen und Diagnose — plattformunabhängig.
-- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
 ### documenter
 - **Tier:** recommended
 - **Beschreibung:** Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
 ### feature
 - **Tier:** recommended
@@ -84,12 +84,12 @@ mindmap
 ### feedback
 - **Tier:** required
 - **Beschreibung:** Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
 ### git
 - **Tier:** required
 - **Beschreibung:** Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea).
-- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
 ### ideation
 - **Tier:** optional
@@ -99,18 +99,18 @@ mindmap
 ### log-analyzer
 - **Tier:** required
 - **Beschreibung:** Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 - **Delegiert an:** feedback, developer, security-auditor
 
 ### meta-feedback
 - **Tier:** optional
 - **Beschreibung:** Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen.
-- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-2.5-flash, Opencode: opencode-go/deepseek-v4-flash
+- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
 ### openscad-developer
 - **Tier:** optional
 - **Beschreibung:** Spezialisierter Developer für parametrische 3D-Modelle in OpenSCAD. Render-Inspect-Refine Loop via MCP, Druckbarkeits-Wissen, Toleranz-Management.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
 ### orchestrator
 - **Tier:** required
@@ -121,7 +121,7 @@ mindmap
 ### release
 - **Tier:** optional
 - **Beschreibung:** Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 - **Delegiert an:** git, documenter
 
 ### requirements
@@ -132,14 +132,14 @@ mindmap
 ### security-auditor
 - **Tier:** optional
 - **Beschreibung:** Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution.
-- **Model:** Claude: claude-opus-4-7, Gemini: gemini-2.5-pro, Opencode: opencode-go/kimi-k2.5
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
 
 ### tester
 - **Tier:** recommended
 - **Beschreibung:** Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
 ### validator
 - **Tier:** recommended
 - **Beschreibung:** Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen.
-- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-2.5-pro, Opencode: opencode-go/qwen3.6-plus
+- **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus

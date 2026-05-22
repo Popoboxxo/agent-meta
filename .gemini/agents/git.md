@@ -11,7 +11,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-model: gemini-2.5-flash
+model: gemini-3.5-flash-high
 ---
 # Git Agent — agent-meta
 

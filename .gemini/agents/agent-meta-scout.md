@@ -9,7 +9,7 @@ tools:
 - Read
 - WebFetch
 - WebSearch
-model: gemini-2.5-pro
+model: gemini-3.1-pro-low
 ---
 # Agent-Meta Scout — agent-meta
 

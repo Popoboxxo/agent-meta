@@ -71,11 +71,11 @@ providers:
     pending_tasks_file: .gemini/pending-tasks.md
     extension_dir: .gemini/3-project
     model-tiers:
-      nano:     gemini-2.5-flash            # ultra-fast, low-cost tasks
-      fast:     gemini-2.5-flash            # quick ops: git, formatting
-      balanced: gemini-2.5-pro              # reasoning + code (default)
-      powerful: gemini-2.5-pro              # same model, Gemini has no separate "opus"
-      max:      gemini-2.5-pro              # reserved for future Gemini Ultra
+      nano:     gemini-3.5-flash-medium     # ultra-fast, low-cost tasks
+      fast:     gemini-3.5-flash-high       # quick ops: git, formatting
+      balanced: gemini-3.1-pro-low          # reasoning + code (default)
+      powerful: gemini-3.1-pro-high         # premium reasoning, complex coding
+      max:      gemini-3.1-pro-high         # reserved for future Gemini Ultra
     model-aliases: {}
 
   Opencode:
