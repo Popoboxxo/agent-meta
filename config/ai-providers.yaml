@@ -28,6 +28,7 @@ providers:
     snippets_dir: .claude/snippets
     pending_tasks_file: .claude/pending-tasks.md
     extension_dir: .claude/3-project
+    orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten mit `claude -a orchestrator` oder wählt ihn aus."
     # Model tiers: abstract tier name → provider-specific model ID.
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
@@ -70,6 +71,7 @@ providers:
     snippets_dir: .gemini/snippets
     pending_tasks_file: .gemini/pending-tasks.md
     extension_dir: .gemini/3-project
+    orchestrator_hint: "- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
     model-tiers:
       nano:     gemini-3.5-flash-medium     # ultra-fast, low-cost tasks
       fast:     gemini-3.5-flash-high       # quick ops: git, formatting
@@ -105,6 +107,7 @@ providers:
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
+    orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
     # opencode-go model IDs — format: opencode-go/<model-id>
     # Full list: https://opencode.ai/docs/go/
     model-tiers:
@@ -145,3 +148,4 @@ providers:
     snippets_dir: .continue/snippets
     pending_tasks_file: .continue/pending-tasks.md
     extension_dir: .continue/3-project
+    orchestrator_hint: "- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von Eurer Aufgabe ein."

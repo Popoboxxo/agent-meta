@@ -148,6 +148,7 @@ def sync_rules(
         'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
         'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
         'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+        'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
     }
     merged_vars = {**variables, **provider_vars} if variables is not None else provider_vars
 
