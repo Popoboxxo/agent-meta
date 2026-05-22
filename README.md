@@ -19,7 +19,7 @@
 Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 Provides generic agent templates that are instantiated per project via `sync.py`.
 
-**Current version:** `0.47.0-beta`
+**Current version:** `0.49.0`
 
 ---
 
@@ -41,7 +41,7 @@ Platform- and project-specific layers stack on top of the generic definitions �
 
 It provides:
 
-- **Generic agent templates** for orchestrator, developer, tester, validator, requirements engineer, documenter, release, and docker roles
+- **Generic agent templates** for orchestrator, developer, tester, validator, requirements engineer, documenter, release, docker, and systems engineering (SE) cascade roles
 - **Orchestrator-First Architecture** (Beta): Universal task decomposition with parallel FANOUT/PARALLEL_GROUP dispatch, provider-agnostic across Claude, Opencode, Gemini, and Continue
 - **Platform-specific overrides** (e.g., Sharkord plugins) that extend generic agents
 - **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
@@ -113,6 +113,42 @@ cat sync.log
 ```
 
 Agents are written to `.claude/agents/`. Never edit them manually — they are regenerated on every sync.
+
+---
+
+## Systems Engineering Cascade (Beta v0.49.0)
+
+A recursive, fractal systems engineering workflow for model-based system decomposition across L1–L3.
+
+### How it works
+
+The SE cascade treats every level as an identical **system cell**:
+
+1. **`se-requirements`** — Captures stakeholder needs and formalizes L1 black-box requirements
+2. **`se-architect`** — Decomposes black-boxes into white-box architectures with sub-components, domains (software/hardware/mechanics/system), and interfaces
+3. **`se-critic`** — Quality gate: completeness, consistency, traceability, verifiability (max 3 iterations)
+4. **`se-interface-mgr`** — Registers interfaces, validates contracts, generates propagation maps for parallel branches
+5. **`se-termination`** — Decides per sub-component: leaf node or spawn next cell (n+1)
+6. **`se-orchestrator`** — Coordinates the entire 6-stage breakdown with context hygiene and parallel cell execution
+
+### Recursive Cell Spawning
+
+White-box elements of level n become black-box requirements of level n+1. Each cell receives only its parent requirement + neighbor interfaces (~2k token limit) to prevent context drift.
+
+### Protection Mechanisms
+
+- `max_depth: 5` — hard recursion limit
+- `max_total_cells: 20` — global cell budget
+- `max_critic_iterations: 3` — bounded correction loops
+- `max_parallel_cells: 4` — parallel execution cap
+
+### Documentation
+
+- [docs/architecture/07-se-cascade.md](docs/architecture/07-se-cascade.md) — Architecture deep-dive
+- [howto/se-workflow.md](howto/se-workflow.md) — Workflow guide with Mermaid diagrams
+- [howto/se-blackbox-to-whitebox.md](howto/se-blackbox-to-whitebox.md) — BB→WB transition methodology
+- [howto/se-interface-management.md](howto/se-interface-management.md) — Interface propagation explained
+- [howto/se-mcp-adapters.md](howto/se-mcp-adapters.md) — MCP adapter concept for Phase 3
 
 ---
 
@@ -417,7 +453,7 @@ agent-meta/
 
 | Platform | Agents |
 |----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout, openscad-developer |
+| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout, openscad-developer, se-orchestrator, se-requirements, se-architect, se-critic, se-interface-mgr, se-termination |
 | Sharkord | sharkord-docker, sharkord-release |
 
 ---
@@ -441,3 +477,9 @@ agent-meta/
 | `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
 | `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
 | `openscad-developer` | Parametric 3D models in OpenSCAD, render-inspect-refine via MCP, print optimization |
+| `se-orchestrator` | Coordinates the 6-level recursive systems engineering cascade |
+| `se-requirements` | Elicits stakeholder needs and formalizes L1 black-box requirements |
+| `se-architect` | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
+| `se-critic` | Audits decompositions: completeness, consistency, traceability, verifiability |
+| `se-interface-mgr` | Manages interface contracts and propagation maps across cascade levels |
+| `se-termination` | Deterministic termination at L3 component requirements |
