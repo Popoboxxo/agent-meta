@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [],
-    "deny": []
+    "deny": [
+      ".continue/**",
+      ".gemini/**",
+      ".opencode/**",
+      "opencode.json",
+      "AGENTS.md"
+    ]
   },
   "hooks": {
     "PostToolUse": [

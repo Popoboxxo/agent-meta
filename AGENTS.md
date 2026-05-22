@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.47.1-beta — `2026-05-21`
+Generiert von agent-meta v0.48.0 — `2026-05-22`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben.
@@ -106,6 +106,46 @@ feat: add queue persistence across restarts
 fix: prevent duplicate video entries on reconnect
 chore: bump version to 1.2.0
 ```
+
+---
+
+# Definition of Done (DoD)
+
+Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
+
+## Immer Pflicht
+
+- [ ] Code implementiert die Aufgabe vollständig
+- [ ] Code-Konventionen eingehalten
+- [ ] Commit-Message im Conventional-Commits-Format
+- [ ] Keine Regressions
+
+{{#if DOD_REQ_TRACEABILITY}}
+## REQ-Traceability
+
+- [ ] REQ-ID existiert in `docs/REQUIREMENTS.md`
+- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
+{{/if}}
+
+{{#if DOD_TESTS_REQUIRED}}
+## Tests
+
+- [ ] Test vorhanden und grün
+{{/if}}
+
+{{#if DOD_CODEBASE_OVERVIEW}}
+## Dokumentation
+
+- [ ] `CODEBASE_OVERVIEW.md` aktualisiert
+{{/if}}
+
+{{#if DOD_SECURITY_AUDIT}}
+## Security
+
+- [ ] Security-Audit vor Release durchgeführt
+{{/if}}
+
+**Keine finale Antwort und keine Commit-Empfehlung** ohne Prüfung aller aktiven Kriterien.
 
 ---
 
@@ -486,6 +526,29 @@ Pflichtschritte — alle vier, sonst ist die Rolle unvollständig:
 | `config/role-defaults.yaml` (neue Rolle) | Tabellen in CLAUDE.md + howto-Dateien |
 | `hint:` Feld in Agent-Template | Projekte syncen (AGENT_HINTS wird neu generiert) |
 | Rules oder Hooks in `rules/` / `hooks/` | Projekte syncen (werden überschrieben) |
+
+---
+
+# agent-meta — sync.py Interface
+
+`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.claude/agents/` schreiben.
+
+Vollständige Referenz (Flags, sync.log, Modulstruktur):
+→ `.agent-meta/agents/1-generic/_wf-sync-interface.md`
+
+## Branch-Guard-Erweiterung für agent-meta
+
+Zusätzlich zu den generischen Branch-Guard-Regeln gilt hier:
+
+- `sync.py` ausführen → immer Branch (Sync propagiert in alle Projekte)
+
+**Faustregel: sync.py ausführen oder >1 Datei anfassen → Branch.**
+
+**NIE direkt auf main:** sync.py-Läufe, Template-Änderungen, Rule-Änderungen — egal wie klein.
+
+## Warum
+
+Direkte Commits auf main propagieren Fehler sofort in alle Projekte beim nächsten Sync.
 
 ---
 
