@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.49.0] — 2026-05-22
+
+### Changed
+
+- **Main Session Auto-Handoff Protocol**: Refactored the orchestrator-first architecture to empower the Main Session as a Smart Communication Interface. The Main Session can now read files and analyze context, but automatically delegates the execution to the Orchestrator via a tool call instead of generating a text refusal message.
+
+---
+
 ## [0.48.0] — 2026-05-22
 
 - Introduce Orchestrator-First Architecture with FANOUT, PARALLEL_GROUP, and BARRIER patterns for multi-agent orchestration.
