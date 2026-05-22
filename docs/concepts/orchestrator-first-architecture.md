@@ -7,12 +7,12 @@
 
 ## Executive Summary
 
-Dieses Konzept beschreibt eine **provider-agnostische Neuausrichtung des Delegations-Systems** von agent-meta: Statt dass die Main Session selbst Arbeit verrichtet (Dateien lesen, Code analysieren, Multi-Step-Workflows ausführen), wird sie zum **Thin Router** — alle Aufgaben fließen durch den Orchestrator, der sie zerlegt, parallelisiert und an spezialisierte Worker-Agents delegiert.
+Dieses Konzept beschreibt eine **provider-agnostische Neuausrichtung des Delegations-Systems** von agent-meta: Die Main Session wird zur **Smarten Kommunikationsoberfläche**, die zwar initialen Kontext lesen und verstehen darf, aber zwingend **automatisch via Tool** delegiert — alle eigentlichen Aufgaben fließen durch den Orchestrator, der sie als Verwaltungs-Bestie zerlegt, parallelisiert und an spezialisierte Worker-Agents delegiert.
 
 **Kerninnovationen:**
 1. **Task Decomposition Protocol** — Der Orchestrator zerlegt "Mach X, Y, Z" in unabhängige Sub-Tasks und dispatched sie parallel an mehrere Agenten des gleichen Typs.
 2. **Provider-Agnostic Parallel Model** — Gleiche Entscheidungslogik für Claude, Opencode, Gemini, Continue. Nur die Syntax variiert (via `PARALLEL_PATTERN`).
-3. **Main Session Thinning** — Reduktion von ~500 auf ~40 Zeilen Managed Block. Alle Rules bleiben als separate Dateien, nur die Routing-Logik und Agenten-Tabelle verbleiben inline.
+3. **Auto-Handoff Protocol** — Der Hauptchat verweigert nie mit Text, sondern delegiert den verstandenen Intent lautlos und automatisch via System-Tool.
 
 **Ziel:** `max-parallel-agents` (heute ungenutzt) wird zum aktiven Steuerungsparameter. Der Orchestrator wird von einem linearen Delegierer zu einem echten **Task-Orchestrator** mit FANOUT, BARRIER und PARALLEL_GROUP.
 
@@ -84,15 +84,15 @@ Dieses Konzept beschreibt eine **provider-agnostische Neuausrichtung des Delegat
 
 ```
 ┌──────────────────────────────────────────────┐
-│        MAIN SESSION (Thin Router)            │
+│  MAIN SESSION (Smarte Kommunikationsoberfläche)│
 │  ~40 Zeilen Managed Block                    │
 │                                              │
-│  Agent-Tabelle + "Für ALLES → Orchestrator"  │
+│  Agent-Tabelle + Auto-Handoff Protokoll      │
 │  Ausnahmen NUR: atomare Git-Ops, Sync,       │
 │  Meta-Fragen, Feedback-Issues                │
 │                                              │
-│  Verhalten: KEIN Datei-Lesen, KEIN Bash,     │
-│  KEINE Analyse — nur Routing                 │
+│  Verhalten: Kontext lesen (Dateien/Bash), um │
+│  Nutzer zu verstehen → Auto-Delegation Tool  │
 └──────────────────┬───────────────────────────┘
                    │ (immer)
                    ▼

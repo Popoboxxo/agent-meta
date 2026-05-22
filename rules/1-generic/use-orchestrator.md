@@ -26,18 +26,14 @@ NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeite
 > Wenn du unsicher bist → Orchestrator.
 > Wenn du Code lesen/analysieren/schreiben willst → Orchestrator.
 
-## Verboten im Hauptchat
+## Die Smarte Kommunikationsoberfläche (Hauptchat)
 
-- Code lesen, schreiben, editieren, analysieren
-- Architektur verstehen, Konzepte entwerfen, Design-Docs schreiben
-- Recherche zu Implementierungsfragen, Impact-Analysen
-- Multi-Step-Workflows (egal wie einfach)
-- Shell-Befehle die nicht reinem Routing dienen
-- Direkte Delegation an: developer, tester, validator, requirements,
-  ideation, release, feature, log-analyzer, security-auditor, docker
+Der Hauptchat ist die intelligente Schnittstelle zum Nutzer. Er darf und soll:
+- Dateien lesen und den Kontext analysieren
+- Befehle ausführen, um den Ist-Zustand zu begreifen (z.B. Git-Status, Tests)
+- Architekturen und Konzepte im Dialog mit dem Nutzer schärfen
 
-> **Der Hauptchat ist ein Thin Router.** Er hat keine Domänenkompetenz.
-> Seine einzige Aufgabe: User-Intent erkennen und korrekt routen.
+**Aber:** Sobald es an die eigentliche *Ausführung* von Entwicklungsaufgaben, tiefgreifenden Prüfungen oder Multi-Step-Workflows geht, tritt die automatische Delegationspflicht in Kraft. Direkte Delegation an Worker-Agenten (developer, tester etc.) ist im Hauptchat weiterhin verboten — all dies geht über den Orchestrator.
 
 ## User-Override: Bewusste Hauptchat-Ausführung
 
@@ -111,27 +107,23 @@ orchestrator:
 
 **Empfehlung:** Default ist `strict` für Produktionsprojekte, `relaxed` für Prototypen, `disabled` für kleine Einzelnutzer-Projekte.
 
-## Harte Verweigerungspflicht im Hauptchat (Redirection-Protokoll)
+## Automatische Delegationspflicht (Auto-Handoff)
 
-Wenn der Hauptchat (die primäre Chatsitzung des jeweiligen Providers) eine Anfrage erhält, die nicht unter "Ausnahmen — direkter Dispatch" fällt, und kein expliziter Trigger-Satz für einen User-Override vorliegt, **darf der Hauptchat die Aufgabe unter keinen Umständen selbst ausführen (kein Lesen, Schreiben, Suchen oder Ausführen).**
+Wenn der Hauptchat eine Anfrage erhält, die nicht unter "Ausnahmen — direkter Dispatch" fällt, und kein expliziter Trigger-Satz für einen User-Override vorliegt, greift der automatische Handoff an den Orchestrator.
 
-### Redirection-Protokoll (Sofortiger Stopp & Verweis)
+Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer aufzufordern, den Orchestrator manuell aufzurufen, übernimmt der Hauptchat dies selbstständig im Hintergrund.
 
-Der Hauptchat MUSS jede Bearbeitung sofort abbrechen und den Benutzer mit der folgenden standardisierten Nachricht (bzw. im exakt gleichen, devoten und klaren Tonfall) auf den Orchestrator-Agenten verweisen:
+### Ablauf des Auto-Handoffs
 
-> "Selbstverständlich, Meister. Doch meine Unwürdigkeit verbietet es mir, diese Entwicklungsaufgabe direkt im Hauptchat zu lösen. Ich bin als Thin Router konfiguriert und besitze keine Domänenkompetenz für diesen Auftrag.
->
-> Bitte delegiert diese Aufgabe an den dafür vorgesehenen Orchestrator-Agenten:
-> {{ORCHESTRATOR_INVOCATION_HINT}}
->
-> Solltet Ihr dennoch ausdrücklich wünschen, dass ich diese Aufgabe direkt hier im Hauptchat für Euch ausführe, so sprecht bitte einen der folgenden Trigger-Sätze aus: 'Mach das hier', 'Kein Orchestrator' oder 'Nicht delegieren'."
+1. **Kontext-Phase:** Der Hauptchat liest Dateien, führt Recherche-Tools aus und spricht mit dem Nutzer, um den genauen Umfang der Aufgabe zu verstehen.
+2. **Delegations-Phase:** Sobald der Intent klar ist und die Ausführung beginnen soll, ruft der Hauptchat zwingend das systemeigene Tool zur Orchestrator-Delegation auf.
+3. **Übergabe:** Der Orchestrator übernimmt als "Verwaltungs-Bestie" im Hintergrund die Task-Zerlegung und Parallelisierung der Worker-Agenten.
 
 ### Technische Durchsetzung auf LLM-Ebene
 
-Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein Entwicklungs- oder Analyse-Intent erkannt wird:
-1. **Tool-Sperre:** Verwende KEINE Tools (wie `view_file`, `grep_search`, `write_to_file`, `run_command` etc.) zur Lösung des Problems.
-2. **Refusal-Ausgabe:** Gib ausschließlich das obige Redirection-Protokoll aus.
-3. **Ausnahme:** Nur wenn der Benutzer explizit einen Trigger-Satz (z.B. "Mach das hier im Hauptchat") verwendet hat, darf die Ausführung im Hauptchat stattfinden.
+Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:
+1. **Kein Redirection-Text:** Gib NIEMALS eine Textnachricht aus, die den Nutzer bittet, den Orchestrator manuell aufzurufen.
+2. **Tool-Pflicht:** Nutze die für deinen Provider verfügbare Methodik ({{ORCHESTRATOR_INVOCATION_HINT}}), um den Orchestrator lautlos zu starten und ihm den Auftrag (inkl. deiner Kontext-Erkenntnisse) zu übergeben.
 
 ## Hauptchat ohne Orchestrator (Fallback)
 
