@@ -1,16 +1,17 @@
 ---
 name: git
-model: claude-haiku-4-5-20251001
-version: "2.2.1"
-description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
+version: 2.2.1
+description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages
+  — plattformunabhängig (GitHub, GitLab, Gitea).'
+hint: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
 tools:
-  - Bash
-  - Read
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+- Bash
+- Read
+- Edit
+- Glob
+- Grep
+- TodoWrite
+model: claude-haiku-4-5-20251001
 ---
 
 # Git Agent — agent-meta

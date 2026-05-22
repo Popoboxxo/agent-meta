@@ -1,19 +1,20 @@
 ---
 name: agent-meta-manager
-model: claude-sonnet-4-6
-version: "1.6.0"
-description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
-hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
+version: 1.6.0
+description: 'agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische
+  Agenten, External-Skill-Lifecycle und Erweiterungen anlegen.'
+hint: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen'
 tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - WebFetch
-  - Agent
-  - TodoWrite
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- Agent
+- TodoWrite
+model: claude-sonnet-4-6
 ---
 
 # Agent-Meta-Manager — agent-meta

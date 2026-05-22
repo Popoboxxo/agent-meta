@@ -63,14 +63,66 @@ _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
 }
 
 
+def _update_frontmatter_dict(content: str, updates: dict, removes: list = None) -> str:
+    """Update YAML frontmatter fields in content using PyYAML.
+
+    If PyYAML is available, splits content into frontmatter and body,
+    parses frontmatter, updates fields, removes specified fields,
+    serializes back to YAML and rejoins the body.
+    """
+    if not _YAML_AVAILABLE:
+        return content
+
+    fm_block, body = _split_frontmatter(content)
+    if fm_block:
+        inner = re.sub(r"^---\n?", "", fm_block)
+        inner = re.sub(r"\n?---\s*$", "", inner)
+        try:
+            fm_dict = _yaml.safe_load(inner)
+            if not isinstance(fm_dict, dict):
+                fm_dict = {}
+        except _yaml.YAMLError:
+            fm_dict = {}
+    else:
+        fm_dict = {}
+        body = content
+
+    # Apply updates
+    for k, v in updates.items():
+        if v is not None:
+            fm_dict[k] = v
+        else:
+            fm_dict.pop(k, None)
+
+    # Apply removes
+    if removes:
+        for k in removes:
+            fm_dict.pop(k, None)
+
+    try:
+        new_fm_inner = _yaml.dump(fm_dict, allow_unicode=True, default_flow_style=False,
+                                  sort_keys=False).rstrip("\n")
+        new_fm_block = f"---\n{new_fm_inner}\n---"
+        if body.startswith("\n"):
+            return new_fm_block + body
+        return new_fm_block + "\n" + body
+    except _yaml.YAMLError:
+        return content
+
+
 def extract_frontmatter_field(content: str, field: str) -> str | None:
     """Extract a YAML frontmatter field value.
 
-    Handles three forms:
-      field: single line value
-      field: "quoted value that may wrap\n  across lines"
-      field: 'single-quoted value'
+    Uses PyYAML if available; falls back to regex.
     """
+    if _YAML_AVAILABLE:
+        fm = _parse_frontmatter_yaml(content)
+        val = fm.get(field)
+        if val is not None:
+            if isinstance(val, (str, type(None))):
+                return val
+            return str(val)
+
     # First try: quoted value that may span multiple lines (YAML block scalar after yaml.dump)
     # Matches: field: "...\n  ..." collecting continuation lines indented with 2+ spaces
     multi = re.search(
@@ -97,6 +149,13 @@ def build_frontmatter(content: str, name: str, description: str,
     The generated_from parameter is kept for API compatibility but is no longer
     emitted as a frontmatter field because opencode rejects it.
     """
+    if _YAML_AVAILABLE:
+        return _update_frontmatter_dict(
+            content,
+            updates={"name": name, "description": description},
+            removes=["generated-from", "generated_from"]
+        )
+
     content = re.sub(
         r"(^---\n.*?^name:\s*)(.+?)(\n)",
         lambda m: f"{m.group(1)}{name}{m.group(3)}",
@@ -122,6 +181,11 @@ def inject_permission_mode_field(content: str, permission_mode: str) -> str:
     If permission_mode is empty, removes any existing permissionMode: field.
     If set, inserts/updates after the memory: line (or model: or name: as fallback).
     """
+    if _YAML_AVAILABLE:
+        if not permission_mode:
+            return _update_frontmatter_dict(content, {}, removes=["permissionMode"])
+        return _update_frontmatter_dict(content, {"permissionMode": permission_mode})
+
     if not permission_mode:
         content = re.sub(r"^permissionMode:.*\n", "", content, count=1, flags=re.MULTILINE)
         return content
@@ -154,6 +218,11 @@ def inject_memory_field(content: str, memory: str) -> str:
     If memory is empty, removes any existing memory: field.
     If memory is set, inserts/updates after the model: line (or name: if no model:).
     """
+    if _YAML_AVAILABLE:
+        if not memory:
+            return _update_frontmatter_dict(content, {}, removes=["memory"])
+        return _update_frontmatter_dict(content, {"memory": memory})
+
     if not memory:
         content = re.sub(r"^memory:.*\n", "", content, count=1, flags=re.MULTILINE)
         return content
@@ -181,6 +250,11 @@ def inject_model_field(content: str, model: str) -> str:
     If model is empty, removes any existing model: field (clean slate).
     If model is set, inserts/updates after the name: line.
     """
+    if _YAML_AVAILABLE:
+        if not model:
+            return _update_frontmatter_dict(content, {}, removes=["model"])
+        return _update_frontmatter_dict(content, {"model": model})
+
     if not model:
         # Remove existing model: field if present
         content = re.sub(r"^model:.*\n", "", content, count=1, flags=re.MULTILINE)
@@ -200,6 +274,7 @@ def inject_model_field(content: str, model: str) -> str:
         rf"\1model: {model}\n",
         content, count=1, flags=re.MULTILINE,
     )
+
 
 
 def target_filename(role: str, role_map: dict) -> str | None:
@@ -596,6 +671,9 @@ def _strip_frontmatter(content: str) -> str:
 
 def _remove_frontmatter_fields(content: str, fields: list) -> str:
     """Remove specific fields from YAML frontmatter."""
+    if _YAML_AVAILABLE:
+        return _update_frontmatter_dict(content, {}, removes=fields)
+
     import re as _re
     for field in fields:
         content = _re.sub(

@@ -1,16 +1,16 @@
 ---
 name: documenter
-model: gemini-2.5-pro
-version: "1.3.3"
-description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
-hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
+version: 1.3.3
+description: Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
+hint: 'Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse'
 tools:
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+model: gemini-2.5-pro
 ---
 # Documenter — agent-meta
 

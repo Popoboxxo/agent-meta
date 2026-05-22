@@ -1,16 +1,17 @@
 ---
 name: requirements
-memory: project
-version: "1.3.3"
-description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
-hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
+version: 1.3.3
+description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und
+  Traceability prüfen.
+hint: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
 tools:
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+memory: project
 ---
 
 # Requirements Engineer — agent-meta

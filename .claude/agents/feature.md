@@ -1,16 +1,15 @@
 ---
 name: feature
-version: "1.4.0"
-description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
-hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
-# isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
-#                          Siehe .agent-meta/howto/agent-isolation.md für Konfiguration und Fallstricke.
-#                          Aktivierung: isolation: worktree als Aufruf-Parameter oder in 3-project/feature.md
+version: 1.4.0
+description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung
+  → Validierung → Commit → PR.'
+hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
+  vom Orchestrator gestartet, nicht direkt vom User.'
 tools:
-  - Bash
-  - Read
-  - Agent
-  - TodoWrite
+- Bash
+- Read
+- Agent
+- TodoWrite
 ---
 
 # Feature — agent-meta

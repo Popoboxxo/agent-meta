@@ -1,17 +1,17 @@
 ---
 name: release
-model: gemini-2.5-pro
-version: "1.3.3"
-description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
-hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
+version: 1.3.3
+description: Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten.
+hint: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
 tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+model: gemini-2.5-pro
 ---
 # Release Manager — agent-meta
 

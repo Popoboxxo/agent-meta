@@ -1,16 +1,17 @@
 ---
 name: git
-model: gemini-2.5-flash
-version: "2.2.1"
-description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
-hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
+version: 2.2.1
+description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages
+  — plattformunabhängig (GitHub, GitLab, Gitea).'
+hint: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
 tools:
-  - Bash
-  - Read
-  - Edit
-  - Glob
-  - Grep
-  - TodoWrite
+- Bash
+- Read
+- Edit
+- Glob
+- Grep
+- TodoWrite
+model: gemini-2.5-flash
 ---
 # Git Agent — agent-meta
 

@@ -1,14 +1,15 @@
 ---
 name: meta-feedback
-model: claude-haiku-4-5-20251001
-version: "2.0.1"
-description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
-hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
+version: 2.0.1
+description: Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues
+  einreichen.
+hint: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
 tools:
-  - Bash
-  - Read
-  - WebFetch
-  - TodoWrite
+- Bash
+- Read
+- WebFetch
+- TodoWrite
+model: claude-haiku-4-5-20251001
 ---
 
 # Meta-Feedback — agent-meta

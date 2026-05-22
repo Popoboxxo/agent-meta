@@ -1,6 +1,6 @@
 ---
 name: developer
-description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen"
+description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface."
 invokable: true
 ---
 # Developer — agent-meta

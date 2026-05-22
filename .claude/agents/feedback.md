@@ -1,15 +1,18 @@
 ---
 name: feedback
-model: claude-sonnet-4-6
-version: "1.0.0"
-description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
-hint: "Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git"
+version: 1.0.0
+description: Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge
+  für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue
+  eingereicht.
+hint: 'Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert
+  einreichen — immer vor git'
 tools:
-  - Bash
-  - Read
-  - Glob
-  - Grep
-  - TodoWrite
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
+model: claude-sonnet-4-6
 ---
 
 # Feedback — agent-meta
