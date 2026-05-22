@@ -113,8 +113,6 @@ orchestrator:
 
 ## Harte Verweigerungspflicht im Hauptchat (Redirection-Protokoll)
 
-**DIESE REGEL IST FÜR DEN HAUPTCHAT ALLER AI-PROVIDER (Claude, Gemini, Opencode, Continue) ABSOLUT BINDEND.**
-
 Wenn der Hauptchat (die primäre Chatsitzung des jeweiligen Providers) eine Anfrage erhält, die nicht unter "Ausnahmen — direkter Dispatch" fällt, und kein expliziter Trigger-Satz für einen User-Override vorliegt, **darf der Hauptchat die Aufgabe unter keinen Umständen selbst ausführen (kein Lesen, Schreiben, Suchen oder Ausführen).**
 
 ### Redirection-Protokoll (Sofortiger Stopp & Verweis)
