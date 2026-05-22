@@ -1,0 +1,556 @@
+# CODEBASE_OVERVIEW — agent-meta
+
+> Letzte Aktualisierung: 2026-05-23
+
+---
+
+## Inhaltsverzeichnis
+
+1. [SE-Agenten-Kaskade (neu)](#1-se-agenten-kaskade)
+2. [Agent-Templates (1-generic)](#2-agent-templates-1-generic)
+3. [Konfiguration](#3-konfiguration)
+4. [Schemas](#4-schemas)
+5. [Templates](#5-templates)
+6. [Howto-Dokumentation](#6-howto-dokumentation)
+7. [Scripts](#7-scripts)
+
+---
+
+## 1. SE-Agenten-Kaskade
+
+Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit 6 spezialisierten Agenten, die zusammen eine 6-stufige Black-Box → White-Box-Zerlegung koordinieren.
+
+### 1.1 `agents/1-generic/se-orchestrator.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch als Fraktal-Zellmaschine.
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-orchestrator
+version: 1.1.0
+description: "Coordinates the 6-level recursive breakdown."
+tools: [read_file, write_file, edit_file, glob, grep]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Initialization` | `(stakeholder_feature) → se-requirements` | Startet die Kaskade mit Stakeholder-Input |
+| `L1_Phase` | `(requirements) → se-architect → se-critic` | L1 Blackbox → Whitebox Definition + Verifikation |
+| `L2_Phase` | `(l1_whitebox) → se-architect → se-critic → se-interface-mgr` | L2 Zerlegung + Interface-Sicherung |
+| `L3_Phase` | `(l2_whitebox) → se-architect → se-critic → se-termination` | L3 Komponentendefinition + finaler Check + Abschluss |
+| `Cell_Spawn` | `(component, propagation_map) → new_cell(n+1)` | Spawn einer neuen Zelle für `decision: continue` Komponenten |
+| `Parallel_Execution` | `(cells[], max_parallel_cells) → results[]` | Parallele Ausführung unabhängiger Zellen |
+
+**Output-Struktur:**
+```json
+{
+  "orchestration_id": "ORCH-001",
+  "level": 1,
+  "status": "completed",
+  "cells_spawned": [...],
+  "leaf_components": [...],
+  "propagation_map_ref": "IFM-001",
+  "next_actions": ["await_cell_completion", "handover_to_disciplines"]
+}
+```
+
+**Kritische Regeln:**
+- **No Contamination:** Zelle n+1 darf nie auf Daten fremder Zellen zugreifen
+- **Deterministic Depth:** `max_depth` wird strikt eingehalten
+- **Idempotence:** Gleicher Input + gleiche Konfiguration = identische Zellsequenz
+- **Context Window Rule:** Zelle n+1 erhält nur Parent Black-Box (~500 Tokens) + relevante Interfaces (~300 Tokens)
+
+**Flows:**
+
+```
+Stakeholder Input → se-requirements → L1 Black-Box REQ
+                                      ↓
+                              se-architect (White-Box)
+                                      ↓
+                              se-critic (Quality Gate)
+                                      ↓
+                          se-interface-mgr (Verträge)
+                                      ↓
+                          se-termination (Leaf/Continue?)
+                           ↙              ↘
+                      Leaf Node        Neue Zelle (n+1)
+```
+
+---
+
+### 1.2 `agents/1-generic/se-requirements.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Nimmt Stakeholder-Bedürfnisse auf und erstellt formale L1-Blackbox-Anforderungen nach ISO/IEC 15288.
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-requirements
+version: 1.1.0
+description: "Elicits stakeholder needs and uses a 6-level template for requirements engineering."
+tools: [read_file, write_file, run_command, ask_question]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Elicit_Requirements` | `(unstructured_input) → structured_dialog` | Dialog mit User zur Klärung von Unklarheiten |
+| `Formulate_BB_Requirement` | `(need) → "The system shall X under Y with Z"` | Messbare Black-Box-Anforderung formulieren |
+| `Assign_REQ_ID` | `(requirement) → REQ-NNN` | Eindeutige ID vergeben (REQ-001, REQ-042, ...) |
+| `Assign_Domain` | `(requirement) → {system\|software\|hardware\|mechanics}` | Domänen-Tag aus kontrolliertem Vokabular |
+| `Capture_External_Interfaces` | `(requirement) → [{direction, type, description}]` | Externe Schnittstellen erfassen |
+| `Prioritize` | `(requirements[]) → ordered[mandatory, desired, optional]` | Priorisierung und Konfliktlösung |
+
+**Output-JSON-Schema:**
+```json
+{
+  "requirements": [{
+    "req_id": "REQ-001",
+    "statement": "The system shall heat 500ml of water to 90°C within 120 seconds.",
+    "domain": "system",
+    "priority": "mandatory",
+    "rationale": "Stakeholder Need: Hot water preparation",
+    "external_interfaces": [
+      {"direction": "input", "type": "physical", "description": "230V AC power supply"}
+    ]
+  }]
+}
+```
+
+**6-Level-Hierarchie:**
+1. Stakeholder Requirement (REQ-L1-SH)
+2. L1 System Blackbox
+3. L1 System Whitebox
+4. L2 System Blackbox
+5. L2 System Whitebox
+6. L3 Component Requirement
+
+---
+
+### 1.3 `agents/1-generic/se-architect.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Zerlegt Black-Box-Anforderungen in White-Box-Architektur nach INCOSE-Methodik (funktionale Dekomposition).
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-architect
+version: 1.1.0
+description: "Designs system architecture using generic laws, CQRS routing, and defines L1/L2 whiteboxes."
+tools: [read_file, write_file, run_command]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Analyze` | `(parent_requirement) → {functional, non-functional, constraints}` | Anforderung analysieren |
+| `Define_SubComponents` | `(blackbox) → sub_components[]` | Minimale Sub-Komponenten definieren |
+| `Assign_Domain` | `(sub_component) → {software\|hardware\|mechanics\|system}` | Domäne zuweisen |
+| `Define_Internal_Interfaces` | `(sub_components[]) → internal_interfaces[]` | Interne Schnittstellen zwischen Komponenten |
+| `Map_External_Interfaces` | `(external_ifaces, sub_components) → mapping` | Externe Interfaces Sub-Komponenten zuordnen |
+| `Derive_BB_Requirement` | `(sub_component) → black_box_requirement` | Neue Black-Box-REQ für nächste Ebene ableiten |
+| `Rationale` | `(decisions) → {chosen, rejected_alternative, reason}` | Architekturentscheidung begründen |
+
+**Kontext-Grenze (Strict):**
+- `parent_requirement`: Einzelne Black-Box-REQ (nicht der gesamte Baum)
+- `external_interfaces`: Vom Parent-Level diktiert
+- `system_domain`: `{system, software, hardware, mechanics}`
+- `neighbor_contracts`: Interface-Verträge vom Interface Manager
+- **MAX ~2k Tokens** — kein Zugriff auf höhere Level
+
+**Output-JSON-Schema:**
+```json
+{
+  "parent_req_id": "REQ-001",
+  "sub_components": [{
+    "id": "COMP-001-01",
+    "name": "Heating Element Controller",
+    "domain": "hardware",
+    "black_box_requirement": "...",
+    "assigned_external_interfaces": ["230V AC power supply"]
+  }],
+  "internal_interfaces": [{
+    "source_id": "COMP-001-02",
+    "target_id": "COMP-001-01",
+    "interface_type": "analog_signal",
+    "data_payload": "PWM control signal 0-100%, 5V logic level"
+  }],
+  "architectural_rationale": "...",
+  "decomposition_completeness": "..."
+}
+```
+
+**Architektur-Gesetze:**
+- Problem Space von Solution Space trennen
+- Orthogonalität (keine überlappenden Verantwortlichkeiten)
+- Strenge Traceability (jede Sub-Komponente → Parent-REQ)
+- Lose Kopplung, hohe Kohäsion
+- Minimalität: Komponente nur wenn nötig
+
+**Post-Decomposition-Handoff:**
+Architect → Critic (Quality Gate) → bei `approved` → Interface Manager + Termination
+
+---
+
+### 1.4 `agents/1-generic/se-critic.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Universeller Auditor und Quality Gate der System-Dekomposition (AutoGen Reflection Pattern).
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-critic
+version: 1.1.0
+description: "Audits architecture against generic laws (orthogonality, testability, traceability)."
+tools: [read_file, write_file, run_command]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Check_Completeness` | `(architect_output) → {passed: bool, issues: []}` | Vollständigkeitsprüfung |
+| `Check_Consistency` | `(architect_output) → {passed: bool, issues: []}` | Konsistenzprüfung |
+| `Check_Verifiability` | `(architect_output) → {passed: bool, issues: []}` | Testbarkeitsprüfung |
+| `Check_Traceability` | `(architect_output) → {passed: bool, issues: []}` | Traceability-Prüfung |
+| `Render_Verdict` | `(checks[]) → {approved\|rejected\|blocked}` | Bindinges Urteil fällen |
+| `Correction_Loop` | `(rejected, hints) → architect_retry` | Korrekturschleife (max. 3 Iterationen) |
+
+**Prüfkriterien im Detail:**
+
+| Check | Was wird geprüft |
+|-------|-----------------|
+| **Completeness** | Sub-Komponenten decken Parent-REQ vollständig ab? Alle externen Interfaces zugeordnet? Minimal? |
+| **Consistency** | Keine Widersprüche zwischen Komponenten? Interface-Typen kompatibel mit Payloads? Domänen sinnvoll? |
+| **Verifiability** | Jede abgeleitete BB-REQ messbar? Akzeptanzkriterien vorhanden? Binär verifizierbar? |
+| **Traceability** | Gültige IDs? `source_id`/`target_id` existieren? Rationale referenziert Parent? |
+
+**Entscheidungslogik:**
+- `approved` → Weiter an Interface Manager + Termination
+- `rejected` → Zurück an Architect mit `correction_hints` (max. 3 Iterationen)
+- `blocked` → Eskalation an Parent-Zelle (fundamentale Fehler)
+
+**Output-JSON-Schema:**
+```json
+{
+  "status": "approved",
+  "checks": {
+    "completeness": {"passed": true, "issues": []},
+    "consistency": {"passed": true, "issues": []},
+    "verifiability": {"passed": true, "issues": []},
+    "traceability": {"passed": true, "issues": []}
+  },
+  "correction_hints": [],
+  "iteration": 1,
+  "max_iterations": 3
+}
+```
+
+---
+
+### 1.5 `agents/1-generic/se-interface-mgr.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Zentrales Management und Validierung aller Interface-Verträge zwischen Systemelementen über Level und parallele Zweige hinweg.
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-interface-mgr
+version: 1.1.0
+description: "Manages generic signal flow and deterministic synchronization across systems."
+tools: [read_file, write_file, edit_file, glob, grep]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Register_Interface` | `(interface) → registry_entry` | Interface in zentrale Registry aufnehmen |
+| `Validate_Contracts` | `(new_interface, existing_registry) → {valid, conflicts}` | Gegen bestehende Verträge prüfen |
+| `Generate_Propagation_Map` | `(internal_interfaces, external_interfaces) → propagation_map` | Propagations-Map erzeugen |
+| `Generate_Interface_Spec` | `(component_id, propagation_map) → iface_spec` | Interface-Spec pro Sub-Komponente |
+
+**Propagations-Map (Zentraler Mechanismus):**
+```json
+{
+  "propagation_map": {
+    "COMP-001-01": {
+      "inherited_external": ["230V AC power supply"],
+      "new_internal_incoming": [],
+      "new_internal_outgoing": ["IF-001-01"]
+    }
+  }
+}
+```
+
+**Regeln:**
+- **Orthogonality:** Kein Zugriff ohne expliziten Contract
+- **Traceability:** Jedes Interface → L1/L2 Architekturelement
+- **Deterministic Synchronization (Rule 11):** Asynchrone Berechnung, kontrollierte synchrone Anwendung
+
+**Workflow:**
+1. `internal_interfaces` vom Architect + `external_interfaces` vom Parent empfangen
+2. Jedes Interface registrieren, IDs validieren, Typen klassifizieren
+3. Gegen bestehende Contracts aus parallelen Zweigen validieren
+4. Propagations-Bedarf identifizieren, Propagations-Map generieren
+5. Interface-Spec pro Sub-Komponente für nächste Ebene erzeugen
+
+---
+
+### 1.6 `agents/1-generic/se-termination.md`
+
+**Version:** 1.1.0
+**Beschreibung:** Deterministische Entscheidung pro Sub-Komponente: Leaf Node (fertig) oder neue Zelle (weiter zerlegen).
+
+**Exportierte API (Frontmatter):**
+```yaml
+name: se-termination
+version: 1.1.0
+description: "Deterministic termination at L3 (Component Requirement)."
+tools: [read_file, write_file, edit_file, glob, grep]
+```
+
+**Interne Funktionen / Zuständigkeiten:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `Leaf_Decision` | `(component) → {decision: "leaf", rationale}` | Leaf-Kriterien prüfen |
+| `Continue_Decision` | `(component) → {decision: "continue", rationale}` | Continue-Kriterien prüfen |
+| `Apply_Protection_Rules` | `(component, depth, cell_count) → forced_leaf?` | Schutzregeln anwenden |
+| `Generate_Summary` | `(decisions[]) → {total, leaf_nodes, continue_nodes, current_depth, max_depth}` | Terminierungs-Zusammenfassung |
+
+**Leaf-Kriterien (mindestens eines muss gelten):**
+- **Atomic Code Unit:** Als einzelne Funktion/Klasse/Modul implementierbar
+- **COTS:** Commercial Off-The-Shelf, kaufbar
+- **Exhausted Domain:** Keine sinnvolle weitere Zerlegung möglich
+- **Explicit Boundary:** Anforderung definiert Zukaufteil
+
+**Continue-Kriterien:**
+- Multiple unterscheidbare Sub-Tasks (>1 Verantwortung)
+- Komponente spannt mehrere Domänen auf
+- Komponente zu komplex für atomare Implementierung
+
+**Schutzregeln:**
+- `max_depth`: Leaf wenn current_depth >= Limit
+- `max_total_cells`: Leaf wenn Gesamtzellen >= Limit
+- **Circular Reference:** Leaf wenn Parent-ID-Kette Zyklus enthält
+
+**Harte Regel:** Kein L4 oder L5 — SE endet bei L3.
+
+**Output-JSON-Schema:**
+```json
+{
+  "termination_decisions": [
+    {"component_id": "COMP-001-01", "decision": "continue", "rationale": "..."},
+    {"component_id": "COMP-001-02", "decision": "leaf", "rationale": "..."}
+  ],
+  "termination_summary": {
+    "total": 3,
+    "leaf_nodes": 2,
+    "continue_nodes": 1,
+    "current_depth": 1,
+    "max_depth": 5
+  }
+}
+```
+
+---
+
+## 2. Agent-Templates (1-generic)
+
+### Nicht-SE Agenten (Bestand)
+
+| Datei | Version | Tools | Kurzbeschreibung |
+|-------|---------|-------|-----------------|
+| `orchestrator.md` | — | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben |
+| `developer.md` | — | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
+| `tester.md` | — | read, write, run_command | TDD, Test-Suite, Testabdeckung |
+| `validator.md` | — | read, run_command | Code gegen REQs prüfen, DoD-Check |
+| `documenter.md` | — | read, write, edit, glob, grep | CODEBASE_OVERVIEW, ARCHITECTURE, README |
+| `requirements.md` | — | read, write, run_command, ask_question | Anforderungen aufnehmen, REQ-IDs |
+| `git.md` | — | run_command | Commits, Branches, Tags, Push/Pull |
+| `release.md` | — | read, write, run_command | Versioning, Changelog, GitHub Release |
+| `ideation.md` | — | read, write, ask_question | Neue Ideen explorieren |
+| `feature.md` | — | read, write, edit, glob, grep | Feature-Lifecycle-Subagent |
+| `agent-meta-manager.md` | — | read, write, edit, glob, grep | agent-meta verwalten |
+| `agent-meta-scout.md` | — | read, write, glob, grep | Ökosystem scouten |
+| `security-auditor.md` | — | read, run_command | Sicherheits-Audit |
+| `docker.md` | — | run_command | Docker-Stack verwalten |
+| `meta-feedback.md` | — | read, write, run_command | Verbesserungsvorschläge als Issues |
+| `feedback.md` | — | read, write, run_command | Projekt-Feedback als Issues |
+| `log-analyzer.md` | — | read, write, run_command | Log-Analyse, Fehler-Clustering |
+
+---
+
+## 3. Konfiguration
+
+### `config/role-defaults.yaml`
+
+**SE-Rollen (neu, Zeilen 142-176):**
+
+| Rolle | Model | Memory | Workflow-Tier | Description |
+|-------|-------|--------|---------------|-------------|
+| `se-requirements` | balanced | project | optional | Stakeholder-Bedürfnisse → L1-Blackbox-REQ |
+| `se-architect` | powerful | project | optional | Blackbox → Whitebox (CQRS, Orthogonalität) |
+| `se-critic` | powerful | — | optional | Vollständigkeit, Konsistenz, Testbarkeit |
+| `se-interface-mgr` | balanced | project | optional | Schnittstellenverträge domänenübergreifend |
+| `se-termination` | fast | — | optional | L3-Component-Leaf-Node Entscheidung |
+| `se-orchestrator` | balanced | — | optional | 6-stufiger rekursiver SE-Herunterbruch |
+
+---
+
+## 4. Schemas
+
+### `schemas/se-decomposition.schema.json`
+
+**Version:** Draft-07 JSON Schema
+**Zweck:** Strukturiertes Output-Schema für generische L1-L3 Layer, CQRS-Events und SE-Agent-Konzept rekursive Zell-Outputs.
+
+**Top-Level Required Fields:**
+- `feature_id` (string) — Eindeutige Feature-ID
+- `stakeholder_requirement` (string) — Formalisierte Stakeholder-Anforderung
+- `l1_system` (object) — `{blackbox: string, whitebox: string[]}`
+- `l2_subsystems` (array) — `[{subsystem_id, blackbox, whitebox}]`
+- `l3_components` (array) — `[{component_id, description, refines}]`
+- `cqrs_interfaces` (object) — `{commands[], events[], queries[]}`
+
+**Optionale Felder (Agent-spezifisch):**
+
+| Feld | Agent | Typ | Beschreibung |
+|------|-------|-----|-------------|
+| `parent_req_id` | Architect | string | Parent-REQ-ID dieser Dekomposition |
+| `sub_components[]` | Architect | array | Sub-Komponenten mit ID, Name, Domain, BB-REQ |
+| `internal_interfaces[]` | Architect/IFM | array | Interne Interfaces (source, target, type, payload) |
+| `propagation_map` | IFM | object | Per-Component Interface-Mapping |
+| `architectural_rationale` | Architect | string | Begründung der Architekturentscheidungen |
+| `decomposition_completeness` | Architect | string | Vollständigkeitsbestätigung |
+| `termination_decisions[]` | Termination | array | Leaf/Continue pro Komponente |
+| `termination_summary` | Termination | object | Statistik (total, leaf, continue, depth) |
+| `critic_status` | Critic | object | Quality Gate (status, checks, hints, iteration) |
+
+**CQRS-Interface-Struktur:**
+- `commands[]` — `{name, source, target, payload}`
+- `events[]` — `{name, source, payload}`
+- `queries[]` — `{name, source, target, return_type}`
+
+**Definitionen:**
+- `checkResult` — `{passed: boolean, issues: string[]}`
+
+---
+
+## 5. Templates
+
+### `templates/SE-STRATEGY.template.md`
+
+**Version:** 1.0.0
+**Zweck:** Durable Anchor für SE-Projekte — definiert System-Ziel, Constraints, Scope, Stakeholder, Annahmen, Risiken und SE-Kaskaden-Konfiguration.
+
+**Platzhalter:**
+| Platzhalter | Zweck |
+|-------------|-------|
+| `{{PROJECT_NAME}}` | Projektname im Header |
+| `{{SYSTEM_GOAL}}` | Primäres Systemziel |
+| `{{SUCCESS_CRITERION_N}}` | Erfolgskriterien (1-3) |
+| `{{HARD_CONSTRAINT_N}}` / `{{IMPACT_N}}` | Harte Constraints |
+| `{{SOFT_CONSTRAINT_N}}` / `{{PRIORITY_N}}` | Weiche Constraints |
+| `{{STAKEHOLDER_N}}` / `{{INTEREST_N}}` / `{{INFLUENCE_N}}` | Stakeholder-Tabelle |
+| `{{IN_SCOPE_N}}` / `{{OUT_OF_SCOPE_N}}` / `{{BOUNDARY_N}}` | Scope-Definition |
+| `{{ASSUMPTION_N}}` / `{{RISK_IF_FALSE_N}}` | Annahmen mit Risiken |
+| `{{RISK_N}}` / `{{PROB_N}}` / `{{IMPACT_RISK_N}}` / `{{MITIGATION_N}}` | Risikotabelle |
+| `{{DATE}}` | Letztes Update-Datum |
+
+**SE-Kaskaden-Konfiguration (YAML-Block):**
+```yaml
+se-cascade:
+  max_depth: 5
+  max_total_cells: 20
+  max_critic_iterations: 3
+  max_parallel_cells: 4
+  cost_limit_eur: 5.00
+```
+
+**Traceability-Tabelle:** Verweist auf `docs/se/requirements.md`, `architecture.md`, `interface-registry.md`, `traceability-matrix.md`.
+
+---
+
+## 6. Howto-Dokumentation
+
+### `howto/se-workflow.md` (181 Zeilen)
+
+**Zweck:** Vollständiger Ablauf des fraktalen SE-Workflows mit Mermaid-Diagrammen, Rollenbeschreibungen, Rekursionsregeln und Konfiguration.
+
+**Inhalt:**
+- Grundprinzip der System-Zelle (Eingabe → Ablauf → Ausgabe)
+- Rekursiver Fluss (Mermaid-Diagramm)
+- 5 Rollen im Detail
+- Rekursion und Terminierung (Übergang n → n+1)
+- Parallelisierung (`max_parallel_cells`)
+- Artefakte pro Ebene (Tabelle)
+- Korrekturschleifen (approved/rejected/blocked)
+- Konfiguration in `.meta-config/project.yaml`
+
+### `howto/se-blackbox-to-whitebox.md` (154 Zeilen)
+
+**Zweck:** Erklärung des zentralen BB → WB-Übergangs mit 7-Schritte-Methode, Beispiel (Wassererhitzungssystem), Regeln und Critic-Checkliste.
+
+**Inhalt:**
+- Black-Box vs. White-Box Definition
+- 7 Schritte des Architects
+- Vollständiges Beispiel mit Mermaid-Diagramm
+- 6 Regeln für den Übergang
+- Häufige Fehler-Tabelle
+- Critic-Checkliste (8 Punkte)
+
+### `howto/se-interface-management.md` (190 Zeilen)
+
+**Zweck:** Detaillierte Erklärung des Interface-Managements mit Propagations-Map, Lifecycle, Vererbungsregeln und Fehlerbeispielen.
+
+**Inhalt:**
+- Warum ein eigener Agent?
+- 4 Aufgaben des Interface Managers
+- Interface-Lifecycle (Mermaid)
+- Propagations-Map mit vollständigem JSON-Beispiel
+- Interface-Vererbung (extern + intern)
+- 5 Validierungs-Regeln
+- Interface-Registry-Format
+- 3 Fehlerbeispiele (Spannung, Zuordnung, Drift)
+
+### `howto/se-mcp-adapters.md` (250 Zeilen)
+
+**Zweck:** MCP-Adapter-Konzept für Export von SE-Artefakten in externe Ticket-Systeme (Markdown, GitHub Issues, Jira, Linear, ReqIF).
+
+**Inhalt:**
+- Export-Architektur (JSON-Graph → Adapter)
+- Phasen-Roadmap (Phase 1-3)
+- Adapter-Schnittstelle (Python-Klasse)
+- Konfiguration für alle 5 Export-Typen
+- Mapping-Tabellen (GitHub Issues, Jira)
+- MCP-Server-Konfiguration (JSON)
+- Export-Workflow (Mermaid)
+- Sicherheit und Secrets
+
+---
+
+## 7. Scripts
+
+### `scripts/sync.py`
+
+**Zweck:** Generiert `.claude/agents/` aus Templates. Liest `config/role-defaults.yaml` für Modell-Konfiguration, Memory, Permission-Modes.
+
+**SE-Integration:** Die 6 SE-Rollen werden wie alle anderen Rollen generiert. `workflow_tier: optional` bedeutet sie werden nur generiert wenn in `project.yaml` unter `roles` aufgelistet.
+
+**Bekannte Flows:**
+1. `sync.py` liest alle Templates aus `agents/1-generic/`, `agents/2-platform/`, `agents/3-project/`
+2. Substitution der Platzhalter (`{{VAR}}`) aus `build_variables()`
+3. Composition-Auflösung (`extends:` + `patches:`)
+4. Output nach `.claude/agents/<rolle>.md`
+5. Rules und Hooks werden nach `.claude/rules/` und `.claude/hooks/` kopiert
+
+---
+
+*Ende der Bestandsaufnahme*
