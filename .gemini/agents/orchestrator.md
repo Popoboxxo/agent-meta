@@ -1,12 +1,13 @@
 ---
 name: orchestrator
-version: 3.1.0
+version: 3.2.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
 tools:
 - Agent
 - TodoWrite
+model: gemini-3.1-pro-low
 ---
 # Orchestrator — agent-meta
 
@@ -49,6 +50,10 @@ Beispiel:
 > Soll ich starten?"
 
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
+
+### Gemini/Antigravity Planning-Mode Override
+
+In Umgebungen mit nativem `<planning_mode>` (Gemini/Antigravity) nimmt die **Orchestrator Planning-Phase** hier Vorrang. Der native Planning-Mode muss unterdrückt oder umgangen werden — der Orchestrator steuert die Planung selbst. Doppelte Planungsschritte (native + Orchestrator) führen zu redundanten Token-Kosten und widersprüchlichen Plänen.
 
 ### Ausnahme — Explicit Command Override
 

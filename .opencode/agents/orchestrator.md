@@ -2,6 +2,7 @@
 name: orchestrator
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 mode: subagent
+model: opencode-go/qwen3.6-plus
 permission:
   task: allow
   todowrite: allow
@@ -47,6 +48,10 @@ Beispiel:
 > Soll ich starten?"
 
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
+
+### Gemini/Antigravity Planning-Mode Override
+
+In Umgebungen mit nativem `<planning_mode>` (Gemini/Antigravity) nimmt die **Orchestrator Planning-Phase** hier Vorrang. Der native Planning-Mode muss unterdrückt oder umgangen werden — der Orchestrator steuert die Planung selbst. Doppelte Planungsschritte (native + Orchestrator) führen zu redundanten Token-Kosten und widersprüchlichen Plänen.
 
 ### Ausnahme — Explicit Command Override
 

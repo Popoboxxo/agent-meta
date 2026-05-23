@@ -30,7 +30,7 @@
 roles:
 
   orchestrator:
-    model: ""           # erbt vom Kontext — Entry-Point, User entscheidet
+    model: "balanced"     # Routing/Delegation braucht Reasoning; balanced ist der richtige Kompromiss
     memory: ""
     workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
