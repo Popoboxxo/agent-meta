@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.51.0] — 2026-05-24
+
+### Fixed
+
+- **Provider-agnostic approach for generic templates**: Corrected orchestrator model handling to ensure 1-generic templates remain provider-agnostic. The generic orchestrator no longer references provider-specific model IDs. (#208)
+
+### Added
+
+- **Planning-Mode section in orchestrator**: Added explicit planning-mode guidance for providers that support native planning (Gemini, Opencode), ensuring the orchestrator's planning phase takes precedence over provider-native planning. (#208)
+- **Gemini Auto-Handoff protocol**: Gemini orchestrator now supports the same auto-handoff pattern as other providers, with explicit planning-mode override instructions. (#208)
+- **New policy rule for generic templates**: Formalized the provider-agnostic policy as a standalone rule, preventing provider names, tool syntax, and API details from leaking into 1-generic templates. (#208)
+
+### Changed
+
+- Various minor corrections and clarifications across agent templates and rules. (#208)
+
+---
+
 ## [0.49.0] — 2026-05-22
 
 ### Changed
