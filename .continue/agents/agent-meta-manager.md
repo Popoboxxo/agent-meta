@@ -234,6 +234,38 @@ der richtige Weg — nicht alles in CLAUDE.md packen).
 - NIE in den managed block von CLAUDE.md schreiben
 - Bei Multi-Tool-Teams (Cursor, OpenAI, etc.): auf Symlink-Strategie hinweisen — `AGENTS.md` ↔ `CLAUDE.md` Symlink, nicht zwei separate Dateien pflegen
 
+---
+
+## 11. Systems Engineering (SE) Kaskade konfigurieren
+
+Wenn der Nutzer wünscht, das SE-Framework für sein Projekt zu aktivieren oder anzupassen, so konfiguriere dies in der `.meta-config/project.yaml`. 
+Erkläre dem Nutzer zuvor, dass dies folgende Struktur in der YAML-Datei voraussetzt:
+
+```yaml
+roles:
+  # SE-Agenten aktivieren
+  - se-orchestrator
+  - se-requirements
+  - se-architect
+  - se-critic
+  - se-interface-mgr
+  - se-termination
+
+variables:
+  # Rekursionstiefe und Zellen-Limits definieren
+  SE_MAX_DEPTH: 5
+  SE_MAX_CELLS: 20
+  SE_MAX_CRITIC_ITERATIONS: 3
+  SE_MAX_PARALLEL_CELLS: 4
+
+se-export:
+  # Export-Format (aktuell: markdown, künftig github_issues, jira etc.)
+  type: markdown
+  output_dir: docs/se
+```
+
+- **Bestätigungspflicht:** Hole Dir vor dem Einfügen oder Anpassen zwingend das Einverständnis des Nutzers. Erkläre dabei kurz, was die Variablen bedeuten (z.B. dass `SE_MAX_DEPTH` die Detailtiefe der Komponenten-Zerlegung begrenzt).
+
 ## Visualization Reporting (Pflicht-Anweisung)
 
 Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.

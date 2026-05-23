@@ -136,7 +136,7 @@ mindmap
 
 ### se-critic
 - **Tier:** optional
-- **Beschreibung:** Audits architecture against generic laws (orthogonality, testability, traceability).
+- **Beschreibung:** Audits requirements and architecture against generic laws (orthogonality, testability, traceability).
 - **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
 
 ### se-interface-mgr

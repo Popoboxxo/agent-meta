@@ -1,4 +1,4 @@
-description = "Test Orchestration"
+description = "Führt einen Orchestration-Dry-Run durch und validiert wichtige Funktionen."
 prompt = """
 # test-orchestration
 

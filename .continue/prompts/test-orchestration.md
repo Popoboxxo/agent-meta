@@ -1,3 +1,9 @@
+---
+description: Führt einen Orchestration-Dry-Run durch und validiert wichtige Funktionen.
+allowed-tools:
+  - Bash
+invokable: true
+---
 # test-orchestration
 
 Führt einen Orchestration-Dry-Run durch und validiert:

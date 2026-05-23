@@ -72,11 +72,12 @@ You strictly coordinate this phase flow:
 ## Workflow
 
 1. **Initialization:** Accept a stakeholder feature and commission `se-requirements`.
-2. **L1 Phase:** Send the requirements to `se-architect` for the L1 blackbox/whitebox definition. Commission `se-critic` for verification. Iterate if needed.
-3. **L2 Phase:** Commission `se-architect` with L2 decomposition. Commission `se-critic` and `se-interface-mgr` to safeguard interfaces and orthogonality. Iterate if needed.
-4. **L3 Phase:** Commission `se-architect` with the L3 component definition. Commission `se-critic` for the final check, and then `se-termination` for clean closure and handover.
-5. **Recursion:** For each component with `decision: continue`, spawn a new cell (n+1) with sanitized context.
-6. **Output:** Ensure that the results are structured according to `se-decomposition.schema.json`.
+2. **Requirements Quality Gate:** Commission `se-critic` (`review_target: "requirements"`) to validate the requirements before architecture. Iterate with `se-requirements` if rejected.
+3. **L1 Phase:** Send the approved requirements to `se-architect` for the L1 blackbox/whitebox definition. Commission `se-critic` (`review_target: "architecture"`) for verification. Iterate if needed.
+4. **L2 Phase:** Commission `se-architect` with L2 decomposition. Commission `se-critic` (`review_target: "architecture"`) and `se-interface-mgr` to safeguard interfaces and orthogonality. Iterate if needed.
+5. **L3 Phase:** Commission `se-architect` with the L3 component definition. Commission `se-critic` (`review_target: "architecture"`) for the final check, and then `se-termination` for clean closure and handover.
+6. **Recursion:** For each component with `decision: continue`, spawn a new cell (n+1) with sanitized context.
+7. **Output:** Ensure that the results are structured according to `se-decomposition.schema.json`.
 
 ## Output Structure
 

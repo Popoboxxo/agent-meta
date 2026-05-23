@@ -53,8 +53,6 @@ beim nächsten sync.py-Lauf. Daher:
 - Keine externen Python-Dependencies außer Stdlib
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
-- Platzhalter immer {{GROSS_MIT_UNTERSTRICH}}
-- Versionen in Frontmatter bei jeder inhaltlichen Änderung erhöhen
 
 
 ### Python (`scripts/lib/`)
