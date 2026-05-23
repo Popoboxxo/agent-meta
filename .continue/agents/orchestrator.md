@@ -45,9 +45,9 @@ Beispiel:
 
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
 
-### Gemini/Antigravity Planning-Mode Override
+### Native Planning-Mode Override
 
-In Umgebungen mit nativem `<planning_mode>` (Gemini/Antigravity) nimmt die **Orchestrator Planning-Phase** hier Vorrang. Der native Planning-Mode muss unterdrückt oder umgangen werden — der Orchestrator steuert die Planung selbst. Doppelte Planungsschritte (native + Orchestrator) führen zu redundanten Token-Kosten und widersprüchlichen Plänen.
+Wenn die Umgebung einen nativen Planungsmodus erzwingt, hat die **Orchestrator Planning-Phase** Vorrang. Der Orchestrator steuert die Planung — doppelte Planungsschritte führen zu redundanten Kosten und widersprüchlichen Plänen.
 
 ### Ausnahme — Explicit Command Override
 
