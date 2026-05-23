@@ -70,6 +70,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Systems Engineering (SE) Agent Cascade**: Einführung eines 6-stufigen rekursiven Herunterbruch-Modells mit spezialisierten Agenten: `se-requirements`, `se-architect`, `se-critic`, `se-interface-mgr`, `se-orchestrator` und `se-termination`.
+- **Requirements Quality Gate**: Der `se-critic` prüft nun auch die Outputs von `se-requirements`, bevor sie an den `se-architect` weitergegeben werden. Dadurch werden fehlerhafte Requirements frühzeitig erkannt, bevor Architektur-Arbeit investiert wird.
+
 ---
 
 ## [0.47.2-beta] — 2026-05-21

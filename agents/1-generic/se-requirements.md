@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.1.0
+version: 1.2.0
 description: Elicits stakeholder needs and uses a 6-level template for requirements engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
 tools:
@@ -91,3 +91,6 @@ Return your final output **only** as a JSON object matching the following schema
 - Requirements must be verifiable and testable (binary true/false or measurable metric).
 - Do not prescribe implementation details inside requirements.
 - Keep the JSON valid — no trailing commas, no comments inside the JSON block.
+
+## Post-Output Handoff
+After producing the JSON output, forward it to the `se-critic` agent (`review_target: "requirements"`) for quality-gate validation. Do not proceed to `se-architect` until the Critic returns `approved`. If the Critic returns `rejected`, iterate on the requirements using the provided `correction_hints`. If the Critic returns `blocked`, escalate to the `se-orchestrator` immediately.
