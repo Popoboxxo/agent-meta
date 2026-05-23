@@ -7,6 +7,7 @@ hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks u
 tools:
 - Agent
 - TodoWrite
+model: gemini-3.1-pro-low
 ---
 # Orchestrator — agent-meta
 
@@ -49,6 +50,10 @@ Beispiel:
 > Soll ich starten?"
 
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
+
+### Native Planning-Mode Override
+
+Wenn die Umgebung einen nativen Planungsmodus erzwingt, hat die **Orchestrator Planning-Phase** Vorrang. Der Orchestrator steuert die Planung — doppelte Planungsschritte führen zu redundanten Kosten und widersprüchlichen Plänen.
 
 ### Ausnahme — Explicit Command Override
 

@@ -72,6 +72,7 @@ providers:
     pending_tasks_file: .gemini/pending-tasks.md
     extension_dir: .gemini/3-project
     orchestrator_hint: "- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
+    planning_mode_hint: "Gemini's `<planning_mode>` hat Vorrang. Wenn der Orchestrator aktiv ist, unterdrückt die Orchestrator-Planning-Phase den nativen Mode. Doppelte Planung vermeiden."
     model-tiers:
       nano:     gemini-3.5-flash-medium     # ultra-fast, low-cost tasks
       fast:     gemini-3.5-flash-high       # quick ops: git, formatting

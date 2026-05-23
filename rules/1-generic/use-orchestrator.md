@@ -123,7 +123,12 @@ Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer au
 
 Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:
 1. **Kein Redirection-Text:** Gib NIEMALS eine Textnachricht aus, die den Nutzer bittet, den Orchestrator manuell aufzurufen.
-2. **Tool-Pflicht:** Nutze die für deinen Provider verfügbare Methodik ({{ORCHESTRATOR_INVOCATION_HINT}}), um den Orchestrator lautlos zu starten und ihm den Auftrag (inkl. deiner Kontext-Erkenntnisse) zu übergeben.
+2. **Tool-Pflicht:** Nutze die für deinen Provider verfügbare Methodik:
+
+   **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
+
+   **In Gemini (VS Code / Antigravity):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
+   Achte darauf, dass der native `<planning_mode>` von Gemini unterdrückt wird — die Orchestrator-Planning-Phase hat Vorrang (siehe orchestrator.md).
 
 ## Hauptchat ohne Orchestrator (Fallback)
 

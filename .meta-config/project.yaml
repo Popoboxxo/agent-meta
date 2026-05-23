@@ -44,6 +44,10 @@ roles:
   - se-termination
   - se-orchestrator
 
+# Architektur-Policy: Generische Agenten muessen provider-agnostisch bleiben.
+# Siehe rules/1-generic/provider-agnostic.md — Provider-Namen, Tool-Syntax und
+# API-Details duerfen NIE in 1-generic/ stehen. Provider-Spezifika gehoehren
+# in 2-platform/ oder werden vom Sync-Prozess generiert.
 project:
   name: agent-meta
   prefix: am
@@ -162,8 +166,7 @@ variables:
   ORCHESTRATOR_STRICT: true
   UNKNOWN_FALLBACK_META_FEEDBACK: true
   UNKNOWN_FALLBACK_MAIN_CHAT: true
-  UNKNOWN_FALLBACK_ASK_USER: false
-  PLUGIN_DIR_NAME: sharkord
+  UNKNOWN_FALLBACK_ASK_USER: false 
 
   REQUIRED_BINARY_NAMES: "(keine)"
   BUILD_SYSTEM_NOTES: >-

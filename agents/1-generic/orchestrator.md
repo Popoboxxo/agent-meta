@@ -62,6 +62,10 @@ Beispiel:
 
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
 
+### Native Planning-Mode Override
+
+Wenn die Umgebung einen nativen Planungsmodus erzwingt, hat die **Orchestrator Planning-Phase** Vorrang. Der Orchestrator steuert die Planung — doppelte Planungsschritte führen zu redundanten Kosten und widersprüchlichen Plänen.
+
 ### Ausnahme — Explicit Command Override
 
 Wenn der User die Ausführung explizit und unmissverständlich befiehlt (z.B. mit Ausdrücken wie "do this now", "execute immediately", "führe das sofort aus", "mach das jetzt", "ohne Umschweife", "leg direkt los"), darf die **Planning-Phase übersprungen** und die Aufgabe direkt delegiert werden.
