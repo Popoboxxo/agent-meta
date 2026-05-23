@@ -170,6 +170,14 @@ variables:
     sync.py generiert .claude/agents/ im Zielprojekt —
     kein Build-Artifact im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: Keine Dist. Releases sind Git-Tags auf main.
+  SE_MAX_DEPTH: 5
+  SE_MAX_CELLS: 20
+  SE_MAX_CRITIC_ITERATIONS: 3
+  SE_MAX_PARALLEL_CELLS: 4
+
+se-export:
+  type: markdown
+  output_dir: docs/se
 
 max-parallel-agents: 4
 
