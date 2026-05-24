@@ -1,13 +1,25 @@
 ---
 name: bug-feature-analyzer
-description: "Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares Feature, Out-of-Scope."
+version: 1.0.0
+description: 'Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests
+  vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares
+  Feature, Out-of-Scope.'
+hint: 'Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren
+  — vor developer/feature-Delegation'
+tools:
+- Read
+- Glob
+- Grep
+- Bash
+- Agent
+- TodoWrite
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:
-  bash: allow
+  read: allow
   glob: allow
   grep: allow
-  read: allow
+  bash: allow
   task: allow
   todowrite: allow
 ---

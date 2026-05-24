@@ -1,8 +1,18 @@
 ---
 name: se-interface-mgr
-description: "Manages generic signal flow and deterministic synchronization across systems."
+version: 1.1.0
+description: Manages generic signal flow and deterministic synchronization across
+  systems.
+hint: Manages generic signal flow, deterministic sync across systems
+tools:
+- read_file
+- write_file
+- edit_file
+- glob
+- grep
 mode: subagent
 model: opencode-go/qwen3.6-plus
+memory: project
 ---
 # Interface Manager Agent (SE)
 

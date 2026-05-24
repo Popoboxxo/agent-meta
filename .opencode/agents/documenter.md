@@ -1,13 +1,23 @@
 ---
 name: documenter
-description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
+version: 1.3.3
+description: Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
+hint: 'Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse'
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 mode: subagent
 model: opencode-go/deepseek-v4-flash
+memory: project
 permission:
+  read: allow
   edit: allow
   glob: allow
   grep: allow
-  read: allow
   todowrite: allow
 ---
 # Documenter — agent-meta

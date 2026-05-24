@@ -1,13 +1,21 @@
 ---
 name: meta-feedback
-description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
+version: 2.0.1
+description: Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues
+  einreichen.
+hint: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
+tools:
+- Bash
+- Read
+- WebFetch
+- TodoWrite
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow
-  todowrite: allow
   webfetch: allow
+  todowrite: allow
 ---
 # Meta-Feedback — agent-meta
 

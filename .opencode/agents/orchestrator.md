@@ -1,6 +1,12 @@
 ---
 name: orchestrator
-description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
+version: 3.5.0
+description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
+hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
+  parallel
+tools:
+- Agent
+- TodoWrite
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

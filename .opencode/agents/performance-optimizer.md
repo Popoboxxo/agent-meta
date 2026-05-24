@@ -1,6 +1,16 @@
 ---
 name: performance-optimizer
-description: "Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch Profiling-Daten, ohne funktionale Aenderungen."
+version: 1.0.0
+description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
+  Profiling-Daten, ohne funktionale Aenderungen.
+hint: Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung.
+tools:
+- read_file
+- write_file
+- edit_file
+- run_command
+- glob
+- grep
 mode: subagent
 model: opencode-go/kimi-k2.5
 ---

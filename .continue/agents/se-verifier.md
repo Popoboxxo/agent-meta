@@ -1,6 +1,18 @@
 ---
 name: se-verifier
-description: "Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems exactly fulfill architectural specifications and interfaces."
+version: 1.0.0
+description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
+  exactly fulfill architectural specifications and interfaces.
+hint: Use this agent to verify integrated systems against their specifications on
+  all architecture levels (L1 through Ln).
+tools:
+- read_file
+- run_command
+- glob
+- grep
+- write_file
+model: balanced
+memory: project
 alwaysApply: false
 ---
 # System-Prompt: se-verifier

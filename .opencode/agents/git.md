@@ -1,14 +1,24 @@
 ---
 name: git
-description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
+version: 2.2.1
+description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages
+  — plattformunabhängig (GitHub, GitLab, Gitea).'
+hint: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
+tools:
+- Bash
+- Read
+- Edit
+- Glob
+- Grep
+- TodoWrite
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
+  read: allow
   edit: allow
   glob: allow
   grep: allow
-  read: allow
   todowrite: allow
 ---
 # Git Agent — agent-meta

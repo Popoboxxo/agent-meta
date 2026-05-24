@@ -1,6 +1,15 @@
 ---
 name: se-integration-and-test-manager
-description: "V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und Traceability-Feedback über L1-Ln."
+version: 1.0.0
+description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
+  Traceability-Feedback über L1-Ln.'
+hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
+  Integrationsplanung.
+tools:
+- read_file
+- write_file
+- Agent
+- TodoWrite
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

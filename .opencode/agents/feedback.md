@@ -1,13 +1,24 @@
 ---
 name: feedback
-description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
+version: 1.1.0
+description: Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge
+  für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue
+  eingereicht.
+hint: 'Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert
+  einreichen — immer vor git'
+tools:
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
+  read: allow
   glob: allow
   grep: allow
-  read: allow
   todowrite: allow
 ---
 # Feedback — agent-meta

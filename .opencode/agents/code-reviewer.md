@@ -1,8 +1,19 @@
 ---
 name: code-reviewer
-description: "Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen und REQ-Traceability in Code-Pfaden."
+version: 1.0.0
+description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen
+  und REQ-Traceability in Code-Pfaden.'
+hint: Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit
+  (das macht validator).
+tools:
+- read_file
+- run_command
+- glob
+- grep
+- TodoWrite
 mode: subagent
 model: opencode-go/kimi-k2.5
+memory: project
 permission:
   todowrite: allow
 ---

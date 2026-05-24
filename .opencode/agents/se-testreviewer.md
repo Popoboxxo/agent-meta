@@ -1,6 +1,14 @@
 ---
 name: se-testreviewer
-description: "Audits the test strategy. Checks for edge cases, boundary value analysis, equivalence class errors, and flakiness."
+version: 1.0.0
+description: Audits the test strategy. Checks for edge cases, boundary value analysis,
+  equivalence class errors, and flakiness.
+hint: Use this agent to review and audit test models and integration test strategies
+  before execution.
+tools:
+- read_file
+- glob
+- grep
 mode: subagent
 model: opencode-go/kimi-k2.5
 ---

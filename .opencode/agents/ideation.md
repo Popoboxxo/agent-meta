@@ -1,16 +1,28 @@
 ---
 name: ideation
-description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
+version: 1.2.3
+description: Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt
+  Fragen, denkt Ecken, übergibt reife Ideen an Requirements.
+hint: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
+tools:
+- Read
+- Write
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- Agent
+- TodoWrite
 mode: subagent
 permission:
+  read: allow
   edit: allow
   glob: allow
   grep: allow
-  read: allow
-  task: allow
-  todowrite: allow
   webfetch: allow
   websearch: allow
+  task: allow
+  todowrite: allow
 ---
 # Ideation — agent-meta
 

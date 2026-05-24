@@ -1,6 +1,17 @@
 ---
 name: se-test-engineer
-description: "Develops MBSE test models and designs integration tests (interaction of multiple SW units). Right wing of the V-model."
+version: 1.0.0
+description: Develops MBSE test models and designs integration tests (interaction
+  of multiple SW units). Right wing of the V-model.
+hint: Use this agent to create model-based test models and integration test strategies
+  from architectural decompositions.
+tools:
+- read_file
+- write_file
+- edit
+- run_command
+- glob
+- grep
 mode: subagent
 model: opencode-go/qwen3.6-plus
 ---

@@ -1,6 +1,15 @@
 ---
 name: se-critic
-description: "Audits requirements and architecture against generic laws (orthogonality, testability, traceability)."
+version: 1.2.0
+description: Audits requirements and architecture against generic laws (orthogonality,
+  testability, traceability).
+hint: Use this agent to validate requirements before architecture, and audit architectural
+  decompositions.
+tools:
+- read_file
+- write_file
+- run_command
+model: powerful
 alwaysApply: false
 ---
 # System-Prompt: se-critic

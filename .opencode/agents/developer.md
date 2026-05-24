@@ -1,14 +1,29 @@
 ---
 name: developer
-description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface."
+version: 1.0.0
+description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
+  Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
+  Rollen-Anlegen-Prozess und Sync-Interface.'
+hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown,
+  YAML)
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Agent
+- TodoWrite
+based-on: 1-generic/developer.md@2.0.1
 mode: subagent
 model: opencode-go/kimi-k2.5
 permission:
   bash: allow
+  read: allow
   edit: allow
   glob: allow
   grep: allow
-  read: allow
   task: allow
   todowrite: allow
 ---

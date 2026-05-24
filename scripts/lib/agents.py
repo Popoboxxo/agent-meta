@@ -547,9 +547,11 @@ def sync_agents(
 ):
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
     from .config import substitute, strip_inactive_conditional_blocks
+    from .providers import load_providers_config
     from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
     from .skills import load_external_skills_config, _skill_is_active
 
+    provider_config = load_providers_config(agent_meta_root)
     CLAUDE_AGENTS_DIR = ".claude/agents"
     role_map = build_role_map(agent_meta_root)
     platforms = config.get("platforms", [])
@@ -607,7 +609,8 @@ def sync_agents(
         content = build_frontmatter(content, name, description,
                                     generated_from=generated_from)
 
-        model = resolve_model(role, config, agent_meta_root)
+        model = resolve_model(role, config, agent_meta_root,
+                              provider="Claude", provider_config=provider_config)
         content = inject_model_field(content, model)
         if model:
             model_src = "project override" if role in config.get("model-overrides", {}) else "meta default"
@@ -702,7 +705,7 @@ def sync_agents_for_provider(
     """
     from .config import substitute, strip_inactive_conditional_blocks
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, load_roles_config
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)
@@ -779,12 +782,40 @@ def sync_agents_for_provider(
         generated_from = f'{source_label}@{source_version}' if source_version else source_label
 
         if provider == 'Continue':
-            # Continue agents: minimal frontmatter (name + description only)
-            # alwaysApply: false — agent is invoked by name, not auto-loaded
-            fm = f"---\nname: {name}\ndescription: \"{description}\"\nalwaysApply: false\n---\n"
+            # Continue agents: preserve original frontmatter, inject model/memory, add alwaysApply
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config)
+            if not model:
+                # Continue has no model-tiers mapping; fall back to raw role-defaults value
+                roles_cfg = load_roles_config(agent_meta_root)
+                raw = roles_cfg["roles"].get(role, {}).get("model", "")
+                if raw:
+                    model = raw
+            content = inject_model_field(content, model)
+            if model:
+                po = config.get('model-overrides', {})
+                is_override = (role in po.get('Continue', {})) or (
+                    role in po and not isinstance(po.get(role), dict)
+                )
+                src = 'project override' if is_override else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+            memory = resolve_memory(role, config, agent_meta_root)
+            content = inject_memory_field(content, memory)
+            if memory:
+                src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+            permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+            content = inject_permission_mode_field(content, permission_mode)
+            if permission_mode:
+                src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+            content = _update_frontmatter_dict(content, {"alwaysApply": False})
             body = _strip_frontmatter(content)
             body = _strip_claude_specific_lines(body)
-            content = fm + body
+            fm_end = content.find('\n---', 3)
+            if fm_end != -1:
+                content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
         else:
             content = build_frontmatter(content, name, description, generated_from=generated_from)
 
@@ -862,8 +893,12 @@ def sync_agents_for_provider(
                     is_override = role in po.get('Opencode', {})
                     src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                memory = resolve_memory(role, config, agent_meta_root)
+                if memory:
+                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
                 content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, generated_from
+                    content, name, description, model, memory, generated_from
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1015,6 +1050,7 @@ def _transform_frontmatter_for_opencode(
     name: str,
     description: str,
     model: str,
+    memory: str,
     generated_from: str,
 ) -> str:
     """Build opencode-native agent frontmatter.
@@ -1024,6 +1060,7 @@ def _transform_frontmatter_for_opencode(
       description: "..."
       mode: subagent
       model: provider/model-id (optional)
+      memory: <scope> (optional)
       permission:             (mapped from template frontmatter tools)
         <key>: allow
     """
@@ -1031,21 +1068,46 @@ def _transform_frontmatter_for_opencode(
     body = _strip_claude_specific_lines(body)
 
     template_fm = _parse_frontmatter_yaml(content)
-    mode = template_fm.get("mode") or "subagent"
-    lines = [f'name: {name}', f'description: "{description}"', f'mode: {mode}']
+
+    # Preserve original fields and add/update opencode-specific ones
+    updates: dict = {
+        "name": name,
+        "description": description,
+        "mode": template_fm.get("mode") or "subagent",
+    }
     if model:
-        lines.append(f'model: {model}')
+        updates["model"] = model
+    if memory:
+        updates["memory"] = memory
 
     # Map template tools to opencode permission block
     template_tools = template_fm.get("tools")
     if isinstance(template_tools, list) and template_tools:
         perms = _map_claude_tools_to_opencode_permissions(template_tools)
         if perms:
-            lines.append("permission:")
-            for key in sorted(perms):
-                lines.append(f"  {key}: {perms[key]}")
+            updates["permission"] = perms
 
-    return '---\n' + '\n'.join(lines) + '\n---\n' + body
+    # Remove fields not used by opencode
+    removes = [
+        "generated-from",
+        "generated_from",
+        "permissionMode",
+        "alwaysApply",
+        "temperature",
+        "top_p",
+        "top_k",
+        "stop_sequences",
+        "max_output_tokens",
+    ]
+
+    content = _update_frontmatter_dict(content, updates, removes=removes)
+
+    # Replace body with stripped version
+    fm_end = content.find('\n---', 3)
+    if fm_end != -1:
+        content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+
+    return content
 
 
 def _strip_claude_specific_lines(content: str) -> str:

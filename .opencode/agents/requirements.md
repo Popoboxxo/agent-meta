@@ -1,13 +1,24 @@
 ---
 name: requirements
-description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
+version: 1.3.3
+description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und
+  Traceability prüfen.
+hint: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 mode: subagent
 model: opencode-go/qwen3.6-plus
+memory: project
 permission:
+  read: allow
   edit: allow
   glob: allow
   grep: allow
-  read: allow
   todowrite: allow
 ---
 # Requirements Engineer — agent-meta

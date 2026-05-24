@@ -1,6 +1,19 @@
 ---
 name: ui-ux-designer
-description: "Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente REQ-IDs zu."
+version: 1.0.0
+description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
+  REQ-IDs zu.
+hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
+  nicht, spezifiziert.
+tools:
+- read_file
+- write_file
+- edit_file
+- run_command
+- glob
+- grep
+model: balanced
+memory: project
 alwaysApply: false
 ---
 # UI/UX Designer — agent-meta

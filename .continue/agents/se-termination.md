@@ -1,6 +1,15 @@
 ---
 name: se-termination
-description: "Deterministic termination at L3 (Component Requirement)."
+version: 1.1.0
+description: Deterministic termination at L3 (Component Requirement).
+hint: Deterministic termination at L3 (Component Requirement)
+tools:
+- read_file
+- write_file
+- edit_file
+- glob
+- grep
+model: fast
 alwaysApply: false
 ---
 # Termination Agent (SE)
