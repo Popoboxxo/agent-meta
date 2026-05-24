@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: "1.0.0"
+version: "1.0.1"
 description: "CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability und Security-Best-Practices."
 hint: "Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben."
 tools:
@@ -148,7 +148,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: app
-          image: "{{CONTAINER_REGISTRY}}/{{PROJECT_NAME}}:{{IMAGE_TAG}}"
+          image: "{{%CONTAINER_REGISTRY%}}/{{PROJECT_NAME}}:{{%IMAGE_TAG%}}"
           resources:
             requests:
               cpu: "100m"

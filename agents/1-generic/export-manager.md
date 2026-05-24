@@ -1,6 +1,6 @@
 ---
 name: export-manager
-version: "1.0.0"
+version: "1.0.1"
 description: "Liest .meta-config/export.yaml und routet strukturierte JSON-Payloads der Fach-Agenten zum konfigurierten Target (markdown, confluence, jira-xray, etc.)."
 hint: "Verwende diesen Agenten fuer Export-Routing von strukturierten Daten zu konfigurierten Targets."
 tools:
@@ -50,7 +50,7 @@ export:
 
     confluence:
       enabled: false
-      space_key: "{{CONFLUENCE_SPACE}}"
+      space_key: "{{%CONFLUENCE_SPACE%}}"
       parent_page_id: ""
       api_url: "https://confluence.example.com/rest/api"
       credentials:
@@ -60,7 +60,7 @@ export:
 
     jira-xray:
       enabled: false
-      project_key: "{{JIRA_PROJECT}}"
+      project_key: "{{%JIRA_PROJECT%}}"
       api_url: "https://jira.example.com/rest/api"
       test_execution: true
       credentials:

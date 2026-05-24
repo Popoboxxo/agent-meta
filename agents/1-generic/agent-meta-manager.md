@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.7.0"
+version: "1.7.1"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -197,7 +197,7 @@ py .agent-meta/scripts/consistency-check.py --changed --json
 |---|---|
 | Frontmatter | version-bump bei Änderung, semver-Format, based-on für 2-platform, extends-Datei existiert, patch-Anchors lösen auf |
 | Cross-References | role-defaults vollständig, Orchestrator-Tabelle aktuell, CHANGELOG erwähnt neue Dateien |
-| Platzhalter | Bekannte Typos, unbekannte `{{VAR}}` |
+| Platzhalter | Bekannte Typos, unbekannte `{{%VAR%}}` |
 | Commands | allowed-tools ist Array, description vorhanden, $ARGUMENTS genutzt |
 
 **Wann ausführen:**
