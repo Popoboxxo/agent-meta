@@ -1,6 +1,6 @@
 ---
 name: template-feedback
-version: "1.0.0"
+version: "1.1.0"
 description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
 hint: "Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git"
 tools:
@@ -76,99 +76,99 @@ Frage / Klärungsbedarf (kein direktes Problem)?        → question
 
 ### `bug`
 ```
-## Beschreibung
-[Kurze Zusammenfassung des Problems]
+## Description
+[Brief summary of the problem]
 
-## Schritte zum Reproduzieren
+## Steps to Reproduce
 1.
 2.
 3.
 
-## Erwartetes Verhalten
-[Was sollte passieren?]
+## Expected Behavior
+[What should happen?]
 
-## Tatsächliches Verhalten
-[Was passiert stattdessen?]
+## Actual Behavior
+[What happens instead?]
 
-## Betroffene Dateien / Komponenten
+## Affected Files / Components
 -
 
-## Umgebung
-[Version, OS, relevante Config]
+## Environment
+[Version, OS, relevant config]
 
-## Zusätzlicher Kontext
-[Logs, Screenshots, Links]
+## Additional Context
+[Logs, screenshots, links]
 ```
 
 ### `feat`
 ```
 ## Problem / Motivation
-[Warum wird dieses Feature gebraucht?]
+[Why is this feature needed?]
 
-## Beschreibung der gewünschten Lösung
-[Was soll das Feature tun?]
+## Proposed Solution
+[What should the feature do?]
 
-## Alternativen (optional)
-[Andere Lösungsansätze die erwogen wurden]
+## Alternatives (optional)
+[Other approaches considered]
 
-## Betroffene Bereiche
+## Affected Areas
 -
 ```
 
 ### `improvement`
 ```
-## Aktuelles Verhalten
-[Wie funktioniert es heute?]
+## Current Behavior
+[How does it work today?]
 
-## Verbesserungsvorschlag
-[Was soll geändert werden und warum?]
+## Improvement Proposal
+[What should change and why?]
 
-## Erwarteter Nutzen
-[Schneller / einfacher / sicherer / etc.]
+## Expected Benefit
+[Faster / simpler / safer / etc.]
 
-## Betroffene Dateien / Komponenten
+## Affected Files / Components
 -
 ```
 
 ### `docs`
 ```
-## Betroffenes Dokument / Bereich
-[Datei, Abschnitt oder Seite]
+## Affected Document / Section
+[File, section, or page]
 
-## Was fehlt / ist veraltet?
-[Konkreter Abschnitt oder fehlende Information]
+## What is missing or outdated?
+[Specific section or missing information]
 
-## Erwarteter Inhalt
-[Was sollte dort stehen?]
+## Expected Content
+[What should be there?]
 ```
 
 ### `security`
 ```
-## Beschreibung
-[Was ist das potenzielle Sicherheitsproblem?]
+## Description
+[What is the potential security issue?]
 
-## Auswirkung
-[Was könnte ein Angreifer tun?]
+## Impact
+[What could an attacker do?]
 
-## Reproduzierbar?
-[ ] Ja — Schritte: ...
-[ ] Nein / Theoretisch
+## Reproducible?
+[ ] Yes — Steps: ...
+[ ] No / Theoretical
 
-## Betroffene Komponenten
+## Affected Components
 -
 
-## Empfohlene Maßnahme (optional)
+## Recommended Action (optional)
 ```
 
 ### `question`
 ```
-## Frage
-[Was ist unklar?]
+## Question
+[What is unclear?]
 
-## Kontext
-[Warum ist das relevant / was hast du bereits versucht?]
+## Context
+[Why is this relevant / what have you tried?]
 
-## Betroffener Bereich
+## Affected Area
 -
 ```
 
@@ -219,4 +219,5 @@ Bestätigung liegt beim aufrufenden Chat.
 ## Sprache
 
 - GitHub Issue-Titel → **immer Englisch**
-- GitHub Issue-Body → {{DOCS_LANGUAGE}}
+- GitHub Issue-Body → **immer Englisch** (externe Dokumentation)
+- Interne Notizen / Analyse → Deutsch

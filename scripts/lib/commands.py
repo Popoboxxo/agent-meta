@@ -60,8 +60,12 @@ def _add_frontmatter_field(content: str, field: str, value: str) -> str:
 def _md_to_toml(content: str, stem: str) -> str:
     """Convert a Claude-style .md command to a Gemini .toml command.
 
-    Extracts `description` from frontmatter and the body as `prompt`.
-    Replaces $ARGUMENTS with {{args}} (Gemini syntax).
+    Extracts description from frontmatter and the body as prompt.
+    Replaces $ARGUMENTS with double-brace args (Gemini syntax).
+
+    TOML escaping: basic multiline strings cannot contain 3+ consecutive
+    quotes. Triple quotes are split using backslash-newline which TOML
+    treats as whitespace continuation.
     """
     description = stem.replace("-", " ").replace("_", " ").title()
     body = content
@@ -78,8 +82,10 @@ def _md_to_toml(content: str, stem: str) -> str:
     body = body.replace("$ARGUMENTS", "{{args}}")
     body = body.strip()
 
-    # TOML multiline string
-    escaped = body.replace('"""', '\\"\\"\\"')
+    # TOML basic multiline strings cannot contain 3+ consecutive quotes.
+    # Split """ using backslash-newline (TOML whitespace continuation).
+    escaped = body.replace('"""', '"\n\\"""')
+
     return f'description = "{description}"\nprompt = """\n{escaped}\n"""\n'
 
 

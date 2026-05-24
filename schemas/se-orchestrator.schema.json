@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SE Orchestrator Output Schema",
+  "description": "Orchestration metadata output from the se-orchestrator agent. Intentionally separate from se-decomposition.schema.json which covers the decomposition data.",
+  "type": "object",
+  "required": [
+    "orchestration_id",
+    "level",
+    "status",
+    "propagation_map_ref",
+    "next_actions"
+  ],
+  "properties": {
+    "orchestration_id": {
+      "type": "string",
+      "description": "Unique identifier for this orchestration session (e.g., ORCH-001)."
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Current recursion level of the orchestration."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "completed", "blocked", "awaiting_input"],
+      "description": "Current status of the orchestration."
+    },
+    "cells_spawned": {
+      "type": "array",
+      "description": "List of child cells spawned for sub-component decomposition.",
+      "items": {
+        "type": "object",
+        "required": ["cell_id", "component_id", "level", "status", "decision"],
+        "properties": {
+          "cell_id": {
+            "type": "string",
+            "description": "Unique cell identifier (e.g., CELL-001-01)."
+          },
+          "component_id": {
+            "type": "string",
+            "description": "ID of the component being decomposed in this cell."
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Recursion level of this cell."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "blocked", "pending"],
+            "description": "Current status of this cell."
+          },
+          "decision": {
+            "type": "string",
+            "enum": ["continue", "leaf"],
+            "description": "Termination decision for this component."
+          },
+          "input_checksum": {
+            "type": "string",
+            "description": "SHA-256 checksum of the cell input for idempotence verification."
+          }
+        }
+      }
+    },
+    "leaf_components": {
+      "type": "array",
+      "description": "Components that reached leaf status and are ready for handover.",
+      "items": {
+        "type": "object",
+        "required": ["component_id", "level", "handover_ready"],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "description": "ID of the leaf component."
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Level at which this component became a leaf."
+          },
+          "handover_ready": {
+            "type": "boolean",
+            "description": "Whether the component is ready for handover to implementing disciplines."
+          },
+          "decomposition_ref": {
+            "type": "string",
+            "description": "Reference to the se-decomposition.schema.json output for this component."
+          }
+        }
+      }
+    },
+    "propagation_map_ref": {
+      "type": "string",
+      "description": "Reference to the interface propagation map (e.g., IFM-001)."
+    },
+    "traceability": {
+      "type": "object",
+      "description": "Zig-zag traceability links across decomposition levels.",
+      "properties": {
+        "forward_links": {
+          "type": "array",
+          "description": "Top-down allocation/derivation links.",
+          "items": { "type": "string" }
+        },
+        "backward_links": {
+          "type": "array",
+          "description": "Bottom-up satisfaction/trace links.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "vv_status": {
+      "type": "object",
+      "description": "Verification & Validation status across the V-model.",
+      "properties": {
+        "requirements_verified": {
+          "type": "boolean",
+          "description": "Whether requirements have passed critic verification."
+        },
+        "architecture_verified": {
+          "type": "boolean",
+          "description": "Whether architecture has passed critic verification."
+        },
+        "integration_test_planned": {
+          "type": "boolean",
+          "description": "Whether integration tests have been planned."
+        },
+        "system_validation_pending": {
+          "type": "boolean",
+          "description": "Whether L1 system validation (User Journeys) is still pending."
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "description": "Recommended next actions for the orchestrator.",
+      "items": { "type": "string" }
+    }
+  }
+}

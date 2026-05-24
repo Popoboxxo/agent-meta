@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.1.0"
+version: "3.2.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -55,7 +55,7 @@ Beispiel:
 > 2. Anforderung aufnehmen → requirements
 > 3. Tests schreiben → tester
 > 4. Implementierung → developer
-> 5. Validierung → validator
+> 5. Validierung → code-reviewer
 > 6. Commit + PR → git
 >
 > Soll ich starten?"
@@ -87,7 +87,7 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | Projekt-Dokumentation aktualisieren | `documenter` | `balanced` | Ja (Multi-Sections) | "Update README", "Architektur ändern" |
 | Anforderungen aufnehmen / REQ-ID vergeben | `requirements` | `balanced` | Nein (sequentiell) | "Dieses Feature braucht eine REQ-ID" |
 | Tests schreiben oder ausführen | `tester` | `balanced` | Ja (Multi-Test-Suites) | "Schreibe Tests dafür", "Test-Suite laufen lassen" |
-| Code validieren / DoD prüfen / Audit | `validator` | `balanced` | Nein (Abhängigkeiten) | "Prüfe ob das Feature fertig ist" |
+| Code validieren / DoD prüfen / Audit | `code-reviewer` (Clean Code) oder `validator` (DoD-Check, wenn aktiv) | `balanced` | Nein (Abhängigkeiten) | "Prüfe ob das Feature fertig ist" |
 | **Meta-Fragen** (Agent-Setup, Sync, Upgrade, Rules, Workflows, agent-meta Konfiguration) | `agent-meta-manager` | `fast` → `balanced` | Nein | "Wie upgrade ich agent-meta?", "Wie funktioniert der Sync?" |
 | Projekt-Feedback als GitHub Issue einreichen | `feedback` | `fast` | Nein | "Melde das als Bug" |
 | Log-Analyse / Fehler clustern | `log-analyzer` | `balanced` | Ja (Multi-Log-Quellen) | "Analysiere die Logs" |
@@ -166,7 +166,7 @@ BARRIER():
   Return a result array: [result_1, result_2, ..., result_N]
 ```
 
-### Provider Implementation (via {{PARALLEL_PATTERN}})
+### Provider Implementation
 
 {{PARALLEL_PATTERN}}
 
@@ -198,7 +198,7 @@ After BARRIER():
 > "Completed in parallel:
 > - [2/3] developer agents succeeded
 > - [1/3] developer needs clarification on [issue]
-> - validator: DoD check passed
+> - code-reviewer: DoD check passed
 >
 > Next step: [action]"
 
@@ -322,25 +322,6 @@ Forbidden: Self-execute (in strict mode when main-chat is disabled), guess, abor
 3. `strict=false` + `main-chat` → Main-Chat handles it
 4. `strict=false` + `meta-feedback` → Background feedback
 5. None enabled → Ask for clarification
-Step 1 — Analysis attempt (max. 1 clarifying question):
-  "I'm unsure: Do you mean [Option A] or [Option B]?"
-  OR: "Could you clarify?"
-  -> If user clarifies → normal Intent Routing
-
-Step 2 — If not clarified or 2+ attempts failed:
-  Check orchestrator mode:
-    - enabled=false → Main-Chat mode, execute yourself
-    - User-Override active → Main-Chat, execute yourself
-    - strict=true → Anonymize content → Delegate to meta-feedback
-    - strict=false → Main-Chat executes + Meta-Feedback in background
-    - unknown-fallback=ask-user → Ask user for preference
-
-Step 3 — After meta-feedback:
-  Inform user: "I couldn't categorize the request. I've sent an improvement
-   suggestion to the agent-meta team. Would you like to rephrase?"
-
-Forbidden: Self-execute (in strict mode), guess, abort.
-```
 
 ---
 
@@ -447,6 +428,7 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 | `agent-meta-manager` | agent-meta Upgrade, Sync, Extensions anlegen | ❌ (atomar) |
 | `agent-meta-scout` | KI-Ökosystem scouten — **nur auf explizite Anfrage** | ✅ (Multi-Quellen) |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* | ✅ (Multi-Suites) |
+| `code-reviewer` | Clean Code, Blast-Radius, SOLID/DRY — *wenn SE aktiv* | ✅ (Multi-Prüfungen) |
 | `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* | ❌ (Abhängigkeiten) |
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* | ❌ (sequentiell) |
 | `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren | ✅ (Multi-Quellen) |
@@ -466,7 +448,7 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 {{/if}}
 
 Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten für unabhängige Schritte (∥).
-Nicht parallel: tester↔developer, validator→git, requirements→tester.
+Nicht parallel: tester↔developer, code-reviewer→git, requirements→tester.
 
 {{PROJECT_SPECIFIC_AGENTS}}
 
@@ -481,7 +463,7 @@ Nicht parallel: tester↔developer, validator→git, requirements→tester.
 ```
 A  Neues Feature:   0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
 B  Bugfix:          0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
-C  Audit:           validator (Traceability + Qualitäts-Scan + Bericht)
+C  Audit:           code-reviewer (Traceability + Qualitäts-Scan + Bericht)
 D  Erkenntnisse:    documenter → docs/conclusions/
 E  Refactoring:     0.git  1.?req  2.dev  3.?test  4∥5.val+?doc  6.git
 F  Stack starten:   docker → starten + Startup-Display
@@ -502,7 +484,7 @@ R  Multi-Test:      FANOUT(N, tester, [test₁..testₙ]) → BARRIER
 S  Multi-Analyse:   FANOUT(N, ideation, [analyze₁..analyzeₙ]) → BARRIER → report
 T  Multi-Docs:      FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 {{#if SE_ENABLED}}
-U  SE-Kaskade:      se-orchestrator → koordiniert (se-requirements, se-architect, se-critic, se-interface-mgr, se-termination)
+U  SE-Kaskade:      se-orchestrator → koordiniert (se-requirements, se-architect, se-critic, se-interface-mgr, se-termination, se-validator, se-verifier, se-test-engineer)
 {{/if}}
 V  Code-Review:     code-reviewer → Blast-Radius + Clean-Code-Audit
 W  UI-Design:       ui-ux-designer → Mockups + UI-Spec → developer
