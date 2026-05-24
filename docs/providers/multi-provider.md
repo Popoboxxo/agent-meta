@@ -121,7 +121,7 @@ Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
 
 ### `CLAUDE.md` (Claude)
 
-- Einmalig angelegt via `howto/CLAUDE.project-template.md` (bei `--init`)
+- Einmalig angelegt via `howto/configs/CLAUDE.project-template.md` (bei `--init`)
 - Managed block (`<!-- agent-meta:managed-begin/end -->`) wird bei **jedem sync** aktualisiert
 - Rest der Datei: manuell gepflegt, wird nie überschrieben
 
