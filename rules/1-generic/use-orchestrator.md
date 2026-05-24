@@ -122,13 +122,12 @@ Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer au
 ### Technische Durchsetzung auf LLM-Ebene
 
 Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:
+
 1. **Kein Redirection-Text:** Gib NIEMALS eine Textnachricht aus, die den Nutzer bittet, den Orchestrator manuell aufzurufen.
-2. **Tool-Pflicht:** Nutze die für deinen Provider verfügbare Methodik:
+2. **Native Tool-Calls priorisieren (PRIMAER):** Verwende IMMER zuerst den nativen Subagent-Dispatch-Mechanismus deiner Umgebung. Das ist das Tool-Call-Interface das Subagenten als strukturierte Aufrufe invoziert (kein reiner Text). Dies ist die bevorzugte und zuverlaessigste Methode — sie funktioniert in allen Umgebungen mit nativer Subagent-Unterstuetzung.
+3. **Text-basierter Fallback (SEKUNDAER):** Nur wenn die Umgebung KEIN natives Subagent-Tool-Call-Interface bereitstellt, verwende den textbasierten Trigger `@orchestrator <Aufgabe>` im Chat als Fallback. Dieser Mechanismus wird von einigen Frontends geparst, ist aber nicht zuverlaessig in Umgebungen mit nativen Tool-Calls.
 
-   **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
-
-   **In Gemini (VS Code / Antigravity):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
-   Achte darauf, dass der native `<planning_mode>` von Gemini unterdrückt wird — die Orchestrator-Planning-Phase hat Vorrang (siehe orchestrator.md).
+**Entscheidungsregel:** Native Umgebung mit Subagent-Tool? → Native Tool-Calls verwenden. Nur reines Text-Chat-Frontend? → `@orchestrator` Fallback.
 
 ## Hauptchat ohne Orchestrator (Fallback)
 
