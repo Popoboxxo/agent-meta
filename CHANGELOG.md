@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.53.1] — 2026-05-25
+
+### Fixed
+
+- **Regenerate all generated files** after orchestrator entry-point sentence fix (PR #231, commit 0225e0e). The fix adds an explicit exceptions reference to the orchestrator entry-point hint to prevent over-delegation for trivial non-development queries.
+
+---
+
 ## [0.53.0] — 2026-05-24
 
 ### Added
