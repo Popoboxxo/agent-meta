@@ -43,7 +43,8 @@ agent-meta/
   external/          ← Git Submodule (externe Skill-Repos via --add-skill)
   howto/
     sync-concept.md  ← dieses Dokument
-    CLAUDE.project-template.md
+    configs/
+      CLAUDE.project-template.md
 ```
 
 ### Im Projekt-Repository

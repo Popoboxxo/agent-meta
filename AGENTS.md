@@ -573,12 +573,32 @@ erfasst nur `[A-Z0-9_]+`.
 
 ## Wenn du eine neue Agenten-Rolle hinzufügst
 
-Pflichtschritte — alle vier, sonst ist die Rolle unvollständig:
+Pflichtschritte — manuell zu pflegen (die anderen Artefakte werden automatisch generiert):
+
+### Manuell (Pflicht)
 
 1. `agents/1-generic/<rolle>.md` anlegen (mit Frontmatter: `name`, `version`, `description`, `hint`, `tools`)
 2. Eintrag in `config/role-defaults.yaml` (model, memory, permissionMode, tier)
-3. Agenten-Tabelle und Hints-Tabelle in `CLAUDE.md` ergänzen
-4. `howto/setup/instantiate-project.md` und `howto/CLAUDE.project-template.md` ergänzen
+3. `howto/setup/instantiate-project.md` ergänzen (Agent-Tabelle und Hints)
+
+### Automatisch via `sync.py` — NIE manuell editieren
+
+Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/aktualisiert:
+
+| Artefakt | Quelle | Hinweis |
+|----------|--------|---------|
+| `CLAUDE.md` (managed block) | `agents/` + `config/role-defaults.yaml` | Agent-Tabelle, Hints, Rules-Referenzen |
+| `AGENTS.md` (managed block) | `agents/` + `config/role-defaults.yaml` | Gleiche Quelle wie CLAUDE.md |
+| `GEMINI.md` | `agents/` + `config/role-defaults.yaml` | Plattform-spezifische Generierung |
+| `.continue/config.yaml` | `agents/` + `config/role-defaults.yaml` | Continue-Plattform |
+| `.*/agents/*.md` | `agents/1-generic/`, `2-platform/`, `3-project/` | Generierte Agenten-Dateien |
+| `docs/agent-graph.html` | `agents/` + Delegation-Map | Visualisierung |
+| `docs/agent-mindmap.md` | `agents/` + Delegation-Map | Mindmap |
+| `.claude/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
+| `.gemini/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
+| `.continue/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
+
+**Merksatz:** Nur `1-generic/<rolle>.md`, `config/role-defaults.yaml` und `howto/setup/instantiate-project.md` sind manuell zu pflegen. Alles andere → `sync.py` ausführen.
 
 ## Wenn du einen neuen Platzhalter einführst
 
