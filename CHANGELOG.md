@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.53.0] — 2026-05-24
+
+### Added
+
+- **`bug-feature-analyzer` agent**: New agent for automated GitHub issue triage and feature analysis. (#219)
+
+### Fixed
+
+- **Orchestrator self-execution guard**: Prevented orchestrator from executing worker tasks directly, enforcing proper delegation protocol.
+
+---
+
 ## [0.52.1] — 2026-05-24
 
 ### Fixed
