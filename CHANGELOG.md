@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.52.1] — 2026-05-24
+
+### Fixed
+
+- **TOML escaping for Gemini /commands**: Fixed triple-quote escaping in `_md_to_toml()` to prevent invalid TOML when command bodies contain `"""`. (#206)
+- **Orchestrator validator references**: Made `validator` agent references in orchestrator template conditional via `{{#if VALIDATOR_ENABLED}}`, preventing routing to non-existent agents in projects without `validator` in roles. (#204)
+- **Inline conditional block preservation**: Fixed `strip_inactive_conditional_blocks()` to preserve inline table rows (no trailing newline) when stripping inactive `{{#if}}` blocks, preventing broken Markdown tables. (#196)
+- **SE orchestrator schema**: Added `schemas/se-orchestrator.schema.json` for orchestration metadata validation. (#195)
+
+### Changed
+
+- **Orchestrator version**: 3.2.0 → 3.3.0 (conditional validator blocks = scope extension)
+
+---
+
 ## [0.52.0] — 2026-05-24
 
 ### Added
