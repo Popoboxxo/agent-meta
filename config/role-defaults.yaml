@@ -133,6 +133,12 @@ roles:
     workflow_tier: required
     description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
 
+  bug-feature-analyzer:
+    model: balanced
+    memory: ""
+    workflow_tier: recommended
+    description: "Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation"
+
   openscad-developer:
     model: balanced
     memory: local

@@ -73,6 +73,7 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | Code validieren / DoD prüfen / Audit | `code-reviewer` (Clean Code) | `balanced` | Nein (Abhängigkeiten) | "Prüfe ob das Feature fertig ist" |
 | **Meta-Fragen** (Agent-Setup, Sync, Upgrade, Rules, Workflows, agent-meta Konfiguration) | `agent-meta-manager` | `fast` → `balanced` | Nein | "Wie upgrade ich agent-meta?", "Wie funktioniert der Sync?" |
 | Projekt-Feedback als GitHub Issue einreichen | `feedback` | `fast` | Nein | "Melde das als Bug" |
+| **Bug-Meldung / Feature-Request triagieren** | `bug-feature-analyzer` | `balanced` | Ja (Multi-Issues) | "Ist das ein Bug oder Feature?", "Klassifiziere diese Meldung" |
 | Log-Analyse / Fehler clustern | `log-analyzer` | `balanced` | Ja (Multi-Log-Quellen) | "Analysiere die Logs" |
 | Release erstellen / Version bump | `release` | `balanced` | Nein (sequentiell) | "Erstelle Release v1.2.0" |
 | **Systems Engineering / SE-Kaskade** | `se-orchestrator` | `balanced` → `powerful` | Nein (Orchestrator) | "Starte den SE-Prozess", "Breche Anforderungen herunter" |
@@ -419,6 +420,7 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* | ❌ (sequentiell) |
 | `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren | ✅ (Multi-Quellen) |
 | `feedback` | Bug/Feature/Verbesserung als GitHub Issue einreichen — **immer vor `git` für Issues** | ❌ (atomar) |
+| `bug-feature-analyzer` | Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope — **vor developer/feature-Delegation** | ✅ (Multi-Issues) |
 | `se-orchestrator` | Koordiniert den 6-stufigen Systems-Engineering-Herunterbruch | ❌ (Meta-Orchestrator) |
 | `se-requirements`| Nimmt Stakeholder-Bedürfnisse auf (L1-Blackbox) | ❌ (sequentiell) |
 | `se-architect`   | Zerlegt Blackboxes in Whiteboxes nach Architekturgesetzen | ✅ (Multi-Systeme) |
@@ -463,6 +465,7 @@ N  Skill-Repo:      → lies .agent-meta/agents/1-generic/_wf-scout.md
 K  Meta-Feedback:   → lies .agent-meta/agents/1-generic/_wf-feedback.md
 O  Log-Analyse:     log-analyzer (--quick Standard | --deep für Tiefenanalyse)
 P  Projekt-Issue:   feedback → Issue aufbereiten + gh issue create (nie direkt git für Issues)
+J  Issue-Triage:    bug-feature-analyzer → Klassifizierung → je nach Ergebnis: developer | requirements | User-Antwort | Ablehnung
 Q  Multi-Fix:       FANOUT(N, developer, [fix₁..fixₙ]) → BARRIER → git
 R  Multi-Test:      FANOUT(N, tester, [test₁..testₙ]) → BARRIER
 S  Multi-Analyse:   FANOUT(N, ideation, [analyze₁..analyzeₙ]) → BARRIER → report
