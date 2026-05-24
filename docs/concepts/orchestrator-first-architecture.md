@@ -609,7 +609,7 @@ skills:
 Generiert von agent-meta v0.46.2 — 2026-05-21
 DoD-Preset: rapid-prototyping | REQ-Traceability: false | Tests: false | ...
 
-> Einstiegspunkt: Starte mit dem orchestrator-Agenten für alle Entwicklungsaufgaben.
+> Einstiegspunkt: Starte mit dem orchestrator-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
 | Agent | Zuständigkeit |
 |-------|--------------|

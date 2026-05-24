@@ -267,5 +267,5 @@ Checkliste:
 - [ ] Bei `"Continue"`: `.continue/rules/project-context.md` vorhanden
 - [ ] Committed
 
-**Nächster Schritt:** Starte mit dem `orchestrator`-Agenten in Claude Code:
+**Nächster Schritt:** Starte mit dem `orchestrator`-Agenten in Claude Code (Ausnahmen siehe »Orchestrator — Universal Router«):
 `> Use orchestrator`
