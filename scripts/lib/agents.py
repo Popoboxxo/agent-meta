@@ -1089,7 +1089,7 @@ def build_agent_hints(config: dict, agent_meta_root: Path) -> str:
     )
     if has_orchestrator:
         lines.append(
-            "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben."
+            "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
         )
         lines.append("")
 
