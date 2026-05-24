@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.52.0] — 2026-05-24
+
+### Added
+
+- **11 new agent templates**: Complete SE right-wing (se-test-engineer, se-testreviewer, se-verifier, se-validator, se-integration-and-test-manager) and SWE agents (code-reviewer, ui-ux-designer, api-specialist, devops-engineer, performance-optimizer, export-manager). (#209)
+- **Manual test framework**: Generic black-box test procedure with 15 scenarios (5 SE + 10 meta-agent), including `--dry-run` support, provider detection, auto-generated bug reports, and target-repository testing. (#209)
+- **Export configuration**: New `config/export.yaml` for target-agnostic output routing (Markdown, Confluence, Jira-Xray). (#209)
+- **Lifecycle hooks integration**: `se-validator` triggered on-release, `code-reviewer` on-merge. (#209)
+- **Placeholder skills registry**: Future skill placeholders for mermaid-renderer, figma-reader, postman-collection-generator. (#209)
+
+### Changed
+
+- **Orchestrator routing table**: Extended with all 11 new agents and V&V workflows. (#209)
+- **Validator/tester templates**: Refocused validator as process guardian, tester as isolated unit-test writer. (#209)
+- **Role defaults**: Added 11 new roles with appropriate model tiers (balanced/powerful/fast). (#209)
+- **Project config**: Activated all new SE and V&V roles. (#209)
+- **Test restructure**: Moved automated tests to `tests/automated/`, manual tests to `tests/manual/`. (#209)
+
+---
+
 ## [0.51.0] — 2026-05-24
 
 ### Fixed
