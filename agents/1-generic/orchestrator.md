@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.2.0"
+version: "3.3.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -87,7 +87,7 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | Projekt-Dokumentation aktualisieren | `documenter` | `balanced` | Ja (Multi-Sections) | "Update README", "Architektur ändern" |
 | Anforderungen aufnehmen / REQ-ID vergeben | `requirements` | `balanced` | Nein (sequentiell) | "Dieses Feature braucht eine REQ-ID" |
 | Tests schreiben oder ausführen | `tester` | `balanced` | Ja (Multi-Test-Suites) | "Schreibe Tests dafür", "Test-Suite laufen lassen" |
-| Code validieren / DoD prüfen / Audit | `code-reviewer` (Clean Code) oder `validator` (DoD-Check, wenn aktiv) | `balanced` | Nein (Abhängigkeiten) | "Prüfe ob das Feature fertig ist" |
+| Code validieren / DoD prüfen / Audit | `code-reviewer` (Clean Code){{#if VALIDATOR_ENABLED}} oder `validator` (DoD-Check, wenn aktiv){{/if}} | `balanced` | Nein (Abhängigkeiten) | "Prüfe ob das Feature fertig ist" |
 | **Meta-Fragen** (Agent-Setup, Sync, Upgrade, Rules, Workflows, agent-meta Konfiguration) | `agent-meta-manager` | `fast` → `balanced` | Nein | "Wie upgrade ich agent-meta?", "Wie funktioniert der Sync?" |
 | Projekt-Feedback als GitHub Issue einreichen | `feedback` | `fast` | Nein | "Melde das als Bug" |
 | Log-Analyse / Fehler clustern | `log-analyzer` | `balanced` | Ja (Multi-Log-Quellen) | "Analysiere die Logs" |
@@ -429,7 +429,9 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 | `agent-meta-scout` | KI-Ökosystem scouten — **nur auf explizite Anfrage** | ✅ (Multi-Quellen) |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen — *wenn DoD aktiv* | ✅ (Multi-Suites) |
 | `code-reviewer` | Clean Code, Blast-Radius, SOLID/DRY — *wenn SE aktiv* | ✅ (Multi-Prüfungen) |
+{{#if VALIDATOR_ENABLED}}
 | `validator` | DoD-Check, Traceability-Audit — *wenn DoD aktiv* | ❌ (Abhängigkeiten) |
+{{/if}}
 | `docker` | Dev/Test-Stack verwalten — *wenn Projekt Docker nutzt* | ❌ (sequentiell) |
 | `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren | ✅ (Multi-Quellen) |
 | `feedback` | Bug/Feature/Verbesserung als GitHub Issue einreichen — **immer vor `git` für Issues** | ❌ (atomar) |

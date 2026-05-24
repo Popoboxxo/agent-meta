@@ -64,8 +64,8 @@ def _md_to_toml(content: str, stem: str) -> str:
     Replaces $ARGUMENTS with double-brace args (Gemini syntax).
 
     TOML escaping: basic multiline strings cannot contain 3+ consecutive
-    quotes. Triple quotes are split using backslash-newline which TOML
-    treats as whitespace continuation.
+    quotes. We escape the third quote so the sequence no longer terminates
+    the string (e.g., \"\"\" becomes \"\"\\\").
     """
     description = stem.replace("-", " ").replace("_", " ").title()
     body = content
@@ -83,8 +83,8 @@ def _md_to_toml(content: str, stem: str) -> str:
     body = body.strip()
 
     # TOML basic multiline strings cannot contain 3+ consecutive quotes.
-    # Split """ using backslash-newline (TOML whitespace continuation).
-    escaped = body.replace('"""', '"\n\\"""')
+    # Escape the third quote so the sequence no longer terminates the string.
+    escaped = body.replace('"""', '""\\"')
 
     return f'description = "{description}"\nprompt = """\n{escaped}\n"""\n'
 

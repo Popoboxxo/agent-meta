@@ -265,6 +265,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # SYSTEMS_ENGINEERING_ENABLED
     se_config = config.get("systems-engineering", {})
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
+    # VALIDATOR_ENABLED: auto-detect from project roles list
+    variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
@@ -292,14 +294,20 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     markers) is removed. If "true", the markers are stripped but content kept.
     This keeps generated agent files lean when features are disabled.
     """
-    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k == "SE_ENABLED") and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED")) and k != "DOD_PRESET"}
 
     for var in conditional_vars:
         def replace_block(m: re.Match, _var: str = var) -> str:
             block_content = m.group(1)
             if variables.get(_var, "true") == "false":
                 return ""
-            return block_content.strip("\n") + "\n"
+            stripped = block_content.strip("\n")
+            # Only append newline if the original match ended with one
+            # (block-level). For inline matches (e.g. table rows), preserve
+            # inline continuity so the Markdown table is not broken.
+            if m.group(0).endswith("\n"):
+                return stripped + "\n"
+            return stripped
 
         pattern = rf"\{{{{#if {re.escape(var)}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
         text = re.sub(pattern, replace_block, text, flags=re.DOTALL)

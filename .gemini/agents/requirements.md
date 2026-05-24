@@ -11,6 +11,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+model: gemini-3.1-pro-low
 ---
 # Requirements Engineer — agent-meta
 

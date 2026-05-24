@@ -11,6 +11,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+model: claude-sonnet-4-6
 memory: project
 ---
 

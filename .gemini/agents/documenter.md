@@ -10,7 +10,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-model: gemini-3.1-pro-low
+model: gemini-3.5-flash-high
 ---
 # Documenter — agent-meta
 

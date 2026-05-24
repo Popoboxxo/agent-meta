@@ -2,7 +2,7 @@
 name: documenter
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 mode: subagent
-model: opencode-go/qwen3.6-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   edit: allow
   glob: allow
