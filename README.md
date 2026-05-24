@@ -22,7 +22,7 @@
 ## Features
 
 - **Multi-Provider Support:** Claude (VS Code), Gemini (VS Code/Antigravity), Opencode, Continue — define once in generic templates, generate per provider via `sync.py`.
-- **Three-Layer Architecture:** `1-generic/` (universal, provider-agnostic) → `2-platform/` (platform-specific overrides) → `0-external/` (external skill agents via Git submodules).
+- **Layer Architecture:** `1-generic/` (universal, provider-agnostic) → `2-platform/` (platform-specific overrides) → `0-external/` (external skill agents via Git submodules).
 - **Orchestrator-First:** Every development task flows through the orchestrator, which decomposes complex tasks into sub-tasks with FANOUT, PARALLEL_GROUP, BARRIER, PIPELINE, and LIFECYCLE dispatch patterns.
 - **Systems Engineering Cascade:** A recursive 6-level (L1–L3) model-based system decomposition with dedicated agents for requirements, architecture, critique, interface management, termination, verification, and validation.
 - **Agent Visualization:** Static Mermaid mindmap + interactive HTML graph + dynamic session event tracking (Gantt, sequence diagrams) + live browser dashboard.
@@ -41,7 +41,7 @@
 
 ## Architecture
 
-### Three-Layer Override Chain
+### Layer Override Chain
 
 ```
 0-external/   → External skill agents (Git submodules, approved/unapproved)
@@ -86,7 +86,7 @@ config/mcp-registry.yaml
 | Opencode | `.opencode/agents/` | Embedded in AGENTS.md | `.opencode/commands/` | `opencode.json` |
 | Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` | `.continue/config.yaml` |
 
-### Three-Layer Agent Composition
+### Layer Agent Composition
 
 Platform-specific (`2-platform/`) and project-specific (`3-project/`) agents can extend generic templates:
 
