@@ -43,6 +43,17 @@ roles:
   - se-interface-mgr
   - se-termination
   - se-orchestrator
+  - se-test-engineer
+  - se-testreviewer
+  - se-verifier
+  - se-validator
+  - se-integration-and-test-manager
+  - code-reviewer
+  - ui-ux-designer
+  - api-specialist
+  - devops-engineer
+  - performance-optimizer
+  - export-manager
 
 # Architektur-Policy: Generische Agenten muessen provider-agnostisch bleiben.
 # Siehe rules/1-generic/provider-agnostic.md — Provider-Namen, Tool-Syntax und
@@ -183,6 +194,16 @@ se-export:
   output_dir: docs/se
 
 max-parallel-agents: 4
+
+# Lifecycle-Hooks — getriggert durch Git-Events (Merge, Release-Tag, Version-Bump).
+# Der lifecycle-check Hook liest diese Konfiguration und erzeugt .opencode/pending-tasks.md.
+#lifecycle-triggers:
+#  on-release:
+#    - agent: se-validator
+#      task: "Post-Release Sanity-Check: Validiere das System (L1) gegen Stakeholder-Bedürfnisse und führe End-to-End User Journeys durch."
+#  on-merge:
+#    - agent: code-reviewer
+#      task: "Post-Merge Blast-Radius-Analyse: Prüfe betroffene Code-Pfade auf Clean-Code-Verletzungen und REQ-Traceability."
 
 # Orchestrator-First Architecture (Beta v3.0.0)
 # Steuert das Verhalten des Orchestrator-Delegations-Systems.

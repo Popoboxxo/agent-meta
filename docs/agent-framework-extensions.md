@@ -197,3 +197,82 @@ Viele der neuen Agenten erzeugen komplexe konzeptionelle Outputs (ADRs vom `se-a
 ## 7. Fazit
 
 Mit diesem Architektur-Update ist `agent-meta` nicht nur ein Agenten-Framework, sondern eine vollständige Abstraktion des ISO/IEC 15288 Systems Engineering Prozesses. Die strenge Trennung von Requirements, Architektur, Code und V&V – gepaart mit fraktaler Rekursion und Closed-Loop Traceability – ermöglicht die fehlerfreie Entwicklung hochkomplexer Systeme.
+
+---
+
+## 8. Implementierungsstatus
+
+> Stand: `2026-05-24` | Branch: `feat/agent-framework-extensions` | 121/121 Tests ✅
+
+### 8.1 Agenten-Templates (agents/1-generic/)
+
+| Agent | Status | Version | JSON-Schema | DoD-Injection | Extension-Hook |
+|-------|--------|---------|-------------|---------------|----------------|
+| `se-requirements` | ✅ Bestand | 1.1.0 | ✅ | — | ✅ |
+| `se-architect` | ✅ Bestand | 1.1.0 | ✅ | — | ✅ |
+| `se-critic` | ✅ Bestand | 1.1.0 | ✅ | — | ✅ |
+| `se-interface-mgr` | ✅ Bestand | 1.1.0 | ✅ | — | ✅ |
+| `se-termination` | ✅ Bestand | 1.1.0 | ✅ | — | ✅ |
+| `se-orchestrator` | ✅ Bestand | 1.1.0 | — | — | ✅ |
+| **se-test-engineer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **se-testreviewer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **se-verifier** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **se-validator** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **se-integration-and-test-manager** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **code-reviewer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **ui-ux-designer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **api-specialist** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **devops-engineer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **performance-optimizer** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| **export-manager** | ✅ **Neu** | 1.0.0 | ✅ | ✅ | ✅ |
+| `tester` | ✅ Aktualisiert | 2.0.0 | — | ✅ | ✅ |
+| `validator` | ✅ Aktualisiert | 3.0.0 | — | ✅ | ✅ |
+
+### 8.2 Framework-Anbindungen (§6)
+
+| § | Anforderung | Status |
+|---|-------------|--------|
+| 6.1 | Orchestrator Routing (Intent-Tabelle + Agenten-Tabelle + Workflows) | ✅ |
+| 6.2 | JSON Contract-Driven Handover (Input/Output Payload in allen neuen Agenten) | ✅ |
+| 6.3 | Globale Rules & Hook-Architektur (Branch-Guard, Commit-Conventions in Templates) | ✅ |
+| 6.4 | Definition of Done Injections ({{DOD_REQ_TRACEABILITY}} in 8 Agenten, 41 Blöcke) | ✅ |
+| 6.5 | Formatter & Context Injection (PROJECT_CONTEXT, CODE_LANGUAGE, CODE_CONVENTIONS, EXTENSION_DIR) | ✅ |
+| 6.6 | Sprachstile & Kommunikation (language.md Referenz in allen 23 Agenten) | ✅ |
+| 6.7 | Role Defaults & Provider Configuration (11 neue Rollen mit Tiers in role-defaults.yaml) | ✅ |
+| 6.8 | Lifecycle Hooks & Pending Tasks (lifecycle-triggers: on-release→se-validator, on-merge→code-reviewer) | ✅ |
+| 6.9 | Skill Registration & External Tooling (3 Platzhalter-Skills in skills-registry.yaml) | ✅ |
+| 6.10 | Provider-Agnostic Export (export-manager + config/export.yaml mit 5 Targets) | ✅ |
+
+### 8.3 Config-Dateien
+
+| Datei | Status | Änderung |
+|-------|--------|----------|
+| `config/role-defaults.yaml` | ✅ | +11 Rollen (SE V&V + SWE + Export) |
+| `config/export.yaml` | ✅ | Neu: 5 Targets (adr, test-models, ui, api, reviews) |
+| `config/skills-registry.yaml` | ✅ | +3 Platzhalter-Skills (mermaid-renderer, figma-reader, postman-collection-generator) |
+| `.meta-config/project.yaml` | ✅ | +13 Rollen aktiviert, lifecycle-triggers konfiguriert |
+| `agents/1-generic/orchestrator.md` | ✅ | Routing-Tabelle +6, SE-Sektion +5, Workflows +5 |
+| `agents/1-generic/validator.md` | ✅ | Fokus auf Prozess-Wächter, Verweis an code-reviewer |
+| `agents/1-generic/tester.md` | ✅ | Fokus auf isolierte Unit-Tests, Verweis an se-test-engineer |
+| `AGENTS.md` | ✅ | +11 Agenten-Einträge |
+
+### 8.4 Test-Infrastruktur
+
+| Datei | Status |
+|-------|--------|
+| `docs/test-scenario.md` (Smart-Light IoT Szenario) | ✅ |
+| `docs/test-validation-checklist.md` (manuell + automatisiert) | ✅ |
+| `tests/se-test-data/stakeholder-needs.md` | ✅ |
+| `tests/se-test-data/expected-l1-requirements.json` | ✅ |
+| `tests/se-test-data/expected-architecture.json` | ✅ |
+| `tests/se-test-data/expected-test-model.json` | ✅ |
+| `tests/se-test-data/test-runner.py` | ✅ 121/121 Tests grün |
+| `tests/se-test-data/test-report.md` | ✅ Generiert |
+
+### 8.5 Offene Punkte
+
+- [ ] Externe Skill-Repos für mermaid-renderer, figma-reader, postman-collection-generator finden/erstellen
+- [ ] Lifecycle-Hook `lifecycle_check.py` um se-validator und code-reviewer als delegierbare Agenten erweitern
+- [ ] `se-integration-and-test-manager` braucht Delegations-Logik für se-test-engineer/se-verifier/se-validator im Orchestrator
+- [ ] E2E-Test: Tatsächlicher SE-Kaskaden-Durchlauf mit echten Agenten (nicht simuliert)
+- [ ] Version-Bump aller geänderten Bestands-Agenten (orchestrator, validator, tester) im nächsten Release

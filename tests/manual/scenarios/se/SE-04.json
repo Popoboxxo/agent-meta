@@ -1,0 +1,80 @@
+{
+  "id": "SE-04",
+  "name": "Rekursive Dekomposition L1->L2->L3",
+  "user_input": "Dekomponiere die Sensorik-Einheit des Smart-Light bis auf Komponentenebene (L3)",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "se-orchestrator",
+    "intent": "SE-Kaskade"
+  },
+  "delegation_chain": [
+    {
+      "from": "se-orchestrator",
+      "to": "se-requirements",
+      "note": "L1"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-architect",
+      "note": "L1"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-critic",
+      "note": "L1"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-termination",
+      "note": "L1"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-requirements",
+      "note": "L2"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-architect",
+      "note": "L2"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-critic",
+      "note": "L2"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-termination",
+      "note": "L2"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-requirements",
+      "note": "L3"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-architect",
+      "note": "L3"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-termination",
+      "note": "L3 -- leaf"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "se-orchestrator",
+    "se-requirements",
+    "se-architect",
+    "se-critic",
+    "se-termination"
+  ],
+  "critical_checks": [
+    "3x se-requirements (L1, L2, L3)",
+    "3x se-termination -- letztes muss auf leaf entscheiden",
+    "Keine se-critic auf L3"
+  ]
+}

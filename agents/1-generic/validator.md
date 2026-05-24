@@ -1,7 +1,7 @@
 ---
 name: template-validator
-version: "2.2.0"
-description: "Code gegen Anforderungen prüfen, Traceability validieren, Definition of Done und Codequalität sicherstellen."
+version: "3.0.0"
+description: "Formaler Prozess-Wächter: DoD-Checkboxen, REQ-ID-Präsenz, Commit-Konventionen. Bewertet KEINE Code-Qualität — dafür code-reviewer."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
   - Bash
@@ -117,9 +117,14 @@ Rückwärts-Traceability: Code → REQ
    - Verwaiste Tests (Tests ohne REQ)
    - Verwaister Code (Funktionen ohne REQ-Bezug)
 
-### 4. Code-Qualitäts-Prüfung
+### 4. Code-Qualitäts-Prüfung — DELEGATION
 
-<!-- PROJEKTSPEZIFISCH: Regeln des Projekts eintragen -->
+> **WICHTIG:** Der validator prüft KEINE Code-Qualität mehr. Das ist die Aufgabe des `code-reviewer`-Agenten.
+> 
+> Wenn Code-Qualitäts-Prüfung erforderlich ist:
+> 1. Verweise an `code-reviewer` für Clean-Code-Audit, SOLID/DRY-Prüfung, Blast-Radius-Analyse
+> 2. Der validator prüft NUR ob der code-reviewer aufgerufen wurde (DoD-Checkbox)
+
 {{CODE_QUALITY_RULES}}
 
 ### 5. Regressions-Prüfung
@@ -221,6 +226,7 @@ Prüfe Konsistenz zwischen Dokumenten:
 - Tests fehlen? → Verweise an `tester`
 - Anforderung unklar/fehlend? → Verweise an `requirements`
 - Dokumentation veraltet? → Verweise an `documenter`
+- Code-Qualität prüfen? → Verweise an `code-reviewer` (nicht selbst prüfen!)
 
 ## Sprache
 

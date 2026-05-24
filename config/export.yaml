@@ -1,0 +1,26 @@
+# Export-Konfiguration für agent-meta Framework.
+# Definiert wohin Fach-Agenten ihre Outputs exportieren.
+# Der export-manager liest diese Konfiguration und routet entsprechend.
+#
+# Verfügbare Targets: markdown, confluence, jira-xray, notion (erweiterbar via skills-registry.yaml)
+# Default: markdown (lokale .md Dateien)
+
+architecture:
+  target: markdown
+  output_dir: docs/adr/
+
+test-models:
+  target: markdown
+  output_dir: docs/test-models/
+
+ui-specs:
+  target: markdown
+  output_dir: docs/ui/
+
+api-specs:
+  target: markdown
+  output_dir: docs/api/
+
+code-reviews:
+  target: markdown
+  output_dir: docs/reviews/

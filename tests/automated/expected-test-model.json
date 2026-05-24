@@ -1,0 +1,236 @@
+{
+  "level": "L3",
+  "type": "test_model",
+  "source_architecture": "expected-architecture.json",
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "title": "Motion Detection Response Time",
+      "requirement": "REQ-L1-001",
+      "component": "COMP-001",
+      "input": {"signal": "SIG-MOTION", "value": true},
+      "expected_output": {"signal": "SIG-LIGHT-CMD", "value": "ON", "max_latency_ms": 200},
+      "test_type": "timing",
+      "priority": "critical"
+    },
+    {
+      "id": "TC-002",
+      "title": "Ambient Light Brightness Mapping",
+      "requirement": "REQ-L1-002",
+      "component": "COMP-002",
+      "input": {"signal": "SIG-LUX", "value": 50},
+      "expected_output": {"signal": "SIG-LIGHT-CMD", "value": "DIMMED", "brightness_pct": 80},
+      "test_type": "functional",
+      "priority": "high"
+    },
+    {
+      "id": "TC-003",
+      "title": "Full Darkness Maximum Brightness",
+      "requirement": "REQ-L1-002",
+      "component": "COMP-002",
+      "input": {"signal": "SIG-LUX", "value": 0},
+      "expected_output": {"signal": "SIG-LIGHT-CMD", "value": "ON", "brightness_pct": 100},
+      "test_type": "functional",
+      "priority": "high"
+    },
+    {
+      "id": "TC-004",
+      "title": "Bright Daylight Minimum Brightness",
+      "requirement": "REQ-L1-002",
+      "component": "COMP-002",
+      "input": {"signal": "SIG-LUX", "value": 10000},
+      "expected_output": {"signal": "SIG-LIGHT-CMD", "value": "DIMMED", "brightness_pct": 10},
+      "test_type": "functional",
+      "priority": "high"
+    },
+    {
+      "id": "TC-005",
+      "title": "230V Wiring Compatibility Check",
+      "requirement": "REQ-L1-004",
+      "component": "COMP-008",
+      "input": {"signal": "SIG-RELAY-STATE", "voltage": 230, "frequency_hz": 50},
+      "expected_output": {"signal": "SIG-ACTUATOR-STATUS", "status": "OK", "current_draw_a": 0.01},
+      "test_type": "compliance",
+      "priority": "critical"
+    },
+    {
+      "id": "TC-006",
+      "title": "Standardized Error Code Output",
+      "requirement": "REQ-L1-005",
+      "component": "COMP-016",
+      "input": {"signal": "SIG-INTERNAL-ERROR", "code": "ERR_SENSOR_TIMEOUT"},
+      "expected_output": {"signal": "SIG-STANDARD-ERROR-CODE", "iec_code": "E-0101", "severity": "warning"},
+      "test_type": "functional",
+      "priority": "medium"
+    },
+    {
+      "id": "TC-007",
+      "title": "MQTT Reconnection After Network Failure",
+      "requirement": "REQ-L1-007",
+      "component": "COMP-011",
+      "input": {"signal": "SIG-CLOUD-STATUS", "status": "DISCONNECTED", "duration_s": 10},
+      "expected_output": {"signal": "SIG-CLOUD-STATUS", "status": "CONNECTED", "reconnect_time_s": 15},
+      "test_type": "resilience",
+      "priority": "high"
+    },
+    {
+      "id": "TC-008",
+      "title": "Bandwidth Usage Under Normal Operation",
+      "requirement": "REQ-L1-008",
+      "component": "COMP-012",
+      "input": {"signal": "SIG-SENSOR-CLEAN", "duration_min": 60, "state_changes": 5},
+      "expected_output": {"signal": "SIG-COMPRESSED-DATA", "total_bytes": 500, "avg_bytes_per_hour": 500},
+      "test_type": "performance",
+      "priority": "medium"
+    },
+    {
+      "id": "TC-009",
+      "title": "OTA Update Verification and Install",
+      "requirement": "REQ-L1-009",
+      "component": "COMP-013",
+      "input": {"signal": "SIG-OTA-PACKAGE", "version": "2.0.0", "signature": "valid"},
+      "expected_output": {"signal": "SIG-OTA-STATUS", "status": "INSTALLED", "rollback_available": true},
+      "test_type": "functional",
+      "priority": "high"
+    },
+    {
+      "id": "TC-010",
+      "title": "No Persistent Motion Data in Storage",
+      "requirement": "REQ-L1-010",
+      "component": "COMP-001",
+      "input": {"signal": "SIG-MOTION", "value": true, "duration_s": 60},
+      "expected_output": {"storage_check": "no_motion_records", "volatile_only": true},
+      "test_type": "security",
+      "priority": "critical"
+    },
+    {
+      "id": "TC-011",
+      "title": "GDPR Anonymization of Presence Data",
+      "requirement": "REQ-L1-011",
+      "component": "COMP-014",
+      "input": {"signal": "SIG-SENSOR-CLEAN", "motion_events": 50, "room_id": "kitchen"},
+      "expected_output": {"signal": "SIG-ANONYMIZED-DATA", "contains_pii": false, "anonymization_method": "aggregation"},
+      "test_type": "security",
+      "priority": "critical"
+    },
+    {
+      "id": "TC-012",
+      "title": "Local Fallback During Cloud Outage",
+      "requirement": "REQ-L1-012",
+      "component": "COMP-006",
+      "input": {"signal": "SIG-CLOUD-STATUS", "status": "DISCONNECTED"},
+      "expected_output": {"signal": "SIG-LIGHT-CMD", "value": "ON", "latency_ms": 195, "cloud_dependency": false},
+      "test_type": "resilience",
+      "priority": "critical"
+    },
+    {
+      "id": "TC-013",
+      "title": "Remote Diagnostics Data Availability",
+      "requirement": "REQ-L1-013",
+      "component": "COMP-015",
+      "input": {"signal": "SIG-DIAG-REQUEST", "type": "sensor_readings"},
+      "expected_output": {"signal": "SIG-DIAG-RESPONSE", "latency_ms": 3000, "data_complete": true},
+      "test_type": "functional",
+      "priority": "medium"
+    },
+    {
+      "id": "TC-014",
+      "title": "Hot-Swap Sensor Module Detection",
+      "requirement": "REQ-L1-014",
+      "component": "COMP-001",
+      "input": {"signal": "SIG-SENSOR-STATUS", "action": "REPLACE", "component_id": "COMP-001"},
+      "expected_output": {"signal": "SIG-SENSOR-STATUS", "status": "RECONFIGURED", "auto_detect_time_ms": 2000},
+      "test_type": "functional",
+      "priority": "medium"
+    },
+    {
+      "id": "TC-015",
+      "title": "Startup Self-Test Completion",
+      "requirement": "REQ-L1-015",
+      "component": "COMP-007",
+      "input": {"signal": "SIG-SELFTEST-CMD", "trigger": "POWER_ON"},
+      "expected_output": {"signal": "SIG-SELFTEST-RESULT", "all_passed": true, "duration_ms": 8000, "components_tested": 9},
+      "test_type": "functional",
+      "priority": "high"
+    }
+  ],
+  "integration_tests": [
+    {
+      "id": "IT-001",
+      "title": "Sensor-to-Actuator Chain",
+      "components": ["COMP-001", "COMP-003", "COMP-004", "COMP-010", "COMP-008"],
+      "flow": ["SIG-MOTION → COMP-003 → SIG-SENSOR-CLEAN → COMP-004 → SIG-LIGHT-CMD → COMP-010 → SIG-RELAY-STATE → COMP-008"],
+      "validation": "End-to-end response < 200ms from motion detection to relay activation"
+    },
+    {
+      "id": "IT-002",
+      "title": "Ambient Light to Dimmer Control Chain",
+      "components": ["COMP-002", "COMP-003", "COMP-004", "COMP-010", "COMP-009"],
+      "flow": ["SIG-LUX → COMP-003 → SIG-SENSOR-CLEAN → COMP-004 → SIG-LIGHT-CMD → COMP-010 → SIG-DIMMER-LEVEL → COMP-009"],
+      "validation": "Brightness correctly mapped from lux input to dimmer output (10%-100% range)"
+    },
+    {
+      "id": "IT-003",
+      "title": "Cloud Outage Local Fallback",
+      "components": ["COMP-001", "COMP-003", "COMP-006", "COMP-010", "COMP-008"],
+      "flow": ["SIG-MOTION → COMP-003 → SIG-SENSOR-CLEAN → COMP-006 → SIG-LIGHT-CMD → COMP-010 → SIG-RELAY-STATE → COMP-008"],
+      "validation": "Full light control operational during cloud outage, response time degradation < 10%"
+    },
+    {
+      "id": "IT-004",
+      "title": "Sensor Data to Cloud with Privacy Filter",
+      "components": ["COMP-001", "COMP-003", "COMP-014", "COMP-012", "COMP-011"],
+      "flow": ["SIG-MOTION → COMP-003 → SIG-SENSOR-CLEAN → COMP-014 → SIG-ANONYMIZED-DATA → COMP-012 → SIG-COMPRESSED-DATA → COMP-011"],
+      "validation": "No PII in cloud payload, bandwidth < 1 KB/hour, data arrives within 5s"
+    },
+    {
+      "id": "IT-005",
+      "title": "Self-Test Full System Diagnostic",
+      "components": ["COMP-007", "COMP-001", "COMP-002", "COMP-008", "COMP-009"],
+      "flow": ["SIG-SELFTEST-CMD → COMP-001/002/008/009 → SIG-SENSOR-STATUS/SIG-ACTUATOR-STATUS → COMP-007 → SIG-SELFTEST-RESULT"],
+      "validation": "All 9 components tested within 10s, results reported locally and remotely"
+    },
+    {
+      "id": "IT-006",
+      "title": "OTA Update with Rollback on Failure",
+      "components": ["COMP-011", "COMP-013", "COMP-004"],
+      "flow": ["SIG-OTA-PACKAGE → COMP-013 → SIG-OTA-STATUS → COMP-004"],
+      "validation": "Update installs correctly, simulated failure triggers rollback, local control never interrupted"
+    },
+    {
+      "id": "IT-007",
+      "title": "Error Code Propagation to Remote Diagnostics",
+      "components": ["COMP-017", "COMP-016", "COMP-015", "COMP-011"],
+      "flow": ["SIG-INTERNAL-ERROR → COMP-016 → SIG-STANDARD-ERROR-CODE → COMP-015 → SIG-DIAG-RESPONSE → COMP-011"],
+      "validation": "Error code follows IEC 62056, appears in remote diagnostics within 5s, retained in 30-day history"
+    }
+  ],
+  "coverage_matrix": {
+    "REQ-L1-001": ["TC-001", "IT-001"],
+    "REQ-L1-002": ["TC-002", "TC-003", "TC-004", "IT-002"],
+    "REQ-L1-003": ["TC-001", "IT-001"],
+    "REQ-L1-004": ["TC-005"],
+    "REQ-L1-005": ["TC-006", "IT-007"],
+    "REQ-L1-006": ["TC-005"],
+    "REQ-L1-007": ["TC-007"],
+    "REQ-L1-008": ["TC-008", "IT-004"],
+    "REQ-L1-009": ["TC-009", "IT-006"],
+    "REQ-L1-010": ["TC-010"],
+    "REQ-L1-011": ["TC-011", "IT-004"],
+    "REQ-L1-012": ["TC-012", "IT-003"],
+    "REQ-L1-013": ["TC-013", "IT-007"],
+    "REQ-L1-014": ["TC-014"],
+    "REQ-L1-015": ["TC-015", "IT-005"]
+  },
+  "metadata": {
+    "total_test_cases": 15,
+    "total_integration_tests": 7,
+    "requirement_coverage_pct": 100,
+    "test_types": ["timing", "functional", "compliance", "resilience", "performance", "security"],
+    "priority_distribution": {
+      "critical": 5,
+      "high": 6,
+      "medium": 4
+    }
+  }
+}

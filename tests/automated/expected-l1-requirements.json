@@ -1,0 +1,153 @@
+{
+  "level": "L1",
+  "type": "blackbox_requirements",
+  "source": "stakeholder-needs.md",
+  "requirements": [
+    {
+      "id": "REQ-L1-001",
+      "title": "Automatic Light Activation",
+      "description": "The system SHALL automatically activate lights when motion is detected in a room",
+      "stakeholder": "SH-01",
+      "priority": "high",
+      "category": "functional",
+      "acceptance_criteria": ["Light turns on within 200ms of motion detection"]
+    },
+    {
+      "id": "REQ-L1-002",
+      "title": "Adaptive Brightness Control",
+      "description": "The system SHALL adjust light brightness based on ambient light levels measured by the lux sensor",
+      "stakeholder": "SH-01",
+      "priority": "high",
+      "category": "functional",
+      "acceptance_criteria": ["Brightness scales inversely with ambient lux", "Minimum brightness 10%, maximum 100%"]
+    },
+    {
+      "id": "REQ-L1-003",
+      "title": "Motion Detection Response Time",
+      "description": "The system SHALL respond to motion detection within 200ms maximum latency",
+      "stakeholder": "SH-01",
+      "priority": "critical",
+      "category": "constraint",
+      "acceptance_criteria": ["End-to-end latency from motion event to light activation <= 200ms in 99% of cases"]
+    },
+    {
+      "id": "REQ-L1-004",
+      "title": "230V Installation Compatibility",
+      "description": "The system SHALL be compatible with existing 230V residential wiring without requiring additional cabling",
+      "stakeholder": "SH-02",
+      "priority": "high",
+      "category": "constraint",
+      "acceptance_criteria": ["No additional low-voltage wiring required for standard installation", "Fits standard EU wall box (55mm diameter)"]
+    },
+    {
+      "id": "REQ-L1-005",
+      "title": "Standardized Error Diagnostics",
+      "description": "The system SHALL provide a standardized error code interface for fault diagnosis",
+      "stakeholder": "SH-02",
+      "priority": "medium",
+      "category": "functional",
+      "acceptance_criteria": ["Error codes follow IEC 62056 standard", "At least 10 distinct error codes defined", "Error codes accessible via local and remote interface"]
+    },
+    {
+      "id": "REQ-L1-006",
+      "title": "Electrical Compliance",
+      "description": "The system SHALL comply with VDE 0100 and EN 60669 electrical installation standards",
+      "stakeholder": "SH-02",
+      "priority": "critical",
+      "category": "constraint",
+      "acceptance_criteria": ["Certified by accredited testing laboratory", "CE marking obtained", "Documentation includes compliance declaration"]
+    },
+    {
+      "id": "REQ-L1-007",
+      "title": "MQTT Connection Resilience",
+      "description": "The system SHALL maintain a stable MQTT connection with automatic reconnection on network failure",
+      "stakeholder": "SH-03",
+      "priority": "high",
+      "category": "quality",
+      "acceptance_criteria": ["Reconnection within 30 seconds of network restore", "No data loss during reconnection (queued messages sent)", "Connection heartbeat interval configurable (default: 60s)"]
+    },
+    {
+      "id": "REQ-L1-008",
+      "title": "Bandwidth-Efficient Data Transmission",
+      "description": "The system SHALL compress sensor data and transmit only on state changes to minimize bandwidth usage",
+      "stakeholder": "SH-03",
+      "priority": "medium",
+      "category": "quality",
+      "acceptance_criteria": ["Average bandwidth usage < 1 KB/hour per sensor", "State change threshold configurable per sensor type", "Heartbeat message sent at least every 5 minutes even without state change"]
+    },
+    {
+      "id": "REQ-L1-009",
+      "title": "Over-the-Air Firmware Updates",
+      "description": "The system SHALL support firmware updates over the air without physical device access",
+      "stakeholder": "SH-03",
+      "priority": "high",
+      "category": "functional",
+      "acceptance_criteria": ["Update package signed and verified before installation", "Rollback to previous version on update failure", "Update process does not interrupt local light control functionality"]
+    },
+    {
+      "id": "REQ-L1-010",
+      "title": "No Persistent Motion Data Storage",
+      "description": "The system SHALL NOT persistently store motion detection data — only real-time processing is permitted",
+      "stakeholder": "SH-04",
+      "priority": "critical",
+      "category": "constraint",
+      "acceptance_criteria": ["Motion events processed in volatile memory only", "No motion data written to non-volatile storage", "Audit log confirms no persistent motion records"]
+    },
+    {
+      "id": "REQ-L1-011",
+      "title": "GDPR-Compliant Data Processing",
+      "description": "The system SHALL process all personal data in compliance with GDPR — no cloud storage of presence data",
+      "stakeholder": "SH-04",
+      "priority": "critical",
+      "category": "constraint",
+      "acceptance_criteria": ["Presence data anonymized before cloud transmission", "User consent mechanism for any data beyond local control", "Data deletion on user request within 24 hours"]
+    },
+    {
+      "id": "REQ-L1-012",
+      "title": "Local Fallback Operation",
+      "description": "The system SHALL maintain full local light control functionality when cloud connectivity is unavailable",
+      "stakeholder": "SH-04",
+      "priority": "critical",
+      "category": "quality",
+      "acceptance_criteria": ["All motion-based and ambient-light-based controls work offline", "Local schedules continue to execute without cloud", "Cloud outage does not affect response time"]
+    },
+    {
+      "id": "REQ-L1-013",
+      "title": "Remote Diagnostics Access",
+      "description": "The system SHALL provide remote access to system status, sensor readings, and error history for maintenance technicians",
+      "stakeholder": "SH-05",
+      "priority": "medium",
+      "category": "functional",
+      "acceptance_criteria": ["System status dashboard accessible via cloud portal", "Sensor readings available with < 5s latency", "Error history retained for minimum 30 days"]
+    },
+    {
+      "id": "REQ-L1-014",
+      "title": "Modular Component Replacement",
+      "description": "The system SHALL allow individual component replacement (sensor, actuator) without total system failure",
+      "stakeholder": "SH-05",
+      "priority": "medium",
+      "category": "quality",
+      "acceptance_criteria": ["Hot-swap capable for sensor modules", "System auto-detects replaced component and reconfigures", "Replacement procedure documented and takes < 15 minutes"]
+    },
+    {
+      "id": "REQ-L1-015",
+      "title": "Integrated Self-Test",
+      "description": "The system SHALL perform an integrated self-test of all components on startup and report results",
+      "stakeholder": "SH-05",
+      "priority": "high",
+      "category": "functional",
+      "acceptance_criteria": ["Self-test completes within 10 seconds of power-on", "All sensors and actuators tested", "Self-test results reported locally (LED indicator) and remotely (cloud status)"]
+    }
+  ],
+  "metadata": {
+    "total_requirements": 15,
+    "categories": ["functional", "constraint", "quality"],
+    "traceability_matrix": {
+      "SH-01": ["REQ-L1-001", "REQ-L1-002", "REQ-L1-003"],
+      "SH-02": ["REQ-L1-004", "REQ-L1-005", "REQ-L1-006"],
+      "SH-03": ["REQ-L1-007", "REQ-L1-008", "REQ-L1-009"],
+      "SH-04": ["REQ-L1-010", "REQ-L1-011", "REQ-L1-012"],
+      "SH-05": ["REQ-L1-013", "REQ-L1-014", "REQ-L1-015"]
+    }
+  }
+}

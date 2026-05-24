@@ -1,0 +1,177 @@
+{
+  "description": "Manuelle Test-Szenarien fuer Delegations-Verifikation via echte Viz-Logs",
+  "version": "2.0.0",
+  "total_scenarios": 10,
+  "orchestrator_routing_table": {
+    "SE-Kaskade": { "target": "se-orchestrator", "tier": "balanced" },
+    "Neues Feature": { "target": "feature", "tier": "balanced" },
+    "Bugfix": { "target": "developer", "tier": "balanced" },
+    "Code-Qualitaets-Audit": { "target": "code-reviewer", "tier": "powerful" },
+    "UI-Design": { "target": "ui-ux-designer", "tier": "balanced" },
+    "API-Design": { "target": "api-specialist", "tier": "balanced" },
+    "CI/CD": { "target": "devops-engineer", "tier": "fast" },
+    "Performance": { "target": "performance-optimizer", "tier": "powerful" },
+    "Export": { "target": "export-manager", "tier": "fast" },
+    "Git-Operationen": { "target": "git", "tier": "fast" },
+    "Tests schreiben": { "target": "tester", "tier": "balanced" },
+    "Code validieren": { "target": "validator", "tier": "balanced" },
+    "Dokumentation": { "target": "documenter", "tier": "balanced" },
+    "Anforderungen": { "target": "requirements", "tier": "balanced" },
+    "Log-Analyse": { "target": "log-analyzer", "tier": "balanced" },
+    "Projekt-Feedback": { "target": "feedback", "tier": "balanced" },
+    "Meta-Fragen": { "target": "agent-meta-manager", "tier": "fast" },
+    "Release": { "target": "release", "tier": "balanced" },
+    "V&V": { "target": "se-integration-and-test-manager", "tier": "balanced" },
+    "Validierung": { "target": "se-validator", "tier": "powerful" }
+  },
+  "scenarios": {
+    "SE": [
+      {
+        "id": "SE-01",
+        "name": "Vollstaendige SE-Kaskade (Linker Fluegel)",
+        "user_input": "Starte den SE-Prozess fuer einen Smart-Light IoT Controller mit Temperatursensor, Bewegungserkennung und WiFi-Anbindung",
+        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
+        "delegation_chain": [
+          { "from": "se-orchestrator", "to": "se-requirements" },
+          { "from": "se-orchestrator", "to": "se-architect" },
+          { "from": "se-orchestrator", "to": "se-critic", "note": "1. Durchlauf" },
+          { "from": "se-orchestrator", "to": "se-architect", "note": "Iteration nach Critic-Feedback" },
+          { "from": "se-orchestrator", "to": "se-critic", "note": "2. Durchlauf" },
+          { "from": "se-orchestrator", "to": "se-termination" },
+          { "from": "se-orchestrator", "to": "se-interface-mgr" }
+        ],
+        "required_agents": ["orchestrator", "se-orchestrator", "se-requirements", "se-architect", "se-critic", "se-termination", "se-interface-mgr"],
+        "critical_checks": ["se-architect muss zweimal delegiert werden (Iteration nach Critic)", "se-termination muss leaf/continue Entscheidungen treffen"]
+      },
+      {
+        "id": "SE-02",
+        "name": "V&V Rechter Fluegel",
+        "user_input": "Fuehre Verifikation und Validierung fuer das Smart-Light System durch",
+        "expected_routing": { "from": "orchestrator", "to": "se-integration-and-test-manager", "intent": "V&V" },
+        "delegation_chain": [
+          { "from": "se-integration-and-test-manager", "to": "se-test-engineer" },
+          { "from": "se-integration-and-test-manager", "to": "se-testreviewer" },
+          { "from": "se-integration-and-test-manager", "to": "se-verifier" },
+          { "from": "se-integration-and-test-manager", "to": "se-validator" }
+        ],
+        "required_agents": ["orchestrator", "se-integration-and-test-manager", "se-test-engineer", "se-testreviewer", "se-verifier", "se-validator"],
+        "critical_checks": ["se-test-engineer vor se-testreviewer", "se-verifier vor se-validator", "se-validator nur auf L1"]
+      },
+      {
+        "id": "SE-03",
+        "name": "Trade-Study mit ADR-Export",
+        "user_input": "Fuehre eine Trade-Study fuer die Kommunikationshardware durch: WiFi vs. Zigbee vs. Thread",
+        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
+        "delegation_chain": [
+          { "from": "se-orchestrator", "to": "se-architect", "note": "Trade-Study + ADR" },
+          { "from": "se-architect", "to": "export-manager", "note": "ADR-Payload zu Target routen" }
+        ],
+        "required_agents": ["orchestrator", "se-orchestrator", "se-architect", "export-manager"],
+        "critical_checks": ["se-architect muss ADR als JSON-Payload an export-manager uebergeben", "export-manager muss Target aus export.yaml lesen"]
+      },
+      {
+        "id": "SE-04",
+        "name": "Rekursive Dekomposition L1->L2->L3",
+        "user_input": "Dekomponiere die Sensorik-Einheit des Smart-Light bis auf Komponentenebene (L3)",
+        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
+        "delegation_chain": [
+          { "from": "se-orchestrator", "to": "se-requirements", "note": "L1" },
+          { "from": "se-orchestrator", "to": "se-architect", "note": "L1" },
+          { "from": "se-orchestrator", "to": "se-critic", "note": "L1" },
+          { "from": "se-orchestrator", "to": "se-termination", "note": "L1" },
+          { "from": "se-orchestrator", "to": "se-requirements", "note": "L2" },
+          { "from": "se-orchestrator", "to": "se-architect", "note": "L2" },
+          { "from": "se-orchestrator", "to": "se-critic", "note": "L2" },
+          { "from": "se-orchestrator", "to": "se-termination", "note": "L2" },
+          { "from": "se-orchestrator", "to": "se-requirements", "note": "L3" },
+          { "from": "se-orchestrator", "to": "se-architect", "note": "L3" },
+          { "from": "se-orchestrator", "to": "se-termination", "note": "L3 -- leaf" }
+        ],
+        "required_agents": ["orchestrator", "se-orchestrator", "se-requirements", "se-architect", "se-critic", "se-termination"],
+        "critical_checks": ["3x se-requirements (L1, L2, L3)", "3x se-termination -- letztes muss auf leaf entscheiden", "Keine se-critic auf L3"]
+      },
+      {
+        "id": "SE-05",
+        "name": "Stakeholder-Validierung (L1)",
+        "user_input": "Validiere das fertige Smart-Light System gegen die urspruenglichen Stakeholder-Anforderungen",
+        "expected_routing": { "from": "orchestrator", "to": "se-validator", "intent": "Validierung" },
+        "delegation_chain": [],
+        "required_agents": ["orchestrator", "se-validator"],
+        "critical_checks": ["se-validator darf keinen Code lesen", "se-validator muss End-to-End User Journeys simulieren", "Keine Delegation von se-validator zu code-reviewer oder developer"]
+      }
+    ],
+    "FW": [
+      {
+        "id": "FW-01",
+        "name": "Feature-Lifecycle mit TDD",
+        "user_input": "Fuege eine Benutzer-Registrierung mit E-Mail-Verifikation hinzu",
+        "expected_routing": { "from": "orchestrator", "to": "feature", "intent": "Neues Feature" },
+        "delegation_chain": [
+          { "from": "feature", "to": "git", "note": "Branch anlegen" },
+          { "from": "feature", "to": "requirements" },
+          { "from": "feature", "to": "tester", "note": "TDD Red" },
+          { "from": "feature", "to": "developer" },
+          { "from": "feature", "to": "tester", "note": "TDD Green" },
+          { "from": "feature", "to": "validator" },
+          { "from": "feature", "to": "documenter" },
+          { "from": "feature", "to": "git", "note": "Commit + PR" }
+        ],
+        "required_agents": ["orchestrator", "feature", "git", "requirements", "tester", "developer", "validator", "documenter"],
+        "critical_checks": ["tester muss VOR developer delegiert werden (TDD)", "tester muss NACH developer erneut delegiert werden", "kein direkter developer-Aufruf vom orchestrator"]
+      },
+      {
+        "id": "FW-02",
+        "name": "Multi-Fix FANOUT mit Code-Review",
+        "user_input": "Fix Bugs #42, #57 und #89 -- alle in verschiedenen Modulen",
+        "expected_routing": { "from": "orchestrator", "to": "developer", "intent": "Bugfix", "fanout": 3 },
+        "delegation_chain": [
+          { "from": "orchestrator", "to": "developer", "note": "Bug #42 -- FANOUT-1" },
+          { "from": "orchestrator", "to": "developer", "note": "Bug #57 -- FANOUT-2" },
+          { "from": "orchestrator", "to": "developer", "note": "Bug #89 -- FANOUT-3" },
+          { "from": "orchestrator", "to": "code-reviewer" },
+          { "from": "orchestrator", "to": "git", "note": "Sammel-Commit" }
+        ],
+        "required_agents": ["orchestrator", "developer", "code-reviewer", "git"],
+        "critical_checks": ["3x developer parallel (agent_start ueberlappend)", "code-reviewer erst nach BARRIER (alle 3 developer beendet)"]
+      },
+      {
+        "id": "FW-03",
+        "name": "Multi-Intent Parallel (UI + DevOps + Performance)",
+        "user_input": "Erstelle ein Dashboard-UI, eine CI/CD-Pipeline dafuer, und optimiere die Ladezeit",
+        "expected_routing": { "from": "orchestrator", "to": "orchestrator", "intent": "Multi-Intent" },
+        "delegation_chain": [
+          { "from": "orchestrator", "to": "ui-ux-designer", "note": "Dashboard-UI" },
+          { "from": "orchestrator", "to": "devops-engineer", "note": "CI/CD-Pipeline" },
+          { "from": "orchestrator", "to": "performance-optimizer", "note": "Ladezeit-Optimierung" }
+        ],
+        "required_agents": ["orchestrator", "ui-ux-designer", "devops-engineer", "performance-optimizer"],
+        "critical_checks": ["3 verschiedene Agent-Typen parallel", "ui-ux-designer, devops-engineer, performance-optimizer alle parallel aktiv"]
+      },
+      {
+        "id": "FW-04",
+        "name": "API-Design Contract-First -> Developer",
+        "user_input": "Definiere eine REST-API: Geraeteverwaltung, Sensor-Daten, Konfiguration",
+        "expected_routing": { "from": "orchestrator", "to": "api-specialist", "intent": "API-Design" },
+        "delegation_chain": [
+          { "from": "api-specialist", "to": "developer", "note": "Implementierung nach Contract" },
+          { "from": "api-specialist", "to": "code-reviewer", "note": "API-Review" },
+          { "from": "api-specialist", "to": "export-manager", "note": "OpenAPI-Spec exportieren" }
+        ],
+        "required_agents": ["orchestrator", "api-specialist", "developer", "code-reviewer", "export-manager"],
+        "critical_checks": ["api-specialist muss JSON-Payload an developer uebergeben", "export-manager routet OpenAPI-Spec zum Target"]
+      },
+      {
+        "id": "FW-05",
+        "name": "Log-Analyse -> Feedback -> Issue",
+        "user_input": "Analysiere die Error-Logs der letzten 24 Stunden und erstelle Issues fuer kritische Fehler",
+        "expected_routing": { "from": "orchestrator", "to": "log-analyzer", "intent": "Log-Analyse" },
+        "delegation_chain": [
+          { "from": "log-analyzer", "to": "feedback", "note": "Kritische Findings als Issues" },
+          { "from": "feedback", "to": "git", "note": "GitHub Issue erstellen" }
+        ],
+        "required_agents": ["orchestrator", "log-analyzer", "feedback", "git"],
+        "critical_checks": ["log-analyzer muss Severity klassifizieren", "feedback muss Issue-Nummer im agent_end Payload haben"]
+      }
+    ]
+  }
+}

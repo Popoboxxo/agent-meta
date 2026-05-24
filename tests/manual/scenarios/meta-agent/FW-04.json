@@ -1,0 +1,38 @@
+{
+  "id": "FW-04",
+  "name": "API-Design Contract-First -> Developer",
+  "user_input": "Definiere eine REST-API: Geraeteverwaltung, Sensor-Daten, Konfiguration",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "api-specialist",
+    "intent": "API-Design"
+  },
+  "delegation_chain": [
+    {
+      "from": "api-specialist",
+      "to": "developer",
+      "note": "Implementierung nach Contract"
+    },
+    {
+      "from": "api-specialist",
+      "to": "code-reviewer",
+      "note": "API-Review"
+    },
+    {
+      "from": "api-specialist",
+      "to": "export-manager",
+      "note": "OpenAPI-Spec exportieren"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "api-specialist",
+    "developer",
+    "code-reviewer",
+    "export-manager"
+  ],
+  "critical_checks": [
+    "api-specialist muss JSON-Payload an developer uebergeben",
+    "export-manager routet OpenAPI-Spec zum Target"
+  ]
+}

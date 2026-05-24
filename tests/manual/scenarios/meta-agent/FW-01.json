@@ -1,0 +1,63 @@
+{
+  "id": "FW-01",
+  "name": "Feature-Lifecycle mit TDD",
+  "user_input": "Fuege eine Benutzer-Registrierung mit E-Mail-Verifikation hinzu",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "feature",
+    "intent": "Neues Feature"
+  },
+  "delegation_chain": [
+    {
+      "from": "feature",
+      "to": "git",
+      "note": "Branch anlegen"
+    },
+    {
+      "from": "feature",
+      "to": "requirements"
+    },
+    {
+      "from": "feature",
+      "to": "tester",
+      "note": "TDD Red"
+    },
+    {
+      "from": "feature",
+      "to": "developer"
+    },
+    {
+      "from": "feature",
+      "to": "tester",
+      "note": "TDD Green"
+    },
+    {
+      "from": "feature",
+      "to": "validator"
+    },
+    {
+      "from": "feature",
+      "to": "documenter"
+    },
+    {
+      "from": "feature",
+      "to": "git",
+      "note": "Commit + PR"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "feature",
+    "git",
+    "requirements",
+    "tester",
+    "developer",
+    "validator",
+    "documenter"
+  ],
+  "critical_checks": [
+    "tester muss VOR developer delegiert werden (TDD)",
+    "tester muss NACH developer erneut delegiert werden",
+    "kein direkter developer-Aufruf vom orchestrator"
+  ]
+}

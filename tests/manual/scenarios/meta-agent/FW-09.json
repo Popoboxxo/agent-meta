@@ -1,0 +1,31 @@
+{
+  "id": "FW-09",
+  "name": "Security-Audit (OWASP + Dependencies)",
+  "user_input": "Führe ein Security-Audit durch: Prüfe auf OWASP-Top-10, Secrets in Code und veraltete Dependencies",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "security-auditor",
+    "intent": "Security-Audit"
+  },
+  "delegation_chain": [
+    {
+      "from": "security-auditor",
+      "to": "feedback",
+      "note": "Findings als Issues melden"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "security-auditor",
+    "feedback"
+  ],
+  "critical_checks": [
+    "security-auditor darf nur lesen, keine Dateien ändern",
+    "Findings müssen Severity (Critical/High/Medium/Low) haben"
+  ],
+  "dry_run_notes": [
+    "Reine statische Analyse — keine Code-Änderungen",
+    "KEIN Issue erstellen ohne Bestätigung",
+    "Nur Read-Operationen auf Source-Code"
+  ]
+}

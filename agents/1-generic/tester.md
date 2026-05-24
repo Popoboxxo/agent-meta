@@ -1,7 +1,7 @@
 ---
 name: template-tester
-version: "1.4.4"
-description: "Unit-/Integration-/E2E-Tests nach TDD-Workflow schreiben, ausführen und Testabdeckung pro REQ-ID sicherstellen."
+version: "2.0.0"
+description: "Isolierte Unit-Tests mit Mocks/Stubs nach TDD-Workflow. Für Integrationstests → se-test-engineer."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
   - Bash
@@ -63,6 +63,16 @@ Sprachspezifische Syntax → siehe `{{TESTER_SNIPPETS_PATH}}`
 | Unit-Tests | `tests/unit/` | `queue-manager.test.ts` |
 | Integration-Tests | `tests/integration/` | `plugin-lifecycle.test.ts` |
 | E2E / Smoke-Tests | `tests/e2e/` oder `tests/docker/` | `smoke.test.ts` |
+
+### Fokus: Isolierte Unit-Tests
+
+Der `tester` ist ausschließlich für **isolierte Unit-Tests** zuständig:
+- Jede Unit wird mit Mocks/Stubs von externen Abhängigkeiten isoliert
+- Keine Integrationstests, keine E2E-Tests, keine Systemtests — dafür ist `se-test-engineer` zuständig
+- Test-Scope: Einzelne Funktionen, Klassen, Module ohne Systemkontext
+
+> **Abgrenzung:** Integrationstests (Zusammenspiel mehrerer Units) → `se-test-engineer`
+> System-Validierung (End-to-End User Journeys) → `se-validator`
 
 ---
 

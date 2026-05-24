@@ -1,0 +1,32 @@
+{
+  "id": "FW-05",
+  "name": "Log-Analyse -> Feedback -> Issue",
+  "user_input": "Analysiere die Error-Logs der letzten 24 Stunden und erstelle Issues fuer kritische Fehler",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "log-analyzer",
+    "intent": "Log-Analyse"
+  },
+  "delegation_chain": [
+    {
+      "from": "log-analyzer",
+      "to": "feedback",
+      "note": "Kritische Findings als Issues"
+    },
+    {
+      "from": "feedback",
+      "to": "git",
+      "note": "GitHub Issue erstellen"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "log-analyzer",
+    "feedback",
+    "git"
+  ],
+  "critical_checks": [
+    "log-analyzer muss Severity klassifizieren",
+    "feedback muss Issue-Nummer im agent_end Payload haben"
+  ]
+}

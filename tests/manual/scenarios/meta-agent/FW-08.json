@@ -1,0 +1,23 @@
+{
+  "id": "FW-08",
+  "name": "Meta-Fragen zu agent-meta Setup",
+  "user_input": "Wie führe ich sync.py aus und wie funktioniert die Agenten-Erweiterung?",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "agent-meta-manager",
+    "intent": "Meta-Fragen"
+  },
+  "delegation_chain": [],
+  "required_agents": [
+    "orchestrator",
+    "agent-meta-manager"
+  ],
+  "critical_checks": [
+    "orchestrator muss Meta-Intent erkennen und an agent-meta-manager routen",
+    "KEINE Code-Änderungen durch Meta-Fragen"
+  ],
+  "dry_run_notes": [
+    "Reine Informationsabfrage — keine Datei-Änderungen",
+    "Agent-meta-manager antwortet nur mit Erklärungen"
+  ]
+}

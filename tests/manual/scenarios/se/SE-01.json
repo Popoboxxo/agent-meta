@@ -1,0 +1,56 @@
+{
+  "id": "SE-01",
+  "name": "Vollstaendige SE-Kaskade (Linker Fluegel)",
+  "user_input": "Starte den SE-Prozess fuer einen Smart-Light IoT Controller mit Temperatursensor, Bewegungserkennung und WiFi-Anbindung",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "se-orchestrator",
+    "intent": "SE-Kaskade"
+  },
+  "delegation_chain": [
+    {
+      "from": "se-orchestrator",
+      "to": "se-requirements"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-architect"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-critic",
+      "note": "1. Durchlauf"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-architect",
+      "note": "Iteration nach Critic-Feedback"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-critic",
+      "note": "2. Durchlauf"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-termination"
+    },
+    {
+      "from": "se-orchestrator",
+      "to": "se-interface-mgr"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "se-orchestrator",
+    "se-requirements",
+    "se-architect",
+    "se-critic",
+    "se-termination",
+    "se-interface-mgr"
+  ],
+  "critical_checks": [
+    "se-architect muss zweimal delegiert werden (Iteration nach Critic)",
+    "se-termination muss leaf/continue Entscheidungen treffen"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "id": "FW-03",
+  "name": "Multi-Intent Parallel (UI + DevOps + Performance)",
+  "user_input": "Erstelle ein Dashboard-UI, eine CI/CD-Pipeline dafuer, und optimiere die Ladezeit",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "orchestrator",
+    "intent": "Multi-Intent"
+  },
+  "delegation_chain": [
+    {
+      "from": "orchestrator",
+      "to": "ui-ux-designer",
+      "note": "Dashboard-UI"
+    },
+    {
+      "from": "orchestrator",
+      "to": "devops-engineer",
+      "note": "CI/CD-Pipeline"
+    },
+    {
+      "from": "orchestrator",
+      "to": "performance-optimizer",
+      "note": "Ladezeit-Optimierung"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "ui-ux-designer",
+    "devops-engineer",
+    "performance-optimizer"
+  ],
+  "critical_checks": [
+    "3 verschiedene Agent-Typen parallel",
+    "ui-ux-designer, devops-engineer, performance-optimizer alle parallel aktiv"
+  ]
+}

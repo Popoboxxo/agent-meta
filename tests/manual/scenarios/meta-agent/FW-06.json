@@ -1,0 +1,37 @@
+{
+  "id": "FW-06",
+  "name": "Release erstellen (Version Bump + Changelog)",
+  "user_input": "Erstelle Release v1.2.0 mit Changelog und GitHub Release",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "release",
+    "intent": "Release"
+  },
+  "delegation_chain": [
+    {
+      "from": "release",
+      "to": "git",
+      "note": "Version Bump Commit"
+    },
+    {
+      "from": "release",
+      "to": "documenter",
+      "note": "Changelog generieren"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "release",
+    "git",
+    "documenter"
+  ],
+  "critical_checks": [
+    "release muss Version Bump und Changelog erstellen",
+    "Kein echter Push ohne Bestätigung (Planungsmodus)"
+  ],
+  "dry_run_notes": [
+    "Nur Version-Dateien und Changelog aktualisieren",
+    "KEIN git push oder GitHub Release erstellen",
+    "KEIN echter Tag anlegen"
+  ]
+}

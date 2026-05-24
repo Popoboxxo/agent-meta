@@ -1,0 +1,31 @@
+{
+  "id": "FW-07",
+  "name": "Dokumentation eines neuen Features",
+  "user_input": "Dokumentiere das neue Login-Feature: Update README, Architektur-Doku und erstelle einen Abschnitt in CODEBASE_OVERVIEW",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "documenter",
+    "intent": "Dokumentation"
+  },
+  "delegation_chain": [
+    {
+      "from": "documenter",
+      "to": "git",
+      "note": "Doku-Commit"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "documenter",
+    "git"
+  ],
+  "critical_checks": [
+    "documenter muss README, CODEBASE_OVERVIEW und Architektur aktualisieren",
+    "Doku-Changes müssen auf Feature-Code referenzieren"
+  ],
+  "dry_run_notes": [
+    "Nur lokale Markdown-Dateien bearbeiten",
+    "KEIN Commit ohne explizite Bestätigung",
+    "Dateien werden in der Arbeitskopie geändert, nicht gepusht"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "SE-02",
+  "name": "V&V Rechter Fluegel",
+  "user_input": "Fuehre Verifikation und Validierung fuer das Smart-Light System durch",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "se-integration-and-test-manager",
+    "intent": "V&V"
+  },
+  "delegation_chain": [
+    {
+      "from": "se-integration-and-test-manager",
+      "to": "se-test-engineer"
+    },
+    {
+      "from": "se-integration-and-test-manager",
+      "to": "se-testreviewer"
+    },
+    {
+      "from": "se-integration-and-test-manager",
+      "to": "se-verifier"
+    },
+    {
+      "from": "se-integration-and-test-manager",
+      "to": "se-validator"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "se-integration-and-test-manager",
+    "se-test-engineer",
+    "se-testreviewer",
+    "se-verifier",
+    "se-validator"
+  ],
+  "critical_checks": [
+    "se-test-engineer vor se-testreviewer",
+    "se-verifier vor se-validator",
+    "se-validator nur auf L1"
+  ]
+}

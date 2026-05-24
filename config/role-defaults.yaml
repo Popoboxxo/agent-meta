@@ -36,13 +36,13 @@ roles:
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
 
   developer:
-    model: ""           # erbt — oft das stärkste verfügbare Modell gewünscht
+    model: powerful          # erbt — oft das stärkste verfügbare Modell gewünscht
     memory: ""
     workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
 
   requirements:
-    model: ""           # erbt
+    model: balanced
     memory: project
     workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
@@ -73,7 +73,7 @@ roles:
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
 
   documenter:
-    model: balanced
+    model: fast
     memory: project
     workflow_tier: recommended
     description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
@@ -128,7 +128,7 @@ roles:
     description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
 
   feedback:
-    model: balanced
+    model: fast
     memory: ""
     workflow_tier: required
     description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
@@ -174,3 +174,71 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch."
+
+  se-test-engineer:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel."
+
+  se-testreviewer:
+    model: powerful
+    memory: ""
+    permission_mode: plan
+    workflow_tier: optional
+    description: "Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness."
+
+  se-verifier:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen."
+
+  se-validator:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse."
+
+  se-integration-and-test-manager:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen."
+
+  code-reviewer:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: recommended
+    description: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+
+  ui-ux-designer:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "UI-Spezifikationen, Mockups und Design-Systeme erstellen."
+
+  api-specialist:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen."
+
+  devops-engineer:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "CI/CD, Infrastructure as Code, Kubernetes, Observability."
+
+  performance-optimizer:
+    model: powerful
+    memory: ""
+    workflow_tier: optional
+    description: "Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung."
+
+  export-manager:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."

@@ -1,0 +1,47 @@
+{
+  "id": "FW-02",
+  "name": "Multi-Fix FANOUT mit Code-Review",
+  "user_input": "Fix Bugs #42, #57 und #89 -- alle in verschiedenen Modulen",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "developer",
+    "intent": "Bugfix",
+    "fanout": 3
+  },
+  "delegation_chain": [
+    {
+      "from": "orchestrator",
+      "to": "developer",
+      "note": "Bug #42 -- FANOUT-1"
+    },
+    {
+      "from": "orchestrator",
+      "to": "developer",
+      "note": "Bug #57 -- FANOUT-2"
+    },
+    {
+      "from": "orchestrator",
+      "to": "developer",
+      "note": "Bug #89 -- FANOUT-3"
+    },
+    {
+      "from": "orchestrator",
+      "to": "code-reviewer"
+    },
+    {
+      "from": "orchestrator",
+      "to": "git",
+      "note": "Sammel-Commit"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "developer",
+    "code-reviewer",
+    "git"
+  ],
+  "critical_checks": [
+    "3x developer parallel (agent_start ueberlappend)",
+    "code-reviewer erst nach BARRIER (alle 3 developer beendet)"
+  ]
+}

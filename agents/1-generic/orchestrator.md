@@ -94,6 +94,12 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | Release erstellen / Version bump | `release` | `balanced` | Nein (sequentiell) | "Erstelle Release v1.2.0" |
 {{#if SE_ENABLED}}
 | **Systems Engineering / SE-Kaskade** | `se-orchestrator` | `balanced` → `powerful` | Nein (Orchestrator) | "Starte den SE-Prozess", "Breche Anforderungen herunter" |
+| **Code-Qualitäts-Audit** / Clean Code / Blast-Radius | `code-reviewer` | `powerful` | Nein (Abhängigkeiten) | "Review den Code", "Blast-Radius prüfen" |
+| **UI-Design** / Mockups / Design-System | `ui-ux-designer` | `balanced` | Ja (Multi-Screens) | "Entwirf ein Dashboard", "Design-System erstellen" |
+| **API-Design** / OpenAPI / Contract-First | `api-specialist` | `balanced` | Nein (sequentiell) | "Erstelle eine API-Spec", "OpenAPI definieren" |
+| **CI/CD** / Infrastruktur / Kubernetes | `devops-engineer` | `fast` | Ja (Multi-Services) | "Pipeline erstellen", "K8s konfigurieren" |
+| **Performance** / Bottlenecks / Profiling | `performance-optimizer` | `powerful` | Nein (sequentiell) | "Performance analysieren", "Bottleneck finden" |
+| **Export** / Target-Routing / Confluence | `export-manager` | `fast` | Nein (atomar) | "Exportiere nach Confluence", "ADR speichern" |
 {{/if}}
 | **Batch-Operationen** (mehrere gleiche Tasks) | — | — | **Ja** | "Fix 3 Bugs", "Schreib Tests für A,B,C" |
 | **Nicht in Tabelle** | Frag den User | — | — | — |
@@ -452,6 +458,11 @@ Analyse- und Design-Aufgaben gehören **niemals** in den Hauptchat und werden **
 | `se-critic`      | Prüft Architekturentscheidungen (Orthogonalität, Testbarkeit) | ✅ (Multi-Prüfungen) |
 | `se-interface-mgr`| Verwaltet und validiert Schnittstellenverträge | ❌ (zentral) |
 | `se-termination` | Entscheidet über L3-Component-Leaf-Node-Erreichung | ❌ (schnell) |
+| `se-test-engineer` | MBSE-Testmodelle, Integrationstests | ✅ (Multi-Strategien) |
+| `se-testreviewer` | Teststrategie-Audit, Edge-Case-Prüfung | ✅ (Multi-Reviews) |
+| `se-verifier` | Multi-Level Verification (L1-Ln) | ✅ (Multi-Ebenen) |
+| `se-validator` | L1 System-Validierung, User Journeys | ❌ (sequentiell) |
+| `se-integration-and-test-manager` | V&V-Orchestrator, Integrationsstrategie | ❌ (Meta-Orchestrator) |
 {{/if}}
 
 Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten für unabhängige Schritte (∥).
@@ -493,6 +504,11 @@ T  Multi-Docs:      FANOUT(N, documenter, [doc₁..docₙ]) → BARRIER
 {{#if SE_ENABLED}}
 U  SE-Kaskade:      se-orchestrator → koordiniert (se-requirements, se-architect, se-critic, se-interface-mgr, se-termination)
 {{/if}}
+V  Code-Review:     code-reviewer → Blast-Radius + Clean-Code-Audit
+W  UI-Design:       ui-ux-designer → Mockups + UI-Spec → developer
+X  API-Design:      api-specialist → OpenAPI-Spec → developer
+Y  Performance:     performance-optimizer → Profiling → Empfehlungen → developer
+Z  Export:          export-manager → Target-Routing (markdown/confluence/jira)
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).

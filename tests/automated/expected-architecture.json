@@ -1,0 +1,246 @@
+{
+  "level": "L2",
+  "type": "system_architecture",
+  "source_requirements": [
+    "REQ-L1-001", "REQ-L1-002", "REQ-L1-003", "REQ-L1-004", "REQ-L1-005",
+    "REQ-L1-006", "REQ-L1-007", "REQ-L1-008", "REQ-L1-009", "REQ-L1-010",
+    "REQ-L1-011", "REQ-L1-012", "REQ-L1-013", "REQ-L1-014", "REQ-L1-015"
+  ],
+  "systems": [
+    {
+      "id": "SYS-001",
+      "name": "Sensor Subsystem",
+      "description": "Captures environmental data from the room — motion and ambient light levels",
+      "source_requirements": ["REQ-L1-001", "REQ-L1-002", "REQ-L1-003", "REQ-L1-010"],
+      "components": [
+        {
+          "id": "COMP-001",
+          "name": "Motion Detector",
+          "type": "sensor",
+          "description": "PIR sensor that detects presence changes in the room",
+          "interface": ["SIG-MOTION", "SIG-SENSOR-STATUS"]
+        },
+        {
+          "id": "COMP-002",
+          "name": "Ambient Light Sensor",
+          "type": "sensor",
+          "description": "Photodiode-based lux meter for ambient light measurement",
+          "interface": ["SIG-LUX", "SIG-SENSOR-STATUS"]
+        },
+        {
+          "id": "COMP-003",
+          "name": "Sensor Signal Preprocessor",
+          "type": "processor",
+          "description": "Filters and normalizes raw sensor signals, applies debouncing and threshold logic",
+          "interface": ["SIG-MOTION", "SIG-LUX", "SIG-SENSOR-RAW", "SIG-SENSOR-CLEAN"]
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-001",
+          "name": "Sensor Data Bus",
+          "type": "internal",
+          "signals": ["SIG-MOTION", "SIG-LUX", "SIG-SENSOR-STATUS", "SIG-SENSOR-RAW", "SIG-SENSOR-CLEAN"]
+        }
+      ]
+    },
+    {
+      "id": "SYS-002",
+      "name": "Control Unit",
+      "description": "Central processing unit that executes control logic, manages schedules, and coordinates actuators",
+      "source_requirements": ["REQ-L1-001", "REQ-L1-002", "REQ-L1-003", "REQ-L1-012", "REQ-L1-015"],
+      "components": [
+        {
+          "id": "COMP-004",
+          "name": "Control Logic Engine",
+          "type": "processor",
+          "description": "Executes the main control algorithm — maps sensor inputs to actuator commands based on rules and schedules",
+          "interface": ["SIG-SENSOR-CLEAN", "SIG-LIGHT-CMD", "SIG-SCHEDULE-EVENT", "SIG-SELFTEST-RESULT"]
+        },
+        {
+          "id": "COMP-005",
+          "name": "Schedule Manager",
+          "type": "processor",
+          "description": "Manages time-based lighting schedules and overrides",
+          "interface": ["SIG-SCHEDULE-EVENT", "SIG-TIME-TRIGGER"]
+        },
+        {
+          "id": "COMP-006",
+          "name": "Local Fallback Controller",
+          "type": "processor",
+          "description": "Ensures full local operation when cloud is unavailable — mirrors control logic without cloud dependency",
+          "interface": ["SIG-SENSOR-CLEAN", "SIG-LIGHT-CMD", "SIG-CLOUD-STATUS"]
+        },
+        {
+          "id": "COMP-007",
+          "name": "Self-Test Module",
+          "type": "processor",
+          "description": "Runs startup diagnostics on all components and reports results",
+          "interface": ["SIG-SELFTEST-CMD", "SIG-SELFTEST-RESULT", "SIG-SENSOR-STATUS", "SIG-ACTUATOR-STATUS"]
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-002",
+          "name": "Control Internal Bus",
+          "type": "internal",
+          "signals": ["SIG-SENSOR-CLEAN", "SIG-LIGHT-CMD", "SIG-SCHEDULE-EVENT", "SIG-TIME-TRIGGER", "SIG-CLOUD-STATUS", "SIG-SELFTEST-CMD", "SIG-SELFTEST-RESULT"]
+        }
+      ]
+    },
+    {
+      "id": "SYS-003",
+      "name": "Actuator Subsystem",
+      "description": "Physical output stage — switches and dims lighting circuits based on control commands",
+      "source_requirements": ["REQ-L1-001", "REQ-L1-002", "REQ-L1-004", "REQ-L1-006", "REQ-L1-014"],
+      "components": [
+        {
+          "id": "COMP-008",
+          "name": "Light Switch Relay",
+          "type": "actuator",
+          "description": "230V relay for on/off switching of lighting circuits",
+          "interface": ["SIG-LIGHT-CMD", "SIG-RELAY-STATE", "SIG-ACTUATOR-STATUS"]
+        },
+        {
+          "id": "COMP-009",
+          "name": "Dimmer Module",
+          "type": "actuator",
+          "description": "Phase-cut dimmer for stepless brightness control (10%-100%)",
+          "interface": ["SIG-LIGHT-CMD", "SIG-DIMMER-LEVEL", "SIG-ACTUATOR-STATUS"]
+        },
+        {
+          "id": "COMP-010",
+          "name": "Actuator Driver",
+          "type": "processor",
+          "description": "Translates high-level light commands into hardware-specific signals for relay and dimmer",
+          "interface": ["SIG-LIGHT-CMD", "SIG-RELAY-STATE", "SIG-DIMMER-LEVEL"]
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-003",
+          "name": "Actuator Control Bus",
+          "type": "internal",
+          "signals": ["SIG-LIGHT-CMD", "SIG-RELAY-STATE", "SIG-DIMMER-LEVEL", "SIG-ACTUATOR-STATUS"]
+        }
+      ]
+    },
+    {
+      "id": "SYS-004",
+      "name": "Cloud Gateway Subsystem",
+      "description": "Handles all cloud communication — MQTT connectivity, data compression, OTA updates, and remote diagnostics",
+      "source_requirements": ["REQ-L1-007", "REQ-L1-008", "REQ-L1-009", "REQ-L1-011", "REQ-L1-013"],
+      "components": [
+        {
+          "id": "COMP-011",
+          "name": "MQTT Client",
+          "type": "communication",
+          "description": "Maintains persistent MQTT connection with automatic reconnection and message queuing",
+          "interface": ["SIG-CLOUD-STATUS", "SIG-MQTT-PUBLISH", "SIG-MQTT-SUBSCRIBE", "SIG-MQTT-QUEUE"]
+        },
+        {
+          "id": "COMP-012",
+          "name": "Data Compressor",
+          "type": "processor",
+          "description": "Compresses sensor data and transmits only on state changes to minimize bandwidth",
+          "interface": ["SIG-SENSOR-CLEAN", "SIG-COMPRESSED-DATA", "SIG-CLOUD-STATUS"]
+        },
+        {
+          "id": "COMP-013",
+          "name": "OTA Update Manager",
+          "type": "processor",
+          "description": "Handles firmware update download, verification, installation, and rollback",
+          "interface": ["SIG-OTA-PACKAGE", "SIG-OTA-STATUS", "SIG-OTA-VERIFY"]
+        },
+        {
+          "id": "COMP-014",
+          "name": "Privacy Filter",
+          "type": "processor",
+          "description": "Anonymizes presence data before cloud transmission, enforces GDPR compliance",
+          "interface": ["SIG-SENSOR-CLEAN", "SIG-ANONYMIZED-DATA", "SIG-PRIVACY-LOG"]
+        },
+        {
+          "id": "COMP-015",
+          "name": "Remote Diagnostics Interface",
+          "type": "communication",
+          "description": "Provides remote access to system status, sensor readings, and error history",
+          "interface": ["SIG-DIAG-REQUEST", "SIG-DIAG-RESPONSE", "SIG-ERROR-HISTORY"]
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-004",
+          "name": "Cloud Communication Bus",
+          "type": "external",
+          "signals": ["SIG-CLOUD-STATUS", "SIG-MQTT-PUBLISH", "SIG-MQTT-SUBSCRIBE", "SIG-MQTT-QUEUE", "SIG-COMPRESSED-DATA", "SIG-ANONYMIZED-DATA", "SIG-OTA-PACKAGE", "SIG-OTA-STATUS", "SIG-OTA-VERIFY", "SIG-DIAG-REQUEST", "SIG-DIAG-RESPONSE", "SIG-ERROR-HISTORY", "SIG-PRIVACY-LOG"]
+        }
+      ]
+    },
+    {
+      "id": "SYS-005",
+      "name": "Error & Diagnostics Subsystem",
+      "description": "Centralized error handling, standardized error codes, and system health monitoring",
+      "source_requirements": ["REQ-L1-005", "REQ-L1-006", "REQ-L1-013", "REQ-L1-014", "REQ-L1-015"],
+      "components": [
+        {
+          "id": "COMP-016",
+          "name": "Error Code Manager",
+          "type": "processor",
+          "description": "Maps internal faults to standardized IEC 62056 error codes",
+          "interface": ["SIG-INTERNAL-ERROR", "SIG-STANDARD-ERROR-CODE", "SIG-ERROR-HISTORY"]
+        },
+        {
+          "id": "COMP-017",
+          "name": "Health Monitor",
+          "type": "processor",
+          "description": "Continuously monitors system health and triggers alerts on degradation",
+          "interface": ["SIG-HEALTH-STATUS", "SIG-SENSOR-STATUS", "SIG-ACTUATOR-STATUS", "SIG-CLOUD-STATUS"]
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-005",
+          "name": "Diagnostics Bus",
+          "type": "internal",
+          "signals": ["SIG-INTERNAL-ERROR", "SIG-STANDARD-ERROR-CODE", "SIG-ERROR-HISTORY", "SIG-HEALTH-STATUS", "SIG-SENSOR-STATUS", "SIG-ACTUATOR-STATUS", "SIG-CLOUD-STATUS"]
+        }
+      ]
+    }
+  ],
+  "signal_flow": [
+    {"from": "COMP-001", "to": "COMP-003", "signal": "SIG-MOTION", "sync_type": "async"},
+    {"from": "COMP-002", "to": "COMP-003", "signal": "SIG-LUX", "sync_type": "async"},
+    {"from": "COMP-003", "to": "COMP-004", "signal": "SIG-SENSOR-CLEAN", "sync_type": "sync"},
+    {"from": "COMP-003", "to": "COMP-006", "signal": "SIG-SENSOR-CLEAN", "sync_type": "sync"},
+    {"from": "COMP-003", "to": "COMP-012", "signal": "SIG-SENSOR-CLEAN", "sync_type": "async"},
+    {"from": "COMP-003", "to": "COMP-014", "signal": "SIG-SENSOR-CLEAN", "sync_type": "async"},
+    {"from": "COMP-004", "to": "COMP-010", "signal": "SIG-LIGHT-CMD", "sync_type": "sync"},
+    {"from": "COMP-005", "to": "COMP-004", "signal": "SIG-SCHEDULE-EVENT", "sync_type": "async"},
+    {"from": "COMP-006", "to": "COMP-010", "signal": "SIG-LIGHT-CMD", "sync_type": "sync"},
+    {"from": "COMP-010", "to": "COMP-008", "signal": "SIG-RELAY-STATE", "sync_type": "sync"},
+    {"from": "COMP-010", "to": "COMP-009", "signal": "SIG-DIMMER-LEVEL", "sync_type": "sync"},
+    {"from": "COMP-007", "to": "COMP-001", "signal": "SIG-SELFTEST-CMD", "sync_type": "sync"},
+    {"from": "COMP-007", "to": "COMP-002", "signal": "SIG-SELFTEST-CMD", "sync_type": "sync"},
+    {"from": "COMP-007", "to": "COMP-008", "signal": "SIG-SELFTEST-CMD", "sync_type": "sync"},
+    {"from": "COMP-007", "to": "COMP-009", "signal": "SIG-SELFTEST-CMD", "sync_type": "sync"},
+    {"from": "COMP-001", "to": "COMP-007", "signal": "SIG-SENSOR-STATUS", "sync_type": "async"},
+    {"from": "COMP-002", "to": "COMP-007", "signal": "SIG-SENSOR-STATUS", "sync_type": "async"},
+    {"from": "COMP-008", "to": "COMP-007", "signal": "SIG-ACTUATOR-STATUS", "sync_type": "async"},
+    {"from": "COMP-009", "to": "COMP-007", "signal": "SIG-ACTUATOR-STATUS", "sync_type": "async"},
+    {"from": "COMP-012", "to": "COMP-011", "signal": "SIG-COMPRESSED-DATA", "sync_type": "async"},
+    {"from": "COMP-014", "to": "COMP-011", "signal": "SIG-ANONYMIZED-DATA", "sync_type": "async"},
+    {"from": "COMP-011", "to": "COMP-013", "signal": "SIG-OTA-PACKAGE", "sync_type": "async"},
+    {"from": "COMP-013", "to": "COMP-004", "signal": "SIG-OTA-STATUS", "sync_type": "async"},
+    {"from": "COMP-015", "to": "COMP-011", "signal": "SIG-DIAG-RESPONSE", "sync_type": "async"},
+    {"from": "COMP-011", "to": "COMP-015", "signal": "SIG-DIAG-REQUEST", "sync_type": "async"},
+    {"from": "COMP-016", "to": "COMP-015", "signal": "SIG-ERROR-HISTORY", "sync_type": "async"},
+    {"from": "COMP-017", "to": "COMP-016", "signal": "SIG-INTERNAL-ERROR", "sync_type": "async"},
+    {"from": "COMP-017", "to": "COMP-011", "signal": "SIG-CLOUD-STATUS", "sync_type": "async"},
+    {"from": "COMP-011", "to": "COMP-006", "signal": "SIG-CLOUD-STATUS", "sync_type": "async"}
+  ],
+  "architecture_audit": {
+    "orthogonality": "pass",
+    "testability": "pass",
+    "traceability": "pass"
+  }
+}

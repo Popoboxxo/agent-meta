@@ -32,6 +32,17 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `se-orchestrator` | Coordinates the 6-level recursive breakdown |
 | `se-requirements` | Use this agent to clarify requirements and start the SE cascade. |
 | `se-termination` | Deterministic termination at L3 (Component Requirement) |
+| `se-test-engineer` | MBSE-Testmodelle, Integrationstests für den rechten V-Modell-Flügel |
+| `se-testreviewer` | Teststrategie-Audit: Edge-Cases, Boundary Values, Flakiness-Prüfung |
+| `se-verifier` | Multi-Level Verification (L1-Ln): Integrierte Systeme gegen Spezifikation |
+| `se-validator` | L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse |
+| `se-integration-and-test-manager` | V&V-Orchestrator: Integrationsstrategie und Test-Koordination |
+| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius, SOLID/DRY, Code-Qualitäts-Audit |
+| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen |
+| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
+| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability |
+| `performance-optimizer` | Big-O Bottleneck-Identifikation, datengetriebene Performance-Optimierung |
+| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira, Notion |
 
 ## Regeln
 

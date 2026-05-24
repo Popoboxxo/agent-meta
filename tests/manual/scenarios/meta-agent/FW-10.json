@@ -1,0 +1,31 @@
+{
+  "id": "FW-10",
+  "name": "Ideation zu Requirements (Feature-Idee formalisieren)",
+  "user_input": "Ich habe eine Idee: Ein Dashboard, das alle Agenten-Aktivitäten in Echtzeit anzeigt. Formalisiere das als Requirements.",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "ideation",
+    "intent": "Ideation"
+  },
+  "delegation_chain": [
+    {
+      "from": "ideation",
+      "to": "requirements",
+      "note": "REQ-IDs vergeben"
+    }
+  ],
+  "required_agents": [
+    "orchestrator",
+    "ideation",
+    "requirements"
+  ],
+  "critical_checks": [
+    "ideation muss Scope schärfen und an requirements übergeben",
+    "requirements muss REQ-IDs vergeben und REQUIREMENTS.md pflegen"
+  ],
+  "dry_run_notes": [
+    "Nur REQUIREMENTS.md aktualisieren",
+    "KEIN Branch anlegen ohne Bestätigung",
+    "Keine Implementierung — nur Anforderungen dokumentieren"
+  ]
+}

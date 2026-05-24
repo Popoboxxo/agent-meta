@@ -1,0 +1,20 @@
+{
+  "id": "SE-05",
+  "name": "Stakeholder-Validierung (L1)",
+  "user_input": "Validiere das fertige Smart-Light System gegen die urspruenglichen Stakeholder-Anforderungen",
+  "expected_routing": {
+    "from": "orchestrator",
+    "to": "se-validator",
+    "intent": "Validierung"
+  },
+  "delegation_chain": [],
+  "required_agents": [
+    "orchestrator",
+    "se-validator"
+  ],
+  "critical_checks": [
+    "se-validator darf keinen Code lesen",
+    "se-validator muss End-to-End User Journeys simulieren",
+    "Keine Delegation von se-validator zu code-reviewer oder developer"
+  ]
+}
