@@ -1,485 +1,428 @@
 # agent-meta
 
-> [!WARNING]
-> ## VibeCoding Experiment — Read Before Using
-> This repository is intentionally run as a **VibeCoding experiment**.
-> The primary goal is to demonstrate both the **benefits** and **risks** of LLM-driven development on a real but minimal project around Sharkord.
->
-> ### Ground rules of this repo
-> - **Source code interventions should happen only in absolute emergencies.**
-> - The preferred workflow is to explore how far we can get with LLM providers, agent orchestration, and prompt-driven iteration.
-> - This project is a **sandbox/playground** for experimenting with different AI coding styles, tooling, and operational patterns.
-> - "Production hardening" is not the primary objective; learning effects and transparent trade-offs are.
-> - And yes: it is also just a fun way to spend an evening with the Dudes on Sharkord, trying out weird and funny plugin ideas. :)
->
-> In short: this is a practical lab setup around Sharkord to evaluate VibeCoding methods, compare approaches, and optionally extend a cool project while making limitations visible.
+[![Version](https://img.shields.io/badge/version-0.53.0-blue.svg)]()
+[![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
----
+> Standardized AI agent templates with multi-provider support, orchestrator-first architecture, and Systems Engineering cascade.
 
-Central meta-repository for standardizing and reusing Claude agent roles across all projects.
-Provides generic agent templates that are instantiated per project via `sync.py`.
+## Table of Contents
 
-**Current version:** `0.49.0`
+- [Features](#features)
+- [Architecture](#architecture)
+- [Agent Roster](#agent-roster)
+- [Quick Start](#quick-start)
+- [Setup](#setup)
+- [Repository Structure](#repository-structure)
+- [Configuration](#configuration)
+- [Workflows](#workflows)
+- [Contributing](#contributing)
+- [License](#license)
 
----
+## Features
 
-## What is agent-meta?
+- **Multi-Provider Support:** Claude (VS Code), Gemini (VS Code/Antigravity), Opencode, Continue — define once in generic templates, generate per provider via `sync.py`.
+- **Three-Layer Architecture:** `1-generic/` (universal, provider-agnostic) → `2-platform/` (platform-specific overrides) → `0-external/` (external skill agents via Git submodules).
+- **Orchestrator-First:** Every development task flows through the orchestrator, which decomposes complex tasks into sub-tasks with FANOUT, PARALLEL_GROUP, BARRIER, PIPELINE, and LIFECYCLE dispatch patterns.
+- **Systems Engineering Cascade:** A recursive 6-level (L1–L3) model-based system decomposition with dedicated agents for requirements, architecture, critique, interface management, termination, verification, and validation.
+- **Agent Visualization:** Static Mermaid mindmap + interactive HTML graph + dynamic session event tracking (Gantt, sequence diagrams) + live browser dashboard.
+- **MCP Server Management:** Global server registry, per-project activation, automatic provider config generation with secret scanning and `.gitignore` management.
+- **Provider Isolation:** Hard-blocks between provider directories to prevent cross-provider contamination during sync.
+- **Extension System:** Managed blocks + project-specific extension files (`3-project/<prefix>-<role>-ext.md`) that add project knowledge without touching generated files.
+- **External Skills:** Git submodule-based third-party agent integration with approval gating and skill wrappers.
+- **Speech Modes:** `full`, `short`, `childish`, `caveman`, `asozial`, `submissive` — configurable communication styles.
+- **Lifecycle Triggers:** `on-release` and `on-merge` hooks that automatically dispatch tasks (e.g., validation, code review) after Git events.
+- **DoD Presets:** `rapid-prototyping`, `strict`, `enterprise` — configurable quality profiles controlling REQ traceability, tests, codebase overview, and security audit.
+- **Config-Driven Generation:** All configuration lives in `config/` (role defaults, DoD presets, MCP registry, AI providers, skills registry) — `sync.py` reads and generates everything.
+- **Versioned Templates:** Every agent template carries a semantic version in its frontmatter; platform agents track their base version.
+- **AI Provider Tier Routing:** Five abstract model tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) are mapped per provider to concrete model IDs — cost-efficient model selection.
+- **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
+- **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
 
-`agent-meta` is a Git submodule that projects include to get a standardized multi-agent system — usable across multiple AI providers from a single source of truth.
+## Architecture
 
-**Core principle: Define once, transform per provider.**
-Agent roles, rules, skills, hooks, and commands are defined once in provider-agnostic source files (`agents/1-generic/`, `rules/1-generic/`, ...). `sync.py` transforms them at build time into provider-ready artifacts:
-
-| Provider | Agents | Rules | Commands |
-|----------|--------|-------|----------|
-| Claude Code | `.claude/agents/` | `.claude/rules/` | `.claude/commands/` |
-| Gemini CLI | `.gemini/agents/` | `.gemini/rules/` | `.gemini/commands/` |
-| Opencode | `.opencode/agents/` | *(embedded in AGENTS.md)* | `.opencode/commands/` |
-| Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` |
-
-Platform- and project-specific layers stack on top of the generic definitions — but always remain provider-agnostic in their source. No knowledge needs to be maintained twice.
-
-It provides:
-
-- **Generic agent templates** for orchestrator, developer, tester, validator, requirements engineer, documenter, release, docker, and systems engineering (SE) cascade roles
-- **Orchestrator-First Architecture** (Beta): Universal task decomposition with parallel FANOUT/PARALLEL_GROUP dispatch, provider-agnostic across Claude, Opencode, Gemini, and Continue
-- **Platform-specific overrides** (e.g., Sharkord plugins) that extend generic agents
-- **A sync script** (`sync.py`) that generates provider-ready agent files from a single set of templates
-- **An extension system** that lets projects add project-specific knowledge without touching generated files
-- **Agent visualization** (opt-in): auto-generated mindmaps of all agents + dynamic session tracking with event reports (Gantt, sequence diagrams, live watch)
-
----
-
-## Three-Layer Architecture
+### Three-Layer Override Chain
 
 ```
-1-generic/    Universal agents — generated for every project
-2-platform/   Platform-specific — overrides generic agents for a specific platform
-3-project/    Project-specific — either full overrides or additive extensions
+0-external/   → External skill agents (Git submodules, approved/unapproved)
+     ↓
+1-generic/    → Universal provider-agnostic templates (always generated)
+     ↓
+2-platform/   → Platform-specific overrides (composition or full replacement)
+     ↓
+3-project/    → Project-specific extensions (<role>.md or <role>-ext.md)
 ```
 
-**Override priority:**
+### Config-Driven Generation
+
 ```
-1-generic  ←  overridden by  →  2-platform  ←  overridden by  →  3-project/<role>.md
+config/role-defaults.yaml
+config/dod-presets.yaml
+config/ai-providers.yaml
+config/skills-registry.yaml
+config/mcp-registry.yaml
+         ↓
+    sync.py
+         ↓
+.claude/agents/  |  .gemini/agents/  |  .opencode/agents/  |  .continue/agents/
 ```
 
-**Extensions (additive, not override):**
-```
-generated agent  +  .claude/3-project/<prefix>-<role>-ext.md  =  full agent context
+### Orchestrator Dispatch Patterns
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **FANOUT** | N instances of same agent type in parallel | 3× `developer` for 3 bugfixes |
+| **PARALLEL_GROUP** | Different agent types simultaneously | `developer` ∥ `tester` |
+| **BARRIER** | Wait for all parallel tasks before proceeding | Collect results from FANOUT |
+| **PIPELINE** | Sequential steps with dependencies | requirements → dev → test |
+| **LIFECYCLE** | Complete end-to-end feature workflow | Branch → REQ → TDD → Dev → Validate → PR |
+
+### Provider Generation Matrix
+
+| Provider | Agents | Rules | Commands | Config |
+|----------|--------|-------|----------|--------|
+| Claude (VS Code) | `.claude/agents/` | `.claude/rules/` | `.claude/commands/` | `.claude/settings.json` |
+| Gemini (VS Code/Antigravity) | `.gemini/agents/` | `.gemini/rules/` | `.gemini/commands/` (TOML) | `.gemini/settings.json` |
+| Opencode | `.opencode/agents/` | Embedded in AGENTS.md | `.opencode/commands/` | `opencode.json` |
+| Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` | `.continue/config.yaml` |
+
+### Three-Layer Agent Composition
+
+Platform-specific (`2-platform/`) and project-specific (`3-project/`) agents can extend generic templates:
+
+```yaml
+extends: "1-generic/<role>.md"
+patches:
+  - op: append-after
+    anchor: "## Some Section"
+    content: "## Additional Content..."
+  - op: replace
+    anchor: "## Section"
+    content: "## Replaced Content..."
+  - op: delete
+    anchor: "## Section"
+  - op: append
+    content: "## Appended Content..."
 ```
 
----
+## Agent Roster
+
+### Generic Agents
+
+| Agent | Tier | Description |
+|-------|------|-------------|
+| **orchestrator** | balanced | Entry point for ALL development tasks — decomposes, parallelizes, delegates with FANOUT/PARALLEL_GROUP/PIPELINE |
+| **developer** | powerful | Feature implementation and bugfixes |
+| **tester** | balanced | TDD, test suite execution, coverage per REQ-ID |
+| **validator** | balanced | DoD checklist, REQ traceability audit, code quality gate |
+| **requirements** | balanced | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
+| **documenter** | fast | Maintain CODEBASE_OVERVIEW, ARCHITECTURE, README, session conclusions |
+| **feature** | — | Full feature lifecycle sub-agent: Branch → REQ → TDD → Dev → Validate → PR |
+| **ideation** | — | Explore new ideas, sharpen vision, structured handoff to requirements |
+| **git** | fast | All Git operations: commits, branches, tags, push/pull, GitHub issues/PRs |
+| **release** | balanced | Versioning, changelog, build artifact, GitHub release |
+| **feedback** | fast | Standardized bug/feature/improvement reports as GitHub issues |
+| **meta-feedback** | fast | Improvement suggestions for agent-meta framework as GitHub issues |
+| **agent-meta-manager** | balanced | Manage agent-meta: upgrade, sync, extensions, project agents |
+| **agent-meta-scout** | balanced | Scout AI ecosystem for new skills, roles, rules, and patterns |
+| **log-analyzer** | balanced | Log analysis with frequency clustering, RFC 5424 severity classification, root-cause hypotheses |
+| **export-manager** | fast | Target-agnostic output routing: Markdown, Confluence, Jira-Xray, Notion |
+| **bug-feature-analyzer** | balanced | Issue triage: classify incoming bugs and feature requests before allocation |
+| **docker** | fast | Dev/test stack management, binary management, Dockerfiles |
+| **security-auditor** | powerful | Security audit: OWASP, secrets, dependencies, supply chain |
+| **openscad-developer** | balanced | Parametric 3D models in OpenSCAD, render-inspect-refine loop |
+| **code-reviewer** | powerful | Clean code gatekeeper: blast-radius analysis, SOLID/DRY audit |
+| **ui-ux-designer** | balanced | UI specifications, mockups, design systems |
+| **api-specialist** | balanced | OpenAPI/contract-first API design, interface specifications |
+| **devops-engineer** | fast | CI/CD, IaC, Kubernetes, monitoring, infrastructure |
+| **performance-optimizer** | powerful | Big-O bottleneck identification, data-driven performance optimization |
+
+### Systems Engineering Agents
+
+| Agent | Tier | Description |
+|-------|------|-------------|
+| **se-orchestrator** | balanced | Coordinates the 6-level recursive SE breakdown |
+| **se-requirements** | balanced | Elicits stakeholder needs and formalizes L1 black-box requirements |
+| **se-architect** | powerful | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
+| **se-critic** | powerful | Audits architectures for completeness, consistency, traceability, verifiability |
+| **se-interface-mgr** | balanced | Manages interface contracts and propagation maps across cascade levels |
+| **se-termination** | fast | Deterministic termination at L3 component requirements |
+| **se-validator** | powerful | L1 system validation via end-to-end user journey simulation |
+| **se-verifier** | balanced | Multi-level verification (L1–Ln) against architecture specifications |
+| **se-test-engineer** | balanced | MBSE test models and integration test strategies |
+| **se-testreviewer** | powerful | Audits test strategies for edge cases, boundary values, flakiness |
+| **se-integration-and-test-manager** | balanced | V&V orchestrator: integration strategy, test level coordination |
 
 ## Quick Start
 
-> **First time setup?** Use [howto/setup/first-steps.md](howto/setup/first-steps.md) — hand it to your AI assistant
-> and say: "Help me set up agent-meta in this project." The assistant will guide you interactively.
-
-### 1. Add as submodule
-
 ```bash
-git submodule add <repo-url> .agent-meta
-```
+# 1. Add as submodule
+git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
+cd .agent-meta && git checkout v0.53.0 && cd ..
 
-```bash
-cd .agent-meta && git checkout v0.28.1
-```
-
-```bash
-cd ..
-```
-
-```bash
-git submodule update --init --recursive
-```
-
-### 2. Create config
-
-```bash
+# 2. Create project config
 mkdir -p .meta-config
 cp .agent-meta/howto/configs/project.yaml.example .meta-config/project.yaml
+
+# 3. Generate agents
+python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init
+
+# 4. Verify
+python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
 ```
 
-Fill in your project values — see [howto/setup/first-steps.md](howto/setup/first-steps.md) for a guided walkthrough.
+## Setup
 
-### 3. Generate agents
+### Prerequisites
 
-```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init
-```
+- **Python 3.8+** (stdlib only — no external dependencies required)
+- **Git** (for submodule management and sync operations)
+- One of: **Claude** (VS Code), **Gemini** (VS Code/Antigravity), **Opencode**, **Continue**
 
-```bash
-cat sync.log
-```
+### Configuration
 
-Agents are written to `.claude/agents/`. Never edit them manually — they are regenerated on every sync.
-
----
-
-## Systems Engineering Cascade (Beta v0.49.0)
-
-A recursive, fractal systems engineering workflow for model-based system decomposition across L1–L3.
-
-### How it works
-
-The SE cascade treats every level as an identical **system cell**:
-
-1. **`se-requirements`** — Captures stakeholder needs and formalizes L1 black-box requirements
-2. **`se-architect`** — Decomposes black-boxes into white-box architectures with sub-components, domains (software/hardware/mechanics/system), and interfaces
-3. **`se-critic`** — Quality gate: completeness, consistency, traceability, verifiability (max 3 iterations)
-4. **`se-interface-mgr`** — Registers interfaces, validates contracts, generates propagation maps for parallel branches
-5. **`se-termination`** — Decides per sub-component: leaf node or spawn next cell (n+1)
-6. **`se-orchestrator`** — Coordinates the entire 6-stage breakdown with context hygiene and parallel cell execution
-
-### Recursive Cell Spawning
-
-White-box elements of level n become black-box requirements of level n+1. Each cell receives only its parent requirement + neighbor interfaces (~2k token limit) to prevent context drift.
-
-### Protection Mechanisms
-
-- `max_depth: 5` — hard recursion limit
-- `max_total_cells: 20` — global cell budget
-- `max_critic_iterations: 3` — bounded correction loops
-- `max_parallel_cells: 4` — parallel execution cap
-
-### Documentation
-
-- [docs/architecture/07-se-cascade.md](docs/architecture/07-se-cascade.md) — Architecture deep-dive
-- [howto/se-workflow.md](howto/se-workflow.md) — Workflow guide with Mermaid diagrams
-- [howto/se-blackbox-to-whitebox.md](howto/se-blackbox-to-whitebox.md) — BB→WB transition methodology
-- [howto/se-interface-management.md](howto/se-interface-management.md) — Interface propagation explained
-- [howto/se-mcp-adapters.md](howto/se-mcp-adapters.md) — MCP adapter concept for Phase 3
-
----
-
-## Agent Visualization (Opt-in)
-
-Visualize your agent fleet, their delegations, and runtime sessions.
-
-### Static Mindmap
-
-Auto-generated on every sync when `viz.enabled: true`:
-
-```bash
-py .agent-meta/scripts/sync.py --viz
-```
-
-- `docs/agent-mindmap.md` — Mermaid diagram (renders natively on GitHub)
-- `docs/agent-graph.html` — Interactive dark-mode graph with agent details
-
-### Dynamic Session Tracking
-
-Enable event logging in `project.yaml`:
+Create `.meta-config/project.yaml`:
 
 ```yaml
-viz:
-  enabled: true
-  mode: "full"        # off | static | dynamic | full
-```
+# Core identity
+project:
+  name: my-project
+  prefix: mp
 
-When `dynamic` or `full`, every generated agent receives a prompt block that instructs it to log events (`agent_start`, `delegate`, `agent_end`, `tool_call`) to `.meta-viz/events.jsonl`.
+# AI providers to target
+ai-providers:
+  - Claude
+  - Gemini
+  - Opencode
+  - Continue
 
-### Session Reports
+# Active agent roles
+roles:
+  - orchestrator
+  - developer
+  - requirements
+  - tester
+  - documenter
+  - git
 
-```bash
-# Live terminal watch
-py .agent-meta/scripts/viz-report.py --watch
-
-# Live Dashboard (browser, auto-refreshes via API)
-py scripts/viz-server.py toggle
-
-# Toggle mode and trigger sync
-/viz-toggle dynamic
-```
-
-Sessions are gitignored and auto-cleaned after `retention_days`. See [howto/agent-visualization.md](howto/agent-visualization.md) for the full guide.
-
----
-
-## Orchestrator-First Architecture (Beta v3.0.0)
-
-The orchestrator is the universal entry point for all development tasks. Instead of the main session handling work directly, every task flows through the orchestrator, which decomposes, parallelizes, and delegates to specialized worker agents.
-
-### Task Decomposition & Parallel Execution
-
-The orchestrator automatically splits multi-tasks into independent sub-tasks and dispatches them in parallel:
-
-| Pattern | Use Case | Example |
-|---------|----------|---------|
-| **FANOUT** | N instances of same agent type | "Fix bugs A, B, C" → 3× `developer` parallel |
-| **PARALLEL_GROUP** | Different agent types simultaneously | "Fix A + test B" → `developer` ∥ `tester` |
-| **PIPELINE** | Sequential with dependencies | "Feature with tests" → requirements → tester → dev → tester |
-| **LIFECYCLE** | Complete end-to-end workflow | "Feature Y complete" → `feature` agent orchestrates |
-| **BARRIER** | Synchronization point | Wait for all parallel agents before next step |
-
-**Provider-agnostic:** Same decision logic for Claude, Opencode, Gemini, and Continue (Continue falls back to sequential).
-
-### Unknown Intent Protocol
-
-When the orchestrator cannot classify an intent, it follows a configurable fallback chain:
-
-```yaml
+# Orchestrator behavior
 orchestrator:
   enabled: true
   strict: true
-  unknown-fallback:
-    meta-feedback: true   # Send anonymized feedback to agent-meta
-    main-chat: true      # Allow main chat to handle the task
-    ask-user: false      # Ask user for preference
+
+# Quality profile
+dod-preset: rapid-prototyping  # rapid-prototyping | strict | enterprise
+
+# Speech mode
+speech-mode: submissive        # full | short | childish | caveman | asozial | submissive
 ```
 
-**Fallback priority:**
-1. `ask-user=true` → Always ask user first
-2. `strict=true` + `meta-feedback=true` → Feedback + rephrase request
-3. `strict=false` + `main-chat=true` → Main-Chat handles it + optional feedback
-4. No fallback enabled → Ask for clarification
+### DoD Presets
 
-### User Override
+| Preset | Tests | REQ Traceability | Codebase Overview | Security Audit |
+|--------|-------|------------------|-------------------|----------------|
+| **rapid-prototyping** | ❌ | ❌ | ❌ | ❌ |
+| **strict** | ✅ | ✅ | ✅ | ❌ |
+| **enterprise** | ✅ | ✅ | ✅ | ✅ |
 
-Users can bypass the orchestrator at any time with explicit phrases:
+### Speech Modes
 
-- "Not delegate" / "Do it here" / "No orchestrator" / "Without orchestrator"
-- "I want to work here" / "Don't delegate"
-
-The main chat then acts as a classical agent for that request. After completion, the user can choose whether to persist this preference.
-
-### Orchestration Testing
-
-Validate the entire delegation pipeline without real agent execution:
-
-```bash
-/test-orchestration                    # All tests for active provider
-/test-orchestration --scenario=parallel # Parallel dispatch tests only
-/test-orchestration --verbose --viz     # All tests with Viz-Log
-```
-
-Tests cover: Intent routing, task decomposition, parallel dispatch, provider syntax, Viz-Log integration.
-
----
-
-## Project Extensions
-
-Extensions let you add project-specific knowledge to a generated agent. The extension file has two parts:
-
-- **Managed block** — auto-generated from config variables, updated via `--update-ext`
-- **Project section** — handwritten, never touched by sync.py
-
-```bash
-# Create extension for one role
-py .agent-meta/scripts/sync.py --create-ext developer
-
-# Create extensions for all roles
-py .agent-meta/scripts/sync.py --create-ext all
-
-# Update managed blocks after config changes
-py .agent-meta/scripts/sync.py --update-ext
-```
-
-Extensions live in `.claude/3-project/<prefix>-<role>-ext.md` in your project — never in this repo.
-
----
-
-## MCP Servers
-
-agent-meta manages MCP servers as a first-class framework concept across all providers.
-
-### How it works
-
-1. **Registry** — `config/mcp-registry.yaml` defines available servers (tools, connection, secrets)
-2. **Activation** — activate per project via `mcp-servers:` in `project.yaml` or implicitly via platform bundles
-3. **Sync** — `sync.py` generates everything automatically:
-   - Rule files (`mcp-<server>.md`) per provider with allowed/blocked tools and agent hints
-   - Committed provider configs with `${ENV_VAR}` references (safe to commit)
-   - Gitignored local configs populated from `.meta-config/secrets.local.yaml` (actual values)
-   - `.gitignore` managed block entries for all secrets files
-
-```yaml
-# .meta-config/project.yaml
-mcp-servers:
-  - home-assistant
-  - influxdb
-```
-
-```bash
-# On first --init: .meta-config/secrets.local.yaml is generated automatically
-py .agent-meta/scripts/sync.py --init
-# Fill in secrets, then re-sync:
-py .agent-meta/scripts/sync.py
-```
-
-**Security:** `sync.py` raises a hard error (`SyncError`) when a real secret is detected in a committed file. Set `allow-committed-secrets: true` in `project.yaml` to downgrade to a warning (not recommended).
-
-See [howto/mcp-setup.md](howto/mcp-setup.md) for full documentation.
-
----
-
-## Upgrading
-
-```bash
-cat .agent-meta/VERSION
-```
-
-```bash
-cd .agent-meta && git checkout v<new-version>
-```
-
-```bash
-cd ..
-```
-
-Update config version field in `.meta-config/project.yaml`: `agent-meta-version: "<new-version>"`
-
-```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
-```
-
-```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
-```
-
-```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --update-ext
-```
-
-See [howto/setup/upgrade-guide.md](howto/setup/upgrade-guide.md) for details.
-
----
+| Mode | Description |
+|------|-------------|
+| `full` | Default — normal communication (no rule generated) |
+| `short` | Facts only, no filler, minimal verbosity |
+| `childish` | Playful, animal/toy analogies, emojis |
+| `caveman` | Brutally short, cave-speak style |
+| `asozial` | Technically correct, dripping with contempt |
+| `submissive` | Completely devoted, addresses as master/mistress |
 
 ## Repository Structure
 
 ```
 agent-meta/
   agents/
-    0-external/       <- wrapper template for external skill agents
-    1-generic/        <- universal agent templates
-    2-platform/       <- platform-specific overrides (e.g. sharkord-docker.md)
-    3-project/        <- intentionally empty (extensions live in your project)
-  config/             <- framework config (managed by agent-meta, do not edit manually)
-    project.yaml                <- agent-meta self-hosting config
-    role-defaults.yaml          <- default model/memory/permissionMode per role
-    dod-presets.yaml            <- DoD quality presets
-    ai-providers.yaml           <- provider settings (Claude, Gemini, Opencode, Continue)
-    mcp-registry.yaml           <- global MCP server catalog (tools, connection, secrets)
-    skills-registry.yaml        <- external skills registry (approved/pinned)
-    project-config.schema.json  <- JSON Schema for project.yaml
-  external/           <- Git submodules for external skill repos (pinned commits)
-  hooks/
-    0-external/       <- hooks from external skill repos
-    1-generic/        <- universal hooks (e.g. dod-push-check.sh)
-    2-platform/       <- platform-specific hook overrides
-  platform-configs/
-    *.defaults.yaml   <- default values for {{platform.*}} placeholders
-  rules/
-    0-external/       <- rules from external skill repos
-    1-generic/        <- universal rules (auto-loaded into every agent context)
-    2-platform/       <- platform-specific rule overrides
-  snippets/
-    tester/           <- language-specific test snippets (bun-typescript, pytest-python)
-    developer/        <- language-specific code pattern snippets
-  speech/
-    short.md          <- facts-only style (no filler)
-    childish.md       <- playful, toy/animal analogies
-    caveman.md        <- caveman style: short, direct
-    asozial.md        <- technically correct, dripping with contempt
-    submissive.md     <- completely devoted and submissive
-  templates/
-    managed-block.md              <- extension managed-block template
-    managed-block-project-stub.md <- project area stub for new extensions
-    claude-md-managed.md          <- CLAUDE.md managed-block template
-  docs/
-    architecture/       <- architecture deep-dives (layer model, sync flow, roles, ...)
-    providers/
-      gemini-cli.md     <- Gemini CLI: features, limits, config reference
-      multi-provider.md <- multi-provider setup and comparison
-  howto/
-    setup/              <- first-time setup, instantiation, upgrade
-      first-steps.md
-      instantiate-project.md
-      upgrade-guide.md
-    features/
-      agent-memory.md   <- persistent agent memory: scopes, config, best practices
-      config-layout.md
-    features/           <- feature-specific how-tos
-      agent-composition.md
-      agent-delegation-map.md
-      agent-isolation.md
-      agent-memory.md
-      agent-versioning.md
-      external-skills.md
-      hooks.md
-      lifecycle-triggers.md
-      platform-config.md
-      rules.md
-      sync-concept.md
-    configs/            <- templates and starter configs (never edit directly)
-      CLAUDE.project-template.md
-      CLAUDE.personal-template.md
-      GEMINI.project-template.md
-      GEMINI.settings-template.json
-      CONTINUE.project-template.md
-      CONTINUE.config-template.yaml
-      project.yaml.example        <- starter config for new projects
-  scripts/
-    sync.py           <- CLI entrypoint (argparse + main)
-    lib/
-      agents.py       <- frontmatter, composition, sync_agents
-      config.py       <- load_config, build_variables, substitute
-      context.py      <- init_claude_md, sync_context, gitignore, sync_snippets
-      dod.py          <- load_dod_presets, resolve_dod
-      extensions.py   <- create_extension, update_extensions
-      hooks.py        <- sync_hooks, create_hook
-      io.py           <- YAML/JSON loader
-      log.py          <- SyncLog
-      platform.py     <- load_platform_config, substitute_platform
-      providers.py    <- load_providers_config, resolve_providers
-      roles.py        <- load_roles_config, build_role_map
-      rules.py        <- sync_rules, sync_speech_mode, create_rule
-      skills.py       <- external skills: load, sync, add
-  VERSION
-  CHANGELOG.md
+    0-external/              # Wrapper template for external skill agents
+    1-generic/               # Universal provider-agnostic agent templates
+    2-platform/              # Platform-specific overrides (composition agents)
+  config/                    # Framework configuration (managed by agent-meta)
+    role-defaults.yaml       # Model/memory/permissionMode defaults per role
+    ai-providers.yaml        # Provider settings (Claude, Gemini, Opencode, Continue)
+    dod-presets.yaml         # DoD quality presets
+    mcp-registry.yaml        # Global MCP server catalog
+    skills-registry.yaml     # External skills registry
+    project-config.schema.json  # JSON Schema for project.yaml validation
+  docs/                      # Documentation
+    agent-graph.html         # Interactive agent visualization graph
+    agent-mindmap.md         # Mermaid mindmap of all agents
+    live-dashboard.html      # Live session monitoring dashboard
+    architecture/            # Architecture deep-dives
+    providers/               # Provider-specific documentation
+    viz-api.md               # Visualization API reference
+    viz-event-schema.md      # Session event schema reference
+    viz-architecture.md      # Visualization architecture decisions
+    CODEBASE_OVERVIEW.md     # Codebase inventory per agent
+    REQUIREMENTS.md          # Requirements (managed by requirements agent)
+  hooks/                     # Git hooks and lifecycle triggers
+    0-external/              # Hooks from external skill repos
+    1-generic/               # Universal hooks (e.g. dod-push-check)
+    2-platform/              # Platform-specific hook overrides
+  howto/                     # Setup guides, templates, feature documentation
+    configs/                 # Template configs (project.yaml, CLAUDE.md, etc.)
+    setup/                   # First-time setup, instantiation, upgrade
+    features/                # Feature-specific how-tos
+  rules/                     # Coding conventions and agent rules
+    0-external/              # Rules from external skill repos
+    1-generic/               # Universal rules (auto-loaded into all agents)
+    2-platform/              # Platform-specific rule overrides
+  scripts/                   # Build and utility scripts
+    sync.py                  # Main generation script (CLI entrypoint)
+    lib/                     # Sync library modules (config, agents, rules, etc.)
+  speech/                    # Communication style mode files
+  templates/                 # Managed-block templates
+  snippets/                  # Language-specific code snippets
+    tester/                  # Test framework snippets
+    developer/               # Code pattern snippets
+  platform-configs/          # Platform defaults (HomeAssistant, Sharkord, etc.)
+  VERSION                    # Current version
+  CHANGELOG.md               # Version history
+  README.md                  # This file
 ```
 
-**Config layout:**
+### Config Ownership
 
-| Location | Owned by | Purpose |
-|----------|----------|---------|
-| `.agent-meta/config/` | agent-meta framework | Role defaults, providers, DoD presets, skill registry — do not edit |
-| `.meta-config/project.yaml` | Your project | Project identity, variables, active roles, providers, orchestrator config |
-| `.claude/platform-config.yaml` | Your project | Platform-specific value overrides (`{{platform.*}}` placeholders) |
+| Location | Owner | Purpose |
+|----------|-------|---------|
+| `.agent-meta/config/` | agent-meta framework | Role defaults, providers, DoD presets, registries — do not edit |
+| `.meta-config/project.yaml` | Your project | Project identity, active roles, providers, orchestrator config |
+| `.claude/platform-config.yaml` | Your project | Platform-specific variable overrides (`{{platform.*}}`) |
 
----
+## Configuration
 
-## Supported Platforms
+### Orchestrator Modes
 
-| Platform | Agents |
-|----------|--------|
-| Generic | orchestrator, developer, tester, validator, requirements, documenter, meta-feedback, release, docker, git, ideation, feature, agent-meta-manager, agent-meta-scout, openscad-developer, se-orchestrator, se-requirements, se-architect, se-critic, se-interface-mgr, se-termination |
-| Sharkord | sharkord-docker, sharkord-release |
+The orchestrator's behavior is configured in `.meta-config/project.yaml`:
 
----
+```yaml
+orchestrator:
+  enabled: true        # true = orchestrator active, false = main-chat mode
+  strict: true         # true = always delegate, false = fallback allowed
+  unknown-fallback:
+    meta-feedback: true   # Send anonymized feedback (default: true)
+    main-chat: true       # Allow main chat to handle (default: true)
+    ask-user: false       # Ask user for preference (default: false)
+```
 
-## Agent Roles
+| Mode | enabled | strict | Behavior |
+|------|---------|--------|----------|
+| **Strict** | true | true | Always delegate, never execute in main chat |
+| **Relaxed** | true | false | Main chat can handle unknown intents |
+| **Ask-First** | true | — | User asked: "Here or delegate?" |
+| **Disabled** | false | — | No orchestrator, main chat does everything |
 
-| Role | Responsibility |
-|------|---------------|
-| `orchestrator` | Universal router — classifies intents, decomposes tasks, parallelizes with FANOUT/PARALLEL_GROUP, delegates to workers |
-| `developer` | REQ-driven implementation, code conventions |
-| `tester` | TDD, test suite, coverage per REQ-ID |
-| `validator` | DoD check, traceability audit, code quality |
-| `requirements` | Requirement intake, REQ-IDs, REQUIREMENTS.md |
-| `documenter` | CODEBASE_OVERVIEW, architecture docs, conclusions |
-| `meta-feedback` | Collect framework feedback, create GitHub Issues in agent-meta |
-| `release` | Versioning, changelog, GitHub release |
-| `docker` | Dev stack, test stack, binary management |
-| `git` | Commits, branches, tags, push/pull and all Git operations |
-| `ideation` | Explore new ideas, sharpen vision, hand off to requirements |
-| `feature` | New feature end-to-end: branch → REQ → TDD → dev → validate → PR |
-| `agent-meta-manager` | Manage agent-meta: upgrade, sync, feedback, create project-specific agents |
-| `agent-meta-scout` | Scout the Claude ecosystem for new skills, roles, rules and patterns |
-| `openscad-developer` | Parametric 3D models in OpenSCAD, render-inspect-refine via MCP, print optimization |
-| `se-orchestrator` | Coordinates the 6-level recursive systems engineering cascade |
-| `se-requirements` | Elicits stakeholder needs and formalizes L1 black-box requirements |
-| `se-architect` | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
-| `se-critic` | Audits decompositions: completeness, consistency, traceability, verifiability |
-| `se-interface-mgr` | Manages interface contracts and propagation maps across cascade levels |
-| `se-termination` | Deterministic termination at L3 component requirements |
+### Visualization Modes
+
+```yaml
+viz:
+  enabled: true
+  mode: "full"          # off | static | dynamic | full
+  event_log: ".meta-viz/events.jsonl"
+  report:
+    retention_days: 7
+    session_timeout_min: 5
+  server:
+    port: 8765
+    timeout_sec: 300
+```
+
+| Mode | Mindmap | Session Tracking |
+|------|---------|------------------|
+| `off` | ❌ | ❌ |
+| `static` | ✅ | ❌ |
+| `dynamic` | ❌ | ✅ |
+| `full` | ✅ | ✅ |
+
+## Workflows
+
+| ID | Workflow | Description | Orchestrator Agent |
+|----|----------|-------------|--------------------|
+| **A** | New Feature | Branch → REQ → Test → Dev → Validate → PR | `feature` |
+| **B** | Bugfix | Branch → REQ → Test → Dev → Validate → PR | `feature` |
+| **C** | Code Audit | Code review + blast-radius + quality scan | `code-reviewer` |
+| **E** | Refactoring | Branch → REQ → Dev → Test → Validate → PR | `feature` |
+| **H1** | Agent Sync | sync.py → commit "chore: regenerate agents" | `agent-meta-manager` |
+| **H2** | Upgrade | Read upgrade workflow → apply | `agent-meta-manager` |
+| **I** | Ideation | Explore idea → sharpen vision → handoff to requirements | `ideation` |
+| **K** | Meta-Feedback | Collect framework feedback → create GitHub issue | `meta-feedback` |
+| **L** | GitHub Issue | Read issue → requirements → dev → test → validate → close | `orchestrator` |
+| **M** | Scout Ecosystem | Search for new skills/roles/rules/patterns | `agent-meta-scout` |
+| **O** | Log Analysis | Analyze logs → cluster errors → delegate findings | `log-analyzer` |
+| **P** | Project Issue | Create standardized bug/feature GitHub issue | `feedback` |
+| **U** | SE Cascade | 6-level recursive systems engineering breakdown | `se-orchestrator` |
+
+## Contributing
+
+### Branch Policy
+
+This repository uses a strict branch policy. **Never commit directly to `main`** for template, rule, script, or sync changes.
+
+```bash
+# Always create a feature branch
+git checkout -b feat/my-change
+# ... make changes ...
+git add .
+git commit -m "feat: add my feature"
+git push -u origin feat/my-change
+```
+
+Direct commits on `main` are only allowed for:
+- Version bumps (`VERSION`, `CHANGELOG.md`, `README.md`)
+- Single-line typo fixes (with user confirmation)
+- Post-merge maintenance
+
+### Development Workflow
+
+1. **Create a branch** (`feat/...`, `fix/...`, `refactor/...`, `docs/...`)
+2. **Edit templates** in `agents/1-generic/` or configuration in `config/`
+3. **Bump the template version** in frontmatter (major/minor/patch per semver)
+4. **Run consistency check**: `python scripts/consistency-check.py`
+5. **Verify generation**: `python scripts/sync.py --dry-run`
+6. **Commit** with [Conventional Commits](#conventional-commits)
+7. **Create a PR**
+
+### Conventional Commits
+
+```
+<type>(REQ-xxx): <description>    ← with REQ traceability
+<type>: <description>             ← without REQ traceability
+```
+
+| Type | Description | REQ-ID |
+|------|-------------|--------|
+| `feat` | New feature | When req-traceability active |
+| `fix` | Bug fix | When req-traceability active |
+| `refactor` | Refactoring without behavior change | When req-traceability active |
+| `test` | Add or modify tests | When req-traceability active |
+| `chore` | Maintenance: dependencies, config, versions | Never |
+| `docs` | Documentation | Never |
+| `ci` | CI/CD changes | Never |
+
+### Adding a New Agent Role
+
+Manual steps:
+1. Create `agents/1-generic/<role>.md` with frontmatter (`name`, `version`, `description`, `hint`, `tools`)
+2. Add entry to `config/role-defaults.yaml` (model, memory, permissionMode, tier)
+3. Update `howto/setup/instantiate-project.md` agent table
+
+Everything else (CLAUDE.md, AGENTS.md, provider agents, visualization) is auto-generated by `sync.py`.
+
+### Development Conventions
+
+- **No external Python dependencies** beyond stdlib (stdlib-only policy)
+- **Agent templates** use YAML frontmatter with semver versioning
+- **Placeholders** follow `{{GROSS_MIT_UNTERSTRICH}}` naming convention
+- **Generated output** (`.claude/agents/`, `.opencode/agents/`, etc.) is never edited manually
+- **Unit tests**: manual verification via `sync.py --dry-run` (no automated test system)
+
+## License
+
+MIT
