@@ -813,7 +813,10 @@ def sync_agents_for_provider(
                     log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
             elif provider == 'Gemini':
-                # Gemini: provider-mapped model only; strip memory, permissionMode, Claude-specific lines
+                # Gemini: provider-mapped model only; strip unsupported sampling
+                # parameters (temperature, top_p, top_k, stop_sequences,
+                # max_output_tokens) plus memory and permissionMode, then
+                # strip Claude-specific lines.
                 model = resolve_model(role, config, agent_meta_root,
                                       provider=provider, provider_config=provider_config)
                 content = inject_model_field(content, model)
@@ -822,7 +825,18 @@ def sync_agents_for_provider(
                     is_override = role in po.get('Gemini', {})
                     src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-                content = _remove_frontmatter_fields(content, ['memory', 'permissionMode'])
+                content = _remove_frontmatter_fields(
+                    content,
+                    [
+                        'memory',
+                        'permissionMode',
+                        'temperature',
+                        'top_p',
+                        'top_k',
+                        'stop_sequences',
+                        'max_output_tokens',
+                    ]
+                )
                 body = _strip_frontmatter(content)
                 body = _strip_claude_specific_lines(body)
                 fm_end = content.find('\n---', 3)
