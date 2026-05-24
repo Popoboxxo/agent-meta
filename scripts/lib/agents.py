@@ -1030,12 +1030,13 @@ def _transform_frontmatter_for_opencode(
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
 
-    lines = [f'name: {name}', f'description: "{description}"', 'mode: subagent']
+    template_fm = _parse_frontmatter_yaml(content)
+    mode = template_fm.get("mode") or "subagent"
+    lines = [f'name: {name}', f'description: "{description}"', f'mode: {mode}']
     if model:
         lines.append(f'model: {model}')
 
     # Map template tools to opencode permission block
-    template_fm = _parse_frontmatter_yaml(content)
     template_tools = template_fm.get("tools")
     if isinstance(template_tools, list) and template_tools:
         perms = _map_claude_tools_to_opencode_permissions(template_tools)
