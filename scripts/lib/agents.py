@@ -825,6 +825,15 @@ def sync_agents_for_provider(
                     is_override = role in po.get('Gemini', {})
                     src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                # Map generic tool names to Gemini-native tools
+                _gemini_fm = _parse_frontmatter_yaml(content)
+                _gemini_tools = _gemini_fm.get('tools')
+                if isinstance(_gemini_tools, list):
+                    _mapped_gemini_tools = _map_claude_tools_to_gemini_tools(_gemini_tools)
+                    if _mapped_gemini_tools:
+                        content = _update_frontmatter_dict(content, {'tools': _mapped_gemini_tools})
+                    else:
+                        content = _remove_frontmatter_fields(content, ['tools'])
                 content = _remove_frontmatter_fields(
                     content,
                     [
@@ -944,6 +953,25 @@ def inject_debug_block(content: str, agent_name: str) -> str:
         marker=_DEBUG_BLOCK_MARKER,
         agent_name=agent_name,
     )
+
+
+def _map_claude_tools_to_gemini_tools(tools: list) -> list[str]:
+    """Map Claude Code tool names to Gemini native tool names.
+
+    Gemini available tools: code_execution, google_search, url_context.
+    File system tools (Read, Write, Edit, Glob, Grep) are automatically
+    active in the Gemini sandbox and don't need explicit mapping.
+    """
+    mapping = {
+        "Bash": "code_execution",
+        "WebSearch": "google_search",
+        "WebFetch": "url_context",
+    }
+    mapped: set[str] = set()
+    for t in tools:
+        if isinstance(t, str) and t in mapping:
+            mapped.add(mapping[t])
+    return sorted(mapped)
 
 
 def _map_claude_tools_to_opencode_permissions(tools: list) -> dict[str, str]:
