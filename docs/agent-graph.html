@@ -172,7 +172,7 @@ graph TD
     classDef recommended fill:#1971c2,stroke:#fff,stroke-width:2px,color:#fff
     classDef optional fill:#868e96,stroke:#fff,stroke-width:2px,color:#fff
     class developer,feedback,git,log-analyzer,orchestrator required
-    class code-reviewer,documenter,feature,requirements,tester,validator recommended
+    class bug-feature-analyzer,code-reviewer,documenter,feature,requirements,tester,validator recommended
     class agent-meta-manager,agent-meta-scout,api-specialist,devops-engineer,docker,export-manager,ideation,meta-feedback,openscad-developer,performance-optimizer,release,se-architect,se-critic,se-integration-and-test-manager,se-interface-mgr,se-orchestrator,se-requirements,se-termination,se-test-engineer,se-testreviewer,se-validator,se-verifier,security-auditor,ui-ux-designer optional
                 </div>
                 <div class="legend">
@@ -228,6 +228,20 @@ graph TD
                 <span class="tier-badge">optional</span>
             </div>
             <p class="description">API-Design, OpenAPI-Spezifikationen, Contract-First Development. Erstellt und pflegt API-Vertraege.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Gemini: gemini-3.1-pro-low</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-recommended" id="bug-feature-analyzer">
+            <div class="agent-header">
+                <span class="tier-icon">🔵</span>
+                <h3>bug-feature-analyzer</h3>
+                <span class="tier-badge">recommended</span>
+            </div>
+            <p class="description">Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares Feature, Out-of-Scope.</p>
             <div class="meta">
                 <span><strong>Model:</strong> <span>Claude: claude-sonnet-4-6</span><br><span>Gemini: gemini-3.1-pro-low</span><br><span>Opencode: opencode-go/qwen3.6-plus</span></span>
                 <span><strong>Memory:</strong> -</span>

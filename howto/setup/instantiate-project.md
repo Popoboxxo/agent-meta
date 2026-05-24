@@ -123,7 +123,7 @@ Pflichtfelder:
   "roles": ["orchestrator", "developer", "tester", "validator",
             "requirements", "documenter", "git", "release", "docker",
             "ideation", "meta-feedback", "feature", "agent-meta-manager",
-            "agent-meta-scout"],
+            "agent-meta-scout", "bug-feature-analyzer"],
   "project": {
     "name": "sharkord-mein-plugin",
     "prefix": "mpl",
@@ -210,6 +210,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
+| `.claude/agents/bug-feature-analyzer.md` | `1-generic/bug-feature-analyzer.md` |
 
 ---
 
@@ -405,6 +406,7 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
 - [ ] `.claude/agents/log-analyzer.md` vorhanden
 - [ ] `.claude/agents/feedback.md` vorhanden
+- [ ] `.claude/agents/bug-feature-analyzer.md` vorhanden
 - [ ] `.claude/agents/se-requirements.md` vorhanden
 - [ ] `.claude/agents/se-architect.md` vorhanden
 - [ ] `.claude/agents/se-critic.md` vorhanden
