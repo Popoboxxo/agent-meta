@@ -1,19 +1,5 @@
 # Changelog
 
-## [0.53.2] — 2026-05-25
-
-### Fixed
-
-- **Syncer tools frontmatter leak**: Fixed `sync.py` generating invalid `tools:` frontmatter for Opencode and Continue providers, causing startup failures. `tools:` is now correctly stripped for unsupported providers and mapped to `permission:` for Opencode. (#235)
-- **Template tool name normalization**: Normalized 17 `agents/1-generic/*.md` templates from non-canonical names (`read_file`, `write_file`, `edit_file`, `run_command`, `glob`, `grep`, `edit`) to canonical Claude tool names (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`).
-
-### Added
-
-- **`config/provider-tools.yaml`**: New per-provider tool whitelist configuration for validating and filtering template tools during agent generation.
-- **Tool validation in sync pipeline**: Added `_validate_tools_against_whitelist()` to `scripts/lib/agents.py` — unknown tools are logged as WARNING and excluded from generated output.
-
----
-
 ## [0.53.1] — 2026-05-25
 
 ### Fixed
