@@ -1,10 +1,7 @@
 ---
 name: se-validator
-version: 1.0.2
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'''
-hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
-  Code, prüft ob der User-Need erfüllt ist.
 mode: subagent
 model: opencode-go/kimi-k2.5
 memory: project

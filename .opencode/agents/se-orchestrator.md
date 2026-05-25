@@ -1,9 +1,7 @@
 ---
 name: se-orchestrator
-version: 1.3.2
 description: Coordinates the 6-level recursive breakdown with zig-zag traceability
   and V&V.
-hint: Coordinates the 6-level recursive breakdown
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

@@ -1,10 +1,7 @@
 ---
 name: feature
-version: 1.4.0
 description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung
   → Validierung → Commit → PR.'
-hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
-  vom Orchestrator gestartet, nicht direkt vom User.'
 mode: subagent
 permission:
   bash: allow

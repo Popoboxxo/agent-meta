@@ -1,8 +1,6 @@
 ---
 name: se-termination
-version: 1.1.2
 description: Deterministic termination at L3 (Component Requirement).
-hint: Deterministic termination at L3 (Component Requirement)
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

@@ -1184,6 +1184,10 @@ def _transform_frontmatter_for_opencode(
         "top_k",
         "stop_sequences",
         "max_output_tokens",
+        "version",
+        "hint",
+        "based-on",
+        "based_on",
     ]
 
     content = _update_frontmatter_dict(content, updates, removes=removes)

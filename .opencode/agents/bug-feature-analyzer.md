@@ -1,11 +1,8 @@
 ---
 name: bug-feature-analyzer
-version: 1.0.0
 description: 'Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests
   vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares
   Feature, Out-of-Scope.'
-hint: 'Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren
-  — vor developer/feature-Delegation'
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

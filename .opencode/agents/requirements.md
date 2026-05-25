@@ -1,9 +1,7 @@
 ---
 name: requirements
-version: 1.3.3
 description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und
   Traceability prüfen.
-hint: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project

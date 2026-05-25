@@ -1,10 +1,7 @@
 ---
 name: log-analyzer
-version: 1.0.0
 description: 'Analysiert System- und Applikations-Logs: Frequency-Clustering, Severity-Klassifikation
   (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing.'
-hint: 'Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings
-  als Issues oder Tasks delegieren'
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

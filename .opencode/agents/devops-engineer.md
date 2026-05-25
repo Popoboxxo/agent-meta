@@ -1,9 +1,7 @@
 ---
 name: devops-engineer
-version: 1.0.3
 description: CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability
   und Security-Best-Practices.
-hint: Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben.
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

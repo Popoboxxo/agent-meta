@@ -1,10 +1,7 @@
 ---
 name: se-verifier
-version: 1.0.2
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces.
-hint: Use this agent to verify integrated systems against their specifications on
-  all architecture levels (L1 through Ln).
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project

@@ -1,10 +1,7 @@
 ---
 name: agent-meta-scout
-version: 1.0.2
 description: Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und
   Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta.
-hint: 'KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta
-  entdecken'
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: local

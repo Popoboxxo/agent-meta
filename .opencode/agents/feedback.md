@@ -1,11 +1,8 @@
 ---
 name: feedback
-version: 1.1.0
 description: Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge
   für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue
   eingereicht.
-hint: 'Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert
-  einreichen — immer vor git'
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

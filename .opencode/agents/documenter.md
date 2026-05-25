@@ -1,8 +1,6 @@
 ---
 name: documenter
-version: 1.3.3
 description: Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
-hint: 'Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse'
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 memory: project

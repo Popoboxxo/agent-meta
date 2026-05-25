@@ -1,10 +1,7 @@
 ---
 name: ui-ux-designer
-version: 1.0.2
 description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
   REQ-IDs zu.
-hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
-  nicht, spezifiziert.
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project

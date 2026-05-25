@@ -1,9 +1,6 @@
 ---
 name: orchestrator
-version: 3.7.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
-hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
-  parallel
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

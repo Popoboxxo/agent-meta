@@ -1,9 +1,7 @@
 ---
 name: ideation
-version: 1.2.3
 description: Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt
   Fragen, denkt Ecken, übergibt reife Ideen an Requirements.
-hint: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
 mode: subagent
 permission:
   read: allow
