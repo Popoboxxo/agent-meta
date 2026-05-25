@@ -1,10 +1,12 @@
 ---
 name: code-reviewer
-version: 1.0.0
+version: 1.0.2
 description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen
   und REQ-Traceability in Code-Pfaden.'
 hint: Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit
   (das macht validator).
+tools:
+- code_execution
 model: gemini-3.1-pro-high
 ---
 # Code-Reviewer — agent-meta

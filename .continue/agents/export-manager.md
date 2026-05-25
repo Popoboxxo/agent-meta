@@ -1,17 +1,10 @@
 ---
 name: export-manager
-version: 1.0.1
+version: 1.0.3
 description: Liest .meta-config/export.yaml und routet strukturierte JSON-Payloads
   der Fach-Agenten zum konfigurierten Target (markdown, confluence, jira-xray, etc.).
 hint: Verwende diesen Agenten fuer Export-Routing von strukturierten Daten zu konfigurierten
   Targets.
-tools:
-- read_file
-- write_file
-- edit_file
-- run_command
-- glob
-- grep
 model: fast
 alwaysApply: false
 ---

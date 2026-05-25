@@ -5,10 +5,6 @@ description: Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules 
   Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta.
 hint: 'KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta
   entdecken'
-tools:
-- Read
-- WebFetch
-- WebSearch
 model: balanced
 memory: local
 alwaysApply: false

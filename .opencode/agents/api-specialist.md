@@ -1,20 +1,19 @@
 ---
 name: api-specialist
-version: 1.0.0
+version: 1.0.2
 description: API-Design, OpenAPI-Spezifikationen, Contract-First Development. Erstellt
   und pflegt API-Vertraege.
 hint: Verwende diesen Agenten fuer API-Design, OpenAPI-Spezifikationen und Contract-First
   Development.
-tools:
-- read_file
-- write_file
-- edit_file
-- run_command
-- glob
-- grep
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project
+permission:
+  read: allow
+  edit: allow
+  bash: allow
+  glob: allow
+  grep: allow
 ---
 # API Specialist — agent-meta
 

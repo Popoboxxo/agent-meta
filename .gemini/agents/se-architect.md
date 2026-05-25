@@ -1,9 +1,11 @@
 ---
 name: se-architect
-version: 1.1.0
+version: 1.1.1
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
+tools:
+- code_execution
 model: gemini-3.1-pro-high
 ---
 # System-Prompt: se-architect

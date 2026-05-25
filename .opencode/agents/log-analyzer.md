@@ -5,15 +5,6 @@ description: 'Analysiert System- und Applikations-Logs: Frequency-Clustering, Se
   (RFC 5424), Root-Cause-Hypothesen und strukturierte Findings mit Delegations-Routing.'
 hint: 'Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings
   als Issues oder Tasks delegieren'
-tools:
-- Bash
-- Read
-- Glob
-- Grep
-- WebSearch
-- WebFetch
-- Agent
-- TodoWrite
 mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:

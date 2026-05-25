@@ -1,16 +1,16 @@
 ---
 name: se-architect
-version: 1.1.0
+version: 1.1.1
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
-tools:
-- read_file
-- write_file
-- run_command
 mode: subagent
 model: opencode-go/kimi-k2.5
 memory: project
+permission:
+  read: allow
+  edit: allow
+  bash: allow
 ---
 # System-Prompt: se-architect
 

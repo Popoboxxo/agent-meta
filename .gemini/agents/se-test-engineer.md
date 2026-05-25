@@ -1,10 +1,12 @@
 ---
 name: se-test-engineer
-version: 1.0.0
+version: 1.0.3
 description: Develops MBSE test models and designs integration tests (interaction
   of multiple SW units). Right wing of the V-model.
 hint: Use this agent to create model-based test models and integration test strategies
   from architectural decompositions.
+tools:
+- code_execution
 model: gemini-3.1-pro-low
 ---
 # System-Prompt: se-test-engineer

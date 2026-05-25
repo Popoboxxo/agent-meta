@@ -1,0 +1,49 @@
+# Provider Tools Whitelist
+# Defines which tool names are valid for each provider's frontmatter.
+# Used by sync.py to validate and filter template tools during agent generation.
+#
+# Unknown tools are logged as WARNING in sync.log and excluded from output.
+
+claude:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - Task
+  - TodoWrite
+  - WebFetch
+  - WebSearch
+  - mcp__*              # MCP tool prefix (wildcard)
+
+opencode:
+  # Opencode uses a permission-based model. Template tools are mapped to permissions.
+  # Only these template tool names are recognized and mapped.
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - WebFetch
+  - WebSearch
+  - Agent
+  - TodoWrite
+
+gemini:
+  # Gemini native tools: code_execution, google_search, url_context
+  # File system tools (Read, Write, Edit, Glob, Grep) are implicitly active
+  # in the Gemini sandbox and don't need explicit frontmatter entries.
+  - Bash                # -> code_execution
+  - WebSearch           # -> google_search
+  - WebFetch            # -> url_context
+  - Read                # implicit in sandbox (no frontmatter entry needed)
+  - Write               # implicit in sandbox
+  - Edit                # implicit in sandbox
+  - Glob                # implicit in sandbox
+  - Grep                # implicit in sandbox
+
+continue:
+  # Continue has no frontmatter tools model. All tools are available by default.
+  # The 'tools' field is removed during generation.

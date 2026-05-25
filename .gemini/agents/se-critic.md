@@ -1,10 +1,12 @@
 ---
 name: se-critic
-version: 1.2.0
+version: 1.2.1
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
   decompositions.
+tools:
+- code_execution
 model: gemini-3.1-pro-high
 ---
 # System-Prompt: se-critic

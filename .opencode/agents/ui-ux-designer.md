@@ -1,20 +1,19 @@
 ---
 name: ui-ux-designer
-version: 1.0.0
+version: 1.0.2
 description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
   REQ-IDs zu.
 hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
   nicht, spezifiziert.
-tools:
-- read_file
-- write_file
-- edit_file
-- run_command
-- glob
-- grep
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project
+permission:
+  read: allow
+  edit: allow
+  bash: allow
+  glob: allow
+  grep: allow
 ---
 # UI/UX Designer — agent-meta
 

@@ -1,10 +1,12 @@
 ---
 name: ui-ux-designer
-version: 1.0.0
+version: 1.0.2
 description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
   REQ-IDs zu.
 hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
   nicht, spezifiziert.
+tools:
+- code_execution
 model: gemini-3.1-pro-low
 ---
 # UI/UX Designer — agent-meta

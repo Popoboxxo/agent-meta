@@ -1,14 +1,8 @@
 ---
 name: se-termination
-version: 1.1.0
+version: 1.1.2
 description: Deterministic termination at L3 (Component Requirement).
 hint: Deterministic termination at L3 (Component Requirement)
-tools:
-- read_file
-- write_file
-- edit_file
-- glob
-- grep
 model: fast
 alwaysApply: false
 ---

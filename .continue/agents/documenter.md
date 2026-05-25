@@ -3,13 +3,6 @@ name: documenter
 version: 1.3.3
 description: Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
 hint: 'Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse'
-tools:
-- Read
-- Write
-- Edit
-- Glob
-- Grep
-- TodoWrite
 model: fast
 memory: project
 alwaysApply: false

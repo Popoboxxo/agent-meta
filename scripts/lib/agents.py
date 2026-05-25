@@ -19,6 +19,62 @@ PROJECT_DIR = "3-project"
 EXTERNAL_DIR = "0-external"
 SKILL_WRAPPER = "_skill-wrapper.md"
 EXT_SUFFIX = "-ext"
+PROVIDER_TOOLS_CONFIG = "config/provider-tools.yaml"
+
+# Cache for provider tools config
+_provider_tools_cache: dict | None = None
+
+
+def load_provider_tools_config(agent_meta_root: Path) -> dict:
+    """Load config/provider-tools.yaml. Returns empty dict if unavailable."""
+    global _provider_tools_cache
+    if _provider_tools_cache is not None:
+        return _provider_tools_cache
+    try:
+        config_path = agent_meta_root / PROVIDER_TOOLS_CONFIG
+        if config_path.exists():
+            if _YAML_AVAILABLE:
+                with open(config_path, encoding="utf-8") as f:
+                    _provider_tools_cache = _yaml.safe_load(f) or {}
+            else:
+                _provider_tools_cache = {}
+        else:
+            _provider_tools_cache = {}
+    except Exception:
+        _provider_tools_cache = {}
+    return _provider_tools_cache
+
+
+def _validate_tools_against_whitelist(
+    tools: list, provider: str, agent_meta_root: Path, log: SyncLog, role: str,
+) -> list:
+    """Validate tool names against provider whitelist.
+
+    Returns filtered list of valid tools.
+    Logs WARNING for unknown tools (does NOT abort).
+    """
+    config = load_provider_tools_config(agent_meta_root)
+    whitelist = config.get(provider.lower(), [])
+    if not whitelist:
+        # No whitelist configured — allow all tools (backward compat)
+        return tools
+
+    valid: list = []
+    for t in tools:
+        if not isinstance(t, str):
+            continue
+        # Support wildcard patterns like "mcp__*"
+        is_valid = any(
+            w.endswith("*") and t.startswith(w[:-1]) or w == t
+            for w in whitelist
+        )
+        if is_valid:
+            valid.append(t)
+        else:
+            log.warn(
+                f"{provider}/{role}: tool '{t}' not in provider whitelist — excluded from frontmatter",
+            )
+    return valid
 
 # Provider-specific parallel execution patterns (injected as {{PARALLEL_PATTERN}})
 _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
@@ -811,6 +867,14 @@ def sync_agents_for_provider(
                 src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
                 log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
             content = _update_frontmatter_dict(content, {"alwaysApply": False})
+            # Continue has no frontmatter tools model — validate and remove template tools
+            _continue_fm = _parse_frontmatter_yaml(content)
+            _continue_tools = _continue_fm.get('tools')
+            if isinstance(_continue_tools, list):
+                _validate_tools_against_whitelist(
+                    _continue_tools, provider, agent_meta_root, log, role,
+                )
+            content = _remove_frontmatter_fields(content, ['tools'])
             body = _strip_frontmatter(content)
             body = _strip_claude_specific_lines(body)
             fm_end = content.find('\n---', 3)
@@ -843,6 +907,14 @@ def sync_agents_for_provider(
                     src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
+                # Validate tools against whitelist — log warnings but keep tools (Claude supports them natively)
+                _claude_fm = _parse_frontmatter_yaml(content)
+                _claude_tools = _claude_fm.get('tools')
+                if isinstance(_claude_tools, list):
+                    _validate_tools_against_whitelist(
+                        _claude_tools, provider, agent_meta_root, log, role,
+                    )
+
             elif provider == 'Gemini':
                 # Gemini: provider-mapped model only; strip unsupported sampling
                 # parameters (temperature, top_p, top_k, stop_sequences,
@@ -860,7 +932,11 @@ def sync_agents_for_provider(
                 _gemini_fm = _parse_frontmatter_yaml(content)
                 _gemini_tools = _gemini_fm.get('tools')
                 if isinstance(_gemini_tools, list):
-                    _mapped_gemini_tools = _map_claude_tools_to_gemini_tools(_gemini_tools)
+                    # Validate against provider whitelist first
+                    _gemini_valid_tools = _validate_tools_against_whitelist(
+                        _gemini_tools, provider, agent_meta_root, log, role,
+                    )
+                    _mapped_gemini_tools = _map_claude_tools_to_gemini_tools(_gemini_valid_tools)
                     if _mapped_gemini_tools:
                         content = _update_frontmatter_dict(content, {'tools': _mapped_gemini_tools})
                     else:
@@ -897,6 +973,15 @@ def sync_agents_for_provider(
                 if memory:
                     src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+                # Validate tools against provider whitelist before transformation
+                _opencode_fm = _parse_frontmatter_yaml(content)
+                _opencode_raw_tools = _opencode_fm.get('tools')
+                if isinstance(_opencode_raw_tools, list):
+                    _opencode_valid_tools = _validate_tools_against_whitelist(
+                        _opencode_raw_tools, provider, agent_meta_root, log, role,
+                    )
+                    # Replace tools with validated subset before transformation
+                    content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
                     content, name, description, model, memory, generated_from
                 )
@@ -1089,6 +1174,7 @@ def _transform_frontmatter_for_opencode(
 
     # Remove fields not used by opencode
     removes = [
+        "tools",
         "generated-from",
         "generated_from",
         "permissionMode",

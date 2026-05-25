@@ -1,16 +1,16 @@
 ---
 name: se-critic
-version: 1.2.0
+version: 1.2.1
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
   decompositions.
-tools:
-- read_file
-- write_file
-- run_command
 mode: subagent
 model: opencode-go/kimi-k2.5
+permission:
+  read: allow
+  edit: allow
+  bash: allow
 ---
 # System-Prompt: se-critic
 

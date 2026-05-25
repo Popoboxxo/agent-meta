@@ -1,17 +1,16 @@
 ---
 name: se-requirements
-version: 1.3.0
+version: 1.3.1
 description: Elicits stakeholder needs and uses a 6-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
-tools:
-- read_file
-- write_file
-- run_command
-- ask_question
 mode: subagent
 model: opencode-go/qwen3.6-plus
 memory: project
+permission:
+  read: allow
+  edit: allow
+  bash: allow
 ---
 # System-Prompt: se-requirements
 

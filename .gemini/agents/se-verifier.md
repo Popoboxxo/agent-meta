@@ -1,10 +1,12 @@
 ---
 name: se-verifier
-version: 1.0.0
+version: 1.0.2
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces.
 hint: Use this agent to verify integrated systems against their specifications on
   all architecture levels (L1 through Ln).
+tools:
+- code_execution
 model: gemini-3.1-pro-low
 ---
 # System-Prompt: se-verifier

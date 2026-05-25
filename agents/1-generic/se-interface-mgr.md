@@ -1,14 +1,15 @@
 ---
 name: se-interface-mgr
-version: 1.1.0
-description: "Manages generic signal flow and deterministic synchronization across systems."
-hint: "Manages generic signal flow, deterministic sync across systems"
+version: 1.1.2
+description: Manages generic signal flow and deterministic synchronization across
+  systems.
+hint: Manages generic signal flow, deterministic sync across systems
 tools:
-  - read_file
-  - write_file
-  - edit_file
-  - glob
-  - grep
+- Read
+- Write
+- Edit
+- Glob
+- Grep
 ---
 
 # Interface Manager Agent (SE)

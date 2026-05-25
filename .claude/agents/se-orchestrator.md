@@ -1,15 +1,15 @@
 ---
 name: se-orchestrator
-version: 1.3.0
+version: 1.3.2
 description: Coordinates the 6-level recursive breakdown with zig-zag traceability
   and V&V.
 hint: Coordinates the 6-level recursive breakdown
 tools:
-- read_file
-- write_file
-- edit_file
-- glob
-- grep
+- Read
+- Write
+- Edit
+- Glob
+- Grep
 model: claude-sonnet-4-6
 ---
 

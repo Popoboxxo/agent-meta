@@ -22,6 +22,26 @@ NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeite
 | Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
 | Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
 
+## Mention-Interception — `@orchestrator` ist der einzige direkte Dispatch
+
+**WICHTIG:** `@orchestrator` ist der **EINZIGE** Mention den User direkt im Chat verwenden dürfen.
+
+Alle anderen `@<agent>`-Mentions (z.B. `@meta-feedback`, `@git`, `@developer`, `@documenter`, `@feedback`) werden **nicht** vom Agent-Invocation-System interceptet. Sie erscheinen als reiner Text und lösen keine automatische Delegation aus.
+
+### Regel für alle Provider
+
+- User sagt "Erstelle ein Meta-Feedback Issue" → Hauptchat delegiert intern an `feedback` (kein `@meta-feedback` im Output)
+- User sagt "Commit das" → Hauptchat delegiert intern an `git` (kein `@git` im Output)
+- **Agenten antworten NIEMALS mit `@<agent>` im Chat** — sie delegieren über das native Tool-Call-Interface
+
+### Warum
+
+Einige Provider-Umgebungen (insbesondere Gemini/Antigravity) intercepten nur den `@orchestrator`-Mention. Andere `@<agent>`-Mentions werden als plain text gerendert und lösen keine Aktion aus. Durch die ausschließliche Verwendung von `@orchestrator` als einzigen sichtbaren Mention wird diese Inkonsistenz eliminiert.
+
+### Konsequenz für die "Ausnahmen — direkter Dispatch"
+
+Die in der Tabelle genannten direkten Dispatch-Ausnahmen (`git`, `feedback`, `agent-meta-manager`, `documenter`) gelten **nur für die interne Delegationslogik** des Hauptchats/Orchestrators — nicht als User-facing Mentions. User verwenden **ausschließlich** `@orchestrator` oder natürliche Sprache.
+
 > **Faustregel:** Wenn du >1 Tool-Call brauchst → Orchestrator.
 > Wenn du unsicher bist → Orchestrator.
 > Wenn du Code lesen/analysieren/schreiben willst → Orchestrator.
@@ -122,13 +142,12 @@ Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer au
 ### Technische Durchsetzung auf LLM-Ebene
 
 Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:
+
 1. **Kein Redirection-Text:** Gib NIEMALS eine Textnachricht aus, die den Nutzer bittet, den Orchestrator manuell aufzurufen.
-2. **Tool-Pflicht:** Nutze die für deinen Provider verfügbare Methodik:
+2. **Native Tool-Calls priorisieren (PRIMAER):** Verwende IMMER zuerst den nativen Subagent-Dispatch-Mechanismus deiner Umgebung. Das ist das Tool-Call-Interface das Subagenten als strukturierte Aufrufe invoziert (kein reiner Text). Dies ist die bevorzugte und zuverlaessigste Methode — sie funktioniert in allen Umgebungen mit nativer Subagent-Unterstuetzung.
+3. **Text-basierter Fallback (SEKUNDAER):** Nur wenn die Umgebung KEIN natives Subagent-Tool-Call-Interface bereitstellt, verwende den textbasierten Trigger `@orchestrator <Aufgabe>` im Chat als Fallback. Dieser Mechanismus wird von einigen Frontends geparst, ist aber nicht zuverlaessig in Umgebungen mit nativen Tool-Calls.
 
-   **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
-
-   **In Gemini (VS Code / Antigravity):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat.
-   Achte darauf, dass der native `<planning_mode>` von Gemini unterdrückt wird — die Orchestrator-Planning-Phase hat Vorrang (siehe orchestrator.md).
+**Entscheidungsregel:** Native Umgebung mit Subagent-Tool? → Native Tool-Calls verwenden. Nur reines Text-Chat-Frontend? → `@orchestrator` Fallback.
 
 ## Hauptchat ohne Orchestrator (Fallback)
 

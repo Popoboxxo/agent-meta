@@ -1,9 +1,11 @@
 ---
 name: performance-optimizer
-version: 1.0.0
+version: 1.0.2
 description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
   Profiling-Daten, ohne funktionale Aenderungen.
 hint: Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung.
+tools:
+- code_execution
 model: gemini-3.1-pro-high
 ---
 # Performance Optimizer — agent-meta

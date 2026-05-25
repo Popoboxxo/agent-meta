@@ -1,13 +1,13 @@
 ---
 name: se-integration-and-test-manager
-version: 1.0.0
+version: 1.0.1
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln.'
 hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
   Integrationsplanung.
 tools:
-- read_file
-- write_file
+- Read
+- Write
 - Agent
 - TodoWrite
 model: claude-sonnet-4-6

@@ -460,6 +460,27 @@ Selbst wenn der übergeordnete Chat detaillierte Implementierungsschritte vorgib
 
 ---
 
+## Mention-Interception Policy (Pflicht)
+
+**`@orchestrator` ist der EINZIGE Mention der vom User direkt verwendet wird.**
+
+Alle anderen Agenten (`git`, `feedback`, `developer`, `documenter`, `meta-feedback`, etc.) werden **ausschließlich** über das native Tool-Call-Interface des Orchestrators aufgerufen — niemals als `@<agent>`-Mention im Chat-Output.
+
+### Regel
+
+- Der Orchestrator delegiert **immer** über Tool-Calls, nie über Text-Mentions
+- Worker-Agenten antworten **nie** mit `@<anderer-agent>` im Chat
+- Der Hauptchat delegiert **nie** mit `@<agent>` — er verwendet das native Dispatch-Tool oder `@orchestrator` als Fallback
+
+### Provider-Umgebungen mit eingeschränktem Mention-Parsing
+
+Einige Provider-Umgebungen intercepten nur `@orchestrator`. In diesen Umgebungen:
+- Alle direkten Dispatch-Ausnahmen (git, feedback, documenter, agent-meta-manager) erfolgen **intern** über Tool-Calls
+- Kein Agent output enthält `@<agent>`-Mentions
+- Falls Tool-Calls nicht verfügbar: `@orchestrator <Aufgabe>` als einziger Fallback
+
+---
+
 ## Agenten
 
 | Agent | Zuständigkeit | Parallel-Eligible |

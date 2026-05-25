@@ -6,13 +6,6 @@ description: 'Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-
   Feature, Out-of-Scope.'
 hint: 'Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren
   — vor developer/feature-Delegation'
-tools:
-- Read
-- Glob
-- Grep
-- Bash
-- Agent
-- TodoWrite
 model: balanced
 alwaysApply: false
 ---

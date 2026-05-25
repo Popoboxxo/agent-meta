@@ -5,11 +5,6 @@ description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD 
   → Validierung → Commit → PR.'
 hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
   vom Orchestrator gestartet, nicht direkt vom User.'
-tools:
-- Bash
-- Read
-- Agent
-- TodoWrite
 alwaysApply: false
 ---
 # Feature — agent-meta

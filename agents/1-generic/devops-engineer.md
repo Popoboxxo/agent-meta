@@ -1,15 +1,16 @@
 ---
 name: devops-engineer
-version: "1.0.1"
-description: "CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability und Security-Best-Practices."
-hint: "Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben."
+version: 1.0.3
+description: CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability
+  und Security-Best-Practices.
+hint: Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben.
 tools:
-  - read_file
-  - write_file
-  - edit_file
-  - run_command
-  - glob
-  - grep
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
 ---
 
 # DevOps Engineer — {{PROJECT_NAME}}

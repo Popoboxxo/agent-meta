@@ -6,12 +6,6 @@ description: Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorsc
   eingereicht.
 hint: 'Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert
   einreichen — immer vor git'
-tools:
-- Bash
-- Read
-- Glob
-- Grep
-- TodoWrite
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

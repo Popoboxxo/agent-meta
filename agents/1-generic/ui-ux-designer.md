@@ -1,15 +1,17 @@
 ---
 name: ui-ux-designer
-version: "1.0.0"
-description: "Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente REQ-IDs zu."
-hint: "UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert."
+version: 1.0.2
+description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
+  REQ-IDs zu.
+hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
+  nicht, spezifiziert.
 tools:
-  - read_file
-  - write_file
-  - edit_file
-  - run_command
-  - glob
-  - grep
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
 ---
 
 # UI/UX Designer — {{PROJECT_NAME}}

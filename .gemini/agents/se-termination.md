@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.1.0
+version: 1.1.2
 description: Deterministic termination at L3 (Component Requirement).
 hint: Deterministic termination at L3 (Component Requirement)
 model: gemini-3.5-flash-high

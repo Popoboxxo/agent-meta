@@ -1,15 +1,16 @@
 ---
 name: performance-optimizer
-version: "1.0.0"
-description: "Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch Profiling-Daten, ohne funktionale Aenderungen."
-hint: "Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung."
+version: 1.0.2
+description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
+  Profiling-Daten, ohne funktionale Aenderungen.
+hint: Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung.
 tools:
-  - read_file
-  - write_file
-  - edit_file
-  - run_command
-  - glob
-  - grep
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
 ---
 
 # Performance Optimizer — {{PROJECT_NAME}}

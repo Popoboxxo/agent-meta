@@ -6,15 +6,6 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
   Rollen-Anlegen-Prozess und Sync-Interface.'
 hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown,
   YAML)
-tools:
-- Bash
-- Read
-- Write
-- Edit
-- Glob
-- Grep
-- Agent
-- TodoWrite
 based-on: 1-generic/developer.md@2.0.1
 model: powerful
 alwaysApply: false
