@@ -7,14 +7,7 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
 hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown,
   YAML)
 tools:
-- Bash
-- Read
-- Write
-- Edit
-- Glob
-- Grep
-- Agent
-- TodoWrite
+- code_execution
 based-on: 1-generic/developer.md@2.0.1
 model: gemini-3.1-pro-high
 ---

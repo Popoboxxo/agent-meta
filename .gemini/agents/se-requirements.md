@@ -4,11 +4,6 @@ version: 1.3.0
 description: Elicits stakeholder needs and uses a 6-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
-tools:
-- read_file
-- write_file
-- run_command
-- ask_question
 model: gemini-3.1-pro-low
 ---
 # System-Prompt: se-requirements

@@ -1,19 +1,12 @@
 ---
 name: agent-meta-manager
-version: 1.7.0
+version: 1.7.1
 description: 'agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische
   Agenten, External-Skill-Lifecycle und Erweiterungen anlegen.'
 hint: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen'
 tools:
-- Bash
-- Read
-- Write
-- Edit
-- Glob
-- Grep
-- WebFetch
-- Agent
-- TodoWrite
+- code_execution
+- url_context
 model: gemini-3.1-pro-low
 ---
 # Agent-Meta-Manager — agent-meta

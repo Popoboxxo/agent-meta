@@ -5,10 +5,8 @@ description: Verbesserungsvorschläge für agent-meta sammeln und als GitHub Iss
   einreichen.
 hint: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
 tools:
-- Bash
-- Read
-- WebFetch
-- TodoWrite
+- code_execution
+- url_context
 model: gemini-3.5-flash-high
 ---
 # Meta-Feedback — agent-meta

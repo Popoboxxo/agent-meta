@@ -5,14 +5,8 @@ description: Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — st
   Fragen, denkt Ecken, übergibt reife Ideen an Requirements.
 hint: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
 tools:
-- Read
-- Write
-- Glob
-- Grep
-- WebFetch
-- WebSearch
-- Agent
-- TodoWrite
+- google_search
+- url_context
 ---
 # Ideation — agent-meta
 

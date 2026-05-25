@@ -5,12 +5,6 @@ description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-
   abgleichen. ''Did we build the right system?'''
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
   Code, prüft ob der User-Need erfüllt ist.
-tools:
-- read_file
-- write_file
-- run_command
-- glob
-- grep
 model: gemini-3.1-pro-high
 ---
 # System-Prompt: se-validator

@@ -7,11 +7,7 @@ description: Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorsc
 hint: 'Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert
   einreichen — immer vor git'
 tools:
-- Bash
-- Read
-- Glob
-- Grep
-- TodoWrite
+- code_execution
 model: gemini-3.5-flash-high
 ---
 # Feedback — agent-meta

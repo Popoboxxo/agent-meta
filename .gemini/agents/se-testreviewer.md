@@ -5,10 +5,6 @@ description: Audits the test strategy. Checks for edge cases, boundary value ana
   equivalence class errors, and flakiness.
 hint: Use this agent to review and audit test models and integration test strategies
   before execution.
-tools:
-- read_file
-- glob
-- grep
 model: gemini-3.1-pro-high
 ---
 # System-Prompt: se-testreviewer

@@ -4,12 +4,6 @@ version: 1.3.0
 description: Coordinates the 6-level recursive breakdown with zig-zag traceability
   and V&V.
 hint: Coordinates the 6-level recursive breakdown
-tools:
-- read_file
-- write_file
-- edit_file
-- glob
-- grep
 model: gemini-3.1-pro-low
 ---
 # Orchestrator Agent (SE)

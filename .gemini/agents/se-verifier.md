@@ -5,12 +5,6 @@ description: Multi-Level Verification L1-Ln. Validates that fully integrated sys
   exactly fulfill architectural specifications and interfaces.
 hint: Use this agent to verify integrated systems against their specifications on
   all architecture levels (L1 through Ln).
-tools:
-- read_file
-- run_command
-- glob
-- grep
-- write_file
 model: gemini-3.1-pro-low
 ---
 # System-Prompt: se-verifier

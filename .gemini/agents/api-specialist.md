@@ -5,13 +5,6 @@ description: API-Design, OpenAPI-Spezifikationen, Contract-First Development. Er
   und pflegt API-Vertraege.
 hint: Verwende diesen Agenten fuer API-Design, OpenAPI-Spezifikationen und Contract-First
   Development.
-tools:
-- read_file
-- write_file
-- edit_file
-- run_command
-- glob
-- grep
 model: gemini-3.1-pro-low
 ---
 # API Specialist — agent-meta

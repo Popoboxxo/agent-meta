@@ -4,9 +4,6 @@ version: 3.5.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
-tools:
-- Agent
-- TodoWrite
 model: gemini-3.1-pro-low
 ---
 # Orchestrator — agent-meta

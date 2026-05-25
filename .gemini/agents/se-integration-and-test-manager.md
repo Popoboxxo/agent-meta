@@ -5,11 +5,6 @@ description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen u
   Traceability-Feedback über L1-Ln.'
 hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
   Integrationsplanung.
-tools:
-- read_file
-- write_file
-- Agent
-- TodoWrite
 model: gemini-3.1-pro-low
 ---
 # System-Prompt: se-integration-and-test-manager

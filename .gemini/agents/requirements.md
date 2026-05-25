@@ -4,13 +4,6 @@ version: 1.3.3
 description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und
   Traceability prüfen.
 hint: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
-tools:
-- Read
-- Write
-- Edit
-- Glob
-- Grep
-- TodoWrite
 model: gemini-3.1-pro-low
 ---
 # Requirements Engineer — agent-meta

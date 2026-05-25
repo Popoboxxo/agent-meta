@@ -6,9 +6,8 @@ description: Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules 
 hint: 'KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta
   entdecken'
 tools:
-- Read
-- WebFetch
-- WebSearch
+- google_search
+- url_context
 model: gemini-3.1-pro-low
 ---
 # Agent-Meta Scout — agent-meta

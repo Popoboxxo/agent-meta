@@ -5,12 +5,7 @@ description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Co
   — plattformunabhängig (GitHub, GitLab, Gitea).'
 hint: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
 tools:
-- Bash
-- Read
-- Edit
-- Glob
-- Grep
-- TodoWrite
+- code_execution
 model: gemini-3.5-flash-high
 ---
 # Git Agent — agent-meta

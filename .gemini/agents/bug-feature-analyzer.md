@@ -7,12 +7,7 @@ description: 'Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-
 hint: 'Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren
   — vor developer/feature-Delegation'
 tools:
-- Read
-- Glob
-- Grep
-- Bash
-- Agent
-- TodoWrite
+- code_execution
 model: gemini-3.1-pro-low
 ---
 # Bug-Feature-Analyzer — agent-meta

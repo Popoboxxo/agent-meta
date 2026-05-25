@@ -5,13 +5,6 @@ description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-
   REQ-IDs zu.
 hint: UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert
   nicht, spezifiziert.
-tools:
-- read_file
-- write_file
-- edit_file
-- run_command
-- glob
-- grep
 model: gemini-3.1-pro-low
 ---
 # UI/UX Designer — agent-meta

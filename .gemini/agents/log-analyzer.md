@@ -6,14 +6,9 @@ description: 'Analysiert System- und Applikations-Logs: Frequency-Clustering, Se
 hint: 'Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings
   als Issues oder Tasks delegieren'
 tools:
-- Bash
-- Read
-- Glob
-- Grep
-- WebSearch
-- WebFetch
-- Agent
-- TodoWrite
+- code_execution
+- google_search
+- url_context
 model: gemini-3.1-pro-low
 ---
 # Log-Analyzer — agent-meta

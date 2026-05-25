@@ -5,12 +5,6 @@ description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-A
   und REQ-Traceability in Code-Pfaden.'
 hint: Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit
   (das macht validator).
-tools:
-- read_file
-- run_command
-- glob
-- grep
-- TodoWrite
 model: gemini-3.1-pro-high
 ---
 # Code-Reviewer — agent-meta
