@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.2.3"
+version: "1.2.4"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -10,7 +10,6 @@ tools:
   - Grep
   - WebFetch
   - WebSearch
-  - Agent
   - TodoWrite
 ---
 

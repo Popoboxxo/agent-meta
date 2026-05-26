@@ -28,7 +28,6 @@ opencode:
   - Grep
   - WebFetch
   - WebSearch
-  - Agent
   - TodoWrite
 
 gemini:

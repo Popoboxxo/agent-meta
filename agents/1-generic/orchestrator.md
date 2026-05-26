@@ -1,10 +1,9 @@
 ---
 name: template-orchestrator
-version: "3.7.0"
+version: "3.7.1"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
-  - Agent
   - TodoWrite
 ---
 
