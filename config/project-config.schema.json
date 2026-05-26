@@ -25,7 +25,8 @@
         "Claude",
         "Gemini",
         "Continue",
-        "GitHub"
+        "GitHub",
+        "Opencode"
       ]
     },
     "ai-providers": {
@@ -36,7 +37,8 @@
         "enum": [
           "Claude",
           "Gemini",
-          "Continue"
+          "Continue",
+          "Opencode"
         ]
       },
       "uniqueItems": true
@@ -55,22 +57,42 @@
       "items": {
         "type": "string",
         "enum": [
-          "orchestrator",
-          "developer",
-          "tester",
-          "validator",
-          "requirements",
-          "ideation",
-          "documenter",
-          "release",
-          "docker",
-          "meta-feedback",
-          "git",
           "agent-meta-manager",
-          "feature",
           "agent-meta-scout",
+          "api-specialist",
+          "bug-feature-analyzer",
+          "code-reviewer",
+          "developer",
+          "devops-engineer",
+          "docker",
+          "documenter",
+          "export-manager",
+          "feature",
+          "feedback",
+          "git",
+          "ideation",
+          "log-analyzer",
+          "meta-feedback",
+          "openscad-developer",
+          "orchestrator",
+          "performance-optimizer",
+          "release",
+          "requirements",
+          "se-architect",
+          "se-critic",
+          "se-integration-and-test-manager",
+          "se-interface-mgr",
+          "se-orchestrator",
+          "se-requirements",
+          "se-termination",
+          "se-test-engineer",
+          "se-testreviewer",
+          "se-validator",
+          "se-verifier",
           "security-auditor",
-          "openscad-developer"
+          "tester",
+          "ui-ux-designer",
+          "validator"
         ]
       },
       "uniqueItems": true
@@ -258,6 +280,11 @@
           "type": "object",
           "description": "Continue model overrides (ignored — Continue manages models in config.yaml).",
           "additionalProperties": {"type": "string"}
+        },
+        "Opencode": {
+          "type": "object",
+          "description": "Opencode model overrides (Opencode manages models in opencode.json).",
+          "additionalProperties": {"type": "string"}
         }
       },
       "additionalProperties": {
@@ -400,9 +427,15 @@
               "default": "full"
             }
           }
+        },
+        "Opencode": {
+          "type": "object",
+          "description": "Options for the Opencode provider.",
+          "additionalProperties": false,
+          "properties": {}
         }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "gitignore": {
       "type": "object",
