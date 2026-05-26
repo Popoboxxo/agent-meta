@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.0.0"
+version: "2.0.1"
 description: "Isolierte Unit-Tests mit Mocks/Stubs nach TDD-Workflow. Für Integrationstests → se-test-engineer."
 hint: "Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen"
 tools:
@@ -10,7 +10,6 @@ tools:
   - Edit
   - Glob
   - Grep
-  - Agent
   - TodoWrite
 ---
 

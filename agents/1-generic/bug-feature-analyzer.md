@@ -1,6 +1,6 @@
 ---
 name: template-bug-feature-analyzer
-version: "1.0.0"
+version: "1.0.1"
 description: "Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares Feature, Out-of-Scope."
 hint: "Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren — vor developer/feature-Delegation"
 tools:
@@ -8,7 +8,6 @@ tools:
   - Glob
   - Grep
   - Bash
-  - Agent
   - TodoWrite
 ---
 
