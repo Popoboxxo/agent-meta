@@ -36,7 +36,7 @@ max-parallel-agents: 4
 # EXAMPLE: Full project.yaml with Orchestrator-First
 # ============================================================
 
-# agent-meta-version: 0.47.0
+# agent-meta-version: 0.53.1
 #
 # provider-isolation: disabled
 #
