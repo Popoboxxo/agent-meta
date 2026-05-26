@@ -72,7 +72,7 @@ def _validate_tools_against_whitelist(
             valid.append(t)
         else:
             log.warn(
-                f"{provider}/{role}: tool '{t}' not in provider whitelist — excluded from frontmatter",
+                f"{provider}/{role}: tool '{t}' not supported by {provider} — skipping (see config/provider-tools.yaml)",
             )
     return valid
 
