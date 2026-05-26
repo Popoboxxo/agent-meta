@@ -162,11 +162,21 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
       - {env:VAR} interpolation (not ${VAR})
     """
     conn_type = conn.get("type", "")
-    entry: dict = {"type": conn_type}
+    orig_type = conn_type
 
     is_opencode = fmt == "opencode-json"
+    if is_opencode:
+        if conn_type == "sse":
+            conn_type = "remote"
+        elif conn_type == "stdio":
+            conn_type = "local"
 
-    if conn_type == "sse":
+    entry: dict = {"type": conn_type}
+
+    if is_opencode:
+        entry["enabled"] = True
+
+    if orig_type == "sse":
         raw_url = conn.get("url", "")
         if is_opencode:
             entry["url"] = _subst_opencode(raw_url, secrets)
@@ -179,7 +189,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
             else:
                 entry["headers"] = {k: _subst(str(v), secrets) for k, v in headers.items()}
 
-    elif conn_type == "stdio":
+    elif orig_type == "stdio":
         cmd = conn.get("command", "")
         args = list(conn.get("args", []))
         env = conn.get("env", {})
