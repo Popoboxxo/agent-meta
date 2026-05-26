@@ -24,6 +24,10 @@
 #   Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only).
 #   Projekte überschreiben via 'permission-mode-overrides' in .meta-config/project.yaml.
 #
+# steps: Maximale Iterationen für Opencode-Agenten. Leer = kein Limit (kein steps:-Feld).
+#   Gültige Werte: positive Ganzzahl (z.B. 10, 25).
+#   Projekte überschreiben via 'steps-overrides' in .meta-config/project.yaml.
+#
 # workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
 #   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
 
