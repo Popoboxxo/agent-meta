@@ -761,7 +761,7 @@ def sync_agents_for_provider(
     """
     from .config import substitute, strip_inactive_conditional_blocks
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, load_roles_config
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_permission_mode, load_roles_config
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)
@@ -973,6 +973,10 @@ def sync_agents_for_provider(
                 if memory:
                     src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+                temperature = resolve_temperature(role, config, agent_meta_root)
+                if temperature:
+                    src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
                 # Validate tools against provider whitelist before transformation
                 _opencode_fm = _parse_frontmatter_yaml(content)
                 _opencode_raw_tools = _opencode_fm.get('tools')
@@ -983,7 +987,7 @@ def sync_agents_for_provider(
                     # Replace tools with validated subset before transformation
                     content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, memory, generated_from
+                    content, name, description, model, memory, generated_from, temperature
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1137,6 +1141,7 @@ def _transform_frontmatter_for_opencode(
     model: str,
     memory: str,
     generated_from: str,
+    temperature: str = "",
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -1172,6 +1177,12 @@ def _transform_frontmatter_for_opencode(
         if perms:
             updates["permission"] = perms
 
+    # Preserve temperature: template frontmatter takes precedence over role defaults
+    if "temperature" in template_fm:
+        updates["temperature"] = template_fm["temperature"]
+    elif temperature:
+        updates["temperature"] = temperature
+
     # Remove fields not used by opencode
     removes = [
         "tools",
@@ -1179,7 +1190,6 @@ def _transform_frontmatter_for_opencode(
         "generated_from",
         "permissionMode",
         "alwaysApply",
-        "temperature",
         "top_p",
         "top_k",
         "stop_sequences",
