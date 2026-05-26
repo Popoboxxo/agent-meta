@@ -160,3 +160,18 @@ def resolve_temperature(role: str, project_config: dict, agent_meta_root: Path) 
         return str(project_overrides[role])
     roles_cfg = load_roles_config(agent_meta_root)
     return roles_cfg["roles"].get(role, {}).get("temperature", "")
+
+
+def resolve_steps(role: str, project_config: dict, agent_meta_root: Path) -> str:
+    """Resolve the steps limit for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: project_config["steps-overrides"][role]
+    2. Meta default:     roles.config.yaml roles[role].steps
+    3. Empty string:     no steps: field injected
+    """
+    project_overrides = project_config.get("steps-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    roles_cfg = load_roles_config(agent_meta_root)
+    return roles_cfg["roles"].get(role, {}).get("steps", "")

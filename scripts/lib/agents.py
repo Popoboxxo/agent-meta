@@ -761,7 +761,7 @@ def sync_agents_for_provider(
     """
     from .config import substitute, strip_inactive_conditional_blocks
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_permission_mode, load_roles_config
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_steps, resolve_permission_mode, load_roles_config
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)
@@ -977,6 +977,10 @@ def sync_agents_for_provider(
                 if temperature:
                     src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
+                steps = resolve_steps(role, config, agent_meta_root)
+                if steps:
+                    src = 'project override' if role in config.get('steps-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'steps: {steps} (from {src})')
                 # Validate tools against provider whitelist before transformation
                 _opencode_fm = _parse_frontmatter_yaml(content)
                 _opencode_raw_tools = _opencode_fm.get('tools')
@@ -987,7 +991,9 @@ def sync_agents_for_provider(
                     # Replace tools with validated subset before transformation
                     content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, memory, generated_from, temperature
+                content = _transform_frontmatter_for_opencode(
+                    content, name, description, model, memory, generated_from, temperature, steps
+                )
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1140,6 +1146,7 @@ def _transform_frontmatter_for_opencode(
     description: str,
     model: str,
     memory: str,
+    steps: str,
     generated_from: str,
     temperature: str = "",
 ) -> str:
@@ -1151,6 +1158,7 @@ def _transform_frontmatter_for_opencode(
       mode: subagent
       model: provider/model-id (optional)
       memory: <scope> (optional)
+      steps: <int> (optional)
       permission:             (mapped from template frontmatter tools)
         <key>: allow
     """
@@ -1169,6 +1177,12 @@ def _transform_frontmatter_for_opencode(
         updates["model"] = model
     if memory:
         updates["memory"] = memory
+    if steps:
+        updates["steps"] = steps
+    if "steps" in template_fm:
+        updates["steps"] = template_fm["steps"]
+    if "maxSteps" in template_fm:
+        updates["steps"] = template_fm["maxSteps"]
 
     # Map template tools to opencode permission block
     template_tools = template_fm.get("tools")
@@ -1198,6 +1212,7 @@ def _transform_frontmatter_for_opencode(
         "hint",
         "based-on",
         "based_on",
+        "maxSteps",
     ]
 
     content = _update_frontmatter_dict(content, updates, removes=removes)
