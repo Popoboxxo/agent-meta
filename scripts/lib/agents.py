@@ -991,13 +991,7 @@ def sync_agents_for_provider(
                     # Replace tools with validated subset before transformation
                     content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
-                content = _transform_frontmatter_for_opencode(
                     content, name, description, model, memory, generated_from, temperature, steps, agent_meta_root
-                )
-=======
-                    content, name, description, model, memory, generated_from,
-                    agent_meta_root,
->>>>>>> feat/opencode-deny-permissions
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1167,10 +1161,8 @@ def _transform_frontmatter_for_opencode(
     memory: str,
     steps: str,
     generated_from: str,
-    generated_from: str,
-    temperature: str = "",
     agent_meta_root: Path,
-) -> str:
+    temperature: str = "",
 ) -> str:
     """Build opencode-native agent frontmatter.
 
