@@ -983,7 +983,8 @@ def sync_agents_for_provider(
                     # Replace tools with validated subset before transformation
                     content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, memory, generated_from
+                    content, name, description, model, memory, generated_from,
+                    agent_meta_root,
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1094,11 +1095,17 @@ def _map_claude_tools_to_gemini_tools(tools: list) -> list[str]:
     return sorted(mapped)
 
 
-def _map_claude_tools_to_opencode_permissions(tools: list) -> dict[str, str]:
+def _map_claude_tools_to_opencode_permissions(
+    tools: list,
+    deny_list: list[str] | None = None,
+) -> dict[str, str]:
     """Map Claude Code tool names to opencode permission keys.
 
     opencode uses a permission-based model (tools frontmatter is deprecated).
     Each mapped key is set to 'allow'. Unknown tools are ignored.
+
+    If deny_list is provided, those permissions are set to 'deny'
+    when not explicitly allowed by the template tools.
 
     Known mappings:
       Bash -> bash
@@ -1124,9 +1131,18 @@ def _map_claude_tools_to_opencode_permissions(tools: list) -> dict[str, str]:
         "WebSearch": "websearch",
     }
     perms: dict[str, str] = {}
+
+    # Allow-mapping
     for t in tools:
         if isinstance(t, str) and t in mapping:
             perms[mapping[t]] = "allow"
+
+    # Deny-mapping
+    if deny_list:
+        for tool_name in deny_list:
+            if tool_name in mapping and mapping[tool_name] not in perms:
+                perms[mapping[tool_name]] = "deny"
+
     return perms
 
 
@@ -1137,6 +1153,7 @@ def _transform_frontmatter_for_opencode(
     model: str,
     memory: str,
     generated_from: str,
+    agent_meta_root: Path,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -1168,7 +1185,11 @@ def _transform_frontmatter_for_opencode(
     # Map template tools to opencode permission block
     template_tools = template_fm.get("tools")
     if isinstance(template_tools, list) and template_tools:
-        perms = _map_claude_tools_to_opencode_permissions(template_tools)
+        provider_tools_cfg = load_provider_tools_config(agent_meta_root)
+        deny_list = provider_tools_cfg.get("opencode_deny_critical", [])
+        perms = _map_claude_tools_to_opencode_permissions(
+            template_tools, deny_list=deny_list
+        )
         if perms:
             updates["permission"] = perms
 
