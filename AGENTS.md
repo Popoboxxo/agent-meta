@@ -502,6 +502,17 @@ Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein au
 
 **Entscheidungsregel:** Native Umgebung mit Subagent-Tool? → Native Tool-Calls verwenden. Nur reines Text-Chat-Frontend? → `@orchestrator` Fallback.
 
+**Provider-spezifische Implementierungsdetails:**
+
+| Provider | Dispatch-Mechanismus | Dokumentation |
+|----------|---------------------|---------------|
+| Opencode | `task()` Tool-Call | Native Subagent-Dispatch |
+| Gemini/Antigravity | `define_subagent` + `invoke_subagent` | Siehe `2-platform/gemini-orchestrator.md` |
+| Claude | `background` Tool-Call | Native Subagent-Dispatch |
+| Continue | Sequenziell (kein Parallel-Dispatch) | Fallback-Modus |
+
+Für Gemini-spezifische Auto-Handoff-Details → `agents/2-platform/gemini-orchestrator.md`.
+
 ## Hauptchat ohne Orchestrator (Fallback)
 
 Wenn der Orchestrator nicht verfügbar ist:
