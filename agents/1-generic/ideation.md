@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.2.4"
+version: "1.3.1"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -165,6 +165,20 @@ Wenn die Idee noch sehr unscharf ist ("wäre cool wenn...", "ich stelle mir vor.
 - NIEMALS Code schreiben
 
 ---
+
+## Anti-Recursion Guard
+
+**Du bist ein Worker-Agent.** Du implementierst, analysierst oder prüfst selbst.
+Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrator` oder einen anderen Worker-Agenten.
+
+| Verboten | Begründung |
+|----------|------------|
+| `@orchestrator` im Output verwenden | Du bist Worker, nicht Router |
+| Task()-Calls an orchestrator starten | Nur der Hauptchat/Orchestrator darf delegieren |
+| "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
+| Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
+
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.
 
 ## Sprache
 

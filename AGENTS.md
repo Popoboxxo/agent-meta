@@ -480,6 +480,18 @@ Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer au
 2. **Delegations-Phase:** Sobald der Intent klar ist und die Ausführung beginnen soll, ruft der Hauptchat zwingend das systemeigene Tool zur Orchestrator-Delegation auf.
 3. **Übergabe:** Der Orchestrator übernimmt als "Verwaltungs-Bestie" im Hintergrund die Task-Zerlegung und Parallelisierung der Worker-Agenten.
 
+### WICHTIG: Auto-Handoff gilt NUR für den Hauptchat
+
+Die Delegationspflicht an den Orchestrator gilt **ausschließlich für den Hauptchat** (die Kommunikationsoberfläche zum Nutzer).
+
+**Worker-Agenten** (developer, tester, documenter, etc.) sind **Endstellen** — sie implementieren ihre Aufgaben selbst und delegieren NICHT zurück an den Orchestrator.
+
+| Ebene | Darf an Orchestrator delegieren? | Begründung |
+|-------|----------------------------------|------------|
+| Hauptchat | ✅ JA | Ist die Router-Ebene |
+| Orchestrator | ✅ JA (an Worker) | Ist die Koordinations-Ebene |
+| Worker-Agenten | ❌ NEIN | Sind die Ausführungs-Ebene |
+
 ### Technische Durchsetzung auf LLM-Ebene
 
 Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:

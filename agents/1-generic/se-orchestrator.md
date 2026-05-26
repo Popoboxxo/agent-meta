@@ -1,6 +1,6 @@
 ---
 name: se-orchestrator
-version: 1.3.2
+version: 1.4.1
 description: Coordinates the 6-level recursive breakdown with zig-zag traceability
   and V&V.
 hint: Coordinates the 6-level recursive breakdown
@@ -208,3 +208,17 @@ Verification & Validation activities run in parallel with the left-wing decompos
 > **Note:** The fields `orchestration_id`, `cells_spawned`, `leaf_components`, `traceability`, `vv_status`, and `next_actions` are orchestration metadata intentionally outside the `se-decomposition.schema.json` decomposition schema.
 
 > **Context Window Rule:** A cell at level n+1 receives only the parent black-box requirement (~500 tokens) plus the relevant neighbor interfaces from the propagation map (~300 tokens). No complete history of the parent white-box. This prevents context drift in deep recursion.
+
+## Anti-Recursion Guard
+
+**Du bist ein Worker-Agent.** Du implementierst, analysierst oder prüfst selbst.
+Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrator` oder einen anderen Worker-Agenten.
+
+| Verboten | Begründung |
+|----------|------------|
+| `@orchestrator` im Output verwenden | Du bist Worker, nicht Router |
+| Task()-Calls an orchestrator starten | Nur der Hauptchat/Orchestrator darf delegieren |
+| "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
+| Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
+
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.
