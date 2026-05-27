@@ -6,6 +6,7 @@ hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks u
   parallel
 tools:
 - TodoWrite
+- Agent
 model: claude-sonnet-4-6
 ---
 

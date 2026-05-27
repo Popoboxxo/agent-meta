@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.55.1] — 2026-05-28
+
+### Fixed
+
+- **Orchestrator Agent Task Tool**: Added `Agent` task tool to orchestrator template, enabling proper subagent delegation in provider environments that support it.
+- **Provider Tool Whitelists**: Added `Agent` to both Opencode and Claude provider tool whitelists (`config/provider-tools.yaml`), preventing sync warnings when the tool is referenced in agent templates.
+
+---
+
 ## [0.55.0] — 2026-05-27
 
 ### Added
