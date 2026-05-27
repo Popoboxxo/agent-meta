@@ -510,6 +510,19 @@
         ],
         "additionalProperties": false
       }
+    },
+    "quality-pipelines": {
+      "type": "object",
+      "properties": {
+        "overrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/pipelineDefinition" }
+        },
+        "custom-pipelines": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/pipelineDefinition" }
+        }
+      }
     }
   },
   "required": [
@@ -517,6 +530,61 @@
   ],
   "additionalProperties": true,
   "$defs": {
+    "stageItem": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "agent": { "type": "string" },
+        "task": { "type": "string" },
+        "mode": { "enum": ["sequential", "parallel_group", "fanout", "loop", "conditional"] },
+        "loop": {
+          "type": "object",
+          "properties": {
+            "generator": { "type": "string" },
+            "critic": { "type": "string" },
+            "max_iterations": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "parallel_group": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agent": { "type": "string" },
+              "task": { "type": "string" }
+            }
+          }
+        },
+        "condition": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "agent": { "type": "string" }
+          }
+        }
+      },
+      "required": ["id", "agent", "task", "mode"]
+    },
+    "pipelineDefinition": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "stages": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/stageItem" }
+            },
+            {
+              "type": "object",
+              "description": "Override form keyed by stage id"
+            }
+          ]
+        },
+        "on_error": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "lifecycleTriggerList": {
       "type": "array",
       "description": "List of agent tasks to run for this lifecycle event.",

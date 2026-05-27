@@ -249,9 +249,33 @@ pathRules:
     agents:
       - developer
 
+quality-pipelines:
+  overrides:
+    standard-feature:
+      stages:
+        review:
+          loop:
+            max_iterations: 5
+    se-cascade:
+      enabled: false
+  custom-pipelines:
+    security-hotfix:
+      stages:
+        - id: detect
+          agent: security-auditor
+          task: "Vulnerability analysieren"
+          mode: sequential
+        - id: fix
+          agent: developer
+          task: "Fix implementieren"
+          mode: sequential
+        - id: verify
+          agent: tester
+          task: "Regression-Tests"
+          mode: sequential
+
 reflection-pairs:
   overrides:
     dev-review-loop:
       max_iterations: 5
       enabled: true
-      - code-reviewer
