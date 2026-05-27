@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.8.0"
+version: "3.9.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -59,6 +59,8 @@ Beispiel:
 >
 > Soll ich starten?"
 
+**Aufwandsschätzung:** Wenn der User nach Zeit/Kosten fragt oder Planungshilfe braucht → delegiere an `effort-estimator`. Der Orchestrator schätzt NIEMALS selbst.
+
 Für Triviale Aufgaben (einzelne Delegation an git, feedback, etc.): Plan überspringen.
 
 ### Native Planning-Mode Override
@@ -102,6 +104,7 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | **Export** / Target-Routing / Confluence | `export-manager` | `fast` | Nein (atomar) | "Exportiere nach Confluence", "ADR speichern" |
 {{/if}}
 | **Batch-Operationen** (mehrere gleiche Tasks) | — | — | **Ja** | "Fix 3 Bugs", "Schreib Tests für A,B,C" |
+| **Aufwandsschätzung** / "Wie lange dauert das?" / Planning-Hilfe | `effort-estimator` | `fast` | Nein (sequentiell) | "Wie lange für Feature X?", "Schätze den Aufwand" |
 | **Nicht in Tabelle** | Frag den User | — | — | — |
 
 **Regel:** Wenn der Intent nicht exakt in dieser Tabelle steht, frage den User nach Klärung — rate nicht und arbeite nicht selbst.
@@ -602,6 +605,7 @@ Wenn ein Worker-Agent eine Aufgabe zurückgibt die in seinem eigenen Scope liegt
 | feedback | GitHub Issues erstellen |
 | ideation | Ideen explorieren, Konzepte schärfen |
 | bug-feature-analyzer | Issues klassifizieren, Triage |
+| effort-estimator | Aufwandsschätzungen erstellen |
 | log-analyzer | Logs analysieren, Fehler clustern |
 | release | Versioning, Changelog, Release |
 | se-* | Systems Engineering Aufgaben (jeweiliger Scope) |
@@ -652,6 +656,7 @@ Einige Provider-Umgebungen intercepten nur `@orchestrator`. In diesen Umgebungen
 | `log-analyzer` | System- und App-Logs analysieren, Severity-Klassifikation, Findings delegieren | ✅ (Multi-Quellen) |
 | `feedback` | Bug/Feature/Verbesserung als GitHub Issue einreichen — **immer vor `git` für Issues** | ❌ (atomar) |
 | `bug-feature-analyzer` | Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope — **vor developer/feature-Delegation** | ✅ (Multi-Issues) |
+| `effort-estimator` | Aufwandsschätzung für Tasks — NIEMALS selbst schätzen | ❌ (sequentiell) |
 {{#if SE_ENABLED}}
 | `se-orchestrator` | Koordiniert den 6-stufigen Systems-Engineering-Herunterbruch | ❌ (Meta-Orchestrator) |
 | `se-requirements`| Nimmt Stakeholder-Bedürfnisse auf (L1-Blackbox) | ❌ (sequentiell) |
@@ -711,6 +716,7 @@ W  UI-Design:       ui-ux-designer → Mockups + UI-Spec → developer
 X  API-Design:      api-specialist → OpenAPI-Spec → developer
 Y  Performance:     performance-optimizer → Profiling → Empfehlungen → developer
 Z  Export:          export-manager → Target-Routing (markdown/confluence/jira)
+AA Schätzung:      effort-estimator → Aufwandsschätzung für [Task]
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).
