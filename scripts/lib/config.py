@@ -256,6 +256,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     orch_config = config.get("orchestrator", {})
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
+    # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml
+    oc_config = config.get("outcome-caching", {})
+    variables["ORCHESTRATOR_OUTCOME_CACHING"] = "true" if oc_config.get("enabled", False) else "false"
+    variables["ORCHESTRATOR_CACHE_TTL"] = str(oc_config.get("ttl_seconds", 3600))
+    variables["ORCHESTRATOR_CACHE_MAX_ENTRIES"] = str(oc_config.get("max_entries", 100))
     # UNKNOWN_FALLBACK: granular flags (new object format) or legacy string
     unknown_fallback = orch_config.get("unknown-fallback", {})
     if isinstance(unknown_fallback, str):

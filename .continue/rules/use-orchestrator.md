@@ -157,3 +157,32 @@ Wenn der Orchestrator nicht verfügbar ist:
 - Keine parallelen Tasks möglich
 - Sequentieller Workflow selbst koordinieren
 
+---
+
+## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
+
+**Diese Regel gilt für ALLE Worker-Agenten.**
+
+Worker-Agenten (developer, tester, documenter, code-reviewer, git, etc.) sind **Ausführungs-Endstellen**. Sie dürfen Aufgaben die in ihrem Scope liegen NIEMALS zurück an den Orchestrator delegieren.
+
+### Verboten für Worker
+
+- `@orchestrator` im Chat-Output verwenden
+- Tool-Calls die den Orchestrator aufrufen
+- "Delegiere an orchestrator" als Handlung
+- Aufgaben zurückgeben die sie selbst lösen können
+
+### Erlaubt für Worker
+
+- Im Text auf andere Worker-Rollen verweisen (z.B. "Tests fehlen → tester")
+- Den User informieren wenn etwas außerhalb des Scope liegt
+- Bei echten Blockern den User um Klärung bitten
+
+### Warum
+
+Rekursive Delegationen (Hauptchat → Orchestrator → Worker → Orchestrator → ...) erzeugen:
+- Endlosschleifen
+- Redundante Token-Kosten
+- Verwirrung über Zuständigkeiten
+- Verlust des Task-Kontexts
+

@@ -490,6 +490,9 @@
       "description": "Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.",
       "default": false
     },
+    "outcome-caching": {
+      "$ref": "#/$defs/outcome-caching"
+    },
     "external-skills": {
       "type": "object",
       "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",
@@ -603,6 +606,16 @@
         "required": ["agent", "task"],
         "additionalProperties": false
       }
+    },
+    "outcome-caching": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "ttl_seconds": { "type": "integer", "minimum": 60, "default": 3600 },
+        "max_entries": { "type": "integer", "minimum": 10, "default": 100 },
+        "invalidation": { "type": "string", "enum": ["git-commit", "ttl", "manual"], "default": "git-commit" }
+      },
+      "additionalProperties": false
     }
   }
 }

@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.53.1 — `2026-05-25`
+Generiert von agent-meta v0.53.1 — `2026-05-27`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -306,6 +306,23 @@ Bevor ein Commit in 1-generic/ gemerged wird:
 
 ---
 
+# Python Conventions
+
+**Gilt für alle Python-Dateien (`*.py`).**
+
+## Code Style
+
+- PEP 8 einhalten
+- Type Hints verwenden wo möglich
+- Docstrings für alle öffentlichen Funktionen/Klassen
+
+## Imports
+
+- Standard Library → Third Party → Local
+- Keine wildcard imports (`from x import *`)
+
+---
+
 # Session-Abschluss — Erkenntnisse sichern
 
 Gilt für Hauptchat und Orchestrator.
@@ -362,10 +379,6 @@ NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeite
 | Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
 | Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
 | Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
-
-**Explizit ausgeschlossen von direktem Dispatch:**
-`bug-feature-analyzer`, `developer`, `feature`, `tester`, `ideation`, `code-reviewer`, `release`, `log-analyzer`, `se-*`, `ui-ux-designer`, `api-specialist`, `devops-engineer`, `performance-optimizer`, `export-manager`
-→ Diese Agenten dürfen **NUR** über den Orchestrator aufgerufen werden.
 
 ## Mention-Interception — `@orchestrator` ist der einzige direkte Dispatch
 
@@ -484,18 +497,6 @@ Der Hauptchat weigert sich **niemals** mit einem Text-Block. Statt den Nutzer au
 2. **Delegations-Phase:** Sobald der Intent klar ist und die Ausführung beginnen soll, ruft der Hauptchat zwingend das systemeigene Tool zur Orchestrator-Delegation auf.
 3. **Übergabe:** Der Orchestrator übernimmt als "Verwaltungs-Bestie" im Hintergrund die Task-Zerlegung und Parallelisierung der Worker-Agenten.
 
-### WICHTIG: Auto-Handoff gilt NUR für den Hauptchat
-
-Die Delegationspflicht an den Orchestrator gilt **ausschließlich für den Hauptchat** (die Kommunikationsoberfläche zum Nutzer).
-
-**Worker-Agenten** (developer, tester, documenter, etc.) sind **Endstellen** — sie implementieren ihre Aufgaben selbst und delegieren NICHT zurück an den Orchestrator.
-
-| Ebene | Darf an Orchestrator delegieren? | Begründung |
-|-------|----------------------------------|------------|
-| Hauptchat | ✅ JA | Ist die Router-Ebene |
-| Orchestrator | ✅ JA (an Worker) | Ist die Koordinations-Ebene |
-| Worker-Agenten | ❌ NEIN | Sind die Ausführungs-Ebene |
-
 ### Technische Durchsetzung auf LLM-Ebene
 
 Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein auszuführender Entwicklungs-, Architektur- oder Prüf-Auftrag ansteht:
@@ -506,17 +507,6 @@ Jeder Provider-Agent liest diese Datei als System-Instruktion ein. Sobald ein au
 
 **Entscheidungsregel:** Native Umgebung mit Subagent-Tool? → Native Tool-Calls verwenden. Nur reines Text-Chat-Frontend? → `@orchestrator` Fallback.
 
-**Provider-spezifische Implementierungsdetails:**
-
-| Provider | Dispatch-Mechanismus | Dokumentation |
-|----------|---------------------|---------------|
-| Opencode | `task()` Tool-Call | Native Subagent-Dispatch |
-| Gemini/Antigravity | `define_subagent` + `invoke_subagent` | Siehe `2-platform/gemini-orchestrator.md` |
-| Claude | `background` Tool-Call | Native Subagent-Dispatch |
-| Continue | Sequenziell (kein Parallel-Dispatch) | Fallback-Modus |
-
-Für Gemini-spezifische Auto-Handoff-Details → `agents/2-platform/gemini-orchestrator.md`.
-
 ## Hauptchat ohne Orchestrator (Fallback)
 
 Wenn der Orchestrator nicht verfügbar ist:
@@ -524,6 +514,35 @@ Wenn der Orchestrator nicht verfügbar ist:
 - Auf `main`/`master` → Branch anlegen
 - Keine parallelen Tasks möglich
 - Sequentieller Workflow selbst koordinieren
+
+---
+
+## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
+
+**Diese Regel gilt für ALLE Worker-Agenten.**
+
+Worker-Agenten (developer, tester, documenter, code-reviewer, git, etc.) sind **Ausführungs-Endstellen**. Sie dürfen Aufgaben die in ihrem Scope liegen NIEMALS zurück an den Orchestrator delegieren.
+
+### Verboten für Worker
+
+- `@orchestrator` im Chat-Output verwenden
+- Tool-Calls die den Orchestrator aufrufen
+- "Delegiere an orchestrator" als Handlung
+- Aufgaben zurückgeben die sie selbst lösen können
+
+### Erlaubt für Worker
+
+- Im Text auf andere Worker-Rollen verweisen (z.B. "Tests fehlen → tester")
+- Den User informieren wenn etwas außerhalb des Scope liegt
+- Bei echten Blockern den User um Klärung bitten
+
+### Warum
+
+Rekursive Delegationen (Hauptchat → Orchestrator → Worker → Orchestrator → ...) erzeugen:
+- Endlosschleifen
+- Redundante Token-Kosten
+- Verwirrung über Zuständigkeiten
+- Verlust des Task-Kontexts
 
 ---
 

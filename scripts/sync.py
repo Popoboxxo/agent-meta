@@ -305,6 +305,8 @@ def main():
                         help="Only generate visualization, skip sync")
     parser.add_argument("--viz-cleanup", action="store_true",
                         help="Clean up old visualization sessions")
+    parser.add_argument("--clear-cache", action="store_true",
+                        help="Clear the outcome cache")
 
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
@@ -324,6 +326,12 @@ def main():
     agent_meta_root = find_agent_meta_root(script_path)
 
     log = SyncLog()
+
+    if args.clear_cache:
+        from lib.cache import invalidate, CACHE_FILE
+        invalidate(CACHE_FILE)
+        print("Outcome cache cleared.")
+        return
 
     if args.dry_run:
         print("DRY-RUN — no files will be written\n")
