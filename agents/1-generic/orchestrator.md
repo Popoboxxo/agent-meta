@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.10.0"
+version: "3.11.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -200,6 +200,11 @@ REPEAT_UNTIL(generator, critic, max_iterations):
     → Repeat until critic approves OR max_iterations reached
   If max_iterations exceeded → escalate to orchestrator
   Example: REPEAT_UNTIL(developer, code-reviewer, 3)
+
+PIPELINE(name, stages):
+  Execute a pre-defined quality pipeline.
+  Each stage is dispatched according to its mode (sequential/parallel/loop).
+  Example: PIPELINE("standard-feature", [branch → implement → review → commit])
 ```
 
 ### Capability Detection
@@ -213,6 +218,25 @@ Implicit capability detection:
   Contains "automatically parallel"? → Gemini mode
   Contains "not supported" or "sequential"? → Continue mode (fallback)
 ```
+
+---
+
+## Quality Pipelines (Generated)
+
+{{#if PIPELINE_STANDARD_FEATURE_ENABLED}}
+### Pipeline: standard-feature
+{{PIPELINE_STANDARD_FEATURE_BLOCK}}
+{{/if}}
+
+{{#if PIPELINE_QUICK_FIX_ENABLED}}
+### Pipeline: quick-fix
+{{PIPELINE_QUICK_FIX_BLOCK}}
+{{/if}}
+
+{{#if PIPELINE_SE_CASCADE_ENABLED}}
+### Pipeline: se-cascade
+{{PIPELINE_SE_CASCADE_BLOCK}}
+{{/if}}
 
 ---
 
@@ -733,6 +757,9 @@ AB Dev-Review-Loop:  developer [⇄ code-reviewer, max={{MAX_ITERATIONS}}] → g
 AC SE-Requirements:  se-requirements [⇄ se-critic, max=3] → se-architect
 AD SE-Architecture:  se-architect [⇄ se-critic, max=3] → se-validator
 AE Schätzung:      effort-estimator → Aufwandsschätzung für [Task]
+AF Pipeline (standard):  PIPELINE_STANDARD_FEATURE  → orchestrator dispatches stages
+AG Pipeline (quick-fix): PIPELINE_QUICK_FIX          → orchestrator dispatches stages
+AH Pipeline (se-cascade): PIPELINE_SE_CASCADE        → orchestrator dispatches stages
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).

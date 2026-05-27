@@ -280,3 +280,81 @@ reflection_pairs:
     generator: se-test-engineer
     critic: se-testreviewer
     max_iterations: 3
+
+quality_pipelines:
+  standard-feature:
+    description: "Full feature lifecycle with TDD, review, and PR"
+    stages:
+      - id: branch
+        agent: git
+        task: "Feature-Branch anlegen"
+        mode: sequential
+      - id: implement
+        agent: developer
+        task: "Feature implementieren"
+        mode: sequential
+      - id: review
+        agent: code-reviewer
+        task: "Code-Qualität prüfen"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 3
+      - id: commit
+        agent: git
+        task: "Commit + Push + PR"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  quick-fix:
+    description: "Schneller Bugfix ohne Overhead"
+    stages:
+      - id: fix
+        agent: developer
+        task: "Bugfix"
+        mode: sequential
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+
+  se-cascade:
+    description: "Systems Engineering 6-Stage Recursive Cascade"
+    stages:
+      - id: l1-requirements
+        agent: se-requirements
+        task: "L1 Stakeholder Needs"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l2-architecture
+        agent: se-architect
+        task: "L2 White-Box Decomposition"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
+      - id: interface
+        agent: se-interface-mgr
+        task: "Signal flow synchronization"
+        mode: sequential
+      - id: termination
+        agent: se-termination
+        task: "Leaf or recurse decision"
+        mode: conditional
+        condition:
+          type: agent_decision
+          agent: se-termination
+      - id: validation
+        agent: se-validator
+        task: "L1 User-Journey validation"
+        mode: parallel_group
+        parallel_group:
+          - agent: se-verifier
+            task: "Multi-Level verification"
+          - agent: se-integration-and-test-manager
+            task: "V&V orchestration"

@@ -992,6 +992,7 @@ def sync_agents_for_provider(
     Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
     """
     from .config import substitute, strip_inactive_conditional_blocks
+    from .pipelines import inject_pipeline_blocks, load_quality_pipelines, apply_overrides
     from .platform import substitute_platform
     from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_steps, resolve_permission_mode, load_roles_config
     from .skills import load_external_skills_config, _skill_is_active
@@ -1059,6 +1060,14 @@ def sync_agents_for_provider(
             'PARALLEL_PATTERN': _PROVIDER_PARALLEL_PATTERNS.get(provider, _PROVIDER_PARALLEL_PATTERNS['Claude']),
         }
         merged_vars = {**variables, **provider_vars}
+
+        # Inject provider-specific pipeline blocks before standard substitution
+        pipelines = load_quality_pipelines(str(agent_meta_root))
+        overrides = config.get("quality-pipelines", {})
+        effective = apply_overrides(pipelines, overrides)
+        if effective:
+            content = inject_pipeline_blocks(content, effective, provider, {})
+
         content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_conditional_blocks(content, variables)
         # Apply platform-config substitution ({{platform.*}} placeholders)

@@ -9,6 +9,12 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json, _write_yaml
 from .log import SyncLog
+from .pipelines import (
+    load_quality_pipelines,
+    load_pipeline_overrides,
+    apply_overrides,
+    build_pipeline_variables,
+)
 
 try:
     import yaml as _yaml
@@ -290,6 +296,28 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables["REFLECTION_PAIRS_ENABLED"] = "true"
     except Exception:
         pass
+    # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
+    variables["QUALITY_PIPELINES_ENABLED"] = "false"
+    try:
+        pipelines = load_quality_pipelines(str(agent_meta_root))
+        overrides = config.get("quality-pipelines", {})
+        effective = apply_overrides(pipelines, overrides)
+        if effective:
+            variables["QUALITY_PIPELINES_ENABLED"] = "true"
+        # Build variables for active pipelines; also set BLOCK="" for disabled
+        # base pipelines so substitute() never warns about missing placeholders.
+        active_vars = build_pipeline_variables(effective, dod_resolved)
+        variables.update(active_vars)
+        for name in pipelines:
+            var_name = name.upper().replace("-", "_")
+            block_key = f"PIPELINE_{var_name}_BLOCK"
+            enabled_key = f"PIPELINE_{var_name}_ENABLED"
+            if block_key not in variables:
+                variables[block_key] = ""
+            if enabled_key not in variables:
+                variables[enabled_key] = "false"
+    except Exception:
+        pass
     return variables, unmapped
 
 
@@ -306,7 +334,8 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     markers) is removed. If "true", the markers are stripped but content kept.
     This keeps generated agent files lean when features are disabled.
     """
-    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED")) and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED")) and k != "DOD_PRESET"}
+    conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
 
     for var in conditional_vars:
         def replace_block(m: re.Match, _var: str = var) -> str:
