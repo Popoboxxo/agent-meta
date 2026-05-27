@@ -146,6 +146,26 @@ Two sub-tasks are independent if:
 
 **Rule of thumb:** If in doubt → sequential. Wrong parallelization is worse than none.
 
+### File-Affinity Check (vor Parallel Execution)
+
+Bevor Sub-Tasks parallel gestartet werden (FANOUT / PARALLEL_GROUP), prüfe ob sich die Dateibereiche überschneiden:
+
+1. **File-Scope schätzen:** Für jeden Sub-Task die betroffenen Dateien/Module benennen
+2. **Mengenvergleich:** Überlappen sich die Dateimengen?
+   - **Kein Overlap** → Parallel execution sicher
+   - **Overlap erkannt** → Betroffene Sub-Tasks sequentialisieren
+3. **Fallback bei Overlap:** Sequentialize affected sub-tasks → BARRIER nach jedem
+
+```
+Beispiel — Overlap erkannt:
+  Task A: "Refactor auth module" → betrifft: auth.py, middleware.py
+  Task B: "Fix login bug"        → betrifft: auth.py, login.py
+  → Overlap: auth.py → NICHT parallel
+  → Reihenfolge: Task A → BARRIER → Task B → BARRIER
+```
+
+**Regel:** File-Affinity Check ist PFLICHT vor jedem FANOUT mit ≥ 2 Tasks die denselben Agent-Typ verwenden.
+
 ---
 
 ## Parallel Execution Engine
