@@ -355,8 +355,81 @@ def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Composition engine (extends: / patches: system)
+# XML Section Wrapping — wraps Markdown sections in XML tags for LLM parsing
 # ---------------------------------------------------------------------------
+
+def wrap_sections_in_xml(content: str) -> str:
+    """Wrap Markdown heading sections in XML tags.
+
+    Transforms:
+        ## Section Name
+        content...
+        ## Next Section
+
+    Into:
+        <section name="section-name">
+        ## Section Name
+        content...
+        </section>
+        <section name="next-section">
+        ## Next Section
+        ...
+        </section>
+
+    Only processes ## level headings (not # title or ### sub-sections).
+    The XML tag name is derived from the heading: lowercase, spaces->hyphens,
+    special chars removed.
+    """
+    lines = content.splitlines(keepends=True)
+    if not lines:
+        return content
+
+    result = []
+    current_section = None
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.rstrip('\n').rstrip('\r')
+
+        # Detect ## level heading (exactly ##, not ### or higher)
+        if stripped.startswith('## ') and not stripped.startswith('###'):
+            # Close previous section if open
+            if current_section is not None:
+                result.append(f'</section>\n')
+
+            # Derive XML-safe tag name from heading
+            heading_text = stripped[3:].strip()  # Remove '## '
+            tag_name = _make_xml_tag_name(heading_text)
+            current_section = tag_name
+
+            # Open new section
+            result.append(f'<section name="{tag_name}">\n')
+            result.append(line)
+        else:
+            result.append(line)
+
+        i += 1
+
+    # Close last section
+    if current_section is not None:
+        result.append(f'</section>\n')
+
+    return ''.join(result)
+
+
+def _make_xml_tag_name(heading: str) -> str:
+    """Convert a Markdown heading to an XML-safe tag name.
+
+    Rules: lowercase, spaces->hyphens, remove special chars,
+    collapse multiple hyphens, strip leading/trailing hyphens.
+    """
+    name = heading.lower()
+    name = name.replace(' ', '-')
+    name = re.sub(r'[^a-z0-9-]', '', name)
+    name = re.sub(r'-+', '-', name)
+    name = name.strip('-')
+    return name
 
 def _split_frontmatter(content: str) -> tuple[str, str]:
     """Split content into (frontmatter_block, body).
@@ -690,6 +763,11 @@ def sync_agents(
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True)
 
+        # XML Section Wrapping: wrap Markdown ## sections in XML tags
+        xml_cfg = config.get('xml-section-wrapping', {})
+        if xml_cfg.get('enabled', False):
+            content = wrap_sections_in_xml(content)
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
@@ -1003,6 +1081,11 @@ def sync_agents_for_provider(
 
         if debug_mode:
             content = inject_debug_block(content, name)
+
+        # XML Section Wrapping: wrap Markdown ## sections in XML tags
+        xml_cfg = config.get('xml-section-wrapping', {})
+        if xml_cfg.get('enabled', False):
+            content = wrap_sections_in_xml(content)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         rel_out = str(target_path.relative_to(project_root))

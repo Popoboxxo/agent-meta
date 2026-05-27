@@ -227,3 +227,7 @@ viz:
   server:
     port: 8765
     timeout_sec: 300
+
+# XML Section Wrapping — wraps Markdown ## sections in XML tags for better LLM parsing
+xml-section-wrapping:
+  enabled: true
