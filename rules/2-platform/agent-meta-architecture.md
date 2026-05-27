@@ -47,7 +47,7 @@ patches:
       ## Anhang ...
 ```
 
-Composition wird zur Build-Zeit aufgelöst — das generierte `.claude/agents/<rolle>.md`
+Composition wird zur Build-Zeit aufgelöst — das generierte `{{AGENTS_DIR}}/<rolle>.md`
 enthält das vollständige Dokument. Kein `extends:` im Output.
 
 ## Abhängigkeitsprinzip

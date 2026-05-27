@@ -244,6 +244,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
     variables.update(config.get("variables", {}))
+    # AGENTS_DIR: provider-agnostic generated agents directory (default: .claude/agents)
+    if "AGENTS_DIR" not in variables:
+        variables["AGENTS_DIR"] = ".claude/agents"
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
         provider_config = load_providers_config(agent_meta_root)
