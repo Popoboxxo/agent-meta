@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.55.0] — 2026-05-27
+
+### Added
+
+- **5 Provider Expert Agents**: New expert agents for each supported AI provider — `claude-expert`, `gemini-expert`, `opencode-expert`, `continue-expert`, `copilot-expert`. Each provides provider-specific configuration guidance, best practices, and troubleshooting.
+- **1-generic/provider-expert.md**: Base template for provider expert agents with `based-on` composition pattern, enabling platform-specific overrides while maintaining a common expert structure.
+- **Orchestrator Expert Routing**: Delegation table extended with expert-agent routing — users requesting provider-specific help are now routed to the matching expert agent.
+
+### Fixed
+
+- **Tool Name Permission Mapping**: Tool names normalized from lowercase to PascalCase across all generated agent frontmatter — fixes incorrect permission mapping in provider environments that expect exact tool name casing.
+- **Consistency Checker based-on Detection**: Consistency checker now recognizes and validates `based-on` relationships between `1-generic/` and `2-platform/` agent templates, preventing broken composition chains.
+
+### Changed
+
+- **Expert Template hint Fields**: All provider expert templates now include descriptive `hint` fields in their frontmatter for better agent discovery and routing context.
+
+---
+
 ## [0.54.2] — 2026-05-27
 
 ### Fixed
