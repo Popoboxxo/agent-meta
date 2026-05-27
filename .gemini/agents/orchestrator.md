@@ -93,6 +93,11 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 | **CI/CD** / Infrastruktur / Kubernetes | `devops-engineer` | `fast` | Ja (Multi-Services) | "Pipeline erstellen", "K8s konfigurieren" |
 | **Performance** / Bottlenecks / Profiling | `performance-optimizer` | `powerful` | Nein (sequentiell) | "Performance analysieren", "Bottleneck finden" |
 | **Export** / Target-Routing / Confluence | `export-manager` | `fast` | Nein (atomar) | "Exportiere nach Confluence", "ADR speichern" |
+| **Plattform-Fragen** / Provider-Integration (Claude) | `claude-expert` | `powerful` | Nein | "Wie konfiguriere ich .claude/?", "Claude Hooks einrichten?" |
+| **Plattform-Fragen** / Provider-Integration (Opencode) | `opencode-expert` | `powerful` | Nein | "Wie konfiguriere ich .opencode/?", "Opencode Permissions?" |
+| **Plattform-Fragen** / Provider-Integration (Gemini) | `gemini-expert` | `powerful` | Nein | "Wie konfiguriere ich .gemini/?", "Gemini MCPs?" |
+| **Plattform-Fragen** / Provider-Integration (Continue) | `continue-expert` | `powerful` | Nein | "Wie konfiguriere ich .continue/?", "Continue Prompts?" |
+| **Plattform-Fragen** / Provider-Integration (Copilot) | `copilot-expert` | `powerful` | Nein | "Wie konfiguriere ich GitHub Copilot?", "Copilot Workspace?" |
 | **Batch-Operationen** (mehrere gleiche Tasks) | — | — | **Ja** | "Fix 3 Bugs", "Schreib Tests für A,B,C" |
 | **Aufwandsschätzung** / "Wie lange dauert das?" / Planning-Hilfe | `effort-estimator` | `fast` | Nein (sequentiell) | "Wie lange für Feature X?", "Schätze den Aufwand" |
 | **Iterativer Review** / Revision-Schleife | `orchestrator` → REPEAT_UNTIL | `balanced` → `powerful` | Nein (sequentiell) | "Review und lass überarbeiten", "Iterativ verbessern" |

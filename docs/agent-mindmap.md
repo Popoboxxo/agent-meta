@@ -69,9 +69,24 @@ mindmap
 - **Beschreibung:** Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-Requests vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares Feature, Out-of-Scope.
 - **Model:** Claude: claude-sonnet-4-6, Gemini: gemini-3.1-pro-low, Opencode: opencode-go/qwen3.6-plus
 
+### claude-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
 ### code-reviewer
 - **Tier:** recommended
 - **Beschreibung:** Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen und REQ-Traceability in Code-Pfaden.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
+### continue-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
+### copilot-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
 - **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
 
 ### developer
@@ -116,6 +131,11 @@ mindmap
 - **Beschreibung:** Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht.
 - **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
+### gemini-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
 ### git
 - **Tier:** required
 - **Beschreibung:** Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea).
@@ -137,6 +157,11 @@ mindmap
 - **Beschreibung:** Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen.
 - **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
+### opencode-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
+- **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
 ### openscad-developer
 - **Tier:** optional
 - **Beschreibung:** Spezialisierter Developer für parametrische 3D-Modelle in OpenSCAD. Render-Inspect-Refine Loop via MCP, Druckbarkeits-Wissen, Toleranz-Management.
@@ -152,6 +177,11 @@ mindmap
 - **Tier:** optional
 - **Beschreibung:** Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch Profiling-Daten, ohne funktionale Aenderungen.
 - **Model:** Claude: claude-opus-4-7, Gemini: gemini-3.1-pro-high, Opencode: opencode-go/kimi-k2.5
+
+### provider-expert
+- **Tier:** optional
+- **Beschreibung:** Absoluter Analyse-Experte für einen AI-Provider: Funktionsweise, Konfiguration, Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.
+- **Model:** inherited
 
 ### release
 - **Tier:** optional

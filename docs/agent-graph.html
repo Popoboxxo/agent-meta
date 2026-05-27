@@ -173,7 +173,7 @@ graph TD
     classDef optional fill:#868e96,stroke:#fff,stroke-width:2px,color:#fff
     class developer,feedback,git,log-analyzer,orchestrator required
     class bug-feature-analyzer,code-reviewer,documenter,feature,requirements,tester,validator recommended
-    class agent-meta-manager,agent-meta-scout,api-specialist,devops-engineer,docker,effort-estimator,export-manager,ideation,meta-feedback,openscad-developer,performance-optimizer,release,se-architect,se-critic,se-integration-and-test-manager,se-interface-mgr,se-orchestrator,se-requirements,se-termination,se-test-engineer,se-testreviewer,se-validator,se-verifier,security-auditor,ui-ux-designer optional
+    class agent-meta-manager,agent-meta-scout,api-specialist,devops-engineer,docker,effort-estimator,export-manager,ideation,meta-feedback,openscad-developer,performance-optimizer,provider-expert,release,se-architect,se-critic,se-integration-and-test-manager,se-interface-mgr,se-orchestrator,se-requirements,se-termination,se-test-engineer,se-testreviewer,se-validator,se-verifier,security-auditor,ui-ux-designer,claude-expert,continue-expert,copilot-expert,gemini-expert,opencode-expert optional
                 </div>
                 <div class="legend">
                     <div class="legend-item">
@@ -249,6 +249,20 @@ graph TD
             
         </div>
         
+        <div class="agent-card tier-optional" id="claude-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>claude-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
         <div class="agent-card tier-recommended" id="code-reviewer">
             <div class="agent-header">
                 <span class="tier-icon">🔵</span>
@@ -256,6 +270,34 @@ graph TD
                 <span class="tier-badge">recommended</span>
             </div>
             <p class="description">Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen und REQ-Traceability in Code-Pfaden.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="continue-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>continue-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="copilot-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>copilot-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
             <div class="meta">
                 <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
                 <span><strong>Memory:</strong> -</span>
@@ -375,6 +417,20 @@ graph TD
             
         </div>
         
+        <div class="agent-card tier-optional" id="gemini-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>gemini-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
         <div class="agent-card tier-required" id="git">
             <div class="agent-header">
                 <span class="tier-icon">🔴</span>
@@ -431,6 +487,20 @@ graph TD
             
         </div>
         
+        <div class="agent-card tier-optional" id="opencode-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>opencode-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
         <div class="agent-card tier-optional" id="openscad-developer">
             <div class="agent-header">
                 <span class="tier-icon">⚪</span>
@@ -468,6 +538,20 @@ graph TD
             <p class="description">Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch Profiling-Daten, ohne funktionale Aenderungen.</p>
             <div class="meta">
                 <span><strong>Model:</strong> <span>Claude: claude-opus-4-7</span><br><span>Gemini: gemini-3.1-pro-high</span><br><span>Opencode: opencode-go/kimi-k2.5</span></span>
+                <span><strong>Memory:</strong> -</span>
+            </div>
+            
+        </div>
+        
+        <div class="agent-card tier-optional" id="provider-expert">
+            <div class="agent-header">
+                <span class="tier-icon">⚪</span>
+                <h3>provider-expert</h3>
+                <span class="tier-badge">optional</span>
+            </div>
+            <p class="description">Absoluter Analyse-Experte für einen AI-Provider: Funktionsweise, Konfiguration, Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta.</p>
+            <div class="meta">
+                <span><strong>Model:</strong> inherited</span>
                 <span><strong>Memory:</strong> -</span>
             </div>
             
