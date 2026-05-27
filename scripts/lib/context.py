@@ -236,6 +236,54 @@ def sync_context_for_provider(
                     settings_path.parent.mkdir(parents=True, exist_ok=True)
                     settings_path.write_text(json_content, encoding="utf-8")
 
+    elif provider == "Copilot":
+        # 1. .github/copilot/COCOPILOT.md — created once from template; managed block updated
+        context_file = pc["context_file"]
+        if context_file is None:
+            return
+        target_path = safe_path(project_root, context_file)
+        template_name = pc["context_template"]
+        template_path = agent_meta_root / template_name if template_name else None
+
+        if not target_path.exists():
+            if template_path and template_path.exists():
+                cp_content = template_path.read_text(encoding="utf-8")
+                cp_content = substitute(cp_content, variables, template_name, log)
+                log.action("INIT", str(target_path.relative_to(project_root)), template_name)
+            else:
+                project_name = config["project"]["name"]
+                cp_content = (
+                    f"# {project_name}\n\n"
+                    "<!-- agent-meta:managed-begin -->\n"
+                    "<!-- agent-meta:managed-end -->\n\n"
+                    "## Agents\n\n"
+                    f"Agent files are in .github/copilot/agents/ (invoke by name in Copilot Chat).\n"
+                )
+                log.action("INIT", str(target_path.relative_to(project_root)),
+                           "minimal fallback (COPILOT.project-template.md not found)")
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(cp_content, encoding="utf-8")
+        else:
+            existing = target_path.read_text(encoding="utf-8")
+            managed_pattern = re.compile(
+                r"<!--\s*agent-meta:managed-begin\s*-->"
+                r".*?<!--\s*agent-meta:managed-end\s*-->",
+                re.DOTALL,
+            )
+            if managed_pattern.search(existing):
+                template = _load_claude_md_managed_template(agent_meta_root)
+                new_managed = substitute(template, variables,
+                                         str(target_path.relative_to(project_root)), log)
+                new_content = managed_pattern.sub(new_managed, existing, count=1)
+                if new_content != existing:
+                    log.action("UPDATE", str(target_path.relative_to(project_root)),
+                               "managed block")
+                    if not dry_run:
+                        target_path.write_text(new_content, encoding="utf-8")
+                else:
+                    log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
+
     elif provider == "Continue":
         # 1. .continue/rules/project-context.md — created once from template; managed block updated
         context_file = pc["context_file"]
@@ -745,7 +793,7 @@ def sync_prompts_for_continue(
     from .agents import (collect_sources, extract_frontmatter_field, compose_agent,
                           target_filename, _strip_frontmatter, _strip_claude_specific_lines,
                           _make_slim_body, AGENTS_DIR, _PROVIDER_PARALLEL_PATTERNS)
-    from .config import substitute
+    from .config import substitute, strip_inactive_conditional_blocks
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
@@ -794,6 +842,7 @@ def sync_prompts_for_continue(
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         content = substitute(content, merged_vars, rel_source, log)
+        content = strip_inactive_conditional_blocks(content, merged_vars)
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
         template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])

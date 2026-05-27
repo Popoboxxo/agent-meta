@@ -147,10 +147,6 @@ After producing the JSON output:
 
 Work iteratively with the output from `se-test-engineer` and `se-architect`, and report verification results to `se-orchestrator` or the parent cell.
 
-{{#if DOD_REQ_TRACEABILITY}}
-## REQ-Traceability
-The `traceability` section must report exact coverage percentages. Every deviation must reference the affected requirement ID(s). Orphaned requirements and implementations must be listed explicitly.
-{{/if}}
 
 ## Anti-Recursion Guard
 

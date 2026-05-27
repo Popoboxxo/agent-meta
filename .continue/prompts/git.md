@@ -24,9 +24,6 @@ Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`
 
 - Sprache: Englisch | Imperativ | Max. 72 Zeichen
 
-{{#if DOD_REQ_TRACEABILITY}}
-REQ-Traceability aktiv — `<type>(REQ-xxx): <beschreibung>` Pflicht.
-{{/if}}
 
 ---
 

@@ -117,6 +117,11 @@ _PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
         "Continue unterstützt keine native parallele Subagent-Ausführung.\n"
         "Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
     ),
+    "Copilot": (
+        "**Parallel-Pattern:**\n"
+        "GitHub Copilot unterstützt keine native parallele Subagent-Ausführung.\n"
+        "Führe parallele Schritte sequentiell aus oder verwende separate VS Code-Sessions.\n"
+    ),
 }
 
 
@@ -1230,6 +1235,20 @@ def sync_agents_for_provider(
                 content = _transform_frontmatter_for_opencode(
                     content, name, description, model, steps, generated_from, agent_meta_root, temperature
                 )
+
+            elif provider == 'Copilot':
+                # Copilot: frontmatter without model/memory/permissionMode/tools
+                # Uses IDE-configured models — no per-agent model field
+                content = build_frontmatter(content, name, description, generated_from=generated_from)
+                content = _remove_frontmatter_fields(content, [
+                    'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
+                    'stop_sequences', 'max_output_tokens', 'tools',
+                ])
+                body = _strip_frontmatter(content)
+                body = _strip_claude_specific_lines(body)
+                fm_end = content.find('\n---', 3)
+                if fm_end != -1:
+                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         # Applies to ALL providers — every generated agent gets the viz reporting block

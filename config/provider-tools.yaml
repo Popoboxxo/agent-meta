@@ -61,3 +61,7 @@ opencode_deny_critical:
 continue:
   # Continue has no frontmatter tools model. All tools are available by default.
   # The 'tools' field is removed during generation.
+
+copilot:
+  # GitHub Copilot has no frontmatter tools model. Tools are provided by the IDE.
+  # The 'tools' field is removed during generation.

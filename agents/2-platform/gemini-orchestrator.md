@@ -1,7 +1,7 @@
 ---
 name: template-orchestrator
 version: "1.1.0"
-based-on: "1-generic/orchestrator.md@3.8.0"
+based-on: "1-generic/orchestrator.md@3.12.0"
 description: "Gemini/Antigravity-spezifischer Orchestrator-Override: Mention-Interception und Tool-Dispatch."
 tools:
   - Agent

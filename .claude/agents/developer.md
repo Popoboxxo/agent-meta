@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-based-on: 1-generic/developer.md@2.0.4
+based-on: 1-generic/developer.md@2.2.0
 model: claude-opus-4-7
 ---
 

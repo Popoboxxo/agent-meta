@@ -8,7 +8,7 @@ hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Mark
   YAML)
 tools:
 - code_execution
-based-on: 1-generic/developer.md@2.0.4
+based-on: 1-generic/developer.md@2.2.0
 model: gemini-3.1-pro-high
 ---
 # Developer — agent-meta

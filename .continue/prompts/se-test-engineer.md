@@ -135,10 +135,6 @@ Do not proceed to test execution until the Test Reviewer returns `approved`. If 
 
 Work iteratively with the output from `se-architect` and `se-integration-and-test-manager`, and hand off to `se-testreviewer` for auditing.
 
-{{#if DOD_REQ_TRACEABILITY}}
-## REQ-Traceability
-Every test scenario must include a `traces_to` field referencing the originating requirement ID. The `coverage_summary` must report requirement coverage percentage.
-{{/if}}
 
 ## Anti-Recursion Guard
 

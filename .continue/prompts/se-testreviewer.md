@@ -158,10 +158,6 @@ Wenn du als Critic in einem Reflection-Loop arbeitest (erkennbar an Iterationsz√
 
 Iterate on the output of `se-test-engineer` until all audit criteria are met.
 
-{{#if DOD_REQ_TRACEABILITY}}
-## REQ-Traceability
-Every finding in `correction_hints` must reference the affected test scenario ID and the originating requirement ID it fails to cover.
-{{/if}}
 
 ## Anti-Recursion Guard
 

@@ -63,4 +63,4 @@ Agent files are in `.gemini/agents/`. Use them with `@agent-name` in Gemini CLI.
 - **Runtime:** Python 3.x
 
 ## REGELN!!!!
-Befoolge strikt und stoisch ALLES was ain /rules steht!
+Befolge strikt und stoisch ALLES was in /rules steht!
