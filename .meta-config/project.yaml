@@ -104,7 +104,8 @@ variables:
   SYSTEM_DEPENDENCIES: "- Python: `>=3.8`"
   SYSTEM_URLS: ""
   BUILD_COMMAND: python scripts/sync.py
-  TEST_COMMAND: "(kein automatisiertes Test-System — manuelle Verifikation via --dry-run)"
+  TEST_COMMAND: python scripts/sync.py --validate
+  TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
   DEV_COMMANDS: |
     python scripts/sync.py
     python scripts/sync.py --dry-run
@@ -153,7 +154,7 @@ variables:
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
   TESTER_SNIPPETS_PATH: ""
   DEVELOPER_SNIPPETS_PATH: ""
-  TEST_COMMANDS: python scripts/sync.py --dry-run
+  TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
   BUILD_COMMANDS: python scripts/sync.py
   REQ_CATEGORIES: |
     - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
@@ -193,6 +194,12 @@ variables:
 se-export:
   type: markdown
   output_dir: docs/se
+
+# Test-Repository — Validierung der generierten Agenten nach Sync
+test-repo:
+  enabled: true
+  path: "../agent-meta-test"
+  env-var: "AGENT_META_TEST_REPO"
 
 max-parallel-agents: 4
 
