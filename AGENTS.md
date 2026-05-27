@@ -363,6 +363,10 @@ NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeite
 | Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
 | Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
 
+**Explizit ausgeschlossen von direktem Dispatch:**
+`bug-feature-analyzer`, `developer`, `feature`, `tester`, `ideation`, `code-reviewer`, `release`, `log-analyzer`, `se-*`, `ui-ux-designer`, `api-specialist`, `devops-engineer`, `performance-optimizer`, `export-manager`
+→ Diese Agenten dürfen **NUR** über den Orchestrator aufgerufen werden.
+
 ## Mention-Interception — `@orchestrator` ist der einzige direkte Dispatch
 
 **WICHTIG:** `@orchestrator` ist der **EINZIGE** Mention den User direkt im Chat verwenden dürfen.

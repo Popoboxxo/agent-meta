@@ -106,6 +106,8 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 
 **Regel:** Wenn der Intent nicht exakt in dieser Tabelle steht, frage den User nach Klärung — rate nicht und arbeite nicht selbst.
 
+**Wichtig:** `bug-feature-analyzer` ist **KEIN** direkter Dispatch — der Hauptchat darf NICHT selbst an `bug-feature-analyzer` delegieren. Nur der Orchestrator ruft `bug-feature-analyzer` auf (nach Intent-Klassifikation im Hauptchat).
+
 ---
 
 ## Task Decomposition Protocol
