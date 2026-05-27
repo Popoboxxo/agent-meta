@@ -1,6 +1,7 @@
 """Agent file generation: frontmatter, composition, sync logic."""
 
 import re
+import fnmatch
 from pathlib import Path
 
 from .log import SyncLog
@@ -498,6 +499,78 @@ def _extract_and_append_critical_footer(
     footer = "\n\n---\n\n## Critical Rules\n\n" + "\n\n---\n\n".join(footer_sections)
     return content.rstrip() + footer
 
+
+# ---------------------------------------------------------------------------
+# Path-based Contextual Rules — inject rules based on file path patterns
+# ---------------------------------------------------------------------------
+
+def apply_path_rules(
+    content: str,
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    role: str,
+) -> str:
+    """Apply path-based contextual rules to agent content.
+
+    Reads `pathRules` from config. Each rule has:
+      - path: glob pattern (e.g. "*.py", "scripts/**", "agents/**/*.md")
+      - rule: rule file name (stem) to include (e.g. "python-conventions")
+      - agents: optional list of agent roles this rule applies to (default: all)
+
+    Matching rules are read, variables substituted, and appended as
+    "## Contextual Rules" section.
+    """
+    from .config import substitute
+    from .rules import collect_rule_sources, resolve_rules
+
+    path_rules = config.get("pathRules", [])
+    if not path_rules:
+        return content
+
+    # Build rule lookup: stem -> source_path
+    platforms = config.get("platforms", [])
+    sources = collect_rule_sources(agent_meta_root, platforms)
+    rule_options = resolve_rules(config, agent_meta_root)
+    source_map: dict[str, Path] = {}
+    for source_path, output_name in sources:
+        rule_stem = Path(output_name).stem
+        source_map[rule_stem] = source_path
+
+    matched_sections: list[str] = []
+    for rule_def in path_rules:
+        path_pattern = rule_def.get("path", "")
+        rule_name = rule_def.get("rule", "")
+        agents = rule_def.get("agents")  # None = all agents
+
+        # Check if rule applies to this agent
+        if agents is not None and role not in agents:
+            continue
+
+        source_path = source_map.get(rule_name)
+        if not source_path or not source_path.exists():
+            log.warn(f"pathRules: rule file '{rule_name}' not found (pattern: '{path_pattern}')")
+            continue
+
+        opts = rule_options.get(rule_name, {})
+        if opts.get("alwaysApply") is False and opts.get("embed") is False:
+            continue
+
+        rule_content = source_path.read_text(encoding="utf-8")
+        rel_source = f"rules/{source_path.parts[-2]}/{source_path.name}"
+        rule_content = substitute(rule_content, variables, rel_source, log)
+        body = _strip_frontmatter(rule_content).strip()
+
+        if body:
+            matched_sections.append(f"### Rule for `{path_pattern}`\n\n{body}")
+
+    if not matched_sections:
+        return content
+
+    footer = "\n\n---\n\n## Contextual Rules\n\n" + "\n\n---\n\n".join(matched_sections)
+    return content.rstrip() + footer
+
 def _split_frontmatter(content: str) -> tuple[str, str]:
     """Split content into (frontmatter_block, body).
 
@@ -837,6 +910,13 @@ def sync_agents(
                 content, agent_meta_root, config, variables, log
             )
 
+        # Path-based Contextual Rules: inject rules based on path patterns
+        path_rules_cfg = config.get('pathRules', [])
+        if path_rules_cfg:
+            content = apply_path_rules(
+                content, agent_meta_root, config, variables, log, role
+            )
+
         # XML Section Wrapping: wrap Markdown ## sections in XML tags
         xml_cfg = config.get('xml-section-wrapping', {})
         if xml_cfg.get('enabled', False):
@@ -1161,6 +1241,13 @@ def sync_agents_for_provider(
         if footer_cfg.get('enabled', False):
             content = _extract_and_append_critical_footer(
                 content, agent_meta_root, config, variables, log, provider
+            )
+
+        # Path-based Contextual Rules: inject rules based on path patterns
+        path_rules_cfg = config.get('pathRules', [])
+        if path_rules_cfg:
+            content = apply_path_rules(
+                content, agent_meta_root, config, variables, log, role
             )
 
         # XML Section Wrapping: wrap Markdown ## sections in XML tags
