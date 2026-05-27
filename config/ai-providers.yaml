@@ -150,3 +150,25 @@ providers:
     pending_tasks_file: .continue/pending-tasks.md
     extension_dir: .continue/3-project
     orchestrator_hint: "- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von Eurer Aufgabe ein."
+
+  Copilot:
+    agents_dir: .github/copilot/agents
+    agent_ext: .md
+    context_file: .github/copilot/COCOPILOT.md
+    context_template: howto/configs/COPILOT.project-template.md
+    has_rules: true
+    rules_dir: .github/copilot/rules
+    has_hooks: false
+    has_commands: false
+    has_settings: false
+    isolation-dirs:
+      - .github/copilot/
+    gitignore_entries: []
+    mcp-config: {}
+    skills_dir: .github/copilot/skills
+    snippets_dir: .github/copilot/snippets
+    pending_tasks_file: .github/copilot/pending-tasks.md
+    extension_dir: .github/copilot/3-project
+    orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
+    model-tiers: {}
+    model-aliases: {}

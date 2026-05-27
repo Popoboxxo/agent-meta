@@ -152,6 +152,10 @@
         "AGENT_META_REPO": {
           "type": "string"
         },
+        "AGENTS_DIR": {
+          "type": "string",
+          "description": "Provider-agnostic path to generated agents directory. Default: .claude/agents"
+        },
         "GIT_PLATFORM": {
           "type": "string",
           "enum": [
