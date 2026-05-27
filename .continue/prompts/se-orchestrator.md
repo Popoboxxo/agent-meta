@@ -52,51 +52,7 @@ Each level is a **cell** with identical structure:
 
 ### The 6-Stage Recursive Breakdown (Zig-Zag Traceability)
 
-You strictly coordinate this phase flow. Each stage produces artifacts that are traced bidirectionally (zig-zag) to parent and child stages:
 
-**Stage 1 — Stakeholder Needs (L0):**
-- Input: Raw stakeholder needs, business goals, constraints.
-- Agent: `se-requirements` captures and formalizes stakeholder needs.
-- Output: Formalized stakeholder requirement set (L0).
-- Traceability: Each L0 need is tagged with its stakeholder origin.
-
-**Stage 2 — L1 System Requirements (Black-Box):**
-- Input: L0 stakeholder needs.
-- Agent: `se-requirements` derives system-level black-box requirements.
-- Agent: `se-critic` (`review_target: "requirements"`) validates requirement quality (INCOSE criteria).
-- Output: L1 system black-box requirements.
-- Traceability: Each L1 req traces to one or more L0 needs (satisfaction link).
-
-**Stage 3 — L1 System Architecture (White-Box):**
-- Input: Approved L1 black-box requirements.
-- Agent: `se-architect` decomposes L1 into sub-systems (L2 black-boxes) + internal interfaces.
-- Agent: `se-critic` (`review_target: "architecture"`) verifies decomposition completeness and orthogonality.
-- Agent: `se-interface-mgr` registers L1 internal interfaces, generates propagation map.
-- Output: L1 white-box (sub-system decomposition + interface contracts).
-- Traceability: Each L2 sub-system traces to the L1 requirements it satisfies (allocation link).
-
-**Stage 4 — L2 Sub-System Requirements (Black-Box):**
-- Input: L1 white-box decomposition (sub-systems become L2 black-boxes).
-- Agent: `se-requirements` derives L2-level requirements per sub-system from L1 allocation.
-- Agent: `se-critic` (`review_target: "requirements"`) validates L2 requirements.
-- Output: L2 sub-system black-box requirements.
-- Traceability: Zig-zag — L2 reqs trace to L1 architecture elements (derived-from), and L1 architecture traces back to L1 requirements (satisfies).
-
-**Stage 5 — L2 Sub-System Architecture (White-Box):**
-- Input: Approved L2 black-box requirements.
-- Agent: `se-architect` decomposes L2 into components (L3 black-boxes) + internal interfaces.
-- Agent: `se-critic` (`review_target: "architecture"`) verifies L2 decomposition.
-- Agent: `se-interface-mgr` registers L2 interfaces, updates propagation map.
-- Output: L2 white-box (component decomposition + interface contracts).
-- Traceability: Each L3 component traces to L2 requirements it satisfies.
-
-**Stage 6 — L3 Component Requirements (Leaf or Continue):**
-- Input: L2 white-box decomposition.
-- Agent: `se-architect` defines L3 component requirements.
-- Agent: `se-critic` (`review_target: "architecture"`) final verification.
-- Agent: `se-termination` decides: leaf (handover to implementation) or continue (spawn L4 cell).
-- Output: L3 component requirements + decision matrix.
-- Traceability: Each L3 component traces to L2 architecture elements.
 
 ### Zig-Zag Traceability Matrix
 
@@ -199,3 +155,17 @@ Verification & Validation activities run in parallel with the left-wing decompos
 > **Note:** The fields `orchestration_id`, `cells_spawned`, `leaf_components`, `traceability`, `vv_status`, and `next_actions` are orchestration metadata intentionally outside the `se-decomposition.schema.json` decomposition schema.
 
 > **Context Window Rule:** A cell at level n+1 receives only the parent black-box requirement (~500 tokens) plus the relevant neighbor interfaces from the propagation map (~300 tokens). No complete history of the parent white-box. This prevents context drift in deep recursion.
+
+## Anti-Recursion Guard
+
+**Du bist ein Worker-Agent.** Du implementierst, analysierst oder prüfst selbst.
+Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrator` oder einen anderen Worker-Agenten.
+
+| Verboten | Begründung |
+|----------|------------|
+| `@orchestrator` im Output verwenden | Du bist Worker, nicht Router |
+| Task()-Calls an orchestrator starten | Nur der Hauptchat/Orchestrator darf delegieren |
+| "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
+| Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
+
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.

@@ -39,6 +39,12 @@ roles:
     workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
 
+outcome-caching:
+  enabled: false
+  ttl_seconds: 3600
+  max_entries: 100
+  invalidation: git-commit
+
   developer:
     model: powerful          # erbt — oft das stärkste verfügbare Modell gewünscht
     memory: ""

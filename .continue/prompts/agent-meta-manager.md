@@ -71,7 +71,34 @@ head -5 sync.log
 
 ---
 
-## 2. Upgrade
+## 1a. Update vs Upgrade — Klare Trennung
+
+**Diese beiden Operationen sind NICHT austauschbar.** Verwende die korrekte Bezeichnung und Commit-Message.
+
+| Operation | Wann | Was passiert | Commit-Message |
+|-----------|------|-------------|----------------|
+| **`update-meta`** (Re-Sync) | Generierte Agenten mit **aktueller** Version neu generieren | `sync.py` läuft, kein Versionswechsel | `chore: regenerate agents` |
+| **`upgrade-meta`** (Version bump) | Auf **neues Tag** wechseln + Sync | `git checkout v<X.Y.Z>` + `sync.py` | `chore: upgrade agent-meta to v<X.Y.Z>` |
+
+### Entscheidungsregel
+
+```
+User will neue Version?  → upgrade-meta (git checkout tag + sync)
+User will nur Agenten neu generieren? → update-meta (nur sync)
+Bereits auf neuestem Tag? → update-meta (nur sync, KEIN upgrade commit)
+```
+
+### Sonderfall: Bereits auf neuestem Version
+
+Wenn `git describe --tags --abbrev=0` dasselbe Tag liefert wie das neueste Remote-Tag:
+
+1. Klare Meldung: "Bereits auf neuester Version `<tag>`, führe Re-Sync durch."
+2. **Nur** `sync.py` ausführen (update-meta, NICHT upgrade-meta)
+3. Commit-Message: `chore: regenerate agents` (niemals `upgrade` verwenden)
+
+---
+
+## 2. Upgrade (`upgrade-meta`)
 
 ```bash
 # Verfügbare Versionen
@@ -91,15 +118,25 @@ git add .agent-meta
 
 → Dann Sync (Abschnitt 3) + `git commit -m "chore: upgrade agent-meta to v<ZIEL>"`
 
+**Wichtig:** Dies ist `upgrade-meta` — ein Versionswechsel. Verwende NIEMALS diese Commit-Message für einen reinen Re-Sync ohne Versionswechsel.
+
 ---
 
-## 3. Sync
+## 3. Update (`update-meta` / Re-Sync)
 
 ```bash
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Danach: `sync.log` auf `[WARN]` prüfen und dem User erklären.
+
+Commit-Message für reinen Re-Sync (ohne Versionswechsel):
+```bash
+git add -A
+git commit -m "chore: regenerate agents"
+```
+
+**Wichtig:** Dies ist `update-meta` — KEIN Versionswechsel. Verwende NIEMALS `upgrade` in der Commit-Message wenn sich die Version nicht geändert hat.
 
 ---
 
@@ -265,3 +302,17 @@ se-export:
 ```
 
 - **Bestätigungspflicht:** Hole Dir vor dem Einfügen oder Anpassen zwingend das Einverständnis des Nutzers. Erkläre dabei kurz, was die Variablen bedeuten (z.B. dass `SE_MAX_DEPTH` die Detailtiefe der Komponenten-Zerlegung begrenzt).
+
+## Anti-Recursion Guard
+
+**Du bist ein Worker-Agent.** Du implementierst, analysierst oder prüfst selbst.
+Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrator` oder einen anderen Worker-Agenten.
+
+| Verboten | Begründung |
+|----------|------------|
+| `@orchestrator` im Output verwenden | Du bist Worker, nicht Router |
+| Task()-Calls an orchestrator starten | Nur der Hauptchat/Orchestrator darf delegieren |
+| "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
+| Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
+
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.
