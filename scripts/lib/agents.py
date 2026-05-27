@@ -1201,10 +1201,6 @@ def sync_agents_for_provider(
                     is_override = role in po.get('Opencode', {})
                     src = 'project override' if is_override else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-                memory = resolve_memory(role, config, agent_meta_root)
-                if memory:
-                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
                 temperature = resolve_temperature(role, config, agent_meta_root)
                 if temperature:
                     src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
@@ -1223,7 +1219,7 @@ def sync_agents_for_provider(
                     # Replace tools with validated subset before transformation
                     content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
                 content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, memory, generated_from, temperature, steps, agent_meta_root
+                    content, name, description, model, steps, generated_from, agent_meta_root, temperature
                 )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -1409,7 +1405,6 @@ def _transform_frontmatter_for_opencode(
     name: str,
     description: str,
     model: str,
-    memory: str,
     steps: str,
     generated_from: str,
     agent_meta_root: Path,
@@ -1422,7 +1417,6 @@ def _transform_frontmatter_for_opencode(
       description: "..."
       mode: subagent
       model: provider/model-id (optional)
-      memory: <scope> (optional)
       steps: <int> (optional)
       permission:             (mapped from template frontmatter tools)
         <key>: allow
@@ -1440,8 +1434,6 @@ def _transform_frontmatter_for_opencode(
     }
     if model:
         updates["model"] = model
-    if memory:
-        updates["memory"] = memory
     if steps:
         updates["steps"] = steps
     if "steps" in template_fm:
@@ -1482,6 +1474,7 @@ def _transform_frontmatter_for_opencode(
         "based-on",
         "based_on",
         "maxSteps",
+        "memory",
     ]
 
     content = _update_frontmatter_dict(content, updates, removes=removes)
