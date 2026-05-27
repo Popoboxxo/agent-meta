@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.55.2] — 2026-05-28
+
+### Changed
+
+- **Orchestrator Platform Patches**: Replaced static `agents/2-platform/gemini-orchestrator.md` template with programmatic platform patches in `config.py` (`PLATFORM_ORCHESTRATOR_PATCHES` dict). Extended conditional block handling to support `{{#if}}...{{else}}...{{/if}}` and `{{#unless}}` syntax. Provider isolation set to disabled. (Issue #250)
+
+---
+
 ## [0.55.1] — 2026-05-28
 
 ### Fixed
