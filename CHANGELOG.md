@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.54.2] — 2026-05-27
+
+### Fixed
+
+- **Stability and Validation**: Minor bugfixes and stability improvements discovered during the release process validation.
+
+---
+
 ## [0.54.1] — 2026-05-27
 
 ### Fixed
