@@ -204,6 +204,94 @@ After BARRIER():
 
 ---
 
+## Few-Shot Examples — Orchestration Patterns
+
+Konkrete Beispiele wie der Orchestrator typische Anfragen zerlegt und delegiert.
+
+### Example 1: Single Feature (Pipeline)
+
+**User:** "Füge eine Login-Funktion hinzu"
+
+```
+Orchestrator → Intent: "Neues Feature" → feature agent (komplexer Lifecycle)
+ODER manuell:
+1. git branch --show-current → auf main? → feat/login
+2. requirements → "REQ-ID für Login vergeben"
+3. tester → "Login-Tests schreiben"
+4. developer → "Login implementieren"
+5. tester → "Tests ausführen"
+6. code-reviewer → "DoD-Check"
+7. documenter → "CODEBASE_OVERVIEW aktualisieren"
+8. git → "Commit + PR erstellen"
+```
+
+### Example 2: Multi-Bug Fix (FANOUT)
+
+**User:** "Fix bugs A, B, C"
+
+```
+Orchestrator → FANOUT(3, developer, [
+  "Fix Bug A: [Beschreibung]",
+  "Fix Bug B: [Beschreibung]",
+  "Fix Bug C: [Beschreibung]"
+])
+→ BARRIER()
+→ git → "Alle Commits erstellen"
+```
+
+### Example 3: Mixed Tasks (PARALLEL_GROUP)
+
+**User:** "Fix A und schreib Tests für B"
+
+```
+Orchestrator → PARALLEL_GROUP([
+  (developer, "Fix Bug A: [Beschreibung]"),
+  (tester, "Schreibe Tests für Feature B: [Beschreibung]")
+])
+→ BARRIER()
+→ code-reviewer → "DoD-Check für beide"
+→ git → "Commit"
+```
+
+### Example 4: Refactoring mit Dependencies (Sequentiell)
+
+**User:** "Refaktoriere Modul X"
+
+```
+Orchestrator → (nicht parallel — Refactoring hat interne Abhängigkeiten)
+1. ideation → "Modul X analysieren: Dependencies, Impact"
+2. developer → "Refactoring implementieren"
+3. tester → "Bestehende Tests ausführen (Regression)"
+4. code-reviewer → "Clean Code + Blast-Radius prüfen"
+5. git → "Commit"
+```
+
+### Example 5: Analysis + Design (Parallel)
+
+**User:** "Analysiere Modul A und B, entwirf Konzept für C"
+
+```
+Orchestrator → PARALLEL_GROUP([
+  (ideation, "Analysiere Modul A: Architektur, Dependencies"),
+  (ideation, "Analysiere Modul B: Architektur, Dependencies"),
+  (ideation, "Entwirf Konzept für C: Anforderungen, Alternativen")
+])
+→ BARRIER()
+→ requirements → "REQ-IDs für C vergeben"
+```
+
+### Example 6: Unknown Intent (Fallback)
+
+**User:** "Mach das Ding mit dem anderen Ding"
+
+```
+Orchestrator → Intent: Unklar
+→ "Könntest du präzisieren was du meinst?"
+→ (je nach Fallback-Konfiguration: meta-feedback, main-chat, oder ask-user)
+```
+
+---
+
 ## Dynamic Model Tier Routing (Kosteneffizienz)
 
 Der Orchestrator wählt **automatisch das kosteneffizienteste Model-Tier** für jede Delegation.
