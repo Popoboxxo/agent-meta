@@ -231,3 +231,7 @@ viz:
 # XML Section Wrapping — wraps Markdown ## sections in XML tags for better LLM parsing
 xml-section-wrapping:
   enabled: true
+
+# Critical Rules Footer — appends critical rules to end of generated agent files
+critical-rules-footer:
+  enabled: true
