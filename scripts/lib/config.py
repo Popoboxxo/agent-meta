@@ -280,6 +280,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
+    variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
     try:
         roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
         if roles_defaults_path.exists() and _YAML_AVAILABLE:
