@@ -5,6 +5,7 @@ mode: subagent
 model: opencode-go/qwen3.6-plus
 permission:
   todowrite: allow
+  task: allow
   bash: deny
   edit: deny
 ---

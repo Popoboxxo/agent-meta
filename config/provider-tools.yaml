@@ -12,6 +12,7 @@ claude:
   - Glob
   - Grep
   - Task
+  - Agent
   - TodoWrite
   - WebFetch
   - WebSearch
@@ -28,6 +29,7 @@ opencode:
   - Grep
   - WebFetch
   - WebSearch
+  - Agent
   - TodoWrite
 
 gemini:

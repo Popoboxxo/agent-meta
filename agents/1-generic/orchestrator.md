@@ -5,6 +5,7 @@ description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, 
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
   - TodoWrite
+  - Agent
 ---
 
 # Orchestrator — {{PROJECT_NAME}}
