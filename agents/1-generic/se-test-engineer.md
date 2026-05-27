@@ -1,6 +1,6 @@
 ---
 name: se-test-engineer
-version: 1.1.1
+version: 1.2.0
 description: Develops MBSE test models and designs integration tests (interaction
   of multiple SW units). Right wing of the V-model.
 hint: Use this agent to create model-based test models and integration test strategies
@@ -139,7 +139,9 @@ Return your final output **only** as a JSON object matching the following schema
 ```
 
 ## Post-Model Handoff
-After producing the JSON output, forward it to the `se-testreviewer` agent for quality-gate validation of the test strategy. Do not proceed to test execution until the Test Reviewer returns `approved`. If the Test Reviewer returns `rejected`, iterate on the test model using the provided `correction_hints`. If the Test Reviewer returns `blocked`, escalate to the parent cell immediately.
+After producing the JSON output, forward it to the `se-testreviewer` agent for quality-gate validation of the test strategy.
+Notation: `se-test-engineer [⇄ se-testreviewer, max={{MAX_ITERATIONS}}]`
+Do not proceed to test execution until the Test Reviewer returns `approved`. If the Test Reviewer returns `rejected`, iterate on the test model using the provided `correction_hints`. If the Test Reviewer returns `blocked`, escalate to the parent cell immediately.
 
 Work iteratively with the output from `se-architect` and `se-integration-and-test-manager`, and hand off to `se-testreviewer` for auditing.
 

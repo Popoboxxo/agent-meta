@@ -154,7 +154,6 @@ variables:
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
   TESTER_SNIPPETS_PATH: ""
   DEVELOPER_SNIPPETS_PATH: ""
-  TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
   BUILD_COMMANDS: python scripts/sync.py
   REQ_CATEGORIES: |
     - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
@@ -249,4 +248,10 @@ pathRules:
     rule: "python-conventions"
     agents:
       - developer
+
+reflection-pairs:
+  overrides:
+    dev-review-loop:
+      max_iterations: 5
+      enabled: true
       - code-reviewer
