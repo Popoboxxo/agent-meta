@@ -168,6 +168,20 @@ Beispiel — Overlap erkannt:
 ---
 
 </section>
+<section name="outcome-caching">
+## Outcome Caching
+
+Wenn `ORCHESTRATOR_OUTCOME_CACHING` aktiviert:
+- Cache-Key = SHA256(agent + prompt[:200])
+- Vor Delegation: Cache prüfen
+- Nach Delegation: Ergebnis cachen wenn cache-eligible
+- Invalidierung: Nach git-commit
+
+Cache-eligible NUR: Read-only, idempotent, keine Side-Effects
+
+---
+
+</section>
 <section name="parallel-execution-engine">
 ## Parallel Execution Engine
 

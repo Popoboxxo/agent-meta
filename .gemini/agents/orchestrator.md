@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 3.11.0
+version: 3.12.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
@@ -162,6 +162,20 @@ Beispiel — Overlap erkannt:
 ```
 
 **Regel:** File-Affinity Check ist PFLICHT vor jedem FANOUT mit ≥ 2 Tasks die denselben Agent-Typ verwenden.
+
+---
+
+</section>
+<section name="outcome-caching">
+## Outcome Caching
+
+Wenn `ORCHESTRATOR_OUTCOME_CACHING` aktiviert:
+- Cache-Key = SHA256(agent + prompt[:200])
+- Vor Delegation: Cache prüfen
+- Nach Delegation: Ergebnis cachen wenn cache-eligible
+- Invalidierung: Nach git-commit
+
+Cache-eligible NUR: Read-only, idempotent, keine Side-Effects
 
 ---
 

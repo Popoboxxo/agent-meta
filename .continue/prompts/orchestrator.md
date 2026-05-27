@@ -169,6 +169,18 @@ Beispiel — Overlap erkannt:
 
 ---
 
+## Outcome Caching
+
+Wenn `ORCHESTRATOR_OUTCOME_CACHING` aktiviert:
+- Cache-Key = SHA256(agent + prompt[:200])
+- Vor Delegation: Cache prüfen
+- Nach Delegation: Ergebnis cachen wenn cache-eligible
+- Invalidierung: Nach git-commit
+
+Cache-eligible NUR: Read-only, idempotent, keine Side-Effects
+
+---
+
 ## Parallel Execution Engine
 
 ### Abstract Operations
