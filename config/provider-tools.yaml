@@ -42,6 +42,7 @@ gemini:
   - Edit                # implicit in sandbox
   - Glob                # implicit in sandbox
   - Grep                # implicit in sandbox
+  - TodoWrite           # skipped silently (unsupported, keeps log clean)
 
   # === UNSUPPORTED TOOLS (explicitly documented for clarity) ===
   # The following tools are NOT supported by Gemini and will be filtered/ignored during sync:
