@@ -6,8 +6,59 @@ from pathlib import Path
 from .report import Finding, Severity
 
 
+def _parse_frontmatter_yaml(path: Path) -> dict:
+    """Parse YAML frontmatter from a markdown file. Returns empty dict on failure."""
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    content = path.read_text(encoding="utf-8")
+    if not content.startswith("---"):
+        return {}
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return {}
+    try:
+        return yaml.safe_load(parts[1]) or {}
+    except Exception:
+        return {}
+
+
+def _load_based_on_references(agent_meta_root: Path) -> dict[str, str]:
+    """Scan 2-platform overrides for based-on references.
+
+    Returns: {generic_template_stem: set of role_names}
+    e.g. {"provider-expert": {"claude-expert", "gemini-expert", ...}}
+    """
+    from collections import defaultdict
+    refs: dict[str, set[str]] = defaultdict(set)
+    platform_dir = agent_meta_root / "agents" / "2-platform"
+    if not platform_dir.exists():
+        return dict(refs)
+
+    # Build role-name → 2-platform-stem mapping by parsing {{PREFIX}} from name field
+    for md in sorted(platform_dir.glob("*.md")):
+        fm = _parse_frontmatter_yaml(md)
+        based_on = fm.get("based-on", "")
+        if not based_on or not based_on.startswith("1-generic/"):
+            continue
+        # Strip version suffix (@1.0.0) and extract stem
+        generic_stem = Path(based_on.split("@")[0]).stem
+
+        # Extract role name from the 'name' field (e.g. "{{PREFIX}}claude-expert")
+        name_field = fm.get("name", "")
+        role = name_field.replace("{{PREFIX}}", "").lstrip("-")
+        if not role:
+            continue
+        refs[generic_stem].add(role)
+    return {k: v for k, v in refs.items()}
+
+
 def check_role_defaults_coverage(agent_meta_root: Path) -> list[Finding]:
-    """Every 1-generic agent (non-workflow) must have an entry in role-defaults.yaml."""
+    """Every 1-generic agent (non-workflow) must have an entry in role-defaults.yaml.
+
+    Skips base templates that are only used via based-on from 2-platform overrides.
+    """
     findings = []
     roles_path = agent_meta_root / "config" / "role-defaults.yaml"
     if not roles_path.exists():
@@ -19,10 +70,16 @@ def check_role_defaults_coverage(agent_meta_root: Path) -> list[Finding]:
     if not agents_dir.exists():
         return findings
 
+    # Templates that serve as base for 2-platform overrides (via based-on)
+    based_on_refs = _load_based_on_references(agent_meta_root)
+    base_template_stems = set(based_on_refs.keys())
+
     for md in sorted(agents_dir.glob("*.md")):
         if md.name.startswith("_"):
             continue  # workflow helpers (_wf-*.md) are not roles
         role = md.stem
+        if role in base_template_stems:
+            continue  # base template used by 2-platform overrides
         if role not in role_names:
             findings.append(Finding(
                 Severity.ERROR, "crossrefs.role-not-in-role-defaults",
@@ -105,7 +162,11 @@ def check_changelog_mentions_new_files(agent_meta_root: Path,
 
 
 def check_role_defaults_has_generic_source(agent_meta_root: Path) -> list[Finding]:
-    """Every role in role-defaults.yaml should have a corresponding 1-generic source file."""
+    """Every role in role-defaults.yaml should have a corresponding 1-generic source file.
+
+    Also accepts roles that have a 2-platform override with based-on pointing
+    to an existing 1-generic base template (e.g. claude-expert → provider-expert.md).
+    """
     findings = []
     roles_path = agent_meta_root / "config" / "role-defaults.yaml"
     if not roles_path.exists():
@@ -114,9 +175,16 @@ def check_role_defaults_has_generic_source(agent_meta_root: Path) -> list[Findin
     role_names = _load_role_names(roles_path)
     agents_dir = agent_meta_root / "agents" / "1-generic"
 
+    # Roles covered by 2-platform based-on references (generic_stem → {roles})
+    based_on_refs = _load_based_on_references(agent_meta_root)
+    covered_roles: set[str] = set()
+    for generic_stem, roles in based_on_refs.items():
+        if (agents_dir / f"{generic_stem}.md").exists():
+            covered_roles.update(roles)
+
     for role in role_names:
         agent_file = agents_dir / f"{role}.md"
-        if not agent_file.exists():
+        if not agent_file.exists() and role not in covered_roles:
             findings.append(Finding(
                 Severity.WARNING, "crossrefs.role-defaults-orphan",
                 "config/role-defaults.yaml",

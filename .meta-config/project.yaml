@@ -6,7 +6,7 @@ agent-meta-version: 0.54.2
 # agent-meta manages all provider directories itself (1-generic, 2-platform, etc.)
 # Provider isolation must be disabled here — the meta-repo intentionally
 # reads and writes all provider directories during sync.
-provider-isolation: disabled
+provider-isolation: enabled
 
 ai-providers:
   - Claude
@@ -55,6 +55,11 @@ roles:
   - performance-optimizer
   - export-manager
   - bug-feature-analyzer
+  - claude-expert
+  - gemini-expert
+  - opencode-expert
+  - continue-expert
+  - copilot-expert
 
 # Architektur-Policy: Generische Agenten muessen provider-agnostisch bleiben.
 # Siehe rules/1-generic/provider-agnostic.md — Provider-Namen, Tool-Syntax und
