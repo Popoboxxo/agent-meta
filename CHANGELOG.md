@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.54.1] — 2026-05-27
+
+### Fixed
+
+- **Opencode JSON parsing**: Added `opencode.json` as a pure JSON alternative to `opencode.jsonc` to resolve parser warnings in strict JSON environments.
+
+---
+
 ## [0.54.0] — 2026-05-27
 
 ### Added
