@@ -15,6 +15,7 @@ Usage:
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule <name>
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-hook <name>
   python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --dry-run
+  python .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate
   python .agent-meta/scripts/sync.py --setup
   python .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name>
                                       --source <path> --role <role> [--entry <file>]
@@ -33,6 +34,7 @@ External skills (config/skills-registry.yaml in agent-meta):
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -128,6 +130,130 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
 
 
 # ---------------------------------------------------------------------------
+# Test-Repository Validation
+# ---------------------------------------------------------------------------
+
+def resolve_test_repo_path(config: dict, project_root: Path, log: SyncLog) -> Path | None:
+    """Resolve the test repository path with precedence:
+    1. AGENT_META_TEST_REPO environment variable
+    2. test-repo.path from project.yaml (relative or absolute)
+    3. None if not configured
+
+    Returns the resolved absolute path, or None if not available.
+    """
+    # 1. Environment variable override
+    env_var_name = config.get("test-repo", {}).get("env-var", "AGENT_META_TEST_REPO")
+    env_path = os.environ.get(env_var_name)
+    if env_path:
+        resolved = Path(env_path).resolve()
+        log.info("test-repo", f"resolved from env var {env_var_name}: {resolved}")
+        return resolved
+
+    # 2. Config path (relative or absolute)
+    test_cfg = config.get("test-repo", {})
+    if not test_cfg:
+        log.info("test-repo", "not configured in project.yaml")
+        return None
+
+    raw_path = test_cfg.get("path")
+    if not raw_path:
+        log.warn("test-repo.path is not set in project.yaml")
+        return None
+
+    path_obj = Path(raw_path)
+    if path_obj.is_absolute():
+        resolved = path_obj.resolve()
+    else:
+        # Relative to project_root (workspace)
+        resolved = (project_root / path_obj).resolve()
+
+    log.info("test-repo", f"resolved from config: {resolved}")
+    return resolved
+
+
+def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict,
+                       log: SyncLog, dry_run: bool) -> bool:
+    """Validate by performing a sync into the test repository and checking results.
+
+    Returns True if validation passed, False otherwise.
+    """
+    if not test_repo_path.exists():
+        log.warn(
+            f"Test repository not found at: {test_repo_path}\n"
+            f"  Set AGENT_META_TEST_REPO environment variable or\n"
+            f"  configure test-repo.path in .meta-config/project.yaml")
+        return False
+
+    if not test_repo_path.is_dir():
+        log.warn(f"Path exists but is not a directory: {test_repo_path}")
+        return False
+
+    log.info("test-repo", f"validating against: {test_repo_path}")
+
+    # Perform a sync into the test repository
+    from lib.agents import collect_sources, sync_agents_for_provider
+    from lib.config import build_variables, substitute
+    from lib.providers import load_providers_config, resolve_providers
+    from lib.dod import resolve_dod
+    from lib.context import sync_context_for_provider, sync_snippets_for_provider
+    from lib.rules import sync_rules, sync_speech_mode
+    from lib.hooks import sync_hooks
+    from lib.commands import sync_commands_for_provider
+    from lib.skills import sync_external_skills_for_provider
+
+    test_variables, pre_warnings = build_variables(config, agent_meta_root)
+    # Override AGENT_META_REPO to point to test repo for validation context
+    test_variables["PROJECT_NAME"] = test_variables.get("PROJECT_NAME", "agent-meta-test")
+
+    provider_config = load_providers_config(agent_meta_root)
+    providers = resolve_providers(config, provider_config)
+
+    validation_errors = 0
+    for provider in providers:
+        pc = provider_config[provider]
+        log.info("test-repo", f"syncing agents for provider: {provider}")
+        sync_agents_for_provider(agent_meta_root, test_repo_path, config, test_variables,
+                                 log, dry_run, provider, provider_config)
+        sync_context_for_provider(agent_meta_root, test_repo_path, config, test_variables,
+                                  log, dry_run, provider, provider_config)
+        if pc["has_rules"]:
+            sync_rules(agent_meta_root, test_repo_path, config, log, dry_run,
+                       variables=test_variables, rules_dir=pc.get("rules_dir"),
+                       provider=provider, provider_config=provider_config)
+            sync_speech_mode(agent_meta_root, test_repo_path, config, log, dry_run,
+                             rules_dir=pc.get("rules_dir"))
+        if pc["has_hooks"]:
+            sync_hooks(agent_meta_root, test_repo_path, config, log, dry_run,
+                       provider=provider, provider_config=provider_config)
+        if pc.get("has_commands", False):
+            sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
+                                       dry_run, provider, provider_config=provider_config,
+                                       variables=test_variables)
+        sync_snippets_for_provider(agent_meta_root, test_repo_path, config, log, dry_run,
+                                   provider, provider_config)
+        sync_external_skills_for_provider(agent_meta_root, test_repo_path, config, test_variables,
+                                          log, dry_run, provider, provider_config)
+
+    # Check sync.log for errors
+    sync_log_path = test_repo_path / "sync.log"
+    if sync_log_path.exists():
+        content = sync_log_path.read_text(encoding="utf-8")
+        error_lines = [line.strip() for line in content.splitlines()
+                       if "[ERROR]" in line or "[FAIL]" in line]
+        if error_lines:
+            log.warn(f"test-repo: Found {len(error_lines)} error(s) in sync.log:")
+            for el in error_lines:
+                log.warn(f"test-repo:   {el}")
+            validation_errors += len(error_lines)
+        else:
+            log.info("test-repo", "sync.log contains no errors")
+    else:
+        log.info("test-repo", "sync.log not found in test repository (first validation run)")
+
+    return validation_errors == 0
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -165,6 +291,11 @@ def main():
                              "followed by --init sync. Use before the first sync on a new project.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
+    parser.add_argument("--validate", action="store_true",
+                        help="Validate sync output against the configured test repository. "
+                             "Resolves test-repo.path from project.yaml (relative or absolute), "
+                             "optionally overridden by AGENT_META_TEST_REPO env var. "
+                             "Performs a full sync into the test repo and checks sync.log for errors.")
     parser.add_argument("--viz", action="store_true",
                         help="Generate static agent visualization (mindmap + interactive HTML)")
     parser.add_argument("--viz-mode", choices=["off", "static", "dynamic", "full"], default=None,
@@ -318,6 +449,24 @@ def main():
         retention = viz_cfg.get("report", {}).get("retention_days", 7)
         cleanup_old_sessions(project_root, retention_days=retention,
                              log=log, dry_run=args.dry_run)
+
+    elif args.validate:
+        mode = "validate"
+        if args.dry_run:
+            print("DRY-RUN — validation will not write files\n")
+        test_repo_path = resolve_test_repo_path(config, project_root, log)
+        if test_repo_path is None:
+            log.error("test-repo",
+                      "No test repository configured.\n"
+                      "  Add to .meta-config/project.yaml:\n"
+                      "  test-repo:\n"
+                      "    enabled: true\n"
+                      "    path: \"../agent-meta-test\"\n"
+                      "  Or set AGENT_META_TEST_REPO environment variable.")
+            sys.exit(1)
+        success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
+        if not success:
+            sys.exit(1)
 
     else:
         provider_config = load_providers_config(agent_meta_root)

@@ -95,6 +95,11 @@ mindmap
 - **Beschreibung:** Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
 - **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
 
+### effort-estimator
+- **Tier:** optional
+- **Beschreibung:** Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Fähigkeiten
+- **Model:** Claude: claude-haiku-4-5-20251001, Gemini: gemini-3.5-flash-high, Opencode: opencode-go/deepseek-v4-flash
+
 ### export-manager
 - **Tier:** optional
 - **Beschreibung:** Liest .meta-config/export.yaml und routet strukturierte JSON-Payloads der Fach-Agenten zum konfigurierten Target (markdown, confluence, jira-xray, etc.).

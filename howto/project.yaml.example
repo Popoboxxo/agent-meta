@@ -33,6 +33,27 @@ orchestrator:
 max-parallel-agents: 4
 
 # ============================================================
+# TEST REPOSITORY VALIDATION
+# ============================================================
+# Enables validation of sync output against a separate test repository.
+# Use --validate flag to run a sync into the test repo and check for errors.
+#
+# Path resolution order:
+#   1. AGENT_META_TEST_REPO environment variable (highest priority)
+#   2. test-repo.path (relative to workspace or absolute)
+#
+# Usage:
+#   python scripts/sync.py --validate
+#   python scripts/sync.py --dry-run --validate
+#
+# If the test repo doesn't exist, validation fails with a clear error message.
+
+test-repo:
+  enabled: true
+  path: "../agent-meta-test"          # relative to workspace root
+  env-var: "AGENT_META_TEST_REPO"     # optional: env var override
+
+# ============================================================
 # EXAMPLE: Full project.yaml with Orchestrator-First
 # ============================================================
 
