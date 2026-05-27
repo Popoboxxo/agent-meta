@@ -278,6 +278,17 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
     variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
+    # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
+    variables["REFLECTION_PAIRS_ENABLED"] = "false"
+    try:
+        roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
+        if roles_defaults_path.exists() and _YAML_AVAILABLE:
+            with roles_defaults_path.open(encoding="utf-8") as f:
+                roles_defaults = _yaml.safe_load(f) or {}
+            if roles_defaults.get("reflection_pairs"):
+                variables["REFLECTION_PAIRS_ENABLED"] = "true"
+    except Exception:
+        pass
     return variables, unmapped
 
 

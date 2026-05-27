@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.1.1"
+version: "2.2.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -109,6 +109,22 @@ Falls `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 <!-- PROJEKTSPEZIFISCH: Build-Kommandos eintragen -->
 {{DEV_COMMANDS}}
+
+---
+
+## Reflection-Loop: Revision-Modus
+
+Wenn du correction_hints von einem Critic erhältst:
+
+1. **Lies** alle correction_hints sorgfältig
+2. **Behebe NUR** die genannten Findings — ändere nichts anderes
+3. **Bestätige** in der Antwort welche hints umgesetzt wurden
+4. **Ignoriere** nicht-monierten Code (Scope-Disziplin)
+
+**Iterations-Awareness:**
+- Du bekommst den aktuellen Stand: "Runde X von Y"
+- Wenn X == Y: Dies ist die letzte Chance — konzentriere dich auf die kritischsten Findings
+- Wenn hints nach Y Runden nicht umsetzbar sind: Markiere als "blocked" und eskaliere
 
 ---
 

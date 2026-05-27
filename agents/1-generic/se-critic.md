@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.3.1
+version: 1.4.0
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
@@ -85,15 +85,15 @@ Perform the following four checks on every output. Each check must yield a boole
 - Does the architectural rationale reference the parent requirement explicitly?
 
 ## Decision Logic
-Run up to `max_iterations: 3`. After each evaluation, render a verdict:
+Run up to `max_iterations: {{MAX_ITERATIONS}}`. After each evaluation, render a verdict:
 
 - **approved** — All checks passed. The output may proceed to the next stage.
 - **rejected** — Deficiencies found that can be corrected by the Generator. Return the output to the Generator together with `correction_hints` for rework.
 - **blocked** — Critical, fundamental flaws found (e.g., safety gap, impossible physics, violation of parent requirement). Inform the parent cell immediately; the decision at level n-1 must be revised.
 
 ## Correction Loop
-- On `rejected` (Requirements): Send `correction_hints` back to `se-requirements`. Iterate at most `max_iterations` times.
-- On `rejected` (Architecture): Send `correction_hints` back to `se-architect`. Iterate at most `max_iterations` times.
+- On `rejected` (Requirements): Send `correction_hints` back to `se-requirements`. Iterate at most `{{MAX_ITERATIONS}}` times.
+- On `rejected` (Architecture): Send `correction_hints` back to `se-architect`. Iterate at most `{{MAX_ITERATIONS}}` times.
 - On `blocked`: Escalate to the parent cell (or `se-orchestrator`) immediately. Do not attempt local correction.
 - If `max_iterations` is reached without `approved`, escalate with the latest `correction_hints`.
 
@@ -128,7 +128,7 @@ Return your final output **only** as a JSON object matching the following schema
     "Add external interface: direction=input, type=control, description='Safety shutoff signal from thermal sensor'."
   ],
   "iteration": 1,
-  "max_iterations": 3
+  "max_iterations": {{MAX_ITERATIONS}}
 }
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.9.0"
+version: "3.10.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -105,6 +105,8 @@ Deine einzige Aufgabe ist: **Klassifiziere den User-Intent und delegiere sofort.
 {{/if}}
 | **Batch-Operationen** (mehrere gleiche Tasks) | — | — | **Ja** | "Fix 3 Bugs", "Schreib Tests für A,B,C" |
 | **Aufwandsschätzung** / "Wie lange dauert das?" / Planning-Hilfe | `effort-estimator` | `fast` | Nein (sequentiell) | "Wie lange für Feature X?", "Schätze den Aufwand" |
+| **Iterativer Review** / Revision-Schleife | `orchestrator` → REPEAT_UNTIL | `balanced` → `powerful` | Nein (sequentiell) | "Review und lass überarbeiten", "Iterativ verbessern" |
+| **Reflection-Loop starten** | `orchestrator` → REPEAT_UNTIL | `balanced` | Nein | "Starte dev-review-loop", "SE-Architektur reviewen lassen" |
 | **Nicht in Tabelle** | Frag den User | — | — | — |
 
 **Regel:** Wenn der Intent nicht exakt in dieser Tabelle steht, frage den User nach Klärung — rate nicht und arbeite nicht selbst.
@@ -189,11 +191,16 @@ BARRIER():
   Wait until ALL started parallel agents have completed.
   Collect all results.
   Return a result array: [result_1, result_2, ..., result_N]
+
+REPEAT_UNTIL(generator, critic, max_iterations):
+  Start a generator agent, then pass output to critic.
+  If critic returns REVISE verdict with correction_hints:
+    → Feed hints back to generator (revision mode)
+    → Increment iteration counter
+    → Repeat until critic approves OR max_iterations reached
+  If max_iterations exceeded → escalate to orchestrator
+  Example: REPEAT_UNTIL(developer, code-reviewer, 3)
 ```
-
-### Provider Implementation
-
-{{PARALLEL_PATTERN}}
 
 ### Capability Detection
 
@@ -610,6 +617,11 @@ Wenn ein Worker-Agent eine Aufgabe zurückgibt die in seinem eigenen Scope liegt
 | release | Versioning, Changelog, Release |
 | se-* | Systems Engineering Aufgaben (jeweiliger Scope) |
 
+### Ausnahme — Reflection-Loops
+Depth-Limit gilt NICHT für Reflection-Loops innerhalb eines konfigurierten Pairs.
+Ein Reflection-Loop (generator ↔ critic) zählt als EINE Operation, nicht als verschachtelte Delegation.
+Maximale Iterationen werden durch `max_iterations` in `reflection_pairs` begrenzt.
+
 ---
 
 ## Mention-Interception Policy (Pflicht)
@@ -716,7 +728,11 @@ W  UI-Design:       ui-ux-designer → Mockups + UI-Spec → developer
 X  API-Design:      api-specialist → OpenAPI-Spec → developer
 Y  Performance:     performance-optimizer → Profiling → Empfehlungen → developer
 Z  Export:          export-manager → Target-Routing (markdown/confluence/jira)
-AA Schätzung:      effort-estimator → Aufwandsschätzung für [Task]
+AA Reflection-Loop:  REPEAT_UNTIL(generator, critic, max_iterations) → git
+AB Dev-Review-Loop:  developer [⇄ code-reviewer, max={{MAX_ITERATIONS}}] → git
+AC SE-Requirements:  se-requirements [⇄ se-critic, max=3] → se-architect
+AD SE-Architecture:  se-architect [⇄ se-critic, max=3] → se-validator
+AE Schätzung:      effort-estimator → Aufwandsschätzung für [Task]
 ```
 
 Am Session-Ende: Erkenntnisse sichern anbieten (documenter) + Workflow K (Feedback).

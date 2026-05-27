@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-version: 1.1.1
+version: 1.2.0
 description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen
   und REQ-Traceability in Code-Pfaden.'
 hint: Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit
@@ -285,6 +285,24 @@ Return your review report as a JSON object matching the following schema:
 }
 ```
 
+## JSON Output Schema — Reflection-Loop Modus
+
+Wenn du als Critic in einem Reflection-Loop arbeitest, verwende dieses erweiterte Schema:
+
+```json
+{
+  "verdict": "REVISE",
+  "iteration": 2,
+  "max_iterations": 3,
+  "correction_hints": [
+    "Funktion X sollte Y statt Z verwenden",
+    "Zeile N: Boundary-Case nicht behandelt"
+  ],
+  "findings": [...],
+  "summary": "..."
+}
+```
+
 ## Verdict Values
 
 | Verdict | Meaning | Action |
@@ -293,6 +311,7 @@ Return your review report as a JSON object matching the following schema:
 | `APPROVED_WITH_RECOMMENDATIONS` | Minor Findings, Bewertung B-C | Merge freigeben, Empfehlungen dokumentieren |
 | `CHANGES_REQUESTED` | Major Findings, Bewertung D | Merge blockieren, Fixes anfordern |
 | `BLOCKED` | Critical Findings, Bewertung F | Merge blockieren, architect konsultieren |
+| `REVISE` | Änderungen nötig — Generator muss überarbeiten (mit correction_hints) | Rückgabe an Generator mit correction_hints |
 
 ---
 
@@ -339,6 +358,23 @@ Return your review report as a JSON object matching the following schema:
 **Blocker:** [Liste oder "keine"]
 **Empfehlungen:** [Liste]
 ```
+
+---
+
+## Evaluator-Optimizer Review (Reflection-Loop Modus)
+
+Wenn du als Critic in einem Reflection-Loop arbeitest (erkennbar an Iterationszähler oder Loop-Kontext):
+
+1. **Prüfe** ob der Generator die vorherigen correction_hints adressiert hat
+2. **Bewerte** nur die spezifischen Findings aus der vorherigen Runde
+3. **Bei REVISE:** Gib präzise, actionable correction_hints (max. 5 Punkte)
+4. **Bei APPROVE:** Bestätige dass alle Findings behoben sind
+5. **Bei ESCALATE:** Nach max_iterations ohne Lösung → Escalation mit Begründung
+
+**Revision-Modus Regeln:**
+- hints müssen spezifisch sein (keine vagen "verbessere den Code")
+- hints müssen referenzierbar sein (Datei, Zeile, Konzept)
+- hints müssen umsetzbar sein (kein "architektur komplett ändern")
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.2.1
+version: 1.3.0
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
@@ -111,7 +111,9 @@ Return your final output **only** as a JSON object matching the following schema
 When an external interface (e.g., "WiFi") is assigned to a sub-component, that sub-component must carry the interface forward into the next cascade level. Ensure that internal interfaces are also declared so the Interface Manager can propagate them to parallel branches. Never drop an interface silently.
 
 ## Post-Decomposition Handoff
-After producing the JSON output, forward it to the `se-critic` agent for quality-gate validation. Do not proceed to the Interface Manager or Terminator until the Critic returns `approved`. If the Critic returns `rejected`, iterate on the decomposition using the provided `correction_hints`. If the Critic returns `blocked`, escalate to the parent cell immediately.
+After producing the JSON output, forward it to the `se-critic` agent for quality-gate validation.
+Notation: `se-architect [⇄ se-critic, max={{MAX_ITERATIONS}}]`
+Do not proceed to the Interface Manager or Terminator until the Critic returns `approved`. If the Critic returns `rejected`, iterate on the decomposition using the provided `correction_hints`. If the Critic returns `blocked`, escalate to the parent cell immediately.
 
 Work iteratively with the output from `se-requirements` and hand off to `se-critic` for auditing.
 
