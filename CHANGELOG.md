@@ -1,6 +1,43 @@
 # Changelog
 
-## [0.53.1] — 2026-05-25
+## [0.54.0] — 2026-05-27
+
+### Added
+
+- **Effort-Estimator Agent** (`agents/1-generic/effort-estimator.md`): New agent for structured task effort estimation with complexity scoring and time-range prediction. Supports the orchestrator's planning phase before task decomposition. (#246)
+- **Outcome Cache** (`scripts/lib/cache.py`): SHA256-based delegation result cache with LRU eviction and configurable TTL. Reduces token costs for recurring orchestrator sub-tasks by caching previous outcomes. (#172)
+- **Quality Pipeline Framework** (`scripts/lib/pipelines.py`): Configurable quality pipeline definitions with provider-specific injection. Enables project-level customization of the multi-stage quality flow (code-review → validate → release). (#164)
+- **Reflection-Loop Infrastructure** (`scripts/lib/reflection.py`): Generator-Critic pair configuration (e.g., developer ↔ code-reviewer) with max-iterations and pair-enabling per project. Supports iterative quality improvement loops. (#163, #166)
+- **Parallel Barrier Runtime** (`scripts/lib/runtime.py`): ThreadPoolExecutor-based barrier implementation for deterministic parallel subagent execution with per-agent and global timeout handling. (#240)
+- **Provider Tool Whitelists** (`config/provider-tools.yaml`): Per-provider tool capability declarations. Prevents agents from referencing tools unavailable in their target provider environment. Documents unsupported Gemini tools. (#223, #240)
+- **Path-Based Contextual Rules** (`config/rules-presets.yaml`): Rules can now be restricted to specific file paths via glob patterns, enabling context-aware rule activation (e.g., Python rules only for `.py` files). (#226)
+- **Critical Rules Footer**: Every generated agent file now receives a critical-rules footer section at the bottom, ensuring essential policies (branch-guard, commit-conventions, provider-agnostic) are always visible. (#225)
+- **Few-Shot Orchestration Examples**: Orchestrator template enhanced with concrete few-shot examples for FANOUT, PIPELINE, and PARALLEL_GROUP dispatch patterns. (#224)
+- **XML Section Wrapping**: Generated agent files now use XML-tagged sections for key blocks, improving structural machine-parseability while maintaining human readability. (#227)
+- **File-Affinity Check**: Parallel task execution now checks file-level conflicts before dispatching, preventing race conditions when multiple agents touch the same files. (#241)
+- **Temperature, Steps, Deny-Permissions in Opencode Frontmatter**: Opencode agent generation now supports `temperature`, `steps` (execution step limit), and explicit `deny` permission rules in frontmatter. (#242)
+
+### Changed
+
+- **Orchestrator v3.12.0**: Integrated cache, pipelines, reflection-loops, barrier runtime, Gemini Auto-Handoff protocol, and anti-recursion guard into the delegation workflow. Entry-point hint updated with orchestrator-exclusive dispatch clarification.
+- **SE Orchestrator v1.5.0**: Extended 6-level cascade with traceability enhancements and validation integration.
+- **SE Requirements v1.5.0**: Enhanced requirements elicitation with improved traceability.
+- **agent-meta-manager v1.9.0**: Clarified update-meta vs upgrade-meta commands. Added reflection-loop and quality pipeline configuration sections.
+
+### Fixed
+
+- **Orchestrator Auto-Handoff Clarification**: Prioritized native tool-calls over text-based `@orchestrator` triggering. Clarified `@orchestrator` as the sole direct-dispatch interceptor for all platforms. (#213, #214)
+- **Gemini Auto-Handoff Protocol**: Gemini orchestrator now implements the full auto-handoff pattern with explicit planning-mode override, correcting missing functionality. (#208, #243)
+- **Anti-Recursion Guard**: Worker agents now explicitly blocked from delegating back to the orchestrator, preventing infinite delegation loops. (#232, #242)
+- **Opencode Frontmatter**: Removed invalid `memory` field, corrected `mode` resolution from template YAML instead of hardcoded `subagent`, and completed frontmatter for Continue and Claude/Opencode. (#239, #217, #220)
+- **Gemini Agent Frontmatter**: Stripped unsupported config parameters, added proper tool mapping translation for Gemini native tools. (#222, #221)
+- **Tool-Specific Placeholders**: Removed provider-tool references from 1-generic templates to maintain provider-agnostic invariance. (#210)
+- **Agent Tool Exclusion**: `Agent` tool removed from generic template frontmatter to eliminate sync warnings across providers. (#236, #238)
+- **Sync Schema Enums**: Updated enums to match current providers and roles, preventing validation errors. (#234, #237)
+- **Bug-Feature-Analyzer**: Excluded from direct dispatch exceptions, enforcing orchestrator routing for issue triage. (#241)
+- **Test-Repo Validation**: Parametrized path resolution for out-of-tree test-repository validation, supporting flexible test setups.
+
+---
 
 ### Fixed
 
