@@ -332,34 +332,88 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
 def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """Remove conditional blocks that are inactive in this project.
 
-    Recognizes the pattern:
-        {{#if VAR_NAME}}
-        ...content...
-        {{/if}}
+    Handles:
+        {{#if VAR}}...content...{{/if}}
+        {{#if VAR}}...content...{{else}}...alt-content...{{/if}}
+        {{#unless VAR}}...content...{{/unless}}
 
-    Applies to DoD-variables (starting with DOD_) and SE_ENABLED.
-    If the corresponding variable is "false", the entire block (including
-    markers) is removed. If "true", the markers are stripped but content kept.
-    This keeps generated agent files lean when features are disabled.
+    Nested blocks are resolved via repeated passes until no markers remain.
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT")})
 
-    for var in conditional_vars:
-        def replace_block(m: re.Match, _var: str = var) -> str:
-            block_content = m.group(1)
-            if variables.get(_var, "true") == "false":
-                return ""
-            stripped = block_content.strip("\n")
-            # Only append newline if the original match ended with one
-            # (block-level). For inline matches (e.g. table rows), preserve
-            # inline continuity so the Markdown table is not broken.
-            if m.group(0).endswith("\n"):
-                return stripped + "\n"
-            return stripped
+    if not conditional_vars:
+        return text
 
-        pattern = rf"\{{{{#if {re.escape(var)}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
-        text = re.sub(pattern, replace_block, text, flags=re.DOTALL)
+    # Repeat until stable — handles nested blocks
+    max_passes = 10
+    for _pass in range(max_passes):
+        made_change = False
+        for var in conditional_vars:
+            var_pattern = re.escape(var)
+
+            # 1. Handle {{#if VAR}}...{{else}}...{{/if}} (if-else-endif)
+            def replace_if_else(m: re.Match, _var: str = var) -> str:
+                true_branch = m.group(1)
+                false_branch = m.group(2)
+                is_true = variables.get(_var, "true") == "true"
+                result = true_branch if is_true else false_branch
+                # Preserve trailing newline if original match ended with one
+                if m.group(0).endswith("\n"):
+                    if not result.endswith("\n"):
+                        result = result + "\n"
+                return result
+
+            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?(.*?)\{{{{else\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            old_text = text
+            text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
+            if text != old_text:
+                made_change = True
+
+            # 2. Handle {{#unless VAR}}...{{/unless}}
+            def replace_unless(m: re.Match, _var: str = var) -> str:
+                block_content = m.group(1)
+                is_true = variables.get(_var, "true") == "true"
+                if is_true:
+                    return ""
+                stripped = block_content.strip("\n")
+                if m.group(0).endswith("\n") and stripped:
+                    return stripped + "\n"
+                return stripped
+
+            pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?(.*?)\{{{{/unless\}}}}\n?"
+            old_text = text
+            text = re.sub(pattern_unless, replace_unless, text, flags=re.DOTALL)
+            if text != old_text:
+                made_change = True
+
+            # 3. Handle {{#if VAR}}...{{/if}} (simple, no else)
+            def replace_if(m: re.Match, _var: str = var) -> str:
+                block_content = m.group(1)
+                if variables.get(_var, "true") == "false":
+                    return ""
+                stripped = block_content.strip("\n")
+                if m.group(0).endswith("\n"):
+                    return stripped + "\n"
+                return stripped
+
+            pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            old_text = text
+            text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
+            if text != old_text:
+                made_change = True
+
+        if not made_change:
+            break
+
+    # Final cleanup: remove any remaining orphaned template markers
+    # (e.g. from nested {{#unless A}}{{#unless B}}...{{/unless}}{{/unless}})
+    text = re.sub(r'\{\{#if\s+\w+\}\}', '', text)
+    text = re.sub(r'\{\{/if\}\}', '', text)
+    text = re.sub(r'\{\{else\}\}', '', text)
+    text = re.sub(r'\{\{#unless\s+\w+\}\}', '', text)
+    text = re.sub(r'\{\{/unless\}\}', '', text)
 
     return text
 
@@ -394,3 +448,73 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
         text = text.replace(f"{_SENTINEL}{i}{_SENTINEL}", f"{{{{{name}}}}}")
 
     return text
+
+
+# ---------------------------------------------------------------------------
+# Platform Orchestrator Patches — provider-specific orchestrator instructions
+# injected by sync.py during agent generation (Issue #250).
+# ---------------------------------------------------------------------------
+
+PLATFORM_ORCHESTRATOR_PATCHES: dict[str, list[dict]] = {
+    "Gemini": [
+        {
+            "op": "append-after",
+            "anchor": "## Mention-Interception Policy (Pflicht)",
+            "content": (
+                "### Gemini/Antigravity-spezifische Hinweise\n"
+                "\n"
+                "**Technische Einschränkung:** Die Gemini/Antigravity UI interceptet **ausschließlich** den `@orchestrator`-Mention.\n"
+                "Alle anderen `@<agent>`-Mentions (`@git`, `@feedback`, `@meta-feedback`, `@developer`, etc.) werden als\n"
+                "reiner Text gerendert und lösen **keine** Subagent-Invocation aus.\n"
+                "\n"
+                "**Pflicht-Regeln für Gemini:**\n"
+                "1. Verwende IMMER `@orchestrator <Aufgabe>` für alle Delegationsaufrufe\n"
+                "2. Verwende NIEMALS `@git`, `@feedback`, `@developer` oder andere Agent-Mentions\n"
+                "3. Wenn der Hauptchat delegieren muss: `@orchestrator Delegiere an git: \"Commit message...\"`\n"
+                "4. Die \"Ausnahmen — direkter Dispatch\" aus use-orchestrator.md gelten in Gemini **nicht** als User-Mentions — sie sind rein interne Delegationsentscheidungen\n"
+                "\n"
+                "**Beispiel — Falsch (funktioniert nicht in Gemini):**\n"
+                "> \"@meta-feedback Bitte erstelle ein Issue für...\"\n"
+                "\n"
+                "**Beispiel — Richtig:**\n"
+                "> \"@orchestrator Delegiere an meta-feedback: Erstelle ein Issue für...\"\n"
+                "\n"
+                "**Oder über Tool-Call (bevorzugt):**\n"
+                "Verwende das native `task()`-Tool des Orchestrators — das umgeht Mention-Parsing komplett."
+            ),
+        },
+        {
+            "op": "append",
+            "content": (
+                "### Gemini Auto-Handoff Methodik\n"
+                "\n"
+                "**`define_subagent` / `invoke_subagent` Blueprint:**\n"
+                "\n"
+                "Gemini/Antigravity verwendet native Subagent-Dispatch-Mechanismen die sich von anderen Providern unterscheiden.\n"
+                "\n"
+                "```\n"
+                "# Gemini Subagent-Dispatch Pattern\n"
+                "1. define_subagent: Definiere den Agent-Typ mit Rolle und Kontext\n"
+                "2. invoke_subagent: Starte den Agenten mit spezifischer Aufgabe\n"
+                "3. Collect results: Warte auf Ergebnis und aggregiere\n"
+                "```\n"
+                "\n"
+                "**Pflicht-Regeln:**\n"
+                "- Orchestrator verwendet IMMER `define_subagent` + `invoke_subagent` für Worker-Delegation\n"
+                "- KEIN text-basierter `@orchestrator` Fallback wenn native Subagent-Tools verfügbar\n"
+                "- Planning-Mode darf Delegation NICHT unterdrücken\n"
+                "\n"
+                "**Planning-Mode Anti-Konflikt-Regel:**\n"
+                "\n"
+                "Wenn die Umgebung einen nativen Planungsmodus erzwingt (z.B. Gemini \"planning\" oder \"thinking\" Phase):\n"
+                "\n"
+                "1. Planning-Phase läuft NUR im Orchestrator — nicht im Worker\n"
+                "2. Planning-Mode darf die eigentliche Delegation NICHT blockieren oder unterdrücken\n"
+                "3. Nach Planning-Phase SOFORT `invoke_subagent` aufrufen — kein zusätzlicher Bestätigungsschritt\n"
+                "4. Wenn Planning-Mode einen \"approval\" Schritt verlangt: Dieser gilt NUR für den Orchestrator→Worker Dispatch, nicht für interne Worker-Operationen\n"
+                "\n"
+                "**Warum:** Ohne diese Regel kann der Planning-Mode die Delegation in eine Endlosschleife bringen (Plan → Bestätigung → Plan → ...) oder komplett unterdrücken."
+            ),
+        },
+    ],
+}

@@ -623,7 +623,7 @@ beim nächsten `sync.py`-Lauf. Daher:
 
 ## Harte Invarianten (niemals verletzen)
 
-**1. `.claude/agents/` ist generierter Output — nie manuell bearbeiten.**
+**1. `.claude/agents` ist generierter Output — nie manuell bearbeiten.**
 Alle Änderungen gehören in die Quell-Templates unter `agents/` oder in `.meta-config/project.yaml`.
 Manuelle Edits werden beim nächsten `sync.py`-Lauf überschrieben.
 
@@ -693,7 +693,7 @@ Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/ak
 
 # agent-meta — sync.py Interface
 
-`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.claude/agents/` schreiben.
+`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.claude/agents` schreiben.
 
 Vollständige Referenz (Flags, sync.log, Modulstruktur):
 → `.agent-meta/agents/1-generic/_wf-sync-interface.md`

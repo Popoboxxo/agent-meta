@@ -6,7 +6,7 @@ agent-meta-version: 0.55.1
 # agent-meta manages all provider directories itself (1-generic, 2-platform, etc.)
 # Provider isolation must be disabled here — the meta-repo intentionally
 # reads and writes all provider directories during sync.
-provider-isolation: enabled
+provider-isolation: disabled
 
 ai-providers:
   - Claude

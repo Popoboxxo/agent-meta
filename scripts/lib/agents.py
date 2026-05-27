@@ -1073,6 +1073,15 @@ def sync_agents_for_provider(
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)
+
+        # Inject platform-specific orchestrator patches (Issue #250)
+        if role == "orchestrator":
+            from .config import PLATFORM_ORCHESTRATOR_PATCHES
+            patches = PLATFORM_ORCHESTRATOR_PATCHES.get(provider, [])
+            for patch in patches:
+                content = apply_patch(content, patch, log, f"{provider}-orchestrator-patch")
+                log.info(str(target_path.relative_to(project_root)), f"applied {provider} orchestrator patch")
+
         name = Path(filename).stem
         layer = source_path.parts[-2]
         source_label = f'{layer}/{source_path.name}'

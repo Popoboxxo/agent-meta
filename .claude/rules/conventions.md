@@ -2,7 +2,7 @@
 
 ## Harte Invarianten (niemals verletzen)
 
-**1. `.claude/agents/` ist generierter Output — nie manuell bearbeiten.**
+**1. `.claude/agents` ist generierter Output — nie manuell bearbeiten.**
 Alle Änderungen gehören in die Quell-Templates unter `agents/` oder in `.meta-config/project.yaml`.
 Manuelle Edits werden beim nächsten `sync.py`-Lauf überschrieben.
 
