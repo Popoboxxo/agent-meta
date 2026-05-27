@@ -431,6 +431,73 @@ def _make_xml_tag_name(heading: str) -> str:
     name = name.strip('-')
     return name
 
+
+# ---------------------------------------------------------------------------
+# Critical Rules Footer — appends critical rules to the end of agent files
+# ---------------------------------------------------------------------------
+
+_CRITICAL_RULES = [
+    "branch-guard",
+    "commit-conventions",
+    "dod-criteria",
+]
+
+
+def _extract_and_append_critical_footer(
+    content: str,
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    provider: str = "Claude",
+) -> str:
+    """Append critical rules as a footer to generated agent content.
+
+    Reads critical rule files, substitutes variables, strips frontmatter,
+    and appends them as a '## Critical Rules' section at the end.
+
+    Only rules that exist and are active (per rules-preset) are included.
+    """
+    from .config import substitute
+    from .rules import collect_rule_sources, resolve_rules
+
+    rule_options = resolve_rules(config, agent_meta_root)
+    platforms = config.get("platforms", [])
+    sources = collect_rule_sources(agent_meta_root, platforms)
+
+    # Build a lookup: rule_stem -> source_path
+    source_map: dict[str, Path] = {}
+    for source_path, output_name in sources:
+        rule_stem = Path(output_name).stem
+        if rule_stem in _CRITICAL_RULES:
+            source_map[rule_stem] = source_path
+
+    footer_sections: list[str] = []
+    for rule_name in _CRITICAL_RULES:
+        source_path = source_map.get(rule_name)
+        if not source_path or not source_path.exists():
+            continue
+
+        opts = rule_options.get(rule_name, {})
+        # Skip if rule is disabled via rules-preset
+        if opts.get("alwaysApply") is False and opts.get("embed") is False:
+            continue
+
+        rule_content = source_path.read_text(encoding="utf-8")
+        rel_source = f"rules/{source_path.parts[-2]}/{source_path.name}"
+        rule_content = substitute(rule_content, variables, rel_source, log)
+
+        # Strip frontmatter if present
+        body = _strip_frontmatter(rule_content).strip()
+        if body:
+            footer_sections.append(body)
+
+    if not footer_sections:
+        return content
+
+    footer = "\n\n---\n\n## Critical Rules\n\n" + "\n\n---\n\n".join(footer_sections)
+    return content.rstrip() + footer
+
 def _split_frontmatter(content: str) -> tuple[str, str]:
     """Split content into (frontmatter_block, body).
 
@@ -763,6 +830,13 @@ def sync_agents(
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True)
 
+        # Critical Rules Footer: append critical rules to end of agent files
+        footer_cfg = config.get('critical-rules-footer', {})
+        if footer_cfg.get('enabled', False):
+            content = _extract_and_append_critical_footer(
+                content, agent_meta_root, config, variables, log
+            )
+
         # XML Section Wrapping: wrap Markdown ## sections in XML tags
         xml_cfg = config.get('xml-section-wrapping', {})
         if xml_cfg.get('enabled', False):
@@ -1081,6 +1155,13 @@ def sync_agents_for_provider(
 
         if debug_mode:
             content = inject_debug_block(content, name)
+
+        # Critical Rules Footer: append critical rules to end of agent files
+        footer_cfg = config.get('critical-rules-footer', {})
+        if footer_cfg.get('enabled', False):
+            content = _extract_and_append_critical_footer(
+                content, agent_meta_root, config, variables, log, provider
+            )
 
         # XML Section Wrapping: wrap Markdown ## sections in XML tags
         xml_cfg = config.get('xml-section-wrapping', {})
