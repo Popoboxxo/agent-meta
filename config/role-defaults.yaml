@@ -252,3 +252,9 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."
+
+  effort-estimator:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung"
