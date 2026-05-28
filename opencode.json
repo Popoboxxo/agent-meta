@@ -13,5 +13,16 @@
       ".continue/**": "deny",
       ".gemini/**": "deny"
     }
+  },
+  "mcp": {
+    "viz-logger": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "python",
+        "scripts/viz-logger.py",
+        "--mcp"
+      ]
+    }
   }
 }

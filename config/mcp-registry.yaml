@@ -82,3 +82,21 @@ mcp-servers:
       - MCP_INFLUXDB_TOKEN
       - MCP_INFLUXDB_ORG
       - MCP_INFLUXDB_BUCKET
+
+  viz-logger:
+    description: "agent-meta visualization event logger — tracks agent_start, delegate_out, agent_end for graph generation"
+    category: agent-meta
+    enabled-by-default: true
+    tools:
+      allowed:
+        - log_viz_event
+    agent-hint: |
+      Nutze log_viz_event um Agenten-Starts, Delegationen und Beendigungen zu protokollieren.
+      Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, target, caller, task_id, payload.
+    connection:
+      type: stdio
+      command: python
+      args:
+        - "scripts/viz-logger.py"
+        - "--mcp"
+    secrets: []

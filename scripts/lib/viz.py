@@ -11,8 +11,6 @@ from .io import write_checked
 from .agents import collect_sources, extract_frontmatter_field
 from .roles import resolve_model
 from .providers import load_providers_config
-
-# Standardisierte Hierarchie: wer delegiert an wen
 # Wird aus Beschreibungen und bekannten Workflows abgeleitet
 _DELEGATION_MAP: dict[str, list[str]] = {
     "orchestrator": [
@@ -665,17 +663,90 @@ def get_gitignore_entries() -> list[str]:
     ]
 
 
+_PROVIDER_TERMINAL_TOOL: dict[str, str | None] = {
+    "Claude": "Bash",
+    "Gemini": "code_execution",
+    "Opencode": "bash",
+    "Continue": None,
+    "Copilot": None,
+}
+
+
+def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> str | None:
+    """Return the terminal tool name for a provider.
+    
+    Reads from config/provider-tools.yaml if available, falls back to hardcoded defaults.
+    """
+    if agent_meta_root is not None:
+        try:
+            from .agents import load_provider_tools_config
+            cfg = load_provider_tools_config(agent_meta_root)
+            terminal_map = cfg.get("terminal_tool", {})
+            if provider in terminal_map:
+                return terminal_map[provider]
+        except Exception:
+            pass
+    return _PROVIDER_TERMINAL_TOOL.get(provider)
+
+
+def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
+    """Extrahiere opencode permission block aus dem Frontmatter-YAML."""
+    fm_match = re.search(r"^---\s*\n(.*?)\n---", agent_content, re.DOTALL)
+    if not fm_match:
+        return {}
+    frontmatter = fm_match.group(1)
+    perm_match = re.search(r"^permission:\s*\n((?:\s+\w+:\s+\w+\n?)+)", frontmatter, re.MULTILINE)
+    if not perm_match:
+        return {}
+    perms: dict[str, str] = {}
+    for line in perm_match.group(1).strip().split("\n"):
+        kv = line.strip().split(":", 1)
+        if len(kv) == 2:
+            perms[kv[0].strip()] = kv[1].strip()
+    return perms
+
+
 def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
-                            viz_enabled: bool, model: str = "") -> str:
+                            viz_enabled: bool, model: str = "",
+                            agent_meta_root: Path | None = None) -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
     Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
     cross-platform CLI-Skript `scripts/viz-logger.py`.
+
+    Provider-spezifisch: Jeder Provider bekommt das korrekte Terminal-Tool
+    genannt. Bei Opencode-Agenten mit ``bash: deny`` wird der CLI-Fallback
+    weggelassen (nur MCP-Tool).
     """
     if not viz_enabled:
         return agent_content
 
     cli_cmd = f"python scripts/viz-logger.py --agent {role} --provider {provider}"
+    terminal_tool = _get_terminal_tool(provider, agent_meta_root)
+
+    has_terminal = True
+    if provider == "Opencode":
+        perms = _parse_opencode_permissions(agent_content)
+        if perms.get("bash") == "deny":
+            has_terminal = False
+
+    if has_terminal and terminal_tool:
+        fallback = (
+            f"**Fallback:** Falls das Tool nicht existiert, "
+            f"führe den Befehl über das `{terminal_tool}`-Tool aus:\n"
+            f"`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`"
+        )
+    elif has_terminal:
+        fallback = (
+            f"**Fallback:** Falls das Tool nicht existiert, "
+            f"führe den Befehl über das in deiner Umgebung verfügbare Terminal-Tool aus:\n"
+            f"`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`"
+        )
+    else:
+        fallback = (
+            "Du hast keinen Zugriff auf ein Terminal-Tool (bash ist deaktiviert). "
+            "Verwende ausschließlich das MCP-Tool `log_viz_event`."
+        )
 
     block = f"""
 ## Visualization Reporting (Pflicht-Anweisung)
@@ -683,8 +754,7 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
 Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
 
 **Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
-**Fallback:** Falls das Tool nicht existiert, führe den Befehl über dein lokales Command-Execution-Tool (z.B. `Bash`, `PowerShell`, `run_command`) aus:
-`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`
+{fallback}
 
 ### Pflicht-Events & Handshake-Protokoll
 
@@ -702,7 +772,7 @@ Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen prot
 **3. Wenn du fertig bist (Erfolg oder Fehler):**
 - Event: `agent_end`
 - Parameter: `--status <success|error> --target <parent_role>`
-- Optional: `--payload "{{\\"error\\": \\"Fehlermeldung\\"}}"`
+- Optional: `--payload "{{\\"error\\": \\"Fehlermeldung\\"}}"
 
 ### Regeln
 - Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.

@@ -65,3 +65,13 @@ continue:
 copilot:
   # GitHub Copilot has no frontmatter tools model. Tools are provided by the IDE.
   # The 'tools' field is removed during generation.
+
+# Terminal (Command-Execution) Tool per Provider
+# Used by viz.py inject_viz_prompt_block to name the correct tool in the fallback
+# Null means: no known terminal tool, use generic phrasing
+terminal_tool:
+  Claude: Bash
+  Opencode: bash
+  Gemini: code_execution
+  Continue: null
+  Copilot: null

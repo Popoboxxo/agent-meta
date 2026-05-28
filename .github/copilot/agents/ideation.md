@@ -194,7 +194,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.\n\n## Visuali
 Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
 
 **Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
-**Fallback:** Falls das Tool nicht existiert, führe den Befehl über dein lokales Command-Execution-Tool (z.B. `Bash`, `PowerShell`, `run_command`) aus:
+**Fallback:** Falls das Tool nicht existiert, führe den Befehl über das in deiner Umgebung verfügbare Terminal-Tool aus:
 `python scripts/viz-logger.py --agent ideation --provider Copilot --event <EVENT_TYPE> [weitere Parameter...]`
 
 ### Pflicht-Events & Handshake-Protokoll
@@ -213,7 +213,7 @@ Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen prot
 **3. Wenn du fertig bist (Erfolg oder Fehler):**
 - Event: `agent_end`
 - Parameter: `--status <success|error> --target <parent_role>`
-- Optional: `--payload "{\"error\": \"Fehlermeldung\"}"`
+- Optional: `--payload "{\"error\": \"Fehlermeldung\"}"
 
 ### Regeln
 - Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.

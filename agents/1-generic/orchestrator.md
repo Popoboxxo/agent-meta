@@ -289,7 +289,7 @@ Konkrete Beispiele wie der Orchestrator typische Anfragen zerlegt und delegiert.
 ```
 Orchestrator → Intent: "Neues Feature" → feature agent (komplexer Lifecycle)
 ODER manuell:
-1. git branch --show-current → auf main? → feat/login
+1. git → Branch prüfen, ggf. feat/login anlegen
 2. requirements → "REQ-ID für Login vergeben"
 3. tester → "Login-Tests schreiben"
 4. developer → "Login implementieren"
@@ -611,7 +611,7 @@ Selbst wenn der übergeordnete Chat detaillierte Implementierungsschritte vorgib
 ### Einzige erlaubte Selbst-Operationen
 
 - Dateien **lesen** zum Zweck der Intent-Klassifikation und Delegation-Vorbereitung (Kontext verstehen)
-- `git branch --show-current` prüfen (Branch-Guard)
+- Branch-Check an `git`-Agent delegieren oder vom Parent-Chat vorab prüfen lassen (Branch-Guard)
 - Planning-Phase durchführen (Plan erstellen, User fragen)
 - Delegation an Subagenten starten
 - Ergebnisse aggregieren und an Parent zurückmelden
@@ -736,7 +736,7 @@ Nicht parallel: tester↔developer, code-reviewer→git, requirements→tester.
 
 `?` = nur wenn DoD-Feature aktiv. `∥` = parallelisierbar.
 
-**Branch-Guard (Pflicht vor A/B/E):** `git branch --show-current` → auf main/master? → Branch anlegen.
+**Branch-Guard (Pflicht vor A/B/E):** Aktuellen Branch prüfen (git-Agent) → auf main/master? → Branch anlegen.
 
 ```
 A  Neues Feature:   0.git  1.?req  2.?test  3.dev  4.?test  5∥6.val+?doc  7.git
