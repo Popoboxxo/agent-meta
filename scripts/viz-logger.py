@@ -2,14 +2,24 @@
 """
 agent-meta viz-logger.py
 ========================
-Unified CLI tool and MCP server for logging visualization events.
+Unified CLI tool, stdio MCP server, and HTTP/SSE MCP server for logging visualization events.
+
+Usage:
+  CLI mode:    python viz-logger.py --event agent_start --agent my-agent --provider opencode
+  Stdio MCP:   python viz-logger.py --mcp
+  HTTP MCP:    python viz-logger.py --http [port]       (default port: 9090)
 """
 
 import argparse
+import http.server
 import json
 import os
+import queue
 import sys
+import threading
 import time
+import urllib.parse
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -180,34 +190,62 @@ def _send_message(msg: dict):
 
 
 def _read_message() -> dict | None:
-    """Read a JSON-RPC message from stdin with Content-Length header."""
-    headers = {}
+    """Read a JSON-RPC message from stdin with Content-Length header.
+
+    Uses os.read() on fd 0 (stdin) directly to bypass Python's
+    TextIOWrapper/BufferedReader layers which cause stdin pipe issues
+    when spawned by Node.js child_process on Windows.
+    """
+    import os
+
+    STDIN_FD = 0
+    HEADER_DELIM = b"\r\n\r\n"
+
+    # --- Read headers byte by byte until \r\n\r\n ---
+    header_bytes = b""
     while True:
-        line = sys.stdin.readline()
-        if not line:
+        try:
+            ch = os.read(STDIN_FD, 1)
+        except OSError:
             return None
+        if not ch:
+            return None  # EOF
+        header_bytes += ch
+        if header_bytes.endswith(HEADER_DELIM):
+            break
+
+    header_str = header_bytes.decode("utf-8")
+    headers = {}
+    for line in header_str.split("\r\n"):
         line = line.strip()
         if not line:
-            break
+            continue
         if ":" in line:
             key, value = line.split(":", 1)
             headers[key.strip().lower()] = value.strip()
 
-    length = headers.get("content-length")
-    if not length:
+    length_raw = headers.get("content-length")
+    if not length_raw:
         return None
 
     try:
-        length = int(length)
+        length = int(length_raw)
     except ValueError:
         return None
 
-    data = sys.stdin.buffer.read(length)
-    if not data:
-        return None
+    # --- Read body with exact byte count ---
+    body_bytes = b""
+    while len(body_bytes) < length:
+        try:
+            chunk = os.read(STDIN_FD, length - len(body_bytes))
+        except OSError:
+            return None
+        if not chunk:
+            return None
+        body_bytes += chunk
 
     try:
-        return json.loads(data.decode("utf-8"))
+        return json.loads(body_bytes.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return None
 
@@ -347,10 +385,154 @@ def run_mcp_server():
             break
 
 
+# ---------------------------------------------------------------------------
+# HTTP/SSE MCP Server
+# ---------------------------------------------------------------------------
+
+_sse_sessions: dict[str, "queue.Queue[dict]"] = {}
+_sse_sessions_lock = threading.Lock()
+
+
+class _MCPSSERequestHandler(http.server.BaseHTTPRequestHandler):
+    """Handles MCP SSE transport: GET /sse (event stream) and POST /message (requests)."""
+
+    def do_GET(self):
+        if self.path.startswith("/sse"):
+            self._handle_sse()
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        if self.path.startswith("/message"):
+            self._handle_message()
+        else:
+            self.send_error(404)
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def _handle_sse(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        session_id = params.get("sessionId", [str(uuid.uuid4())])[0]
+
+        q: queue.Queue = queue.Queue()
+        with _sse_sessions_lock:
+            _sse_sessions[session_id] = q
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        # Send endpoint event so client knows where to POST
+        endpoint_url = f"/message?sessionId={session_id}"
+        self.wfile.write(f"event: endpoint\ndata: {endpoint_url}\n\n".encode())
+        self.wfile.flush()
+
+        try:
+            while True:
+                try:
+                    data = q.get(timeout=30)
+                    payload = json.dumps(data, ensure_ascii=False)
+                    self.wfile.write(f"event: message\ndata: {payload}\n\n".encode())
+                    self.wfile.flush()
+                except queue.Empty:
+                    # Periodic keep-alive (SSE comment — ignored by client)
+                    self.wfile.write(b":\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            with _sse_sessions_lock:
+                _sse_sessions.pop(session_id, None)
+
+    def _handle_message(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        session_id = params.get("sessionId", [""])[0]
+
+        with _sse_sessions_lock:
+            session_queue = _sse_sessions.get(session_id)
+        if session_queue is None:
+            self.send_error(400, "Invalid or missing sessionId")
+            return
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length)
+
+        try:
+            msg = json.loads(body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.send_error(400, "Invalid JSON")
+            return
+
+        self.send_response(202)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        method = msg.get("method")
+        request_id = msg.get("id")
+        params_in = msg.get("params", {})
+
+        if method == "initialize":
+            response = _handle_initialize(request_id, params_in)
+        elif method == "notifications/initialized":
+            self.send_response(200)
+            self.end_headers()
+            return  # Notification — no response
+        elif method == "tools/list":
+            response = _handle_tools_list(request_id, params_in)
+        elif method == "tools/call":
+            response = _handle_tools_call(request_id, params_in)
+        elif method is not None:
+            response = _make_response(
+                request_id,
+                error={"code": -32601, "message": f"Method '{method}' not found"},
+            )
+        else:
+            return  # Unknown message without method
+
+        if response is not None:
+            session_queue.put(response)
+
+    def log_message(self, format, *args):
+        pass  # Suppress default access log
+
+
+def run_http_server(port: int = 9090):
+    """Run the MCP server over HTTP with SSE transport."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), _MCPSSERequestHandler)
+    print(f"viz-logger MCP HTTP server listening on http://127.0.0.1:{port}/sse")
+    print("Press Ctrl+C to stop.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down.")
+        server.shutdown()
+
+
 def main():
-    # Detect --mcp before argparse so required fields are not enforced in server mode.
+    # Detect --mcp or --http before argparse so required fields are not enforced in server mode.
     if any(a == "--mcp" for a in sys.argv):
         run_mcp_server()
+        return
+
+    if any(a == "--http" for a in sys.argv):
+        port = 9090
+        for i, a in enumerate(sys.argv):
+            if a == "--http" and i + 1 < len(sys.argv):
+                try:
+                    port = int(sys.argv[i + 1])
+                except ValueError:
+                    pass
+        run_http_server(port)
         return
 
     parser = argparse.ArgumentParser(description="Log viz events")

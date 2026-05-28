@@ -16,13 +16,10 @@
   },
   "mcp": {
     "viz-logger": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "python",
-        "scripts/viz-logger.py",
-        "--mcp"
-      ]
+      "type": "remote",
+      "url": "http://127.0.0.1:9090/sse",
+      "enabled": true
     }
   }
+
 }
