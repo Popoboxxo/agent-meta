@@ -665,85 +665,48 @@ def get_gitignore_entries() -> list[str]:
     ]
 
 
-_VIZ_PY_APPEND = (
-    "import json,os,sys;"
-    "from datetime import datetime,timezone;"
-    "d={0};"
-    "d.setdefault('ts',datetime.now(timezone.utc).isoformat());"
-    "p='.meta-viz/events.jsonl';"
-    "os.makedirs(os.path.dirname(p),exist_ok=True);"
-    "open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\\n')"
-)
-
-
-def _viz_bash_cmd(event_dict_literal: str) -> str:
-    """Gibt den Bash-Befehl zurück der ein Event ans JSONL-Log anhängt.
-
-    Funktioniert auf Windows (python) und Unix (python3/python).
-    event_dict_literal: Python-Dict-Literal als String, z.B. "{'event':'agent_start',...}"
-    """
-    py = _VIZ_PY_APPEND.format(event_dict_literal)
-    # Versuche python3, fallback python — beide plattformübergreifend
-    return f'python3 -c "{py}" 2>/dev/null || python -c "{py}" 2>/dev/null'
-
-
 def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
                             viz_enabled: bool, model: str = "") -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
-    Nur wenn viz.mode == "dynamic" oder "full" und viz_enabled == True.
-    Nutzt ausschließlich das `Bash`-Tool zum Schreiben — write_file/edit_file
-    existieren in Claude Code nicht und führen dazu dass Agenten den Block ignorieren.
+    Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
+    cross-platform CLI-Skript `scripts/viz-logger.py`.
     """
     if not viz_enabled:
         return agent_content
 
-    model_field = f",'model':'{model}'" if model else ""
-    start_cmd = _viz_bash_cmd(
-        f"{{'event':'agent_start','agent':'{role}','provider':'{provider}'{model_field}}}"
-    )
-    delegate_cmd = _viz_bash_cmd(
-        f"{{'event':'delegate','from':'{role}','to':'ZIEL_AGENT'}}"
-    )
-    end_cmd_ok  = _viz_bash_cmd(
-        f"{{'event':'agent_end','agent':'{role}','status':'success'}}"
-    )
-    end_cmd_err = _viz_bash_cmd(
-        f"{{'event':'agent_end','agent':'{role}','status':'error','payload':{{'error':'FEHLERMELDUNG'}}}}"
-    )
+    cli_cmd = f"python scripts/viz-logger.py --agent {role} --provider {provider}"
 
     block = f"""
 ## Visualization Reporting (Pflicht-Anweisung)
 
-Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.
+Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
 
-### Pflicht-Events — exakt diese Bash-Befehle ausführen
+**Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
+**Fallback:** Falls das Tool nicht existiert, führe den Befehl über dein lokales Command-Execution-Tool (z.B. `Bash`, `PowerShell`, `run_command`) aus:
+`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`
+
+### Pflicht-Events & Handshake-Protokoll
 
 **1. Beim Start deiner Aufgabe (erstes was du tust):**
-```bash
-{start_cmd}
-```
+- Event: `agent_start`
+- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben:
+  `--caller <parent_role> --task_id <uuid>`
 
-**2. Wenn du an einen anderen Agenten delegierst** (`ZIEL_AGENT` ersetzen):
-```bash
-{delegate_cmd}
-```
+**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
+- Event: `delegate_out`
+- Parameter: `--target <ZIEL_AGENT> --task_id <neue_eindeutige_uuid>`
+- WICHTIG: Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
+- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
 
-**3. Wenn du fertig bist — Erfolg:**
-```bash
-{end_cmd_ok}
-```
-
-**3b. Wenn du fertig bist — Fehler** (`FEHLERMELDUNG` ersetzen):
-```bash
-{end_cmd_err}
-```
+**3. Wenn du fertig bist (Erfolg oder Fehler):**
+- Event: `agent_end`
+- Parameter: `--status <success|error> --target <parent_role>`
+- Optional: `--payload "{{\\"error\\": \\"Fehlermeldung\\"}}"`
 
 ### Regeln
-- Diese Bash-Befehle **immer ausführen** — sie schreiben eine Zeile JSON ans Log.
-- Kein anderes Tool verwenden — nur `Bash`.
-- Timestamp wird automatisch gesetzt.
-- Nie den Bash-Befehl weglassen oder überspringen.
+- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
+- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.
 """
 
-    return agent_content.rstrip() + "\n\n" + block.strip() + "\n"
+    return agent_content.rstrip() + "\\n\\n" + block.strip() + "\\n"
