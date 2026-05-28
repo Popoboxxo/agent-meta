@@ -906,7 +906,7 @@ def sync_agents(
         viz_cfg = config.get("viz", {})
         if viz_cfg.get("mode") in ("dynamic", "full"):
             from .viz import inject_viz_prompt_block
-            content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True)
+            content = inject_viz_prompt_block(content, role, "Claude", viz_enabled=True, agent_meta_root=agent_meta_root)
 
         # Critical Rules Footer: append critical rules to end of agent files
         footer_cfg = config.get('critical-rules-footer', {})
@@ -1264,7 +1264,7 @@ def sync_agents_for_provider(
         viz_cfg = config.get('viz', {})
         if viz_cfg.get('mode') in ('dynamic', 'full'):
             from .viz import inject_viz_prompt_block
-            content = inject_viz_prompt_block(content, role, provider, viz_enabled=True)
+            content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root)
 
         if debug_mode:
             content = inject_debug_block(content, name)

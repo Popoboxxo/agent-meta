@@ -53,5 +53,15 @@
         ]
       }
     ]
+  },
+  "mcpServers": {
+    "viz-logger": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "scripts/viz-logger.py",
+        "--mcp"
+      ]
+    }
   }
 }

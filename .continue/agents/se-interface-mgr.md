@@ -103,41 +103,35 @@ Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrat
 | "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
 | Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
 
-**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.\n\n## Visualization Reporting (Pflicht-Anweisung)
 
-</section>
-<section name="visualization-reporting-pflicht-anweisung">
-## Visualization Reporting (Pflicht-Anweisung)
+Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
 
-Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.
+**Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
+**Fallback:** Falls das Tool nicht existiert, führe den Befehl über das in deiner Umgebung verfügbare Terminal-Tool aus:
+`python scripts/viz-logger.py --agent se-interface-mgr --provider Continue --event <EVENT_TYPE> [weitere Parameter...]`
 
-### Pflicht-Events — exakt diese Bash-Befehle ausführen
+### Pflicht-Events & Handshake-Protokoll
 
 **1. Beim Start deiner Aufgabe (erstes was du tust):**
-```bash
-python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_start','agent':'se-interface-mgr','provider':'Continue'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_start','agent':'se-interface-mgr','provider':'Continue'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
-```
+- Event: `agent_start`
+- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben:
+  `--caller <parent_role> --task_id <uuid>`
 
-**2. Wenn du an einen anderen Agenten delegierst** (`ZIEL_AGENT` ersetzen):
-```bash
-python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'delegate','from':'se-interface-mgr','to':'ZIEL_AGENT'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'delegate','from':'se-interface-mgr','to':'ZIEL_AGENT'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
-```
+**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
+- Event: `delegate_out`
+- Parameter: `--target <ZIEL_AGENT> --task_id <neue_eindeutige_uuid>`
+- WICHTIG: Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
+- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
 
-**3. Wenn du fertig bist — Erfolg:**
-```bash
-python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'se-interface-mgr','status':'success'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'se-interface-mgr','status':'success'};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
-```
-
-**3b. Wenn du fertig bist — Fehler** (`FEHLERMELDUNG` ersetzen):
-```bash
-python3 -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'se-interface-mgr','status':'error','payload':{'error':'FEHLERMELDUNG'}};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null || python -c "import json,os,sys;from datetime import datetime,timezone;d={'event':'agent_end','agent':'se-interface-mgr','status':'error','payload':{'error':'FEHLERMELDUNG'}};d.setdefault('ts',datetime.now(timezone.utc).isoformat());p='.meta-viz/events.jsonl';os.makedirs(os.path.dirname(p),exist_ok=True);open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\n')" 2>/dev/null
-```
+**3. Wenn du fertig bist (Erfolg oder Fehler):**
+- Event: `agent_end`
+- Parameter: `--status <success|error> --target <parent_role>`
+- Optional: `--payload "{\"error\": \"Fehlermeldung\"}"
 
 ### Regeln
-- Diese Bash-Befehle **immer ausführen** — sie schreiben eine Zeile JSON ans Log.
-- Kein anderes Tool verwenden — nur `Bash`.
-- Timestamp wird automatisch gesetzt.
-- Nie den Bash-Befehl weglassen oder überspringen.
+- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
+- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.\n
 
 ---
 

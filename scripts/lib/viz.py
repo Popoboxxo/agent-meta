@@ -11,8 +11,6 @@ from .io import write_checked
 from .agents import collect_sources, extract_frontmatter_field
 from .roles import resolve_model
 from .providers import load_providers_config
-
-# Standardisierte Hierarchie: wer delegiert an wen
 # Wird aus Beschreibungen und bekannten Workflows abgeleitet
 _DELEGATION_MAP: dict[str, list[str]] = {
     "orchestrator": [
@@ -665,85 +663,120 @@ def get_gitignore_entries() -> list[str]:
     ]
 
 
-_VIZ_PY_APPEND = (
-    "import json,os,sys;"
-    "from datetime import datetime,timezone;"
-    "d={0};"
-    "d.setdefault('ts',datetime.now(timezone.utc).isoformat());"
-    "p='.meta-viz/events.jsonl';"
-    "os.makedirs(os.path.dirname(p),exist_ok=True);"
-    "open(p,'a',encoding='utf-8').write(json.dumps(d,ensure_ascii=False)+'\\n')"
-)
+_PROVIDER_TERMINAL_TOOL: dict[str, str | None] = {
+    "Claude": "Bash",
+    "Gemini": "code_execution",
+    "Opencode": "bash",
+    "Continue": None,
+    "Copilot": None,
+}
 
 
-def _viz_bash_cmd(event_dict_literal: str) -> str:
-    """Gibt den Bash-Befehl zurück der ein Event ans JSONL-Log anhängt.
-
-    Funktioniert auf Windows (python) und Unix (python3/python).
-    event_dict_literal: Python-Dict-Literal als String, z.B. "{'event':'agent_start',...}"
+def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> str | None:
+    """Return the terminal tool name for a provider.
+    
+    Reads from config/provider-tools.yaml if available, falls back to hardcoded defaults.
     """
-    py = _VIZ_PY_APPEND.format(event_dict_literal)
-    # Versuche python3, fallback python — beide plattformübergreifend
-    return f'python3 -c "{py}" 2>/dev/null || python -c "{py}" 2>/dev/null'
+    if agent_meta_root is not None:
+        try:
+            from .agents import load_provider_tools_config
+            cfg = load_provider_tools_config(agent_meta_root)
+            terminal_map = cfg.get("terminal_tool", {})
+            if provider in terminal_map:
+                return terminal_map[provider]
+        except Exception:
+            pass
+    return _PROVIDER_TERMINAL_TOOL.get(provider)
+
+
+def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
+    """Extrahiere opencode permission block aus dem Frontmatter-YAML."""
+    fm_match = re.search(r"^---\s*\n(.*?)\n---", agent_content, re.DOTALL)
+    if not fm_match:
+        return {}
+    frontmatter = fm_match.group(1)
+    perm_match = re.search(r"^permission:\s*\n((?:\s+\w+:\s+\w+\n?)+)", frontmatter, re.MULTILINE)
+    if not perm_match:
+        return {}
+    perms: dict[str, str] = {}
+    for line in perm_match.group(1).strip().split("\n"):
+        kv = line.strip().split(":", 1)
+        if len(kv) == 2:
+            perms[kv[0].strip()] = kv[1].strip()
+    return perms
 
 
 def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
-                            viz_enabled: bool, model: str = "") -> str:
+                            viz_enabled: bool, model: str = "",
+                            agent_meta_root: Path | None = None) -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
-    Nur wenn viz.mode == "dynamic" oder "full" und viz_enabled == True.
-    Nutzt ausschließlich das `Bash`-Tool zum Schreiben — write_file/edit_file
-    existieren in Claude Code nicht und führen dazu dass Agenten den Block ignorieren.
+    Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
+    cross-platform CLI-Skript `scripts/viz-logger.py`.
+
+    Provider-spezifisch: Jeder Provider bekommt das korrekte Terminal-Tool
+    genannt. Bei Opencode-Agenten mit ``bash: deny`` wird der CLI-Fallback
+    weggelassen (nur MCP-Tool).
     """
     if not viz_enabled:
         return agent_content
 
-    model_field = f",'model':'{model}'" if model else ""
-    start_cmd = _viz_bash_cmd(
-        f"{{'event':'agent_start','agent':'{role}','provider':'{provider}'{model_field}}}"
-    )
-    delegate_cmd = _viz_bash_cmd(
-        f"{{'event':'delegate','from':'{role}','to':'ZIEL_AGENT'}}"
-    )
-    end_cmd_ok  = _viz_bash_cmd(
-        f"{{'event':'agent_end','agent':'{role}','status':'success'}}"
-    )
-    end_cmd_err = _viz_bash_cmd(
-        f"{{'event':'agent_end','agent':'{role}','status':'error','payload':{{'error':'FEHLERMELDUNG'}}}}"
-    )
+    cli_cmd = f"python scripts/viz-logger.py --agent {role} --provider {provider}"
+    terminal_tool = _get_terminal_tool(provider, agent_meta_root)
+
+    has_terminal = True
+    if provider == "Opencode":
+        perms = _parse_opencode_permissions(agent_content)
+        if perms.get("bash") == "deny":
+            has_terminal = False
+
+    if has_terminal and terminal_tool:
+        fallback = (
+            f"**Fallback:** Falls das Tool nicht existiert, "
+            f"führe den Befehl über das `{terminal_tool}`-Tool aus:\n"
+            f"`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`"
+        )
+    elif has_terminal:
+        fallback = (
+            f"**Fallback:** Falls das Tool nicht existiert, "
+            f"führe den Befehl über das in deiner Umgebung verfügbare Terminal-Tool aus:\n"
+            f"`{cli_cmd} --event <EVENT_TYPE> [weitere Parameter...]`"
+        )
+    else:
+        fallback = (
+            "Du hast keinen Zugriff auf ein Terminal-Tool (bash ist deaktiviert). "
+            "Verwende ausschließlich das MCP-Tool `log_viz_event`."
+        )
 
     block = f"""
 ## Visualization Reporting (Pflicht-Anweisung)
 
-Der Visualisierungsmodus ist aktiv. Protokolliere deinen Status via **Bash-Tool** in `.meta-viz/events.jsonl`.
+Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
 
-### Pflicht-Events — exakt diese Bash-Befehle ausführen
+**Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
+{fallback}
+
+### Pflicht-Events & Handshake-Protokoll
 
 **1. Beim Start deiner Aufgabe (erstes was du tust):**
-```bash
-{start_cmd}
-```
+- Event: `agent_start`
+- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben:
+  `--caller <parent_role> --task_id <uuid>`
 
-**2. Wenn du an einen anderen Agenten delegierst** (`ZIEL_AGENT` ersetzen):
-```bash
-{delegate_cmd}
-```
+**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
+- Event: `delegate_out`
+- Parameter: `--target <ZIEL_AGENT> --task_id <neue_eindeutige_uuid>`
+- WICHTIG: Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
+- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
 
-**3. Wenn du fertig bist — Erfolg:**
-```bash
-{end_cmd_ok}
-```
-
-**3b. Wenn du fertig bist — Fehler** (`FEHLERMELDUNG` ersetzen):
-```bash
-{end_cmd_err}
-```
+**3. Wenn du fertig bist (Erfolg oder Fehler):**
+- Event: `agent_end`
+- Parameter: `--status <success|error> --target <parent_role>`
+- Optional: `--payload "{{\\"error\\": \\"Fehlermeldung\\"}}"
 
 ### Regeln
-- Diese Bash-Befehle **immer ausführen** — sie schreiben eine Zeile JSON ans Log.
-- Kein anderes Tool verwenden — nur `Bash`.
-- Timestamp wird automatisch gesetzt.
-- Nie den Bash-Befehl weglassen oder überspringen.
+- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
+- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.
 """
 
-    return agent_content.rstrip() + "\n\n" + block.strip() + "\n"
+    return agent_content.rstrip() + "\\n\\n" + block.strip() + "\\n"

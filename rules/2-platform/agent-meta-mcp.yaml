@@ -1,0 +1,8 @@
+platform: agent-meta
+
+# MCP server bundle for the agent-meta meta-repository.
+# References entries from config/mcp-registry.yaml.
+# sync.py activates these servers for all projects with platforms: [agent-meta].
+
+mcp-servers:
+  - viz-logger
