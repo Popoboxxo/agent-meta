@@ -1,18 +1,19 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-05-23
+> Letzte Aktualisierung: 2026-05-28
 
 ---
 
 ## Inhaltsverzeichnis
 
-1. [SE-Agenten-Kaskade (neu)](#1-se-agenten-kaskade)
-2. [Agent-Templates (1-generic)](#2-agent-templates-1-generic)
-3. [Konfiguration](#3-konfiguration)
-4. [Schemas](#4-schemas)
-5. [Templates](#5-templates)
-6. [Howto-Dokumentation](#6-howto-dokumentation)
-7. [Scripts](#7-scripts)
+1. [SE-Agenten-Kaskade](#1-se-agenten-kaskade)
+2. [Provider-Expert-Agenten](#2-provider-expert-agenten)
+3. [Agent-Templates (1-generic)](#3-agent-templates-1-generic)
+4. [Konfiguration](#4-konfiguration)
+5. [Schemas](#5-schemas)
+6. [Templates](#6-templates)
+7. [Howto-Dokumentation](#7-howto-dokumentation)
+8. [Scripts](#8-scripts)
 
 ---
 
@@ -361,33 +362,71 @@ tools: [read_file, write_file, edit_file, glob, grep]
 
 ---
 
-## 2. Agent-Templates (1-generic)
+## 2. Provider-Expert-Agenten
+
+Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-spezifische Konfigurationsberatung, Best Practices und Troubleshooting. Sie basieren auf dem generischen Template `agents/1-generic/provider-expert.md` (v1.0.0) mit `based-on` Composition Pattern.
+
+### 2.1 Generische Basis: `agents/1-generic/provider-expert.md`
+
+**Version:** 1.0.0
+**Beschreibung:** Provider-agnostische Basis für alle Expert-Agenten.
+
+**Plattform-Instanziierungen (2-platform/):**
+
+| Agent | Plattform-Datei | Provider |
+|-------|----------------|----------|
+| `claude-expert` | `agents/2-platform/agent-meta-claude-expert.md` | Claude Code (VS Code) |
+| `gemini-expert` | `agents/2-platform/agent-meta-gemini-expert.md` | Gemini (VS Code/Antigravity) |
+| `opencode-expert` | `agents/2-platform/agent-meta-opencode-expert.md` | Opencode |
+| `continue-expert` | `agents/2-platform/agent-meta-continue-expert.md` | Continue |
+| `copilot-expert` | `agents/2-platform/agent-meta-copilot-expert.md` | GitHub Copilot |
+
+**Zuständigkeiten:**
+- Provider-spezifische Konfigurationsvalidierung (`.claude/`, `.gemini/`, `.opencode/`, `.continue/`, `.github/copilot/`)
+- MCP-Server-Integration pro Provider
+- Best Practices für Agent-Template-Erstellung
+- Troubleshooting bei Provider-spezifischen Fehlern
+- Orchestrator Routing: User-Anfragen zu Provider-Konfiguration werden an den passenden Expert-Agent delegiert
+
+---
+
+## 3. Agent-Templates (1-generic)
 
 ### Nicht-SE Agenten (Bestand)
 
 | Datei | Version | Tools | Kurzbeschreibung |
 |-------|---------|-------|-----------------|
-| `orchestrator.md` | — | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben |
-| `developer.md` | — | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
+| `orchestrator.md` | 3.12.0 | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben |
+| `developer.md` | 2.0.1 | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
 | `tester.md` | — | read, write, run_command | TDD, Test-Suite, Testabdeckung |
-| `validator.md` | — | read, run_command | Code gegen REQs prüfen, DoD-Check |
+| `validator.md` | 2.0.1 | read, run_command | Code gegen REQs prüfen, DoD-Check |
 | `documenter.md` | — | read, write, edit, glob, grep | CODEBASE_OVERVIEW, ARCHITECTURE, README |
 | `requirements.md` | — | read, write, run_command, ask_question | Anforderungen aufnehmen, REQ-IDs |
-| `git.md` | — | run_command | Commits, Branches, Tags, Push/Pull |
+| `git.md` | 2.2.0 | run_command | Commits, Branches, Tags, Push/Pull |
 | `release.md` | — | read, write, run_command | Versioning, Changelog, GitHub Release |
 | `ideation.md` | — | read, write, ask_question | Neue Ideen explorieren |
 | `feature.md` | — | read, write, edit, glob, grep | Feature-Lifecycle-Subagent |
-| `agent-meta-manager.md` | — | read, write, edit, glob, grep | agent-meta verwalten |
+| `agent-meta-manager.md` | 1.9.0 | read, write, edit, glob, grep | agent-meta verwalten |
 | `agent-meta-scout.md` | — | read, write, glob, grep | Ökosystem scouten |
 | `security-auditor.md` | — | read, run_command | Sicherheits-Audit |
 | `docker.md` | — | run_command | Docker-Stack verwalten |
-| `meta-feedback.md` | — | read, write, run_command | Verbesserungsvorschläge als Issues |
+| `meta-feedback.md` | 2.0.0 | read, write, run_command | Verbesserungsvorschläge als Issues |
 | `feedback.md` | — | read, write, run_command | Projekt-Feedback als Issues |
 | `log-analyzer.md` | — | read, write, run_command | Log-Analyse, Fehler-Clustering |
+| `effort-estimator.md` | — | read, write, run_command | Aufwandsschätzung mit Komplexitäts-Scoring |
+| `code-reviewer.md` | — | read, write, edit, glob, grep | Clean Code Gatekeeper, Blast-Radius-Analyse |
+| `ui-ux-designer.md` | — | read, write, glob, grep | UI-Spezifikationen, Mockups, Design-Systeme |
+| `api-specialist.md` | — | read, write, edit, glob, grep | OpenAPI/Contract-First API-Design |
+| `devops-engineer.md` | — | read, write, run_command | CI/CD, IaC, Kubernetes, Infrastruktur |
+| `performance-optimizer.md` | — | read, write, run_command | Big-O Bottleneck-Identifikation |
+| `export-manager.md` | — | read, write, run_command | Target-agnostisches Output-Routing |
+| `bug-feature-analyzer.md` | — | read, write, glob, grep | Issue-Triage, Bug/Feature-Klassifikation |
+| `openscad-developer.md` | — | read, write, run_command | Parametrische 3D-Modelle in OpenSCAD |
+| `provider-expert.md` | 1.0.0 | read, write, edit, glob, grep | Basis-Template für Provider-Experten |
 
 ---
 
-## 3. Konfiguration
+## 4. Konfiguration
 
 ### `config/role-defaults.yaml`
 
@@ -404,7 +443,7 @@ tools: [read_file, write_file, edit_file, glob, grep]
 
 ---
 
-## 4. Schemas
+## 5. Schemas
 
 ### `schemas/se-decomposition.schema.json`
 
@@ -443,7 +482,7 @@ tools: [read_file, write_file, edit_file, glob, grep]
 
 ---
 
-## 5. Templates
+## 6. Templates
 
 ### `templates/SE-STRATEGY.template.md`
 
@@ -478,7 +517,7 @@ se-cascade:
 
 ---
 
-## 6. Howto-Dokumentation
+## 7. Howto-Dokumentation
 
 ### `howto/se-workflow.md` (181 Zeilen)
 
@@ -536,7 +575,7 @@ se-cascade:
 
 ---
 
-## 7. Scripts
+## 8. Scripts
 
 ### `scripts/sync.py`
 
@@ -551,11 +590,18 @@ se-cascade:
 4. Output nach `.claude/agents/<rolle>.md`
 5. Rules und Hooks werden nach `.claude/rules/` und `.claude/hooks/` kopiert
 
-### `scripts/viz-logger.py` & `scripts/lib/viz.py`
+### `scripts/viz-logger.py` & `scripts/viz-logger-mcp.mjs` & `scripts/lib/viz.py`
 
 **Zweck:** Steuerung und Ausführung der Visualisierung von Agenten-Netzwerken.
-- `viz-logger.py`: Eigenständiges CLI-Skript, das von den Agenten ausgeführt wird, um Viz-Events (`agent_start`, `delegate_out`, `agent_end`) thread-safe zu protokollieren. Es bietet ein robustes Cross-Process File-Locking zur Verhinderung von `PermissionError` unter Windows.
-- `lib/viz.py`: Beinhaltet Kernlogiken zur Mindmap/HTML-Generierung (Architektur-Graphen) und zur Injection (`inject_viz_prompt_block`), um die kurzen Logging-Instruktionen in die generierten Agenten-Templates zu integrieren.
+- `viz-logger.py`: MCP-Server und CLI-Fallback für agenten-seitiges Event-Logging (`agent_start`, `delegate_out`, `agent_end`). Primärer Weg für MCP-fähige Provider (kein Prompt-Bloat, keine Bestätigungs-Popups). CLI-Modus als Fallback für Provider ohne MCP-Unterstützung.
+- `viz-logger-mcp.mjs`: HTTP/SSE MCP-Transport für OpenCode unter Windows. Löst das Kompatibilitätsproblem mit stdio-basiertem MCP auf dieser Plattform.
+- `lib/viz.py`: Beinhaltet Kernlogiken zur Mindmap/HTML-Generierung (Architektur-Graphen) und zur Injection (`inject_viz_prompt_block`), um die kurzen Logging-Instruktionen (MCP/CLI-Fallback) in die generierten Agenten-Templates zu integrieren. Die Prompt-Blöcke wurden in v0.55.2 um ~60% reduziert durch Auslagerung der Logging-Logik in das MCP-Tool.
+
+**Architektur-Entscheidung (MCP + CLI Fallback):**
+- Vermeidung von Prompt-Bloat durch Auslagerung langer Inline-Python-Skripte
+- Höhere Zuverlässigkeit durch MCP-Tools (keine Bash-Bestätigungs-Popups bei Copilot, Continue, Claude Code)
+- Robustes Cross-Process File-Locking mit Exponential Backoff gegen Windows `PermissionError`
+- Explizites Handshake-Tracking via `task_id`/`caller`/`target` für lückenlose Delegationspfade
 
 ---
 

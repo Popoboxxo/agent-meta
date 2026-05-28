@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Version: **0.49.0** — last updated: 2026-05-23
+> Version: **0.55.2** — last updated: 2026-05-28
 
 ---
 
@@ -15,6 +15,7 @@
 | 5 | [External Skills](docs/architecture/05-external-skills.md) | Submodule → Config → Wrapper → Zielprojekt |
 | 6 | [Versioning Strategy](docs/architecture/06-versioning.md) | Repo-, Agent- und Snippet-Versionen |
 | 7 | [SE-Agenten-Kaskade](docs/architecture/07-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
+| 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
 
 ---
 
@@ -46,7 +47,8 @@ agent-meta/
 │   │   ├── se-architect.md          ← SE: Black-Box → White-Box
 │   │   ├── se-critic.md             ← SE: Quality Gate Auditor
 │   │   ├── se-interface-mgr.md      ← SE: Interface-Verträge
-│   │   └── se-termination.md        ← SE: Leaf/Continue-Entscheidung
+│   │   ├── se-termination.md        ← SE: Leaf/Continue-Entscheidung
+│   │   └── provider-expert.md        ← Basis-Template für Provider-Experten
 │   └── 2-platform/          ← Plattform-Overrides
 │       ├── sharkord-release.md
 │       └── sharkord-docker.md
@@ -71,6 +73,8 @@ agent-meta/
 ├── docs/
 │   ├── architecture/        ← Architektur-Diagramme (Mermaid)
 │   ├── CODEBASE_OVERVIEW.md ← Codegenaue Bestandsaufnahme aller src/ Dateien
+│   ├── concepts/             ← Feature-Konzepte & Design-Entscheidungen
+│   │   └── viz-logging-mcp.md ← MCP-basierte Viz-Logging-Architektur
 │   └── conclusions/         ← Tägliche Session-Erkenntnisse
 ├── schemas/
 │   └── se-decomposition.schema.json  ← JSON Schema für SE-Kaskaden-Outputs
@@ -81,7 +85,9 @@ agent-meta/
 ├── roles.config.yaml        ← Zentrale Rollen-Konfiguration (model, permissionMode)
 ├── scripts/
 │   ├── sync.py              ← Agent-Generator
-│   └── viz-logger.py        ← CLI-Fallback & Event-Logging für den Visualisierungsmechanismus
+│   ├── viz-logger.py         ← MCP-Server & CLI-Fallback für Event-Logging
+│   ├── viz-logger-mcp.mjs    ← HTTP/SSE MCP-Transport für OpenCode (Windows)
+│   └── viz-report.py         ← Session-Report-Generator (Terminal/HTML/JSON)
 └── howto/
     ├── first-steps.md
     ├── instantiate-project.md
@@ -203,6 +209,54 @@ variables:
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4
 ```
+
+---
+
+## Viz-Logging MCP — Architektur
+
+Das Agenten-Event-Logging (`agent_start`, `delegate_out`, `agent_end`) wurde in v0.55.2 auf einen MCP-basierten Mechanismus mit CLI-Fallback umgestellt.
+
+### Problem der Vorgänger-Architektur
+- Lange Inline-Python-Skripte in Agenten-Prompts (~80 Zeilen pro Agent) → Prompt-Bloat
+- Provider-spezifische Bash-Bestätigungs-Popups (Copilot, Continue, Claude Code) → Prompt Fatigue
+- Race-Conditions bei parallelen Subagent-Schreibzugriffen auf `events.jsonl` unter Windows
+- Keine explizite Verknüpfung eingehender/ausgehender Delegationen
+
+### Neue Architektur
+
+```
+Agent Prompt (kurze Instruktion, ~10 Zeilen)
+         ↓
+    MCP Tool: log_viz_event  (primär, kein Popup)
+         ↓               ↘
+    HTTP/SSE Transport    CLI Fallback
+    (OpenCode Windows)    (python viz-logger.py --event …)
+         ↓                   ↓
+    viz-logger-mcp.mjs    viz-logger.py
+         ↓                   ↓
+    Cross-Process File Lock (.lock + Exponential Backoff)
+         ↓
+    Handshake-Tracking (task_id/caller/target)
+         ↓
+    events.jsonl
+```
+
+### Komponenten
+
+| Komponente | Zweck |
+|-----------|-------|
+| `scripts/viz-logger.py` | MCP-Server + CLI-Fallback. Primär via MCP-Tool `log_viz_event`, fallback via `python viz-logger.py --event ...`. Cross-Process File-Locking mit 10-fachem Retry. |
+| `scripts/viz-logger-mcp.mjs` | HTTP/SSE MCP-Transport für OpenCode auf Windows. Löst stdio-Kompatibilitätsproblem. |
+| `scripts/lib/viz.py` | `inject_viz_prompt_block()`: Injiziert nur noch kompakte Instruktionen (~10 Zeilen) in Agent-Templates. Prompt-Größe um ~60% reduziert. |
+| `scripts/viz-report.py` | Session-Report-Generator mit Terminal-/HTML-/JSON-Ausgabe. Inaktivitäts-Watcher für automatischen Server-Shutdown. |
+| `docs/live-dashboard.html` | Interaktives Browser-Dashboard mit Cytoscape-Graph, Gantt-Timeline und Sequence-Diagram. |
+
+### Delegations-Tracking
+
+Das Handshake-Verfahren ordnet Delegationen via `task_id` lückenlos zu:
+- **Outgoing:** Orchestrator loggt `delegate_out` mit `target=developer, task_id=uuid-1234`
+- **Incoming:** Worker-Agent loggt `agent_start` mit `caller=orchestrator, task_id=uuid-1234`
+- **Return:** Worker-Agent loggt `agent_end` mit `target=orchestrator, status=success`
 
 ---
 

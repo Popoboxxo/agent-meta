@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.54.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.55.2-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -21,15 +21,20 @@
 
 ## Features
 
-- **Multi-Provider Support:** Claude (VS Code), Gemini (VS Code/Antigravity), Opencode, Continue — define once in generic templates, generate per provider via `sync.py`.
+- **Multi-Provider Support:** Claude (VS Code), Gemini (VS Code/Antigravity), Opencode, Continue, GitHub Copilot — define once in generic templates, generate per provider via `sync.py`.
 - **Layer Architecture:** `1-generic/` (universal, provider-agnostic) → `2-platform/` (platform-specific overrides) → `0-external/` (external skill agents via Git submodules).
 - **Orchestrator-First:** Every development task flows through the orchestrator, which decomposes complex tasks into sub-tasks with FANOUT, PARALLEL_GROUP, BARRIER, PIPELINE, and LIFECYCLE dispatch patterns.
 - **Systems Engineering Cascade:** A recursive 6-level (L1–L3) model-based system decomposition with dedicated agents for requirements, architecture, critique, interface management, termination, verification, and validation.
-- **Agent Visualization:** Static Mermaid mindmap + interactive HTML graph + dynamic session event tracking (Gantt, sequence diagrams) + live browser dashboard.
+- **Provider Expert Agents:** Five dedicated expert agents (Claude, Gemini, Opencode, Continue, Copilot) for provider-specific configuration guidance, best practices, and troubleshooting.
+- **Agent Visualization with MCP Logging:** Static Mermaid mindmap + interactive HTML graph + dynamic session event tracking (Gantt, sequence diagrams) via MCP server with CLI fallback, cross-process file locking, and handshake-based delegation tracking.
 - **MCP Server Management:** Global server registry, per-project activation, automatic provider config generation with secret scanning and `.gitignore` management.
 - **Provider Isolation:** Hard-blocks between provider directories to prevent cross-provider contamination during sync.
 - **Extension System:** Managed blocks + project-specific extension files (`3-project/<prefix>-<role>-ext.md`) that add project knowledge without touching generated files.
 - **External Skills:** Git submodule-based third-party agent integration with approval gating and skill wrappers.
+- **Quality Pipeline Framework:** Configurable multi-stage quality pipelines (code-review → validate → release) with provider-specific injection.
+- **Reflection Loops:** Generator-Critic pair configuration (e.g., developer ↔ code-reviewer) with max-iterations for iterative quality improvement.
+- **Outcome Cache:** SHA256-based delegation result cache with LRU eviction and configurable TTL to reduce token costs for recurring orchestrator sub-tasks.
+- **Parallel Barrier Runtime:** ThreadPoolExecutor-based barrier for deterministic parallel subagent execution with per-agent and global timeout handling.
 - **Speech Modes:** `full`, `short`, `childish`, `caveman`, `asozial`, `submissive` — configurable communication styles.
 - **Lifecycle Triggers:** `on-release` and `on-merge` hooks that automatically dispatch tasks (e.g., validation, code review) after Git events.
 - **DoD Presets:** `rapid-prototyping`, `strict`, `enterprise` — configurable quality profiles controlling REQ traceability, tests, codebase overview, and security audit.
@@ -38,6 +43,9 @@
 - **AI Provider Tier Routing:** Five abstract model tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) are mapped per provider to concrete model IDs — cost-efficient model selection.
 - **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
 - **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
+- **Provider Tool Whitelists:** Per-provider tool capability declarations prevent agents from referencing tools unavailable in their target provider environment.
+- **Few-Shot Orchestration Examples:** Orchestrator template includes concrete examples for FANOUT, PIPELINE, and PARALLEL_GROUP dispatch patterns.
+- **Critical Rules Footer:** Every generated agent file receives a critical-rules footer ensuring essential policies are always visible.
 
 ## Architecture
 
@@ -85,6 +93,7 @@ config/mcp-registry.yaml
 | Gemini (VS Code/Antigravity) | `.gemini/agents/` | `.gemini/rules/` | `.gemini/commands/` (TOML) | `.gemini/settings.json` |
 | Opencode | `.opencode/agents/` | Embedded in AGENTS.md | `.opencode/commands/` | `opencode.json` |
 | Continue | `.continue/agents/` | `.continue/rules/` | `.continue/prompts/` | `.continue/config.yaml` |
+| GitHub Copilot | `.github/copilot/agents/` | `.github/copilot/rules/` | `.github/copilot/commands/` | `.github/copilot/copilot.json` |
 
 ### Layer Agent Composition
 
@@ -117,6 +126,7 @@ patches:
 | **validator** | balanced | DoD checklist, REQ traceability audit, code quality gate |
 | **requirements** | balanced | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | **documenter** | fast | Maintain CODEBASE_OVERVIEW, ARCHITECTURE, README, session conclusions |
+| **effort-estimator** | fast | Structured task effort estimation with complexity scoring and time-range prediction |
 | **feature** | — | Full feature lifecycle sub-agent: Branch → REQ → TDD → Dev → Validate → PR |
 | **ideation** | — | Explore new ideas, sharpen vision, structured handoff to requirements |
 | **git** | fast | All Git operations: commits, branches, tags, push/pull, GitHub issues/PRs |
@@ -136,6 +146,11 @@ patches:
 | **api-specialist** | balanced | OpenAPI/contract-first API design, interface specifications |
 | **devops-engineer** | fast | CI/CD, IaC, Kubernetes, monitoring, infrastructure |
 | **performance-optimizer** | powerful | Big-O bottleneck identification, data-driven performance optimization |
+| **claude-expert** | balanced | Claude Code expert: configuration (.claude), best practices, MCP integration |
+| **gemini-expert** | balanced | Gemini (Antigravity) expert: configuration (.gemini), best practices, MCP integration |
+| **opencode-expert** | balanced | Opencode expert: configuration (.opencode), best practices, MCP integration |
+| **continue-expert** | balanced | Continue expert: configuration (.continue), best practices, MCP integration |
+| **copilot-expert** | balanced | GitHub Copilot expert: configuration (.github/copilot), best practices, MCP integration |
 
 ### Systems Engineering Agents
 
@@ -158,7 +173,7 @@ patches:
 ```bash
 # 1. Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.54.0 && cd ..
+cd .agent-meta && git checkout v0.55.2 && cd ..
 
 # 2. Create project config
 mkdir -p .meta-config
@@ -246,10 +261,13 @@ agent-meta/
     2-platform/              # Platform-specific overrides (composition agents)
   config/                    # Framework configuration (managed by agent-meta)
     role-defaults.yaml       # Model/memory/permissionMode defaults per role
-    ai-providers.yaml        # Provider settings (Claude, Gemini, Opencode, Continue)
+    ai-providers.yaml        # Provider settings (Claude, Gemini, Opencode, Continue, Copilot)
     dod-presets.yaml         # DoD quality presets
     mcp-registry.yaml        # Global MCP server catalog
+    provider-tools.yaml      # Per-provider tool capability whitelists
     skills-registry.yaml     # External skills registry
+    rules-presets.yaml       # Rule embedding presets per provider
+    export.yaml              # Export target configuration
     project-config.schema.json  # JSON Schema for project.yaml validation
   docs/                      # Documentation
     agent-graph.html         # Interactive agent visualization graph
@@ -257,6 +275,8 @@ agent-meta/
     live-dashboard.html      # Live session monitoring dashboard
     architecture/            # Architecture deep-dives
     providers/               # Provider-specific documentation
+    concepts/                # Feature concepts & design decisions
+      viz-logging-mcp.md     # MCP-based viz logging architecture
     viz-api.md               # Visualization API reference
     viz-event-schema.md      # Session event schema reference
     viz-architecture.md      # Visualization architecture decisions
@@ -276,6 +296,11 @@ agent-meta/
     2-platform/              # Platform-specific rule overrides
   scripts/                   # Build and utility scripts
     sync.py                  # Main generation script (CLI entrypoint)
+    viz-logger.py            # MCP server & CLI fallback for agent event logging
+    viz-logger-mcp.mjs       # HTTP/SSE MCP transport for OpenCode (Windows)
+    viz-server.py            # Live dashboard HTTP server
+    viz-report.py            # Session report generator (terminal/HTML/JSON)
+    consistency-check.py     # Deterministic template consistency validation
     lib/                     # Sync library modules (config, agents, rules, etc.)
   speech/                    # Communication style mode files
   templates/                 # Managed-block templates
