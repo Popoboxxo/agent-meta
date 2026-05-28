@@ -551,6 +551,12 @@ se-cascade:
 4. Output nach `.claude/agents/<rolle>.md`
 5. Rules und Hooks werden nach `.claude/rules/` und `.claude/hooks/` kopiert
 
+### `scripts/viz-logger.py` & `scripts/lib/viz.py`
+
+**Zweck:** Steuerung und Ausführung der Visualisierung von Agenten-Netzwerken.
+- `viz-logger.py`: Eigenständiges CLI-Skript, das von den Agenten ausgeführt wird, um Viz-Events (`agent_start`, `delegate_out`, `agent_end`) thread-safe zu protokollieren. Es bietet ein robustes Cross-Process File-Locking zur Verhinderung von `PermissionError` unter Windows.
+- `lib/viz.py`: Beinhaltet Kernlogiken zur Mindmap/HTML-Generierung (Architektur-Graphen) und zur Injection (`inject_viz_prompt_block`), um die kurzen Logging-Instruktionen in die generierten Agenten-Templates zu integrieren.
+
 ---
 
 *Ende der Bestandsaufnahme*

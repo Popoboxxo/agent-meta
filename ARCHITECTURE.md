@@ -80,7 +80,8 @@ agent-meta/
 ├── external-skills.config.yaml  ← Skill-Konfiguration (approved: true/false)
 ├── roles.config.yaml        ← Zentrale Rollen-Konfiguration (model, permissionMode)
 ├── scripts/
-│   └── sync.py              ← Agent-Generator
+│   ├── sync.py              ← Agent-Generator
+│   └── viz-logger.py        ← CLI-Fallback & Event-Logging für den Visualisierungsmechanismus
 └── howto/
     ├── first-steps.md
     ├── instantiate-project.md

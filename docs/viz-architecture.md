@@ -52,3 +52,20 @@ Beide Modi teilen `applyStateToGraph()`, `renderAgents()`, `renderTimeline()`.
 1. Der WSGI-Server ist threaded (`ThreadingMixIn`).
 2. Paralleles Lesen (`/api/state`) und Schreiben (Agenten-Events) könnte zu halb gelesenen JSONL-Zeilen führen.
 3. `clear-log` führt einen atomaren `open(path, "w")` unter dem Lock durch.
+
+---
+
+## MCP + CLI Fallback Logging Mechanism
+
+**Entscheidung:** Das Agenten-Event-Logging (`agent_start`, `delegate_out`, `agent_end`) wird über einen eigenständigen MCP-Server (`log_viz_event`) mit einem OS-agnostischen CLI-Fallback (`scripts/viz-logger.py`) abgewickelt.
+
+**Begründung:**
+- Vermeidung von Prompt-Bloat: Agenten-Prompts müssen keine langen Python-Logging-Skripte mehr enthalten.
+- Höhere Zuverlässigkeit: Reduziert "Prompt Fatigue" bei Providern (wie Copilot, Continue, Claude Code), die Bash-Ausführungen blockieren oder nach Bestätigung fragen.
+- Robustes Cross-Process File-Locking: Verhindert `PermissionError` unter Windows bei parallelen Schreibzugriffen durch Worker-Agenten (via `.lock` Mechanismen und Exponential Backoff).
+- Vollständiges Tracking: Das Handshake-Verfahren via `--task_id`, `--caller` und `--target` ordnet eingehende und ausgehende Delegationen lückenlos einander zu.
+
+**Implementierung:**
+- `scripts/viz-logger.py`: Eigenständiges Skript, das sowohl als CLI aufgerufen werden kann als auch die Basis für zukünftige MCP-Server ist.
+- File-Locking: Es verwendet temporäre `.lock`-Dateien mit einer 10-fachen Retry-Schleife (Delay 0.1s).
+- `scripts/lib/viz.py`: Die Funktion `inject_viz_prompt_block` injiziert nun nur noch eine kurze Dokumentation zur Ausführung des CLI-Befehls/MCP-Tools, sowie die Aufforderung zur parallelen Tool-Ausführung (`concurrent execution`).
