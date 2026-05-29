@@ -176,6 +176,11 @@ PIPELINE(name, stages):             Vordefinierte Pipeline sequentiell/parallel
 {{PIPELINE_SE_CASCADE_BLOCK}}
 {{/if}}
 
+{{#if PIPELINE_BUGFIX_ENABLED}}
+### Pipeline: bugfix
+{{PIPELINE_BUGFIX_BLOCK}}
+{{/if}}
+
 ---
 
 ## Result Aggregation
@@ -432,28 +437,14 @@ Nicht parallel: tester↔developer, code-reviewer→git, requirements→tester.
 
 `?`=DoD aktiv, `∥`=parallel. Branch-Guard vor Feature/Bugfix/Refactoring.
 
-### Bugfix-Pipeline (Default für alle Bugs)
+### Bugfix-Pipeline (Default)
+
+→ `bugfix` Pipeline (auto-generiert aus quality_pipelines). FANOUT-fähig für unabhängige Bugs.
+
+Pipeline-Abkürzung: Bei User-Error/Out-of-Scope → stoppen, User informieren.
 
 ```
-bug-feature-analyzer → developer → code-reviewer → documenter
-```
-
-**Jeder Bug durchläuft diese 4 Stufen.** Der Orchestrator delegiert sequentiell, nie selbst ausführen.
-
-| Stufe | Agent | Ergebnis |
-|-------|-------|----------|
-| 1. Analyse | `bug-feature-analyzer` | Klassifikation: Bug/User-Error/Feature/Out-of-Scope |
-| 2. Entwicklung | `developer` | Fix implementiert, getestet |
-| 3. Review | `code-reviewer` | Clean Code, Blast-Radius, SOLID/DRY |
-| 4. Dokumentation | `documenter` | CODEBASE_OVERVIEW, Session-Erkenntnisse |
-
-**Mehrere unabhängige Bugs?** → FANOUT parallel: jede Pipeline-Instanz läuft eigenständig.
-Bei gemeinsam betroffenen Dateien → sequentialisieren (BARRIER trennt Pipeline-Instanzen).
-
-**Pipeline-Abkürzung:** Wenn `bug-feature-analyzer` auf User-Error oder Out-of-Scope entscheidet → Pipeline stoppen, User informieren.
-
-```
-A/B  Feature/Bug:  bug-feature-analyzer → developer → code-reviewer → documenter → git
+A/B  Feature/Bug:  {{#if PIPELINE_BUGFIX_ENABLED}}bugfix-Pipeline → git{{else}}git→?req→?test→dev→?test→∥val+?doc→git{{/if}}
 ```
 C    Audit:         code-reviewer
 D    Erkenntnisse:  documenter
