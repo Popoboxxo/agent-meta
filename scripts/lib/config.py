@@ -230,6 +230,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
+    from .delegation_table import generate_agent_delegation_table
     from .dod import resolve_dod
     from .providers import load_providers_config, resolve_providers
 
@@ -281,6 +282,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
+    # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
+    variables["AGENT_DELEGATION_TABLE"] = generate_agent_delegation_table(agent_meta_root, config, variables)
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
@@ -486,34 +489,16 @@ PLATFORM_ORCHESTRATOR_PATCHES: dict[str, list[dict]] = {
         {
             "op": "append",
             "content": (
-                "### Gemini Auto-Handoff Methodik\n"
+                "## Gemini/Antigravity — SE-Cascade Workaround\n"
                 "\n"
-                "**`define_subagent` / `invoke_subagent` Blueprint:**\n"
+                "Gemini unterstützt kein natives Subagent-Dispatch-Tool. "
+                "Für SE-Cascades verwende `scripts/run-cascade.py`:\n"
+                "1. `python scripts/run-cascade.py --input \"<Stakeholder Need>\"`\n"
+                "2. Prompt-Dateien aus `.se-cascade/<session>/prompts/` in Gemini einfügen\n"
+                "3. Ergebnisse in `.se-cascade/<session>/` speichern\n"
+                "4. `--resume <session-id>` für Fortsetzung nach Unterbrechung\n"
                 "\n"
-                "Gemini/Antigravity verwendet native Subagent-Dispatch-Mechanismen die sich von anderen Providern unterscheiden.\n"
-                "\n"
-                "```\n"
-                "# Gemini Subagent-Dispatch Pattern\n"
-                "1. define_subagent: Definiere den Agent-Typ mit Rolle und Kontext\n"
-                "2. invoke_subagent: Starte den Agenten mit spezifischer Aufgabe\n"
-                "3. Collect results: Warte auf Ergebnis und aggregiere\n"
-                "```\n"
-                "\n"
-                "**Pflicht-Regeln:**\n"
-                "- Orchestrator verwendet IMMER `define_subagent` + `invoke_subagent` für Worker-Delegation\n"
-                "- KEIN text-basierter `@orchestrator` Fallback wenn native Subagent-Tools verfügbar\n"
-                "- Planning-Mode darf Delegation NICHT unterdrücken\n"
-                "\n"
-                "**Planning-Mode Anti-Konflikt-Regel:**\n"
-                "\n"
-                "Wenn die Umgebung einen nativen Planungsmodus erzwingt (z.B. Gemini \"planning\" oder \"thinking\" Phase):\n"
-                "\n"
-                "1. Planning-Phase läuft NUR im Orchestrator — nicht im Worker\n"
-                "2. Planning-Mode darf die eigentliche Delegation NICHT blockieren oder unterdrücken\n"
-                "3. Nach Planning-Phase SOFORT `invoke_subagent` aufrufen — kein zusätzlicher Bestätigungsschritt\n"
-                "4. Wenn Planning-Mode einen \"approval\" Schritt verlangt: Dieser gilt NUR für den Orchestrator→Worker Dispatch, nicht für interne Worker-Operationen\n"
-                "\n"
-                "**Warum:** Ohne diese Regel kann der Planning-Mode die Delegation in eine Endlosschleife bringen (Plan → Bestätigung → Plan → ...) oder komplett unterdrücken."
+                "Dokumentation: `howto/SE_CASCADE_GEMINI.md`\n"
             ),
         },
     ],
