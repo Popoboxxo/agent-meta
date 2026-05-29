@@ -355,6 +355,31 @@ quality_pipelines:
         task: "Commit + Push"
         mode: sequential
 
+  bugfix:
+    description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
+    stages:
+      - id: triage
+        agent: bug-feature-analyzer
+        task: "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen."
+        mode: sequential
+      - id: fix
+        agent: developer
+        task: "Bugfix implementieren"
+        mode: sequential
+      - id: review
+        agent: code-reviewer
+        task: "Code-Qualität, Blast-Radius, SOLID/DRY prüfen"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 2
+      - id: document
+        agent: documenter
+        task: "CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
   se-cascade:
     description: "Systems Engineering 6-Stage Recursive Cascade"
     stages:
