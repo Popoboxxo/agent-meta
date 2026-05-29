@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-viz-server.py — Start/Stop/Toggle/Status für den agent-meta Viz-Server
-=====================================================================
+viz-server.py — Start/Stop/Toggle/Status für den agent-meta Viz- und MCP-Server
+=================================================================================
 
 Usage:
-  python scripts/viz-server.py toggle     # Starten falls gestoppt, stoppen falls gestartet
-  python scripts/viz-server.py start      # Server im Hintergrund starten
-  python scripts/viz-server.py stop       # Server beenden
-  python scripts/viz-server.py status     # Status prüfen
-  python scripts/viz-server.py restart    # Neustarten
+  python scripts/viz-server.py start      # Dashboard + MCP-Server starten
+  python scripts/viz-server.py stop       # Beide Server beenden
+  python scripts/viz-server.py status     # Status beider Server
+  python scripts/viz-server.py restart    # Beide neustarten
+  python scripts/viz-server.py toggle     # Umschalten
   python scripts/viz-server.py open       # Dashboard im Browser öffnen
+  python scripts/viz-server.py mcp-only   # Nur MCP-Server starten (ohne Dashboard)
 
-Konfiguration:
-  Port und Auto-Shutdown werden aus .meta-config/project.yaml gelesen:
+Konfiguration (.meta-config/project.yaml):
 
-    viz:
-      server:
-        port: 8765
-        timeout_sec: 300
-
-  Fehlt die Config, werden die Defaults 8765 / 300s verwendet.
+  viz:
+    server:
+      port: 8765          # Dashboard-Port
+      timeout_sec: 300    # Auto-Shutdown nach Inaktivität
+    mcp:
+      port: 9090          # MCP-SSE-Port (opencode verbindet sich hierher)
 """
 
 import sys
@@ -33,23 +33,27 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-# Project-Root ist das Parent-Verzeichnis von scripts/
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-PID_FILE = PROJECT_ROOT / ".meta-viz/.server-pid"
-LOG_FILE = PROJECT_ROOT / ".meta-viz/server.log"
+
+# --- Dashboard server ---
 VIZ_REPORT = SCRIPT_DIR / "viz-report.py"
+VIZ_PID_FILE = PROJECT_ROOT / ".meta-viz/.server-pid"
+VIZ_LOG_FILE = PROJECT_ROOT / ".meta-viz/server.log"
 
-# Hardcoded defaults (used when config is missing or unreadable)
-_DEFAULT_PORT = 8765
-_DEFAULT_TIMEOUT = 300  # 5 Minuten
+# --- MCP server ---
+VIZ_LOGGER = SCRIPT_DIR / "viz-logger.py"
+MCP_PID_FILE = PROJECT_ROOT / ".meta-viz/.mcp-server-pid"
+MCP_LOG_FILE = PROJECT_ROOT / ".meta-viz/mcp-server.log"
+
+# --- Defaults ---
+_DEFAULT_VIZ_PORT = 8765
+_DEFAULT_VIZ_TIMEOUT = 300
+_DEFAULT_MCP_PORT = 9090
 
 
-def _load_viz_server_config() -> tuple[int, int]:
-    """Load viz.server.port and viz.server.timeout_sec from project.yaml.
-
-    Returns (port, timeout_sec) with hardcoded defaults as fallback.
-    """
+def _load_server_config() -> dict:
+    """Load viz config from project.yaml, returns dict with defaults."""
     config_path = PROJECT_ROOT / ".meta-config" / "project.yaml"
     try:
         sys.path.insert(0, str(SCRIPT_DIR))
@@ -57,23 +61,21 @@ def _load_viz_server_config() -> tuple[int, int]:
         config = load_config(config_path)
         viz_cfg = config.get("viz", {})
         server_cfg = viz_cfg.get("server", {})
-        port = int(server_cfg.get("port", _DEFAULT_PORT))
-        timeout = int(server_cfg.get("timeout_sec", _DEFAULT_TIMEOUT))
-        return port, timeout
+        mcp_cfg = viz_cfg.get("mcp", {})
+        return {
+            "viz_port": int(server_cfg.get("port", _DEFAULT_VIZ_PORT)),
+            "viz_timeout": int(server_cfg.get("timeout_sec", _DEFAULT_VIZ_TIMEOUT)),
+            "mcp_port": int(mcp_cfg.get("port", _DEFAULT_MCP_PORT)),
+        }
     except Exception:
-        return _DEFAULT_PORT, _DEFAULT_TIMEOUT
+        return {
+            "viz_port": _DEFAULT_VIZ_PORT,
+            "viz_timeout": _DEFAULT_VIZ_TIMEOUT,
+            "mcp_port": _DEFAULT_MCP_PORT,
+        }
 
 
-def get_pid():
-    if PID_FILE.exists():
-        try:
-            return int(PID_FILE.read_text().strip())
-        except ValueError:
-            pass
-    return None
-
-
-def is_running(pid):
+def _is_process_running(pid: int) -> bool:
     if not pid:
         return False
     try:
@@ -92,34 +94,33 @@ def is_running(pid):
         return False
 
 
-def start_server(port: int | None = None, timeout: int | None = None):
-    pid = get_pid()
-    if pid and is_running(pid):
-        print(f"  i  Server läuft bereits. PID: {pid}")
-        print(f"  i  Dashboard: http://localhost:{get_configured_port()}/")
-        return
-
-    cfg_port, cfg_timeout = _load_viz_server_config()
-    port = port if port is not None else cfg_port
-    timeout = timeout if timeout is not None else cfg_timeout
-
-    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    # Altes Log rotieren
-    if LOG_FILE.exists():
+def _read_pid(pid_file: Path) -> int | None:
+    if pid_file.exists():
         try:
-            LOG_FILE.unlink()
+            return int(pid_file.read_text().strip())
+        except ValueError:
+            pass
+    return None
+
+
+def _start_process(args: list[str], pid_file: Path, log_file: Path, label: str) -> bool:
+    """Start a background process, write PID. Returns True on success."""
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Rotate old log
+    if log_file.exists():
+        try:
+            log_file.unlink()
         except PermissionError:
             pass
 
     if sys.platform == "win32":
-        # STARTUPINFO versteckt das Konsolenfenster
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0  # SW_HIDE
         proc = subprocess.Popen(
-            [sys.executable, str(VIZ_REPORT), "--serve", "--port", str(port), "--timeout", str(timeout)],
-            stdout=open(LOG_FILE, "a", encoding="utf-8"),
+            args,
+            stdout=open(log_file, "a", encoding="utf-8"),
             stderr=subprocess.STDOUT,
             startupinfo=si,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
@@ -127,89 +128,158 @@ def start_server(port: int | None = None, timeout: int | None = None):
         )
     else:
         proc = subprocess.Popen(
-            [sys.executable, str(VIZ_REPORT), "--serve", "--port", str(port), "--timeout", str(timeout)],
-            stdout=open(LOG_FILE, "a", encoding="utf-8"),
+            args,
+            stdout=open(log_file, "a", encoding="utf-8"),
             stderr=subprocess.STDOUT,
             start_new_session=True,
             cwd=str(PROJECT_ROOT),
         )
 
-    PID_FILE.write_text(str(proc.pid))
+    pid_file.write_text(str(proc.pid))
     time.sleep(1.5)
 
-    if is_running(proc.pid):
-        print(f"  i  Server gestartet. PID: {proc.pid}")
-        print(f"  i  Dashboard: http://localhost:{port}/")
-        print(f"  i  Auto-Shutdown: {timeout}s Inaktivitaet")
-        print(f"  i  Log: {LOG_FILE}")
+    if _is_process_running(proc.pid):
+        print(f"  + {label} gestartet. PID: {proc.pid}")
+        return True
     else:
-        print(f"  !  Server konnte nicht gestartet werden. Siehe {LOG_FILE}")
-        PID_FILE.unlink(missing_ok=True)
+        print(f"  ! {label} konnte nicht gestartet werden. Siehe {log_file}")
+        pid_file.unlink(missing_ok=True)
+        return False
 
 
-def stop_server():
-    pid = get_pid()
+def _stop_process(pid_file: Path, label: str):
+    pid = _read_pid(pid_file)
     if not pid:
-        print("  i  Server läuft nicht.")
+        print(f"  - {label}: läuft nicht.")
+        pid_file.unlink(missing_ok=True)
         return
 
-    if not is_running(pid):
-        print(f"  i  Prozess {pid} nicht mehr aktiv.")
-        PID_FILE.unlink(missing_ok=True)
+    if not _is_process_running(pid):
+        print(f"  - {label}: Prozess {pid} nicht mehr aktiv.")
+        pid_file.unlink(missing_ok=True)
         return
 
     try:
         if sys.platform == "win32":
             subprocess.run(["taskkill", "/PID", str(pid), "/F"], check=True, capture_output=True)
         else:
-            os.kill(pid, 15)  # SIGTERM
+            os.kill(pid, 15)
             time.sleep(1)
-            if is_running(pid):
-                os.kill(pid, 9)  # SIGKILL
-        print(f"  i  Server beendet (PID: {pid}).")
+            if _is_process_running(pid):
+                os.kill(pid, 9)
+        print(f"  - {label} beendet (PID: {pid}).")
     except Exception as e:
-        print(f"  !  Fehler beim Beenden: {e}")
+        print(f"  ! Fehler beim Beenden von {label}: {e}")
     finally:
-        PID_FILE.unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
 
 
-def toggle_server():
-    pid = get_pid()
-    if pid and is_running(pid):
-        print(f"  i  Server läuft (PID: {pid}) — stoppe...")
-        stop_server()
+# ---------------------------------------------------------------------------
+# Dashboard server
+# ---------------------------------------------------------------------------
+
+def start_viz():
+    cfg = _load_server_config()
+    pid = _read_pid(VIZ_PID_FILE)
+    if pid and _is_process_running(pid):
+        print(f"  - Dashboard läuft bereits (PID: {pid}, Port: {cfg['viz_port']})")
+        return
+    _start_process(
+        [sys.executable, str(VIZ_REPORT), "--serve", "--port", str(cfg["viz_port"]), "--timeout", str(cfg["viz_timeout"])],
+        VIZ_PID_FILE, VIZ_LOG_FILE,
+        f"Dashboard (Port {cfg['viz_port']})",
+    )
+
+
+def stop_viz():
+    _stop_process(VIZ_PID_FILE, "Dashboard")
+
+
+def viz_running() -> bool:
+    pid = _read_pid(VIZ_PID_FILE)
+    return bool(pid and _is_process_running(pid))
+
+
+# ---------------------------------------------------------------------------
+# MCP server
+# ---------------------------------------------------------------------------
+
+def start_mcp():
+    cfg = _load_server_config()
+    pid = _read_pid(MCP_PID_FILE)
+    if pid and _is_process_running(pid):
+        print(f"  - MCP-Server läuft bereits (PID: {pid}, Port: {cfg['mcp_port']})")
+        return
+    _start_process(
+        [sys.executable, "-u", str(VIZ_LOGGER), "--http", str(cfg["mcp_port"])],
+        MCP_PID_FILE, MCP_LOG_FILE,
+        f"MCP-Server (Port {cfg['mcp_port']})",
+    )
+
+
+def stop_mcp():
+    _stop_process(MCP_PID_FILE, "MCP-Server")
+
+
+def mcp_running() -> bool:
+    pid = _read_pid(MCP_PID_FILE)
+    return bool(pid and _is_process_running(pid))
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def cmd_start(mcp_only: bool = False):
+    cfg = _load_server_config()
+    if not mcp_only:
+        start_viz()
+    start_mcp()
+    print()
+    if not mcp_only:
+        print(f"  Dashboard: http://localhost:{cfg['viz_port']}/")
+    print(f"  MCP-SSE:   http://127.0.0.1:{cfg['mcp_port']}/sse")
+    print(f"  Logs:      {PROJECT_ROOT / '.meta-viz'}")
+
+
+def cmd_stop():
+    stop_viz()
+    stop_mcp()
+
+
+def cmd_status():
+    cfg = _load_server_config()
+    viz = viz_running()
+    mcp = mcp_running()
+
+    print(f"  Dashboard  (Port {cfg['viz_port']}): {'LAUFT' if viz else 'GESTOPPT'}")
+    if viz:
+        print(f"    PID: {_read_pid(VIZ_PID_FILE)}  |  http://localhost:{cfg['viz_port']}/")
+
+    print(f"  MCP-Server (Port {cfg['mcp_port']}): {'LAUFT' if mcp else 'GESTOPPT'}")
+    if mcp:
+        print(f"    PID: {_read_pid(MCP_PID_FILE)}  |  http://127.0.0.1:{cfg['mcp_port']}/sse")
+
+
+def cmd_toggle():
+    if viz_running() or mcp_running():
+        print("  i  Server laufen — stoppe...")
+        cmd_stop()
     else:
-        print(f"  i  Server läuft nicht — starte...")
-        start_server()
+        print("  i  Server gestoppt — starte...")
+        cmd_start()
 
 
-def get_configured_port() -> int:
-    """Return the configured viz server port (with fallback)."""
-    return _load_viz_server_config()[0]
-
-
-def status():
-    pid = get_pid()
-    port = get_configured_port()
-    if pid and is_running(pid):
-        print(f"  i  Server LAUFT. PID: {pid}")
-        print(f"  i  Dashboard: http://localhost:{port}/")
-        print(f"  i  Log: {LOG_FILE}")
-    else:
-        print("  i  Server läuft NICHT.")
-        if PID_FILE.exists():
-            PID_FILE.unlink(missing_ok=True)
-
-
-def restart():
-    stop_server()
+def cmd_restart():
+    cmd_stop()
     time.sleep(1)
-    start_server()
+    cmd_start()
 
 
-def open_browser():
+def cmd_open():
     import webbrowser
-    webbrowser.open(f"http://localhost:{get_configured_port()}/")
+    cfg = _load_server_config()
+    webbrowser.open(f"http://localhost:{cfg['viz_port']}/")
 
 
 def main():
@@ -219,18 +289,19 @@ def main():
 
     cmd = sys.argv[1].lower()
 
-    if cmd == "toggle":
-        toggle_server()
-    elif cmd == "start":
-        start_server()
-    elif cmd == "stop":
-        stop_server()
-    elif cmd == "status":
-        status()
-    elif cmd == "restart":
-        restart()
-    elif cmd == "open":
-        open_browser()
+    commands = {
+        "start": lambda: cmd_start(),
+        "mcp-only": lambda: cmd_start(mcp_only=True),
+        "stop": cmd_stop,
+        "status": cmd_status,
+        "restart": cmd_restart,
+        "toggle": cmd_toggle,
+        "open": cmd_open,
+    }
+
+    handler = commands.get(cmd)
+    if handler:
+        handler()
     else:
         print(__doc__)
         sys.exit(1)
