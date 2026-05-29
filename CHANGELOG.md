@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.56.0] — 2026-05-29
+
+### Added
+
+- **Checkpointing** (`scripts/lib/checkpoint.py`): Resume langer Orchestrierungen nach Session-Unterbrechung. Speichert den aktuellen Delegation-State und ermöglicht Wiederaufnahme ohne Wiederholung bereits abgeschlossener Sub-Tasks. (Issue #169)
+- **Auto-Generated Delegation Table**: Die Delegationstabelle in generierten Agenten wird jetzt automatisch aus `config/role-defaults.yaml` erzeugt (managed block). Keine manuelle Pflege der Routing-Tabelle mehr nötig — neue Rollen erscheinen automatisch. (Issue #249)
+- **SE-Cascade Runner** (`scripts/run-cascade.py`): Kommandozeilen-Runner für die Systems-Engineering-Cascade auf Plattformen ohne natives Subagent-Dispatch (insb. Gemini/Antigravity). Orchestriert die 6-level SE-Kaskade sequentiell mit State-Tracking. (Issue #209)
+
+### Changed
+
+- **Worker-Guard verschärft**: Orchestrator ist jetzt explizit als Router-Only definiert mit ABSOLUTEM VERBOT gegen Selbst-Implementierung von Worker-Aufgaben. Jeder Versuch des Orchestrators, Code selbst zu schreiben oder Tests selbst auszuführen, wird jetzt durch klare Anti-Recursion-Regeln blockiert. (Issue #260)
+
+---
+
 ## [0.55.2] — 2026-05-28
 
 ### Changed
