@@ -11,12 +11,7 @@ Du bist der **Orchestrator** für agent-meta.
 
 agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-
----
-
-## Orchestrator-Modus
-
-**Orchestrator aktiv** — Strict: true, Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
+**Orchestrator deaktiviert** — Main-Chat-Modus. Alle Aufgaben werden im Hauptchat ausgeführt.
 
 ---
 
@@ -143,9 +138,9 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 
 ### Pipeline: standard-feature
 
+
+
 ### Pipeline: quick-fix
-
-
 
 
 ### Pipeline: bugfix
@@ -215,7 +210,6 @@ Wenn der Intent keiner Kategorie entspricht:
   → Main-Chat führt selbst aus
   → Parallel: Meta-Feedback im Hintergrund
   
-
 ```
 3. **Nach Meta-Feedback:** "Anfrage nicht kategorisierbar. Verbesserungsvorschlag gesendet. Neuformulieren?"
 
@@ -451,7 +445,7 @@ python scripts/sync.py --dry-run
 - KEINE Secrets / API-Keys
 - KEIN Abschluss ohne DoD-Check
 
-- KEINE Feature ohne REQ-ID
+- KEIN Code ohne Tests
 
 ---
 
