@@ -14,7 +14,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None  # type: ignore[assignment]
 
 
 class DelegationSyntaxEngine:
@@ -25,7 +28,7 @@ class DelegationSyntaxEngine:
         "PAL_FANOUT": "fanout",
         "PAL_PARALLEL_GROUP": "parallel_group",
         "PAL_FALLBACK": "fallback",
-        "PAL_TOOL_PREAMBLE": "tool_preamble_section",
+        "PAL_TOOL_PREAMBLE": "tool_preamble",
     }
 
     def __init__(self, config_dir: Path | None = None) -> None:
@@ -39,16 +42,28 @@ class DelegationSyntaxEngine:
     def syntax_registry(self) -> dict[str, Any]:
         if self._syntax_registry is None:
             path = self.config_dir / "delegation-syntax.yaml"
-            with open(path) as f:
-                self._syntax_registry = yaml.safe_load(f)
+            try:
+                with open(path, encoding="utf-8") as f:
+                    if yaml is not None:
+                        self._syntax_registry = yaml.safe_load(f)
+                    else:
+                        self._syntax_registry = {}
+            except (FileNotFoundError, yaml.YAMLError) as e:
+                self._syntax_registry = {}
         return self._syntax_registry or {}
 
     @property
     def capabilities_registry(self) -> dict[str, Any]:
         if self._capabilities_registry is None:
             path = self.config_dir / "provider-capabilities.yaml"
-            with open(path) as f:
-                self._capabilities_registry = yaml.safe_load(f)
+            try:
+                with open(path, encoding="utf-8") as f:
+                    if yaml is not None:
+                        self._capabilities_registry = yaml.safe_load(f)
+                    else:
+                        self._capabilities_registry = {}
+            except (FileNotFoundError, yaml.YAMLError) as e:
+                self._capabilities_registry = {}
         return self._capabilities_registry or {}
 
     def get_syntax(self, provider: str) -> dict[str, Any]:

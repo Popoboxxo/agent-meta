@@ -10,7 +10,6 @@ Usage:
     result = engine.run_bootstrap(provider="Gemini", agents_dir=Path("..."))
 """
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +33,14 @@ class BootstrapEngine:
     def bootstrap_registry(self) -> dict[str, Any]:
         if self._bootstrap_registry is None:
             path = self.config_dir / "provider-bootstrap.yaml"
-            with open(path) as f:
-                if yaml is not None:
-                    self._bootstrap_registry = yaml.safe_load(f)
-                else:
-                    self._bootstrap_registry = {}
+            try:
+                with open(path, encoding="utf-8") as f:
+                    if yaml is not None:
+                        self._bootstrap_registry = yaml.safe_load(f)
+                    else:
+                        self._bootstrap_registry = {}
+            except (FileNotFoundError, yaml.YAMLError) as e:
+                self._bootstrap_registry = {}
         return self._bootstrap_registry or {}
 
     def get_bootstrap_config(self, provider: str) -> dict[str, Any]:
