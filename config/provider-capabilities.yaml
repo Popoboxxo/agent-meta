@@ -1,0 +1,60 @@
+# Provider Capability Matrix
+# Documents what each provider supports for agent orchestration.
+# Used to drive conditional logic in agent generation and bootstrap.
+
+capabilities:
+  Claude:
+    subagent_dispatch: true
+    parallel_execution: true
+    file_based_agents: true
+    text_mentions: true
+    hooks: true
+    native_agent_tools: ["Agent", "Task"]
+    description: "Vollständige Agent-Orchestrierung mit nativen Tool-Calls und Hooks."
+
+  Opencode:
+    subagent_dispatch: true
+    parallel_execution: true
+    file_based_agents: true
+    text_mentions: false
+    hooks: false
+    native_agent_tools: ["task"]
+    description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
+
+  Gemini:
+    subagent_dispatch: true
+    parallel_execution: true
+    file_based_agents: false
+    text_mentions: false
+    hooks: false
+    native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
+    description: "API-basierte Agent-Registrierung, ephemere Runtime."
+    bootstrap_required: true
+    special_notes:
+      - "Agenten müssen bei JEDER Session via define_subagent registriert werden."
+      - ".gemini/agents/*.md werden NICHT automatisch geladen."
+      - "Kein dateibasiertes Agent-Inventar wie Claude Code."
+
+  Continue:
+    subagent_dispatch: false
+    parallel_execution: false
+    file_based_agents: false
+    text_mentions: true
+    hooks: false
+    native_agent_tools: []
+    description: "Text-basierte Agent-Mentions (@agent). Keine native Subagent-API."
+    special_notes:
+      - "@agent Text-Mentions als Subagent-Dispatch."
+      - "Agenten werden in .continue/config.yaml konfiguriert."
+      - "Keine parallele Subagent-Ausführung."
+
+  Copilot:
+    subagent_dispatch: false
+    parallel_execution: false
+    file_based_agents: true
+    text_mentions: true
+    hooks: false
+    native_agent_tools: []
+    description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
+    special_notes:
+      - "Dateien in .github/copilot/agents/ werden automatisch geladen."
