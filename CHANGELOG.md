@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.57.0] — 2026-05-31
+
+### Added
+
+- **Provider Abstraction Layer (PAL)**: 3-layer architecture that eliminates cross-provider syntax leaks and enables clean orchestration across Gemini, Continue, and Copilot. Resolves Issue #277.
+  - **Layer 1 — Generic Core**: Provider-agnostic agent templates in `1-generic/` remain strictly universal with zero provider-specific references.
+  - **Layer 2 — Platform Adapters**: Provider-specific orchestration patches and syntax normalization in `2-platform/` for Gemini, Continue, and Copilot.
+  - **Layer 3 — Bootstrap Engine**: Dynamic provider detection and config injection at sync-time, ensuring each generated agent receives only the tools and syntax valid for its target provider.
+- **9 new files**: PAL core modules, provider adapter templates, and bootstrap engine components.
+- **Provider-specific patches**: Gemini, Continue, and Copilot orchestration templates with native tool mapping and syntax isolation.
+- **HowTo documentation**: Complete PAL setup guide and migration instructions for existing projects.
+
+### Changed
+
+- **5 modified files**: Agent templates updated to use PAL delegation patterns instead of direct provider references.
+- **3 config files**: Provider registry, role defaults, and project config schema extended with PAL metadata.
+- **2 Python modules**: `sync.py` and `scripts/lib/agents.py` updated for PAL bootstrap injection and provider-aware generation.
+
+### Fixed
+
+- **Cross-provider syntax leaks**: Eliminated provider-specific tool syntax (at-agent, claude -a, define_subagent) from generic templates that previously leaked into non-target provider environments.
+- **Gemini/Continue/Copilot orchestration**: Each provider now receives native delegation syntax via platform adapters, fixing broken subagent dispatch in non-Claude environments.
+
+---
+
 ## [0.56.0] — 2026-05-29
 
 ### Added
