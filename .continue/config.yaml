@@ -70,6 +70,28 @@ agents:
     prompt: prompts/release.md
   - name: requirements
     prompt: prompts/requirements.md
+  - name: se-architect
+    prompt: prompts/se-architect.md
+  - name: se-critic
+    prompt: prompts/se-critic.md
+  - name: se-integration-and-test-manager
+    prompt: prompts/se-integration-and-test-manager.md
+  - name: se-interface-mgr
+    prompt: prompts/se-interface-mgr.md
+  - name: se-orchestrator
+    prompt: prompts/se-orchestrator.md
+  - name: se-requirements
+    prompt: prompts/se-requirements.md
+  - name: se-termination
+    prompt: prompts/se-termination.md
+  - name: se-test-engineer
+    prompt: prompts/se-test-engineer.md
+  - name: se-testreviewer
+    prompt: prompts/se-testreviewer.md
+  - name: se-validator
+    prompt: prompts/se-validator.md
+  - name: se-verifier
+    prompt: prompts/se-verifier.md
   - name: ui-ux-designer
     prompt: prompts/ui-ux-designer.md
 # agent-meta:managed-agents-end
