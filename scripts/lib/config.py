@@ -504,4 +504,50 @@ PLATFORM_ORCHESTRATOR_PATCHES: dict[str, list[dict]] = {
             ),
         },
     ],
+    "Continue": [
+        {
+            "op": "append-after",
+            "anchor": "## Mention-Interception Policy (Pflicht)",
+            "content": (
+                "### Continue-spezifische Delegation\n"
+                "\n"
+                "Continue unterstützt **kein** natives Subagent-Dispatch-Tool.\n"
+                "Delegation erfolgt ausschließlich über `@agent`-Text-Mentions:\n"
+                "\n"
+                "**Syntax:**\n"
+                "- `@developer Implementiere Feature X`\n"
+                "- `@git Commit und push`\n"
+                "- `@code-reviewer Prüfe die Änderungen`\n"
+                "\n"
+                "**Einschränkungen:**\n"
+                "- Keine parallele Subagent-Ausführung — Aufgaben sequentiell abarbeiten\n"
+                "- Agent-Dateien müssen in `.continue/prompts/` liegen\n"
+                "- Der `@orchestrator`-Mention wird von Continue unterstützt\n"
+                "\n"
+                "**Pflicht-Regeln für Continue:**\n"
+                "1. Verwende `@agent <Aufgabe>` für alle Delegationen\n"
+                "2. Keine parallelen Delegationen — sequentiell abarbeiten\n"
+                "3. Prüfe nach jeder Delegation das Ergebnis vor der nächsten\n"
+            ),
+        },
+    ],
+    "Copilot": [
+        {
+            "op": "append-after",
+            "anchor": "## Mention-Interception Policy (Pflicht)",
+            "content": (
+                "### Copilot-spezifische Delegation\n"
+                "\n"
+                "Copilot verwendet `@agent`-Text-Mentions für Agenten-Dispatch:\n"
+                "\n"
+                "**Syntax:**\n"
+                "- `@developer Implementiere Feature X`\n"
+                "- `@git Commit und push`\n"
+                "\n"
+                "**Einschränkungen:**\n"
+                "- Keine parallele Subagent-Ausführung — sequentiell\n"
+                "- Agenten werden aus `.github/copilot/agents/` geladen\n"
+            ),
+        },
+    ],
 }
