@@ -205,16 +205,5 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-| `se-architect` | Use this agent to design L1 and L2 architectures from requirements. |
-| `se-critic` | Use this agent to validate requirements before architecture, and audit architectural decompositions. |
-| `se-integration-and-test-manager` | Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down, Integrationsplanung. |
-| `se-interface-mgr` | Manages generic signal flow, deterministic sync across systems |
-| `se-orchestrator` | Coordinates the 6-level recursive breakdown |
-| `se-requirements` | Use this agent to clarify requirements and start the SE cascade. |
-| `se-termination` | Deterministic termination at L3 (Component Requirement) |
-| `se-test-engineer` | Use this agent to create model-based test models and integration test strategies from architectural decompositions. |
-| `se-testreviewer` | Use this agent to review and audit test models and integration test strategies before execution. |
-| `se-validator` | Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert Code, prüft ob der User-Need erfüllt ist. |
-| `se-verifier` | Use this agent to verify integrated systems against their specifications on all architecture levels (L1 through Ln). |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 <!-- agent-meta:managed-end -->
