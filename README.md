@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.55.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.56.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -22,6 +22,7 @@
 ## Features
 
 - **Multi-Provider Support:** Claude (VS Code), Gemini (VS Code/Antigravity), Opencode, Continue, GitHub Copilot — define once in generic templates, generate per provider via `sync.py`.
+- **Provider Abstraction Layer (PAL):** Syntactic isolation between generic templates and provider-specific delegation syntax. Abstract placeholders (`{{PAL_DELEGATE}}`, `{{PAL_FANOUT}}`, `{{PAL_PARALLEL_GROUP}}`, `{{PAL_FALLBACK}}`, `{{PAL_TOOL_PREAMBLE}}`) are resolved at sync-time via `DelegationSyntaxEngine` using `config/delegation-syntax.yaml`. A capability matrix (`config/provider-capabilities.yaml`) drives conditional logic. Provider bootstrap mechanisms (`config/provider-bootstrap.yaml` + `scripts/lib/bootstrap.py`) handle Gemini's `define_subagent` API calls and Continue's config.yaml updates.
 - **Layer Architecture:** `1-generic/` (universal, provider-agnostic) → `2-platform/` (platform-specific overrides) → `0-external/` (external skill agents via Git submodules).
 - **Orchestrator-First:** Every development task flows through the orchestrator, which decomposes complex tasks into sub-tasks with FANOUT, PARALLEL_GROUP, BARRIER, PIPELINE, and LIFECYCLE dispatch patterns.
 - **Systems Engineering Cascade:** A recursive 6-level (L1–L3) model-based system decomposition with dedicated agents for requirements, architecture, critique, interface management, termination, verification, and validation.
@@ -73,6 +74,38 @@ config/mcp-registry.yaml
     sync.py
          ↓
 .claude/agents/  |  .gemini/agents/  |  .opencode/agents/  |  .continue/agents/
+```
+
+### Provider Abstraction Layer (PAL)
+
+PAL isolates generic agent templates from provider-specific delegation syntax, preventing "syntax leaks" into wrong provider targets.
+
+```
+config/delegation-syntax.yaml
+config/provider-capabilities.yaml
+config/provider-bootstrap.yaml
+          ↓
+   PAL Engine (delegation_syntax.py + bootstrap.py)
+          ↓
+     sync.py
+          ↓
+.claude/agents/  |  .gemini/agents/  |  .opencode/agents/  |  .continue/agents/
+```
+
+| Placeholder | Meaning | Claude | Opencode | Gemini | Continue | Copilot |
+|-------------|---------|--------|----------|--------|----------|---------|
+| `{{PAL_DELEGATE}}` | Agent dispatch syntax | `Agent(subagent_type=...)` | `task(subagent_type=...)` | Text: "Rufe den **X-Agenten** auf" | `@agent task` | `@agent Führe aus: task` |
+| `{{PAL_FANOUT}}` | Parallel same-type agents | Multi-call in one response | Multiple `task()` in one response | Text instruction | Sequential (no parallel) | Sequential |
+| `{{PAL_PARALLEL_GROUP}}` | Parallel different agents | Foreground + background calls | Foreground + `task()` | Text instruction | Sequential | Sequential |
+| `{{PAL_FALLBACK}}` | Fallback when tools unavailable | "Delegiere an Orchestrator" | `@orchestrator task` | "Bearbeite selbst" | `@orchestrator task` | "Bearbeite: task" |
+
+**Bootstrap Mechanisms:**
+
+| Provider | Mechanism | Description |
+|----------|-----------|-------------|
+| Claude, Opencode, Copilot | file-based | Agents auto-loaded from directory at context start |
+| Gemini | api-based | `define_subagent` API call required at every session start |
+| Continue | config-based | `sync.py` writes agent entries into `.continue/config.yaml` |
 ```
 
 ### Orchestrator Dispatch Patterns
@@ -173,7 +206,7 @@ patches:
 ```bash
 # 1. Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.55.2 && cd ..
+cd .agent-meta && git checkout v0.56.0 && cd ..
 
 # 2. Create project config
 mkdir -p .meta-config
@@ -269,6 +302,9 @@ agent-meta/
     rules-presets.yaml       # Rule embedding presets per provider
     export.yaml              # Export target configuration
     project-config.schema.json  # JSON Schema for project.yaml validation
+    delegation-syntax.yaml   # PAL: provider-specific delegation syntax registry
+    provider-capabilities.yaml  # PAL: capability matrix per provider
+    provider-bootstrap.yaml  # PAL: bootstrap mechanism definitions
   docs/                      # Documentation
     agent-graph.html         # Interactive agent visualization graph
     agent-mindmap.md         # Mermaid mindmap of all agents
@@ -302,8 +338,12 @@ agent-meta/
     viz-report.py            # Session report generator (terminal/HTML/JSON)
     consistency-check.py     # Deterministic template consistency validation
     lib/                     # Sync library modules (config, agents, rules, etc.)
+      delegation_syntax.py   # PAL: DelegationSyntaxEngine for placeholder substitution
+      bootstrap.py           # PAL: BootstrapEngine for provider-specific registration
   speech/                    # Communication style mode files
   templates/                 # Managed-block templates
+    bootstrap/               # PAL: bootstrap instruction templates
+      gemini-session-bootstrap.md  # Gemini define_subagent session-start workflow
   snippets/                  # Language-specific code snippets
     tester/                  # Test framework snippets
     developer/               # Code pattern snippets

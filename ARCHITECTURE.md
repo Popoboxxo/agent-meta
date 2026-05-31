@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Version: **0.55.2** — last updated: 2026-05-28
+> Version: **0.56.0** — last updated: 2026-05-31
 
 ---
 
@@ -16,6 +16,7 @@
 | 6 | [Versioning Strategy](docs/architecture/06-versioning.md) | Repo-, Agent- und Snippet-Versionen |
 | 7 | [SE-Agenten-Kaskade](docs/architecture/07-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
 | 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
+| 9 | [Provider Abstraction Layer](docs/architecture/09-pal.md) | PAL architecture: syntax registry, capability matrix, bootstrap |
 
 ---
 
@@ -72,6 +73,7 @@ agent-meta/
 ├── external/                ← Git Submodule (externe Skill-Repos)
 ├── docs/
 │   ├── architecture/        ← Architektur-Diagramme (Mermaid)
+│   │   └── 09-pal.md        ← PAL: Provider Abstraction Layer Architektur
 │   ├── CODEBASE_OVERVIEW.md ← Codegenaue Bestandsaufnahme aller src/ Dateien
 │   ├── concepts/             ← Feature-Konzepte & Design-Entscheidungen
 │   │   └── viz-logging-mcp.md ← MCP-basierte Viz-Logging-Architektur
@@ -79,15 +81,24 @@ agent-meta/
 ├── schemas/
 │   └── se-decomposition.schema.json  ← JSON Schema für SE-Kaskaden-Outputs
 ├── templates/
-│   └── SE-STRATEGY.template.md       ← Durable Anchor für SE-Projekte
+│   ├── SE-STRATEGY.template.md       ← Durable Anchor für SE-Projekte
+│   └── bootstrap/                   ← PAL: Bootstrap-Instruktions-Templates
+│       └── gemini-session-bootstrap.md ← PAL: Gemini define_subagent Workflow
 ├── agent-meta.schema.json   ← JSON Schema für agent-meta.config.yaml (Draft-07)
 ├── external-skills.config.yaml  ← Skill-Konfiguration (approved: true/false)
 ├── roles.config.yaml        ← Zentrale Rollen-Konfiguration (model, permissionMode)
+├── config/                   ← PAL: Provider-Konfiguration
+│   ├── delegation-syntax.yaml    ← PAL: Syntax-Mapping {{PAL_*}} → nativer Syntax
+│   ├── provider-capabilities.yaml  ← PAL: Capability-Matrix pro Provider
+│   └── provider-bootstrap.yaml  ← PAL: Bootstrap-Mechanismen (file/api/config)
 ├── scripts/
 │   ├── sync.py              ← Agent-Generator
 │   ├── viz-logger.py         ← MCP-Server & CLI-Fallback für Event-Logging
 │   ├── viz-logger-mcp.mjs    ← HTTP/SSE MCP-Transport für OpenCode (Windows)
-│   └── viz-report.py         ← Session-Report-Generator (Terminal/HTML/JSON)
+│   ├── viz-report.py         ← Session-Report-Generator (Terminal/HTML/JSON)
+│   └── lib/
+│       ├── delegation_syntax.py  ← PAL: DelegationSyntaxEngine
+│       └── bootstrap.py          ← PAL: BootstrapEngine
 └── howto/
     ├── first-steps.md
     ├── instantiate-project.md
@@ -257,6 +268,75 @@ Das Handshake-Verfahren ordnet Delegationen via `task_id` lückenlos zu:
 - **Outgoing:** Orchestrator loggt `delegate_out` mit `target=developer, task_id=uuid-1234`
 - **Incoming:** Worker-Agent loggt `agent_start` mit `caller=orchestrator, task_id=uuid-1234`
 - **Return:** Worker-Agent loggt `agent_end` mit `target=orchestrator, status=success`
+
+---
+
+## Provider Abstraction Layer (PAL) — Architektur
+
+PAL verhindert dass provider-spezifische Delegationssyntax (z.B. `Agent()`, `task()`) in generische Templates gelangt und dort als "Syntax Leak" in falsche Provider-Targets propagiert. Gleichzeitig löst PAL das Problem dass Gemini/Antigravity keine dateibasierte Agent-Registry besitzt.
+
+### Drei-Schichten-Modell
+
+```
+1-generic Templates ({{PAL_DELEGATE}}, {{PAL_FANOUT}}, {{PAL_PARALLEL_GROUP}}, {{PAL_FALLBACK}})
+        ↓
+Provider Abstraction Layer (Syntax-Registry + Capability Matrix + Bootstrap)
+        ↓
+Claude | Gemini | Opencode | Continue | Copilot
+```
+
+### Komponenten
+
+| Komponente | Datei | Zweck |
+|------------|-------|-------|
+| **Syntax Registry** | `config/delegation-syntax.yaml` | Mapping `{{PAL_*}}` → provider-native Syntax |
+| **Capability Matrix** | `config/provider-capabilities.yaml` | Feature-Flags pro Provider (subagent_dispatch, parallel_execution, file_based_agents, hooks, native_agent_tools) |
+| **Bootstrap Registry** | `config/provider-bootstrap.yaml` | Registrierungsmechanismus pro Provider (file-based, api-based, config-based) |
+| **DelegationSyntaxEngine** | `scripts/lib/delegation_syntax.py` | Lädt Syntax-Registry, substituiert `{{PAL_*}}` in `_compose_agent()` während sync |
+| **BootstrapEngine** | `scripts/lib/bootstrap.py` | Führt provider-spezifische Bootstrap-Aktionen aus (Gemini: define_subagent Instruktionen, Continue: config.yaml Update) |
+| **Bootstrap Template** | `templates/bootstrap/gemini-session-bootstrap.md` | Session-Start Workflow für Gemini (define_subagent) |
+
+### Integration in sync.py
+
+```
+_compose_agent() (agents.py)
+  → nach substitute() und platform-vars:
+    → DelegationSyntaxEngine.apply(content, provider)
+    → substituiert alle {{PAL_*}} Placeholder
+  → für Orchestrator: PLATFORM_ORCHESTRATOR_PATCHES anwenden
+  → nach Agent-Generierung pro Provider:
+    → BootstrapEngine.run_bootstrap(provider, agents_dir, project_root)
+    → Gemini: inject-bootstrap-instructions in GEMINI.md
+    → Continue: update-config in .continue/config.yaml
+```
+
+### Capability Matrix (Auszug)
+
+| Capability | Claude | Opencode | Gemini | Continue | Copilot |
+|------------|--------|----------|--------|----------|---------|
+| subagent_dispatch | ✅ | ✅ | ✅ | ❌ | ❌ |
+| parallel_execution | ✅ | ✅ | ✅ | ❌ | ❌ |
+| file_based_agents | ✅ | ✅ | ❌ | ❌ | ✅ |
+| hooks | ✅ | ❌ | ❌ | ❌ | ❌ |
+| bootstrap_required | ❌ | ❌ | ✅ | ✅ | ❌ |
+
+### Bootstrap-Flow
+
+```
+file-based (Claude, Opencode, Copilot):
+  → Keine Aktion. Agenten werden automatisch aus Verzeichnis geladen.
+
+api-based (Gemini):
+  → sync.py generiert define_subagent Instruktionen
+  → Instruktionen werden in GEMINI.md injiziert (managed block)
+  → Bei Session-Start: Hauptchat liest .gemini/agents/*.md
+  → Registriert jeden Agent via define_subagent API-Call
+
+config-based (Continue):
+  → sync.py trägt Agenten in .continue/config.yaml ein
+  → Managed block zwischen # agent-meta:managed-agents-begin/end
+  → Eintrag: name + prompt-Pfad pro Agent
+```
 
 ---
 
