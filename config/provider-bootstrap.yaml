@@ -1,0 +1,37 @@
+# Provider Bootstrap Registry
+# Defines how agents are registered/discovered by each provider.
+# Used by scripts/lib/bootstrap.py at sync time and at session start.
+
+bootstrap:
+  Claude:
+    mechanism: "file-based"
+    action: "none"
+    description: "Agenten in .claude/agents/ werden beim Kontext-Laden automatisch registriert."
+
+  Opencode:
+    mechanism: "file-based"
+    action: "none"
+    description: "Agenten in .opencode/agents/ werden beim Start automatisch geladen."
+
+  Gemini:
+    mechanism: "api-based"
+    action: "inject-bootstrap-instructions"
+    template_file: "templates/bootstrap/gemini-session-bootstrap.md"
+    description: |
+      Gemini/Antigravity benötigt define_subagent API-Calls bei Session-Start.
+      Die Bootstrap-Instruktionen werden in GEMINI.md injiziert.
+    instructions: |
+      Bei Session-Beginn MUSS der Hauptchat:
+      1. Alle Dateien in .gemini/agents/ lesen.
+      2. Jeden Agent via define_subagent registrieren.
+      3. Dann erst Anfragen bearbeiten.
+
+  Continue:
+    mechanism: "config-based"
+    action: "update-config"
+    description: "Agenten in .continue/config.yaml eintragen."
+
+  Copilot:
+    mechanism: "file-based"
+    action: "none"
+    description: "Agenten in .github/copilot/agents/ werden automatisch geladen."

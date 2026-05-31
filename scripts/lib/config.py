@@ -476,14 +476,16 @@ PLATFORM_ORCHESTRATOR_PATCHES: dict[str, list[dict]] = {
                 "3. Wenn der Hauptchat delegieren muss: `@orchestrator Delegiere an git: \"Commit message...\"`\n"
                 "4. Die \"Ausnahmen — direkter Dispatch\" aus use-orchestrator.md gelten in Gemini **nicht** als User-Mentions — sie sind rein interne Delegationsentscheidungen\n"
                 "\n"
+                "**Wichtiger Hinweis zur Delegation:**\n"
+                "Gemini/Antigravity unterstützt kein natives Subagent-Dispatch-Tool wie andere Umgebungen.\n"
+                "Die ausgelieferten `.gemini/agents/*.md`-Dateien werden von Antigravity **nicht** automatisch geladen.\n"
+                "Siehe Bootstrap-Instruktionen in `GEMINI.md` für die Session-Start-Registrierung.\n"
+                "\n"
                 "**Beispiel — Falsch (funktioniert nicht in Gemini):**\n"
                 "> \"@meta-feedback Bitte erstelle ein Issue für...\"\n"
                 "\n"
                 "**Beispiel — Richtig:**\n"
-                "> \"@orchestrator Delegiere an meta-feedback: Erstelle ein Issue für...\"\n"
-                "\n"
-                "**Oder über Tool-Call (bevorzugt):**\n"
-                "Verwende das native `task()`-Tool des Orchestrators — das umgeht Mention-Parsing komplett."
+                "> \"@orchestrator Delegiere an meta-feedback: Erstelle ein Issue für...\""
             ),
         },
         {

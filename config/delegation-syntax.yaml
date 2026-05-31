@@ -1,0 +1,53 @@
+# Provider Delegation Syntax Registry
+# Maps abstract {{PAL_*}} placeholders to provider-specific syntax.
+# Used by scripts/lib/delegation_syntax.py during agent generation.
+
+delegation_syntax:
+  Claude:
+    delegate: 'Agent(subagent_type="{{agent}}", prompt="{{task}}")'
+    fanout: "# FANOUT: Launch all agents in ONE response — independent calls run concurrently:\n{{calls}}"
+    parallel_group: "{{foreground}}\n\n# Gleichzeitig im Hintergrund (in derselben Antwort):\n{{background}}"
+    fallback: "Delegiere folgende Aufgabe an den Orchestrator: {{task}}"
+    bootstrap: "file-based"
+    tool_preamble: true
+
+  Opencode:
+    delegate: 'task(subagent_type="{{agent}}", description="{{short_desc}}", prompt="{{task}}")'
+    fanout: "# FANOUT: Multiple task()-Calls in ONE response mean parallel execution:\n{{calls}}"
+    parallel_group: "{{foreground}}\n\n# Parallel:\n{{background}}"
+    fallback: "@orchestrator {{task}}"
+    bootstrap: "file-based"
+    tool_preamble: true
+
+  Gemini:
+    delegate: 'Rufe den **{{agent}}-Agenten** auf mit der Aufgabe: "{{task}}"'
+    fanout: "Bearbeite folgende unabhängige Aufgaben — die Gemini-Runtime parallelisiert automatisch bei separaten Tool-Calls:\n{{tasks_list}}"
+    parallel_group: "Delegiere diese unabhängigen Teilaufgaben — Gemini führt sie automatisch parallel aus:\n{{tasks_list}}"
+    fallback: "Bearbeite folgende Aufgabe selbst, mit höchster Sorgfalt: {{task}}"
+    bootstrap: "api-define_subagent"
+    bootstrap_sequence:
+      - type: "api_call"
+        template: 'define_subagent(name="{{name}}", description="{{description}}", system_prompt="{{prompt}}")'
+    tool_preamble: false
+    auto_parallel: true
+
+  Continue:
+    delegate: "@{{agent}} {{task}}"
+    fanout: "Führe folgende Aufgaben nacheinander aus (Continue unterstützt keine parallele Subagent-Ausführung):\n{{tasks_list}}"
+    parallel_group: "Führe folgende Aufgaben nacheinander aus:\n{{tasks_list}}"
+    fallback: "@orchestrator {{task}}"
+    bootstrap: "config-based"
+    bootstrap_sequence:
+      - type: "config_update"
+        target: ".continue/config.yaml"
+    tool_preamble: false
+    auto_parallel: false
+
+  Copilot:
+    delegate: "@{{agent}} Führe folgende Aufgabe aus: {{task}}"
+    fanout: "Bearbeite diese Aufgaben der Reihe nach:\n{{tasks_list}}"
+    parallel_group: "Bearbeite diese Aufgaben:\n{{tasks_list}}"
+    fallback: "Bearbeite: {{task}}"
+    bootstrap: "file-based"
+    tool_preamble: false
+    auto_parallel: false
