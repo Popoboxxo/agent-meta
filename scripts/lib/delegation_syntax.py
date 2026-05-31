@@ -85,6 +85,8 @@ class DelegationSyntaxEngine:
         for placeholder, syntax_key in self.PLACEHOLDERS.items():
             pattern = r"\{\{" + re.escape(placeholder) + r"\}\}"
             replacement = syntax.get(syntax_key, "")
+            if not isinstance(replacement, str):
+                replacement = ""
             content = re.sub(pattern, replacement, content)
 
         # Remove any remaining {{PAL_*}} placeholders (no-ops for this provider)
