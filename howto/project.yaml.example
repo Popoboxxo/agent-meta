@@ -107,6 +107,12 @@ test-repo:
 #   dod-push-check:
 #     enabled: true
 #
+# # .gitignore-Verhalten — Managed-Block, togglen fügt/entfernt Einträge automatisch
+# # gitignore:
+# #   local: true       # Default — persönliche Dateien gitignoren
+# #   generated: false   # Default — generierte dirs committen
+# #   settings: false    # Default — settings committen
+#
 # speech-mode: submissive
 #
 # variables:

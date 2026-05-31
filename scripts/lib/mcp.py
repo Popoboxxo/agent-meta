@@ -248,6 +248,7 @@ def _update_json_config(
     log: SyncLog,
     dry_run: bool,
     allow_secrets: bool,
+    config: dict | None = None,
 ) -> None:
     """Merge mcp_entries into a JSON settings file under mcp_key.
 
@@ -274,7 +275,7 @@ def _update_json_config(
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            written = write_checked(path, content, log, rel, allow_secrets=allow_secrets)
+            written = write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config)
         except SyncError:
             raise
         if written:
@@ -291,6 +292,7 @@ def _update_continue_yaml_config(
     log: SyncLog,
     dry_run: bool,
     allow_secrets: bool,
+    config: dict | None = None,
 ) -> None:
     """Merge mcpServers into a Continue config.yaml file.
 
@@ -354,7 +356,7 @@ def _update_continue_yaml_config(
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            written = write_checked(path, new_content, log, rel, allow_secrets=allow_secrets)
+            written = write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config)
         except SyncError:
             raise
         if written:
@@ -427,6 +429,7 @@ def generate_provider_configs(
         log=log,
         dry_run=dry_run,
         allow_secrets=allow_committed_secrets,
+        config=config,
     )
 
     # --- Local/secrets provider config (only when secrets.local.yaml exists) ---
@@ -439,6 +442,7 @@ def generate_provider_configs(
             log=log,
             dry_run=dry_run,
             allow_secrets=True,  # local files are always gitignored
+            config=config,
         )
 
 
@@ -449,14 +453,15 @@ def _write_provider_config(
     log: SyncLog,
     dry_run: bool,
     allow_secrets: bool,
+    config: dict | None = None,
 ) -> None:
     """Dispatch to format-specific writer."""
     if fmt in ("claude-settings", "gemini-settings"):
-        _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets)
+        _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config)
     elif fmt == "opencode-json":
-        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets)
+        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config)
     elif fmt == "continue-yaml":
-        _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets)
+        _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config)
     else:
         log.warn(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
 
@@ -578,7 +583,7 @@ def generate_mcp_artifacts(
             src_label = f"mcp-registry/{server_name}"
 
             if not dry_run:
-                if write_checked(target_path, content, log, src_label):
+                if write_checked(target_path, content, log, src_label, config=config):
                     log.action("WRITE", rel_out, src_label)
                 else:
                     log.skip(rel_out, "unchanged")
