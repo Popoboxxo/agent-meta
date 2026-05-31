@@ -37,6 +37,17 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+| `se-architect` | Use this agent to design L1 and L2 architectures from requirements. |
+| `se-critic` | Use this agent to validate requirements before architecture, and audit architectural decompositions. |
+| `se-integration-and-test-manager` | Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down, Integrationsplanung. |
+| `se-interface-mgr` | Manages generic signal flow, deterministic sync across systems |
+| `se-orchestrator` | Coordinates the 6-level recursive breakdown |
+| `se-requirements` | Use this agent to clarify requirements and start the SE cascade. |
+| `se-termination` | Deterministic termination at L3 (Component Requirement) |
+| `se-test-engineer` | Use this agent to create model-based test models and integration test strategies from architectural decompositions. |
+| `se-testreviewer` | Use this agent to review and audit test models and integration test strategies before execution. |
+| `se-validator` | Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert Code, prüft ob der User-Need erfüllt ist. |
+| `se-verifier` | Use this agent to verify integrated systems against their specifications on all architecture levels (L1 through Ln). |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 <!-- agent-meta:managed-end -->
 
@@ -86,6 +97,17 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `performance-optimizer.md` → registriere als `performance-optimizer`
    - `release.md` → registriere als `release`
    - `requirements.md` → registriere als `requirements`
+   - `se-architect.md` → registriere als `se-architect`
+   - `se-critic.md` → registriere als `se-critic`
+   - `se-integration-and-test-manager.md` → registriere als `se-integration-and-test-manager`
+   - `se-interface-mgr.md` → registriere als `se-interface-mgr`
+   - `se-orchestrator.md` → registriere als `se-orchestrator`
+   - `se-requirements.md` → registriere als `se-requirements`
+   - `se-termination.md` → registriere als `se-termination`
+   - `se-test-engineer.md` → registriere als `se-test-engineer`
+   - `se-testreviewer.md` → registriere als `se-testreviewer`
+   - `se-validator.md` → registriere als `se-validator`
+   - `se-verifier.md` → registriere als `se-verifier`
    - `ui-ux-designer.md` → registriere als `ui-ux-designer`
 
 2. Registriere jeden Agenten via define_subagent API-Call:
@@ -114,6 +136,17 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="performance-optimizer", ...)
    define_subagent(name="release", ...)
    define_subagent(name="requirements", ...)
+   define_subagent(name="se-architect", ...)
+   define_subagent(name="se-critic", ...)
+   define_subagent(name="se-integration-and-test-manager", ...)
+   define_subagent(name="se-interface-mgr", ...)
+   define_subagent(name="se-orchestrator", ...)
+   define_subagent(name="se-requirements", ...)
+   define_subagent(name="se-termination", ...)
+   define_subagent(name="se-test-engineer", ...)
+   define_subagent(name="se-testreviewer", ...)
+   define_subagent(name="se-validator", ...)
+   define_subagent(name="se-verifier", ...)
    define_subagent(name="ui-ux-designer", ...)
    ```
 
