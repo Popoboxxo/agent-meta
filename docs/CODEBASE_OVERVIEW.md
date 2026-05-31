@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-05-28
+> Letzte Aktualisierung: 2026-05-31
 
 ---
 
@@ -14,6 +14,7 @@
 6. [Templates](#6-templates)
 7. [Howto-Dokumentation](#7-howto-dokumentation)
 8. [Scripts](#8-scripts)
+9. [Provider Abstraction Layer (PAL)](#9-provider-abstraction-layer-pal)
 
 ---
 
@@ -602,6 +603,179 @@ se-cascade:
 - Höhere Zuverlässigkeit durch MCP-Tools (keine Bash-Bestätigungs-Popups bei Copilot, Continue, Claude Code)
 - Robustes Cross-Process File-Locking mit Exponential Backoff gegen Windows `PermissionError`
 - Explizites Handshake-Tracking via `task_id`/`caller`/`target` für lückenlose Delegationspfade
+
+### `scripts/lib/delegation_syntax.py` & `scripts/lib/bootstrap.py`
+
+**Zweck:** Provider Abstraction Layer (PAL) — syntaktische Isolation generischer Templates.
+- `delegation_syntax.py`: `DelegationSyntaxEngine` substituiert `{{PAL_*}}` Platzhalter in provider-native Syntax während der Agent-Generierung. Lädt `config/delegation-syntax.yaml` und `config/provider-capabilities.yaml`.
+- `bootstrap.py`: `BootstrapEngine` führt provider-spezifische Registrierungsaktionen aus. Gemini: `define_subagent` Instruktionen in GEMINI.md injizieren. Continue: Agent-Einträge in `.continue/config.yaml` schreiben.
+
+---
+
+## 9. Provider Abstraction Layer (PAL)
+
+Der Provider Abstraction Layer (PAL) isoliert generische Agent-Templates von provider-spezifischer Delegationssyntax. Er verhindert "Syntax Leaks" und handhabt provider-spezifische Bootstrap-Mechanismen.
+
+### 9.1 `config/delegation-syntax.yaml`
+
+**Zweck:** Registry die abstrakte `{{PAL_*}}` Platzhalter auf provider-native Delegationssyntax mappt.
+
+**Struktur:**
+```yaml
+delegation_syntax:
+  <Provider>:
+    delegate: '<native syntax mit {{agent}} und {{task}}>'
+    fanout: '<parallel execution instruction>'
+    parallel_group: '<mixed agent parallel instruction>'
+    fallback: '<fallback instruction>'
+    bootstrap: 'file-based | api-based | config-based'
+    tool_preamble: true | false
+```
+
+**Platzhalter-Mapping:**
+
+| PAL-Platzhalter | YAML-Key | Bedeutung |
+|-----------------|----------|-----------|
+| `{{PAL_DELEGATE}}` | `delegate` | Native Agent-Delegationssyntax |
+| `{{PAL_FANOUT}}` | `fanout` | Parallele Ausführung gleicher Agenten |
+| `{{PAL_PARALLEL_GROUP}}` | `parallel_group` | Parallele Ausführung verschiedener Agenten |
+| `{{PAL_FALLBACK}}` | `fallback` | Fallback bei nicht verfügbaren Tool-Calls |
+| `{{PAL_TOOL_PREAMBLE}}` | `tool_preamble` | Tool-Auflistung im Agent-Template |
+
+### 9.2 `config/provider-capabilities.yaml`
+
+**Zweck:** Capability Matrix — dokumentiert welche Features jeder Provider unterstützt.
+
+**Capability-Flags:**
+
+| Flag | Typ | Bedeutung |
+|------|-----|-----------|
+| `subagent_dispatch` | boolean | Native Subagent-Dispatch-Tools verfügbar |
+| `parallel_execution` | boolean | Parallele Subagent-Ausführung möglich |
+| `file_based_agents` | boolean | Agenten werden aus Dateien automatisch geladen |
+| `text_mentions` | boolean | `@agent` Text-Mentions als Dispatch |
+| `hooks` | boolean | Git-Hook-Integration unterstützt |
+| `native_agent_tools` | string[] | Namen der nativen Agent-Tools |
+| `bootstrap_required` | boolean | Session-Bootstrap erforderlich |
+
+### 9.3 `config/provider-bootstrap.yaml`
+
+**Zweck:** Definiert Registrierungsmechanismus pro Provider.
+
+**Mechanismen:**
+
+| Mechanismus | Provider | Aktion |
+|-------------|----------|--------|
+| `file-based` | Claude, Opencode, Copilot | `none` — Auto-Discovery |
+| `api-based` | Gemini | `inject-bootstrap-instructions` in GEMINI.md |
+| `config-based` | Continue | `update-config` in `.continue/config.yaml` |
+
+### 9.4 `scripts/lib/delegation_syntax.py`
+
+**Klasse:** `DelegationSyntaxEngine`
+
+**Exportierte API:**
+
+| Methode | Signatur | Zweck |
+|---------|----------|-------|
+| `__init__` | `(config_dir: Path \| None) → None` | Initialisiert mit Config-Verzeichnis |
+| `syntax_registry` | property → `dict` | Lädt `delegation-syntax.yaml` (lazy, cached) |
+| `capabilities_registry` | property → `dict` | Lädt `provider-capabilities.yaml` (lazy, cached) |
+| `get_syntax` | `(provider: str) → dict` | Syntax-Map für Provider |
+| `get_capabilities` | `(provider: str) → dict` | Capabilities für Provider |
+| `apply` | `(content: str, provider: str) → str` | Substituiert `{{PAL_*}}` in Template-Content |
+| `needs_bootstrap` | `(provider: str) → bool` | Prüft ob Bootstrap erforderlich |
+| `has_native_subagent_dispatch` | `(provider: str) → bool` | Native Dispatch verfügbar? |
+| `has_file_based_agents` | `(provider: str) → bool` | File-based Agent-Discovery? |
+
+**PLACEHOLDERS-Mapping (Klassenkonstante):**
+```python
+PLACEHOLDERS = {
+    "PAL_DELEGATE": "delegate",
+    "PAL_FANOUT": "fanout",
+    "PAL_PARALLEL_GROUP": "parallel_group",
+    "PAL_FALLBACK": "fallback",
+    "PAL_TOOL_PREAMBLE": "tool_preamble",
+}
+```
+
+**Flow:**
+```
+1. _compose_agent() ruft DelegationSyntaxEngine.apply(content, provider) auf
+2. Engine lädt delegation-syntax.yaml (lazy, einmalig)
+3. Für jeden PAL-Platzhalter: Regex-Substitution mit provider-spezifischer Syntax
+4. Verbleibende {{PAL_*}} Placeholder werden entfernt (no-op für diesen Provider)
+5. PAL_PREFIX: Marker-Zeilen werden entfernt
+6. Return: bereinigter Content mit nativer Provider-Syntax
+```
+
+### 9.5 `scripts/lib/bootstrap.py`
+
+**Klasse:** `BootstrapEngine`
+
+**Exportierte API:**
+
+| Methode | Signatur | Zweck |
+|---------|----------|-------|
+| `__init__` | `(config_dir: Path \| None) → None` | Initialisiert mit Config-Verzeichnis |
+| `bootstrap_registry` | property → `dict` | Lädt `provider-bootstrap.yaml` (lazy, cached) |
+| `get_bootstrap_config` | `(provider: str) → dict` | Bootstrap-Konfiguration für Provider |
+| `run_bootstrap` | `(provider, agents_dir, project_root) → dict` | Führt provider-spezifischen Bootstrap aus |
+| `generate_gemini_bootstrap_instructions` | `(agents_dir: Path) → str` | Generiert lesbare Bootstrap-Instruktionen für GEMINI.md |
+
+**Bootstrap-Mechanismen:**
+
+| Mechanismus | Methode | Beschreibung |
+|-------------|---------|-------------|
+| `api-based` | `_bootstrap_api_based()` | Liest Agent-Dateien, extrahiert Descriptions, generiert define_subagent Calls |
+| `config-based` | `_bootstrap_config_based()` | Trägt Agenten in `.continue/config.yaml` ein (managed block mit Markern) |
+| `none` | — | Skip — file-based Provider benötigen keinen Bootstrap |
+
+**Flow für Gemini:**
+```
+1. BootstrapEngine.generate_gemini_bootstrap_instructions(agents_dir)
+2. Liest alle .md-Dateien aus .gemini/agents/
+3. Extrahiert description aus Frontmatter jeder Datei
+4. Generiert Schritt-für-Schritt Instruktionen (Session-Start Pflicht)
+5. _inject_gemini_bootstrap() injiziert in GEMINI.md (managed block)
+```
+
+**Flow für Continue:**
+```
+1. BootstrapEngine.run_bootstrap(provider, agents_dir, project_root)
+2. Liest alle .md-Dateien aus .continue/agents/
+3. Öffnet .continue/config.yaml
+4. Findet/erstellt managed block (agent-meta:managed-agents-begin/end)
+5. Schreibt Agent-Einträge (name + prompt-Pfad)
+6. Nur bei Änderungen → Datei wird aktualisiert
+```
+
+### 9.6 `templates/bootstrap/gemini-session-bootstrap.md`
+
+**Zweck:** Bootstrap-Template für Gemini/Antigravity Session-Start.
+
+**Inhalt:**
+- Erklärung warum Bootstrap nötig ist (keine dateibasierte Registry)
+- 4-Schritte-Workflow: Dateien einlesen → define_subagent → Orchestrator zuerst → Anfragen bearbeiten
+- Hinweise: Ephemere Registrierung, Version-Abhängigkeit von sync.py, Konsequenzen ohne Bootstrap
+
+### 9.7 Integration in `scripts/lib/agents.py`
+
+**Stelle:** `_compose_agent()` Funktion, Zeile ~1082
+
+```python
+# Apply PAL delegation syntax per provider (Issue #277)
+from .delegation_syntax import DelegationSyntaxEngine
+pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+content = pal_engine.apply(content, provider)
+```
+
+**Stelle:** `sync_agents_for_provider()`, nach Agent-Generierung
+
+```python
+_inject_gemini_bootstrap(provider, target_dir, ...)  # Gemini: GEMINI.md
+BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
+```
 
 ---
 
