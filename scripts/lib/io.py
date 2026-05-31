@@ -66,6 +66,7 @@ def write_checked(
     rel_label: str,
     force: bool = False,
     allow_secrets: bool = False,
+    config: dict | None = None,
 ) -> bool:
     """Write content to path unless it is already identical (incremental sync).
 
@@ -77,12 +78,15 @@ def write_checked(
     Set allow-committed-secrets: true in project.yaml to override for a project
     (not recommended — prefer ${ENV_VAR} references in committed configs).
 
+    config: optional project config dict — extends secret detection with
+            security.secret-patterns from project.yaml.
+
     Returns True when the file was written, False when skipped as unchanged.
     """
     if not force and is_unchanged(path, content):
         return False
     from .secrets import scan_for_secrets
-    findings = scan_for_secrets(content)
+    findings = scan_for_secrets(content, config=config)
     if findings:
         if not allow_secrets:
             raise SyncError(

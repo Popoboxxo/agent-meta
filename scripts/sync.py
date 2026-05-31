@@ -502,14 +502,10 @@ def main():
         if platform_vars is not None:
             log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
         is_claude = "Claude" in providers
-        if args.init or is_claude:
-            init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
-            init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
-            init_settings_json(project_root, log, args.dry_run)
-            init_settings_local_json(project_root, log, args.dry_run)
-            claude_pc = provider_config.get("Claude", {})
-            gitignore_cfg = config.get("gitignore", {})
-            # local: true (default) — personal/local files are gitignored
+        claude_pc = provider_config.get("Claude", {})
+        gitignore_cfg = config.get("gitignore", {})
+        base_gitignore_entries: list[str] = []
+        if is_claude:
             if gitignore_cfg.get("local", True):
                 base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
                     ".claude/settings.local.json",
@@ -517,11 +513,6 @@ def main():
                     "CLAUDE.personal.md",
                     "sync.log",
                 ]))
-            else:
-                base_gitignore_entries = []
-        if args.init:
-            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
-            # generated: false (default) — generated files are committed
             if gitignore_cfg.get("generated", False):
                 for _prov in providers:
                     _pc = provider_config.get(_prov, {})
@@ -531,7 +522,6 @@ def main():
                             base_gitignore_entries.append(_d + "/")
                     if _pc.get("has_commands") and _pc.get("commands_dir"):
                         base_gitignore_entries.append(_pc["commands_dir"] + "/")
-            # settings: false (default) — settings files are committed
             if gitignore_cfg.get("settings", False):
                 for _prov in providers:
                     _pc = provider_config.get(_prov, {})
@@ -539,11 +529,13 @@ def main():
                     if _sf:
                         base_gitignore_entries.append(_sf)
                     _ctx = _pc.get("context_file")
-                    # CLAUDE.md is semi-manual (has handwritten sections) — skip
                     if _ctx and _ctx != "CLAUDE.md":
                         base_gitignore_entries.append(_ctx)
-            # Skill gitignore entries are collected after skills are processed (below)
-            # and merged via exact_entries so stale entries are removed automatically.
+        if args.init or is_claude:
+            init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
+            init_settings_json(project_root, log, args.dry_run)
+            init_settings_local_json(project_root, log, args.dry_run)
         if args.init:
             init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync

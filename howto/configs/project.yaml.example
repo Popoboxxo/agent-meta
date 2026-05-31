@@ -52,6 +52,31 @@ project:
 # hooks:
 #   dod-push-check:
 #     enabled: true
+#
+# .gitignore-Verhalten — steuert welche Dateien sync.py in .gitignore einträgt.
+# Alle Einträge landen in einem klar markierten Managed-Block. Toggeln der Flags
+# fügt Einträge hinzu bzw. entfernt sie automatisch beim nächsten Sync.
+# gitignore:
+#   # local: true (Default) → persönliche/lokale Dateien gitignoren:
+#   #   .claude/settings.local.json, CLAUDE.personal.md, sync.log, agent-memory-local/
+#   local: true
+#   # generated: false (Default) → alle generierten Verzeichnisse (agents/, rules/,
+#   #   hooks/, commands/) aller aktiven Provider in .gitignore aufnehmen.
+#   #   true = "generate, don't store"-Prinzip.
+#   generated: false
+#   # settings: false (Default) → Provider-Settings-Dateien (settings.json,
+#   #   GEMINI.md, config.yaml) gitignoren. CLAUDE.md ist nie betroffen.
+#   settings: false
+#
+# Secrets in committeten Dateien erlauben (NICHT empfohlen).
+# Default: false — sync bricht mit Fehler ab wenn Secrets in nicht-gitignored Dateien erkannt werden.
+# Nur auf true setzen wenn absichtlich demo-tokens o.ä. committet werden sollen.
+# allow-committed-secrets: false
+#
+# Externe Skills — opt-in pro Skill (muss auch approved: true in skills-registry.yaml sein)
+# external-skills:
+#   home-organization:
+#     enabled: true
 
 # Externe Skills — opt-in pro Skill (muss auch approved: true in skills-registry.yaml sein)
 # external-skills:

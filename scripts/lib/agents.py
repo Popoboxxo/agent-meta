@@ -930,7 +930,7 @@ def sync_agents(
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            if write_checked(target_path, content, log, rel_label):
+            if write_checked(target_path, content, log, rel_label, config=config):
                 log.action("WRITE", rel_out, rel_label)
             else:
                 log.skip(rel_out, "unchanged")
@@ -1291,7 +1291,7 @@ def sync_agents_for_provider(
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            if write_checked(target_path, content, log, rel_label):
+            if write_checked(target_path, content, log, rel_label, config=config):
                 log.action('WRITE', rel_out, rel_label)
             else:
                 log.skip(rel_out, 'unchanged')
