@@ -77,54 +77,6 @@ def _validate_tools_against_whitelist(
             )
     return valid
 
-# Provider-specific parallel execution patterns (injected as {{PARALLEL_PATTERN}})
-_PROVIDER_PARALLEL_PATTERNS: dict[str, str] = {
-    "Claude": (
-        "**Parallel-Pattern (konkret):**\n"
-        "```\n"
-        '# Vordergrund:\n'
-        'Agent(subagent_type="validator", prompt="DoD-Check für ...")\n'
-        "# Gleichzeitig im Hintergrund:\n"
-        'Agent(subagent_type="documenter", prompt="Update CODEBASE_OVERVIEW ...", run_in_background=True)\n'
-        "# Dann warten bis Hintergrund fertig, dann:\n"
-        'Agent(subagent_type="git", prompt="Commit und PR erstellen ...")\n'
-        "```\n"
-    ),
-    "Opencode": (
-        "**Parallel-Dispatch (Opencode):**\n"
-        "FANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\n"
-        "PARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\n"
-        "BARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n"
-        "\n"
-        "```\n"
-        "# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\n"
-        "task(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\n"
-        "task(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\n"
-        "task(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n"
-        "# Alle drei Calls in derselben Antwort → parallele Ausführung\n"
-        "# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n"
-        "```\n"
-        "\n"
-        "Limit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
-    ),
-    "Gemini": (
-        "**Parallel-Pattern (konkret):**\n"
-        "Gemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\n"
-        "Delegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
-    ),
-    "Continue": (
-        "**Parallel-Pattern:**\n"
-        "Continue unterstützt keine native parallele Subagent-Ausführung.\n"
-        "Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
-    ),
-    "Copilot": (
-        "**Parallel-Pattern:**\n"
-        "GitHub Copilot unterstützt keine native parallele Subagent-Ausführung.\n"
-        "Führe parallele Schritte sequentiell aus oder verwende separate VS Code-Sessions.\n"
-    ),
-}
-
-
 def _update_frontmatter_dict(content: str, updates: dict, removes: list = None) -> str:
     """Update YAML frontmatter fields in content using PyYAML.
 
@@ -1062,7 +1014,6 @@ def sync_agents_for_provider(
             'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
             'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
             'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
-            'PARALLEL_PATTERN': _PROVIDER_PARALLEL_PATTERNS.get(provider, _PROVIDER_PARALLEL_PATTERNS['Claude']),
         }
         merged_vars = {**variables, **provider_vars}
 
@@ -1083,14 +1034,6 @@ def sync_agents_for_provider(
         from .delegation_syntax import DelegationSyntaxEngine
         pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
         content = pal_engine.apply(content, provider)
-
-        # Inject platform-specific orchestrator patches (Issue #250)
-        if role == "orchestrator":
-            from .config import PLATFORM_ORCHESTRATOR_PATCHES
-            patches = PLATFORM_ORCHESTRATOR_PATCHES.get(provider, [])
-            for patch in patches:
-                content = apply_patch(content, patch, log, f"{provider}-orchestrator-patch")
-                log.info(str(target_path.relative_to(project_root)), f"applied {provider} orchestrator patch")
 
         name = Path(filename).stem
         layer = source_path.parts[-2]

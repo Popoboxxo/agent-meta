@@ -29,6 +29,7 @@ class DelegationSyntaxEngine:
         "PAL_PARALLEL_GROUP": "parallel_group",
         "PAL_FALLBACK": "fallback",
         "PAL_TOOL_PREAMBLE": "tool_preamble",
+        "PAL_PARALLEL_PATTERN": "parallel_pattern",
     }
 
     def __init__(self, config_dir: Path | None = None) -> None:

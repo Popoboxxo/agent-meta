@@ -792,7 +792,7 @@ def sync_prompts_for_continue(
     """
     from .agents import (collect_sources, extract_frontmatter_field, compose_agent,
                           target_filename, _strip_frontmatter, _strip_claude_specific_lines,
-                          _make_slim_body, AGENTS_DIR, _PROVIDER_PARALLEL_PATTERNS)
+                          _make_slim_body, AGENTS_DIR)
     from .config import substitute, strip_inactive_conditional_blocks
     from .providers import resolve_provider_options
     from .roles import build_role_map
@@ -807,7 +807,6 @@ def sync_prompts_for_continue(
         'SNIPPETS_DIR': pc.get('snippets_dir', '.continue/snippets'),
         'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.continue/pending-tasks.md'),
         'SKILLS_DIR': pc.get('skills_dir', '.continue/skills'),
-        'PARALLEL_PATTERN': _PROVIDER_PARALLEL_PATTERNS.get("Continue", _PROVIDER_PARALLEL_PATTERNS["Claude"]),
     }
     merged_vars = {**variables, **provider_vars}
 
@@ -843,6 +842,11 @@ def sync_prompts_for_continue(
         rel_source = str(source_path.relative_to(agent_meta_root))
         content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_conditional_blocks(content, merged_vars)
+
+        # Apply PAL delegation syntax for Continue prompts
+        from .delegation_syntax import DelegationSyntaxEngine
+        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+        content = pal_engine.apply(content, "Continue")
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
         template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
