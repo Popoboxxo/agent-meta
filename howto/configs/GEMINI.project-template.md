@@ -16,6 +16,9 @@ DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | Te
 
 Agent files are in `.gemini/agents/`. Use them with `@agent-name` in Gemini CLI.
 
+<!-- agent-meta:bootstrap-begin -->
+<!-- agent-meta:bootstrap-end -->
+
 ## Project Setup
 
 - **Build:** `{{BUILD_COMMAND}}`

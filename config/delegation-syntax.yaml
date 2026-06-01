@@ -9,7 +9,8 @@ delegation_syntax:
     parallel_group: "{{foreground}}\n\n# Gleichzeitig im Hintergrund (in derselben Antwort):\n{{background}}"
     fallback: "Delegiere folgende Aufgabe an den Orchestrator: {{task}}"
     bootstrap: "file-based"
-    tool_preamble: true
+    tool_preamble: "true"
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\n# Vordergrund:\nAgent(subagent_type=\"validator\", prompt=\"DoD-Check für ...\")\n# Gleichzeitig im Hintergrund:\nAgent(subagent_type=\"documenter\", prompt=\"Update CODEBASE_OVERVIEW ...\", run_in_background=True)\n# Dann warten bis Hintergrund fertig, dann:\nAgent(subagent_type=\"git\", prompt=\"Commit und PR erstellen ...\")\n```\n"
 
   Opencode:
     delegate: 'task(subagent_type="{{agent}}", description="{{short_desc}}", prompt="{{task}}")'
@@ -17,7 +18,8 @@ delegation_syntax:
     parallel_group: "{{foreground}}\n\n# Parallel:\n{{background}}"
     fallback: "@orchestrator {{task}}"
     bootstrap: "file-based"
-    tool_preamble: true
+    tool_preamble: "true"
+    parallel_pattern: "**Parallel-Dispatch (Opencode):**\nFANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\nPARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\nBARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n\n```\n# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\ntask(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n# Alle drei Calls in derselben Antwort → parallele Ausführung\n# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n```\n\nLimit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
 
   Gemini:
     delegate: 'Rufe den **{{agent}}-Agenten** auf mit der Aufgabe: "{{task}}"'
@@ -28,8 +30,9 @@ delegation_syntax:
     bootstrap_sequence:
       - type: "api_call"
         template: 'define_subagent(name="{{name}}", description="{{description}}", system_prompt="{{prompt}}")'
-    tool_preamble: false
+    tool_preamble: "false"
     auto_parallel: true
+    parallel_pattern: "**Parallel-Pattern (konkret):**\nGemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\nDelegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
 
   Continue:
     delegate: "@{{agent}} {{task}}"
@@ -40,8 +43,9 @@ delegation_syntax:
     bootstrap_sequence:
       - type: "config_update"
         target: ".continue/config.yaml"
-    tool_preamble: false
+    tool_preamble: "false"
     auto_parallel: false
+    parallel_pattern: "**Parallel-Pattern:**\nContinue unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
 
   Copilot:
     delegate: "@{{agent}} Führe folgende Aufgabe aus: {{task}}"
@@ -49,5 +53,6 @@ delegation_syntax:
     parallel_group: "Bearbeite diese Aufgaben:\n{{tasks_list}}"
     fallback: "Bearbeite: {{task}}"
     bootstrap: "file-based"
-    tool_preamble: false
+    tool_preamble: "false"
     auto_parallel: false
+    parallel_pattern: "**Parallel-Pattern:**\nGitHub Copilot unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate VS Code-Sessions.\n"

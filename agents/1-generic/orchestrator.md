@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.17.0"
+version: "3.18.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -150,15 +150,14 @@ Wenn `ORCHESTRATOR_OUTCOME_CACHING` aktiviert:
 
 ## Parallel Execution Engine
 
-```
-FANOUT(N, AgentType, [tasks]):      N gleiche Agenten parallel starten
-PARALLEL_GROUP([(AgentType, task)]): Verschiedene Agenten parallel starten
+{{PAL_DELEGATE}}
+{{PAL_FANOUT}}
+{{PAL_PARALLEL_GROUP}}
 BARRIER():                           Warten bis alle fertig; Ergebnisse sammeln
 REPEAT_UNTIL(gen, critic, max):     Generator → Critic → Revision bis max
 PIPELINE(name, stages):             Vordefinierte Pipeline sequentiell/parallel
-```
 
-**Capability Detection:** `{{PARALLEL_PATTERN}}` enthält Provider-Anweisungen. "not supported" → sequentieller Fallback.
+**Capability Detection:** {{PAL_PARALLEL_PATTERN}}
 
 ---
 
@@ -386,7 +385,7 @@ Alle anderen Agenten werden **ausschließlich** über das native Tool-Call-Inter
 - Worker-Agenten antworten **nie** mit `@<anderer-agent>` im Chat
 - Der Hauptchat delegiert **nie** mit `@<agent>` — er verwendet das native Dispatch-Tool oder `@orchestrator` als Fallback
 
-**Fallback:** Falls Tool-Calls nicht verfügbar → `@orchestrator <Aufgabe>`.
+**Fallback:** Falls Tool-Calls nicht verfügbar → {{PAL_FALLBACK}}.
 
 ---
 
@@ -533,6 +532,14 @@ Wenn eine Delegation fehlschlägt (Permission denied, Tool unavailable, Timeout)
 **Grundregel:** Nach 2 gescheiterten Delegationen für denselben Intent → User um Klärung bitten. **Niemals selbst Workarounds implementieren.**
 
 <!-- ===== END MANAGED ===== -->
+
+{{#if PAL_TOOL_PREAMBLE}}
+---
+
+## Tools
+
+Verwende die verfügbaren Tools entsprechend deiner Aufgabe.
+{{/if}}
 
 ## Sprache
 

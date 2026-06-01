@@ -441,6 +441,9 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
         key = match.group(1)
         if key in variables:
             return variables[key]
+        # Skip PAL_* placeholders — they are handled by DelegationSyntaxEngine downstream
+        if key.startswith("PAL_"):
+            return match.group(0)
         log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
 
@@ -453,101 +456,4 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
     return text
 
 
-# ---------------------------------------------------------------------------
-# Platform Orchestrator Patches — provider-specific orchestrator instructions
-# injected by sync.py during agent generation (Issue #250).
-# ---------------------------------------------------------------------------
 
-PLATFORM_ORCHESTRATOR_PATCHES: dict[str, list[dict]] = {
-    "Gemini": [
-        {
-            "op": "append-after",
-            "anchor": "## Mention-Interception Policy (Pflicht)",
-            "content": (
-                "### Gemini/Antigravity-spezifische Hinweise\n"
-                "\n"
-                "**Technische Einschränkung:** Die Gemini/Antigravity UI interceptet **ausschließlich** den `@orchestrator`-Mention.\n"
-                "Alle anderen `@<agent>`-Mentions (`@git`, `@feedback`, `@meta-feedback`, `@developer`, etc.) werden als\n"
-                "reiner Text gerendert und lösen **keine** Subagent-Invocation aus.\n"
-                "\n"
-                "**Pflicht-Regeln für Gemini:**\n"
-                "1. Verwende IMMER `@orchestrator <Aufgabe>` für alle Delegationsaufrufe\n"
-                "2. Verwende NIEMALS `@git`, `@feedback`, `@developer` oder andere Agent-Mentions\n"
-                "3. Wenn der Hauptchat delegieren muss: `@orchestrator Delegiere an git: \"Commit message...\"`\n"
-                "4. Die \"Ausnahmen — direkter Dispatch\" aus use-orchestrator.md gelten in Gemini **nicht** als User-Mentions — sie sind rein interne Delegationsentscheidungen\n"
-                "\n"
-                "**Wichtiger Hinweis zur Delegation:**\n"
-                "Gemini/Antigravity unterstützt kein natives Subagent-Dispatch-Tool wie andere Umgebungen.\n"
-                "Die ausgelieferten `.gemini/agents/*.md`-Dateien werden von Antigravity **nicht** automatisch geladen.\n"
-                "Siehe Bootstrap-Instruktionen in `GEMINI.md` für die Session-Start-Registrierung.\n"
-                "\n"
-                "**Beispiel — Falsch (funktioniert nicht in Gemini):**\n"
-                "> \"@meta-feedback Bitte erstelle ein Issue für...\"\n"
-                "\n"
-                "**Beispiel — Richtig:**\n"
-                "> \"@orchestrator Delegiere an meta-feedback: Erstelle ein Issue für...\""
-            ),
-        },
-        {
-            "op": "append",
-            "content": (
-                "## Gemini/Antigravity — SE-Cascade Workaround\n"
-                "\n"
-                "Gemini unterstützt kein natives Subagent-Dispatch-Tool. "
-                "Für SE-Cascades verwende `scripts/run-cascade.py`:\n"
-                "1. `python scripts/run-cascade.py --input \"<Stakeholder Need>\"`\n"
-                "2. Prompt-Dateien aus `.se-cascade/<session>/prompts/` in Gemini einfügen\n"
-                "3. Ergebnisse in `.se-cascade/<session>/` speichern\n"
-                "4. `--resume <session-id>` für Fortsetzung nach Unterbrechung\n"
-                "\n"
-                "Dokumentation: `howto/SE_CASCADE_GEMINI.md`\n"
-            ),
-        },
-    ],
-    "Continue": [
-        {
-            "op": "append-after",
-            "anchor": "## Mention-Interception Policy (Pflicht)",
-            "content": (
-                "### Continue-spezifische Delegation\n"
-                "\n"
-                "Continue unterstützt **kein** natives Subagent-Dispatch-Tool.\n"
-                "Delegation erfolgt ausschließlich über `@agent`-Text-Mentions:\n"
-                "\n"
-                "**Syntax:**\n"
-                "- `@developer Implementiere Feature X`\n"
-                "- `@git Commit und push`\n"
-                "- `@code-reviewer Prüfe die Änderungen`\n"
-                "\n"
-                "**Einschränkungen:**\n"
-                "- Keine parallele Subagent-Ausführung — Aufgaben sequentiell abarbeiten\n"
-                "- Agent-Dateien müssen in `.continue/prompts/` liegen\n"
-                "- Der `@orchestrator`-Mention wird von Continue unterstützt\n"
-                "\n"
-                "**Pflicht-Regeln für Continue:**\n"
-                "1. Verwende `@agent <Aufgabe>` für alle Delegationen\n"
-                "2. Keine parallelen Delegationen — sequentiell abarbeiten\n"
-                "3. Prüfe nach jeder Delegation das Ergebnis vor der nächsten\n"
-            ),
-        },
-    ],
-    "Copilot": [
-        {
-            "op": "append-after",
-            "anchor": "## Mention-Interception Policy (Pflicht)",
-            "content": (
-                "### Copilot-spezifische Delegation\n"
-                "\n"
-                "Copilot verwendet `@agent`-Text-Mentions für Agenten-Dispatch:\n"
-                "\n"
-                "**Syntax:**\n"
-                "- `@developer Implementiere Feature X`\n"
-                "- `@git Commit und push`\n"
-                "\n"
-                "**Einschränkungen:**\n"
-                "- Keine parallele Subagent-Ausführung — sequentiell\n"
-                "- Agenten werden aus `.github/copilot/agents/` geladen\n"
-            ),
-        },
-    ],
-}
