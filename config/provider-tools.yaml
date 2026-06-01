@@ -49,7 +49,6 @@ gemini:
   # === UNSUPPORTED TOOLS (explicitly documented for clarity) ===
   # The following tools are NOT supported by Gemini and will be filtered/ignored during sync:
   # - Agent              # Gemini has no subagent dispatch
-  # - TodoWrite          # Gemini has no todo/task list feature
   # - Task               # Gemini has no task orchestration
   # - mcp__*             # Gemini MCP support varies by version
 

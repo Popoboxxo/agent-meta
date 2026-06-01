@@ -153,6 +153,38 @@ def sync_context_for_provider(
                 else:
                     log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
 
+        # .gemini/settings.json — skeleton created once, never overwritten
+        settings_file = pc.get("settings_file")
+        if settings_file:
+            settings_path = safe_path(project_root, settings_file)
+            if settings_path.exists():
+                log.skip(str(settings_path.relative_to(project_root)),
+                         "already exists — not overwritten")
+            else:
+                settings_template_rel = pc.get("settings_template")
+                settings_template_path = (
+                    agent_meta_root / settings_template_rel if settings_template_rel else None
+                )
+                if settings_template_path and settings_template_path.exists():
+                    json_content = settings_template_path.read_text(encoding="utf-8")
+                    source_label = settings_template_rel
+                else:
+                    json_content = (
+                        '{\n'
+                        '  "//": "Gemini settings — https://ai.google.dev/gemini-api/docs"\n'
+                        '}\n'
+                    )
+                    source_label = "minimal fallback"
+                    if settings_template_rel:
+                        log.warn(
+                            f"{settings_template_rel} not found "
+                            f"— using minimal fallback for {settings_file}"
+                        )
+                log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
+                if not dry_run:
+                    settings_path.parent.mkdir(parents=True, exist_ok=True)
+                    settings_path.write_text(json_content, encoding="utf-8")
+
     elif provider == "Opencode":
         context_file = pc["context_file"]  # "AGENTS.md"
         target_path = safe_path(project_root, context_file)

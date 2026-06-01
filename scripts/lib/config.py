@@ -439,6 +439,10 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
     # Second pass: substitute real {{VAR}} placeholders
     def replacer(match):
         key = match.group(1)
+        # PAL_* placeholders are handled by the delegation syntax engine,
+        # not by general substitution — skip silently.
+        if key.startswith("PAL_"):
+            return match.group(0)
         if key in variables:
             return variables[key]
         # Skip PAL_* placeholders — they are handled by DelegationSyntaxEngine downstream
