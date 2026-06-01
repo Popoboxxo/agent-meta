@@ -156,10 +156,10 @@ Delegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolg
 
 3. invoke_subagent("git", "Commit + Push + PR")
 
-
 ### Pipeline: quick-fix
 1. invoke_subagent("developer", "Bugfix")
 2. invoke_subagent("git", "Commit + Push")
+
 
 
 ### Pipeline: bugfix
@@ -216,7 +216,6 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
-
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.

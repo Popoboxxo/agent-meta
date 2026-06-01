@@ -155,10 +155,10 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 
 3. @git Commit + Push + PR
 
-
 ### Pipeline: quick-fix
 1. @developer Bugfix
 2. @git Commit + Push
+
 
 
 ### Pipeline: bugfix
@@ -215,7 +215,6 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
-
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.

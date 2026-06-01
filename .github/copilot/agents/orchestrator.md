@@ -153,10 +153,10 @@ Führe parallele Schritte sequentiell aus oder verwende separate VS Code-Session
 
 3. task(subagent_type="git", prompt="Commit + Push + PR")
 
-
 ### Pipeline: quick-fix
 1. task(subagent_type="developer", prompt="Bugfix")
 2. task(subagent_type="git", prompt="Commit + Push")
+
 
 
 ### Pipeline: bugfix
@@ -213,7 +213,6 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
-
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
