@@ -49,7 +49,7 @@ Unterstützt `@./path/file.md` für Modularisierung.
 | Kontext-Datei | `CLAUDE.md` | `GEMINI.md` |
 | Config-Verzeichnis | `.claude/` | `.gemini/` |
 | Sub-Agenten | `.claude/agents/*.md` | `.gemini/agents/*.md` |
-| Rules (auto-load) | `.claude/rules/` | **Nicht vorhanden** (alles in GEMINI.md) |
+| Rules (auto-load) | `.claude/rules/` | `.gemini/rules/` |
 | Slash-Commands | `.claude/commands/*.md` | `.gemini/commands/*.toml` |
 | Hooks | `.claude/hooks/*.sh` + `settings.json` | `.gemini/hooks/*.sh` + `settings.json` |
 | Frontmatter: model | `model:` | `model:` |
@@ -83,11 +83,10 @@ Entfernt im Vergleich zu Claude: `memory`, `permissionMode`.
 
 ## Rules
 
-Gemini CLI hat **kein `.gemini/rules/`-Verzeichnis**. Regeln werden direkt in
-`GEMINI.md` eingebettet. agent-meta generiert deshalb:
+Gemini CLI unterstützt `.gemini/rules/` für Rule-Dateien. agent-meta generiert:
 
-- Keine separaten Rule-Dateien für Gemini
-- `has_rules: false` in `config/ai-providers.yaml`
+- Rule-Dateien in `.gemini/rules/`
+- `has_rules: true` in `config/ai-providers.yaml`
 
 **Workaround:** Wichtige Regeln als eigene `@./`-Referenzen in GEMINI.md einbinden:
 
@@ -191,13 +190,13 @@ model-overrides:
 | `.gemini/settings.json` | ❌ Einmalig angelegt (Skeleton) |
 | `.gemini/commands/*.toml` | ✅ Aus `commands/` transformiert, stale gelöscht |
 | `.gemini/hooks/*.sh` | ✅ Kopiert, stale gelöscht |
-| Rules | ❌ Nicht vorhanden (kein `.gemini/rules/`) |
+| Rules | ✅ Generiert in `.gemini/rules/`, stale gelöscht |
 
 ---
 
 ## Bekannte Einschränkungen
 
-1. **Kein Rules-System** — Regeln nur über GEMINI.md einbindbar
+1. **Rules werden wie bei Claude generiert** — `.gemini/rules/` wird von sync.py befüllt
 2. **Kein persistentes Agenten-Gedächtnis** — `memory:`-Feld wird entfernt
 3. **Kein permissionMode** — Berechtigungen über Google-Account gesteuert
 4. **Sub-Agenten inoffiziell** — Gemini kennt `.gemini/agents/` nicht nativ; die Dateien sind für zukünftige Kompatibilität vorbereitet

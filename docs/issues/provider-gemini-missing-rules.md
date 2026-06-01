@@ -1,7 +1,13 @@
 ---
 title: "[provider] Gemini skips 5 rules, reducing agent context significantly"
 labels: [provider, Gemini, P1]
+status: resolved
+resolved-in: "Removed all `gemini: skip` entries from `minimal` and `silent` presets. Closes #71, #80."
 ---
+
+> **RESOLVED** — All `gemini: skip` entries have been removed from `config/rules-presets.yaml`.
+> Gemini now gets all rules like Claude. Rules are generated into `.gemini/rules/`.
+> See `CHANGELOG.md` for details.
 
 ## Summary
 The Gemini rules-preset skips 5 important rules: `dod-criteria`, `issue-lifecycle`, `lifecycle-tasks`, `use-orchestrator`, `sync-interface`. This means Gemini agents operate with significantly less context than Claude agents.
@@ -36,9 +42,9 @@ Either:
 3. **Create Gemini-specific rule variants** without `alwaysApply`
 
 ## Acceptance Criteria
-- [ ] All 5 rules are available to Gemini agents in some form
-- [ ] `GEMINI.md` includes full rule context
-- [ ] `sync.log` shows no `[SKIP] (rules-preset: gemini: skip)` for these rules
+- [x] All 5 rules are available to Gemini agents in some form
+- [x] `GEMINI.md` includes full rule context
+- [x] `sync.log` shows no `[SKIP] (rules-preset: gemini: skip)` for these rules
 
 ## Related
 - `docs/reviews/framework-provider-review-2026-05-07.md` — Finding #8
