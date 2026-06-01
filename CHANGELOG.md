@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.57.1] — 2026-06-01
+
+### Fixed
+
+- **COCOPILOT.md typo**: Renamed `COCOPILOT.md` to `COPILOT.md` — fixes broken file reference for Copilot platform.
+- **Gemini settings.json not initialized**: Gemini `settings.json` was never created during sync, causing missing configuration in Gemini projects.
+- **Gemini orchestrator had zero tools**: Gemini orchestrator agent received an empty tool list, breaking all delegation capabilities.
+- **Cross-block matching in conditional stripping**: Prevented false-positive matches when stripping inactive `{{#if}}` blocks across separate template sections.
+
+### Changed
+
+- **use-orchestrator rule shortened**: Reduced from 188 to 29 lines by extracting verbose content to lazy-load `_wf-use-orchestrator.md` file. (#280)
+- **Orchestrator template reduced**: Shrunk from 547 to 323 lines (-41%) by extracting workflow details to `_wf-*.md` files.
+- **PAL wiring completed**: Moved all provider-specific syntax from generic templates into platform adapter templates — full Provider Abstraction Layer integration. (#278)
+- **Orphaned GEMINI.md removed**: Removed stale root-level `GEMINI.md` — Gemini now correctly reads `.gemini/GEMINI.md`.
+
+---
+
 ## [0.57.0] — 2026-05-31
 
 ### Added
