@@ -167,10 +167,10 @@ Agent(subagent_type="git", prompt="Commit und PR erstellen ...")
 
 3. background(agent="git", prompt="Commit + Push + PR")
 
-
 ### Pipeline: quick-fix
 1. background(agent="developer", prompt="Bugfix")
 2. background(agent="git", prompt="Commit + Push")
+
 
 
 ### Pipeline: bugfix
@@ -227,7 +227,6 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
-
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.

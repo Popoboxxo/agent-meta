@@ -128,9 +128,9 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 
 ### Pipeline: standard-feature
 
-
-
 ### Pipeline: quick-fix
+
+
 
 
 ### Pipeline: bugfix
@@ -172,7 +172,6 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
-
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
