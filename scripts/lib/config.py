@@ -341,6 +341,10 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
         {{#unless VAR}}...content...{{/unless}}
 
     Nested blocks are resolved via repeated passes until no markers remain.
+
+    Uses a guarded non-greedy pattern to prevent cross-block matching
+    (e.g. DOD_REQ_TRACEABILITY accidentally matching the ORCHESTRATOR_ENABLED
+    block's {{else}} token).
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
@@ -356,21 +360,26 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
         for var in conditional_vars:
             var_pattern = re.escape(var)
 
-            # 1. Handle {{#if VAR}}...{{else}}...{{/if}} (if-else-endif)
-            def replace_if_else(m: re.Match, _var: str = var) -> str:
-                true_branch = m.group(1)
-                false_branch = m.group(2)
-                is_true = variables.get(_var, "true") == "true"
-                result = true_branch if is_true else false_branch
-                # Preserve trailing newline if original match ended with one
+            # Process simple-if FIRST (before if-else) to prevent
+            # cross-block matching: a simple {{#if A}}...{{/if}} should
+            # never accidentally capture a downstream {{else}} token.
+            #
+            # 1. Handle {{#if VAR}}...{{/if}} (simple, no else)
+            def replace_if(m: re.Match, _var: str = var) -> str:
+                block_content = m.group(1)
+                if variables.get(_var, "true") == "false":
+                    return ""
+                stripped = block_content.strip("\n")
                 if m.group(0).endswith("\n"):
-                    if not result.endswith("\n"):
-                        result = result + "\n"
-                return result
+                    return stripped + "\n"
+                return stripped
 
-            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?(.*?)\{{{{else\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            # Guard: prevent simple-if from matching if-else blocks
+            # by not crossing {{/if}} or {{else}} boundaries.
+            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
+            pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?({_simple_body})\{{{{/if\}}}}\n?"
             old_text = text
-            text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
+            text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
             if text != old_text:
                 made_change = True
 
@@ -385,25 +394,31 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                     return stripped + "\n"
                 return stripped
 
-            pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?(.*?)\{{{{/unless\}}}}\n?"
+            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}).)*?"
+            pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?({_unless_body})\{{{{/unless\}}}}\n?"
             old_text = text
             text = re.sub(pattern_unless, replace_unless, text, flags=re.DOTALL)
             if text != old_text:
                 made_change = True
 
-            # 3. Handle {{#if VAR}}...{{/if}} (simple, no else)
-            def replace_if(m: re.Match, _var: str = var) -> str:
-                block_content = m.group(1)
-                if variables.get(_var, "true") == "false":
-                    return ""
-                stripped = block_content.strip("\n")
+            # 3. Handle {{#if VAR}}...{{else}}...{{/if}} (if-else-endif)
+            def replace_if_else(m: re.Match, _var: str = var) -> str:
+                true_branch = m.group(1)
+                false_branch = m.group(2)
+                is_true = variables.get(_var, "true") == "true"
+                result = true_branch if is_true else false_branch
+                # Preserve trailing newline if original match ended with one
                 if m.group(0).endswith("\n"):
-                    return stripped + "\n"
-                return stripped
+                    if not result.endswith("\n"):
+                        result = result + "\n"
+                return result
 
-            pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            # Guard: prevent if-else from matching past {{/if}} into
+            # other blocks (e.g. DOD simple-if capturing orchestrator's {{else}}).
+            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
+            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
             old_text = text
-            text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
+            text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
             if text != old_text:
                 made_change = True
 

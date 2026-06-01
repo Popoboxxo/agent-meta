@@ -61,7 +61,6 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 | CI/CD / Infrastruktur | `devops-engineer` | `fast` / Ja |
 | Performance / Bottlenecks | `performance-optimizer` | `powerful` / Nein |
 | Export / Target-Routing | `export-manager` | `fast` / Nein |
-
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | — / Ja |
 | Aufwandsschätzung | `effort-estimator` | `fast` / Nein |
@@ -131,8 +130,6 @@ Führe parallele Schritte sequentiell aus oder verwende separate Continue-Sessio
 ### Pipeline: quick-fix
 
 
-
-
 ### Pipeline: bugfix
 
 ---
@@ -172,6 +169,8 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
+
+  → Anonymisieren → meta-feedback + Neuformulierung erbitten
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.

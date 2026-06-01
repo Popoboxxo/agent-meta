@@ -73,7 +73,6 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 | CI/CD / Infrastruktur | `devops-engineer` | `fast` / Ja |
 | Performance / Bottlenecks | `performance-optimizer` | `powerful` / Nein |
 | Export / Target-Routing | `export-manager` | `fast` / Nein |
-
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | — / Ja |
 | Aufwandsschätzung | `effort-estimator` | `fast` / Nein |
@@ -161,7 +160,6 @@ Delegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolg
 2. invoke_subagent("git", "Commit + Push")
 
 
-
 ### Pipeline: bugfix
 1. invoke_subagent("bug-feature-analyzer", "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen.")
 2. invoke_subagent("developer", "Bugfix implementieren")
@@ -216,6 +214,8 @@ Intent nicht in Tabelle:
 1. Max. 1 präzisierende Frage → bei Klärung normal routen
 2. Fallback:
 ```
+
+  → Anonymisieren → meta-feedback + Neuformulierung erbitten
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
