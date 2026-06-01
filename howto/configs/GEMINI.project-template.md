@@ -14,7 +14,7 @@ DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | Te
 
 ## Agents
 
-Agent files are in `.gemini/agents/`. Use them with `@agent-name` in Gemini CLI.
+Agent files are in `.gemini/agents/`. Agents must be registered at session start via the bootstrap instructions above. `@agent` text mentions are not intercepted by Gemini.
 
 ## Project Setup
 
