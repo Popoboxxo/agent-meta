@@ -269,7 +269,7 @@ def sync_context_for_provider(
                     settings_path.write_text(json_content, encoding="utf-8")
 
     elif provider == "Copilot":
-        # 1. .github/copilot/COCOPILOT.md — created once from template; managed block updated
+        # 1. .github/copilot/COPILOT.md — created once from template; managed block updated
         context_file = pc["context_file"]
         if context_file is None:
             return

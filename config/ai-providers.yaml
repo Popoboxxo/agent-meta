@@ -153,7 +153,7 @@ providers:
   Copilot:
     agents_dir: .github/copilot/agents
     agent_ext: .md
-    context_file: .github/copilot/COCOPILOT.md
+    context_file: .github/copilot/COPILOT.md
     context_template: howto/configs/COPILOT.project-template.md
     has_rules: true
     rules_dir: .github/copilot/rules
