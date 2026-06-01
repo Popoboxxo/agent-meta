@@ -232,6 +232,9 @@ Intent nicht in Tabelle:
 
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
 
+  → Main-Chat führt selbst aus
+   + Meta-Feedback im Hintergrund
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
