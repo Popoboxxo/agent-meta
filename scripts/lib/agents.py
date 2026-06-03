@@ -312,6 +312,14 @@ def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
     return None
 
 
+def _is_role_enabled(role: str, config: dict) -> bool:
+    """Check if a role is enabled based on project config (e.g. systems-engineering flag)."""
+    if role.startswith("se-"):
+        se_config = config.get("systems-engineering") or {}
+        return se_config.get("enabled", True)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # XML Section Wrapping — wraps Markdown sections in XML tags for LLM parsing
 # ---------------------------------------------------------------------------
@@ -807,6 +815,11 @@ def sync_agents(
                      f"role '{role}' not in config['roles']")
             continue
 
+        if not _is_role_enabled(role, config):
+            log.skip(str(target_dir / filename).replace(str(project_root) + "/", "").replace(str(project_root) + "\\", ""),
+                     "systems-engineering is disabled")
+            continue
+
         expected_filenames.add(filename)
         target_path = safe_path(target_dir, filename)
         content = source_path.read_text(encoding="utf-8")
@@ -985,6 +998,14 @@ def sync_agents_for_provider(
                        .replace(str(project_root) + '/', '')
                        .replace(str(project_root) + chr(92), ""))
                 log.skip(rel, f"role '{role}' not in config['roles']")
+            continue
+
+        if not _is_role_enabled(role, config):
+            if provider == 'Claude':
+                rel = (str(target_dir / filename)
+                       .replace(str(project_root) + '/', '')
+                       .replace(str(project_root) + chr(92), ""))
+                log.skip(rel, "systems-engineering is disabled")
             continue
 
         expected_filenames.add(filename)
@@ -1635,6 +1656,8 @@ def build_agent_hints(config: dict, agent_meta_root: Path) -> str:
     for role, source_path in sorted(overrides.items()):
         if allowed_roles is not None and role not in allowed_roles:
             continue
+        if not _is_role_enabled(role, config):
+            continue
         if not target_filename(role, role_map):
             continue
         content = source_path.read_text(encoding="utf-8")
@@ -1664,6 +1687,8 @@ def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[st
     unmapped = []
     for role, source_path in sorted(overrides.items()):
         if allowed_roles is not None and role not in allowed_roles:
+            continue
+        if not _is_role_enabled(role, config):
             continue
         filename = target_filename(role, role_map)
         if not filename:
