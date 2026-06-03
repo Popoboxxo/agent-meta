@@ -1339,12 +1339,12 @@ def _inject_gemini_bootstrap(
     # Validate context_file does not escape project_root (path traversal guard)
     resolved = (project_root / context_file).resolve()
     if project_root.resolve() not in resolved.parents and resolved != project_root.resolve():
-        log.warn(context_file, "path escapes project root — skipping bootstrap injection")
+        log.warn(f"{context_file} path escapes project root — skipping bootstrap injection")
         return
 
     gemini_md_path = project_root / context_file
     if not gemini_md_path.exists():
-        log.warn(str(gemini_md_path.relative_to(project_root)), "does not exist — cannot inject bootstrap instructions")
+        log.warn(f"{str(gemini_md_path.relative_to(project_root))} does not exist — cannot inject bootstrap instructions")
         return
 
     existing = gemini_md_path.read_text(encoding="utf-8")

@@ -66,13 +66,6 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 | Bug/Feature triagieren | `bug-feature-analyzer` | `balanced` / Ja |
 | Log-Analyse | `log-analyzer` | `balanced` / Ja |
 | Release / Version bump | `release` | `balanced` / Nein |
-| Systems Engineering / SE-Kaskade | `se-orchestrator` | `balanced`→`powerful` / Nein |
-| Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `powerful` / Nein |
-| UI-Design / Mockups | `ui-ux-designer` | `balanced` / Ja |
-| API-Design / OpenAPI | `api-specialist` | `balanced` / Nein |
-| CI/CD / Infrastruktur | `devops-engineer` | `fast` / Ja |
-| Performance / Bottlenecks | `performance-optimizer` | `powerful` / Nein |
-| Export / Target-Routing | `export-manager` | `fast` / Nein |
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | — / Ja |
 | Aufwandsschätzung | `effort-estimator` | `fast` / Nein |
@@ -291,17 +284,6 @@ Fallback (kein Tool-Call): Bearbeite folgende Aufgabe selbst, mit höchster Sorg
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. | ❌ (sequentiell) |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | ❌ (sequentiell) |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | ❌ (sequentiell) |
-| `se-architect` | Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität). | ✅ (Multi-Systeme) |
-| `se-critic` | Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit. | ✅ (Multi-Prüfungen) |
-| `se-integration-and-test-manager` | V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen. | ❌ (Meta-Orchestrator) |
-| `se-interface-mgr` | Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend. | ❌ (zentral) |
-| `se-orchestrator` | Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch. | ❌ (Meta-Orchestrator) |
-| `se-requirements` | Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement. | ❌ (sequentiell) |
-| `se-termination` | Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde. | ❌ (schnell) |
-| `se-test-engineer` | Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel. | ✅ (Multi-Strategien) |
-| `se-testreviewer` | Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness. | ✅ (Multi-Reviews) |
-| `se-validator` | L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse. | ❌ (sequentiell) |
-| `se-verifier` | Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen. | ✅ (Multi-Ebenen) |
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | ✅ (Multi-Suites) |
 | `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. | ✅ (Multi-Entwürfe) |
 

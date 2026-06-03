@@ -1,20 +1,7 @@
 {
-  "permissions": {
-    "allow": [],
-    "deny": []
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .gemini/hooks/viz-log.sh"
-          }
-        ]
-      }
-    ]
-  },
+  "theme": "Default",
+  "selectedAuthType": "oauth-personal",
+  "hooks": {},
   "mcpServers": {
     "viz-logger": {
       "type": "stdio",

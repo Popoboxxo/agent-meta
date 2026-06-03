@@ -531,7 +531,7 @@ def main():
                     _ctx = _pc.get("context_file")
                     if _ctx and _ctx != "CLAUDE.md":
                         base_gitignore_entries.append(_ctx)
-        if args.init or is_claude:
+        if is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
             init_settings_json(project_root, log, args.dry_run)
@@ -547,12 +547,12 @@ def main():
         for provider in providers:
             pc = provider_config[provider]
             log.provider_header(provider)
+            sync_context_for_provider(agent_meta_root, project_root, config, variables,
+                                      log, args.dry_run, provider, provider_config)
             sync_agents_for_provider(agent_meta_root, project_root, config, variables,
                                      log, args.dry_run, provider, provider_config,
                                      platform_vars=platform_vars,
                                      debug_mode=debug_mode)
-            sync_context_for_provider(agent_meta_root, project_root, config, variables,
-                                      log, args.dry_run, provider, provider_config)
             if provider == "Continue":
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run,

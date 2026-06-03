@@ -9,17 +9,14 @@ agent-meta-version: 0.57.1
 provider-isolation: disabled
 
 ai-providers:
-  - Claude
-  - Continue
   - Gemini
-  - Opencode
-  - Copilot
+
 
 dod-preset: rapid-prototyping
 rules-preset: silent
 
 systems-engineering:
-  enabled: true
+  enabled: false
 
 platforms:
   - agent-meta
@@ -38,17 +35,6 @@ roles:
   - agent-meta-scout
   - log-analyzer
   - feedback
-  - se-requirements
-  - se-architect
-  - se-critic
-  - se-interface-mgr
-  - se-termination
-  - se-orchestrator
-  - se-test-engineer
-  - se-testreviewer
-  - se-verifier
-  - se-validator
-  - se-integration-and-test-manager
   - code-reviewer
   - ui-ux-designer
   - api-specialist
@@ -156,9 +142,11 @@ variables:
     - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
     - KEINE Breaking Changes ohne Major-Version-Bump
     - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
+    - IMMER zuerst graph tools (z.B. code-review-graph) nutzen — effizienter als Grep/Glob/Read
   CODE_QUALITY_RULES: |
     - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
+    - Änderungs-Workflow: Einfacher Wert -> project.yaml, Projektwissen -> 3-project-ext, Neue Rolle -> 1-generic, Neuer Skill -> sync.py --add-skill
   TESTER_SNIPPETS_PATH: ""
   DEVELOPER_SNIPPETS_PATH: ""
   BUILD_COMMANDS: python scripts/sync.py
@@ -191,7 +179,7 @@ variables:
   BUILD_SYSTEM_NOTES: >-
     sync.py generiert .claude/agents/ im Zielprojekt —
     kein Build-Artifact im Meta-Repo selbst.
-  VERSION_DIST_BEHAVIOUR: Keine Dist. Releases sind Git-Tags auf main.
+  VERSION_DIST_BEHAVIOUR: "Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag."
   SE_MAX_DEPTH: 5
   SE_MAX_CELLS: 20
   SE_MAX_CRITIC_ITERATIONS: 3
