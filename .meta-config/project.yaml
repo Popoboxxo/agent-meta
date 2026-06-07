@@ -10,6 +10,7 @@ provider-isolation: disabled
 
 ai-providers:
   - Gemini
+  - Opencode
 
 
 dod-preset: rapid-prototyping
@@ -216,11 +217,24 @@ orchestrator:
     meta-feedback: true   # Send anonymized feedback to agent-meta
     main-chat: true       # Allow main chat to handle the task
     ask-user: false       # Ask user for preference
+  handoff:
+    protocol: "a2a-v1"           # Aktives Handoff-Protokoll (a2a-v1 = A2A-Envelope)
+    validate-before-delegate: true  # Schema-Validierung vor jeder Delegation
+    supersession-tracking: true     # Supersession-Ketten aktiv (CRITIC-REPEAT_UNTIL)
+    strict-validation: false        # true = Abbruch bei invaliden Handoffs, false = Fallback
+    compact-mode: false             # true = Token-sparend (kurze Payload-Namen)
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:
   enabled: true
   mode: "full"
+  debug: false                # true = A2A-Events in viz loggen (Token-Kosten)
+  a2a_events:                 # Welche A2A-Events loggen? Nur aktiv wenn debug: true
+    handoff_start: true
+    handoff_validated: true
+    handoff_delivered: true
+    handoff_failed: true
+    supersession: true
   event_log: ".meta-viz/events.jsonl"
   report:
     retention_days: 7
@@ -268,6 +282,10 @@ quality-pipelines:
           agent: tester
           task: "Regression-Tests"
           mode: sequential
+
+model-overrides:
+  Opencode:
+    developer: "opencode-go/deepseek-v4-pro"
 
 reflection-pairs:
   overrides:

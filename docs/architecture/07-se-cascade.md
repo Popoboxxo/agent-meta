@@ -271,6 +271,137 @@ variables:
 
 ---
 
+---
+
+## A2A-Handoff-Protokoll für die SE-Kaskade
+
+> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/a2a-best-practice-analysis.md`
+
+### A2A als EINZIGES Format
+
+Die SE-Kaskade nutzt **ausschließlich** A2A-Envelopes für Agent-zu-Agent-Übergaben. Die existierenden SE-Schemas (`se-decomposition.schema.json`, `se-orchestrator.schema.json`) bleiben **unverändert** und werden als `payload` in den Envelope eingebettet.
+
+**SE-Schemas laufen mit `compact_mode: false`** — die langen, lesbaren Feldnamen bleiben erhalten, da die SE-Kaskade strukturreiche Payloads mit vielen semantischen Feldnamen hat und ein Breaking Change der SE-Schemas nicht gerechtfertigt ist.
+
+### viz-Debug als separates Konzept
+
+Der viz-Handshake (`scripts/viz-logger.py`) trackt die **Ausführung** (Operational Layer), der A2A-Envelope trägt die **Datenverträge** (Data Contract Layer). A2A-Events werden **nur** bei `viz.debug: true` geloggt (default: `false` → Null-Token-Kosten im Produktivbetrieb).
+
+Die lose Kopplung erfolgt ausschließlich über `trace_context.viz_task_id` im Envelope.
+
+### Envelope-Beispiel: se-architect → se-critic
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-20260607-025",
+  "source_agent": "se-architect",
+  "target_agent": "se-critic",
+  "schema_ref": "schemas/se-decomposition.schema.json",
+  "compact_mode": false,
+  "payload": {
+    "feature_id": "REQ-L1-SH-001",
+    "stakeholder_requirement": "Das System soll 500ml Wasser in 120s auf 90°C erhitzen.",
+    "sub_components": [
+      {
+        "id": "COMP-001-01",
+        "name": "Heizelement-Steuerung",
+        "domain": "hardware",
+        "black_box_requirement": "Das Heizelement soll 500ml Wasser von 10°C auf 90°C in max. 120s erhitzen."
+      }
+    ],
+    "internal_interfaces": [
+      {
+        "source_id": "COMP-001-02",
+        "target_id": "COMP-001-01",
+        "interface_type": "analog_signal",
+        "data_payload": "PWM control signal 0-100%, 5V logic level"
+      }
+    ],
+    "architectural_rationale": "Heizelement und Temperatursensor als separate Komponenten für Testbarkeit.",
+    "decomposition_completeness": "Alle L1-Anforderungen durch Sub-Komponenten abgedeckt."
+  },
+  "trace_parent": "HOFF-20260607-024"
+}
+```
+
+### Handoff-Routen in der SE-Kaskade
+
+| Route | Contract | Payload-Schema | compact_mode |
+|-------|----------|---------------|-------------|
+| `se-orchestrator → se-requirements` | `se-req-input-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-requirements → se-architect` | `se-req-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-architect → se-critic` | `se-arch-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-critic → se-architect` | `se-critic-reject-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-critic → se-interface-mgr` | `se-critic-approve-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-interface-mgr → se-termination` | `se-ifm-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-termination → se-orchestrator` | `se-term-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
+
+**Alle 7 SE-Routen nutzen dasselbe Payload-Schema** (`se-decomposition.schema.json`) — die SE-Agenten füllen jeweils die für sie relevanten optionalen Felder (architect: `sub_components[]`, critic: `critic_status`, ifm: `propagation_map`, termination: `termination_decisions[]`).
+
+### Supersession in der Critic-Korrekturschleife
+
+Der Critic-Zyklus (architect → critic → architect → ...) nutzt Supersession mit vollständiger `history[]`:
+
+```
+HOFF-020: se-architect → se-critic  (v1, initial)
+  → critic rejected: "missing traceability for COMP-001-03"
+
+HOFF-021: se-architect → se-critic  (v2, supersedes: HOFF-020, history: [HOFF-020])
+  → critic rejected: "interface type mismatch"
+
+HOFF-022: se-architect → se-critic  (v3, supersedes: HOFF-021, history: [HOFF-020, HOFF-021])
+  → critic approved ✓
+
+HOFF-023: se-critic → se-interface-mgr
+  (supersession: { version: 3, supersedes: "HOFF-022", history: ["HOFF-020","HOFF-021","HOFF-022"] })
+```
+
+Der `se-interface-mgr` erhält die vollständige Revisionshistorie via `history[]`-Array und kann jede Iteration nachvollziehen.
+
+### Abbruchbedingung (MAX_CRITIC_ITERATIONS)
+
+Wenn `MAX_CRITIC_ITERATIONS` (default: 3) erreicht ist → `critic_status.status: "blocked"` → Eskalation an `se-orchestrator` mit `supersession.history[]` + Begründung. Kein weiterer Handoff — der `se-orchestrator` entscheidet über Eskalation oder Abbruch.
+
+### Validierungsgrenzen
+
+Jeder Handoff wird **vor** dem Delegieren gegen das Ziel-Schema validiert. Fehlschläge brechen den Handoff ab:
+
+```mermaid
+graph LR
+    subgraph "Data Contract Layer (A2A-Envelope)"
+        V1["Validierung gegen schema_ref"]
+        V2["Validierung gegen target.input_schema"]
+    end
+
+    ARCH -->|"Envelope + Payload"| V1
+    V1 -->|valid| CRIT
+    V1 -->|invalid| ARCH
+
+    CRIT -->|"Response Envelope"| V2
+    V2 -->|valid| ARCH
+    V2 -->|invalid| CRIT
+```
+
+**Regel:** Kein "lost in translation" — invalide Handoffs werden sofort abgewiesen, bevor der downstream-Agent startet.
+
+### A2A + viz-Handshake — parallele Tracking-Ebenen
+
+```
+se-orchestrator → viz: delegate_out(target=se-architect, task_id=uuid-X)
+                 → A2A: handoff_id=HOFF-X, viz_task_id=uuid-X (lose Kopplung)
+
+se-architect    → viz: agent_start(caller=se-orchestrator, task_id=uuid-X)
+                 → A2A: parst Envelope, validiert Payload
+                 → A2A: handoff_delivered(handoff_id=HOFF-X)
+
+se-architect    → viz: agent_end(status=success)
+```
+
+**Nur bei `viz.debug: true`** werden zusätzliche A2A-Events geloggt (`a2a_handoff_start`, `a2a_handoff_validated`, `a2a_handoff_delivered`, `a2a_handoff_failed`).
+
+---
+
 ## Export-Adapter (Zukunft)
 
 Der SE-Workflow ist tool-agnostisch. Phase 1 exportiert nach Markdown. Geplante Adapter:

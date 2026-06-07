@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IdeationExtension — ideation→requirements Payload Extension",
+  "description": "Erweitert TaskSpec um ideation-spezifische Felder. Wird via JSON Schema allOf mit task-spec.schema.json kombiniert. Kurze Feldnamen (2-3 Zeichen) für Token-Effizienz.",
+  "type": "object",
+  "required": ["ci", "g", "sv1"],
+  "properties": {
+    "ci": {
+      "type": "string",
+      "title": "Core Idea",
+      "description": "Ein-Satz-Beschreibung der Kernidee.",
+      "minLength": 1
+    },
+    "g": {
+      "type": "string",
+      "title": "Goal",
+      "description": "Was ändert sich für wen — das intendierte Ergebnis."
+    },
+    "sv1": {
+      "type": "object",
+      "title": "Scope v1",
+      "description": "Minimal viable scope für die erste Version.",
+      "required": ["ins", "oos"],
+      "properties": {
+        "ins": {
+          "type": "array",
+          "title": "In Scope",
+          "description": "Was in der ersten Version enthalten ist.",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "oos": {
+          "type": "array",
+          "title": "Out of Scope",
+          "description": "Was explizit auf spätere Versionen verschoben wird.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "oq": {
+      "type": "array",
+      "title": "Open Questions",
+      "description": "Noch ungeklärte Fragen aus der Ideation.",
+      "items": { "type": "string" }
+    },
+    "ref": {
+      "type": "array",
+      "title": "External References",
+      "description": "URLs oder Referenzen auf relevante externe Ressourcen.",
+      "items": { "type": "string", "format": "uri" }
+    }
+  },
+  "additionalProperties": false
+}

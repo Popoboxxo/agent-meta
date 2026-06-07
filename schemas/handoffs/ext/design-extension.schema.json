@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DesignExtension — ui-ux-designer→developer Payload Extension",
+  "description": "Erweitert TaskSpec um UI/UX-Design-spezifische Felder für die Übergabe von Design-Spezifikationen an den developer. Wird via JSON Schema allOf mit task-spec.schema.json kombiniert.",
+  "type": "object",
+  "required": ["ds"],
+  "properties": {
+    "ds": {
+      "type": "object",
+      "title": "Design Spec",
+      "description": "UI-Komponenten-Spezifikation.",
+      "required": ["cm"],
+      "properties": {
+        "cm": {
+          "type": "array",
+          "title": "Components",
+          "description": "Liste der zu implementierenden UI-Komponenten.",
+          "items": {
+            "type": "object",
+            "required": ["nm"],
+            "properties": {
+              "nm": {
+                "type": "string",
+                "title": "Name",
+                "description": "Komponentenname (z.B. LoginButton, UserCard)"
+              },
+              "tp": {
+                "type": "string",
+                "title": "Type",
+                "description": "Komponententyp (button, form, card, modal, layout, input)."
+              },
+              "st": {
+                "type": "array",
+                "title": "States",
+                "description": "Zu unterstützende Zustände (default, hover, active, disabled, loading, error).",
+                "items": { "type": "string" }
+              },
+              "pr": {
+                "type": "array",
+                "title": "Props",
+                "description": "Props/Properties der Komponente.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "nm": { "type": "string", "title": "Name" },
+                    "tp": { "type": "string", "title": "Type" },
+                    "req": { "type": "boolean", "title": "Required" }
+                  }
+                }
+              },
+              "ac": {
+                "type": "string",
+                "title": "Accessibility",
+                "description": "A11y-Anforderungen (role, aria-Attribute, Tastatur-Navigation)."
+              },
+              "rp": {
+                "type": "string",
+                "title": "Responsive",
+                "description": "Responsive-Verhalten (Breakpoints, Layout-Änderungen)."
+              }
+            }
+          }
+        },
+        "th": {
+          "type": "object",
+          "title": "Theme",
+          "description": "Design-Tokens und Theme-Variablen.",
+          "properties": {
+            "co": {
+              "type": "object",
+              "title": "Colors",
+              "description": "Farbpalette (primary, secondary, surface, error, etc.)."
+            },
+            "ty": {
+              "type": "object",
+              "title": "Typography",
+              "description": "Schriftgrößen, -gewichte, Zeilenhöhen pro Hierarchie-Ebene."
+            },
+            "sp": {
+              "type": "object",
+              "title": "Spacing",
+              "description": "Abstands-Skala (xs, sm, md, lg, xl in px/rem)."
+            },
+            "br": {
+              "type": "object",
+              "title": "Border Radius",
+              "description": "Border-Radius-Werte (sm, md, lg, full)."
+            }
+          }
+        }
+      }
+    },
+    "lo": {
+      "type": "array",
+      "title": "Layouts",
+      "description": "Layout-Spezifikationen (Grid, Flexbox, Positionierung).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nm": { "type": "string", "title": "Name" },
+          "tp": { "type": "string", "title": "Type", "enum": ["grid", "flex", "absolute", "fixed", "flow"] },
+          "sp": { "type": "string", "title": "Spec", "description": "CSS-Grid/Flex-Shorthand oder Beschreibung." }
+        }
+      }
+    },
+    "wf": {
+      "type": "array",
+      "title": "Wireframes",
+      "description": "Referenzen auf Wireframes/Mockups (Dateipfade oder URLs).",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
