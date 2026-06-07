@@ -10,6 +10,7 @@
 
 - [Features](#features)
 - [Architecture](#architecture)
+   - [A2A Handoff Protocol](#a2a-handoff-protocol)
 - [Agent Roster](#agent-roster)
 - [Quick Start](#quick-start)
 - [Setup](#setup)
@@ -107,6 +108,48 @@ config/provider-bootstrap.yaml
 | Gemini | api-based | `define_subagent` API call required at every session start |
 | Continue | config-based | `sync.py` writes agent entries into `.continue/config.yaml` |
 ```
+
+### A2A Handoff Protocol
+
+A standardized JSON envelope for Agent-to-Agent communication with schema validation, supersession tracking, and batch FANOUT — replacing natural-language prompts between agents with structured data contracts.
+
+This is a separate concept from the viz-handshake (Operational Layer). A2A operates as the **Data Contract Layer** — loose coupling via `trace_context.viz_task_id`.
+
+```
+Envelope (handoff_id, schema_ref, payload)
+      ↓
+Schema Validation (against JSON Schema Draft-07)
+      ↓
+Provider Adaptation (json → yaml_text_block for Continue/Copilot)
+      ↓
+Delivery via PAL_DELEGATE / PAL_HANDOFF
+```
+
+#### Key Features
+
+- **Structured Envelopes** instead of natural language: `handoff_id`, `source_agent`, `target_agent`, `payload` — machine-validatable, token-efficient (~60 tokens overhead)
+- **TaskSpec Core + 4 Extensions** cover 84% of agent routes (Ideation, Design, API, Review + SE Decomposition)
+- **Batch-Mode** saves 56% envelope overhead on FANOUT: 3 tasks in one envelope vs 3 separate (~70 vs ~180 tokens)
+- **Supersession-Tracking** for iteration histories (e.g., Critic review loops): full revision chain via `history[]` array
+- **Human-in-the-Loop Gates** with `requires_human_approval` flag for critical delegations
+
+#### Provider Transport Matrix
+
+| Provider | structured_handoff | handoff_format | Envelope Transport |
+|----------|-------------------|----------------|--------------------|
+| Claude | `true` | `json` | JSON in Task-Tool-Prompt |
+| Opencode | `true` | `json` | JSON in task()-Prompt |
+| Gemini | `true` | `json` | JSON in define_subagent-Prompt |
+| Continue | `false` | `yaml_text_block` | YAML block in prompt text |
+| Copilot | `false` | `yaml_text_block` | YAML block in prompt text |
+
+#### Handoff Contracts per Role
+
+Each agent role declares its handoff contracts in `config/role-defaults.yaml` — what it consumes (`input_contracts`) and produces (`output_contract`). 16 roles have handoff contracts configured (orchestrator, developer, requirements, ideation, feature, tester, validator, code-reviewer, ui-ux-designer, api-specialist, and 6 SE agents).
+
+→ Full spec: `docs/concepts/a2a-handoff-protocol.md`
+→ Envelope schema: `schemas/a2a-handoff.schema.json`
+→ TaskSpec + Extensions: `schemas/handoffs/task-spec.schema.json`, `schemas/handoffs/ext/*.schema.json`
 
 ### Orchestrator Dispatch Patterns
 

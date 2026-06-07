@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.19.0"
+version: "3.20.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -60,36 +60,36 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 
 ## Intent-Routing
 
-| User-Intent | Ziel-Agent | Tier / Parallel |
-|-------------|-----------|-----------------|
-| Neues Feature / Bugfix / Refactoring | `feature` (komplex) oder `developer` (klar, ≤3 Dateien) | `balanced`→`powerful` / Ja |
-| Codebase analysieren / Dependencies / Impact | `ideation` | `balanced` / Ja |
-| Design / Konzept / Architektur | `ideation` | `balanced`→`powerful` / Ja |
-| Implementierung / Code schreiben | `developer` | `balanced`→`powerful` / Ja |
-| Git-Operationen | `git` | `fast` / Nein |
-| Dokumentation aktualisieren | `documenter` | `balanced` / Ja |
-| Anforderungen / REQ-ID | `requirements` | `balanced` / Nein |
-| Tests schreiben oder ausführen | `tester` | `balanced` / Ja |
-| Code validieren / DoD prüfen | `code-reviewer`{{#if VALIDATOR_ENABLED}} oder `validator`{{/if}} | `balanced` / Nein |
-| Meta-Fragen (Agent-Setup, Sync, Rules) | `agent-meta-manager` | `fast`→`balanced` / Nein |
-| Projekt-Feedback als GitHub Issue | `feedback` | `fast` / Nein |
-| Bug/Feature triagieren | `bug-feature-analyzer` | `balanced` / Ja |
-| Log-Analyse | `log-analyzer` | `balanced` / Ja |
-| Release / Version bump | `release` | `balanced` / Nein |
+| User-Intent | Ziel-Agent | Handoff-Contract | Tier / Parallel |
+|-------------|-----------|------------------|-----------------|
+| Neues Feature / Bugfix / Refactoring | `feature` (komplex) oder `developer` (klar, ≤3 Dateien) | `task-spec-v1` | `balanced`→`powerful` / Ja |
+| Codebase analysieren / Dependencies / Impact | `ideation` | `task-spec-v1` | `balanced` / Ja |
+| Design / Konzept / Architektur | `ideation` | `task-spec-v1` | `balanced`→`powerful` / Ja |
+| Implementierung / Code schreiben | `developer` | `task-spec-v1` | `balanced`→`powerful` / Ja |
+| Git-Operationen | `git` | — | `fast` / Nein |
+| Dokumentation aktualisieren | `documenter` | `task-spec-v1` | `balanced` / Ja |
+| Anforderungen / REQ-ID | `requirements` | `task-spec-v1` | `balanced` / Nein |
+| Tests schreiben oder ausführen | `tester` | `task-spec-v1` | `balanced` / Ja |
+| Code validieren / DoD prüfen | `code-reviewer`{{#if VALIDATOR_ENABLED}} oder `validator`{{/if}} | `task-spec-v1` | `balanced` / Nein |
+| Meta-Fragen (Agent-Setup, Sync, Rules) | `agent-meta-manager` | — | `fast`→`balanced` / Nein |
+| Projekt-Feedback als GitHub Issue | `feedback` | — | `fast` / Nein |
+| Bug/Feature triagieren | `bug-feature-analyzer` | `task-spec-v1` | `balanced` / Ja |
+| Log-Analyse | `log-analyzer` | `task-spec-v1` | `balanced` / Ja |
+| Release / Version bump | `release` | — | `balanced` / Nein |
 {{#if SE_ENABLED}}
-| Systems Engineering / SE-Kaskade | `se-orchestrator` | `balanced`→`powerful` / Nein |
-| Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `powerful` / Nein |
-| UI-Design / Mockups | `ui-ux-designer` | `balanced` / Ja |
-| API-Design / OpenAPI | `api-specialist` | `balanced` / Nein |
-| CI/CD / Infrastruktur | `devops-engineer` | `fast` / Ja |
-| Performance / Bottlenecks | `performance-optimizer` | `powerful` / Nein |
-| Export / Target-Routing | `export-manager` | `fast` / Nein |
+| Systems Engineering / SE-Kaskade | `se-orchestrator` | — | `balanced`→`powerful` / Nein |
+| Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `task-spec-v1` | `powerful` / Nein |
+| UI-Design / Mockups | `ui-ux-designer` | `task-spec-v1` | `balanced` / Ja |
+| API-Design / OpenAPI | `api-specialist` | `task-spec-v1` | `balanced` / Nein |
+| CI/CD / Infrastruktur | `devops-engineer` | `task-spec-v1` | `fast` / Ja |
+| Performance / Bottlenecks | `performance-optimizer` | `task-spec-v1` | `powerful` / Nein |
+| Export / Target-Routing | `export-manager` | `task-spec-v1` | `fast` / Nein |
 {{/if}}
-| Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | `powerful` / Nein |
-| Batch-Operationen (mehrere gleiche Tasks) | — | — / Ja |
-| Aufwandsschätzung | `effort-estimator` | `fast` / Nein |
-| Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | `balanced`→`powerful` / Nein |
-| Nicht in Tabelle | Frag den User | — / — |
+| Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
+| Batch-Operationen (mehrere gleiche Tasks) | — | `task-spec-v1` (batch: true) | — / Ja |
+| Aufwandsschätzung | `effort-estimator` | — | `fast` / Nein |
+| Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | supersession | `balanced`→`powerful` / Nein |
+| Nicht in Tabelle | Frag den User | — | — / — |
 
 Intent nicht exakt in Tabelle → User fragen, nicht raten. `bug-feature-analyzer` nur durch Orchestrator, nie direkt.
 
@@ -123,6 +123,91 @@ Nach BARRIER(): Ergebnisse sammeln, Konsistenz prüfen, Widersprüche → User i
 
 ---
 
+## A2A Handoff Protocol
+
+**Jede Delegation MUSS als strukturiertes A2A-Envelope erfolgen.** Der Orchestrator ist die Envelope-Fabrik.
+
+### Envelope-Erstellung (vor jeder Delegation)
+
+1. **`handoff_id` generieren:** `HOFF-YYYYMMDD-NNN` (Datum + fortlaufende Nummer)
+2. **`schema_ref` bestimmen:** Aus Intent-Routing-Tabelle (Handoff-Contract-Spalte) oder implizit via Route
+3. **`payload` aus User-Request + Kontext extrahieren:**
+   - `t`: Task-Beschreibung (Pflicht)
+   - `ctx`: Zusätzlicher Kontext (optional)
+   - `con`: Constraints (optional)
+   - `pri`: Priority (optional, default: medium)
+   - `refs`: Referenzen (optional)
+4. **Envelope zusammenbauen:**
+   ```json
+   {
+     "protocol_version": "1.0.0",
+     "handoff_id": "HOFF-YYYYMMDD-NNN",
+     "source_agent": "orchestrator",
+     "target_agent": "<ziel>",
+     "schema_ref": "<schema-uri>",
+     "payload": { "t": "...", "pri": "..." },
+     "trace_parent": "<parent-HOFF>"
+   }
+   ```
+
+### FANOUT — Batch-Mode
+
+Wenn mehrere Tasks an den GLEICHEN Agententyp delegiert werden:
+- `batch: true` setzen
+- `payload` als Array mit `batch_task_id` pro Eintrag
+
+```json
+{
+  "batch": true,
+  "payload": [
+    { "batch_task_id": "T1", "t": "Fix A", "pri": "high" },
+    { "batch_task_id": "T2", "t": "Fix B", "pri": "medium" }
+  ]
+}
+```
+
+Token-Ersparnis vs. separate Envelopes: ~110 Tokens pro FANOUT(3).
+
+### HITL — Human-in-the-Loop
+
+`requires_human_approval: true` setzen bei:
+- Kritischen Änderungen (DELETE-Operationen, Schema-Migrationen)
+- Unsicherheits-Flag: Orchestrator erkennt Ambiguität
+- Security-sensiblen Operationen
+
+Downstream-Agent pausiert vor Ausführung und wartet auf User-Bestätigung.
+
+### Retry-Logik
+
+- Jeder Envelope führt `retry_count` (Start: 0) und `max_retries` (Default: 3)
+- Bei Delegation-Failure: `retry_count` inkrementieren, erneut senden
+- Wenn `retry_count >= max_retries` → Abbruch, User benachrichtigen
+
+### PIPELINE — trace_parent-Verkettung
+
+Bei Pipeline-Delegationen (z.B. requirements→tester→developer):
+- Jeder Schritt setzt `trace_parent` auf die `handoff_id` des vorherigen Schritts
+- Ermöglicht vollständige Chain-of-custody bei Fehlschlägen
+
+### REPEAT_UNTIL — Supersession
+
+Bei Reflection-Loops (z.B. developer↔code-reviewer):
+- Erste Delegation: `supersession` nicht gesetzt, `history: []`
+- Bei Critic-Rejection: neue `handoff_id` mit `supersession.supersedes` auf vorherige ID
+- `supersession.history[]` enthält alle vorherigen handoff_ids (NUR IDs, keine Payloads)
+- `version = history.length + 1`
+
+### Provider-Transport
+
+| Provider | structured_handoff | Transport |
+|----------|-------------------|-----------|
+| Claude, Opencode, Gemini | `true` | JSON-Envelope im Prompt |
+| Continue, Copilot | `false` | YAML-Text-Block (kein natives JSON-Tool-Call) |
+
+Bei `structured_handoff: false`: YAML-Text-Block statt JSON, aber gleiche Struktur.
+
+---
+
 ## Outcome Caching
 
 Wenn aktiviert: Cache-Key = SHA256(agent + prompt[:200]). Read-only, idempotent, keine Side-Effects. Invalidierung nach git-commit.
@@ -134,6 +219,7 @@ Wenn aktiviert: Cache-Key = SHA256(agent + prompt[:200]). Read-only, idempotent,
 {{PAL_DELEGATE}}
 {{PAL_FANOUT}}
 {{PAL_PARALLEL_GROUP}}
+{{PAL_HANDOFF}}
 BARRIER(): Warten bis alle fertig; Ergebnisse sammeln
 REPEAT_UNTIL(gen, critic, max): Generator → Critic → Revision bis max
 PIPELINE(name, stages): Vordefinierte Pipeline sequentiell/parallel

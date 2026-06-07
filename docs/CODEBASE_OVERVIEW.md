@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-07
+> Letzte Aktualisierung: 2026-06-07 (A2A-Status auf Vollständig aktualisiert)
 
 ---
 
@@ -836,7 +836,7 @@ BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 
 ## 10. A2A-Handoff-Protokoll
 
-> **Status:** Konzept v2.0 — Implementation-nah (Phase 1 abgeschlossen)
+> **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
 > **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
 > **Dokument:** `docs/concepts/a2a-handoff-protocol.md`
 > **Analyse:** `docs/concepts/a2a-best-practice-analysis.md`
@@ -921,29 +921,59 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 
 | Artefakt | Änderung | Status |
 |----------|----------|--------|
-| `schemas/a2a-handoff.schema.json` | Envelope: `compact_mode`, `supersession.history[]` | ✓ Phase 1 |
-| `schemas/handoffs/task-spec.schema.json` | Universelles Kern-Payload (NEU) | ✓ Phase 1 |
-| `schemas/handoffs/ext/*.schema.json` | 4 Extensions (NEU) | ✓ Phase 1 |
+| `schemas/a2a-handoff.schema.json` | Envelope: `batch`, `retry_count`, `requires_human_approval`, `negotiated_format`, `supersession.history[]` | ✓ Phase 1 |
+| `schemas/handoffs/task-spec.schema.json` | Universelles Kern-Payload (NEU) — kurze Feldnamen | ✓ Phase 1 |
+| `schemas/handoffs/ext/*.schema.json` | 4 Extensions (NEU): Ideation, Design, API, Review | ✓ Phase 1 |
 | `schemas/se-decomposition.schema.json` | **Unverändert** — in Envelope eingebettet | — |
 | `schemas/se-orchestrator.schema.json` | **Unverändert** — in Envelope eingebettet | — |
-| `.meta-config/project.yaml` | `orchestrator.handoff` + `viz.debug` + `viz.a2a_events` | ✓ Phase 1 |
-| `docs/concepts/a2a-handoff-protocol.md` | Implementation-nahes Konzept (v2.0) | ✓ Phase 1 |
+| `.meta-config/project.yaml` | `orchestrator.handoff`-Block + `viz.debug` + `viz.a2a_events` | ✓ Phase 1 |
+| `docs/concepts/a2a-handoff-protocol.md` | Implementation-nahes Konzept (v2.0, 872 Zeilen) | ✓ Phase 1 |
 | `docs/CODEBASE_OVERVIEW.md` | Abschnitte 5 + 10 aktualisiert | ✓ Phase 1 |
-| `config/delegation-syntax.yaml` | `{{PAL_HANDOFF}}` Platzhalter | Phase 2 |
-| `config/provider-capabilities.yaml` | `structured_handoff` + `handoff_format` Flags | Phase 2 |
-| `scripts/lib/delegation_syntax.py` | `PLACEHOLDERS` um `PAL_HANDOFF` erweitern | Phase 2 |
-| `agents/1-generic/orchestrator.md` | Handoff-Routing-Tabelle + Envelope-Fabrik | Phase 3 |
-| `agents/1-generic/se-*.md` | Envelope-basierte Handoffs in SE-Kaskade | Phase 3 |
-| `scripts/viz-logger.py` | A2A-Events hinter `viz.debug`-Flag | Phase 4 |
+| `config/delegation-syntax.yaml` | `handoff:`-Block für alle 5 Provider (JSON + YAML-Fallback) | ✓ Phase 2 |
+| `config/provider-capabilities.yaml` | `structured_handoff` + `handoff_format` + `handoff_envelope_support` Flags | ✓ Phase 2 |
+| `scripts/lib/delegation_syntax.py` | `PLACEHOLDERS` um `PAL_HANDOFF` erweitert | ✓ Phase 2 |
+| `config/role-defaults.yaml` | 16 Rollen-Contracts: `input_contracts`, `output_contract`, `input_schema`, `output_schema`, `target_roles` | ✓ Phase 3 |
+| `agents/1-generic/orchestrator.md` | Handoff-Routing-Tabelle + Envelope-Fabrik + Supersession-Tracking | ✓ Phase 3 |
+| `agents/1-generic/ideation.md` | Envelope-basierte Handoffs | ✓ Phase 3 |
+| `agents/1-generic/feature.md` | A2A-Handoff-Integration | ✓ Phase 3 |
+| `agents/1-generic/developer.md` | A2A-Envelope-Consumer | ✓ Phase 3 |
+| `agents/1-generic/se-*.md` | Envelope-basierte Handoffs in SE-Kaskade (6 Agenten) | ✓ Phase 3 |
+| `config/mcp-registry.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
+| `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
 
 ### 10.9 Roadmap
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
 | 1 — Konzept + Schemas | Core-Schema + 4 Extensions + Envelope-Anpassungen + Config + Doku | ✓ Abgeschlossen |
-| 2 — Provider-Capabilities | `{{PAL_HANDOFF}}`-Platzhalter + `structured_handoff`-Flags + delegation-syntax.yaml | Geplant |
-| 3 — Agent-Updates | Orchestrator-Envelope-Fabrik + ideation, feature, developer, SE-Agenten | Geplant |
-| 4 — MCP & Tooling | MCP-Tools (resolve-handoff-schema, validate-handoff) + viz-Integration | Geplant |
+| 2 — Provider-Capabilities | `{{PAL_HANDOFF}}`-Platzhalter + `structured_handoff`-Flags + delegation-syntax.yaml | ✓ Abgeschlossen |
+| 3 — Agent-Updates | Orchestrator-Envelope-Fabrik + handoff-Contracts + ideation, feature, developer, SE-Agenten | ✓ Abgeschlossen |
+| 4 — MCP & Tooling | MCP-Tools (resolve-handoff-schema, validate-handoff, resolve-handoff) + viz-Integration | ✓ Abgeschlossen |
+
+### 10.10 Handoff-Contracts in `config/role-defaults.yaml`
+
+16 Rollen deklarieren A2A-Handoff-Contracts in ihrer `handoff:`-Sektion:
+
+| Rolle | input_contracts | output_contract | target_roles | output_schema |
+|-------|----------------|-----------------|--------------|---------------|
+| **orchestrator** | — | `task-spec-v1` | — | — |
+| **developer** | `task-spec-v1` | `dev-result-v1` | — | — |
+| **requirements** | `ideation-output-v1, task-spec-v1` | `req-output-v1` | developer, tester | — |
+| **ideation** | — | `ideation-output-v1` | requirements | `ext/ideation-extension.schema.json` |
+| **feature** | `task-spec-v1` | `feature-result-v1` | — | — |
+| **tester** | `task-spec-v1, req-output-v1` | `test-result-v1` | — | — |
+| **validator** | `task-spec-v1, dev-result-v1` | — | — | `a2a-handoff.schema.json` |
+| **code-reviewer** | `dev-result-v1` | `review-output-v1` | developer | `ext/review-extension.schema.json` |
+| **ui-ux-designer** | — | `design-spec-v1` | developer | `ext/design-extension.schema.json` |
+| **api-specialist** | — | `api-spec-v1` | developer | `ext/api-extension.schema.json` |
+| **se-requirements** | `task-spec-v1` | `se-req-output-v1` | se-critic | — |
+| **se-architect** | `task-spec-v1` | `se-arch-output-v1` | se-critic | `se-decomposition.schema.json` |
+| **se-critic** | `se-arch-output-v1` | `critic-result-v1` | se-architect, se-interface-mgr | — |
+| **se-interface-mgr** | `critic-result-v1` | `interface-result-v1` | se-termination | — |
+| **se-termination** | `interface-result-v1` | `termination-result-v1` | — | — |
+| **se-orchestrator** | `task-spec-v1` | `task-spec-v1` | se-architect, se-requirements | — |
+
+Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für optionale Schema-Validierung vor/nach Delegation. `target_roles` deklariert die typischen Empfänger — der Orchestrator nutzt dies für dynamisches Routing.
 
 ---
 

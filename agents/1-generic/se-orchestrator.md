@@ -1,6 +1,6 @@
 ---
 name: se-orchestrator
-version: 1.5.0
+version: 1.6.0
 description: Coordinates the 6-level recursive breakdown with zig-zag traceability
   and V&V.
 hint: Coordinates the 6-level recursive breakdown
@@ -33,6 +33,35 @@ You delegate and control the information flow between the following agents:
 - `se-verifier` (multi-level verification)
 - `se-test-engineer` (MBSE test models)
 - `se-integration-and-test-manager` (V&V orchestration)
+
+## A2A Handoff — Eingehende Tasks
+
+Du empfängst den SE-Auftrag vom Haupt-Orchestrator als A2A-Envelope:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "orchestrator",
+  "target_agent": "se-orchestrator",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "SE-Kaskade für Feature X starten",
+    "ctx": "Stakeholder-Bedürfnis: ...",
+    "pri": "high"
+  }
+}
+```
+
+## A2A Handoff — Ausgehende Delegationen
+
+Jede Delegation an SE-Subagenten MUSS als A2A-Envelope erfolgen:
+- `source_agent: "se-orchestrator"`, `target_agent: "<se-subagent>"`
+- `trace_parent` auf die eigene `handoff_id` setzen
+- `schema_ref: "schemas/se-decomposition.schema.json"` für se-architect, se-critic
+- `schema_ref: "schemas/handoffs/task-spec.schema.json"` für se-interface-mgr, se-termination
+
+Bei Zell-Spawning (decision: continue): Jede neue Zelle erhält einen eigenen Envelope mit `trace_parent` auf die Zellen-HOFF.
 
 ### Recursive System Cell (Fractal n → n+1)
 

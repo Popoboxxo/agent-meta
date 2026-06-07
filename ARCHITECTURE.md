@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Version: **0.56.0** — last updated: 2026-05-31
+> Version: **0.57.1** — last updated: 2026-06-07
 
 ---
 
@@ -17,6 +17,7 @@
 | 7 | [SE-Agenten-Kaskade](docs/architecture/07-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
 | 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
 | 9 | [Provider Abstraction Layer](docs/architecture/09-pal.md) | PAL architecture: syntax registry, capability matrix, bootstrap |
+| 10 | [A2A Handoff Protocol](#a2a-handoff-protocol--architecture) | Structured JSON envelopes for Agent-to-Agent data contracts |
 
 ---
 
@@ -79,7 +80,16 @@ agent-meta/
 │   │   └── viz-logging-mcp.md ← MCP-basierte Viz-Logging-Architektur
 │   └── conclusions/         ← Tägliche Session-Erkenntnisse
 ├── schemas/
-│   └── se-decomposition.schema.json  ← JSON Schema für SE-Kaskaden-Outputs
+│   ├── a2a-handoff.schema.json       ← A2A Envelope Schema (Draft-07)
+│   ├── se-decomposition.schema.json  ← JSON Schema für SE-Kaskaden-Outputs
+│   └── handoffs/
+│       ├── task-spec.schema.json     ← Universelles Kern-Payload (kurze Feldnamen)
+│       ├── ideation-output.schema.json ← existierend, in Envelope eingebettet
+│       └── ext/
+│           ├── ideation-extension.schema.json
+│           ├── design-extension.schema.json
+│           ├── api-extension.schema.json
+│           └── review-extension.schema.json
 ├── templates/
 │   ├── SE-STRATEGY.template.md       ← Durable Anchor für SE-Projekte
 │   └── bootstrap/                   ← PAL: Bootstrap-Instruktions-Templates
@@ -337,6 +347,104 @@ config-based (Continue):
   → Managed block zwischen # agent-meta:managed-agents-begin/end
   → Eintrag: name + prompt-Pfad pro Agent
 ```
+
+---
+
+## A2A Handoff Protocol — Architecture
+
+The A2A Handoff Protocol standardizes Agent-to-Agent communication via structured JSON envelopes. It replaces natural-language prompts with machine-validatable data contracts.
+
+### Zwei-Ebenen-Modell
+
+| Ebene | System | ID | Default |
+|-------|--------|-----|---------|
+| **Operational Layer** | viz-Handshake | `viz_task_id` | Aktiv (basic Events) |
+| **Data Contract Layer** | A2A-Envelope | `handoff_id` | Immer aktiv |
+| **Debug-Ebene** | A2A viz-Events | `viz_task_id` | **AUS** (`viz.debug: false`) |
+
+Lose Kopplung via `trace_context.viz_task_id` im Envelope. A2A funktioniert ohne viz, und viz funktioniert ohne A2A.
+
+### Datenfluss
+
+```
+source_agent                         target_agent
+     │                                     ▲
+     │  1. Envelope erstellen               │
+     │  (handoff_id, payload,               │
+     │   schema_ref, trace_parent)          │
+     │                                     │
+     ▼  2. Schema-Validierung               │
+  [validate gegen schema_ref]              │
+     │                                     │
+     │  3. Provider-Adaption               │
+     │  (json → yaml für Continue/Copilot) │
+     │                                     │
+     │  4. PAL_Dispatch                    │
+     └─────────────────────────────────────┘
+```
+
+### Envelope-Struktur (gekürzt)
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "orchestrator",
+  "target_agent": "developer",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": { "t": "Task-Beschreibung", "pri": "high" },
+  "trace_parent": "HOFF-YYYYMMDD-NNN",
+  "trace_context": { "trace_id": "...", "span_id": "...", "viz_task_id": "..." },
+  "supersession": {
+    "supersedes": "HOFF-...",
+    "history": ["HOFF-...", "HOFF-..."],
+    "reason": "critic rejection: missing traceability"
+  }
+}
+```
+
+### Schema-Strategie: 1 Core + 4 Extensions + 1 SE
+
+```
+schemas/handoffs/
+├── task-spec.schema.json              ← Core: 60-80% Abdeckung (kurze Feldnamen)
+├── ext/
+│   ├── ideation-extension.schema.json  ← ideation → requirements
+│   ├── design-extension.schema.json    ← ui-ux-designer → developer
+│   ├── api-extension.schema.json       ← api-specialist → developer
+│   └── review-extension.schema.json    ← code-reviewer → developer
+└── (se-decomposition.schema.json)      ← SE-Kaskade (7 Routen, lange Feldnamen)
+```
+
+84% Routen-Abdeckung mit Core + Extensions. SE-Schemas laufen mit `compact_mode: false`.
+
+### Provider Transport
+
+| Provider | structured_handoff | Format | Batch | Supersession |
+|----------|-------------------|--------|-------|-------------|
+| Claude | `true` | JSON | `batch: true` | `history[]` |
+| Opencode | `true` | JSON | `batch: true` | `history[]` |
+| Gemini | `true` | JSON | `batch: true` | `history[]` |
+| Continue | `false` | YAML-Block | Sequential | `history[]` |
+| Copilot | `false` | YAML-Block | Sequential | `history[]` |
+
+### Orchestrator-Integration
+
+Der Orchestrator ist die primäre Envelope-Fabrik:
+- **Intent-Routing** → bestimmt `target_agent` + `schema_ref` aus Routing-Tabelle
+- **FANOUT** → N parallele Envelopes mit gemeinsamem `trace_context.trace_id`
+- **Batch-Mode** → N Tasks in einem Envelope (gleiches Ziel) — spart ~110 Tokens bei 3 Tasks
+- **BARRIER** → aggregiert Response-Envelopes, liefert Aggregations-Envelope
+- **PIPELINE** → verkettet Envelopes via `trace_parent`
+- **REPEAT_UNTIL** → managed Supersession-Ketten via `history[]`
+
+### Handoff-Contracts
+
+16 Rollen deklarieren Contracts in `config/role-defaults.yaml` (`input_contracts`, `output_contract`, `target_roles`, `input_schema`, `output_schema`). Jeder Contract referenziert das Payload-Schema das für die Route gilt.
+
+→ Full spec: `docs/concepts/a2a-handoff-protocol.md`
+→ Envelope schema: `schemas/a2a-handoff.schema.json`
+→ MCP tools: `config/mcp-registry.yaml` (a2a-handoff server: validate_handoff, resolve_handoff_schema, resolve_handoff)
 
 ---
 
