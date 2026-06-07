@@ -49,6 +49,5 @@
       "description": "URLs oder Referenzen auf relevante externe Ressourcen.",
       "items": { "type": "string", "format": "uri" }
     }
-  },
-  "additionalProperties": false
+  }
 }

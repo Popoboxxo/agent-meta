@@ -51,6 +51,5 @@
         "pattern": "^HOFF-\\d{8}-\\d{3,6}$"
       }
     }
-  },
-  "additionalProperties": false
+  }
 }

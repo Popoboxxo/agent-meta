@@ -8,7 +8,6 @@
     "handoff_id",
     "source_agent",
     "target_agent",
-    "schema_ref",
     "payload"
   ],
   "properties": {
@@ -35,13 +34,7 @@
     "supersession": {
       "type": "object",
       "description": "Optional. Tracks versioning and replacement of prior handoffs. Present when this handoff supersedes a previous one.",
-      "required": ["version"],
       "properties": {
-        "version": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Monotonic version number for this source_agent/target_agent pair within the same session."
-        },
         "supersedes": {
           "type": "string",
           "pattern": "^HOFF-\\d{8}-\\d{3,6}$",
@@ -73,15 +66,35 @@
         "required": ["reason", "timestamp"]
       }
     },
+    "batch": {
+      "type": "boolean",
+      "description": "Optional. When true, payload is an array of task objects for FANOUT delegation. Each array entry has a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch. Default: false.",
+      "default": false
+    },
+    "retry_count": {
+      "type": "integer",
+      "description": "Optional. How many times this handoff has been retried. Incremented by the orchestrator on each retry. When retry_count >= max_retries, the handoff is aborted with error escalation. Default: 0.",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_retries": {
+      "type": "integer",
+      "description": "Optional. Maximum allowed retries for this handoff. Controlled by orchestrator.handoff.max_retries in project.yaml. Default: 3.",
+      "minimum": 1,
+      "default": 3
+    },
     "schema_ref": {
       "type": "string",
       "format": "uri",
       "description": "URI reference to the JSON Schema that validates the payload. Supports relative paths (e.g. 'schemas/se-decomposition.schema.json') and absolute URLs."
     },
     "payload": {
-      "type": "object",
-      "description": "The domain-specific data being handed over. Must conform to the schema referenced by schema_ref. No constraints here — validated dynamically against schema_ref.",
-      "additionalProperties": true
+      "type": ["object", "array"],
+      "description": "The domain-specific data being handed over. Must conform to the schema referenced by schema_ref. When batch is true, payload is an array of task objects — each with a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch.",
+      "additionalProperties": true,
+      "items": {
+        "type": "object"
+      }
     },
     "trace_parent": {
       "type": "string",
@@ -100,20 +113,22 @@
           "type": "string",
           "description": "Current span ID for this specific handoff."
         },
-        "parent_span_id": {
-          "type": "string",
-          "description": "Span ID of the upstream handoff that caused this one."
-        },
         "viz_task_id": {
           "type": "string",
           "description": "References the viz-handshake task_id for cross-referencing execution tracking. Links the Data Contract Layer (A2A) to the Operational Layer (viz)."
         }
       }
     },
-    "compact_mode": {
+    "requires_human_approval": {
       "type": "boolean",
-      "description": "Optional. When true, payload field names use compact encoding (2-3 chars, e.g. 't' instead of 'task'). When false or absent, payload field names may use human-readable long forms. Default: false. Controlled by orchestrator.handoff.compact-mode in project.yaml.",
+      "description": "Optional. When true, the downstream agent MUST pause before execution and wait for user confirmation. Controlled by orchestrator.handoff.human_approval_required in project.yaml. Default: false.",
       "default": false
+    },
+    "negotiated_format": {
+      "type": "string",
+      "description": "Optional. Transport format negotiated between source and target agent. auto = the orchestrator selects based on payload size. Controlled by orchestrator.handoff.protocol_routing in project.yaml.",
+      "enum": ["json", "yaml", "text", "auto"],
+      "default": "auto"
     },
     "metadata": {
       "type": "object",

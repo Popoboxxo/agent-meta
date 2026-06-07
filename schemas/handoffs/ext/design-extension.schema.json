@@ -109,6 +109,5 @@
       "description": "Referenzen auf Wireframes/Mockups (Dateipfade oder URLs).",
       "items": { "type": "string" }
     }
-  },
-  "additionalProperties": false
+  }
 }

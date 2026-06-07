@@ -219,10 +219,13 @@ orchestrator:
     ask-user: false       # Ask user for preference
   handoff:
     protocol: "a2a-v1"           # Aktives Handoff-Protokoll (a2a-v1 = A2A-Envelope)
-    validate-before-delegate: true  # Schema-Validierung vor jeder Delegation
+    validate-before-delegate: true  # Schema-Validierung vor jeder Delegation (MUSS)
     supersession-tracking: true     # Supersession-Ketten aktiv (CRITIC-REPEAT_UNTIL)
     strict-validation: false        # true = Abbruch bei invaliden Handoffs, false = Fallback
-    compact-mode: false             # true = Token-sparend (kurze Payload-Namen)
+    compact-mode: false             # true = Token-sparend (kurze Payload-Namen) — Build-Config, nicht im Envelope
+    max_retries: 3                  # Maximale Retries pro Handoff (Envelope-Feld: max_retries)
+    human_approval_required: false  # true = HITL: downstream-Agent pausiert vor Ausführung
+    protocol_routing: static        # static = feste Format-Wahl, dynamic = größenbasiert (Payload <1KB→JSON, 1-10KB→YAML, >10KB→Text)
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:

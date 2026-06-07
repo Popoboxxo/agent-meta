@@ -92,6 +92,5 @@
       "title": "Review ID",
       "description": "Eindeutige Review-ID für Traceability."
     }
-  },
-  "additionalProperties": false
+  }
 }

@@ -105,6 +105,5 @@
       "title": "Gateway",
       "description": "API-Gateway-Route-Präfix (z.B. /api/v1)."
     }
-  },
-  "additionalProperties": false
+  }
 }
