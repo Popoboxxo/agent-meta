@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskSpec — Universal Core Payload Schema",
+  "description": "Universelles Kern-Payload-Schema für 60-80% aller Agent-zu-Agent-Delegationen. Kurze Feldnamen (2-3 Zeichen) für Token-Effizienz, ausführliche title/description für Lesbarkeit. Eingebettet in A2A-Envelope als payload.",
+  "type": "object",
+  "required": ["t"],
+  "properties": {
+    "t": {
+      "type": "string",
+      "title": "Task",
+      "description": "Task-Beschreibung in Natural Language. Pflichtfeld.",
+      "minLength": 1,
+      "examples": ["Implementiere Login-Flow", "Fixe NullPointer in UserService.create()"]
+    },
+    "ctx": {
+      "type": "string",
+      "title": "Context",
+      "description": "Zusätzlicher Kontext für den Task (bestehende Architektur, Constraints, Vorarbeiten). Optional."
+    },
+    "con": {
+      "type": "array",
+      "title": "Constraints",
+      "description": "Harte Randbedingungen die bei der Implementierung eingehalten werden müssen.",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["Muss OAuth2 unterstützen", "Keine neuen Dependencies"]]
+    },
+    "refs": {
+      "type": "array",
+      "title": "References",
+      "description": "Referenzen auf relevante Dateien, Schemas, Issues oder Dokumentation.",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["schemas/auth-api.json", "docs/architecture.md#section-3"]]
+    },
+    "pri": {
+      "type": "string",
+      "title": "Priority",
+      "description": "Priorität des Tasks.",
+      "enum": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    },
+    "dep": {
+      "type": "array",
+      "title": "Depends On",
+      "description": "Liste von handoff_id's von denen dieser Task abhängt. Blockiert Ausführung bis alle Abhängigkeiten erfüllt sind.",
+      "items": {
+        "type": "string",
+        "pattern": "^HOFF-\\d{8}-\\d{3,6}$"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-05-31
+> Letzte Aktualisierung: 2026-06-07 (A2A-Status auf Vollständig aktualisiert)
 
 ---
 
@@ -15,6 +15,7 @@
 7. [Howto-Dokumentation](#7-howto-dokumentation)
 8. [Scripts](#8-scripts)
 9. [Provider Abstraction Layer (PAL)](#9-provider-abstraction-layer-pal)
+10. [A2A-Handoff-Protokoll](#10-a2a-handoff-protokoll)
 
 ---
 
@@ -446,10 +447,80 @@ Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-sp
 
 ## 5. Schemas
 
-### `schemas/se-decomposition.schema.json`
+### 5.0 A2A-Handoff-Envelope — Das EINZIGE Austauschformat
+
+**A2A-Envelopes sind das einzige Format für Agent-zu-Agent-Daten.** Natural-Language-Prompts zwischen Agenten werden vollständig durch strukturierte Envelopes ersetzt. Alle bisherigen Payload-Schemas (ideation-output, se-decomposition, se-orchestrator) werden unverändert als `payload` in den Envelope eingebettet.
+
+Neue Payload-Schemas (TaskSpec + Extensions) verwenden **kurze Feldnamen** (2–3 Zeichen) mit ausführlichen `title`/`description` im Schema für Lesbarkeit — Token-Ersparnis: 20–50 Tokens pro Handoff.
+
+**Schema-Strategie:** 1 Core (TaskSpec) + 4 Extensions (Ideation, Design, API, Review) + 1 SE (se-decomposition). Reduziert die Schema-Anzahl von 19 auf 6.
+
+### 5.1 `schemas/a2a-handoff.schema.json` — Envelope
 
 **Version:** Draft-07 JSON Schema
-**Zweck:** Strukturiertes Output-Schema für generische L1-L3 Layer, CQRS-Events und SE-Agent-Konzept rekursive Zell-Outputs.
+**Zweck:** Standardisierter Envelope für ALLE Agent-zu-Agent-Handoffs. Umhüllt jedes domain-spezifische Payload mit Metadaten für Validierung, Supersession-Tracking und Traceability.
+
+**Top-Level Required Fields:**
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `protocol_version` | string (SemVer) | Version des A2A-Protokolls (default = aktuell, nur explizit bei Major-Change) |
+| `handoff_id` | string (`HOFF-YYYYMMDD-NNN`) | Eindeutige Handoff-ID |
+| `source_agent` | string | Rolle des sendenden Agenten |
+| `target_agent` | string | Rolle des empfangenden Agenten |
+| `payload` | object | Domain-spezifische Daten (validiert gegen `schema_ref`) |
+
+**Optionale Felder:**
+| Feld | Beschreibung |
+|------|-------------|
+| `schema_ref` | URI zum Payload-Schema (implizit aus Route ableitbar — optional für Token-Ersparnis) |
+| `compact_mode` | boolean: `true` = kurze Payload-Feldnamen (default: `false`) |
+| `supersession` | Versionsinfo: `version`, `supersedes`, `history[]`, `reason`, `timestamp` |
+| `trace_parent` | handoff_id des übergeordneten Handoffs (Delegationsbaum-Tracing) |
+| `trace_context` | Erweitertes Tracing: `trace_id`, `span_id`, `parent_span_id`, `viz_task_id` |
+| `metadata` | Extensible Key-Value-Map für provider-spezifische Metadaten |
+
+**Definitionen:**
+- `handoffRoute` — Registrierte Route zwischen zwei Rollen: `source`, `target`, `contract`, `input_schema`
+- `agentContract` — Deklaration was eine Rolle konsumiert/produziert
+- `handoffRegistry` — Vollständige Registry aller Routen
+
+### 5.2 `schemas/handoffs/task-spec.schema.json` (NEU — Universelles Kern-Payload)
+
+**Zweck:** Universelles Payload-Schema für 60-80% aller Delegationen. Kurze Feldnamen (2-3 Zeichen) für Token-Effizienz.
+
+**Feld-Mapping (kurz → lang):**
+| Feld | Key | Typ | Beschreibung |
+|------|-----|-----|-------------|
+| Task | `t` | string (Pflicht) | Task-Beschreibung in Natural Language |
+| Context | `ctx` | string | Zusätzlicher Kontext |
+| Constraints | `con` | string[] | Harte Randbedingungen |
+| References | `refs` | string[] | Referenzen auf Dateien/Schemas/Issues |
+| Priority | `pri` | enum | `low`, `medium`, `high`, `critical` |
+| Depends on | `dep` | HOFF[] | Abhängigkeiten von anderen Handoffs |
+
+**Token-Ersparnis vs. lange Feldnamen:** ~40 Tokens pro Handoff (31% Reduktion).
+
+### 5.3 Extensions (NEU — 4 Dateien unter `schemas/handoffs/ext/`)
+
+Jede Extension erweitert TaskSpec um domain-spezifische Felder via JSON Schema `allOf`:
+
+| Extension | Datei | Route | Zusätzliche Felder |
+|-----------|-------|-------|-------------------|
+| IdeationExtension | `ideation-extension.schema.json` | ideation → requirements | `ci` (core_idea), `g` (goal), `sv1` (scope_v1), `oq`, `ref` |
+| DesignExtension | `design-extension.schema.json` | ui-ux-designer → developer | `ds` (design_spec: components, theme), `lo` (layouts), `wf` (wireframes) |
+| APIExtension | `api-extension.schema.json` | api-specialist → developer | `ct` (contract: endpoints, schemas), `cf`, `vr`, `gw` |
+| ReviewExtension | `review-extension.schema.json` | code-reviewer → developer | `rd` (review_data: verdict, findings[], blast_radius), `ri` |
+
+### 5.4 `schemas/handoffs/ideation-output.schema.json` (Existierend)
+
+**Zweck:** Strukturiertes Payload-Schema für den Handoff von `ideation` → `requirements`. **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet. **Hinweis:** Dieses Schema hat noch lange Feldnamen. Neue Instanzen sollen stattdessen TaskSpec + IdeationExtension mit `compact_mode: true` nutzen.
+
+**Required Fields:** `core_idea`, `goal`, `preliminary_requirements[]`, `scope_v1{in_scope[], out_of_scope[]}`
+
+### 5.5 `schemas/se-decomposition.schema.json` (Existierend)
+
+**Version:** Draft-07 JSON Schema
+**Zweck:** Strukturiertes Output-Schema für generische L1-L3 Layer, CQRS-Events und SE-Agent-Konzept rekursive Zell-Outputs. **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet. `compact_mode: false` (lange Feldnamen erhalten).
 
 **Top-Level Required Fields:**
 - `feature_id` (string) — Eindeutige Feature-ID
@@ -459,27 +530,9 @@ Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-sp
 - `l3_components` (array) — `[{component_id, description, refines}]`
 - `cqrs_interfaces` (object) — `{commands[], events[], queries[]}`
 
-**Optionale Felder (Agent-spezifisch):**
+### 5.6 `schemas/se-orchestrator.schema.json` (Existierend)
 
-| Feld | Agent | Typ | Beschreibung |
-|------|-------|-----|-------------|
-| `parent_req_id` | Architect | string | Parent-REQ-ID dieser Dekomposition |
-| `sub_components[]` | Architect | array | Sub-Komponenten mit ID, Name, Domain, BB-REQ |
-| `internal_interfaces[]` | Architect/IFM | array | Interne Interfaces (source, target, type, payload) |
-| `propagation_map` | IFM | object | Per-Component Interface-Mapping |
-| `architectural_rationale` | Architect | string | Begründung der Architekturentscheidungen |
-| `decomposition_completeness` | Architect | string | Vollständigkeitsbestätigung |
-| `termination_decisions[]` | Termination | array | Leaf/Continue pro Komponente |
-| `termination_summary` | Termination | object | Statistik (total, leaf, continue, depth) |
-| `critic_status` | Critic | object | Quality Gate (status, checks, hints, iteration) |
-
-**CQRS-Interface-Struktur:**
-- `commands[]` — `{name, source, target, payload}`
-- `events[]` — `{name, source, payload}`
-- `queries[]` — `{name, source, target, return_type}`
-
-**Definitionen:**
-- `checkResult` — `{passed: boolean, issues: string[]}`
+**Zweck:** Orchestrierungs-Metadaten vom se-orchestrator. **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet.
 
 ---
 
@@ -776,6 +829,151 @@ content = pal_engine.apply(content, provider)
 _inject_gemini_bootstrap(provider, target_dir, ...)  # Gemini: GEMINI.md
 BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 ```
+
+---
+
+---
+
+## 10. A2A-Handoff-Protokoll
+
+> **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
+> **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
+> **Dokument:** `docs/concepts/a2a-handoff-protocol.md`
+> **Analyse:** `docs/concepts/a2a-best-practice-analysis.md`
+
+### 10.1 Prinzip: A2A als EINZIGES Format
+
+**A2A-Envelopes sind das einzige Format für Agent-zu-Agent-Daten.** Natural-Language-Prompts zwischen Agenten werden vollständig durch strukturierte Envelopes ersetzt. Dies eliminiert Context Loss, ermöglicht deterministische Validierung und schafft lückenloses Supersession-Tracking.
+
+Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Text-Block statt JSON — identisches Konzept, anderes Transport-Format.
+
+### 10.2 Kernkonzepte
+
+| Konzept | Beschreibung |
+|---------|-------------|
+| **A2A-Envelope** | Standardisierter JSON-Wrapper mit Metadaten — das **einzige** Austauschformat |
+| **TaskSpec** | Universelles Kern-Payload-Schema für 60-80% aller Delegationen (kurze Feldnamen) |
+| **Extensions** | 4 domain-spezifische Erweiterungen zu TaskSpec (Ideation, Design, API, Review) |
+| **compact_mode** | Envelope-Flag: `true` = kurze Payload-Namen (Token-sparend), `false` = lesbare Namen |
+| **Supersession** | Version-Tracking mit `history[]`-Array für vollständige Revisionsketten |
+| **Contract** | Jede Route deklariert Schema + Extension + compact_mode in der Routing-Tabelle |
+
+### 10.3 A2A vs. viz-Debug — Separate Konzepte
+
+Das A2A-Protokoll und der viz-Handshake sind **separate Systeme** mit loser Kopplung:
+
+| Ebene | System | ID | Default | Token-Kosten |
+|-------|--------|-----|---------|-------------|
+| **Data Contract Layer** | A2A-Envelope | `handoff_id` | **Immer aktiv** | Envelope-Overhead (~60 Tokens) |
+| **Operational Layer** | viz-Handshake | `viz_task_id` | Aktiv (basic) | 0 (MCP-basiert) |
+| **Debug-Ebene** | viz A2A-Events | `viz_task_id` | **AUS** (`viz.debug: false`) | 0 Tokens |
+
+**Lose Kopplung via `trace_context.viz_task_id`** — das einzige Feld das beide Systeme verbindet. Der A2A-Envelope funktioniert vollständig ohne viz, und viz funktioniert ohne A2A.
+
+### 10.4 Schema-Strategie: 1 Core + 4 Extensions + 1 SE
+
+```
+schemas/handoffs/
+├── task-spec.schema.json              ← Core (60-80% Abdeckung)
+├── ext/
+│   ├── ideation-extension.schema.json  ← ideation → requirements
+│   ├── design-extension.schema.json    ← ui-ux-designer → developer
+│   ├── api-extension.schema.json       ← api-specialist → developer
+│   └── review-extension.schema.json    ← code-reviewer → developer
+└── (se-decomposition.schema.json)      ← SE-Kaskade (existierend, unverändert)
+```
+
+Reduziert die Schema-Anzahl von 19 auf 6 (84% Routen-Abdeckung mit Core + Extensions).
+
+### 10.5 Orchestrator als Envelope-Fabrik
+
+Der Orchestrator ist der primäre Envelope-Produzent:
+
+| Orchestrator-Funktion | A2A-Rolle |
+|-----------------------|-----------|
+| Intent-Routing | Bestimmt `target_agent` + `schema_ref` + `compact_mode` aus Routing-Tabelle |
+| FANOUT | Produziert N parallele Envelopes mit gemeinsamem `trace_context.trace_id` |
+| BARRIER | Konsumiert Response-Envelopes, aggregiert Ergebnisse |
+| PIPELINE | Verkettet Envelopes via `trace_parent` |
+| REPEAT_UNTIL | Managed Supersession-Ketten via `supersession.history[]` |
+
+### 10.6 Provider-Matrix: Transport-Format
+
+| Provider | structured_handoff | handoff_format | Envelope-Transport |
+|----------|-------------------|----------------|-------------------|
+| Claude | `true` | `json` | JSON im Task-Tool-Prompt |
+| Opencode | `true` | `json` | JSON im task()-Prompt |
+| Gemini | `true` | `json` | JSON im define_subagent-Prompt |
+| Continue | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
+| Copilot | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
+
+### 10.7 Token-Budget & Optimierungen
+
+| Optimierung | Ersparnis | Status |
+|-------------|-----------|--------|
+| Kurze Payload-Feldnamen (TaskSpec + Extensions) | 20–50 Tokens/Handoff | ✓ Umgesetzt |
+| `schema_ref` optional (implizit aus Route) | ~20 Tokens | ✓ Im Schema |
+| `protocol_version` default = aktuell | ~9 Tokens | ✓ Konvention |
+| `compact_mode`-Flag zur Steuerung | — (schaltet #1) | ✓ Im Envelope |
+| viz.debug: false (default) | 30 Tokens/Handoff | ✓ In Config |
+
+### 10.8 Betroffene Artefakte
+
+| Artefakt | Änderung | Status |
+|----------|----------|--------|
+| `schemas/a2a-handoff.schema.json` | Envelope: `batch`, `retry_count`, `requires_human_approval`, `negotiated_format`, `supersession.history[]` | ✓ Phase 1 |
+| `schemas/handoffs/task-spec.schema.json` | Universelles Kern-Payload (NEU) — kurze Feldnamen | ✓ Phase 1 |
+| `schemas/handoffs/ext/*.schema.json` | 4 Extensions (NEU): Ideation, Design, API, Review | ✓ Phase 1 |
+| `schemas/se-decomposition.schema.json` | **Unverändert** — in Envelope eingebettet | — |
+| `schemas/se-orchestrator.schema.json` | **Unverändert** — in Envelope eingebettet | — |
+| `.meta-config/project.yaml` | `orchestrator.handoff`-Block + `viz.debug` + `viz.a2a_events` | ✓ Phase 1 |
+| `docs/concepts/a2a-handoff-protocol.md` | Implementation-nahes Konzept (v2.0, 872 Zeilen) | ✓ Phase 1 |
+| `docs/CODEBASE_OVERVIEW.md` | Abschnitte 5 + 10 aktualisiert | ✓ Phase 1 |
+| `config/delegation-syntax.yaml` | `handoff:`-Block für alle 5 Provider (JSON + YAML-Fallback) | ✓ Phase 2 |
+| `config/provider-capabilities.yaml` | `structured_handoff` + `handoff_format` + `handoff_envelope_support` Flags | ✓ Phase 2 |
+| `scripts/lib/delegation_syntax.py` | `PLACEHOLDERS` um `PAL_HANDOFF` erweitert | ✓ Phase 2 |
+| `config/role-defaults.yaml` | 16 Rollen-Contracts: `input_contracts`, `output_contract`, `input_schema`, `output_schema`, `target_roles` | ✓ Phase 3 |
+| `agents/1-generic/orchestrator.md` | Handoff-Routing-Tabelle + Envelope-Fabrik + Supersession-Tracking | ✓ Phase 3 |
+| `agents/1-generic/ideation.md` | Envelope-basierte Handoffs | ✓ Phase 3 |
+| `agents/1-generic/feature.md` | A2A-Handoff-Integration | ✓ Phase 3 |
+| `agents/1-generic/developer.md` | A2A-Envelope-Consumer | ✓ Phase 3 |
+| `agents/1-generic/se-*.md` | Envelope-basierte Handoffs in SE-Kaskade (6 Agenten) | ✓ Phase 3 |
+| `config/mcp-registry.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
+| `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
+
+### 10.9 Roadmap
+
+| Phase | Inhalt | Status |
+|-------|--------|--------|
+| 1 — Konzept + Schemas | Core-Schema + 4 Extensions + Envelope-Anpassungen + Config + Doku | ✓ Abgeschlossen |
+| 2 — Provider-Capabilities | `{{PAL_HANDOFF}}`-Platzhalter + `structured_handoff`-Flags + delegation-syntax.yaml | ✓ Abgeschlossen |
+| 3 — Agent-Updates | Orchestrator-Envelope-Fabrik + handoff-Contracts + ideation, feature, developer, SE-Agenten | ✓ Abgeschlossen |
+| 4 — MCP & Tooling | MCP-Tools (resolve-handoff-schema, validate-handoff, resolve-handoff) + viz-Integration | ✓ Abgeschlossen |
+
+### 10.10 Handoff-Contracts in `config/role-defaults.yaml`
+
+16 Rollen deklarieren A2A-Handoff-Contracts in ihrer `handoff:`-Sektion:
+
+| Rolle | input_contracts | output_contract | target_roles | output_schema |
+|-------|----------------|-----------------|--------------|---------------|
+| **orchestrator** | — | `task-spec-v1` | — | — |
+| **developer** | `task-spec-v1` | `dev-result-v1` | — | — |
+| **requirements** | `ideation-output-v1, task-spec-v1` | `req-output-v1` | developer, tester | — |
+| **ideation** | — | `ideation-output-v1` | requirements | `ext/ideation-extension.schema.json` |
+| **feature** | `task-spec-v1` | `feature-result-v1` | — | — |
+| **tester** | `task-spec-v1, req-output-v1` | `test-result-v1` | — | — |
+| **validator** | `task-spec-v1, dev-result-v1` | — | — | `a2a-handoff.schema.json` |
+| **code-reviewer** | `dev-result-v1` | `review-output-v1` | developer | `ext/review-extension.schema.json` |
+| **ui-ux-designer** | — | `design-spec-v1` | developer | `ext/design-extension.schema.json` |
+| **api-specialist** | — | `api-spec-v1` | developer | `ext/api-extension.schema.json` |
+| **se-requirements** | `task-spec-v1` | `se-req-output-v1` | se-critic | — |
+| **se-architect** | `task-spec-v1` | `se-arch-output-v1` | se-critic | `se-decomposition.schema.json` |
+| **se-critic** | `se-arch-output-v1` | `critic-result-v1` | se-architect, se-interface-mgr | — |
+| **se-interface-mgr** | `critic-result-v1` | `interface-result-v1` | se-termination | — |
+| **se-termination** | `interface-result-v1` | `termination-result-v1` | — | — |
+| **se-orchestrator** | `task-spec-v1` | `task-spec-v1` | se-architect, se-requirements | — |
+
+Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für optionale Schema-Validierung vor/nach Delegation. `target_roles` deklariert die typischen Empfänger — der Orchestrator nutzt dies für dynamisches Routing.
 
 ---
 

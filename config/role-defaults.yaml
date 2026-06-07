@@ -38,36 +38,58 @@ roles:
     memory: ""
     workflow_tier: required
     description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
+    handoff:
+      output_contract: "task-spec-v1"
+      handoff_routing: "static"
 
   developer:
     model: powerful          # erbt — oft das stärkste verfügbare Modell gewünscht
     memory: ""
     workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 300
 
   requirements:
     model: balanced
     memory: project
     workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
+    handoff:
+      input_contracts: ["ideation-output-v1", "task-spec-v1"]
+      output_contract: "req-output-v1"
+      target_roles: ["developer", "tester"]
 
   ideation:
     model: ""           # erbt
     memory: ""
     workflow_tier: optional
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
+    handoff:
+      output_contract: "ideation-output-v1"
+      output_schema: "schemas/handoffs/ext/ideation-extension.schema.json"
+      target_roles: ["requirements"]
 
   feature:
     model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
     memory: ""
     workflow_tier: recommended
     description: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "feature-result-v1"
 
   tester:
     model: balanced
     memory: ""
     workflow_tier: recommended
     description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
+    handoff:
+      input_contracts: ["task-spec-v1", "req-output-v1"]
+      output_contract: "test-result-v1"
 
   validator:
     model: balanced
@@ -75,6 +97,10 @@ roles:
     permission_mode: plan
     workflow_tier: recommended
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
+    handoff:
+      input_contracts: ["task-spec-v1", "dev-result-v1"]
+      validate_handoff: true
+      output_schema: "schemas/a2a-handoff.schema.json"
 
   documenter:
     model: fast
@@ -154,36 +180,60 @@ roles:
     memory: project
     workflow_tier: optional
     description: "Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "se-req-output-v1"
+      target_roles: ["se-critic"]
 
   se-architect:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität)."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "se-arch-output-v1"
+      output_schema: "schemas/se-decomposition.schema.json"
+      target_roles: ["se-critic"]
 
   se-critic:
     model: powerful
     memory: ""
     workflow_tier: optional
     description: "Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit."
+    handoff:
+      input_contracts: ["se-arch-output-v1"]
+      output_contract: "critic-result-v1"
+      target_roles: ["se-architect", "se-interface-mgr"]
 
   se-interface-mgr:
     model: balanced
     memory: project
     workflow_tier: optional
     description: "Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend."
+    handoff:
+      input_contracts: ["critic-result-v1"]
+      output_contract: "interface-result-v1"
+      target_roles: ["se-termination"]
 
   se-termination:
     model: fast
     memory: ""
     workflow_tier: optional
     description: "Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde."
+    handoff:
+      input_contracts: ["interface-result-v1"]
+      output_contract: "termination-result-v1"
 
   se-orchestrator:
     model: balanced
     memory: ""
     workflow_tier: optional
     description: "Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "task-spec-v1"
+      target_roles: ["se-architect", "se-requirements"]
 
   se-test-engineer:
     model: balanced
@@ -222,18 +272,31 @@ roles:
     permission_mode: plan
     workflow_tier: recommended
     description: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+    handoff:
+      input_contracts: ["dev-result-v1"]
+      output_contract: "review-output-v1"
+      output_schema: "schemas/handoffs/ext/review-extension.schema.json"
+      target_roles: ["developer"]
 
   ui-ux-designer:
     model: balanced
     memory: project
     workflow_tier: optional
     description: "UI-Spezifikationen, Mockups und Design-Systeme erstellen."
+    handoff:
+      output_contract: "design-spec-v1"
+      output_schema: "schemas/handoffs/ext/design-extension.schema.json"
+      target_roles: ["developer"]
 
   api-specialist:
     model: balanced
     memory: project
     workflow_tier: optional
     description: "OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen."
+    handoff:
+      output_contract: "api-spec-v1"
+      output_schema: "schemas/handoffs/ext/api-extension.schema.json"
+      target_roles: ["developer"]
 
   devops-engineer:
     model: fast

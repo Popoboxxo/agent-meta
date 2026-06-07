@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "A2A Handoff Envelope Schema",
+  "description": "Standardized envelope for structured Agent-to-Agent handoffs in agent-meta. Wraps any domain-specific payload with metadata for validation, supersession tracking, and traceability.",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "handoff_id",
+    "source_agent",
+    "target_agent",
+    "payload"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "SemVer version of the A2A handoff protocol itself (not the payload schema)."
+    },
+    "handoff_id": {
+      "type": "string",
+      "pattern": "^HOFF-\\d{8}-\\d{3,6}$",
+      "description": "Globally unique handoff identifier: HOFF-{YYYYMMDD}-{sequential or random suffix}."
+    },
+    "source_agent": {
+      "type": "string",
+      "description": "Role name of the agent producing this handoff (e.g. 'se-architect', 'ideation').",
+      "examples": ["se-architect", "ideation", "requirements", "developer"]
+    },
+    "target_agent": {
+      "type": "string",
+      "description": "Role name of the agent intended to consume this handoff (e.g. 'se-critic', 'requirements').",
+      "examples": ["se-critic", "requirements", "developer", "tester"]
+    },
+    "supersession": {
+      "type": "object",
+      "description": "Optional. Tracks versioning and replacement of prior handoffs. Present when this handoff supersedes a previous one.",
+      "properties": {
+        "supersedes": {
+          "type": "string",
+          "pattern": "^HOFF-\\d{8}-\\d{3,6}$",
+          "description": "handoff_id of the previous handoff that this one replaces."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the supersession (e.g. 'critic rejection: missing traceability')."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this supersession was created."
+        },
+        "history": {
+          "type": "array",
+          "description": "Optional. Full revision history: ordered list of all superseded handoff_ids from the beginning of the chain. The last entry is identical to 'supersedes'. Enables downstream agents to see the full revision chain, not just the immediate predecessor.",
+          "items": {
+            "type": "string",
+            "pattern": "^HOFF-\\d{8}-\\d{3,6}$"
+          },
+          "minItems": 1
+        }
+      },
+      "if": {
+        "required": ["supersedes"]
+      },
+      "then": {
+        "required": ["reason", "timestamp"]
+      }
+    },
+    "batch": {
+      "type": "boolean",
+      "description": "Optional. When true, payload is an array of task objects for FANOUT delegation. Each array entry has a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch. Default: false.",
+      "default": false
+    },
+    "retry_count": {
+      "type": "integer",
+      "description": "Optional. How many times this handoff has been retried. Incremented by the orchestrator on each retry. When retry_count >= max_retries, the handoff is aborted with error escalation. Default: 0.",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_retries": {
+      "type": "integer",
+      "description": "Optional. Maximum allowed retries for this handoff. Controlled by orchestrator.handoff.max_retries in project.yaml. Default: 3.",
+      "minimum": 1,
+      "default": 3
+    },
+    "schema_ref": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI reference to the JSON Schema that validates the payload. Supports relative paths (e.g. 'schemas/se-decomposition.schema.json') and absolute URLs."
+    },
+    "payload": {
+      "type": ["object", "array"],
+      "description": "The domain-specific data being handed over. Must conform to the schema referenced by schema_ref. When batch is true, payload is an array of task objects — each with a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch.",
+      "additionalProperties": true,
+      "items": {
+        "type": "object"
+      }
+    },
+    "trace_parent": {
+      "type": "string",
+      "pattern": "^HOFF-\\d{8}-\\d{3,6}$",
+      "description": "Optional. handoff_id of the parent handoff that triggered this one. Enables full delegation-tree tracing."
+    },
+    "trace_context": {
+      "type": "object",
+      "description": "Extended trace context for distributed tracing across the agent cascade. Links to viz-handshake task_id.",
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "description": "Globally unique trace ID spanning the entire cascade."
+        },
+        "span_id": {
+          "type": "string",
+          "description": "Current span ID for this specific handoff."
+        },
+        "viz_task_id": {
+          "type": "string",
+          "description": "References the viz-handshake task_id for cross-referencing execution tracking. Links the Data Contract Layer (A2A) to the Operational Layer (viz)."
+        }
+      }
+    },
+    "requires_human_approval": {
+      "type": "boolean",
+      "description": "Optional. When true, the downstream agent MUST pause before execution and wait for user confirmation. Controlled by orchestrator.handoff.human_approval_required in project.yaml. Default: false.",
+      "default": false
+    },
+    "negotiated_format": {
+      "type": "string",
+      "description": "Optional. Transport format negotiated between source and target agent. auto = the orchestrator selects based on payload size. Controlled by orchestrator.handoff.protocol_routing in project.yaml.",
+      "enum": ["json", "yaml", "text", "auto"],
+      "default": "auto"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional. Extensible key-value store for provider-specific or workflow-specific metadata. May include 'provider_handoff_format' ('json'|'yaml_text_block'|'file') to indicate the transport format used, and other provider-specific hints.",
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "handoffRoute": {
+      "type": "object",
+      "description": "A registered handoff route between two agent roles, defining which contract applies.",
+      "required": ["source", "target", "contract"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source agent role."
+        },
+        "target": {
+          "type": "string",
+          "description": "Target agent role."
+        },
+        "contract": {
+          "type": "string",
+          "description": "Name of the contract that governs this handoff (e.g. 'ideation-output-v1')."
+        },
+        "input_schema": {
+          "type": "string",
+          "description": "Path to the JSON Schema the payload must validate against."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this handoff accomplishes."
+        }
+      }
+    },
+    "agentContract": {
+      "type": "object",
+      "description": "Declares what an agent role consumes and produces in terms of structured data.",
+      "required": ["role", "produces", "consumes"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Agent role name."
+        },
+        "consumes": {
+          "type": "array",
+          "description": "List of contract names this agent can consume as input.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "produces": {
+          "type": "array",
+          "description": "List of contract names this agent can produce as output.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "input_schema": {
+          "type": "string",
+          "description": "Path to JSON Schema for validating incoming handoffs."
+        },
+        "output_schema": {
+          "type": "string",
+          "description": "Path to JSON Schema for validating outgoing handoffs."
+        },
+        "target_roles": {
+          "type": "array",
+          "description": "Roles this agent typically hands off to.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "handoffRegistry": {
+      "type": "object",
+      "description": "Complete registry of all registered handoff routes in the project.",
+      "patternProperties": {
+        "^[a-z-]+→[a-z-]+$": {
+          "$ref": "#/definitions/handoffRoute"
+        }
+      }
+    }
+  }
+}

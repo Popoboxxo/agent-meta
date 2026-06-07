@@ -10,6 +10,9 @@ capabilities:
     text_mentions: true
     hooks: true
     native_agent_tools: ["Agent", "Task"]
+    structured_handoff: true
+    handoff_format: "json"
+    handoff_envelope_support: true
     description: "Vollständige Agent-Orchestrierung mit nativen Tool-Calls und Hooks."
 
   Opencode:
@@ -19,6 +22,9 @@ capabilities:
     text_mentions: false
     hooks: false
     native_agent_tools: ["task"]
+    structured_handoff: true
+    handoff_format: "json"
+    handoff_envelope_support: true
     description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
 
   Gemini:
@@ -28,6 +34,9 @@ capabilities:
     text_mentions: false
     hooks: false
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
+    structured_handoff: true
+    handoff_format: "json"
+    handoff_envelope_support: true
     description: "API-basierte Agent-Registrierung, ephemere Runtime."
     bootstrap_required: true
     special_notes:
@@ -42,6 +51,9 @@ capabilities:
     text_mentions: true
     hooks: false
     native_agent_tools: []
+    structured_handoff: false
+    handoff_format: "yaml_text_block"
+    handoff_envelope_support: false
     description: "Text-basierte Agent-Mentions (@agent). Keine native Subagent-API."
     special_notes:
       - "@agent Text-Mentions als Subagent-Dispatch."
@@ -55,6 +67,9 @@ capabilities:
     text_mentions: true
     hooks: false
     native_agent_tools: []
+    structured_handoff: false
+    handoff_format: "yaml_text_block"
+    handoff_envelope_support: false
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
       - "Dateien in .github/copilot/agents/ werden automatisch geladen."

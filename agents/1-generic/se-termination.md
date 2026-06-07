@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.2.1
+version: 1.3.0
 description: Deterministic termination at L3 (Component Requirement).
 hint: Deterministic termination at L3 (Component Requirement)
 tools:
@@ -41,6 +41,49 @@ Your task is the deterministic decision per sub-component: Is the decomposition 
    - `max_depth`: Enforce leaf node when current depth >= configured limit.
    - `max_total_cells`: Enforce leaf node when total cell count >= limit.
    - **Circular Reference:** Enforce leaf node when the `parent_id` chain contains a cycle.
+
+## A2A Handoff — Input/Output
+
+### Eingehender Envelope
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-interface-mgr",
+  "target_agent": "se-termination",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "Termination-Entscheidung für Sub-Components",
+    "sub_components": [ ... ],
+    "propagation_map": { ... },
+    "current_depth": 2,
+    "max_depth": 3
+  },
+  "trace_parent": "HOFF-YYYYMMDD-PARENT"
+}
+```
+
+### Ausgehender Envelope (deterministische Entscheidung)
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-termination",
+  "target_agent": "se-orchestrator",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "Termination-Entscheidung",
+    "decisions": [
+      {"component_id": "COMP-001-01", "decision": "leaf", "reason": "Atomic Code Unit"},
+      {"component_id": "COMP-001-02", "decision": "continue", "reason": "Multi-domain"}
+    ],
+    "summary": "2 components: 1 leaf, 1 continue"
+  },
+  "trace_parent": "<eingehende handoff_id>"
+}
+```
 
 ## Rules & Compliance
 

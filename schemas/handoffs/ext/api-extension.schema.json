@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APIExtension — api-specialist→developer Payload Extension",
+  "description": "Erweitert TaskSpec um API-Contract-spezifische Felder für die Übergabe von API-Spezifikationen an den developer. Wird via JSON Schema allOf mit task-spec.schema.json kombiniert.",
+  "type": "object",
+  "required": ["ct"],
+  "properties": {
+    "ct": {
+      "type": "object",
+      "title": "Contract",
+      "description": "API-Contract-Definition.",
+      "required": ["ep"],
+      "properties": {
+        "ep": {
+          "type": "array",
+          "title": "Endpoints",
+          "description": "Liste der API-Endpunkte.",
+          "items": {
+            "type": "object",
+            "required": ["mt", "pt"],
+            "properties": {
+              "mt": {
+                "type": "string",
+                "title": "Method",
+                "description": "HTTP-Methode.",
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+              },
+              "pt": {
+                "type": "string",
+                "title": "Path",
+                "description": "URL-Pfad (z.B. /api/users/{id})."
+              },
+              "sm": {
+                "type": "string",
+                "title": "Summary",
+                "description": "Kurzbeschreibung des Endpunkts."
+              },
+              "rq": {
+                "type": "object",
+                "title": "Request",
+                "description": "Request-Schema (Body/Query/Path/Header).",
+                "properties": {
+                  "bd": { "type": "object", "title": "Body", "description": "Request-Body-Schema (JSON Schema)." },
+                  "qp": { "type": "object", "title": "Query Params", "description": "Query-Parameter." },
+                  "ph": { "type": "object", "title": "Path Params", "description": "Pfad-Parameter." },
+                  "hd": { "type": "object", "title": "Headers", "description": "Erforderliche Header." }
+                }
+              },
+              "rs": {
+                "type": "object",
+                "title": "Responses",
+                "description": "Response-Schemas pro Status-Code.",
+                "patternProperties": {
+                  "^[1-5]\\d{2}$": {
+                    "type": "object",
+                    "properties": {
+                      "desc": { "type": "string", "title": "Description" },
+                      "bd": { "type": "object", "title": "Body", "description": "Response-Body-Schema." }
+                    }
+                  }
+                }
+              },
+              "au": {
+                "type": "boolean",
+                "title": "Auth Required",
+                "description": "Authentifizierung erforderlich?",
+                "default": false
+              },
+              "sc": {
+                "type": "array",
+                "title": "Scopes",
+                "description": "Erforderliche OAuth2-Scopes.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "sr": {
+          "type": "array",
+          "title": "Schemas",
+          "description": "Wiederverwendbare Schema-Definitionen (OpenAPI components/schemas).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nm": { "type": "string", "title": "Name" },
+              "sc": { "type": "object", "title": "Schema", "description": "JSON Schema der Komponente." }
+            }
+          }
+        }
+      }
+    },
+    "cf": {
+      "type": "string",
+      "title": "Contract File",
+      "description": "Pfad zur OpenAPI-Spezifikationsdatei (openapi.yaml/json)."
+    },
+    "vr": {
+      "type": "string",
+      "title": "Version",
+      "description": "API-Version (z.B. v1, v2).",
+      "pattern": "^v\\d+$"
+    },
+    "gw": {
+      "type": "string",
+      "title": "Gateway",
+      "description": "API-Gateway-Route-Präfix (z.B. /api/v1)."
+    }
+  }
+}

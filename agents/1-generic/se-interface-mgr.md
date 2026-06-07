@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.2.1
+version: 1.3.0
 description: Manages generic signal flow and deterministic synchronization across
   systems.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -41,6 +41,47 @@ Your responsibility is the central management and validation of all interface co
 4. **Interface Spec per Component:**
    - For each sub-component: list of all interfaces it is involved in (incoming and outgoing).
    - This spec becomes the input payload for the cell at level n+1.
+
+## A2A Handoff — Input/Output
+
+### Eingehender Envelope
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-critic",
+  "target_agent": "se-interface-mgr",
+  "schema_ref": "schemas/se-decomposition.schema.json",
+  "payload": {
+    "verdict": "approved",
+    "approved_output": {
+      "sub_components": [ ... ],
+      "internal_interfaces": [ ... ],
+      "architectural_rationale": "..."
+    }
+  },
+  "trace_parent": "HOFF-YYYYMMDD-PARENT"
+}
+```
+
+### Ausgehender Envelope (an se-termination)
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-interface-mgr",
+  "target_agent": "se-termination",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "Termination-Entscheidung für Sub-Components treffen",
+    "propagation_map": { ... },
+    "interface_specs": [ ... ]
+  },
+  "trace_parent": "<eingehende handoff_id>"
+}
+```
 
 ## Rules & Compliance
 

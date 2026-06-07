@@ -100,3 +100,26 @@ mcp-servers:
         - "scripts/viz-logger.py"
         - "--mcp"
     secrets: []
+
+  a2a-handoff:
+    description: "A2A Handoff Protocol tools: Schema-Validierung und Route-Resolution"
+    category: agent-meta
+    enabled-by-default: true
+    tools:
+      allowed:
+        - validate_handoff
+        - resolve_handoff_schema
+        - resolve_handoff
+    agent-hint: |
+      validate_handoff: Prüft A2A-Envelope gegen referenziertes Schema.
+      resolve_handoff_schema: Liefert Schema-URI für source-target Route.
+      resolve_handoff: Rekonstruiert Envelope aus Event-Log (für Supersession-History).
+    connection:
+      type: stdio
+      command: python
+      args:
+        - "scripts/viz-logger.py"
+        - "--mcp"
+        - "--mode"
+        - "a2a"
+    secrets: []

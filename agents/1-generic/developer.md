@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.2.0"
+version: "2.3.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -96,6 +96,51 @@ Falls `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 <!-- PROJEKTSPEZIFISCH: Struktur des Projekts beschreiben -->
 {{ARCHITECTURE}}
+
+---
+
+## A2A Handoff — Eingehende Tasks
+
+Du kannst Tasks vom Orchestrator oder Feature-Agent als strukturiertes A2A-Envelope (JSON) erhalten.
+
+### Envelope parsen
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "orchestrator",
+  "target_agent": "developer",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "Implementiere Login-Flow mit OAuth2",
+    "ctx": "Bestehender Auth-Service unter /internal/auth nutzen",
+    "con": ["Muss OAuth2 mit PKCE unterstützen", "Keine neuen Dependencies"],
+    "refs": ["schemas/auth-api.json", "docs/architecture.md#auth-flow"],
+    "pri": "high",
+    "dep": ["HOFF-20260607-042"]
+  },
+  "trace_parent": "HOFF-20260607-041"
+}
+```
+
+**Extraktion:**
+- `payload.t` → Task-Beschreibung (DEINE Hauptaufgabe)
+- `payload.ctx` → Kontext (bestehende Systeme, Constraints)
+- `payload.con[]` → Harte Randbedingungen (MÜSSEN eingehalten werden)
+- `payload.refs[]` → Referenzen (Dateien, Schemas, Docs die du lesen solltest)
+- `payload.pri` → Priorität (low/medium/high/critical)
+- `payload.dep[]` → Abhängigkeiten (warten bis diese HOFFs erledigt sind)
+
+### Batch-Mode
+
+Wenn `batch: true` gesetzt ist, ist `payload` ein Array. Bearbeite die Tasks sequentiell in der Reihenfolge des Arrays. Jeder Eintrag hat `batch_task_id` zur Identifikation.
+
+### Fallback
+
+Wenn du keinen A2A-Envelope erhältst (Natural-Language-Prompt vom Orchestrator):
+- Führe die Aufgabe normal aus (Backward-Kompatibilität)
+- Der Natural-Language-Prompt enthält die gleichen Informationen, nur unstrukturiert
 
 ---
 

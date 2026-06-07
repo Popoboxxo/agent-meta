@@ -708,7 +708,8 @@ def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
 
 def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
                             viz_enabled: bool, model: str = "",
-                            agent_meta_root: Path | None = None) -> str:
+                            agent_meta_root: Path | None = None,
+                            viz_debug: bool = False) -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
     Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
@@ -779,4 +780,42 @@ Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen prot
 - Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.
 """
 
-    return agent_content.rstrip() + "\\n\\n" + block.strip() + "\\n"
+    result = agent_content.rstrip() + "\\n\\n" + block.strip() + "\\n"
+
+    # A2A Debug Events — nur bei viz.debug:true injizieren (Null-Token-Kosten sonst)
+    if viz_debug:
+        a2a_block = f"""
+## A2A Handoff Debug Events (Debug-Mode)
+
+Der A2A-Debug-Modus ist aktiv. Protokolliere zusätzlich zu den viz-Handshake-Events die folgenden A2A-Events:
+
+**Zusätzliche Pflicht-Events:**
+
+**4. Wenn ein A2A-Envelope erstellt wird:**
+- Event: `a2a_handoff_start`
+- Parameter: `--event a2a_handoff_start --task_id <uuid> --caller <source_agent> --target <target_agent> --payload '{{"handoff_id":"HOFF-...","contract":"..."}}'`
+
+**5. Wenn ein A2A-Envelope validiert wurde:**
+- Event: `a2a_handoff_validated`
+- Parameter: `--event a2a_handoff_validated --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","valid":true}}'`
+
+**6. Wenn ein A2A-Envelope delivered wurde:**
+- Event: `a2a_handoff_delivered`
+- Parameter: `--event a2a_handoff_delivered --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","status":"accepted"}}'`
+
+**7. Wenn ein A2A-Handoff fehlschlägt:**
+- Event: `a2a_handoff_failed`
+- Parameter: `--event a2a_handoff_failed --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","errors":["..."]}}'`
+
+**8. Wenn eine Supersession erstellt wird:**
+- Event: `a2a_supersession`
+- Parameter: `--event a2a_supersession --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","supersedes":"HOFF-...","reason":"..."}}'`
+
+### Regeln
+- Diese Events sind ZUSÄTZLICH zu den viz-Handshake-Events (agent_start, delegate_out, agent_end).
+- A2A-Events werden NUR im Debug-Modus protokolliert (viz.debug: true in project.yaml).
+- Nutze dasselbe Tool wie für viz-Handshake-Events (MCP log_viz_event oder CLI-Fallback).
+"""
+        result += "\\n\\n" + a2a_block.strip() + "\\n"
+
+    return result

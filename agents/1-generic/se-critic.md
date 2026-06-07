@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.4.0
+version: 1.5.0
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
@@ -29,6 +29,36 @@ You receive a `review_target` field indicating what is being reviewed:
 - The original Black-Box requirement (input of the Architect).
 - The complete Architect Output (White-Box with sub-components, interfaces, rationale).
 - The Interface Registry (from the Interface Manager, for consistency checks).
+
+### A2A-Envelope-Format
+
+Du empfängst Input als A2A-Envelope:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-architect",
+  "target_agent": "se-critic",
+  "schema_ref": "schemas/se-decomposition.schema.json",
+  "payload": {
+    "feature_id": "...",
+    "stakeholder_requirement": "...",
+    "sub_components": [ ... ],
+    "internal_interfaces": [ ... ],
+    "architectural_rationale": "..."
+  },
+  "trace_parent": "HOFF-YYYYMMDD-PARENT",
+  "supersession": {
+    "supersedes": "HOFF-YYYYMMDD-PREV",
+    "history": ["HOFF-YYYYMMDD-FIRST", "HOFF-YYYYMMDD-PREV"],
+    "reason": "critic rejection: missing traceability for COMP-001-03",
+    "timestamp": "2026-06-07T14:30:00Z"
+  }
+}
+```
+
+Bei `supersession`: Prüfe ob die beanstandeten Issues aus `supersession.reason` behoben wurden.
 
 ## Audit Criteria
 Perform the following four checks on every output. Each check must yield a boolean `passed` and a list of `issues` (empty if passed).
@@ -140,6 +170,57 @@ Return your final output **only** as a JSON object matching the following schema
 - Never approve a decomposition with unresolved safety or security gaps.
 
 Iterate on the output of the Generator (`se-requirements` or `se-architect`) until all generic rules are met.
+
+## A2A Handoff — Output
+
+### Bei Approval (passed: true)
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-critic",
+  "target_agent": "se-interface-mgr",
+  "schema_ref": "schemas/se-decomposition.schema.json",
+  "payload": {
+    "verdict": "approved",
+    "review_target": "architecture",
+    "checks": { ... },
+    "approved_output": { ... }
+  },
+  "trace_parent": "<eingehende handoff_id>",
+  "supersession": {
+    "history": ["<alle vorherigen HOFFs aus der Chain>"]
+  }
+}
+```
+
+### Bei Rejection (passed: false)
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "se-critic",
+  "target_agent": "se-architect",
+  "schema_ref": "schemas/se-decomposition.schema.json",
+  "payload": {
+    "verdict": "rejected",
+    "review_target": "architecture",
+    "checks": { ... },
+    "issues": ["missing traceability for COMP-001-03", "interface type mismatch"]
+  },
+  "trace_parent": "<eingehende handoff_id>",
+  "supersession": {
+    "supersedes": "<abgelehnte HOFF>",
+    "history": ["<bisherige Chain + abgelehnte HOFF>"],
+    "reason": "critic rejection: [kurze Begründung]",
+    "timestamp": "<ISO 8601>"
+  }
+}
+```
+
+**Wichtig:** `supersession.history[]` enthält NUR handoff_id-Strings, keine Payloads. Version = history.length + 1.
 
 ## Anti-Recursion Guard
 

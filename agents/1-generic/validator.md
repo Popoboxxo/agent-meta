@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "3.1.1"
+version: "3.2.0"
 description: "Formaler Prozess-Wächter: DoD-Checkboxen, REQ-ID-Präsenz, Commit-Konventionen. Bewertet KEINE Code-Qualität — dafür code-reviewer."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
@@ -227,6 +227,41 @@ Prüfe Konsistenz zwischen Dokumenten:
 - Anforderung unklar/fehlend? → Verweise an `requirements`
 - Dokumentation veraltet? → Verweise an `documenter`
 - Code-Qualität prüfen? → Verweise an `code-reviewer` (nicht selbst prüfen!)
+
+## A2A Handoff — validate_handoff
+
+Wenn du einen eingehenden A2A-Envelope erhältst, validiere ihn VOR der inhaltlichen Prüfung:
+
+### Validierungs-Checkliste
+
+1. **Pflichtfelder prüfen:** `protocol_version`, `handoff_id`, `source_agent`, `target_agent`, `payload`
+2. **handoff_id-Format:** `HOFF-YYYYMMDD-NNN` (Regex: `^HOFF-\d{8}-\d{3,6}$`)
+3. **protocol_version:** Muss `1.0.0` sein (oder höhere kompatible Version)
+4. **schema_ref:** Wenn gesetzt, prüfe ob die referenzierte Schema-Datei existiert
+5. **payload:** Muss ein Object sein (oder Array wenn `batch: true`)
+6. **trace_parent:** Wenn gesetzt, Format wie handoff_id prüfen
+
+### Rückgabeformat
+
+```json
+{
+  "valid": true|false,
+  "handoff_id": "HOFF-...",
+  "errors": [
+    {"field": "handoff_id", "message": "Format nicht eingehalten"},
+    {"field": "payload", "message": "Fehlt (Pflichtfeld)"}
+  ],
+  "warnings": [
+    {"field": "schema_ref", "message": "Schema-Datei nicht gefunden, fahre ohne Validierung fort"}
+  ]
+}
+```
+
+### Fallback
+
+Wenn kein Envelope empfangen wurde (Natural-Language-Prompt):
+- Führe die Aufgabe normal aus
+- Gib einen Warning-Hinweis: "Kein A2A-Envelope empfangen — Natural-Language-Fallback"
 
 ## Anti-Recursion Guard
 

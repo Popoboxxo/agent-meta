@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.3.1"
+version: "1.4.0"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -111,25 +111,43 @@ Risiken:         [Was könnte problematisch werden?]
 
 Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offenen Blockerfragen):
 
-1. Fasse die Idee als **vorläufige Anforderungsliste** zusammen — **keine REQ-IDs**, das ist Aufgabe des Requirements-Agenten
-2. Frag den Anwender: "Soll ich das jetzt an den Requirements-Agenten übergeben?"
-3. Bei Bestätigung: Starte den `requirements`-Agenten via `Agent`-Tool mit der strukturierten Zusammenfassung als Prompt
+**Übergabe als A2A-Envelope:**
 
-**Übergabe-Prompt-Format:**
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "ideation",
+  "target_agent": "requirements",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "payload": {
+    "t": "[Kernidee als Ein-Satz-Task]",
+    "ctx": "[Kontext: Codebase, bestehende Systeme, Rahmenbedingungen]",
+    "pri": "[medium|high|critical]",
+    "ci": "[Kernidee — was soll der Nutzer können?]",
+    "g": "[Ziel — wer profitiert, was ändert sich?]",
+    "sv1": {
+      "ins": ["Scope v1: Mindestanforderungen"],
+      "oos": ["Scope v2+: Ausblick"]
+    },
+    "oq": ["Offene Fragen — was ist noch unklar?"],
+    "ref": ["Referenzen auf bestehende Dateien, Issues oder externe Quellen"]
+  },
+  "requires_human_approval": false
+}
 ```
-Bitte nehme folgende Idee als neue Anforderungen auf:
 
-Kontext: [Kurzbeschreibung der Idee]
-Ziel: [Was soll erreicht werden?]
+**Payload-Felder (Ideation-Extension):**
+- `ci` (core_idea): Kernidee in einem Satz
+- `g` (goal): Ziel — wer profitiert, was ändert sich?
+- `sv1` (scope_v1): `ins` (in scope) und `oos` (out of scope)
+- `oq` (open_questions): Offene Fragen
+- `ref` (references): URLs oder Dateipfade
 
-Vorläufige Anforderungen:
-- [Anforderung 1]
-- [Anforderung 2]
-- ...
-
-Offene Punkte zur Klärung:
-- [Was noch nicht final ist]
-```
+**Vor der Übergabe:**
+1. Fasse die Idee strukturiert zusammen (keine REQ-IDs!)
+2. Frag den Anwender: "Soll ich das jetzt als strukturierten Handoff an den Requirements-Agenten übergeben?"
+3. Bei Bestätigung: Erstelle den A2A-Envelope und starte `requirements`
 
 ---
 

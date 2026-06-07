@@ -11,6 +11,14 @@ delegation_syntax:
     bootstrap: "file-based"
     tool_preamble: "true"
     parallel_pattern: "**Parallel-Pattern (konkret):**\n```\n# Vordergrund:\nAgent(subagent_type=\"validator\", prompt=\"DoD-Check für ...\")\n# Gleichzeitig im Hintergrund:\nAgent(subagent_type=\"documenter\", prompt=\"Update CODEBASE_OVERVIEW ...\", run_in_background=True)\n# Dann warten bis Hintergrund fertig, dann:\nAgent(subagent_type=\"git\", prompt=\"Commit und PR erstellen ...\")\n```\n"
+    handoff: |
+      **A2A Handoff Protocol:**
+      Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
+      Füge den JSON-Envelope VOR dem Agent()-Tool-Call in den Prompt ein:
+      ```json
+      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
+      ```
+      FANOUT mit gleichem target: batch:true, payload als Array.
 
   Opencode:
     delegate: 'task(subagent_type="{{agent}}", description="{{short_desc}}", prompt="{{task}}")'
@@ -20,6 +28,14 @@ delegation_syntax:
     bootstrap: "file-based"
     tool_preamble: "true"
     parallel_pattern: "**Parallel-Dispatch (Opencode):**\nFANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\nPARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\nBARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n\n```\n# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\ntask(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n# Alle drei Calls in derselben Antwort → parallele Ausführung\n# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n```\n\nLimit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
+    handoff: |
+      **A2A Handoff Protocol:**
+      Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
+      Füge den JSON-Envelope VOR dem task()-Call in den Prompt ein:
+      ```json
+      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
+      ```
+      FANOUT mit gleichem target: batch:true, payload als Array.
 
   Gemini:
     delegate: 'Rufe den **{{agent}}-Agenten** auf mit der Aufgabe: "{{task}}"'
@@ -33,6 +49,14 @@ delegation_syntax:
     tool_preamble: "false"
     auto_parallel: true
     parallel_pattern: "**Parallel-Pattern (konkret):**\nGemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\nDelegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
+    handoff: |
+      **A2A Handoff Protocol:**
+      Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
+      Füge den JSON-Envelope VOR dem Agenten-Aufruf in den Prompt ein:
+      ```json
+      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
+      ```
+      FANOUT mit gleichem target: batch:true, payload als Array.
 
   Continue:
     delegate: "@{{agent}} {{task}}"
@@ -46,6 +70,22 @@ delegation_syntax:
     tool_preamble: "false"
     auto_parallel: false
     parallel_pattern: "**Parallel-Pattern:**\nContinue unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
+    handoff: |
+      **A2A Handoff Protocol — YAML-Fallback:**
+      Continue: kein natives JSON-Tool. Verwende YAML-Text-Block:
+      ```yaml
+      a2a_handoff:
+        protocol_version: "1.0.0"
+        handoff_id: "HOFF-YYYYMMDD-NNN"
+        source_agent: "<quelle>"
+        target_agent: "<ziel>"
+        schema_ref: "<schema-uri>"
+        trace_parent: "<parent-HOFF>"
+        payload:
+          t: "<task>"
+          pri: "<priority>"
+      ```
+      Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
 
   Copilot:
     delegate: "@{{agent}} Führe folgende Aufgabe aus: {{task}}"
@@ -56,3 +96,19 @@ delegation_syntax:
     tool_preamble: "false"
     auto_parallel: false
     parallel_pattern: "**Parallel-Pattern:**\nGitHub Copilot unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate VS Code-Sessions.\n"
+    handoff: |
+      **A2A Handoff Protocol — YAML-Fallback:**
+      Copilot: kein natives JSON-Tool. Verwende YAML-Text-Block:
+      ```yaml
+      a2a_handoff:
+        protocol_version: "1.0.0"
+        handoff_id: "HOFF-YYYYMMDD-NNN"
+        source_agent: "<quelle>"
+        target_agent: "<ziel>"
+        schema_ref: "<schema-uri>"
+        trace_parent: "<parent-HOFF>"
+        payload:
+          t: "<task>"
+          pri: "<priority>"
+      ```
+      Dann: @<ziel> Bearbeite diesen strukturierten Handoff.

@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReviewExtension — code-reviewer→developer Payload Extension",
+  "description": "Erweitert TaskSpec um Code-Review-spezifische Felder für die Übergabe von Review-Feedback an den developer. Wird via JSON Schema allOf mit task-spec.schema.json kombiniert.",
+  "type": "object",
+  "required": ["rd"],
+  "properties": {
+    "rd": {
+      "type": "object",
+      "title": "Review Data",
+      "description": "Strukturiertes Review-Ergebnis.",
+      "required": ["v", "fl"],
+      "properties": {
+        "v": {
+          "type": "string",
+          "title": "Verdict",
+          "description": "Gesamturteil des Reviews.",
+          "enum": ["approved", "changes_requested", "blocked"]
+        },
+        "fl": {
+          "type": "array",
+          "title": "Findings",
+          "description": "Liste der Review-Findings.",
+          "items": {
+            "type": "object",
+            "required": ["fp", "sv", "msg"],
+            "properties": {
+              "fp": {
+                "type": "string",
+                "title": "File Path",
+                "description": "Pfad zur betroffenen Datei."
+              },
+              "ln": {
+                "type": "integer",
+                "title": "Line",
+                "description": "Zeilennummer (optional, wenn ganze Datei betroffen).",
+                "minimum": 1
+              },
+              "sv": {
+                "type": "string",
+                "title": "Severity",
+                "description": "Schweregrad des Findings.",
+                "enum": ["info", "warning", "error", "critical"]
+              },
+              "ct": {
+                "type": "string",
+                "title": "Category",
+                "description": "Kategorie des Findings.",
+                "enum": ["clean_code", "security", "performance", "naming", "structure", "duplication", "testing", "documentation", "traceability", "api_design"]
+              },
+              "msg": {
+                "type": "string",
+                "title": "Message",
+                "description": "Beschreibung des Findings."
+              },
+              "sg": {
+                "type": "string",
+                "title": "Suggestion",
+                "description": "Konkreter Verbesserungsvorschlag."
+              }
+            }
+          }
+        },
+        "br": {
+          "type": "object",
+          "title": "Blast Radius",
+          "description": "Blast-Radius-Analyse: betroffene Code-Pfade und Risiken.",
+          "properties": {
+            "pf": {
+              "type": "array",
+              "title": "Affected Paths",
+              "description": "Betroffene Code-Pfade.",
+              "items": { "type": "string" }
+            },
+            "rl": {
+              "type": "string",
+              "title": "Risk Level",
+              "description": "Risiko-Level der Änderung.",
+              "enum": ["low", "medium", "high", "critical"]
+            },
+            "tn": {
+              "type": "string",
+              "title": "Test Needed",
+              "description": "Empfohlene Test-Strategie."
+            }
+          }
+        }
+      }
+    },
+    "ri": {
+      "type": "string",
+      "title": "Review ID",
+      "description": "Eindeutige Review-ID für Traceability."
+    }
+  }
+}
