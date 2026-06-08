@@ -36,12 +36,12 @@ Selbst mit Pflicht-Prompt bleibt die Zuverlässigkeit LLM-abhängig. Agenten kö
 - Exit 0 — blockiert den Tool-Aufruf nicht
 
 ### Provider-Abdeckung
-| Provider | Hook-Infrastruktur | Logging |
-|----------|-------------------|---------|
-| Claude Code | ✅ PreToolUse | Hook + Prompt |
-| Gemini CLI | ✅ PreToolUse | Hook + Prompt |
-| Opencode | ❌ Keine Hooks | Nur Prompt |
-| Continue | ❌ Keine Hooks | Nur Prompt |
+| Provider | Hook-Infrastruktur | Hook-Event | Logging |
+|----------|-------------------|------------|---------|
+| Claude Code | ✅ Hooks | PreToolUse | Hook + Prompt |
+| Gemini CLI | ✅ Hooks | BeforeTool | Hook + Prompt |
+| Opencode | ❌ Keine Hooks | — | Nur Prompt |
+| Continue | ❌ Keine Hooks | — | Nur Prompt |
 
 ---
 
@@ -51,7 +51,7 @@ Selbst mit Pflicht-Prompt bleibt die Zuverlässigkeit LLM-abhängig. Agenten kö
 
 Der `viz-log` Hook ist der erste **conditional Hook** im Framework:
 
-- **viz.mode == `dynamic` oder `full`:** Hook wird kopiert + in `settings.json` als PreToolUse registriert (auto-enabled)
+- **viz.mode == `dynamic` oder `full`:** Hook wird kopiert + in `settings.json` registriert (auto-enabled). Das Event wird provider-spezifisch gemapped (Claude: PreToolUse, Gemini: BeforeTool).
 - **viz.mode == `off` oder `static`:** Hook wird übersprungen, als stale markiert, automatisch gelöscht aus `.claude/hooks/` UND aus `settings.json`
 
 ### Stale-Clean-up funktioniert vollautomatisch

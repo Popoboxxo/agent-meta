@@ -14,10 +14,10 @@ delegation_syntax:
     handoff: |
       **A2A Handoff Protocol:**
       Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
-      Füge den JSON-Envelope VOR dem Agent()-Tool-Call in den Prompt ein:
-      ```json
-      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
-      ```
+      Der folgende Platzhalter wird zur Runtime durch den tatsächlichen A2A-Envelope ersetzt:
+      {{A2A_ENVELOPE}}
+      Füge den JSON-Envelope VOR dem Agent()-Tool-Call ein:
+      Agent(subagent_type="{{agent}}", prompt="{{task}}")
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Opencode:
@@ -31,10 +31,10 @@ delegation_syntax:
     handoff: |
       **A2A Handoff Protocol:**
       Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
-      Füge den JSON-Envelope VOR dem task()-Call in den Prompt ein:
-      ```json
-      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
-      ```
+      Der folgende Platzhalter wird zur Runtime durch den tatsächlichen A2A-Envelope ersetzt:
+      {{A2A_ENVELOPE}}
+      Füge den JSON-Envelope VOR dem task()-Call ein:
+      task(subagent_type="{{agent}}", description="{{short_desc}}", prompt="{{task}}")
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Gemini:
@@ -52,10 +52,10 @@ delegation_syntax:
     handoff: |
       **A2A Handoff Protocol:**
       Jede Delegation MUSS als strukturiertes A2A-Envelope (JSON) erfolgen.
-      Füge den JSON-Envelope VOR dem Agenten-Aufruf in den Prompt ein:
-      ```json
-      {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
-      ```
+      Der folgende Platzhalter wird zur Runtime durch den tatsächlichen A2A-Envelope ersetzt:
+      {{A2A_ENVELOPE}}
+      Delegiere an den **{{agent}}-Agenten** mit folgender Aufgabe:
+      "{{task}}"
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Continue:
@@ -72,20 +72,9 @@ delegation_syntax:
     parallel_pattern: "**Parallel-Pattern:**\nContinue unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate Continue-Sessions.\n"
     handoff: |
       **A2A Handoff Protocol — YAML-Fallback:**
-      Continue: kein natives JSON-Tool. Verwende YAML-Text-Block:
-      ```yaml
-      a2a_handoff:
-        protocol_version: "1.0.0"
-        handoff_id: "HOFF-YYYYMMDD-NNN"
-        source_agent: "<quelle>"
-        target_agent: "<ziel>"
-        schema_ref: "<schema-uri>"
-        trace_parent: "<parent-HOFF>"
-        payload:
-          t: "<task>"
-          pri: "<priority>"
-      ```
-      Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
+      Continue: kein natives JSON-Tool. Verwende diesen strukturierten Handoff:
+      {{A2A_ENVELOPE}}
+      Dann: @{{agent}} Bearbeite diesen strukturierten Handoff: {{task}}
 
   Copilot:
     delegate: "@{{agent}} Führe folgende Aufgabe aus: {{task}}"
@@ -98,17 +87,6 @@ delegation_syntax:
     parallel_pattern: "**Parallel-Pattern:**\nGitHub Copilot unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate VS Code-Sessions.\n"
     handoff: |
       **A2A Handoff Protocol — YAML-Fallback:**
-      Copilot: kein natives JSON-Tool. Verwende YAML-Text-Block:
-      ```yaml
-      a2a_handoff:
-        protocol_version: "1.0.0"
-        handoff_id: "HOFF-YYYYMMDD-NNN"
-        source_agent: "<quelle>"
-        target_agent: "<ziel>"
-        schema_ref: "<schema-uri>"
-        trace_parent: "<parent-HOFF>"
-        payload:
-          t: "<task>"
-          pri: "<priority>"
-      ```
-      Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
+      Copilot: kein natives JSON-Tool. Verwende diesen strukturierten Handoff:
+      {{A2A_ENVELOPE}}
+      Dann: @{{agent}} Führe folgende Aufgabe aus: {{task}}

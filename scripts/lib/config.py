@@ -458,11 +458,12 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
         # not by general substitution — skip silently.
         if key.startswith("PAL_"):
             return match.group(0)
+        # Runtime placeholders — filled by the LLM at invocation time, not by
+        # the sync build process.  Skip silently (no warning).
+        if key in ("agent", "task", "A2A_ENVELOPE"):
+            return match.group(0)
         if key in variables:
             return variables[key]
-        # Skip PAL_* placeholders — they are handled by DelegationSyntaxEngine downstream
-        if key.startswith("PAL_"):
-            return match.group(0)
         log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
 

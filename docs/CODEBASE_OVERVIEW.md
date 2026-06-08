@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-07 (A2A-Status auf Vollständig aktualisiert)
+> Letzte Aktualisierung: 2026-06-08 (A2A-Core-Engine + PAL-Handoff + Orchestrator-Guard)
 
 ---
 
@@ -15,7 +15,9 @@
 7. [Howto-Dokumentation](#7-howto-dokumentation)
 8. [Scripts](#8-scripts)
 9. [Provider Abstraction Layer (PAL)](#9-provider-abstraction-layer-pal)
-10. [A2A-Handoff-Protokoll](#10-a2a-handoff-protokoll)
+10. [Hooks — Opt-in Shell Scripts](#10-hooks--opt-in-shell-scripts)
+11. [Rules — Projekt-globale Regeln](#11-rules--projekt-globale-regeln)
+12. [A2A-Handoff-Protokoll](#12-a2a-handoff-protokoll)
 
 ---
 
@@ -651,6 +653,18 @@ se-cascade:
 - `viz-logger-mcp.mjs`: HTTP/SSE MCP-Transport für OpenCode unter Windows. Löst das Kompatibilitätsproblem mit stdio-basiertem MCP auf dieser Plattform.
 - `lib/viz.py`: Beinhaltet Kernlogiken zur Mindmap/HTML-Generierung (Architektur-Graphen) und zur Injection (`inject_viz_prompt_block`), um die kurzen Logging-Instruktionen (MCP/CLI-Fallback) in die generierten Agenten-Templates zu integrieren. Die Prompt-Blöcke wurden in v0.55.2 um ~60% reduziert durch Auslagerung der Logging-Logik in das MCP-Tool.
 
+**Provider-spezifischer Terminal-Tool (NEU — Fix #248):** `_PROVIDER_TERMINAL_TOOL`-Dictionary mappt Provider auf ihren nativen Terminal-Tool-Namen. Fix für Issue #248 (Viz-Bash-Hardcode). `_get_terminal_tool()` liest aus `config/provider-tools.yaml` (falls vorhanden), fallback auf Hardcoded-Map. Case-insensitive Lookup.
+
+| Provider | Terminal Tool | Grund |
+|----------|--------------|-------|
+| `claude` | `Bash` | Claude Code nativer Tool-Name |
+| `gemini` | `code_execution` | Gemini/Antigravity nativer Tool-Name |
+| `opencode` | `bash` | Opencode nativer Tool-Name (lowercase) |
+| `continue` | `None` | Kein Terminal-Tool verfügbar |
+| `copilot` | `None` | Kein Terminal-Tool verfügbar |
+
+**Gemini/Antigravity-Fallback (NEU):** `_GEMINI_VIZ_BLOCK` — Datei-basiertes Viz-Logging (JSONL) als graceful degradation für Gemini/Antigravity, da MCP-Tools dort nicht supported werden (code_execution braucht manuelle User-Bestätigung → unzuverlässig für Subagenten).
+
 **Architektur-Entscheidung (MCP + CLI Fallback):**
 - Vermeidung von Prompt-Bloat durch Auslagerung langer Inline-Python-Skripte
 - Höhere Zuverlässigkeit durch MCP-Tools (keine Bash-Bestätigungs-Popups bei Copilot, Continue, Claude Code)
@@ -660,8 +674,40 @@ se-cascade:
 ### `scripts/lib/delegation_syntax.py` & `scripts/lib/bootstrap.py`
 
 **Zweck:** Provider Abstraction Layer (PAL) — syntaktische Isolation generischer Templates.
-- `delegation_syntax.py`: `DelegationSyntaxEngine` substituiert `{{PAL_*}}` Platzhalter in provider-native Syntax während der Agent-Generierung. Lädt `config/delegation-syntax.yaml` und `config/provider-capabilities.yaml`.
+- `delegation_syntax.py`: `DelegationSyntaxEngine` substituiert `{{PAL_*}}` Platzhalter in provider-native Syntax während der Agent-Generierung. Ersetzt `{{A2A_ENVELOPE}}` durch Runtime-Placeholder-Kommentar. `build_handoff()` erzeugt programmatisch A2AEnvelope + native Delegations-Syntax. Lädt `config/delegation-syntax.yaml` und `config/provider-capabilities.yaml`.
 - `bootstrap.py`: `BootstrapEngine` führt provider-spezifische Registrierungsaktionen aus. Gemini: `define_subagent` Instruktionen in GEMINI.md injizieren. Continue: Agent-Einträge in `.continue/config.yaml` schreiben.
+
+---
+
+### `scripts/lib/a2a.py` (NEU — Phase 0 Core Engine)
+
+**Zweck:** Runtime-Engine für A2A-Handoff-Envelopes — Erzeugung, Validierung und Serialisierung strukturierter Agent-zu-Agent-Daten. Die einzige Runtime-Komponente des A2A-Protokolls (Schemas sind Config/Build-Zeit). Wird vom Orchestrator und anderen Agenten zur Runtime verwendet.
+
+**Klasse:** `A2AEnvelope`
+
+**Exportierte API:**
+
+| Methode | Signatur | Zweck |
+|---------|----------|-------|
+| `__init__` | `(source_agent, target_agent, payload, handoff_id, protocol_version, schema_ref, trace_parent, trace_context, retry_count, max_retries, batch, requires_human_approval, negotiated_format, supersession, metadata)` | Vollständiger Konstruktor mit allen optionalen Feldern |
+| `create` | `(source, target, payload, schema_ref, trace_parent, trace_context, **kwargs) → A2AEnvelope` | Factory-Methode: erzeugt + validiert + returned |
+| `validate` | `() → bool` | Validierung gegen a2a-handoff.schema.json (jsonschema) oder manuelles Fallback |
+| `to_dict` | `() → dict` | Serialisierung als dict (nur non-None Felder) |
+| `to_json` | `(indent=2) → str` | Serialisierung als JSON-String |
+| `from_json` | `(json_str) → A2AEnvelope` | Deserialisierung aus JSON + Validierung |
+
+**Unabhängige Funktion:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `generate_handoff_id` | `() → str` | Thread-safe HOFF-YYYYMMDD-NNN Generierung |
+
+**Design-Entscheidungen:**
+- `__slots__` für Speichereffizienz und Schutz vor versehentlichen Attributen
+- `to_dict()` serialisiert nur non-Default Felder (reduziert Envelope-Overhead)
+- `validate()` versucht `jsonschema`-Bibliothek; Fallback auf manuelle Prüfung wenn nicht installiert
+- Validierung aller 5 Required-Felder + Format-Prüfung (handoff_id, protocol_version) + Enum-Prüfung (negotiated_format) + Supersession-Validierung
+- Thread-safe ID-Generierung via threading.Lock + datumsbasierter Counter-Resets
 
 ---
 
@@ -727,6 +773,13 @@ delegation_syntax:
 
 **Klasse:** `DelegationSyntaxEngine`
 
+**Module-Level-Konstanten (NEU in dieser Session):**
+
+| Konstante | Typ | Wert / Zweck |
+|-----------|-----|-------------|
+| `_RUNTIME_PLACEHOLDERS` | `frozenset[str]` | `{"agent", "task", "A2A_ENVELOPE"}` — preserved von `apply()`, da sie vom LLM zur Runtime gefüllt werden |
+| `_A2A_ENVELOPE_PLACEHOLDER` | `str` | HTML-Kommentar-Marker der zur Build-Zeit `{{A2A_ENVELOPE}}` ersetzt; teilt dem LLM mit, einen echten Envelope zur Runtime zu generieren |
+
 **Exportierte API:**
 
 | Methode | Signatur | Zweck |
@@ -736,7 +789,8 @@ delegation_syntax:
 | `capabilities_registry` | property → `dict` | Lädt `provider-capabilities.yaml` (lazy, cached) |
 | `get_syntax` | `(provider: str) → dict` | Syntax-Map für Provider |
 | `get_capabilities` | `(provider: str) → dict` | Capabilities für Provider |
-| `apply` | `(content: str, provider: str) → str` | Substituiert `{{PAL_*}}` in Template-Content |
+| `apply` | `(content: str, provider: str) → str` | Substituiert `{{PAL_*}}` + ersetzt `{{A2A_ENVELOPE}}` in Template-Content |
+| `build_handoff` | `(provider, source, target, payload, schema_ref, trace_parent) → dict` | **NEU** Erzeugt A2AEnvelope + provider-spezifische Delegations-Syntax in einem Schritt |
 | `needs_bootstrap` | `(provider: str) → bool` | Prüft ob Bootstrap erforderlich |
 | `has_native_subagent_dispatch` | `(provider: str) → bool` | Native Dispatch verfügbar? |
 | `has_file_based_agents` | `(provider: str) → bool` | File-based Agent-Discovery? |
@@ -749,17 +803,31 @@ PLACEHOLDERS = {
     "PAL_PARALLEL_GROUP": "parallel_group",
     "PAL_FALLBACK": "fallback",
     "PAL_TOOL_PREAMBLE": "tool_preamble",
+    "PAL_PARALLEL_PATTERN": "parallel_pattern",
+    "PAL_HANDOFF": "handoff",
 }
 ```
 
-**Flow:**
+**Flow (apply — Build-Zeit):**
 ```
 1. _compose_agent() ruft DelegationSyntaxEngine.apply(content, provider) auf
 2. Engine lädt delegation-syntax.yaml (lazy, einmalig)
 3. Für jeden PAL-Platzhalter: Regex-Substitution mit provider-spezifischer Syntax
-4. Verbleibende {{PAL_*}} Placeholder werden entfernt (no-op für diesen Provider)
-5. PAL_PREFIX: Marker-Zeilen werden entfernt
-6. Return: bereinigter Content mit nativer Provider-Syntax
+4. PAL_HANDOFF → handoff-Template (enthält {{A2A_ENVELOPE}})
+5. {{A2A_ENVELOPE}} → _A2A_ENVELOPE_PLACEHOLDER-Kommentar (für LLM-Runtime)
+6. Verbleibende {{PAL_*}} Placeholder werden entfernt (no-op für diesen Provider)
+7. PAL_PREFIX: Marker-Zeilen werden entfernt
+8. Return: bereinigter Content mit nativer Provider-Syntax + A2A-Runtime-Marker
+```
+
+**Flow (build_handoff — Runtime):**
+```
+1. Orchestrator/Agent ruft build_handoff(provider, source, target, payload, ...) auf
+2. Engine erzeugt A2AEnvelope.create() — validiert sofort
+3. Lädt delegation-syntax.yaml für den Provider
+4. Extrahiert task_summary aus payload.get("t", str(payload))
+5. Substituiert {{agent}} → target, {{task}} → task_summary im delegate-Template
+6. Return: {"envelope": <A2AEnvelope>, "provider_syntax": "<native delegation call>"}
 ```
 
 ### 9.5 `scripts/lib/bootstrap.py`
@@ -814,6 +882,20 @@ PLACEHOLDERS = {
 
 ### 9.7 Integration in `scripts/lib/agents.py`
 
+**Provider-Awareness (NEU in dieser Session):** Die sync-Pipeline wurde von hartkodiertem `provider="Claude"` auf eine provider-agnostische Architektur umgestellt. `sync_agents_for_provider()` erhält den Provider explizit übergeben und generiert provider-spezifische Agent-Dateien.
+
+**Stelle:** `sync_agents_for_provider()` — Provider-Aware Frontmatter & Tool-Validierung
+
+```python
+# Provider wird explizit übergeben (kein Hardcoded-Default mehr)
+def sync_agents_for_provider(provider: str, provider_config: dict, ...):
+    # Provider-spezifische Frontmatter-Felder (model, memory, permission_mode)
+    # werden aus provider_config gelöst — nicht mehr hardcoded "Claude"
+    ...
+    # Tool-Validierung gegen config/provider-tools.yaml-Whitelist
+    # Unterschiedliche Provider haben unterschiedliche erlaubte Tools
+```
+
 **Stelle:** `_compose_agent()` Funktion, Zeile ~1082
 
 ```python
@@ -830,24 +912,86 @@ _inject_gemini_bootstrap(provider, target_dir, ...)  # Gemini: GEMINI.md
 BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 ```
 
----
+**Provider-spezifische Tool-Mappings (hinterlegte Funktionen in agents.py):**
+
+| Funktion | Zweck |
+|----------|-------|
+| `_claude_tools` | Tool-Namen für Claude Code (Bash, TodoWrite, Agent) |
+| `_gemini_tools` | Claude→Gemini Tool-Name-Mapping |
+| `_opencode_raw_tools` | Claude→Opencode Permission-Key-Mapping |
+| `load_provider_tools_config()` | Lädt `config/provider-tools.yaml` für Tool-Whitelist pro Provider |
+| `_strip_claude_specific()` | Entfernt Claude-spezifische Zeilen in Nicht-Claude-Outputs |
+| `inject_viz_prompt_block()` | Viz-Reporting-Block — jetzt provider-spezifisch (MCP vs. file-based) |
 
 ---
 
-## 10. A2A-Handoff-Protokoll
+## 10. Hooks — Opt-in Shell Scripts
 
-> **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
+Hooks werden von `sync.py` aus `hooks/` nach `.claude/hooks/` kopiert und in `.claude/settings.json` registriert. Sie werden nur ausgeführt wenn in `.meta-config/project.yaml` aktiviert.
+
+### `hooks/1-generic/orchestrator-guard.sh` (NEU)
+
+**Version:** 1.0.0
+**Event:** PreToolUse
+**Beschreibung:** Blockiert direkte Worker-Subagent-Aufrufe aus dem Hauptchat — erzwingt Orchestrator-First-Routing. NUR aktiv wenn `enabled_by_default: false` → explizit in project.yaml aktivieren.
+
+**Logik:**
+1. Parsed Tool-Call aus stdin (JSON) via embedded Python
+2. Extrahiert `tool_name` (task/Agent/Task) und `subagent_type` aus dem tool_input
+3. Schreitet nur bei task()/Agent()/Task() Tool-Calls ein (andere Tools passieren ungehindert)
+4. Erlaubt wenn `AGENT_NAME=orchestrator` (im Orchestrator-Kontext sind alle Delegationen erlaubt)
+5. Erlaubt für Dispatch-Ausnahmen: `orchestrator`, `git`, `agent-meta-manager`, `feedback`, `documenter`
+6. Alle anderen Worker-Aufrufe → Exit 2 mit formatierter Blockierungs-Meldung
+
+**Schichten-Struktur:**
+```yaml
+hooks/
+├── 0-external/         ← Hooks aus externen Skill-Repos
+├── 1-generic/          ← Universelle Hooks (orchestrator-guard, dod-push-check)
+└── 2-platform/         ← Plattform-spezifische Hooks
+```
+
+## 11. Rules — Projekt-globale Regeln
+
+Rules werden von `sync.py` aus `rules/` nach `.claude/rules/` kopiert. Claude Code lädt sie automatisch in jeden Agenten-Kontext — kein Read-Tool nötig. Ideal für Cross-Cutting-Policies.
+
+### `rules/1-generic/use-orchestrator.md` (NEU)
+
+**Zweck:** Subagent Invocation Policy — definiert wer wen aufrufen darf.
+
+**Kernregeln:**
+- Hauptchat darf KEINE Worker-Agenten direkt aufrufen (developer, tester, git, etc.)
+- Hauptchat darf NUR `orchestrator` aufrufen
+- Orchestrator darf alle Worker aufrufen
+- 4 atomare Ausnahmen: `git`, `agent-meta-manager`, `feedback`, `documenter`
+- Anti-Recursion Guard: Worker dürfen nicht zurück zum Orchestrator delegieren
+
+**User-Override:** Trigger-Sätze wie "Nicht delegieren", "Ohne Orchestrator", "Im Hauptchat bitte" deaktivieren die Policy für die aktuelle Anfrage.
+
+**Schichten-Struktur:**
+```yaml
+rules/
+├── 0-external/         ← Rules aus externen Skill-Repos
+├── 1-generic/          ← Universelle Regeln (use-orchestrator, issue-lifecycle)
+└── 2-platform/         ← Plattform-spezifische Regeln
+```
+
+---
+
+## 12. A2A-Handoff-Protokoll
+
+> **Status:** Vollständig implementiert (Phasen 0–4) — 27 Dateien, ~1100 Zeilen
 > **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
 > **Dokument:** `docs/concepts/a2a-handoff-protocol.md`
 > **Analyse:** `docs/concepts/a2a-best-practice-analysis.md`
 
-### 10.1 Prinzip: A2A als EINZIGES Format
+### 12.1 Prinzip: A2A als EINZIGES Format
 
 **A2A-Envelopes sind das einzige Format für Agent-zu-Agent-Daten.** Natural-Language-Prompts zwischen Agenten werden vollständig durch strukturierte Envelopes ersetzt. Dies eliminiert Context Loss, ermöglicht deterministische Validierung und schafft lückenloses Supersession-Tracking.
 
 Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Text-Block statt JSON — identisches Konzept, anderes Transport-Format.
 
-### 10.2 Kernkonzepte
+### 12.2 Kernkonzepte
 
 | Konzept | Beschreibung |
 |---------|-------------|
@@ -858,7 +1002,7 @@ Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Tex
 | **Supersession** | Version-Tracking mit `history[]`-Array für vollständige Revisionsketten |
 | **Contract** | Jede Route deklariert Schema + Extension + compact_mode in der Routing-Tabelle |
 
-### 10.3 A2A vs. viz-Debug — Separate Konzepte
+### 12.3 A2A vs. viz-Debug — Separate Konzepte
 
 Das A2A-Protokoll und der viz-Handshake sind **separate Systeme** mit loser Kopplung:
 
@@ -870,7 +1014,7 @@ Das A2A-Protokoll und der viz-Handshake sind **separate Systeme** mit loser Kopp
 
 **Lose Kopplung via `trace_context.viz_task_id`** — das einzige Feld das beide Systeme verbindet. Der A2A-Envelope funktioniert vollständig ohne viz, und viz funktioniert ohne A2A.
 
-### 10.4 Schema-Strategie: 1 Core + 4 Extensions + 1 SE
+### 12.4 Schema-Strategie: 1 Core + 4 Extensions + 1 SE
 
 ```
 schemas/handoffs/
@@ -885,7 +1029,7 @@ schemas/handoffs/
 
 Reduziert die Schema-Anzahl von 19 auf 6 (84% Routen-Abdeckung mit Core + Extensions).
 
-### 10.5 Orchestrator als Envelope-Fabrik
+### 12.5 Orchestrator als Envelope-Fabrik
 
 Der Orchestrator ist der primäre Envelope-Produzent:
 
@@ -897,7 +1041,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | PIPELINE | Verkettet Envelopes via `trace_parent` |
 | REPEAT_UNTIL | Managed Supersession-Ketten via `supersession.history[]` |
 
-### 10.6 Provider-Matrix: Transport-Format
+### 12.6 Provider-Matrix: Transport-Format
 
 | Provider | structured_handoff | handoff_format | Envelope-Transport |
 |----------|-------------------|----------------|-------------------|
@@ -907,7 +1051,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | Continue | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
 | Copilot | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
 
-### 10.7 Token-Budget & Optimierungen
+### 12.7 Token-Budget & Optimierungen
 
 | Optimierung | Ersparnis | Status |
 |-------------|-----------|--------|
@@ -917,7 +1061,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `compact_mode`-Flag zur Steuerung | — (schaltet #1) | ✓ Im Envelope |
 | viz.debug: false (default) | 30 Tokens/Handoff | ✓ In Config |
 
-### 10.8 Betroffene Artefakte
+### 12.8 Betroffene Artefakte
 
 | Artefakt | Änderung | Status |
 |----------|----------|--------|
@@ -941,16 +1085,17 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `config/mcp-registry.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
 | `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
 
-### 10.9 Roadmap
+### 12.9 Roadmap
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
+| 0 — Core Engine | `scripts/lib/a2a.py` — A2AEnvelope-Klasse (create, validate, to_json, from_json, thread-safe handoff_id) | ✓ Abgeschlossen |
 | 1 — Konzept + Schemas | Core-Schema + 4 Extensions + Envelope-Anpassungen + Config + Doku | ✓ Abgeschlossen |
 | 2 — Provider-Capabilities | `{{PAL_HANDOFF}}`-Platzhalter + `structured_handoff`-Flags + delegation-syntax.yaml | ✓ Abgeschlossen |
 | 3 — Agent-Updates | Orchestrator-Envelope-Fabrik + handoff-Contracts + ideation, feature, developer, SE-Agenten | ✓ Abgeschlossen |
 | 4 — MCP & Tooling | MCP-Tools (resolve-handoff-schema, validate-handoff, resolve-handoff) + viz-Integration | ✓ Abgeschlossen |
 
-### 10.10 Handoff-Contracts in `config/role-defaults.yaml`
+### 12.10 Handoff-Contracts in `config/role-defaults.yaml`
 
 16 Rollen deklarieren A2A-Handoff-Contracts in ihrer `handoff:`-Sektion:
 

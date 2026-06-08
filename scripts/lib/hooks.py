@@ -10,6 +10,21 @@ from .log import SyncLog
 HOOKS_DIR = "hooks"
 CLAUDE_HOOKS_DIR = ".claude/hooks"
 
+# Provider-specific event name mapping.
+# Hook scripts use Claude Code event names (PreToolUse, PostToolUse, etc.) as
+# canonical names. When syncing for a non-Claude provider, the event name is
+# remapped to the provider's equivalent via this table.
+# Keyed by lowercase provider name.
+_PROVIDER_EVENT_MAP: dict[str, dict[str, str]] = {
+    "gemini": {
+        "PreToolUse": "BeforeTool",
+        "PostToolUse": "AfterTool",
+        "Notification": "Notification",
+        "Stop": "SessionEnd",
+        "SubagentStop": "AfterAgent",
+    },
+}
+
 HOOK_TEMPLATE_SH = """\
 #!/bin/bash
 # hook: %(stem)s
@@ -268,6 +283,8 @@ def sync_hooks(
 
         if is_enabled:
             event = meta.get("event", "PreToolUse")
+            # Map canonical event name to provider-specific name
+            event = _PROVIDER_EVENT_MAP.get(provider.lower(), {}).get(event, event)
             active_entries.append({
                 "name": hook_stem,
                 "event": event,

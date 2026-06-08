@@ -1,7 +1,26 @@
 {
   "theme": "Default",
   "selectedAuthType": "oauth-personal",
-  "hooks": {},
+  "hooks": {
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .gemini/hooks/orchestrator-guard.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .gemini/hooks/viz-log.sh"
+          }
+        ]
+      }
+    ]
+  },
   "mcpServers": {
     "viz-logger": {
       "type": "stdio",

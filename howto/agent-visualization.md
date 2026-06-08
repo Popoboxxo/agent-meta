@@ -100,15 +100,19 @@ Jeder generierte Agent erhält einen Prompt-Block am Ende seiner Definition, der
 - `delegate` — Delegation von A an B
 - `tool_call` — Agent führt Tool aus
 
-#### Stufe 2: PreToolUse Hook (Claude + Gemini)
+#### Stufe 2: System-Hook (Claude Code + Gemini CLI)
 
-Für Provider mit Hook-Infrastruktur (Claude Code, Gemini CLI) wird automatisch ein System-Hook registriert:
+Für Provider mit Hook-Infrastruktur (Claude Code, Gemini CLI) wird automatisch ein System-Hook registriert.
+Der Hook nutzt das kanonische Event `PreToolUse` — sync.py mapped dies automatisch auf das
+provider-spezifische Äquivalent (Gemini: `BeforeTool`).
 
 | Komponente | Pfad | Zweck |
 |------------|------|-------|
 | Quell-Hook | `hooks/1-generic/viz-log.sh` | Bash-Skript mit eingebettetem Python |
-| Ziel-Hook | `.claude/hooks/viz-log.sh` | Kopiert von sync.py |
-| Registrierung | `.claude/settings.json` | PreToolUse Event → intercept |
+| Ziel-Hook (Claude) | `.claude/hooks/viz-log.sh` | Kopiert von sync.py |
+| Ziel-Hook (Gemini) | `.gemini/hooks/viz-log.sh` | Kopiert von sync.py |
+| Registrierung (Claude) | `.claude/settings.json` | PreToolUse Event → intercept |
+| Registrierung (Gemini) | `.gemini/settings.json` | BeforeTool Event → intercept |
 
 **Funktionsweise:**
 1. Hook intercepted **jeden** Tool-Aufruf auf System-Ebene (vor Ausführung)
@@ -118,12 +122,12 @@ Für Provider mit Hook-Infrastruktur (Claude Code, Gemini CLI) wird automatisch 
 
 **Provider-Unterstützung:**
 
-| Provider | Hook-Infrastruktur | Logging-Mechanismus |
-|----------|-------------------|---------------------|
-| Claude Code | ✅ PreToolUse Hooks | Hook + Pflicht-Prompt |
-| Gemini CLI | ✅ PreToolUse Hooks | Hook + Pflicht-Prompt |
-| Opencode | ❌ Keine Hooks | Nur Pflicht-Prompt |
-| Continue | ❌ Keine Hooks | Nur Pflicht-Prompt |
+| Provider | Hook-Infrastruktur | Hook-Event | Logging-Mechanismus |
+|----------|-------------------|------------|---------------------|
+| Claude Code | ✅ Hooks | PreToolUse | Hook + Pflicht-Prompt (MCP/CLI) |
+| Gemini CLI | ✅ Hooks | BeforeTool | Hook + File-based Prompt |
+| Opencode | ❌ Keine Hooks | — | Nur Pflicht-Prompt (MCP/CLI) |
+| Continue | ❌ Keine Hooks | — | Nur Pflicht-Prompt (MCP/CLI) |
 
 #### Conditional Hook-Management
 
@@ -258,11 +262,40 @@ Folgende Einträge werden automatisch verwaltet:
 
 ---
 
+## Gemini / Antigravity — Einschränkungen & Workaround
+
+Die Gemini/Antigravity-Plattform hat zwei Limitationen die das Event-Logging beeinflussen:
+
+### Blockierte Mechanismen
+
+| Mechanismus | Status | Grund |
+|-------------|--------|-------|
+| MCP `log_viz_event` Tool | ❌ Blockiert | Antigravity's Sandbox blockiert stdio-basierte MCP-Server |
+| CLI `viz-logger.py` | ❌ Blockiert | Gemini's `code_execution` erfordert manuelle User-Bestätigung — unbrauchbar für Subagenten |
+| System-Hook (`BeforeTool`) | ✅ Funktioniert | Hook läuft auf System-Ebene, nicht in der Sandbox |
+
+### File-based Workaround
+
+Für Gemini-Agenten injiziert sync.py einen **file-based Prompt-Block** statt des MCP/CLI-basierten Blocks.
+Der Agent schreibt Event-JSONL-Zeilen direkt in `.meta-viz/events.jsonl` mittels seines Datei-Schreib-Tools.
+
+**Vorteile:**
+- Kein MCP-Server nötig (umgeht Sandbox-Blockade)
+- Kein `code_execution` nötig (umgeht User-Confirmation)
+- Gleiches Event-Format wie über MCP/CLI generierte Events
+
+**Einschränkung:**
+- Der Agent muss die Events selbstständig protokollieren (via Prompt-Anweisung).
+  Bei MCP/CLI wird dies tool-seitig erledigt. Die Zuverlässigkeit hängt daher stärker
+  von der Prompt-Compliance des LLMs ab.
+
+---
+
 ## Wichtige Hinweise
 
 1. **Statische Mindmap** funktioniert sofort — kein Opt-in nötig.
 2. **Dynamischer Modus** ist aktiviert via `viz.enabled: true` und `mode: dynamic` oder `full`.
-3. **Zweistufiges Logging** — Pflicht-Prompt-Block für alle Provider + PreToolUse Hook für Claude/Gemini.
+3. **Zweistufiges Logging** — Pflicht-Prompt-Block für alle Provider + System-Hook für Claude (`PreToolUse`) und Gemini (`BeforeTool`).
 4. **Hook ist conditional** — `viz-log.sh` wird nur kopiert/registriert wenn `viz.mode` == `dynamic` oder `full`. Bei Wechsel auf `off`/`static` automatisch entfernt.
 5. **Keine IDE-Integration** — Das Framework beobachtet die IDEs nicht von außen. Stattdessen protokollieren die Agenten ihre Aktivitäten selbst (via Prompt) und Hooks intercepten Tool-Aufrufe (via System-Ebene).
 6. **Sessions sind flüchtig** — Sie werden nie committed und regelmäßig aufgeräumt.
@@ -282,7 +315,7 @@ agent-meta/
 │       └── hooks.py         # sync_hooks: conditional viz-log Management
 ├── hooks/
 │   └── 1-generic/
-│       └── viz-log.sh       # PreToolUse Hook: intercept tool calls → events.jsonl
+│       └── viz-log.sh       # System-Hook: intercept tool calls → events.jsonl (PreToolUse/BeforeTool)
 ├── docs/
 │   ├── agent-mindmap.md     # GENERIERT (Mermaid)
 │   ├── agent-graph.html     # GENERIERT (Interaktiv, statisch)
@@ -301,9 +334,9 @@ agent-meta/
 │                    Agent-Session                        │
 │                                                         │
 │  ┌──────────────┐    ┌──────────────────────────────┐  │
-│  │ Pflicht-     │    │ PreToolUse Hook (Claude/     │  │
-│  │ Prompt-Block │    │ Gemini)                      │  │
-│  │ (alle Prov.) │    │                              │  │
+│  │ Pflicht-     │    │ System-Hook (Claude:       │  │
+│  │ Prompt-Block │    │ PreToolUse / Gemini:       │  │
+│  │ (alle Prov.) │    │ BeforeTool)                │  │
 │  │              │    │  Intercept: JEDER Tool-Aufruf │  │
 │  │ LLM schreibt │    │  → python3 extrahiert:       │  │
 │  │ Events:      │    │    - tool_name               │  │

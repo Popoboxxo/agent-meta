@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Version: **0.57.1** — last updated: 2026-06-07
+> Version: **0.57.1** — last updated: 2026-06-08
 
 ---
 
@@ -17,7 +17,7 @@
 | 7 | [SE-Agenten-Kaskade](docs/architecture/07-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
 | 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
 | 9 | [Provider Abstraction Layer](docs/architecture/09-pal.md) | PAL architecture: syntax registry, capability matrix, bootstrap |
-| 10 | [A2A Handoff Protocol](#a2a-handoff-protocol--architecture) | Structured JSON envelopes for Agent-to-Agent data contracts |
+| 10 | [A2A Handoff Protocol](#a2a-handoff-protocol--architecture) | Structured JSON envelopes (Phases 0–4, Engine + Schemas + PAL + Agents + MCP) |
 
 ---
 
@@ -57,12 +57,14 @@ agent-meta/
 ├── hooks/                   ← Versionierte Hook-Scripts (3-Schichten-Modell)
 │   ├── 0-external/          ← Hooks aus externen Skill-Repos
 │   ├── 1-generic/           ← Universelle Hooks
-│   │   └── dod-push-check.sh
+│   │   ├── dod-push-check.sh
+│   │   └── orchestrator-guard.sh  ← PreToolUse: blockiert direkte Worker-Aufrufe
 │   └── 2-platform/          ← Plattform-spezifische Hooks
 ├── rules/                   ← Projekt-globale Regeln (auto-loaded in alle Agenten)
 │   ├── 0-external/          ← Rules aus externen Skill-Repos
 │   ├── 1-generic/           ← Universelle Regeln
-│   │   └── issue-lifecycle.md
+│   │   ├── issue-lifecycle.md
+│   │   └── use-orchestrator.md  ← Subagent Invocation Policy
 │   └── 2-platform/          ← Plattform-spezifische Regeln
 ├── snippets/                ← Versionierte Code-Snippets (per Agent + Sprache)
 │   ├── tester/
@@ -107,7 +109,8 @@ agent-meta/
 │   ├── viz-logger-mcp.mjs    ← HTTP/SSE MCP-Transport für OpenCode (Windows)
 │   ├── viz-report.py         ← Session-Report-Generator (Terminal/HTML/JSON)
 │   └── lib/
-│       ├── delegation_syntax.py  ← PAL: DelegationSyntaxEngine
+│       ├── a2a.py                ← A2AEnvelope Engine (Phase 0)
+│       ├── delegation_syntax.py  ← PAL: DelegationSyntaxEngine + build_handoff()
 │       └── bootstrap.py          ← PAL: BootstrapEngine
 └── howto/
     ├── first-steps.md
@@ -353,6 +356,10 @@ config-based (Continue):
 ## A2A Handoff Protocol — Architecture
 
 The A2A Handoff Protocol standardizes Agent-to-Agent communication via structured JSON envelopes. It replaces natural-language prompts with machine-validatable data contracts.
+
+**Implementation status:** Phases 0–4 complete (27 files, ~1100 lines).
+- **Phase 0 (Core Engine):** `scripts/lib/a2a.py` — `A2AEnvelope` class with thread-safe `generate_handoff_id()`, factory `create()`, `validate()` (jsonschema + manual fallback), `to_json()`/`from_json()` serialization.
+- **Phase 1–4:** Schemas, PAL-Integration, Agent-Updates, MCP-Tools (see `docs/CODEBASE_OVERVIEW.md` §12).
 
 ### Zwei-Ebenen-Modell
 

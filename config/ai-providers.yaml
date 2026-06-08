@@ -51,7 +51,8 @@ providers:
     context_template: howto/configs/GEMINI.project-template.md
     has_rules: true
     rules_dir: .gemini/rules
-    has_hooks: false
+    has_hooks: true
+    hooks_dir: .gemini/hooks
     has_commands: true
     commands_dir: .gemini/commands
     commands_ext: .toml

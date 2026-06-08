@@ -8,16 +8,37 @@ Usage:
 
     engine = DelegationSyntaxEngine()
     processed = engine.apply(content, provider="Gemini")
+
+    # A2A handoff generation (runtime/programmatic):
+    result = engine.build_handoff("Claude", "orchestrator", "developer",
+                                  payload={"t": "Fix bug #248"})
 """
 
 import re
 from pathlib import Path
 from typing import Any
 
+from .a2a import A2AEnvelope
+
 try:
     import yaml
 except ImportError:
     yaml = None  # type: ignore[assignment]
+
+
+# Runtime placeholders that are filled by the LLM at invocation time,
+# not by the sync build process.  `apply()` preserves them unchanged.
+_RUNTIME_PLACEHOLDERS: frozenset[str] = frozenset(
+    {"agent", "task", "A2A_ENVELOPE"}
+)
+
+# Replacement for {{A2A_ENVELOPE}} at build time — a comment marker
+# that tells the LLM to generate a real A2A envelope at runtime.
+_A2A_ENVELOPE_PLACEHOLDER: str = (
+    "<!-- A2A_ENVELOPE: generated at runtime — "
+    "create via A2AEnvelope.create(source=<you>, target=<subagent>, "
+    "payload={...}) → to_json() → insert here -->"
+)
 
 
 class DelegationSyntaxEngine:
@@ -97,7 +118,65 @@ class DelegationSyntaxEngine:
         # Remove PAL_PREFIX: markers (used in templates to mark PAL-dependent sections)
         content = re.sub(r"PAL_PREFIX:\w+\s*\n", "", content)
 
+        # Replace {{A2A_ENVELOPE}} with a runtime placeholder comment.
+        # The actual envelope is generated at invocation time by the LLM.
+        content = content.replace("{{A2A_ENVELOPE}}", _A2A_ENVELOPE_PLACEHOLDER)
+
         return content
+
+    def build_handoff(
+        self,
+        provider: str,
+        source: str,
+        target: str,
+        payload: dict | None = None,
+        schema_ref: str | None = None,
+        trace_parent: str | None = None,
+    ) -> dict:
+        """Erzeuge einen A2A-Envelope + provider-spezifische Delegations-Syntax.
+
+        Args:
+            provider: Provider name (Claude, Opencode, Gemini, ...).
+            source: Role name of the delegating agent.
+            target: Role name of the target agent.
+            payload: Domain-specific payload dict. If None, an empty dict is used.
+            schema_ref: URI to the JSON Schema for the payload.
+            trace_parent: handoff_id of the parent handoff.
+
+        Returns:
+            dict with:
+                - "envelope": A2AEnvelope instance (already validated)
+                - "provider_syntax": str — native delegation code for the provider
+                  with {{agent}} and {{task}} replaced by actual values.
+
+        Raises:
+            ValueError: If the envelope validation fails.
+        """
+        actual_payload: dict = payload if payload is not None else {}
+        envelope = A2AEnvelope.create(
+            source=source,
+            target=target,
+            payload=actual_payload,
+            schema_ref=schema_ref,
+            trace_parent=trace_parent,
+        )
+
+        syntax = self.get_syntax(provider)
+        delegate_template = syntax.get("delegate", "")
+        if not isinstance(delegate_template, str):
+            delegate_template = ""
+
+        # Extract a human-readable task summary from the payload.
+        task_summary = actual_payload.get("t", str(actual_payload))
+
+        # Replace runtime placeholders with actual values.
+        provider_syntax = delegate_template.replace("{{agent}}", target)
+        provider_syntax = provider_syntax.replace("{{task}}", task_summary)
+
+        return {
+            "envelope": envelope,
+            "provider_syntax": provider_syntax,
+        }
 
     def needs_bootstrap(self, provider: str) -> bool:
         """Check if provider needs session bootstrap."""
