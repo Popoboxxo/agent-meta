@@ -709,21 +709,107 @@ def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
     return perms
 
 
+# Gemini/Antigravity prompt: file-based logging only (MCP stdio blocked by sandbox,
+# code_execution needs manual user confirmation → unreliable for subagents).
+_GEMINI_VIZ_BLOCK = """
+## Visualization Reporting (Pflicht-Anweisung)
+
+Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
+
+**Logging-Mechanismus:** Schreibe jedes Event als eine JSON-Zeile (JSONL) direkt in die Datei `.meta-viz/events.jsonl`.
+Nutze das in deiner Umgebung verfügbare Datei-Schreib-Tool (Write, edit, o.ä.) und hänge jede Zeile mit `>>` an oder schreibe die gesamte Datei neu mit der zusätzlichen Zeile.
+
+**Event-Format (JSONL):**
+```json
+{{"ts":"2026-06-08T12:00:00Z","event":"agent_start","agent":"{ROLE}","provider":"Gemini","caller":"<parent_role>","task_id":"<uuid>"}}
+{{"ts":"2026-06-08T12:00:01Z","event":"delegate_out","agent":"{ROLE}","provider":"Gemini","target":"<target_role>","task_id":"<uuid>"}}
+{{"ts":"2026-06-08T12:05:00Z","event":"agent_end","agent":"{ROLE}","provider":"Gemini","status":"success","target":"<parent_role>"}}
+```
+Ersetze `{ROLE}` durch deine Rollen-ID (z.B. developer, orchestrator).
+
+### Pflicht-Events & Handshake-Protokoll
+
+**1. Beim Start deiner Aufgabe (erstes was du tust):**
+- Event: `agent_start`
+- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben.
+
+**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
+- Event: `delegate_out`
+- Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
+- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
+
+**3. Wenn du fertig bist (Erfolg oder Fehler):**
+- Event: `agent_end`
+- Parameter: status (`success`|`error`), target (parent_role)
+
+### Regeln
+- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
+- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.
+- Der Timestamp (`ts`) MUSS im ISO-8601-Format mit Zeitzone sein.
+- Das `.meta-viz/`-Verzeichnis wird automatisch erstellt — du musst es nicht manuell anlegen.
+"""
+
+
+def _build_a2a_debug_block_file_based() -> str:
+    """Build A2A debug event instructions for file-based logging (Gemini/Antigravity)."""
+    return """
+
+## A2A Handoff Debug Events (Debug-Mode)
+
+Der A2A-Debug-Modus ist aktiv. Protokolliere zusätzlich zu den viz-Handshake-Events die folgenden A2A-Events:
+
+**Zusätzliche Pflicht-Events (als JSONL-Zeilen in .meta-viz/events.jsonl):**
+
+**4. Wenn ein A2A-Envelope erstellt wird:**
+- Event: `a2a_handoff_start`
+- Felder: `event`, `agent`, `provider`, `caller`, `target`, `task_id`, `payload` (mit `handoff_id` und `contract`)
+
+**5. Wenn ein A2A-Envelope validiert wurde:**
+- Event: `a2a_handoff_validated`
+- Felder: `event`, `agent`, `provider`, `task_id`, `payload` (mit `handoff_id` und `valid`)
+
+**6. Wenn ein A2A-Envelope delivered wurde:**
+- Event: `a2a_handoff_delivered`
+- Felder: `event`, `agent`, `provider`, `task_id`, `payload` (mit `handoff_id` und `status`)
+
+**7. Wenn ein A2A-Handoff fehlschlägt:**
+- Event: `a2a_handoff_failed`
+- Felder: `event`, `agent`, `provider`, `task_id`, `payload` (mit `handoff_id` und `errors`)
+
+**8. Wenn eine Supersession erstellt wird:**
+- Event: `a2a_supersession`
+- Felder: `event`, `agent`, `provider`, `task_id`, `payload` (mit `handoff_id`, `supersedes`, `reason`)
+
+### Regeln
+- Diese Events sind ZUSÄTZLICH zu den viz-Handshake-Events (agent_start, delegate_out, agent_end).
+- A2A-Events werden NUR im Debug-Modus protokolliert (viz.debug: true in project.yaml).
+- Nutze denselben file-based Mechanismus wie für viz-Handshake-Events.
+"""
+
+
 def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
                             viz_enabled: bool, model: str = "",
                             agent_meta_root: Path | None = None,
                             viz_debug: bool = False) -> str:
     """Injiziere den Visualization-Prompt-Block in einen Agenten.
 
-    Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
-    cross-platform CLI-Skript `scripts/viz-logger.py`.
+    Provider-spezifische Logging-Strategie:
 
-    Provider-spezifisch: Jeder Provider bekommt das korrekte Terminal-Tool
-    genannt. Bei Opencode-Agenten mit ``bash: deny`` wird der CLI-Fallback
-    weggelassen (nur MCP-Tool).
+    - **Claude/Opencode:** MCP-Tool `log_viz_event` (bevorzugt), CLI `scripts/viz-logger.py` als Fallback.
+    - **Gemini/Antigravity:** File-based Logging direkt in `.meta-viz/events.jsonl`.
+      MCP-stdio ist durch die Sandbox blockiert, und `code_execution` benötigt
+      manuelle User-Bestätigung — beides unbrauchbar für Subagenten.
     """
     if not viz_enabled:
         return agent_content
+
+    # Gemini: file-based approach (no MCP, no CLI, no terminal)
+    if provider.lower() == "gemini":
+        block = _GEMINI_VIZ_BLOCK.replace("{ROLE}", role)
+        result = agent_content.rstrip() + "\n\n" + block.strip() + "\n"
+        if viz_debug:
+            result += _build_a2a_debug_block_file_based()
+        return result
 
     cli_cmd = f"python scripts/viz-logger.py --agent {role} --provider {provider}"
     terminal_tool = _get_terminal_tool(provider, agent_meta_root)
@@ -733,12 +819,6 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
         perms = _parse_opencode_permissions(agent_content)
         if perms.get("bash") == "deny":
             has_terminal = False
-
-    # Gemini/Antigravity: Sandbox blocks MCP tools, code_execution requires
-    # manual user confirmation which subagents cannot provide.
-    # → No CLI fallback, only MCP tool with graceful degradation.
-    if provider.lower() == "gemini":
-        has_terminal = False  # code_execution is not usable for subagents
 
     if has_terminal and terminal_tool:
         fallback = (
