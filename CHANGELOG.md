@@ -47,13 +47,13 @@
 
 ### Added
 
-- **Checkpointing** (`scripts/lib/checkpoint.py`): Resume langer Orchestrierungen nach Session-Unterbrechung. Speichert den aktuellen Delegation-State und ermöglicht Wiederaufnahme ohne Wiederholung bereits abgeschlossener Sub-Tasks. (Issue #169)
-- **Auto-Generated Delegation Table**: Die Delegationstabelle in generierten Agenten wird jetzt automatisch aus `config/role-defaults.yaml` erzeugt (managed block). Keine manuelle Pflege der Routing-Tabelle mehr nötig — neue Rollen erscheinen automatisch. (Issue #249)
-- **SE-Cascade Runner** (`scripts/run-cascade.py`): Kommandozeilen-Runner für die Systems-Engineering-Cascade auf Plattformen ohne natives Subagent-Dispatch (insb. Gemini/Antigravity). Orchestriert die 6-level SE-Kaskade sequentiell mit State-Tracking. (Issue #209)
+- **Checkpointing** (`scripts/lib/checkpoint.py`): Resume long orchestrations after session interruption. Saves the current delegation state and enables resumption without repeating already completed sub-tasks. (Issue #169)
+- **Auto-Generated Delegation Table**: The delegation table in generated agents is now automatically created from `config/role-defaults.yaml` (managed block). No more manual maintenance of the routing table needed — new roles appear automatically. (Issue #249)
+- **SE-Cascade Runner** (`scripts/run-cascade.py`): Command-line runner for the Systems Engineering cascade on platforms without native subagent dispatch (especially Gemini/Antigravity). Orchestrates the 6-level SE cascade sequentially with state tracking. (Issue #209)
 
 ### Changed
 
-- **Worker-Guard verschärft**: Orchestrator ist jetzt explizit als Router-Only definiert mit ABSOLUTEM VERBOT gegen Selbst-Implementierung von Worker-Aufgaben. Jeder Versuch des Orchestrators, Code selbst zu schreiben oder Tests selbst auszuführen, wird jetzt durch klare Anti-Recursion-Regeln blockiert. (Issue #260)
+- **Worker-Guard tightened**: Orchestrator is now explicitly defined as router-only with ABSOLUTE BAN on self-implementing worker tasks. Any attempt by the orchestrator to write code itself or run tests itself is now blocked by clear anti-recursion rules. (Issue #260)
 
 ---
 
@@ -371,17 +371,17 @@
 
 ### Added
 
-- **`log-analyzer` agent** (`agents/1-generic/log-analyzer.md`): Analysiert System- und Applikations-Logs mit Frequency-Clustering (Bash-basiert, vor LLM-Analyse), RFC-5424-konformer Severity-Klassifikation (CRITICAL/HIGH/MEDIUM/LOW/INFO), Auto-Discovery bekannter Log-Pfade (syslog, journald, Docker, Home Assistant, Nginx) und strukturierten Finding-Cards. Zwei Modi: `--quick` (Standard, token-sparend) und `--deep` (Codebase-Suche + Online-Recherche). Delegations-Routing zu `feedback`, `developer`, `security-auditor` und `requirements`. `workflow_tier: required`.
-- **`homeassistant-log-analyzer` platform agent** (`agents/2-platform/homeassistant-log-analyzer.md`): Erweitert den generischen Log-Analyzer via `extends: + patches:` mit HA-spezifischem Log-Format, Logger-zu-Komponenten-Mapping, bekannten Fehlermustern (TemplateError, Platform not ready, MQTT disconnect, ZHA, Recorder), Startup-Rauschen-Filter und HA-spezifischen Delegations-Ressourcen (community.home-assistant.io, HACS).
-- **`feedback` agent** (`agents/1-generic/feedback.md`): Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt als GitHub Issues. Pflicht-Gate vor jeder direkten `git`-basierten Issue-Erstellung. Sechs Typen (`bug`, `feat`, `improvement`, `docs`, `security`, `question`) mit Body-Templates. Auto-Repo-Erkennung via `gh repo view`. Klare Abgrenzung zu `meta-feedback` (Framework vs. Projekt). `workflow_tier: required`.
-- **`/analyze-logs` command** (`commands/1-generic/analyze-logs.md`): Delegiert an `log-analyzer`-Agent. Unterstützt optionalen Pfad und `--quick`/`--deep`-Flags. Wird für alle aktiven Provider generiert (Claude → `.claude/commands/`, Gemini → `.gemini/commands/` (`.toml`), Opencode → `.opencode/commands/`, Continue → `.continue/prompts/`).
-- **`/feedback` command** (`commands/1-generic/feedback.md`): Delegiert an `feedback`-Agent. Unterstützt optionalen Typ-Keyword (`bug | feat | improvement | docs | security | question`) und Kurzbeschreibung als Argument. Wird für alle aktiven Provider generiert.
-- **`/report-bug` command aktualisiert** (`commands/1-generic/report-bug.md`): Delegiert jetzt an `feedback`-Agent (Typ `bug` vorbelegt) statt eigenem Inline-Workflow — konsistent mit dem standardisierten Feedback-Kanal.
-- **Orchestrator Workflow O + P** (`agents/1-generic/orchestrator.md`): Workflow O (Log-Analyse via `log-analyzer`) und Workflow P (Projekt-Issue via `feedback → gh issue create`) ergänzt. Beide neuen Agenten in der Agenten-Tabelle eingetragen.
-- **`consistency-check.py`** (`scripts/consistency-check.py` + `scripts/lib/consistency/`): Neues Python-Script zur deterministischen Konsistenzprüfung von Agent-Templates, Commands und Cross-References ohne LLM-Aufruf. Prüft: Frontmatter-Version-Bumps (git-diff-basiert), semver-Format, extends/patches-Anchor-Auflösung, role-defaults-Vollständigkeit, Orchestrator-Tabelle, CHANGELOG-Erwähnungen, Platzhalter-Typos. Exit-Codes: 0=ok, 1=Fehler, 2=Script-Error. Flags: `--changed`, `--file`, `--strict`, `--json`, `--root`. Stdlib-only, PyYAML optional.
-- **`/consistency-check` command** (`commands/1-generic/consistency-check.md`): Slash-Command ruft das Script auf, interpretiert Findings und bietet interaktive Fixes an. Wird für alle aktiven Provider generiert.
-- **`agent-meta-manager` v1.5.0** (`agents/1-generic/agent-meta-manager.md`): Neuer Abschnitt 8 "Consistency-Check" mit vollständiger Referenz, Wann-ausführen-Tabelle und Link auf Howto.
-- **Howto** (`howto/features/consistency-check.md`): Vollständige Referenz mit manueller Ausführung, allen CLI-Flags, Check-Katalog, JSON-Format, GitHub-Actions-Integration und Anleitung zum Hinzufügen neuer Checks.
+- **`log-analyzer` agent** (`agents/1-generic/log-analyzer.md`): Analyzes system and application logs with frequency clustering (Bash-based, before LLM analysis), RFC-5424-compliant severity classification (CRITICAL/HIGH/MEDIUM/LOW/INFO), auto-discovery of known log paths (syslog, journald, Docker, Home Assistant, Nginx) and structured finding cards. Two modes: `--quick` (default, token-efficient) and `--deep` (codebase search + online research). Delegation routing to `feedback`, `developer`, `security-auditor` and `requirements`. `workflow_tier: required`.
+- **`homeassistant-log-analyzer` platform agent** (`agents/2-platform/homeassistant-log-analyzer.md`): Extends the generic log analyzer via `extends: + patches:` with HA-specific log format, logger-to-component mapping, known error patterns (TemplateError, Platform not ready, MQTT disconnect, ZHA, Recorder), startup noise filter and HA-specific delegation resources (community.home-assistant.io, HACS).
+- **`feedback` agent** (`agents/1-generic/feedback.md`): Standardizes bug reports, feature requests and improvement suggestions for the target project as GitHub Issues. Mandatory gate before any direct `git`-based issue creation. Six types (`bug`, `feat`, `improvement`, `docs`, `security`, `question`) with body templates. Auto-repo-detection via `gh repo view`. Clear separation from `meta-feedback` (framework vs. project). `workflow_tier: required`.
+- **`/analyze-logs` command** (`commands/1-generic/analyze-logs.md`): Delegates to `log-analyzer` agent. Supports optional path and `--quick`/`--deep` flags. Generated for all active providers (Claude → `.claude/commands/`, Gemini → `.gemini/commands/` (`.toml`), Opencode → `.opencode/commands/`, Continue → `.continue/prompts/`).
+- **`/feedback` command** (`commands/1-generic/feedback.md`): Delegates to `feedback` agent. Supports optional type keyword (`bug | feat | improvement | docs | security | question`) and short description as argument. Generated for all active providers.
+- **`/report-bug` command updated** (`commands/1-generic/report-bug.md`): Now delegates to `feedback` agent (type `bug` pre-selected) instead of own inline workflow — consistent with the standardized feedback channel.
+- **Orchestrator Workflow O + P** (`agents/1-generic/orchestrator.md`): Workflow O (log analysis via `log-analyzer`) and Workflow P (project issue via `feedback → gh issue create`) added. Both new agents listed in the agents table.
+- **`consistency-check.py`** (`scripts/consistency-check.py` + `scripts/lib/consistency/`): New Python script for deterministic consistency checking of agent templates, commands and cross-references without LLM calls. Checks: frontmatter version bumps (git-diff-based), semver format, extends/patches anchor resolution, role-defaults completeness, orchestrator table, CHANGELOG mentions, placeholder typos. Exit codes: 0=ok, 1=error, 2=script-error. Flags: `--changed`, `--file`, `--strict`, `--json`, `--root`. Stdlib-only, PyYAML optional.
+- **`/consistency-check` command** (`commands/1-generic/consistency-check.md`): Slash command calls the script, interprets findings and offers interactive fixes. Generated for all active providers.
+- **`agent-meta-manager` v1.5.0** (`agents/1-generic/agent-meta-manager.md`): New section 8 "Consistency-Check" with full reference, when-to-run table and link to howto.
+- **Howto** (`howto/features/consistency-check.md`): Full reference with manual execution, all CLI flags, check catalog, JSON format, GitHub Actions integration and guide for adding new checks.
 
 ---
 
@@ -471,18 +471,18 @@
 
 ### Added
 
-- **Provider-spezifische Modell-Tiers** (`config/ai-providers.yaml`, `config/role-defaults.yaml`, `scripts/lib/roles.py`): Fünf abstrakte Tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) ersetzen Claude-spezifische Aliase in `role-defaults.yaml`. `sync.py` mappt Tiers per Provider auf konkrete Modell-IDs — Gemini bekommt jetzt korrekte Gemini-Modelle statt ungültige Claude-Aliase.
-- **Provider-Tier-Mapping** (`config/ai-providers.yaml`): `model-tiers` und `model-aliases` pro Provider:
+- **Provider-specific model tiers** (`config/ai-providers.yaml`, `config/role-defaults.yaml`, `scripts/lib/roles.py`): Five abstract tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) replace Claude-specific aliases in `role-defaults.yaml`. `sync.py` maps tiers per provider to concrete model IDs — Gemini now receives correct Gemini models instead of invalid Claude aliases.
+- **Provider-Tier-Mapping** (`config/ai-providers.yaml`): `model-tiers` and `model-aliases` per provider:
   - Claude: `nano/fast` → `claude-haiku-4-5-20251001` | `balanced` → `claude-sonnet-4-6` | `powerful/max` → `claude-opus-4-7`
   - Gemini: `nano/fast` → `gemini-2.5-flash` | `balanced/powerful/max` → `gemini-2.5-pro`
-  - Continue: leer — Continue verwaltet Modelle zentral in `config.yaml`
-- **Provider-spezifische `model-overrides`** (`config/project-config.schema.json`, `scripts/lib/roles.py`): Neues Format `model-overrides.Claude.git: fast` neben Legacy `model-overrides.git: fast`. Provider-Block hat Vorrang für den jeweiligen Provider; Legacy-Block gilt nur für Claude.
-- **Rückwärtskompatibilität**: `haiku`/`sonnet`/`opus` als Aliase für Claude weiter gültig. Für andere Provider werden sie auf den entsprechenden Tier gemappt (`haiku` → `fast`, `sonnet` → `balanced`, `opus` → `powerful`).
-- **Konkretes `run_in_background`-Beispiel** (`agents/1-generic/orchestrator.md` v2.5.0): Orchestrator zeigt jetzt Python-Code-Pattern für parallele Delegation (Vordergrund + `run_in_background=True`).
+  - Continue: empty — Continue manages models centrally in `config.yaml`
+- **Provider-specific `model-overrides`** (`config/project-config.schema.json`, `scripts/lib/roles.py`): New format `model-overrides.Claude.git: fast` alongside legacy `model-overrides.git: fast`. Provider block takes precedence for the respective provider; legacy block applies only to Claude.
+- **Backward compatibility**: `haiku`/`sonnet`/`opus` remain valid as aliases for Claude. For other providers they are mapped to the corresponding tier (`haiku` → `fast`, `sonnet` → `balanced`, `opus` → `powerful`).
+- **Concrete `run_in_background` example** (`agents/1-generic/orchestrator.md` v2.5.0): Orchestrator now shows Python code pattern for parallel delegation (foreground + `run_in_background=True`).
 
 ### Fixed
 
-- **Gemini-Agenten hatten ungültige `model:`-Felder** (`scripts/lib/agents.py`): `model: haiku` oder `model: sonnet` wurden in Gemini-Frontmatter geschrieben — Gemini CLI ignoriert oder lehnt diese ab. Alle Gemini-Agenten erhalten jetzt korrekte Gemini-Modell-IDs.
+- **Gemini agents had invalid `model:` fields** (`scripts/lib/agents.py`): `model: haiku` or `model: sonnet` were written into Gemini frontmatter — Gemini CLI ignores or rejects these. All Gemini agents now receive correct Gemini model IDs.
 
 ---
 
@@ -569,16 +569,16 @@
 
 ### Added
 
-- **HA platform: MCP-Server-Guidelines** (`rules/2-platform/homeassistant-mcp-integration.md`): Neue Sektion "Lokale / Projektspezifische MCP-Server" — Dokumentationskonvention für lokale MCP-Server via `platform-config.yaml`, gitignore-Hinweise, Fallback-Strategie.
-- **HA platform: project.yaml Template** (`howto/configs/project.yaml.homeassistant.example`): HA-spezifisches Beispiel ohne Build-Artifact-Felder, mit YAML/Jinja2-Kontext und HA-typischer Rollen-Whitelist.
-- **branch-guard Rule** (`rules/1-generic/branch-guard.md`): Vollständig überarbeitete Entscheidungslogik mit explizitem Entscheidungsbaum, "Branch PFLICHT"-Tabelle und präzisen Ausnahmen. Issues bearbeiten, mehrere Dateien ändern und `sync.py` ausführen erfordern jetzt immer einen Branch.
+- **HA platform: MCP-Server-Guidelines** (`rules/2-platform/homeassistant-mcp-integration.md`): New section "Local / Project-Specific MCP Servers" — documentation convention for local MCP servers via `platform-config.yaml`, gitignore hints, fallback strategy.
+- **HA platform: project.yaml Template** (`howto/configs/project.yaml.homeassistant.example`): HA-specific example without build artifact fields, with YAML/Jinja2 context and HA-typical role whitelist.
+- **branch-guard Rule** (`rules/1-generic/branch-guard.md`): Completely revised decision logic with explicit decision tree, "Branch PFLICHT" table and precise exceptions. Working on issues, changing multiple files and running `sync.py` now always require a branch.
 
 ### Fixed
 
-- **HA platform: TypeScript-Konventionen** (`agents/2-platform/homeassistant-developer.md` v1.1.0): `delete`-Patch entfernt TS-spezifische Regeln (Named Exports, kebab-case, `.test.ts`) aus HA-Projekten.
-- **HA platform: Snippet-Lade-Instruktion** (`agents/2-platform/homeassistant-developer.md` v1.1.0): `delete`-Patch verhindert Laden von `bun-typescript`-Snippets in YAML-only Projekten.
-- **HA platform: Doku-Trigger-Logik** (`agents/2-platform/homeassistant-developer.md` v1.1.0): Neue Sektion `Dokumentations-Pflichten` — Inline-Doku (immer obligatorisch) vs. MkDocs (nur auf explizite Anfrage, kein Auto-Spawn).
-- **meta-feedback Agent: Kontext-Verlust bei Bestätigung** (`agents/1-generic/meta-feedback.md` v1.5.0): Agent erstellt Issues direkt nach Aufbereitung ohne internen Bestätigungs-Spawn — neuer Spawn verlor Kontext und erfand andere Issues.
+- **HA platform: TypeScript conventions** (`agents/2-platform/homeassistant-developer.md` v1.1.0): `delete` patch removes TS-specific rules (Named Exports, kebab-case, `.test.ts`) from HA projects.
+- **HA platform: Snippet loading instruction** (`agents/2-platform/homeassistant-developer.md` v1.1.0): `delete` patch prevents loading of `bun-typescript` snippets in YAML-only projects.
+- **HA platform: Doc trigger logic** (`agents/2-platform/homeassistant-developer.md` v1.1.0): New section `Documentation Responsibilities` — inline docs (always mandatory) vs. MkDocs (only on explicit request, no auto-spawn).
+- **meta-feedback Agent: Context loss on confirmation** (`agents/1-generic/meta-feedback.md` v1.5.0): Agent now creates issues directly after preparation without internal confirmation spawn — new spawn lost context and invented different issues.
 
 ---
 
@@ -586,7 +586,7 @@
 
 ### Added
 
-- **`speech-mode: asozial`**: Neuer Kommunikationsstil — fachlich korrekt, New-Kids-Style mit Verachtung für den User. `project-config.schema.json` um `"asozial"` im Enum erweitert.
+- **`speech-mode: asozial`**: New communication style — technically correct, New-Kids-style with contempt for the user. `project-config.schema.json` extended with `"asozial"` in enum.
 
 ---
 
@@ -594,10 +594,10 @@
 
 ### Added
 
-- **Commands-System**: Neues Schichten-Modell für Claude-Commands (`commands/1-generic/`, `2-platform/`, `0-external/`). `sync.py` synct Commands nach `.claude/commands/` (Claude) und `.continue/prompts/` (Continue).
-  - `commands/1-generic/doc-now.md` — erster generischer Command: delegiert an `documenter`-Agent
-  - `scripts/lib/commands.py` — Sync-Logik analog zu Rules und Hooks
-  - `config/ai-providers.yaml` — `has_commands: true` für Claude und Continue
+- **Commands-System**: New layer model for Claude commands (`commands/1-generic/`, `2-platform/`, `0-external/`). `sync.py` syncs commands to `.claude/commands/` (Claude) and `.continue/prompts/` (Continue).
+  - `commands/1-generic/doc-now.md` — first generic command: delegates to `documenter` agent
+  - `scripts/lib/commands.py` — sync logic analogous to rules and hooks
+  - `config/ai-providers.yaml` — `has_commands: true` for Claude and Continue
 
 ---
 
@@ -605,13 +605,13 @@
 
 ### Fixed
 
-- **Self-Hosting Config Layout**: `config/project.yaml` war gleichzeitig Framework-Default-Verzeichnis und Self-Hosting-Config — semantisch falsch. Die Projekt-Config für das Meta-Repo selbst liegt jetzt korrekt unter `.meta-config/project.yaml` (identisch zu jedem anderen Zielprojekt).
-  - `.meta-config/project.yaml` angelegt mit allen Self-Hosting-Einstellungen
-  - `config/project.yaml` durch Hinweis-Stub ersetzt (Framework-Defaults bleiben in `config/`)
-  - Auto-Detection: `config/project.yaml` aus Kandidaten-Liste entfernt — nur noch `.meta-config/project.yaml` → Legacy-Fallbacks
-  - `sync.py` Root-Erkennung: `"config"` als Elternordner-Sonderfall entfernt
-  - `CLAUDE.md` Verzeichnisstruktur: `.meta-config/` Block ergänzt, `config/project.yaml` als Stub dokumentiert
-  - `.claude/rules/sync-interface.md` Auto-Detection-Liste aktualisiert
+- **Self-Hosting Config Layout**: `config/project.yaml` was simultaneously the framework default directory and self-hosting config — semantically incorrect. The project config for the meta repo itself now correctly resides under `.meta-config/project.yaml` (identical to any other target project).
+  - `.meta-config/project.yaml` created with all self-hosting settings
+  - `config/project.yaml` replaced with a notice stub (framework defaults remain in `config/`)
+  - Auto-Detection: `config/project.yaml` removed from candidate list — only `.meta-config/project.yaml` → legacy fallbacks
+  - `sync.py` root detection: `"config"` parent directory special case removed
+  - `CLAUDE.md` directory structure: `.meta-config/` block added, `config/project.yaml` documented as stub
+  - `.claude/rules/sync-interface.md` auto-detection list updated
 
 ---
 
@@ -619,18 +619,18 @@
 
 ### Added
 
-- **Platform `agent-meta`**: Neues `platforms: [agent-meta]` in `config/project.yaml` aktiviert 3 neue plattformspezifische Rules für das Meta-Repo selbst:
-  - `rules/2-platform/agent-meta-architecture.md` — Schichten-Modell, Composition-Syntax, Override-Reihenfolge
-  - `rules/2-platform/agent-meta-conventions.md` — Invarianten, Versions-Bump-Tabelle, Rollen- und Platzhalter-Lifecycle
-  - `rules/2-platform/agent-meta-sync-interface.md` — sync.py Flags, log-Format, Python-Modulstruktur
-- **`agents/2-platform/agent-meta-developer.md`**: Erweiterter Developer-Agent speziell für das Meta-Repo (extends `1-generic/developer.md`). Ergänzt um Python-Stdlib-Only-Regel, ≤600-Zeilen-Modul-Grenze, SyncLog-Pflicht, keine `print()` in `lib/`.
-- **Rules-Substitution**: `sync_rules()` wendet jetzt `substitute()` auf Rule-Inhalte an — Rules bekommen projektspezifische Variablen injiziert (z.B. `{{DOD_REQ_TRACEABILITY}}`, `{{CODE_LANGUAGE}}`).
-- **`rules/1-generic/commit-conventions.md`**: Kanonische Commit-Konventions-Rule für alle Projekte — ersetzt duplizierte Tabellen in Agent-Templates.
-- **`rules/1-generic/dod-criteria.md`**: DoD-Checkliste als Rule mit echten Projekt-Werten via Variablen-Substitution — jedes Projekt sieht seine tatsächlich konfigurierten DoD-Features.
+- **Platform `agent-meta`**: New `platforms: [agent-meta]` in `config/project.yaml` activates 3 new platform-specific rules for the meta repo itself:
+  - `rules/2-platform/agent-meta-architecture.md` — layer model, composition syntax, override order
+  - `rules/2-platform/agent-meta-conventions.md` — invariants, version bump table, role and placeholder lifecycle
+  - `rules/2-platform/agent-meta-sync-interface.md` — sync.py flags, log format, Python module structure
+- **`agents/2-platform/agent-meta-developer.md`**: Extended developer agent specifically for the meta repo (extends `1-generic/developer.md`). Added Python-stdlib-only rule, ≤600-line module limit, SyncLog requirement, no `print()` in `lib/`.
+- **Rules-Substitution**: `sync_rules()` now applies `substitute()` to rule content — rules receive project-specific variables injected (e.g. `{{DOD_REQ_TRACEABILITY}}`, `{{CODE_LANGUAGE}}`).
+- **`rules/1-generic/commit-conventions.md`**: Canonical commit conventions rule for all projects — replaces duplicated tables in agent templates.
+- **`rules/1-generic/dod-criteria.md`**: DoD checklist as rule with real project values via variable substitution — each project sees its actually configured DoD features.
 
 ### Changed
 
-- **Config-Restructuring**: Framework-Config liegt jetzt sauber in `config/` (Meta-Repo-owned); Projektconfig in `.meta-config/project.yaml` (Projekt-owned, unabhängig von Submodul-Pfad und AI-Provider).
+- **Config-Restructuring**: Framework config now cleanly in `config/` (meta-repo owned); project config in `.meta-config/project.yaml` (project-owned, independent of submodule path and AI provider).
   - Auto-Detection: `.meta-config/project.yaml` → `config/project.yaml` → Legacy-Fallbacks
   - `--fill-defaults` schreibt in erkannte Config-Datei
 - **`agents/1-generic/developer.md`** (2.0.1): Doppelte Commit-Tabelle entfernt — verweist auf Rule.
@@ -649,13 +649,13 @@
 
 ### Fixed
 
-- **CLAUDE.md**: Veraltete Referenzen auf `ROLE_MAP in sync.py`, `DOD_DEFAULTS in sync.py`
-  und `MANAGED_BLOCK_TEMPLATE in sync.py` korrigiert — zeigen jetzt auf die richtigen
-  Dateien (`roles.config.yaml`, `dod-presets.config.yaml`, `templates/managed-block.md`,
+- **CLAUDE.md**: Outdated references to `ROLE_MAP in sync.py`, `DOD_DEFAULTS in sync.py`
+  and `MANAGED_BLOCK_TEMPLATE in sync.py` corrected — now point to the correct
+  files (`roles.config.yaml`, `dod-presets.config.yaml`, `templates/managed-block.md`,
   `scripts/lib/dod.py`).
-- **CLAUDE.md**: Verzeichnisstruktur um `scripts/lib/`, `templates/` und
-  `providers.config.yaml` ergänzt.
-- **howto/sync-concept.md**: Struktur um neue Module aktualisiert.
+- **CLAUDE.md**: Directory structure extended with `scripts/lib/`, `templates/` and
+  `providers.config.yaml`.
+- **howto/sync-concept.md**: Structure updated with new modules.
 - **howto/upgrade-guide.md**: `MANAGED_BLOCK_TEMPLATE` → `templates/managed-block.md`.
 
 ---
@@ -664,12 +664,12 @@
 
 ### Added
 
-- **`scripts/lib/`** — sync.py in 13 eigenständige Module aufgeteilt (log, io, config,
+- **`scripts/lib/`** — sync.py split into 13 independent modules (log, io, config,
   roles, dod, platform, providers, agents, rules, hooks, skills, extensions, context).
-  Jedes Modul ist ≤600 Zeilen und einzeln lesbar — optimiert für LLM-gestützte Entwicklung.
-- **`providers.config.yaml`** — `PROVIDER_CONFIG` aus sync.py ausgelagert.
-  Neuen AI-Provider (Cursor, Windsurf, ...) hinzufügen ohne Python-Code-Änderung.
-  Enthält auch `gitignore_entries` pro Provider.
+  Each module is ≤600 lines and individually readable — optimized for LLM-assisted development.
+- **`providers.config.yaml`** — `PROVIDER_CONFIG` extracted from sync.py.
+  Add a new AI provider (Cursor, Windsurf, ...) without Python code changes.
+  Also contains `gitignore_entries` per provider.
 - **`templates/`** — Managed-Block-Templates als echte Dateien statt Multiline-Strings im Code:
   `managed-block.md`, `managed-block-project-stub.md`, `claude-md-managed.md`
 
@@ -954,61 +954,61 @@ No breaking changes — all new features are opt-in with backward-compatible def
 
 ### Added
 
-- **Hooks-Schichten-System** (`hooks/`): Vier-Schichten-Modell analog zu Rules und Agents.
-  `sync.py` kopiert Hook-Skripte aus `0-external/`, `1-generic/`, `2-platform/` nach `.claude/hooks/`.
-  Stale-Tracking via `.claude/hooks/.agent-meta-managed`.
-  Registrierung in `.claude/settings.json` nur bei Opt-in: `"hooks": {"<name>": {"enabled": true}}`.
-  Settings.json wird bei jedem Sync gemergt (Hooks-Section) — nicht mehr nur einmalig angelegt.
-- **`dod-push-check.sh`** (`hooks/1-generic/`): Blockiert `git push` wenn Tests nicht grün sind.
-  Liest `TEST_COMMAND` aus `agent-meta.config.yaml` oder `$AGENT_META_TEST_COMMAND`.
-- **`--create-hook <name>`** in `sync.py`: Erstellt `.claude/hooks/<name>.sh` als Template.
-  Projekt-eigene Hooks — nie von sync.py überschrieben.
-- **`init_settings_local_json()`** in `sync.py`: Erstellt `.claude/settings.local.json` Skeleton
-  beim ersten Claude-Sync (`--init` oder `ai-provider: Claude`). Einmalig, nie überschrieben.
-- **`howto/hooks.md`** (neu): Vollständige Dokumentation des Hooks-Systems —
-  Schichten, Sync-Verhalten, dod-push-check Konfiguration, Abgrenzung zu Rules.
+- **Hooks Layer System** (`hooks/`): Four-layer model analogous to Rules and Agents.
+  `sync.py` copies hook scripts from `0-external/`, `1-generic/`, `2-platform/` to `.claude/hooks/`.
+  Stale tracking via `.claude/hooks/.agent-meta-managed`.
+  Registration in `.claude/settings.json` only on opt-in: `"hooks": {"<name>": {"enabled": true}}`.
+  Settings.json is merged on every sync (hooks section) — no longer only created once.
+- **`dod-push-check.sh`** (`hooks/1-generic/`): Blocks `git push` when tests are not green.
+  Reads `TEST_COMMAND` from `agent-meta.config.yaml` or `$AGENT_META_TEST_COMMAND`.
+- **`--create-hook <name>`** in `sync.py`: Creates `.claude/hooks/<name>.sh` as template.
+  Project-owned hooks — never overwritten by sync.py.
+- **`init_settings_local_json()`** in `sync.py`: Creates `.claude/settings.local.json` skeleton
+  on first Claude sync (`--init` or `ai-provider: Claude`). One-time, never overwritten.
+- **`howto/hooks.md`** (new): Full documentation of the hooks system —
+  layers, sync behavior, dod-push-check configuration, distinction from Rules.
 - **`permissionMode`-Injection** in `sync.py`: `resolve_permission_mode()` +
-  `inject_permission_mode_field()` — analog zu `model` und `memory`.
-  Liest aus `roles.config.yaml` (Meta-Default) oder `permission-mode-overrides` in
-  `agent-meta.config.yaml` (Projekt-Override).
-- **`permission_mode`-Feld in `roles.config.yaml`**: `validator` → `plan`,
-  `security-auditor` → `plan`. Alle anderen Rollen leer (Standard-Verhalten).
-- **`permission-mode-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen
-  überschreiben. Gültige Werte: `plan`, `acceptEdits`, `bypassPermissions`, `default`.
-- **`agent-meta.schema.json`** (neu): Vollständiges JSON Schema Draft-07 für
-  `agent-meta.config.yaml`. Validiert alle Top-Level-Keys, Enum-Werte für
+  `inject_permission_mode_field()` — analogous to `model` and `memory`.
+  Reads from `roles.config.yaml` (meta default) or `permission-mode-overrides` in
+  `agent-meta.config.yaml` (project override).
+- **`permission_mode` field in `roles.config.yaml`**: `validator` → `plan`,
+  `security-auditor` → `plan`. All other roles empty (default behavior).
+- **`permission-mode-overrides`** in `agent-meta.config.yaml`: Projects can override
+  individual roles. Valid values: `plan`, `acceptEdits`, `bypassPermissions`, `default`.
+- **`agent-meta.schema.json`** (new): Full JSON Schema Draft-07 for
+  `agent-meta.config.yaml`. Validates all top-level keys, enum values for
   `model-overrides` (haiku/sonnet/opus), `memory-overrides` (project/local/user),
   `permission-mode-overrides` (plan/acceptEdits/bypassPermissions/default), Hooks, External Skills.
-- **Optionale Schema-Validierung** in `sync.py`: Wenn `jsonschema` installiert ist,
-  werden Config-Fehler als Warnings ausgegeben (graceful fallback wenn nicht installiert).
-- **`howto/agent-isolation.md`** (neu): Dokumentation für `isolation: worktree` —
-  Wann sinnvoll, bekannte Fallstricke (Submodule, Merge-Konflikte, Windows), Konfiguration.
-- **`rules/1-generic/issue-lifecycle.md`** (neu): Erste generische Rule.
-  Erinnert alle Agenten daran, GitHub Issues nach Abschluss zu kommentieren und zu schließen.
+- **Optional Schema Validation** in `sync.py`: When `jsonschema` is installed,
+  config errors are output as warnings (graceful fallback when not installed).
+- **`howto/agent-isolation.md`** (new): Documentation for `isolation: worktree` —
+  when useful, known pitfalls (submodules, merge conflicts, Windows), configuration.
+- **`rules/1-generic/issue-lifecycle.md`** (new): First generic rule.
+  Reminds all agents to comment on and close GitHub Issues after completion.
 
 ### Changed
 
-- **Agent-Descriptions bereinigt**: Alle `1-generic/*.md` Templates hatten
-  „Generisches Template für den X-Agenten." in der `description:` — entfernt.
-  Ersetzt durch prägnante, einzeilige Beschreibungen ohne interne Implementierungsdetails.
-  Wirkt sich sofort auf den Claude Code Agent-Picker aus (nach nächstem Sync).
-- **`git.md`** v1.2.0 → v1.3.0: DoD-Hooks-Sektion + Workflow 7 (Issue schließen nach Arbeit).
-- **`feature.md`** v1.0.0 → v1.1.0: Frontmatter-Kommentar mit `isolation: worktree` Opt-in-Hinweis.
-- **`CLAUDE.md`**: Hooks-System, permissionMode-Overrides, JSON-Schema, settings.json-Verhalten,
-  settings.local.json-Init, agent-isolation.md — alle neuen Konzepte vollständig dokumentiert.
-- **`howto/instantiate-project.md`**: `$schema`-Zeile im Config-Template ergänzt.
-- **`agent-meta.config.yaml`** (self-hosting): `$schema`-Referenz ergänzt.
+- **Agent-Descriptions cleaned up**: All `1-generic/*.md` templates had
+  "Generic template for the X agent." in `description:` — removed.
+  Replaced with concise, one-line descriptions without internal implementation details.
+  Takes effect immediately on the Claude Code Agent Picker (after next sync).
+- **`git.md`** v1.2.0 → v1.3.0: DoD hooks section + Workflow 7 (close issue after work).
+- **`feature.md`** v1.0.0 → v1.1.0: Frontmatter comment with `isolation: worktree` opt-in hint.
+- **`CLAUDE.md`**: Hooks system, permissionMode overrides, JSON schema, settings.json behavior,
+  settings.local.json init, agent-isolation.md — all new concepts fully documented.
+- **`howto/instantiate-project.md`**: `$schema` line added to config template.
+- **`agent-meta.config.yaml`** (self-hosting): `$schema` reference added.
 
-### Migration von v0.16.5
+### Migration from v0.16.5
 
-Keine Breaking Changes.
+No Breaking Changes.
 
-- Neue Dateien in `.claude/hooks/` werden automatisch angelegt — kein Opt-in nötig.
-- `.claude/settings.json` wird bei aktivierten Hooks gemergt. Bestehende Dateien ohne
-  Hooks-Section bleiben unverändert bis ein Hook aktiviert wird.
-- `.claude/settings.local.json` wird beim nächsten Sync (wenn nicht vorhanden) erstellt.
-- `validator` und `security-auditor` erhalten `permissionMode: plan` im generierten Agent.
-  Falls das für ein Projekt nicht gewünscht ist:
+- New files in `.claude/hooks/` are created automatically — no opt-in required.
+- `.claude/settings.json` is merged when hooks are activated. Existing files without
+  hooks section remain unchanged until a hook is activated.
+- `.claude/settings.local.json` is created on next sync (if not present).
+- `validator` and `security-auditor` receive `permissionMode: plan` in the generated agent.
+  If this is not desired for a project:
   `"permission-mode-overrides": {"validator": "default"}` in `agent-meta.config.yaml`.
 
 ---
@@ -1017,22 +1017,22 @@ Keine Breaking Changes.
 
 ### Added
 
-- **Rules-Schichten-System** (`rules/`): Vier-Schichten-Modell analog zu Agenten.
-  `sync.py` kopiert Rules aus `0-external/`, `1-generic/`, `2-platform/` nach `.claude/rules/`.
-  Platform-Rules (`<platform>-<name>.md`) überschreiben gleichnamige Generic-Rules.
-  Stale-Tracking via `.claude/rules/.agent-meta-managed` — entfernt veraltete Managed-Rules.
-- **`--create-rule <name>`** in `sync.py`: Erstellt `.claude/rules/<name>.md` als leeres Template.
-  Überschreibt nie bestehende Dateien.
-- **`howto/rules.md`** (neu): Vollständige Dokumentation des Rules-Systems —
-  Schichten, Sync-Verhalten, Naming-Konvention, Abgrenzung zu Extensions.
-- **`CLAUDE.md`**: Rules-Abschnitt ergänzt (Vier-Schichten-Modell, Sync-Verhalten,
-  Abgrenzung zu Extensions), Update-Verhalten-Tabelle um Rules-Zeilen erweitert,
-  Verzeichnisstruktur um `rules/` ergänzt.
+- **Rules Layer System** (`rules/`): Four-layer model analogous to agents.
+  `sync.py` copies rules from `0-external/`, `1-generic/`, `2-platform/` to `.claude/rules/`.
+  Platform rules (`<platform>-<name>.md`) override generic rules with the same name.
+  Stale tracking via `.claude/rules/.agent-meta-managed` — removes outdated managed rules.
+- **`--create-rule <name>`** in `sync.py`: Creates `.claude/rules/<name>.md` as empty template.
+  Never overwrites existing files.
+- **`howto/rules.md`** (new): Full documentation of the rules system —
+  layers, sync behavior, naming convention, distinction from extensions.
+- **`CLAUDE.md`**: Rules section added (four-layer model, sync behavior,
+  distinction from extensions), update behavior table extended with rules rows,
+  directory structure extended with `rules/`.
 
-### Migration von v0.16.4
+### Migration from v0.16.4
 
-Keine Breaking Changes. `sync.py` läuft silent durch wenn `rules/1-generic/` leer ist —
-kein Log-Eintrag, kein Warning.
+No Breaking Changes. `sync.py` runs silently when `rules/1-generic/` is empty —
+no log entry, no warning.
 
 ---
 
@@ -1040,23 +1040,23 @@ kein Log-Eintrag, kein Warning.
 
 ### Added
 
-- **`howto/agent-memory.md`** (neu): Vollständige Dokumentation des Agent-Memory-Systems —
-  drei Scopes (`project`, `local`, `user`), Konfiguration via `roles.config.yaml` +
-  `memory-overrides`, MEMORY.md-Struktur-Empfehlungen, `.gitignore`-Verhalten.
+- **`howto/agent-memory.md`** (new): Full documentation of the agent memory system —
+  three scopes (`project`, `local`, `user`), configuration via `roles.config.yaml` +
+  `memory-overrides`, MEMORY.md structure recommendations, `.gitignore` behavior.
 - **`memory:`-Injection in `sync.py`**: `resolve_memory()` + `inject_memory_field()` —
-  liest Memory-Scope aus `roles.config.yaml` (Meta-Default) oder `memory-overrides` in
-  `agent-meta.config.yaml` (Projekt-Override). Wird nach `model:` in den Frontmatter injiziert.
-- **`memory`-Feld in `roles.config.yaml`**: Memory-Scope-Defaults für alle Rollen.
+  reads memory scope from `roles.config.yaml` (meta default) or `memory-overrides` in
+  `agent-meta.config.yaml` (project override). Injected after `model:` in frontmatter.
+- **`memory` field in `roles.config.yaml`**: Memory scope defaults for all roles.
   `validator`, `documenter`, `requirements`, `security-auditor` → `project`;
-  `agent-meta-scout` → `local`; alle anderen → leer (kein Gedächtnis).
-- **`memory-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen
-  überschreiben. Precedence: Projekt-Override > Meta-Default > kein Feld.
-- **`CLAUDE.md`**: `memory-overrides`-Abschnitt mit Scopes-Tabelle und Defaults ergänzt.
+  `agent-meta-scout` → `local`; all others → empty (no memory).
+- **`memory-overrides`** in `agent-meta.config.yaml`: Projects can override individual
+  roles. Precedence: project override > meta default > no field.
+- **`CLAUDE.md`**: `memory-overrides` section with scopes table and defaults added.
 
-### Migration von v0.16.3
+### Migration from v0.16.3
 
-Keine Breaking Changes — generierte Agenten bekommen ggf. ein neues `memory:`-Feld,
-wenn `roles.config.yaml` einen Default definiert. Wer das nicht möchte: `"memory-overrides": { "<rolle>": "" }` im Projekt setzen.
+No Breaking Changes — generated agents may receive a new `memory:` field
+if `roles.config.yaml` defines a default. To disable: set `"memory-overrides": { "<role>": "" }` in the project config.
 
 ---
 
@@ -1064,18 +1064,18 @@ wenn `roles.config.yaml` einen Default definiert. Wer das nicht möchte: `"memor
 
 ### Changed
 
-- **`roles.config.yaml`** (neu): Modell-Defaults aus `sync.py` ausgelagert —
-  Meta-Maintainer pflegt Rollen + empfohlene Modelle + Beschreibungen zentral in dieser Datei.
-  `sync.py` liest Defaults von dort statt aus einer hardkodierten Konstante.
-- **`sync.py`**: `DEFAULT_MODEL_MAP`-Konstante entfernt → `load_roles_config()` liest
-  `roles.config.yaml`; `resolve_model()` nimmt `agent_meta_root` als Parameter.
-- **`CLAUDE.md`**: `model-overrides`-Abschnitt zeigt auf `roles.config.yaml` statt sync.py;
-  Verzeichnisbaum um `roles.config.yaml` ergänzt.
+- **`roles.config.yaml`** (new): Model defaults extracted from `sync.py` —
+  meta maintainer manages roles + recommended models + descriptions centrally in this file.
+  `sync.py` reads defaults from there instead of a hardcoded constant.
+- **`sync.py`**: `DEFAULT_MODEL_MAP` constant removed → `load_roles_config()` reads
+  `roles.config.yaml`; `resolve_model()` takes `agent_meta_root` as parameter.
+- **`CLAUDE.md`**: `model-overrides` section points to `roles.config.yaml` instead of sync.py;
+  directory tree extended with `roles.config.yaml`.
 
-### Migration von v0.16.2
+### Migration from v0.16.2
 
-Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
-`roles.config.yaml` statt in `sync.py`.
+No Breaking Changes — behavior identical. Model adjustments now in
+`roles.config.yaml` instead of `sync.py`.
 
 ---
 
@@ -1083,33 +1083,33 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
 
 ### Added
 
-- **Zentrales Modell-Mapping** (`DEFAULT_MODEL_MAP` in `sync.py`): Meta-Maintainer pflegt
-  empfohlene Claude-Modelle pro Rolle. `sync.py` injiziert `model:`-Feld beim Generieren.
-- **`model-overrides`** in `agent-meta.config.yaml`: Projekte können einzelne Rollen überschreiben.
-  Precedence: Projekt-Override > Meta-Default > kein Feld (erbt vom Parent).
-- **`resolve_model()`** + **`inject_model_field()`** in `sync.py`: neue Hilfsfunktionen.
-  `inject_model_field()` fügt `model:` nach `name:` ein, überschreibt bestehende Werte,
-  oder entfernt das Feld wenn kein Modell konfiguriert (sauberer Output).
-- **`[INFO]`-Log** in `sync.log` bei Model-Injection: zeigt gesetztes Modell + Quelle
+- **Central Model Mapping** (`DEFAULT_MODEL_MAP` in `sync.py`): Meta maintainer manages
+  recommended Claude models per role. `sync.py` injects `model:` field during generation.
+- **`model-overrides`** in `agent-meta.config.yaml`: Projects can override individual roles.
+  Precedence: project override > meta default > no field (inherits from parent).
+- **`resolve_model()`** + **`inject_model_field()`** in `sync.py`: new helper functions.
+  `inject_model_field()` inserts `model:` after `name:`, overwrites existing values,
+  or removes the field when no model is configured (clean output).
+- **`[INFO]`-Log** in `sync.log` on model injection: shows set model + source
   (`meta default` vs. `project override`).
-- **`agents/1-generic/security-auditor.md`** (v1.0.0-beta): neuer generischer Agent für
-  statische Sicherheitsanalyse — OWASP Top 10, Secrets, Dependencies, Supply Chain, Crypto.
-  Read-only (kein Write/Edit), kein Alarm-Fanatismus, klare Abgrenzung zu `validator`/`tester`.
+- **`agents/1-generic/security-auditor.md`** (v1.0.0-beta): new generic agent for
+  static security analysis — OWASP Top 10, Secrets, Dependencies, Supply Chain, Crypto.
+  Read-only (no Write/Edit), no alarm fanaticism, clear separation from `validator`/`tester`.
 
 ### Changed
 
 - `scripts/sync.py`: `DEFAULT_MODEL_MAP` Konstante + `resolve_model()` + `inject_model_field()`
 - `scripts/sync.py`: `sync_agents()` ruft Model-Injection nach `build_frontmatter()` auf
-- `CLAUDE.md`: neuer Abschnitt `model-overrides` mit vollständiger Defaults-Tabelle
-- `CLAUDE.md`: `roles`-Whitelist um `agent-meta-scout` und `security-auditor` ergänzt
+- `CLAUDE.md`: new section `model-overrides` with full defaults table
+- `CLAUDE.md`: `roles` whitelist extended with `agent-meta-scout` and `security-auditor`
 
-### Meta-Defaults (injiziert wenn kein Projekt-Override)
+### Meta-Defaults (injected when no project override)
 
 | Modell | Rollen |
 |--------|--------|
 | `haiku` | `git`, `meta-feedback`, `docker` |
 | `sonnet` | `tester`, `validator`, `documenter`, `security-auditor`, `agent-meta-scout`, `agent-meta-manager`, `release` |
-| *(leer)* | `orchestrator`, `developer`, `requirements`, `ideation`, `feature` |
+| *(empty)* | `orchestrator`, `developer`, `requirements`, `ideation`, `feature` |
 
 ---
 
@@ -1117,21 +1117,21 @@ Keine Breaking Changes — Verhalten identisch. Modell-Anpassungen jetzt in
 
 ### Added
 
-- **`agents/1-generic/agent-meta-scout.md`** (v1.0.0): neuer generischer Agent — scoutet das
-  Claude Code Ökosystem auf neue Skills, Agenten-Rollen, Rules und Workflow-Patterns.
-  Liest `evaluate-repository.md` aus dem `awesome-claude-code` Submodule als Evaluation-Framework.
-  Wird **ausschließlich auf explizite Nutzer-Anfrage** gestartet (kein Auto-Trigger).
-- **`external/awesome-claude-code`**: neues Git Submodule (Meta-Repo mit kuratierten Claude-Skills).
-  Gepinnt auf `3d8bde25`. Kein Skill-Wrapper — wird direkt vom `agent-meta-scout` per Read-Tool genutzt.
-- **`external-skills.config.yaml`**: neuer `repos`-Eintrag für `awesome-claude-code`.
-- **Orchestrator Workflow M**: "Claude-Ökosystem scouten" — explizite Trigger-Liste,
-  `agent-meta-scout` in Agenten-Tabelle eingetragen.
+- **`agents/1-generic/agent-meta-scout.md`** (v1.0.0): new generic agent — scouts the
+  Claude Code ecosystem for new skills, agent roles, rules and workflow patterns.
+  Reads `evaluate-repository.md` from the `awesome-claude-code` submodule as evaluation framework.
+  Started **exclusively on explicit user request** (no auto-trigger).
+- **`external/awesome-claude-code`**: new Git submodule (meta repo with curated Claude skills).
+  Pinned to `3d8bde25`. No skill wrapper — used directly by `agent-meta-scout` via Read tool.
+- **`external-skills.config.yaml`**: new `repos` entry for `awesome-claude-code`.
+- **Orchestrator Workflow M**: "Scout Claude ecosystem" — explicit trigger list,
+  `agent-meta-scout` listed in agents table.
 
 ### Changed
 
-- `scripts/sync.py`: `ROLE_MAP` um `agent-meta-scout` erweitert
-- `agents/1-generic/orchestrator.md` (v1.6.1 → v1.7.0): Agenten-Tabelle + Workflow M ergänzt
-- `CLAUDE.md`: Agenten-Tabelle + Abhängigkeitskarte um `agent-meta-scout` erweitert
+- `scripts/sync.py`: `ROLE_MAP` extended with `agent-meta-scout`
+- `agents/1-generic/orchestrator.md` (v1.6.1 → v1.7.0): Agents table + Workflow M added
+- `CLAUDE.md`: Agents table + dependency map extended with `agent-meta-scout`
 
 ---
 
@@ -1265,7 +1265,7 @@ In each project's `agent-meta.config.yaml`:
 
 - `sync.py` — `.gitignore` entries are ensured on every sync (not just once) — missing entries are appended; existing entries untouched
 - `CLAUDE.md` — update-behavior table revised: added `CLAUDE.personal.md`, `.claude/settings.json`, `.gitignore` rows with committed/gitignored column
-- `howto/sync-concept.md` — sync behavior table expanded; Team vs. Persönlich table updated with "Angelegt von" column
+- `howto/sync-concept.md` — sync behavior table expanded; Personal vs. Team table updated with "Created by" column
 - `howto/instantiate-project.md` — commit command includes `.gitignore`; checklist expanded
 
 ## [0.14.1] — 2026-04-05
@@ -1296,7 +1296,7 @@ In each project's `agent-meta.config.yaml`:
 - `hint` frontmatter field in all 11 `1-generic` + 2 `2-platform` agent templates — short user-facing description used in `CLAUDE.md` agent table
 - `sync.py` — `build_agent_hints()`: reads `hint` (preferred) or `description` from each active agent's template; generates `{{AGENT_HINTS}}` with orchestrator start hint + role table
 - `sync.py` — `{{AGENT_HINTS}}` auto-injected variable, available in all templates
-- `CLAUDE_MD_MANAGED_TEMPLATE` — new "Verfügbare Agenten" section with `{{AGENT_HINTS}}` + orchestrator entry point hint; technical table moved to subsection
+- `CLAUDE_MD_MANAGED_TEMPLATE` — new "Available Agents" section with `{{AGENT_HINTS}}` + orchestrator entry point hint; technical table moved to subsection
 - `howto/CLAUDE.project-template.md` — same agent sections added to `--init` template
 
 ### Fixed
@@ -1367,18 +1367,18 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- Neue Variable `{{USER_INPUT_LANGUAGE}}` — Sprache in der der Nutzer Anweisungen gibt (Agent-Input), unabhängig von `COMMUNICATION_LANGUAGE` (Agent-Output)
-- `howto/agent-meta.config.example.json` — `USER_INPUT_LANGUAGE` mit Kommentar ergänzt
+- New variable `{{USER_INPUT_LANGUAGE}}` — language in which the user gives instructions (Agent-Input), independent of `COMMUNICATION_LANGUAGE` (Agent-Output)
+- `howto/agent-meta.config.example.json` — `USER_INPUT_LANGUAGE` added with comment
 
 ### Changed
 
-- Alle 13 Agenten-Templates (`+0.0.1` Patch): `USER_INPUT_LANGUAGE` in `## Sprache`-Sektion ergänzt
+- All 13 agent templates (`+0.0.1` Patch): `USER_INPUT_LANGUAGE` in `## Sprache` section added
   - `1-generic`: orchestrator `1.6.1`, developer `1.4.1`, tester `1.4.1`, validator `1.3.1`, requirements `1.3.1`, documenter `1.3.1`, release `1.3.1`, docker `1.3.1`, git `1.1.1`, meta-feedback `1.3.1`, ideation `1.2.1`
   - `2-platform`: sharkord-release `1.3.1`, sharkord-docker `1.2.1`
   - `0-external`: _skill-wrapper `1.0.1`
-- `howto/agent-meta.config.example.json` nach `howto/` verschoben (war bisher im Repo-Root)
-- Alle Referenzen auf `agent-meta.config.example.json` aktualisiert: README, CLAUDE.md, ARCHITECTURE.md, howto/*, orchestrator.md
-- CLAUDE.md — `COMMUNICATION_LANGUAGE` Beschreibung präzisiert (End-User Output), `USER_INPUT_LANGUAGE` in Variablen-Tabelle ergänzt
+- `howto/agent-meta.config.example.json` moved under `howto/` (was previously in repo root)
+- All references to `agent-meta.config.example.json` updated: README, CLAUDE.md, ARCHITECTURE.md, howto/*, orchestrator.md
+- CLAUDE.md — `COMMUNICATION_LANGUAGE` description refined (end-user output), `USER_INPUT_LANGUAGE` added to variables table
 
 ---
 
@@ -1386,8 +1386,8 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- `orchestrator.md` (`1.6.0`) — Workflow L: GitHub Issue bearbeiten (Issue lesen → requirements → tester → developer → tester → validator → documenter → git close)
-- `git.md` (`1.1.0`) — `gh issue` Kommandos: list, view, close mit Comment, PR mit "Closes #id"
+- `orchestrator.md` (`1.6.0`) — Workflow L: Process GitHub Issue (read issue → requirements → tester → developer → tester → validator → documenter → git close)
+- `git.md` (`1.1.0`) — `gh issue` commands: list, view, close with comment, PR with "Closes #id"
 
 ---
 
@@ -1395,15 +1395,15 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **`1-generic/git.md`** (`1.0.0`) — neuer Git-Agent: Commits, Branches, Merges, Tags, Push/Pull, Commit-Messages, plattformunabhängig (GitHub, GitLab, Gitea)
-- Neue Variablen: `{{GIT_PLATFORM}}`, `{{GIT_REMOTE_URL}}`, `{{GIT_MAIN_BRANCH}}`
-- `sync.py` ROLE_MAP + CLAUDE.md: `git`-Rolle registriert
+- **`1-generic/git.md`** (`1.0.0`) — new Git agent: Commits, Branches, Merges, Tags, Push/Pull, Commit Messages, platform-independent (GitHub, GitLab, Gitea)
+- New variables: `{{GIT_PLATFORM}}`, `{{GIT_REMOTE_URL}}`, `{{GIT_MAIN_BRANCH}}`
+- `sync.py` ROLE_MAP + CLAUDE.md: `git` role registered
 
 ### Changed
 
-- `orchestrator.md` (`1.5.0`) — `git`-Agent in Agenten-Tabelle; Git-Commits in Workflows A/B/E/H1/H2 an `git` delegiert; Commit-Konventionen-Sektion entfernt (→ `git.md`); DoD-Punkt aktualisiert
-- `release.md` (`1.3.0`) — Release-Workflow Schritt 5→6 umgestellt: `git tag` → Delegation an `git`; Checkliste + Delegation aktualisiert
-- `sharkord-release.md` (`1.3.0`) — Schritt 6 (Commit + Tag + Push) als Delegation an `git`-Agenten formuliert; Checkliste aktualisiert
+- `orchestrator.md` (`1.5.0`) — `git` agent in agents table; Git commits in workflows A/B/E/H1/H2 delegated to `git`; commit conventions section removed (→ `git.md`); DoD item updated
+- `release.md` (`1.3.0`) — Release workflow step 5→6 reordered: `git tag` → delegation to `git`; checklist + delegation updated
+- `sharkord-release.md` (`1.3.0`) — Step 6 (Commit + Tag + Push) formulated as delegation to `git` agent; checklist updated
 
 ---
 
@@ -1411,18 +1411,18 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **`0-external` Layer** — neuer Agenten-Layer für externe Skill-Pakete aus Drittrepos
-- `agents/0-external/_skill-wrapper.md` — generisches Wrapper-Template: Header + `{{SKILL_CONTENT}}` Substitution + lazy `additional_files`
-- `external-skills.config.yaml` — zentrale Skill-Konfiguration (Modell A): Submodule-URLs + Skill-Mapping + `enabled: true/false` Aktivierung
-- `sync.py` — `sync_external_skills()`: generiert `.claude/agents/<role>.md` + kopiert Skill-Dateien nach `.claude/skills/<skill-name>/`
-- `sync.py` — `--add-skill <repo-url> --skill-name --source --role [--entry]`: registriert Git Submodule + legt Config-Eintrag an
-- CLAUDE.md — vollständiger "External Skills (0-external Layer)"-Abschnitt mit Konzept, Konfigurationsformat, Workflow, Versionierung
+- **`0-external` Layer** — new agent layer for external skill packages from third-party repos
+- `agents/0-external/_skill-wrapper.md` — generic wrapper template: Header + `{{SKILL_CONTENT}}` substitution + lazy `additional_files`
+- `external-skills.config.yaml` — central skill configuration (Model A): Submodule URLs + Skill mapping + `enabled: true/false` activation
+- `sync.py` — `sync_external_skills()`: generates `.claude/agents/<role>.md` + copies skill files to `.claude/skills/<skill-name>/`
+- `sync.py` — `--add-skill <repo-url> --skill-name --source --role [--entry]`: registers Git submodule + creates config entry
+- CLAUDE.md — full "External Skills (0-external Layer)" section with concept, configuration format, workflow, versioning
 
 ### Changed
 
-- CLAUDE.md — "Drei-Schichten-Modell" → "Schichten-Modell" (0-external ergänzt, Override-Reihenfolge aktualisiert)
-- CLAUDE.md — Verzeichnisstruktur: `0-external/`, `external/`, `external-skills.config.yaml` dokumentiert
-- CLAUDE.md — Abhängigkeits-Karte + Änderungs-Kategorien um External Skills ergänzt
+- CLAUDE.md — "Three-layer model" → "Layer model" (0-external added, override order updated)
+- CLAUDE.md — Directory structure: `0-external/`, `external/`, `external-skills.config.yaml` documented
+- CLAUDE.md — Dependency map + change categories extended with External Skills
 
 ---
 
@@ -1430,15 +1430,15 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- `snippets/developer/bun-typescript.md` (`1.0.0`) — Imports/Exports, Typisierung, Fehlerbehandlung, Dateistruktur, Async für TypeScript/Bun
-- `snippets/developer/pytest-python.md` (`1.0.0`) — Python-Äquivalente
-- **`{{DEVELOPER_SNIPPETS_PATH}}`** — neue Variable, zeigt auf Developer-Snippet-Datei
+- `snippets/developer/bun-typescript.md` (`1.0.0`) — Imports/Exports, Typing, Error Handling, File Structure, Async for TypeScript/Bun
+- `snippets/developer/pytest-python.md` (`1.0.0`) — Python equivalents
+- **`{{DEVELOPER_SNIPPETS_PATH}}`** — new variable, points to developer snippet file
 
 ### Changed
 
-- `developer.md` (`1.4.0`) — `DEVELOPER_SNIPPETS_PATH` Read-Instruktion in Sprach-Best-Practices eingebaut
-- CLAUDE.md — `DEVELOPER_SNIPPETS_PATH` in Variablen-Tabelle + Snippets-Tabelle + Verzeichnisstruktur
-- `agent-meta.config.example.json` — `DEVELOPER_SNIPPETS_PATH` hinzugefügt
+- `developer.md` (`1.4.0`) — `DEVELOPER_SNIPPETS_PATH` Read instruction integrated into language best practices
+- CLAUDE.md — `DEVELOPER_SNIPPETS_PATH` in variables table + snippets table + directory structure
+- `agent-meta.config.example.json` — `DEVELOPER_SNIPPETS_PATH` added
 
 ---
 
@@ -1446,17 +1446,17 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **Snippet-System** — sprachspezifische Code-Beispiele ausgelagert in `snippets/<rolle>/`
-- `snippets/tester/bun-typescript.md` (`1.0.0`) — TypeScript/Bun Test-Syntax, Naming, Assertions
-- `snippets/tester/pytest-python.md` (`1.0.0`) — Python/pytest Äquivalente
-- **`{{TESTER_SNIPPETS_PATH}}`** — neue Variable, zeigt auf Snippet-Datei (relativ zu `snippets/`)
-- `sync.py` — `sync_snippets()`: kopiert Snippet-Dateien nach `.claude/snippets/` im Zielprojekt (respektiert `--dry-run`, loggt Version)
-- CLAUDE.md — neuer Abschnitt "Snippets" mit Konzept, Frontmatter, verfügbaren Snippets, Anleitung
+- **Snippet System** — language-specific code examples extracted to `snippets/<role>/`
+- `snippets/tester/bun-typescript.md` (`1.0.0`) — TypeScript/Bun test syntax, naming, assertions
+- `snippets/tester/pytest-python.md` (`1.0.0`) — Python/pytest equivalents
+- **`{{TESTER_SNIPPETS_PATH}}`** — new variable, points to snippet file (relative to `snippets/`)
+- `sync.py` — `sync_snippets()`: copies snippet files to `.claude/snippets/` in target project (respects `--dry-run`, logs version)
+- CLAUDE.md — new section "Snippets" with concept, frontmatter, available snippets, guide
 
 ### Changed
 
-- `tester.md` (`1.4.0`) — TypeScript-Codeblöcke durch sprach-agnostisches Pseudocode ersetzt; `{{TESTER_SNIPPETS_PATH}}` Read-Instruktion an 3 Stellen eingebaut
-- `orchestrator.md` (`1.4.0`) — `py .agent-meta/scripts/sync.py` → `python .agent-meta/scripts/sync.py` (plattformübergreifend)
+- `tester.md` (`1.4.0`) — TypeScript code blocks replaced with language-agnostic pseudocode; `{{TESTER_SNIPPETS_PATH}}` Read instruction integrated at 3 locations
+- `orchestrator.md` (`1.4.0`) — `py .agent-meta/scripts/sync.py` → `python .agent-meta/scripts/sync.py` (cross-platform)
 
 ---
 
@@ -1464,22 +1464,22 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **`{{CODE_LANGUAGE}}`** — neue Variable für code-nahe Artefakte: Code-Kommentare, Commit-Messages, Test-Beschreibungen, docker-compose-Kommentare (Default: `Englisch`)
-- **`{{INTERNAL_DOCS_LANGUAGE}}`** — neue Variable für interne Doku: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions (Default: `Deutsch`)
+- **`{{CODE_LANGUAGE}}`** — new variable for code-near artifacts: code comments, commit messages, test descriptions, docker-compose comments (Default: `English`)
+- **`{{INTERNAL_DOCS_LANGUAGE}}`** — new variable for internal docs: CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, conclusions (Default: `German`)
 
 ### Changed
 
-- `COMMUNICATION_LANGUAGE` Default-Wert: `Deutsch` → `Englisch`
-- `developer.md` (`1.3.0`) — Code-Kommentare + Commit-Messages → `{{CODE_LANGUAGE}}`
-- `docker.md` (`1.3.0`) — docker-compose Kommentare → `{{CODE_LANGUAGE}}`
-- `documenter.md` (`1.3.0`) — Datei-Tabelle + README-WICHTIG → `{{DOCS_LANGUAGE}}`/`{{INTERNAL_DOCS_LANGUAGE}}`; Sprach-Sektion aufgetrennt
+- `COMMUNICATION_LANGUAGE` default value: `German` → `English`
+- `developer.md` (`1.3.0`) — Code comments + Commit messages → `{{CODE_LANGUAGE}}`
+- `docker.md` (`1.3.0`) — docker-compose comments → `{{CODE_LANGUAGE}}`
+- `documenter.md` (`1.3.0`) — File table + README-IMPORTANT → `{{DOCS_LANGUAGE}}`/`{{INTERNAL_DOCS_LANGUAGE}}`; language section split
 - `meta-feedback.md` (`1.3.0`) — GitHub Issues → `{{DOCS_LANGUAGE}}`
-- `tester.md` (`1.3.0`) — Test-Beschreibungen → `{{CODE_LANGUAGE}}`
+- `tester.md` (`1.3.0`) — Test descriptions → `{{CODE_LANGUAGE}}`
 - `requirements.md` (`1.3.0`) — REQUIREMENTS.md → `{{INTERNAL_DOCS_LANGUAGE}}`
-- `validator.md` (`1.3.0`) — Berichte → `{{INTERNAL_DOCS_LANGUAGE}}`
-- `sharkord-docker.md` (`1.2.0`) — Kommentare → `{{CODE_LANGUAGE}}`, Kommunikation → `{{COMMUNICATION_LANGUAGE}}`
-- `sharkord-release.md` (`1.2.0`) — Release Notes → `{{DOCS_LANGUAGE}}`, Kommunikation → `{{COMMUNICATION_LANGUAGE}}`
-- CLAUDE.md — Variablen-Tabelle um `CODE_LANGUAGE` + `INTERNAL_DOCS_LANGUAGE` erweitert
+- `validator.md` (`1.3.0`) — Reports → `{{INTERNAL_DOCS_LANGUAGE}}`
+- `sharkord-docker.md` (`1.2.0`) — Comments → `{{CODE_LANGUAGE}}`, communication → `{{COMMUNICATION_LANGUAGE}}`
+- `sharkord-release.md` (`1.2.0`) — Release Notes → `{{DOCS_LANGUAGE}}`, communication → `{{COMMUNICATION_LANGUAGE}}`
+- CLAUDE.md — Variables table extended with `CODE_LANGUAGE` + `INTERNAL_DOCS_LANGUAGE`
 
 ---
 
@@ -1487,12 +1487,12 @@ In each project's `agent-meta.config.yaml`:
 
 ### Changed
 
-- Alle Agenten — `## Projektspezifische Erweiterung`-Block von 8 auf 1 Zeile komprimiert (kein Inhaltsverlust, ~84 Zeilen gespart)
-- `tester.md` (`1.2.0`) — Don'ts-Sektion: Duplikate aus "Qualitätsprinzipien"-Abschnitt entfernt, durch Querverweis ersetzt
-- `developer.md` (`1.2.0`) — "Sprach-Best-Practices": erklärender Absatz entfernt, Regel auf eine Zeile
-- `orchestrator.md` (`1.3.0`) — Extension-Block komprimiert
-- Alle anderen 1-generic Agenten (`1.2.0`) — Extension-Block komprimiert
-- 2-platform Agenten (`1.1.0`) — Extension-Block komprimiert
+- All agents — `## Projekt-specific Extension` block compressed from 8 to 1 line (no content loss, ~84 lines saved)
+- `tester.md` (`1.2.0`) — Don'ts section: duplicates from "Quality Principles" section removed, replaced with cross-reference
+- `developer.md` (`1.2.0`) — "Language Best Practices": explanatory paragraph removed, rule to one line
+- `orchestrator.md` (`1.3.0`) — Extension block compressed
+- All other 1-generic agents (`1.2.0`) — Extension block compressed
+- 2-platform agents (`1.1.0`) — Extension block compressed
 
 ---
 
@@ -1500,21 +1500,21 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **`{{COMMUNICATION_LANGUAGE}}`** — neue Variable in allen Agenten; steuert Sprache der Nutzer-Kommunikation
-- **`{{DOCS_LANGUAGE}}`** — neue Variable in allen Agenten; steuert Sprache von Dokumentationsdateien
-- **`{{PROJECT_GOAL}}`** — neue Variable im Projektkontext-Block aller Agenten (primäres Ziel)
-- **`{{PROJECT_LANGUAGES}}`** — neue Variable im Projektkontext-Block aller Agenten
-- **`{{AGENT_META_REPO}}`** — neue Variable in `meta-feedback.md`; ersetzt hardcodierten `Popoboxxo/agent-meta`
-- `config.example.json` — alle neuen Variablen mit Defaults ergänzt
+- **`{{COMMUNICATION_LANGUAGE}}`** — new variable in all agents; controls language of user communication
+- **`{{DOCS_LANGUAGE}}`** — new variable in all agents; controls language of documentation files
+- **`{{PROJECT_GOAL}}`** — new variable in project context block of all agents (primary goal)
+- **`{{PROJECT_LANGUAGES}}`** — new variable in project context block of all agents
+- **`{{AGENT_META_REPO}}`** — new variable in `meta-feedback.md`; replaces hardcoded `Popoboxxo/agent-meta`
+- `config.example.json` — all new variables added with defaults
 
 ### Changed
 
-- `tester.md` (`1.1.0`) — neuer Abschnitt "Qualitätsprinzipien: Keine Shortcuts": echte Assertions, realitätsnahe Testdaten (keine `"foo"`/`"test"`/`123`-Dummy-Daten), Warnung vor Tests die immer grün sind
-- `developer.md` (`1.1.0`) — neuer Unterabschnitt "Sprach-Best-Practices": strikt Best Practices der verwendeten Sprache(n) befolgen
-- `meta-feedback.md` (`1.1.0`) — `--repo Popoboxxo/agent-meta` durch `--repo {{AGENT_META_REPO}}` ersetzt
-- `orchestrator.md` (`1.2.0`) — Sprachvariablen + Projektkontext erweitert
-- Alle anderen 1-generic Agenten (`1.1.0`) — Sprachvariablen + Projektkontext erweitert
-- CLAUDE.md — Variablen-Tabelle um neue Variablen ergänzt
+- `tester.md` (`1.1.0`) — new section "Quality Principles: No Shortcuts": real assertions, realistic test data (no `"foo"`/`"test"`/`123` dummy data), warning about tests that are always green
+- `developer.md` (`1.1.0`) — new subsection "Language Best Practices": strictly follow best practices of the used language(s)
+- `meta-feedback.md` (`1.1.0`) — `--repo Popoboxxo/agent-meta` replaced with `--repo {{AGENT_META_REPO}}`
+- `orchestrator.md` (`1.2.0`) — Language variables + project context extended
+- All other 1-generic agents (`1.1.0`) — Language variables + project context extended
+- CLAUDE.md — Variables table extended with new variables
 
 ---
 
@@ -1522,11 +1522,11 @@ In each project's `agent-meta.config.yaml`:
 
 ### Fixed
 
-- `orchestrator.md` — version von `1.0.0` auf `1.1.0` hochgezogen (war bei 0.10.1 vergessen worden)
+- `orchestrator.md` — version bumped from `1.0.0` to `1.1.0` (was missed at 0.10.1)
 
 ### Changed
 
-- Release-Prozess in CLAUDE.md — Schritt 1 "Agenten-Versionen prüfen" explizit ergänzt; Regel: bei Unsicherheit Nutzer fragen
+- Release process in CLAUDE.md — Step 1 "Check agent versions" explicitly added; rule: ask user when unsure
 
 ---
 
@@ -1534,15 +1534,15 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **Neuer Agent `ideation`** (`1-generic/ideation.md`) — Begleitet die frühe, unscharfe Phase bei neuen Projekten und Features: Ideen erkunden, Fragen stellen, Scope schärfen, externe Impulse geben, strukturierte Übergabe an den Requirements-Agenten
-- **Workflow I** im Orchestrator — "Neue Idee / Vision erkunden" mit Ideation → Requirements-Kette
-- **Workflow H** in CLAUDE.md — dokumentiert den neuen Ideation-Workflow
+- **New Agent `ideation`** (`1-generic/ideation.md`) — Guides the early, fuzzy phase for new projects and features: explore ideas, ask questions, sharpen scope, provide external impulses, structured handover to the Requirements agent
+- **Workflow I** in Orchestrator — "Explore new idea / vision" with Ideation → Requirements chain
+- **Workflow H** in CLAUDE.md — documents the new Ideation workflow
 
 ### Changed
 
-- `orchestrator.md` — `ideation` in Agenten-Tabelle + Workflow I; bisheriger Workflow I (meta-feedback) → Workflow K
-- CLAUDE.md — `ideation` in Agenten-Rollen-Tabellen, Namenstabelle und Abhängigkeits-Karte
-- `sync.py` ROLE_MAP — `ideation` ergänzt
+- `orchestrator.md` — `ideation` in agents table + Workflow I; previous Workflow I (meta-feedback) → Workflow K
+- CLAUDE.md — `ideation` in agent role tables, names table and dependency map
+- `sync.py` ROLE_MAP — `ideation` added
 
 ---
 
@@ -1550,23 +1550,23 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- **Agent-Versionierung** — Jede Template-Datei trägt jetzt `version:` im Frontmatter
-- `based-on:` in 2-platform Agenten — dokumentiert die Generic-Basis mit Version (z.B. `1-generic/docker.md@1.0.0`)
-- `generated-from:` — wird von `sync.py` automatisch bei jedem Sync in generierte Agenten geschrieben
-- `extract_frontmatter_field()` in `sync.py` — liest beliebige YAML-Felder aus Templates
-- [howto/agent-versioning.md](howto/agent-versioning.md) — vollständige Dokumentation des Versioning-Konzepts
+- **Agent Versioning** — Every template file now carries `version:` in its frontmatter
+- `based-on:` in 2-platform agents — documents the generic base with version (e.g. `1-generic/docker.md@1.0.0`)
+- `generated-from:` — automatically written by `sync.py` into generated agents on every sync
+- `extract_frontmatter_field()` in `sync.py` — reads any YAML fields from templates
+- [howto/agent-versioning.md](howto/agent-versioning.md) — full documentation of the versioning concept
 
 ### Changed
 
-- `build_frontmatter()` in `sync.py` — schreibt `generated-from:` ins generierte Frontmatter; `version` und `based-on` bleiben unverändert erhalten
-- `sync_agents()` in `sync.py` — liest `version` aus Quell-Template und befüllt `generated-from` automatisch
-- CLAUDE.md — neuer Abschnitt "Agent-Versionierung", Abhängigkeits-Tabelle um Versionshinweise erweitert
-- Alle 1-generic Agenten starten mit `version: "1.0.0"`
-- Alle 2-platform Agenten starten mit `version: "1.0.0"` und `based-on:`
+- `build_frontmatter()` in `sync.py` — writes `generated-from:` into generated frontmatter; `version` and `based-on` remain unchanged
+- `sync_agents()` in `sync.py` — reads `version` from source template and populates `generated-from` automatically
+- CLAUDE.md — new section "Agent Versioning", dependency table extended with version notes
+- All 1-generic agents start with `version: "1.0.0"`
+- All 2-platform agents start with `version: "1.0.0"` and `based-on:`
 
 ### Fixed
 
-- `update_extensions()` in `sync.py` — pre-existierender `updated += 1` Bug (nicht initialisierte Variable) entfernt
+- `update_extensions()` in `sync.py` — pre-existing `updated += 1` bug (uninitialized variable) removed
 
 ---
 
@@ -1585,19 +1585,19 @@ In each project's `agent-meta.config.yaml`:
 
 ### Added
 
-- `SYSTEM_DEPENDENCIES` — Markdown-Liste aller Kern-Abhängigkeiten mit Versionen
-- `SYSTEM_URLS` — Markdown-Liste aller relevanten System-URLs
-- `EXTRA_PORTS` — Markdown-Liste weiterer Ports neben `PRIMARY_PORT`
-- `config.example.json` in vier klare Sektionen gegliedert:
-  - **Generisch** — für jedes Projekt
-  - **Infrastruktur** — Docker, Ports, Container
-  - **Plattform** — nur bei `platforms: ["sharkord"]`
-  - **Projektspezifisch** — individuelle Werte pro Projekt
-- `CLAUDE.md` — Variablen-Tabelle nach denselben vier Sektionen strukturiert
+- `SYSTEM_DEPENDENCIES` — Markdown list of all core dependencies with versions
+- `SYSTEM_URLS` — Markdown list of all relevant system URLs
+- `EXTRA_PORTS` — Markdown list of additional ports alongside `PRIMARY_PORT`
+- `config.example.json` grouped into four clear sections:
+  - **Generic** — for every project
+  - **Infrastructure** — Docker, Ports, Containers
+  - **Platform** — only with `platforms: ["sharkord"]`
+  - **Project-specific** — individual values per project
+- `CLAUDE.md` — Variables table structured by the same four sections
 
 ### Changed
 
-- `sharkord-docker.md` — Platzhalter-Dokumentation aktualisiert, Port-Vorlage generalisiert
+- `sharkord-docker.md` — Placeholder documentation updated, port template generalized
 
 ---
 
