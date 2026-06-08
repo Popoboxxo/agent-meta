@@ -734,6 +734,12 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
         if perms.get("bash") == "deny":
             has_terminal = False
 
+    # Gemini/Antigravity: Sandbox blocks MCP tools, code_execution requires
+    # manual user confirmation which subagents cannot provide.
+    # → No CLI fallback, only MCP tool with graceful degradation.
+    if provider.lower() == "gemini":
+        has_terminal = False  # code_execution is not usable for subagents
+
     if has_terminal and terminal_tool:
         fallback = (
             f"**Fallback:** Falls das Tool nicht existiert, "
