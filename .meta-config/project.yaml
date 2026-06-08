@@ -64,6 +64,8 @@ project:
 hooks:
   dod-push-check:
     enabled: true
+  orchestrator-guard:
+    enabled: true
 
 # Provider-spezifische Optionen — pro Provider konfigurierbar
 provider-options:
