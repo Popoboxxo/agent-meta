@@ -2,6 +2,7 @@
 
 import re
 import fnmatch
+import threading
 from pathlib import Path
 
 from .log import SyncLog
@@ -52,18 +53,35 @@ _A2A_INJECTION_ANCHORS = [
 ]
 
 
-_VIZ_LOGGING_BLOCK = (
-    "\n**Viz-Logging:**\n"
-    "Logge jeden Handoff:\n"
-    "- `agent_start` beim Start (mit handoff_id, caller)\n"
-    "- `delegate_out` bei ausgehender Delegation (mit target, task_id)\n"
-    "- `agent_end` bei Abschluss (mit status: success/error)"
-)
+_VIZ_LOGGING_BLOCK: str | None = None
+_VIZ_CONFIG_LOCK: threading.Lock = threading.Lock()
+
+
+def _load_a2a_viz_config(agent_meta_root: Path) -> str | None:
+    """Load the viz-logging text block from config/a2a-handoff.yaml.
+
+    Cached after first read. Returns None if config is missing.
+    """
+    global _VIZ_LOGGING_BLOCK
+    if _VIZ_LOGGING_BLOCK is not None:
+        return _VIZ_LOGGING_BLOCK
+    with _VIZ_CONFIG_LOCK:
+        if _VIZ_LOGGING_BLOCK is not None:
+            return _VIZ_LOGGING_BLOCK
+        cfg_path = agent_meta_root / "config" / "a2a-handoff.yaml"
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                import yaml as _yaml
+                cfg = _yaml.safe_load(f) or {}
+                block = cfg.get("viz_logging_block", "")
+                _VIZ_LOGGING_BLOCK = block.rstrip("\n")
+        except (FileNotFoundError, Exception):
+            _VIZ_LOGGING_BLOCK = ""
+    return _VIZ_LOGGING_BLOCK or None
 
 
 def _inject_a2a_handoff_block(
     content: str, agent_meta_root: Path, log: SyncLog,
-    viz_enabled: bool = False,
 ) -> str:
     """Inject the A2A handoff protocol block if not already present.
 
@@ -78,9 +96,6 @@ def _inject_a2a_handoff_block(
     if not partial:
         return content
 
-    # Append viz-logging block only when viz is active
-    viz_block = ("\n" + _VIZ_LOGGING_BLOCK) if viz_enabled else ""
-
     # Find the best anchor to inject before
     for anchor in _A2A_INJECTION_ANCHORS:
         idx = content.find("\n" + anchor)
@@ -92,7 +107,7 @@ def _inject_a2a_handoff_block(
                 line_start += 1
 
             before = content[:line_start].rstrip()
-            a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
+            a2a_block = "\n\n---\n\n" + partial + "\n"
             if before.endswith("---"):
                 return before + a2a_block + content[line_start:]
             return before + a2a_block + content[line_start:]
@@ -107,12 +122,46 @@ def _inject_a2a_handoff_block(
             line_start = 0
         else:
             line_start += 1
-        a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
+        a2a_block = "\n\n---\n\n" + partial + "\n"
         return content[:line_start] + a2a_block + content[line_start:]
 
     # Fallback: append at end
-    a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
+    a2a_block = "\n\n---\n\n" + partial + "\n"
     return content.rstrip() + a2a_block
+
+
+def _sync_a2a_viz_block(content: str, agent_meta_root: Path, viz_enabled: bool) -> str:
+    """Update or remove the viz-logging sub-section within the A2A block.
+
+    Runs on every sync — replaces any existing viz-logging text with the
+    current config value (or removes it when viz is disabled).
+    """
+    import re as _re
+    # Match any existing viz block (old or new format)
+    viz_pattern = _re.compile(
+        r"\n\*\*Viz-Logging[^*]*\*\*[^#]*?(?=\n## |\Z)",
+        re.DOTALL,
+    )
+    if viz_enabled:
+        viz_text = _load_a2a_viz_config(agent_meta_root)
+        if viz_text:
+            replacement = "\n" + viz_text
+            if viz_pattern.search(content):
+                return viz_pattern.sub(replacement, content)
+            # No existing viz block — append to A2A section
+            a2a_end = content.rfind("\n## ")
+            if a2a_end != -1:
+                prev_section_end = content.rfind("\n", 0, a2a_end)
+                if prev_section_end != -1:
+                    return (
+                        content[:prev_section_end]
+                        + replacement
+                        + content[prev_section_end:]
+                    )
+            return content + replacement
+        return content
+    else:
+        return viz_pattern.sub("", content)
 
 
 def load_provider_tools_config(agent_meta_root: Path) -> dict:
@@ -932,8 +981,10 @@ def sync_agents(
                                               viz_debug=viz_cfg.get("debug", False))
         viz_enabled = viz_cfg.get("mode") in ("dynamic", "full")
 
-        # Auto-inject A2A handoff block (with viz section only when viz is active)
-        content = _inject_a2a_handoff_block(content, agent_meta_root, log, viz_enabled=viz_enabled)
+        # Auto-inject A2A handoff block
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
+        # Sync viz-logging sub-section (add/remove based on viz mode)
+        content = _sync_a2a_viz_block(content, agent_meta_root, viz_enabled)
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
@@ -1333,8 +1384,10 @@ def sync_agents_for_provider(
 
         viz_enabled = viz_cfg.get('mode') in ('dynamic', 'full')
 
-        # Auto-inject A2A handoff block (with viz section only when viz is active)
-        content = _inject_a2a_handoff_block(content, agent_meta_root, log, viz_enabled=viz_enabled)
+        # Auto-inject A2A handoff block
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
+        # Sync viz-logging sub-section (add/remove based on viz mode)
+        content = _sync_a2a_viz_block(content, agent_meta_root, viz_enabled)
 
         if debug_mode:
             content = inject_debug_block(content, name)

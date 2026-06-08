@@ -1,0 +1,8 @@
+# A2A Handoff Protocol Configuration
+# Viz-logging text block — injected into agent templates only when viz mode is active.
+viz_logging_block: |
+  **Viz-Logging:**
+  Logge jeden Handoff:
+  - `agent_start` beim Start (mit handoff_id, caller)
+  - `delegate_out` bei ausgehender Delegation (mit target, task_id)
+  - `agent_end` bei Abschluss (mit status: success/error)
