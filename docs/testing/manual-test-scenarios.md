@@ -1,4 +1,4 @@
-# Manual Test Scenarios — agent-meta Framework v0.53.0
+# Manual Test Scenarios — agent-meta Framework v0.57.1
 
 > **Generated:** 2026-05-24
 > **Total Scenarios:** 64 (16 Features × 4 Providers)
@@ -36,7 +36,7 @@
 
 ## Einleitung
 
-Dieses Dokument definiert 64 manuelle Test-Szenarien für das agent-meta Framework v0.53.0.
+Dieses Dokument definiert 64 manuelle Test-Szenarien für das agent-meta Framework v0.57.1.
 Jedes Szenario testet eines der 16 Kern-Features auf einem der 4 unterstützten AI-Provider
 (Claude, Gemini, Opencode, Continue).
 
@@ -2266,4 +2266,4 @@ Alle Continue-Szenarien befinden sich in den Abschnitten oben (1.4, 2.4, 3.4, ..
 
 ---
 
-*Generiert von agent-meta v0.53.0 — nicht manuell bearbeiten.*
+*Generiert von agent-meta v0.57.1 — nicht manuell bearbeiten.*
