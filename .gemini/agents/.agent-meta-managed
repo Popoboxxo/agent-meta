@@ -8,7 +8,9 @@ continue-expert.md
 copilot-expert.md
 developer.md
 devops-engineer.md
+docker.md
 documenter.md
+effort-estimator.md
 export-manager.md
 feature.md
 feedback.md
@@ -22,4 +24,5 @@ orchestrator.md
 performance-optimizer.md
 release.md
 requirements.md
+tester.md
 ui-ux-designer.md

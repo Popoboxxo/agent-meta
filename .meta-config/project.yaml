@@ -48,6 +48,9 @@ roles:
   - opencode-expert
   - continue-expert
   - copilot-expert
+  - docker
+  - effort-estimator
+  - tester
 
 # Architektur-Policy: Generische Agenten muessen provider-agnostisch bleiben.
 # Siehe rules/1-generic/provider-agnostic.md — Provider-Namen, Tool-Syntax und
@@ -289,6 +292,7 @@ quality-pipelines:
 model-overrides:
   Opencode:
     developer: "opencode-go/deepseek-v4-pro"
+    code-reviewer: "opencode-go/deepseek-v4-flash"
 
 reflection-pairs:
   overrides:

@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.57.1 — `2026-06-03`
+Generiert von agent-meta v0.57.1 — `2026-06-08`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -23,7 +23,9 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
 | `devops-engineer` | Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben. |
+| `docker` | Dev-Stack starten/stoppen, Dockerfiles, Binary-Management |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
+| `effort-estimator` | Aufwandsschätzung für Tasks — delegiere hierher wenn User nach Zeit/Kosten fragt |
 | `export-manager` | Verwende diesen Agenten fuer Export-Routing von strukturierten Daten zu konfigurierten Targets. |
 | `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. |
 | `feedback` | Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git |
@@ -37,6 +39,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+| `tester` | Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 <!-- agent-meta:managed-end -->
 
@@ -62,7 +65,9 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `copilot-expert.md` → registriere als `copilot-expert`
    - `developer.md` → registriere als `developer`
    - `devops-engineer.md` → registriere als `devops-engineer`
+   - `docker.md` → registriere als `docker`
    - `documenter.md` → registriere als `documenter`
+   - `effort-estimator.md` → registriere als `effort-estimator`
    - `export-manager.md` → registriere als `export-manager`
    - `feature.md` → registriere als `feature`
    - `feedback.md` → registriere als `feedback`
@@ -76,6 +81,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `performance-optimizer.md` → registriere als `performance-optimizer`
    - `release.md` → registriere als `release`
    - `requirements.md` → registriere als `requirements`
+   - `tester.md` → registriere als `tester`
    - `ui-ux-designer.md` → registriere als `ui-ux-designer`
 
 2. Registriere jeden Agenten via define_subagent API-Call:
@@ -90,7 +96,9 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="copilot-expert", ...)
    define_subagent(name="developer", ...)
    define_subagent(name="devops-engineer", ...)
+   define_subagent(name="docker", ...)
    define_subagent(name="documenter", ...)
+   define_subagent(name="effort-estimator", ...)
    define_subagent(name="export-manager", ...)
    define_subagent(name="feature", ...)
    define_subagent(name="feedback", ...)
@@ -104,6 +112,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="performance-optimizer", ...)
    define_subagent(name="release", ...)
    define_subagent(name="requirements", ...)
+   define_subagent(name="tester", ...)
    define_subagent(name="ui-ux-designer", ...)
    ```
 
