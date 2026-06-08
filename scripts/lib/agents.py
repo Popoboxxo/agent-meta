@@ -22,8 +22,6 @@ EXTERNAL_DIR = "0-external"
 SKILL_WRAPPER = "_skill-wrapper.md"
 EXT_SUFFIX = "-ext"
 PROVIDER_TOOLS_CONFIG = "config/provider-tools.yaml"
-PARTIALS_DIR = "agents/_partials"
-A2A_PARTIAL = "_a2a-handoff.md"
 
 # Cache for provider tools config
 _provider_tools_cache: dict | None = None
@@ -33,15 +31,20 @@ _a2a_partial_cache: str | None = None
 
 
 def _load_a2a_partial(agent_meta_root: Path) -> str | None:
-    """Load the A2A handoff partial template. Cached after first read."""
+    """Load the A2A handoff block from config/a2a-handoff.yaml. Cached."""
     global _a2a_partial_cache
     if _a2a_partial_cache is not None:
         return _a2a_partial_cache
-    partial_path = agent_meta_root / PARTIALS_DIR / A2A_PARTIAL
-    if partial_path.exists():
-        _a2a_partial_cache = partial_path.read_text(encoding="utf-8").strip()
-        return _a2a_partial_cache
-    return None
+    cfg_path = agent_meta_root / "config" / "a2a-handoff.yaml"
+    try:
+        with open(cfg_path, encoding="utf-8") as f:
+            import yaml as _yaml
+            cfg = _yaml.safe_load(f) or {}
+            block = cfg.get("a2a_handoff_block", "")
+            _a2a_partial_cache = block.rstrip("\n") or None
+    except (FileNotFoundError, Exception):
+        _a2a_partial_cache = None
+    return _a2a_partial_cache
 
 
 # Anchor sections for A2A block injection (checked in priority order)
