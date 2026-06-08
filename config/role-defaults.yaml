@@ -419,11 +419,15 @@ quality_pipelines:
         mode: sequential
 
   bugfix:
-    description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
+    description: "Default bugfix pipeline: branch → triage → user-feedback → fix → review → document. FANOUT-fähig für unabhängige Bugs."
     stages:
+      - id: branch
+        agent: git
+        task: "Fix-Branch anlegen (fix/<issue-number>)"
+        mode: sequential
       - id: triage
         agent: bug-feature-analyzer
-        task: "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen."
+        task: "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Ergebnis dem User vorlegen und Bestätigung einholen bevor Pipeline fortgesetzt wird."
         mode: sequential
       - id: fix
         agent: developer
