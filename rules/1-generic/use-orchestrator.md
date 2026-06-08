@@ -23,6 +23,19 @@ Trigger-Sätze (User sagt explizit): "Nicht delegieren" | "Mach das hier" | "Im 
 
 Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
 
+## Subagent Invocation Policy (Pflicht)
+
+**Der Hauptchat darf KEINE Worker-Agenten direkt aufrufen.**
+
+| Aktion | Hauptchat | Orchestrator |
+|--------|-----------|--------------|
+| Worker aufrufen (developer, tester, git, etc.) | **Verboten** | Erlaubt |
+| Orchestrator aufrufen | Erlaubt (einziger erlaubter Agent-Call) | — |
+| Atomare Ausnahme (siehe "Ausnahmen — direkter Dispatch") | Erlaubt | — |
+
+**Begründung:** Nur der Orchestrator kennt Intent-Routing, A2A-Envelopes, Parallel-Engine
+und Anti-Recursion-Guards. Direkte Worker-Aufrufe umgehen diese Infrastruktur.
+
 ## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
 
 **Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.

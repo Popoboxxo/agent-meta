@@ -41,6 +41,15 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
+
+### Subagent Invocation Policy
+
+**Hauptchat:** Darf NUR `orchestrator` via `invoke_subagent` aufrufen.
+**Verboten:** `invoke_subagent("developer", ...)`, `invoke_subagent("git", ...)` etc. direkt.
+**Ausnahmen:** Atomare Operationen laut Rule `use-orchestrator.md`.
+**Warum:** Nur Orchestrator kennt Intent-Routing, A2A-Envelopes, Parallel-Engine.
+
+
 <!-- agent-meta:managed-end -->
 
 ## Agents

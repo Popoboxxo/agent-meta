@@ -14,6 +14,33 @@ GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
 # Path to the CLAUDE.md managed block template (relative to agent-meta root)
 _CLAUDE_MD_MANAGED_TEMPLATE_PATH = "templates/claude-md-managed.md"
 
+# Subagent Invocation Policy for Gemini — injected into GEMINI.md managed block
+_GEMINI_SUBAGENT_POLICY = (
+    "### Subagent Invocation Policy\n"
+    "\n"
+    "**Hauptchat:** Darf NUR `orchestrator` via `invoke_subagent` aufrufen.\n"
+    "**Verboten:** `invoke_subagent(\"developer\", ...)`, `invoke_subagent(\"git\", ...)` etc. direkt.\n"
+    "**Ausnahmen:** Atomare Operationen laut Rule `use-orchestrator.md`.\n"
+    "**Warum:** Nur Orchestrator kennt Intent-Routing, A2A-Envelopes, Parallel-Engine.\n"
+)
+
+
+def _inject_gemini_subagent_policy(managed_block: str) -> str:
+    """Inject the Subagent Invocation Policy before the managed-end marker.
+
+    Only used for Gemini provider (GEMINI.md managed block).
+    Idempotent: does nothing if policy is already present.
+    """
+    if _GEMINI_SUBAGENT_POLICY in managed_block:
+        return managed_block
+    marker = "<!-- agent-meta:managed-end -->"
+    if marker in managed_block:
+        return managed_block.replace(
+            marker,
+            f"\n{_GEMINI_SUBAGENT_POLICY}\n\n{marker}",
+        )
+    return managed_block
+
 
 def _load_claude_md_managed_template(agent_meta_root: Path) -> str:
     """Load CLAUDE.md managed block template from templates/claude-md-managed.md."""
@@ -130,6 +157,18 @@ def sync_context_for_provider(
                 )
                 log.action("INIT", str(target_path.relative_to(project_root)),
                            "minimal fallback (GEMINI.project-template.md not found)")
+            # Inject Subagent Invocation Policy into managed block (Bug #271)
+            g_managed_pattern = re.compile(
+                r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+                re.DOTALL,
+            )
+            g_match = g_managed_pattern.search(gcontent)
+            if g_match:
+                gcontent = gcontent.replace(
+                    g_match.group(0),
+                    _inject_gemini_subagent_policy(g_match.group(0)),
+                    1,
+                )
             if not dry_run:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 target_path.write_text(gcontent, encoding="utf-8")
@@ -144,6 +183,8 @@ def sync_context_for_provider(
                 template = _load_claude_md_managed_template(agent_meta_root)
                 new_managed = substitute(template, variables,
                                          str(target_path.relative_to(project_root)), log)
+                # Inject Subagent Invocation Policy for Gemini (Bug #271)
+                new_managed = _inject_gemini_subagent_policy(new_managed)
                 new_content = managed_pattern.sub(new_managed, existing, count=1)
                 if new_content != existing:
                     log.action("UPDATE", str(target_path.relative_to(project_root)),
