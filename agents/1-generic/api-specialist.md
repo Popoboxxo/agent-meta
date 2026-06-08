@@ -1,6 +1,6 @@
 ---
 name: api-specialist
-version: 1.1.1
+version: "1.1.2"
 description: API-Design, OpenAPI-Spezifikationen, Contract-First Development. Erstellt
   und pflegt API-Vertraege.
 hint: Verwende diesen Agenten fuer API-Design, OpenAPI-Spezifikationen und Contract-First
@@ -280,6 +280,33 @@ API-Spezifikationen sind **Projekt-Infrastruktur** — Änderungen propagieren i
 - Breaking Changes erfordern eigenen Branch und explizite User-Freigabe
 
 ---
+
+---
+
+## A2A Handoff Protocol — Eingehende Tasks
+
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
+}
+```
+
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
+
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
 ## Don'ts
 

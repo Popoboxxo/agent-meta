@@ -1,6 +1,6 @@
 ---
 name: se-test-engineer
-version: 1.2.0
+version: "1.2.1"
 description: Develops MBSE test models and designs integration tests (interaction
   of multiple SW units). Right wing of the V-model.
 hint: Use this agent to create model-based test models and integration test strategies
@@ -149,6 +149,33 @@ Work iteratively with the output from `se-architect` and `se-integration-and-tes
 ## REQ-Traceability
 Every test scenario must include a `traces_to` field referencing the originating requirement ID. The `coverage_summary` must report requirement coverage percentage.
 {{/if}}
+
+---
+
+## A2A Handoff Protocol — Eingehende Tasks
+
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
+}
+```
+
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
+
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
 ## Anti-Recursion Guard
 

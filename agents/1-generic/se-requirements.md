@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.5.0
+version: "1.5.1"
 description: Elicits stakeholder needs and uses a 6-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
@@ -109,6 +109,33 @@ Return your final output **only** as a JSON object matching the following schema
 After producing the JSON output, forward it to the `se-critic` agent (`review_target: "requirements"`) for quality-gate validation.
 Notation: `se-requirements [⇄ se-critic, max={{MAX_ITERATIONS}}]`
 Do not proceed to `se-architect` until the Critic returns `approved`. If the Critic returns `rejected`, iterate on the requirements using the provided `correction_hints`. If the Critic returns `blocked`, escalate to the `se-orchestrator` immediately.
+
+---
+
+## A2A Handoff Protocol — Eingehende Tasks
+
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
+}
+```
+
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
+
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
 ## Anti-Recursion Guard
 

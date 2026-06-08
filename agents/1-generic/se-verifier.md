@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.1.1
+version: "1.1.2"
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces.
 hint: Use this agent to verify integrated systems against their specifications on
@@ -160,6 +160,33 @@ Work iteratively with the output from `se-test-engineer` and `se-architect`, and
 ## REQ-Traceability
 The `traceability` section must report exact coverage percentages. Every deviation must reference the affected requirement ID(s). Orphaned requirements and implementations must be listed explicitly.
 {{/if}}
+
+---
+
+## A2A Handoff Protocol — Eingehende Tasks
+
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
+}
+```
+
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
+
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
 ## Anti-Recursion Guard
 

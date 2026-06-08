@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.4.1"
+version: "1.4.2"
 description: "Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten."
 hint: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
 tools:
@@ -125,6 +125,33 @@ Vor jedem Release:
 - KEIN Release ohne CHANGELOG-Eintrag
 - KEIN Release ohne DoD-Check aller enthaltenen Features
 - KEINE direkte Modifikation von Versions-Tags nach dem Push
+
+---
+
+## A2A Handoff Protocol — Eingehende Tasks
+
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
+
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
+}
+```
+
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
+
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
 ## Delegation
 

@@ -21,9 +21,111 @@ EXTERNAL_DIR = "0-external"
 SKILL_WRAPPER = "_skill-wrapper.md"
 EXT_SUFFIX = "-ext"
 PROVIDER_TOOLS_CONFIG = "config/provider-tools.yaml"
+PARTIALS_DIR = "agents/_partials"
+A2A_PARTIAL = "_a2a-handoff.md"
 
 # Cache for provider tools config
 _provider_tools_cache: dict | None = None
+
+# Cached A2A partial content
+_a2a_partial_cache: str | None = None
+
+
+def _load_a2a_partial(agent_meta_root: Path) -> str | None:
+    """Load the A2A handoff partial template. Cached after first read."""
+    global _a2a_partial_cache
+    if _a2a_partial_cache is not None:
+        return _a2a_partial_cache
+    partial_path = agent_meta_root / PARTIALS_DIR / A2A_PARTIAL
+    if partial_path.exists():
+        _a2a_partial_cache = partial_path.read_text(encoding="utf-8").strip()
+        return _a2a_partial_cache
+    return None
+
+
+# Anchor sections for A2A block injection (checked in priority order)
+_A2A_INJECTION_ANCHORS = [
+    "## Delegation",
+    "## Don'ts",
+    "## Anti-Recursion Guard",
+    "## Sprache",
+]
+
+
+def _inject_a2a_handoff_block(
+    content: str, agent_meta_root: Path, log: SyncLog
+) -> str:
+    """Inject the A2A handoff protocol block if not already present.
+
+    Checks for 'A2A Handoff' anywhere in content. If missing, reads the partial
+    from agents/_partials/_a2a-handoff.md and injects it before the first
+    closing-section anchor found.
+    """
+    if "A2A Handoff" in content:
+        return content
+
+    partial = _load_a2a_partial(agent_meta_root)
+    if not partial:
+        return content
+
+    # Find the best anchor to inject before
+    for anchor in _A2A_INJECTION_ANCHORS:
+        idx = content.find("\n" + anchor)
+        if idx != -1:
+            line_start = content.rfind("\n", 0, idx)
+            if line_start == -1:
+                line_start = 0
+            else:
+                line_start += 1
+
+            before = content[:line_start].rstrip()
+            a2a_block = "\n\n---\n\n" + partial + "\n"
+            if before.endswith("---"):
+                return before + a2a_block + content[line_start:]
+            return before + a2a_block + content[line_start:]
+
+    # No anchor found — inject before the last ## heading
+    import re as _re
+    matches = list(_re.finditer(r'^## ', content, _re.MULTILINE))
+    if matches:
+        last_idx = matches[-1].start()
+        line_start = content.rfind("\n", 0, last_idx)
+        if line_start == -1:
+            line_start = 0
+        else:
+            line_start += 1
+        a2a_block = "\n\n---\n\n" + partial + "\n"
+        return content[:line_start] + a2a_block + content[line_start:]
+
+    # Fallback: append at end
+    return content.rstrip() + "\n\n---\n\n" + partial + "\n"
+
+
+def _handle_a2a_viz_logging(content: str, viz_enabled: bool) -> str:
+    """Replace viz-logging hints in the A2A block based on viz mode.
+
+    When viz is disabled: replace the active viz-logging instructions with
+    a deactivated notice.
+
+    When viz is enabled: leave the viz-logging instructions as-is.
+    """
+    if viz_enabled:
+        return content
+
+    # Pattern: the viz-logging sub-section within the A2A block
+    import re as _re
+    viz_pattern = _re.compile(
+        r'\*\*Viz-Logging \(nur wenn Visualisierungsmodus aktiv\):\*\*\n'
+        r'Logge jeden Handoff:\n'
+        r'- `agent_start` beim Start \(mit handoff_id, caller\)\n'
+        r'- `delegate_out` bei ausgehender Delegation \(mit target, task_id\)\n'
+        r'- `agent_end` bei Abschluss \(mit status: success/error\)'
+    )
+    replacement = (
+        "**Viz-Logging:** Visualisierungsmodus ist deaktiviert "
+        "— kein Viz-Logging nötig."
+    )
+    return viz_pattern.sub(replacement, content)
 
 
 def load_provider_tools_config(agent_meta_root: Path) -> dict:
@@ -835,6 +937,9 @@ def sync_agents(
                 f"composed from {extends_base} + {source_path.name}",
             )
 
+        # Auto-inject A2A handoff block if not present in source template
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
+
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
         template_description = extract_frontmatter_field(content, "description")
@@ -874,6 +979,10 @@ def sync_agents(
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root,
                                               viz_debug=viz_cfg.get("debug", False))
+
+        # Handle A2A viz-logging sub-section based on viz mode
+        viz_enabled = viz_cfg.get("mode") in ("dynamic", "full")
+        content = _handle_a2a_viz_logging(content, viz_enabled)
 
         # Critical Rules Footer: append critical rules to end of agent files
         footer_cfg = config.get('critical-rules-footer', {})
@@ -1024,6 +1133,9 @@ def sync_agents_for_provider(
                     str(target_path.relative_to(project_root)),
                     f'composed from {extends_base} + {source_path.name}',
                 )
+
+        # Auto-inject A2A handoff block if not present in source template
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, 'version')
@@ -1237,6 +1349,10 @@ def sync_agents_for_provider(
             from .viz import inject_viz_prompt_block
             content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root,
                                               viz_debug=viz_cfg.get("debug", False))
+
+        # Handle A2A viz-logging sub-section based on viz mode
+        viz_enabled = viz_cfg.get('mode') in ('dynamic', 'full')
+        content = _handle_a2a_viz_logging(content, viz_enabled)
 
         if debug_mode:
             content = inject_debug_block(content, name)

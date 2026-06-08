@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.6.0"
+version: "1.7.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -68,36 +68,36 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 
-## A2A Handoff — Eingehende Tasks
+## A2A Handoff Protocol — Eingehende Tasks
 
-Du empfängst Tasks vom Orchestrator als strukturiertes A2A-Envelope (JSON):
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten:
 
 ```json
 {
   "protocol_version": "1.0.0",
   "handoff_id": "HOFF-YYYYMMDD-NNN",
-  "source_agent": "orchestrator",
-  "target_agent": "feature",
-  "schema_ref": "schemas/handoffs/task-spec.schema.json",
-  "payload": {
-    "t": "Feature-Beschreibung",
-    "ctx": "Kontext",
-    "pri": "high",
-    "con": ["Constraint 1", "Constraint 2"],
-    "refs": ["docs/architecture.md"]
-  },
-  "trace_parent": "HOFF-YYYYMMDD-PARENT"
+  "source_agent": "<caller>",
+  "target_agent": "<agent-rolle>",
+  "payload": { ... },
+  "trace_parent": "<parent-hoff-id>"
 }
 ```
 
-**Parsing:** Extrahiere `payload.t` als Feature-Beschreibung, `payload.ctx` als Kontext, `payload.pri` als Priorität.
+**Empfangen:** Wenn ein A2A-Envelope vorliegt → parsen und validieren, `payload` extrahieren.
+**Antworten:** Strukturiertes Antwort-Format: `{"status": "success|error", "result": "...", "handoff_id": "<hoff-id>"}`
+**Delegieren (nur wenn du Sub-Agenten beauftragst):** Erstelle einen A2A-Envelope und übergib ihn strukturiert.
 
-## A2A Handoff — Ausgehende Delegationen
+**Viz-Logging (nur wenn Visualisierungsmodus aktiv):**
+Logge jeden Handoff:
+- `agent_start` beim Start (mit handoff_id, caller)
+- `delegate_out` bei ausgehender Delegation (mit target, task_id)
+- `agent_end` bei Abschluss (mit status: success/error)
 
-Jede Delegation an Sub-Agenten MUSS als A2A-Envelope erfolgen:
-- `source_agent: "feature"`, `target_agent: "<sub-agent>"`
-- `trace_parent` auf die eigene `handoff_id` setzen (PIPELINE-Chain)
-- `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator
+---
+
+## Parallel Execution Engine
+
+{{PAL_HANDOFF}}
 
 ---
 
