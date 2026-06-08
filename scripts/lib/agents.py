@@ -52,8 +52,18 @@ _A2A_INJECTION_ANCHORS = [
 ]
 
 
+_VIZ_LOGGING_BLOCK = (
+    "\n**Viz-Logging:**\n"
+    "Logge jeden Handoff:\n"
+    "- `agent_start` beim Start (mit handoff_id, caller)\n"
+    "- `delegate_out` bei ausgehender Delegation (mit target, task_id)\n"
+    "- `agent_end` bei Abschluss (mit status: success/error)"
+)
+
+
 def _inject_a2a_handoff_block(
-    content: str, agent_meta_root: Path, log: SyncLog
+    content: str, agent_meta_root: Path, log: SyncLog,
+    viz_enabled: bool = False,
 ) -> str:
     """Inject the A2A handoff protocol block if not already present.
 
@@ -68,6 +78,9 @@ def _inject_a2a_handoff_block(
     if not partial:
         return content
 
+    # Append viz-logging block only when viz is active
+    viz_block = ("\n" + _VIZ_LOGGING_BLOCK) if viz_enabled else ""
+
     # Find the best anchor to inject before
     for anchor in _A2A_INJECTION_ANCHORS:
         idx = content.find("\n" + anchor)
@@ -79,7 +92,7 @@ def _inject_a2a_handoff_block(
                 line_start += 1
 
             before = content[:line_start].rstrip()
-            a2a_block = "\n\n---\n\n" + partial + "\n"
+            a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
             if before.endswith("---"):
                 return before + a2a_block + content[line_start:]
             return before + a2a_block + content[line_start:]
@@ -94,38 +107,12 @@ def _inject_a2a_handoff_block(
             line_start = 0
         else:
             line_start += 1
-        a2a_block = "\n\n---\n\n" + partial + "\n"
+        a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
         return content[:line_start] + a2a_block + content[line_start:]
 
     # Fallback: append at end
-    return content.rstrip() + "\n\n---\n\n" + partial + "\n"
-
-
-def _handle_a2a_viz_logging(content: str, viz_enabled: bool) -> str:
-    """Replace viz-logging hints in the A2A block based on viz mode.
-
-    When viz is disabled: replace the active viz-logging instructions with
-    a deactivated notice.
-
-    When viz is enabled: leave the viz-logging instructions as-is.
-    """
-    if viz_enabled:
-        return content
-
-    # Pattern: the viz-logging sub-section within the A2A block
-    import re as _re
-    viz_pattern = _re.compile(
-        r'\*\*Viz-Logging \(nur wenn Visualisierungsmodus aktiv\):\*\*\n'
-        r'Logge jeden Handoff:\n'
-        r'- `agent_start` beim Start \(mit handoff_id, caller\)\n'
-        r'- `delegate_out` bei ausgehender Delegation \(mit target, task_id\)\n'
-        r'- `agent_end` bei Abschluss \(mit status: success/error\)'
-    )
-    replacement = (
-        "**Viz-Logging:** Visualisierungsmodus ist deaktiviert "
-        "— kein Viz-Logging nötig."
-    )
-    return viz_pattern.sub(replacement, content)
+    a2a_block = "\n\n---\n\n" + partial + viz_block + "\n"
+    return content.rstrip() + a2a_block
 
 
 def load_provider_tools_config(agent_meta_root: Path) -> dict:
@@ -937,8 +924,16 @@ def sync_agents(
                 f"composed from {extends_base} + {source_path.name}",
             )
 
-        # Auto-inject A2A handoff block if not present in source template
-        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
+        # Visualization: determine viz mode before A2A injection
+        viz_cfg = config.get("viz", {})
+        if viz_cfg.get("mode") in ("dynamic", "full"):
+            from .viz import inject_viz_prompt_block
+            content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root,
+                                              viz_debug=viz_cfg.get("debug", False))
+        viz_enabled = viz_cfg.get("mode") in ("dynamic", "full")
+
+        # Auto-inject A2A handoff block (with viz section only when viz is active)
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log, viz_enabled=viz_enabled)
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
@@ -972,17 +967,6 @@ def sync_agents(
         if permission_mode:
             pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
-
-        # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
-        viz_cfg = config.get("viz", {})
-        if viz_cfg.get("mode") in ("dynamic", "full"):
-            from .viz import inject_viz_prompt_block
-            content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root,
-                                              viz_debug=viz_cfg.get("debug", False))
-
-        # Handle A2A viz-logging sub-section based on viz mode
-        viz_enabled = viz_cfg.get("mode") in ("dynamic", "full")
-        content = _handle_a2a_viz_logging(content, viz_enabled)
 
         # Critical Rules Footer: append critical rules to end of agent files
         footer_cfg = config.get('critical-rules-footer', {})
@@ -1133,9 +1117,6 @@ def sync_agents_for_provider(
                     str(target_path.relative_to(project_root)),
                     f'composed from {extends_base} + {source_path.name}',
                 )
-
-        # Auto-inject A2A handoff block if not present in source template
-        content = _inject_a2a_handoff_block(content, agent_meta_root, log)
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, 'version')
@@ -1350,9 +1331,10 @@ def sync_agents_for_provider(
             content = inject_viz_prompt_block(content, role, provider, viz_enabled=True, agent_meta_root=agent_meta_root,
                                               viz_debug=viz_cfg.get("debug", False))
 
-        # Handle A2A viz-logging sub-section based on viz mode
         viz_enabled = viz_cfg.get('mode') in ('dynamic', 'full')
-        content = _handle_a2a_viz_logging(content, viz_enabled)
+
+        # Auto-inject A2A handoff block (with viz section only when viz is active)
+        content = _inject_a2a_handoff_block(content, agent_meta_root, log, viz_enabled=viz_enabled)
 
         if debug_mode:
             content = inject_debug_block(content, name)
