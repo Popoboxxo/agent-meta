@@ -8,6 +8,11 @@ agent-meta-version: 0.57.1
 # reads and writes all provider directories during sync.
 provider-isolation: disabled
 
+gitignore:
+  local: true
+  generated: true
+  settings: false
+
 ai-providers:
   - Gemini
   - Opencode
