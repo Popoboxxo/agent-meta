@@ -505,32 +505,39 @@ def main():
         claude_pc = provider_config.get("Claude", {})
         gitignore_cfg = config.get("gitignore", {})
         base_gitignore_entries: list[str] = []
-        if is_claude:
-            if gitignore_cfg.get("local", True):
-                base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
-                    ".claude/settings.local.json",
-                    ".claude/agent-memory-local/",
-                    "CLAUDE.personal.md",
-                    "sync.log",
-                ]))
-            if gitignore_cfg.get("generated", False):
-                for _prov in providers:
-                    _pc = provider_config.get(_prov, {})
-                    for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
-                        _d = _pc.get(_dir_key)
-                        if _d:
-                            base_gitignore_entries.append(_d + "/")
-                    if _pc.get("has_commands") and _pc.get("commands_dir"):
-                        base_gitignore_entries.append(_pc["commands_dir"] + "/")
-            if gitignore_cfg.get("settings", False):
-                for _prov in providers:
-                    _pc = provider_config.get(_prov, {})
-                    _sf = _pc.get("settings_file")
-                    if _sf:
-                        base_gitignore_entries.append(_sf)
-                    _ctx = _pc.get("context_file")
-                    if _ctx and _ctx != "CLAUDE.md":
-                        base_gitignore_entries.append(_ctx)
+
+        # Claude-specific local entries (personal files, local settings)
+        if is_claude and gitignore_cfg.get("local", True):
+            base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
+                ".claude/settings.local.json",
+                ".claude/agent-memory-local/",
+                "CLAUDE.personal.md",
+                "sync.log",
+            ]))
+
+        # Provider-generated directories (agents/, rules/, hooks/, commands/)
+        # Not Claude-specific — applies to all active providers
+        if gitignore_cfg.get("generated", False):
+            for _prov in providers:
+                _pc = provider_config.get(_prov, {})
+                for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
+                    _d = _pc.get(_dir_key)
+                    if _d:
+                        base_gitignore_entries.append(_d + "/")
+                if _pc.get("has_commands") and _pc.get("commands_dir"):
+                    base_gitignore_entries.append(_pc["commands_dir"] + "/")
+
+        # Provider settings files (settings.json, GEMINI.md, AGENTS.md etc.)
+        # Not Claude-specific — applies to all active providers
+        if gitignore_cfg.get("settings", False):
+            for _prov in providers:
+                _pc = provider_config.get(_prov, {})
+                _sf = _pc.get("settings_file")
+                if _sf:
+                    base_gitignore_entries.append(_sf)
+                _ctx = _pc.get("context_file")
+                if _ctx and _ctx != "CLAUDE.md":
+                    base_gitignore_entries.append(_ctx)
         if is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
@@ -632,10 +639,11 @@ def main():
             )
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      exact_entries=all_gitignore_entries)
-        elif extra_provider_entries or mcp_gitignore_extras:
-            # No Claude active but other providers have gitignore entries to manage
-            ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+        else:
+            all_entries = base_gitignore_entries + extra_provider_entries + mcp_gitignore_extras
+            if all_entries:
+                ensure_gitignore_entries(project_root, log, args.dry_run,
+                                         exact_entries=all_entries)
 
     # Visualization: generate static mindmap if requested (static or full mode)
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
