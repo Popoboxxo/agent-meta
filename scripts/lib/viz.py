@@ -664,11 +664,11 @@ def get_gitignore_entries() -> list[str]:
 
 
 _PROVIDER_TERMINAL_TOOL: dict[str, str | None] = {
-    "Claude": "Bash",
-    "Gemini": "code_execution",
-    "Opencode": "bash",
-    "Continue": None,
-    "Copilot": None,
+    "claude": "Bash",
+    "gemini": "code_execution",
+    "opencode": "bash",
+    "continue": None,
+    "copilot": None,
 }
 
 
@@ -676,17 +676,20 @@ def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> st
     """Return the terminal tool name for a provider.
     
     Reads from config/provider-tools.yaml if available, falls back to hardcoded defaults.
+    Lookup is case-insensitive to handle both "Opencode" and "opencode" provider names.
     """
+    provider_lower = provider.lower()
     if agent_meta_root is not None:
         try:
             from .agents import load_provider_tools_config
             cfg = load_provider_tools_config(agent_meta_root)
             terminal_map = cfg.get("terminal_tool", {})
-            if provider in terminal_map:
-                return terminal_map[provider]
+            for key, value in terminal_map.items():
+                if key.lower() == provider_lower:
+                    return value
         except Exception:
             pass
-    return _PROVIDER_TERMINAL_TOOL.get(provider)
+    return _PROVIDER_TERMINAL_TOOL.get(provider_lower)
 
 
 def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
@@ -726,7 +729,7 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
     terminal_tool = _get_terminal_tool(provider, agent_meta_root)
 
     has_terminal = True
-    if provider == "Opencode":
+    if provider.lower() == "opencode":
         perms = _parse_opencode_permissions(agent_content)
         if perms.get("bash") == "deny":
             has_terminal = False
