@@ -7,6 +7,7 @@
 - **3-tier developer system**: new roles `junior-developer` (tier `fast` — trivial, tightly-scoped changes with a structured ESCALATE protocol) and `senior-developer` (tier `max`, project memory — architecture impact, cross-cutting refactorings, hard bugs, DECISION notes). The orchestrator routes by difficulty and handles escalations without a user round-trip; active only when both roles are enabled (`DEVELOPER_TIERS_ENABLED`).
 - **PAL conditionals**: `{{#if PAL_*}}...{{/if}}` blocks are now evaluated per provider by the DelegationSyntaxEngine (e.g. the orchestrator Tools section appears only for providers with `tool_preamble: true`).
 - **PAL diagnostics**: missing or unknown PAL placeholder definitions now produce sync warnings instead of being silently removed.
+- **Gemini registration notice**: every generated `.gemini/agents/*.md` starts with a note that the agent must be registered via `define_subagent` (Gemini is API-registered, not file-discovered).
 
 ### Fixed
 
