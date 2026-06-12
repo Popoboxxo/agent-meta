@@ -251,6 +251,16 @@ _PROVIDER_NOTATION = {
 }
 
 
+def _execution_mode_for_pipeline(stages: list) -> str:
+    """Derive the dominant execution mode label from pipeline stages."""
+    modes = {s.get("mode", "sequential") for s in stages}
+    if "loop" in modes:
+        return "loop"
+    if "parallel_group" in modes or "fanout" in modes:
+        return "parallel_group"
+    return "sequential"
+
+
 def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
     """Generate a provider-specific markdown block for a single pipeline."""
     provider_key = provider.lower()
@@ -258,6 +268,11 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
     lines = []
     stages = pipeline.get("stages", [])
     seq_idx = 0
+
+    # Execution mode header (Issue #285)
+    exec_mode = _execution_mode_for_pipeline(stages)
+    lines.append(f"Execution mode: {exec_mode}")
+    lines.append("")
 
     for stage in stages:
         mode = stage.get("mode", "sequential")
@@ -267,11 +282,10 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
 
         if mode == "sequential":
             seq_idx += 1
-            lines.append(
-                fmt["sequential_item"].format(
-                    index=seq_idx, agent=agent, task=task
-                )
+            line = fmt["sequential_item"].format(
+                index=seq_idx, agent=agent, task=task
             )
+            lines.append(line + " → warten bis abgeschlossen")
 
         elif mode == "parallel_group":
             lines.append("")
@@ -319,7 +333,7 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
                         agent=crit, task="Review / Critic feedback"
                     )
                 )
-            lines.append(f"  Max iterations: {max_iter}")
+            lines.append(f"  Max iterations: {max_iter} → Erfolg pruefen; bei Abbruch User benachrichtigen")
             lines.append("")
 
         elif mode == "conditional":

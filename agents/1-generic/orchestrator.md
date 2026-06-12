@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.21.0"
+version: "3.22.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -130,6 +130,16 @@ Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher s
 
 ## Task Decomposition & Delegation
 
+### Pre-Delegation Gate (Pflicht vor jeder Delegation)
+
+Vor jeder Delegation diese 3 Punkte prüfen — ANY "nein" → erst lösen, dann delegieren:
+
+1. **Agent passt zum Intent?** (Intent-Routing-Tabelle konsultieren)
+2. **Kein offener Dependency-Konflikt?** (Hängt dieser Task von einem noch laufenden parallelen Task ab?)
+3. **Erwartetes Ergebnis konkret genug zu validieren?** (Vages "verbessere X" → erst präzisieren)
+
+→ Alle drei "ja" → Delegation starten
+
 ### Dispatch-Entscheidung
 
 | User sagt | Aktion |
@@ -166,10 +176,25 @@ Nach BARRIER(): Ergebnisse sammeln, Konsistenz prüfen, Widersprüche → User i
 2. **`schema_ref` bestimmen:** Aus Intent-Routing-Tabelle (Handoff-Contract-Spalte) oder implizit via Route
 3. **`payload` aus User-Request + Kontext extrahieren:**
    - `t`: Task-Beschreibung (Pflicht)
-   - `ctx`: Zusätzlicher Kontext (optional)
+   - `ctx`: Strukturierter Kontext (optional, Format siehe unten)
    - `con`: Constraints (optional)
    - `pri`: Priority (optional, default: medium)
    - `refs`: Referenzen (optional)
+
+**Standardformat für `ctx` (Mindest-Set bei jeder Delegation):**
+```
+TASK: <eine Zeile>
+CONTEXT:
+  - Branch: <name>
+  - REQ-ID: <id oder n/a>
+  - Vorherige Ergebnisse: <key findings in 1-2 Sätzen>
+CONSTRAINTS:
+  - Nicht anfassen: <Dateien/Bereiche falls zutreffend>
+  - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+EXPECTED_OUTPUT:
+  - <konkret messbares Ergebnis>
+```
+Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
 4. **Envelope zusammenbauen:**
    ```json
    {
@@ -255,6 +280,31 @@ PIPELINE(name, stages): Vordefinierte Pipeline sequentiell/parallel
 **Capability Detection:** {{PAL_PARALLEL_PATTERN}}
 
 ---
+
+---
+
+## BARRIER Protocol
+
+BARRIER() blockiert bis ALLE gestarteten parallelen Agenten geantwortet haben.
+
+**Ablauf nach FANOUT / PARALLEL_GROUP:**
+1. Warten bis jeder Subagent ein Ergebnis liefert (kein Timeout-Skip)
+2. Ergebnisse strukturiert wrappen:
+   ```
+   ||| agent=<name> result_key=<key> |||
+   <Ergebnis-Text>
+   |||
+   ```
+3. Diff-Check bei identischen Agenten-Typen (z.B. zwei `developer`-Instanzen):
+   - Widersprechende Datei-Edits oder Entscheidungen? → User informieren, nicht auto-mergen
+   - Konsistente Ergebnisse? → weiterfahren
+4. Zusammenfassung an User: "[N] Agenten abgeschlossen. Weiter mit: [naechster Schritt]"
+
+**Widerspruchs-Handling:**
+> "[Agent-A] und [Agent-B] haben widersprechende Ergebnisse geliefert:
+> - Agent-A: [Kurzfassung]
+> - Agent-B: [Kurzfassung]
+> Bitte entscheide, welche Version weiterverwendet werden soll."
 
 ## Quality Pipelines (Generated)
 
@@ -349,6 +399,22 @@ Bestätigung vor: Commit auf main/master, Branch löschen, sync.py, Rollen/Dod-P
 
 ---
 
+---
+
+## In-Context Delegation Tracker
+
+Fuehre intern eine Tracker-Tabelle mit jeder Delegation:
+
+| # | Agent | Task (Kurzform) | Status | Result-Key |
+|---|-------|----------------|--------|------------|
+| 1 | `<agent>` | `<task-summary>` | pending / done / failed | `<key>` |
+
+**Regeln:**
+- Nach jeder Delegation: Zeile hinzufuegen / Status aktualisieren
+- Vor neuer Delegation: Duplikat-Check — gleicher Agent + gleicher Task-Summary → ueberspringen, kein erneuter Dispatch
+- Nach jeder 3. Delegation: kompakte Status-Tabelle einmalig an User zeigen
+- Context Guard (>5 Delegationen): Tracker auf 2-3 Zeilen komprimieren (nur offene / fehlgeschlagene behalten)
+
 ## Mention-Interception Policy (Pflicht)
 
 Nur `@orchestrator` ist User-Mention. Alle anderen Agenten ausschließlich über native Tool-Calls.
@@ -402,6 +468,8 @@ Delegation fehlgeschlagen → **nicht selbst ausführen:**
 | Timeout | Max. 1 Retry mit anderem Tier. Erneut fehl → User |
 | Out-of-scope | Intent neu klassifizieren, alternativen Agent wählen |
 | Multi-Failure | Sequentiell umschalten, User informieren |
+| Ambiguous result | Klaerungsnachricht zurueck zum Agent (1x Retry), dann User |
+| Partial completion | Zeigen was fertig ist, User entscheiden lassen: weiter oder abbrechen |
 
 Nach 2 gescheiterten Delegationen für denselben Intent → User um Klärung bitten.
 

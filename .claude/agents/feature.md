@@ -1,6 +1,6 @@
 ---
 name: feature
-version: 1.7.0
+version: 1.8.0
 description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung
   → Validierung → Commit → PR.'
 hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
@@ -98,6 +98,20 @@ Jede Delegation an Sub-Agenten MUSS als A2A-Envelope erfolgen:
 - `source_agent: "feature"`, `target_agent: "<sub-agent>"`
 - `trace_parent` auf die eigene `handoff_id` setzen (PIPELINE-Chain)
 - `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator
+
+**Standardformat für `ctx` in ausgehenden Delegationen:**
+```
+TASK: <eine Zeile>
+CONTEXT:
+  - Branch: <name>
+  - REQ-ID: <id oder n/a>
+  - Vorherige Ergebnisse: <key findings in 1-2 Sätzen>
+CONSTRAINTS:
+  - Nicht anfassen: <Dateien falls zutreffend>
+  - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+EXPECTED_OUTPUT:
+  - <konkret messbares Ergebnis>
+```
 
 ---
 
