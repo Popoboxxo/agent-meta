@@ -52,25 +52,33 @@ def _validate_tools_against_whitelist(
     """Validate tool names against provider whitelist.
 
     Returns filtered list of valid tools.
-    Logs WARNING for unknown tools (does NOT abort).
+    Logs WARNING for unknown tools (does NOT abort). Tools listed under
+    '<provider>-silent' are known-unsupported by design and dropped as INFO.
     """
     config = load_provider_tools_config(agent_meta_root)
     whitelist = config.get(provider.lower(), [])
     if not whitelist:
         # No whitelist configured — allow all tools (backward compat)
         return tools
+    silent = config.get(f"{provider.lower()}-silent", []) or []
+
+    def matches(t: str, patterns: list) -> bool:
+        return any(
+            w.endswith("*") and t.startswith(w[:-1]) or w == t
+            for w in patterns
+        )
 
     valid: list = []
     for t in tools:
         if not isinstance(t, str):
             continue
-        # Support wildcard patterns like "mcp__*"
-        is_valid = any(
-            w.endswith("*") and t.startswith(w[:-1]) or w == t
-            for w in whitelist
-        )
-        if is_valid:
+        if matches(t, whitelist):
             valid.append(t)
+        elif matches(t, silent):
+            log.info(
+                f"{provider}/{role}",
+                f"tool '{t}' not supported by {provider} — dropped by design",
+            )
         else:
             log.warn(
                 f"{provider}/{role}: tool '{t}' not supported by {provider} — skipping (see config/provider-tools.yaml)",

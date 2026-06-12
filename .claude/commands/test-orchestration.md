@@ -1,9 +1,12 @@
 ---
 description: Führt einen Orchestration-Dry-Run durch und validiert wichtige Funktionen.
+argument-hint: "[--scenario=all|routing|decomposition|parallel|unknown|override] [--verbose] [--viz]"
 allowed-tools:
   - Bash
 ---
 # test-orchestration
+
+Argumente: $ARGUMENTS
 
 Führt einen Orchestration-Dry-Run durch und validiert:
 - Intent-Routing

@@ -1,6 +1,6 @@
 ---
 name: feature
-version: 1.6.0
+version: 1.7.0
 description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung
   → Validierung → Commit → PR.'
 hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
@@ -8,6 +8,7 @@ hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate �
 tools:
 - Bash
 - Read
+- Agent
 - TodoWrite
 ---
 

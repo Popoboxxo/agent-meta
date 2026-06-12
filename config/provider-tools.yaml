@@ -46,11 +46,12 @@ gemini:
   - Grep                # implicit in sandbox
   - TodoWrite           # skipped silently (unsupported, keeps log clean)
 
-  # === UNSUPPORTED TOOLS (explicitly documented for clarity) ===
-  # The following tools are NOT supported by Gemini and will be filtered/ignored during sync:
-  # - Agent              # Gemini has no subagent dispatch
-  # - Task               # Gemini has no task orchestration
-  # - mcp__*             # Gemini MCP support varies by version
+# Known-unsupported tools for Gemini — dropped by design (INFO instead of WARNING).
+# Gemini delegation happens via the runtime (define_subagent), not via a tool.
+gemini-silent:
+  - Agent               # Gemini has no subagent dispatch tool
+  - Task                # Gemini has no task orchestration tool
+  - mcp__*              # Gemini MCP support varies by version
 
 opencode_deny_critical:
   - Bash
