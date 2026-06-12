@@ -1192,7 +1192,16 @@ def sync_agents_for_provider(
                 body = _strip_claude_specific_lines(body)
                 fm_end = content.find('\n---', 3)
                 if fm_end != -1:
-                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+                    # Gemini agents are API-registered, not file-discovered —
+                    # without the session bootstrap this file has no effect.
+                    registration_note = (
+                        "> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit "
+                        "via `define_subagent` registriert — er ist NICHT automatisch aktiv. "
+                        f"Bootstrap-Instruktionen: `{pc.get('context_file', '.gemini/GEMINI.md')}` "
+                        "(Block `agent-meta:bootstrap`).\n"
+                    )
+                    content = (content[:fm_end + 4] + '\n' + registration_note
+                               + '\n' + body.lstrip('\n'))
 
             elif provider == 'Opencode':
                 # Opencode: native frontmatter (description + mode: subagent + model)
