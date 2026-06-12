@@ -13,6 +13,7 @@ from .pipelines import (
     load_quality_pipelines,
     load_pipeline_overrides,
     apply_overrides,
+    validate_pipelines,
     build_pipeline_variables,
 )
 
@@ -271,6 +272,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     orch_config = config.get("orchestrator", {})
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
+    variables["DIRECT_DISPATCH_ENABLED"] = "true" if orch_config.get("direct-dispatch-enabled", True) else "false"
+    # DIRECT_DISPATCH_SECTION: loaded from central template file; empty when direct dispatch is disabled
+    _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
+    if _dd_enabled:
+        _dd_template = agent_meta_root / "templates" / "direct-dispatch-section.md"
+        variables["DIRECT_DISPATCH_SECTION"] = _dd_template.read_text(encoding="utf-8") if _dd_template.exists() else ""
+    else:
+        variables["DIRECT_DISPATCH_SECTION"] = ""
     # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml
     oc_config = config.get("outcome-caching", {})
     variables["ORCHESTRATOR_OUTCOME_CACHING"] = "true" if oc_config.get("enabled", False) else "false"
@@ -330,6 +339,16 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         pipelines = load_quality_pipelines(str(agent_meta_root))
         overrides = config.get("quality-pipelines", {})
         effective = apply_overrides(pipelines, overrides)
+        # Validate pipeline agent references against available roles
+        from .roles import build_role_map
+        all_roles = list(build_role_map(agent_meta_root).keys())
+        if "roles" in config:
+            available_roles = set(config["roles"])
+        else:
+            available_roles = set(all_roles)
+        pipeline_errors = validate_pipelines(effective, list(available_roles))
+        for err in pipeline_errors:
+            unmapped.append(f"quality-pipelines: {err}")
         if effective:
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled
@@ -365,7 +384,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
-    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT")})
 
     if not conditional_vars:
         return text

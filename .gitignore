@@ -15,6 +15,9 @@ sync.log
 .meta-viz/
 .meta-viz/events-*.jsonl
 .meta-viz/session-reports/
+.opencode/mcp.local.json
+.opencode/settings.local.json
+AGENTS.personal.md
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---

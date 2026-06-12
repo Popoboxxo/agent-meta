@@ -1,27 +1,11 @@
 # Orchestrator — Universal Router
 
-**JEDE Entwicklungsaufgabe geht über den Orchestrator.**
-
-## Ausnahmen — direkter Dispatch
-
-NUR für atomare Einzeloperationen (ein Schritt, ein Agent, keine Abhängigkeiten):
-
-| Operation | Direkt an | Bedingung |
-|-----------|-----------|-----------|
-| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
-| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
-| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
-| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
-
-> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
-
-## User-Override
-
-Trigger-Sätze (User sagt explizit): "Nicht delegieren" | "Mach das hier" | "Im Hauptchat bitte" | "Kein Orchestrator" | "Ohne Orchestrator" | "Ich will hier arbeiten" | "Delegiere nicht"
+**STRICT MODE — KEINE Ausnahmen.** Jede Entwicklungsaufgabe geht zwingend über den `orchestrator`. Kein User-Override, kein direkter Dispatch, kein Fallback in den Hauptchat.
 
 ## Auto-Handoff
 
-Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
+Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
+
 
 ## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
 

@@ -226,10 +226,12 @@ def sync_hooks(
     project_hooks_cfg = config.get("hooks", {})
     active_entries: list[dict] = []
 
-    # Viz mode: conditional hooks (viz-log) are only managed when dynamic/full
+    # Viz mode: conditional hooks (viz-log) are only managed when viz is enabled
+    # and mode is dynamic/full.
     viz_cfg = config.get("viz", {})
+    viz_enabled = viz_cfg.get("enabled", False)
     viz_mode = viz_cfg.get("mode", "off")
-    viz_active = viz_mode in ("dynamic", "full")
+    viz_active = viz_enabled and viz_mode in ("dynamic", "full")
 
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
