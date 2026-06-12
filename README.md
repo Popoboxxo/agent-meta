@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.56.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.57.1-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -249,7 +249,7 @@ patches:
 ```bash
 # 1. Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.56.0 && cd ..
+cd .agent-meta && git checkout v0.57.1 && cd ..
 
 # 2. Create project config
 mkdir -p .meta-config
