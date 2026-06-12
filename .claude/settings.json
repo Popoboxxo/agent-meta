@@ -28,9 +28,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/viz-log.sh"
+            "command": "bash .claude/hooks/orchestrator-guard.sh"
           }
-        ]
+        ],
+        "matcher": "\"\""
       }
     ]
   }

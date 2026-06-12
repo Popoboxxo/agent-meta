@@ -266,7 +266,8 @@ def sync_hooks(
         if hook_stem == "viz-log" and viz_active:
             is_enabled = True
         else:
-            is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", False)
+            enabled_by_default = meta.get("enabled_by_default", "false").lower() == "true"
+            is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", enabled_by_default)
 
         if is_enabled:
             event = meta.get("event", "PreToolUse")
