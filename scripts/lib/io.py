@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,24 @@ def _load_yaml_or_json(*paths: Path) -> tuple[dict, Path]:
             with path.open(encoding="utf-8") as f:
                 return json.load(f), path
     return {}, preferred  # none found — return empty + preferred path
+
+
+def read_json_lenient(path: Path) -> dict | None:
+    """Read a JSON file, tolerating JSONC-style // comments, trailing commas and a BOM.
+
+    Settings files like opencode.json(c) are JSONC: full-line and inline
+    // comments plus trailing commas left behind after commenting out entries.
+    Returns None when the file cannot be parsed even after cleanup.
+    """
+    text = path.read_text(encoding="utf-8-sig")
+    stripped = re.sub(r'(?m)^\s*//.*$', '', text)
+    # Inline comments: require whitespace before // so URLs ("https://...") survive
+    stripped = re.sub(r'(?m)\s+//[^"\n]*$', '', stripped)
+    stripped = re.sub(r',\s*([}\]])', r'\1', stripped)
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 def _write_yaml(path: Path, data: dict) -> None:

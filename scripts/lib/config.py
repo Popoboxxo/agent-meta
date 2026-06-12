@@ -244,7 +244,15 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
-    variables.update(config.get("variables", {}))
+    # User variables may be YAML scalars (true, 20) — coerce to the string form
+    # templates expect ("true"/"false" for {{#if}} blocks, str() otherwise).
+    for key, value in (config.get("variables") or {}).items():
+        if isinstance(value, bool):
+            variables[key] = "true" if value else "false"
+        elif not isinstance(value, str):
+            variables[key] = str(value)
+        else:
+            variables[key] = value
     # AGENTS_DIR: provider-agnostic generated agents directory (default: .claude/agents)
     if "AGENTS_DIR" not in variables:
         variables["AGENTS_DIR"] = ".claude/agents"
@@ -459,10 +467,7 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
         if key.startswith("PAL_"):
             return match.group(0)
         if key in variables:
-            return variables[key]
-        # Skip PAL_* placeholders — they are handled by DelegationSyntaxEngine downstream
-        if key.startswith("PAL_"):
-            return match.group(0)
+            return str(variables[key])
         log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
 
