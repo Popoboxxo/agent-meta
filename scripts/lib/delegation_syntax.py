@@ -76,22 +76,52 @@ class DelegationSyntaxEngine:
         """Return capabilities for a provider."""
         return self.capabilities_registry.get("capabilities", {}).get(provider, {})
 
-    def apply(self, content: str, provider: str) -> str:
+    def apply(self, content: str, provider: str, log=None) -> str:
         """Apply provider-specific syntax to abstract placeholders in content.
 
-        Replaces {{PAL_*}} placeholders with the native syntax defined
-        for the given provider. Removes any remaining PAL placeholders.
+        1. Evaluates {{#if PAL_*}}...{{/if}} blocks against this provider's
+           syntax values ("false"/empty → block removed, anything else → kept).
+        2. Replaces {{PAL_*}} placeholders with the native syntax defined
+           for the given provider. Removes any remaining PAL placeholders.
+
+        log: optional SyncLog — warns when content references a PAL placeholder
+        that has no definition for this provider (likely a config gap).
         """
         syntax = self.get_syntax(provider)
+
+        def eval_conditional(m: re.Match) -> str:
+            syntax_key = self.PLACEHOLDERS.get(m.group(1), "")
+            value = syntax.get(syntax_key, "")
+            active = isinstance(value, str) and value.strip().lower() not in ("", "false")
+            if not active:
+                return ""
+            return m.group(2).strip("\n") + "\n"
+
+        content = re.sub(
+            r"\{\{#if (PAL_[A-Z_]+)\}\}\n?(.*?)\{\{/if\}\}\n?",
+            eval_conditional, content, flags=re.DOTALL,
+        )
 
         for placeholder, syntax_key in self.PLACEHOLDERS.items():
             pattern = r"\{\{" + re.escape(placeholder) + r"\}\}"
             replacement = syntax.get(syntax_key, "")
             if not isinstance(replacement, str):
                 replacement = ""
-            content = re.sub(pattern, replacement, content)
+            if log is not None and not replacement and re.search(pattern, content):
+                log.warn(
+                    f"PAL: '{placeholder}' has no definition for provider "
+                    f"'{provider}' — placeholder removed (check config/delegation-syntax.yaml)"
+                )
+            content = re.sub(pattern, lambda _m: replacement, content)
 
         # Remove any remaining {{PAL_*}} placeholders (no-ops for this provider)
+        leftover = set(re.findall(r"\{\{(PAL_[A-Z_]+)\}\}", content))
+        if log is not None:
+            for name in sorted(leftover):
+                log.warn(
+                    f"PAL: unknown placeholder '{{{{{name}}}}}' for provider "
+                    f"'{provider}' — removed (not in DelegationSyntaxEngine.PLACEHOLDERS)"
+                )
         content = re.sub(r"\{\{PAL_[A-Z_]+\}\}", "", content)
 
         # Remove PAL_PREFIX: markers (used in templates to mark PAL-dependent sections)

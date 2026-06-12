@@ -25,6 +25,8 @@ platforms:
 roles:
   - orchestrator
   - developer
+  - junior-developer
+  - senior-developer
   - requirements
   - documenter
   - git

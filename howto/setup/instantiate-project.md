@@ -193,6 +193,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 |-------------|---------------------------|
 | `.claude/agents/orchestrator.md` | `1-generic/orchestrator.md` |
 | `.claude/agents/developer.md` | `1-generic/developer.md` |
+| `.claude/agents/junior-developer.md` | `1-generic/junior-developer.md` (optional, 3-Tier-System) |
+| `.claude/agents/senior-developer.md` | `1-generic/senior-developer.md` (optional, 3-Tier-System) |
 | `.claude/agents/tester.md` | `1-generic/tester.md` |
 | `.claude/agents/validator.md` | `1-generic/validator.md` |
 | `.claude/agents/requirements.md` | `1-generic/requirements.md` |

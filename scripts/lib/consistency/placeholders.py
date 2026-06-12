@@ -57,7 +57,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "UNKNOWN_FALLBACK_ASK_USER",
     # Feature flags (injected by build_variables)
     "SE_ENABLED", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
-    "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS",
+    "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     # Paths

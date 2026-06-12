@@ -293,6 +293,12 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
+    # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)
+    # — active only when both tier roles are enabled in the project
+    _roles = config.get("roles", [])
+    variables["DEVELOPER_TIERS_ENABLED"] = (
+        "true" if "junior-developer" in _roles and "senior-developer" in _roles else "false"
+    )
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
     variables["AGENT_DELEGATION_TABLE"] = generate_agent_delegation_table(agent_meta_root, config, variables)
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
@@ -357,7 +363,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     (e.g. DOD_REQ_TRACEABILITY accidentally matching the ORCHESTRATOR_ENABLED
     block's {{else}} token).
     """
-    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED")) and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT")})
 

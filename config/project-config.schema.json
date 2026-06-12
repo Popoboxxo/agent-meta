@@ -76,6 +76,7 @@
           "gemini-expert",
           "git",
           "ideation",
+          "junior-developer",
           "log-analyzer",
           "meta-feedback",
           "opencode-expert",
@@ -96,6 +97,7 @@
           "se-validator",
           "se-verifier",
           "security-auditor",
+          "senior-developer",
           "tester",
           "ui-ux-designer",
           "validator"

@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.20.0"
+version: "3.21.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -66,6 +66,10 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 | Codebase analysieren / Dependencies / Impact | `ideation` | `task-spec-v1` | `balanced` / Ja |
 | Design / Konzept / Architektur | `ideation` | `task-spec-v1` | `balanced`→`powerful` / Ja |
 | Implementierung / Code schreiben | `developer` | `task-spec-v1` | `balanced`→`powerful` / Ja |
+{{#if DEVELOPER_TIERS_ENABLED}}
+| Trivialer Fix (≤2 Dateien, Lösung offensichtlich) | `junior-developer` | `task-spec-v1` | `fast` / Ja |
+| Komplexe Implementierung / Architektur-Impact / schwieriger Bug | `senior-developer` | `task-spec-v1` | `max` / Nein |
+{{/if}}
 | Git-Operationen | `git` | — | `fast` / Nein |
 | Dokumentation aktualisieren | `documenter` | `task-spec-v1` | `balanced` / Ja |
 | Anforderungen / REQ-ID | `requirements` | `task-spec-v1` | `balanced` / Nein |
@@ -92,6 +96,35 @@ Dateien nach Analyse selbst editieren → **streng verboten**.
 | Nicht in Tabelle | Frag den User | — | — / — |
 
 Intent nicht exakt in Tabelle → User fragen, nicht raten. `bug-feature-analyzer` nur durch Orchestrator, nie direkt.
+
+{{#if DEVELOPER_TIERS_ENABLED}}
+---
+
+## Developer-Tier-Auswahl
+
+Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher schafft:
+
+| Stufe | Wann | Signale |
+|-------|------|---------|
+| `junior-developer` | Lösung offensichtlich, ≤2 Dateien, kein Design nötig | Typo, Off-by-one, Config-Wert, Logging, Boilerplate nach Vorlage |
+| `developer` | Standard-Implementierung, klarer Scope | Feature mit bekanntem Pattern, normaler Bugfix, ≤3 Dateien |
+| `senior-developer` | Architektur-Impact, Risiko oder unklare Ursache | API/Schema-Änderung, Cross-Cutting-Refactoring, Race Condition, Security-Pfad, Performance-kritisch |
+
+**Entscheidungsregeln:**
+- Im Zweifel zwischen zwei Stufen → die höhere wählen (Fehlrouting nach unten kostet eine Eskalations-Runde)
+- Batch gleichartiger Trivial-Tasks → FANOUT auf `junior-developer`
+- Eskalationen NIE überspringen: `junior-developer` eskaliert zu `developer` ODER direkt zu `senior-developer` je nach `recommended_tier`
+
+**Eskalations-Protokoll:** Antwortet ein Developer mit einer `ESCALATE`-Card
+(`reason`, `recommended_tier`, `findings`, `partial_work`):
+
+1. KEINE Rückfrage an den User — sofort an `recommended_tier` neu dispatchen
+2. `findings` der Card in `payload.ctx` des neuen Handoffs übernehmen (spart Analysezeit)
+3. `trace_parent` auf die ursprüngliche handoff_id setzen
+4. Maximal 1 Eskalation pro Task — eskaliert auch die zweite Stufe, geht der Task an den User
+
+**De-Eskalation:** Enthält ein `senior-developer`-Ergebnis `de_escalation_hint: <tier>`, merke dir das Muster für künftiges Routing ähnlicher Tasks.
+{{/if}}
 
 ---
 
@@ -197,14 +230,9 @@ Bei Reflection-Loops (z.B. developer↔code-reviewer):
 - `supersession.history[]` enthält alle vorherigen handoff_ids (NUR IDs, keine Payloads)
 - `version = history.length + 1`
 
-### Provider-Transport
+### Transport
 
-| Provider | structured_handoff | Transport |
-|----------|-------------------|-----------|
-| Claude, Opencode, Gemini | `true` | JSON-Envelope im Prompt |
-| Continue, Copilot | `false` | YAML-Text-Block (kein natives JSON-Tool-Call) |
-
-Bei `structured_handoff: false`: YAML-Text-Block statt JSON, aber gleiche Struktur.
+Das konkrete Handoff-Format deiner Umgebung ist in der Sektion »Parallel Execution Engine« definiert (vom Sync-Prozess generiert). Umgebungen mit strukturiertem Handoff nutzen das JSON-Envelope im Prompt; alle anderen einen YAML-Text-Block mit identischer Struktur.
 
 ---
 

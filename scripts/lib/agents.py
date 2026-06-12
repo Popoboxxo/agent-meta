@@ -1055,15 +1055,17 @@ def sync_agents_for_provider(
             content = inject_pipeline_blocks(content, effective, provider, {})
 
         content = substitute(content, merged_vars, rel_source, log)
+        # Apply PAL delegation syntax per provider (Issue #277).
+        # Must run BEFORE strip_inactive_conditional_blocks — its final cleanup
+        # removes ALL {{#if}} markers, which would strip {{#if PAL_*}} blocks
+        # before the engine can evaluate them per provider.
+        from .delegation_syntax import DelegationSyntaxEngine
+        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+        content = pal_engine.apply(content, provider, log=log)
         content = strip_inactive_conditional_blocks(content, variables)
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)
-
-        # Apply PAL delegation syntax per provider (Issue #277)
-        from .delegation_syntax import DelegationSyntaxEngine
-        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        content = pal_engine.apply(content, provider)
 
         name = Path(filename).stem
         layer = source_path.parts[-2]
