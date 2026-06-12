@@ -10,17 +10,11 @@ sync.log
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
-.continue/config.local.yaml
-.continue/settings.local.yaml
-.gemini/settings.local.json
 .mcp.json
 .meta-config/secrets.local.yaml
 .meta-viz/
 .meta-viz/events-*.jsonl
 .meta-viz/session-reports/
-.opencode/mcp.local.json
-.opencode/settings.local.json
-AGENTS.personal.md
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---

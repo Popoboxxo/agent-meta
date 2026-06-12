@@ -107,8 +107,9 @@ def check_orchestrator_table(agent_meta_root: Path) -> list[Finding]:
             continue  # orchestrator doesn't list itself
         if tier not in ("required", "recommended"):
             continue  # optional roles are not required in the table
-        # Check if role appears as a table row: | `role` |
-        pattern = rf'\|\s*`{re.escape(role)}`\s*\|'
+        # Check if role appears inside any table cell: | ... `role` ... |
+        # (roles may share a cell, e.g. "`feature` (komplex) oder `developer`")
+        pattern = rf'\|[^|\n]*`{re.escape(role)}`[^|\n]*\|'
         if not re.search(pattern, orch_content):
             findings.append(Finding(
                 Severity.WARNING, "crossrefs.orchestrator-table-incomplete",
@@ -225,4 +226,7 @@ def _parse_role_names_regex(roles_path: Path) -> dict:
 
 
 def _is_agent_or_command(filepath: str) -> bool:
+    name = filepath.rsplit("/", 1)[-1]
+    if name.startswith("."):
+        return False  # marker files like .agent-meta-managed
     return "agents/" in filepath or "commands/" in filepath

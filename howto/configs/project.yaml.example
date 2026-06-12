@@ -25,6 +25,10 @@ platforms: []
 roles:
   - orchestrator
   - developer
+  # 3-Tier-Developer-System (optional): BEIDE aktivieren, dann routet der
+  # Orchestrator nach Schwierigkeit (junior = trivial, senior = Architektur/Risiko)
+  # - junior-developer
+  # - senior-developer
   - requirements
   - validator
   - documenter

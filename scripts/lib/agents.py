@@ -52,25 +52,33 @@ def _validate_tools_against_whitelist(
     """Validate tool names against provider whitelist.
 
     Returns filtered list of valid tools.
-    Logs WARNING for unknown tools (does NOT abort).
+    Logs WARNING for unknown tools (does NOT abort). Tools listed under
+    '<provider>-silent' are known-unsupported by design and dropped as INFO.
     """
     config = load_provider_tools_config(agent_meta_root)
     whitelist = config.get(provider.lower(), [])
     if not whitelist:
         # No whitelist configured — allow all tools (backward compat)
         return tools
+    silent = config.get(f"{provider.lower()}-silent", []) or []
+
+    def matches(t: str, patterns: list) -> bool:
+        return any(
+            w.endswith("*") and t.startswith(w[:-1]) or w == t
+            for w in patterns
+        )
 
     valid: list = []
     for t in tools:
         if not isinstance(t, str):
             continue
-        # Support wildcard patterns like "mcp__*"
-        is_valid = any(
-            w.endswith("*") and t.startswith(w[:-1]) or w == t
-            for w in whitelist
-        )
-        if is_valid:
+        if matches(t, whitelist):
             valid.append(t)
+        elif matches(t, silent):
+            log.info(
+                f"{provider}/{role}",
+                f"tool '{t}' not supported by {provider} — dropped by design",
+            )
         else:
             log.warn(
                 f"{provider}/{role}: tool '{t}' not supported by {provider} — skipping (see config/provider-tools.yaml)",
@@ -1047,15 +1055,17 @@ def sync_agents_for_provider(
             content = inject_pipeline_blocks(content, effective, provider, {})
 
         content = substitute(content, merged_vars, rel_source, log)
+        # Apply PAL delegation syntax per provider (Issue #277).
+        # Must run BEFORE strip_inactive_conditional_blocks — its final cleanup
+        # removes ALL {{#if}} markers, which would strip {{#if PAL_*}} blocks
+        # before the engine can evaluate them per provider.
+        from .delegation_syntax import DelegationSyntaxEngine
+        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+        content = pal_engine.apply(content, provider, log=log)
         content = strip_inactive_conditional_blocks(content, variables)
         # Apply platform-config substitution ({{platform.*}} placeholders)
         if platform_vars is not None:
             content = substitute_platform(content, platform_vars, rel_source, log)
-
-        # Apply PAL delegation syntax per provider (Issue #277)
-        from .delegation_syntax import DelegationSyntaxEngine
-        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        content = pal_engine.apply(content, provider)
 
         name = Path(filename).stem
         layer = source_path.parts[-2]
@@ -1182,7 +1192,16 @@ def sync_agents_for_provider(
                 body = _strip_claude_specific_lines(body)
                 fm_end = content.find('\n---', 3)
                 if fm_end != -1:
-                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+                    # Gemini agents are API-registered, not file-discovered —
+                    # without the session bootstrap this file has no effect.
+                    registration_note = (
+                        "> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit "
+                        "via `define_subagent` registriert — er ist NICHT automatisch aktiv. "
+                        f"Bootstrap-Instruktionen: `{pc.get('context_file', '.gemini/GEMINI.md')}` "
+                        "(Block `agent-meta:bootstrap`).\n"
+                    )
+                    content = (content[:fm_end + 4] + '\n' + registration_note
+                               + '\n' + body.lstrip('\n'))
 
             elif provider == 'Opencode':
                 # Opencode: native frontmatter (description + mode: subagent + model)

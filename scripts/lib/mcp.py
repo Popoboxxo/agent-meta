@@ -13,7 +13,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
+from .io import SyncError, _load_yaml_or_json, read_json_lenient, safe_path, write_checked
 from .log import SyncLog
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
@@ -227,18 +227,8 @@ def _build_mcp_entries(
 
 
 def _read_json_lenient(path: Path) -> dict | None:
-    """Read a JSON file, tolerating JSONC-style // line comments.
-
-    Returns None if the file cannot be parsed even after stripping comments.
-    """
-    text = path.read_text(encoding="utf-8")
-    # Strip // line comments (not inside strings — good enough for settings files)
-    stripped = re.sub(r'(?m)^\s*//.*$', '', text)
-    stripped = re.sub(r'\s*//[^"]*$', '', stripped, flags=re.MULTILINE)
-    try:
-        return json.loads(stripped)
-    except (json.JSONDecodeError, ValueError):
-        return None
+    """Read a JSON file, tolerating JSONC comments and trailing commas."""
+    return read_json_lenient(path)
 
 
 def _update_json_config(

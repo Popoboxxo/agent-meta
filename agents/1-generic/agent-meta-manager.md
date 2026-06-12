@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.9.0"
+version: "1.10.0"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische Agenten, External-Skill-Lifecycle und Erweiterungen anlegen."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -10,6 +10,7 @@ tools:
   - Edit
   - Glob
   - Grep
+  - Agent
   - WebFetch
   - TodoWrite
 ---

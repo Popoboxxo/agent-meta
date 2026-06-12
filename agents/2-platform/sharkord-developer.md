@@ -1,7 +1,7 @@
 ---
 name: sharkord-developer
-version: "2.1.1"
-based-on: "1-generic/developer.md@1.4.1"
+version: "2.1.2"
+based-on: "1-generic/developer.md@2.3.0"
 description: "Sharkord-spezifischer Developer-Agent. Ergänzt den generischen Developer um Sharkord-Build-Kommandos. Das Sharkord Plugin-SDK Wissen (PluginContext API, Mediasoup, Commands, Events, Don'ts) kommt automatisch aus der Rule rules/2-platform/sharkord-sdk.md."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs (Sharkord Plugin SDK)"
 tools:

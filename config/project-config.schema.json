@@ -38,7 +38,8 @@
           "Claude",
           "Gemini",
           "Continue",
-          "Opencode"
+          "Opencode",
+          "Copilot"
         ]
       },
       "uniqueItems": true
@@ -61,7 +62,10 @@
           "agent-meta-scout",
           "api-specialist",
           "bug-feature-analyzer",
+          "claude-expert",
           "code-reviewer",
+          "continue-expert",
+          "copilot-expert",
           "developer",
           "devops-engineer",
           "docker",
@@ -69,10 +73,13 @@
           "export-manager",
           "feature",
           "feedback",
+          "gemini-expert",
           "git",
           "ideation",
+          "junior-developer",
           "log-analyzer",
           "meta-feedback",
+          "opencode-expert",
           "openscad-developer",
           "orchestrator",
           "performance-optimizer",
@@ -90,6 +97,7 @@
           "se-validator",
           "se-verifier",
           "security-auditor",
+          "senior-developer",
           "tester",
           "ui-ux-designer",
           "validator"
@@ -123,7 +131,7 @@
     },
     "variables": {
       "type": "object",
-      "description": "Template variables substituted as {{KEY}} in agent templates.",
+      "description": "Template variables substituted as {{KEY}} in agent templates. Non-string scalars (booleans, numbers) are coerced to strings during sync.",
       "properties": {
         "PROJECT_CONTEXT": {
           "type": "string"
@@ -250,7 +258,12 @@
         }
       },
       "additionalProperties": {
-        "type": "string"
+        "type": [
+          "string",
+          "boolean",
+          "integer",
+          "number"
+        ]
       }
     },
     "model-overrides": {
@@ -263,9 +276,25 @@
           "additionalProperties": {
             "type": "string",
             "anyOf": [
-              {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
-              {"enum": ["haiku", "sonnet", "opus"]},
-              {"pattern": "^claude-"}
+              {
+                "enum": [
+                  "nano",
+                  "fast",
+                  "balanced",
+                  "powerful",
+                  "max"
+                ]
+              },
+              {
+                "enum": [
+                  "haiku",
+                  "sonnet",
+                  "opus"
+                ]
+              },
+              {
+                "pattern": "^claude-"
+              }
             ]
           }
         },
@@ -275,30 +304,62 @@
           "additionalProperties": {
             "type": "string",
             "anyOf": [
-              {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
-              {"pattern": "^gemini-"}
+              {
+                "enum": [
+                  "nano",
+                  "fast",
+                  "balanced",
+                  "powerful",
+                  "max"
+                ]
+              },
+              {
+                "pattern": "^gemini-"
+              }
             ]
           }
         },
         "Continue": {
           "type": "object",
           "description": "Continue model overrides (ignored — Continue manages models in config.yaml).",
-          "additionalProperties": {"type": "string"}
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "Opencode": {
           "type": "object",
           "description": "Opencode model overrides (Opencode manages models in opencode.json).",
-          "additionalProperties": {"type": "string"}
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": {
         "type": "string",
         "description": "Legacy flat form: role → tier/alias/model-id. Applied to Claude only.",
         "anyOf": [
-          {"enum": ["nano", "fast", "balanced", "powerful", "max"]},
-          {"enum": ["haiku", "sonnet", "opus"]},
-          {"pattern": "^claude-"},
-          {"pattern": "^gemini-"}
+          {
+            "enum": [
+              "nano",
+              "fast",
+              "balanced",
+              "powerful",
+              "max"
+            ]
+          },
+          {
+            "enum": [
+              "haiku",
+              "sonnet",
+              "opus"
+            ]
+          },
+          {
+            "pattern": "^claude-"
+          },
+          {
+            "pattern": "^gemini-"
+          }
         ]
       }
     },
@@ -379,7 +440,14 @@
     "speech-mode": {
       "type": "string",
       "description": "Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech. 'asozial' = technically correct but dripping with contempt — New Kids style, insults the user's intelligence. 'submissive' = completely devoted and submissive, no contradiction, no own opinion, addresses user as master/mistress.",
-      "enum": ["full", "short", "childish", "caveman", "asozial", "submissive"],
+      "enum": [
+        "full",
+        "short",
+        "childish",
+        "caveman",
+        "asozial",
+        "submissive"
+      ],
       "default": "full"
     },
     "hooks": {
@@ -427,7 +495,10 @@
             "prompt-mode": {
               "type": "string",
               "description": "Content mode for generated prompts. 'full' = complete agent body. 'slim' = compact role + core rules only (~80 lines).",
-              "enum": ["full", "slim"],
+              "enum": [
+                "full",
+                "slim"
+              ],
               "default": "full"
             }
           }
@@ -467,12 +538,24 @@
       "type": "object",
       "description": "Agent tasks to run automatically on git lifecycle events (commit, merge, version bump, release). Requires lifecycle-check hook to be enabled.",
       "properties": {
-        "on-commit":             { "$ref": "#/$defs/lifecycleTriggerList" },
-        "on-merge":              { "$ref": "#/$defs/lifecycleTriggerList" },
-        "on-version-bump-patch": { "$ref": "#/$defs/lifecycleTriggerList" },
-        "on-version-bump-minor": { "$ref": "#/$defs/lifecycleTriggerList" },
-        "on-version-bump-major": { "$ref": "#/$defs/lifecycleTriggerList" },
-        "on-release":            { "$ref": "#/$defs/lifecycleTriggerList" }
+        "on-commit": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-merge": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-version-bump-patch": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-version-bump-minor": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-version-bump-major": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-release": {
+          "$ref": "#/$defs/lifecycleTriggerList"
+        }
       },
       "additionalProperties": false
     },
@@ -486,7 +569,9 @@
     },
     "provider-isolation": {
       "type": "string",
-      "enum": ["disabled"],
+      "enum": [
+        "disabled"
+      ],
       "description": "Set to 'disabled' to skip provider isolation generation (e.g. in the agent-meta meta-repo itself, which intentionally manages all provider directories)."
     },
     "allow-committed-secrets": {
@@ -523,11 +608,15 @@
       "properties": {
         "overrides": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/pipelineDefinition" }
+          "additionalProperties": {
+            "$ref": "#/$defs/pipelineDefinition"
+          }
         },
         "custom-pipelines": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/pipelineDefinition" }
+          "additionalProperties": {
+            "$ref": "#/$defs/pipelineDefinition"
+          }
         }
       }
     }
@@ -540,16 +629,37 @@
     "stageItem": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "agent": { "type": "string" },
-        "task": { "type": "string" },
-        "mode": { "enum": ["sequential", "parallel_group", "fanout", "loop", "conditional"] },
+        "id": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "task": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "sequential",
+            "parallel_group",
+            "fanout",
+            "loop",
+            "conditional"
+          ]
+        },
         "loop": {
           "type": "object",
           "properties": {
-            "generator": { "type": "string" },
-            "critic": { "type": "string" },
-            "max_iterations": { "type": "integer", "minimum": 1 }
+            "generator": {
+              "type": "string"
+            },
+            "critic": {
+              "type": "string"
+            },
+            "max_iterations": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         "parallel_group": {
@@ -557,30 +667,47 @@
           "items": {
             "type": "object",
             "properties": {
-              "agent": { "type": "string" },
-              "task": { "type": "string" }
+              "agent": {
+                "type": "string"
+              },
+              "task": {
+                "type": "string"
+              }
             }
           }
         },
         "condition": {
           "type": "object",
           "properties": {
-            "type": { "type": "string" },
-            "agent": { "type": "string" }
+            "type": {
+              "type": "string"
+            },
+            "agent": {
+              "type": "string"
+            }
           }
         }
       },
-      "required": ["id", "agent", "task", "mode"]
+      "required": [
+        "id",
+        "agent",
+        "task",
+        "mode"
+      ]
     },
     "pipelineDefinition": {
       "type": "object",
       "properties": {
-        "description": { "type": "string" },
+        "description": {
+          "type": "string"
+        },
         "stages": {
           "oneOf": [
             {
               "type": "array",
-              "items": { "$ref": "#/$defs/stageItem" }
+              "items": {
+                "$ref": "#/$defs/stageItem"
+              }
             },
             {
               "type": "object",
@@ -588,7 +715,9 @@
             }
           ]
         },
-        "on_error": { "type": "string" }
+        "on_error": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
@@ -607,17 +736,39 @@
             "description": "Task description passed to the agent."
           }
         },
-        "required": ["agent", "task"],
+        "required": [
+          "agent",
+          "task"
+        ],
         "additionalProperties": false
       }
     },
     "outcome-caching": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean", "default": false },
-        "ttl_seconds": { "type": "integer", "minimum": 60, "default": 3600 },
-        "max_entries": { "type": "integer", "minimum": 10, "default": 100 },
-        "invalidation": { "type": "string", "enum": ["git-commit", "ttl", "manual"], "default": "git-commit" }
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "default": 3600
+        },
+        "max_entries": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 100
+        },
+        "invalidation": {
+          "type": "string",
+          "enum": [
+            "git-commit",
+            "ttl",
+            "manual"
+          ],
+          "default": "git-commit"
+        }
       },
       "additionalProperties": false
     }

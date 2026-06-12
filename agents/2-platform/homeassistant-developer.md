@@ -1,7 +1,7 @@
 ---
 name: developer
-version: "1.1.0"
-based-on: "1-generic/developer.md@2.0.2"
+version: "1.1.1"
+based-on: "1-generic/developer.md@2.3.0"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
 tools:

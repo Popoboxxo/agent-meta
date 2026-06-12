@@ -18,7 +18,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import safe_path, write_checked
+from .io import read_json_lenient, safe_path, write_checked
 from .log import SyncLog
 
 # Companion state files — store agent-meta tracking data outside tool JSON schemas.
@@ -99,15 +99,10 @@ def _read_json_safe(path: Path, log: SyncLog | None = None) -> dict | None:
     """
     if not path.exists():
         return None
-    text = path.read_text(encoding="utf-8")
-    stripped = re.sub(r'(?m)^\s*//.*$', '', text)
-    stripped = re.sub(r'\s*//[^"]*$', '', stripped, flags=re.MULTILINE)
-    try:
-        return json.loads(stripped)
-    except (json.JSONDecodeError, ValueError):
-        if log:
-            log.warn(f"{path.name}: could not parse JSON — skipping isolation update to avoid data loss")
-        return None
+    parsed = read_json_lenient(path)
+    if parsed is None and log:
+        log.warn(f"{path.name}: could not parse JSON — skipping isolation update to avoid data loss")
+    return parsed
 
 
 def _read_state(state_path: Path) -> list[str]:

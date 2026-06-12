@@ -50,7 +50,28 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "BUILD_SYSTEM_NOTES", "VERSION_DIST_BEHAVIOUR",
     # Misc
     "SYSTEM_DEPENDENCIES", "SYSTEM_URLS",
+    # Orchestrator (injected by build_variables)
+    "ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "ORCHESTRATOR_OUTCOME_CACHING",
+    "ORCHESTRATOR_CACHE_TTL", "ORCHESTRATOR_CACHE_MAX_ENTRIES",
+    "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT",
+    "UNKNOWN_FALLBACK_ASK_USER",
+    # Feature flags (injected by build_variables)
+    "SE_ENABLED", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
+    "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
+    # Generated tables (injected by build_variables)
+    "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
+    # Paths
+    "AGENTS_DIR",
+    # Release / plugin packaging
+    "PLUGIN_DIR_NAME",
 })
+
+# Placeholder families resolved downstream, not by build_variables():
+# PAL_* by the DelegationSyntaxEngine, PIPELINE_*_BLOCK by inject_pipeline_blocks().
+_DYNAMIC_PREFIXES: tuple[re.Pattern, ...] = (
+    re.compile(r'^PAL_[A-Z0-9_]+$'),
+    re.compile(r'^PIPELINE_[A-Z0-9_]+_(BLOCK|PROVIDER_BLOCKS)$'),
+)
 
 # Known common typos: wrong_name → correct_name
 _KNOWN_TYPOS: dict[str, str] = {
@@ -96,7 +117,7 @@ def check_placeholders(path: Path, content: str, agent_meta_root: Path,
                 f"Placeholder '{{{{{var}}}}}' looks like a typo.",
                 f"Did you mean '{{{{{_KNOWN_TYPOS[var]}}}}}' ?",
             ))
-        elif var not in known:
+        elif var not in known and not any(p.match(var) for p in _DYNAMIC_PREFIXES):
             findings.append(Finding(
                 Severity.WARNING, "placeholders.unknown", rel,
                 f"Placeholder '{{{{{var}}}}}' is not a known built-in variable.",

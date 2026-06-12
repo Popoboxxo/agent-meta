@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.6.0"
+version: "1.7.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -9,6 +9,7 @@ hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate �
 tools:
   - Bash
   - Read
+  - Agent
   - TodoWrite
 ---
 

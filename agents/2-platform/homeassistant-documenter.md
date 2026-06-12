@@ -1,7 +1,7 @@
 ---
 name: documenter
-version: "1.0.0"
-based-on: "1-generic/documenter.md@1.3.1"
+version: "1.0.1"
+based-on: "1-generic/documenter.md@1.4.1"
 description: "Home Assistant Documenter — generiert und pflegt MkDocs-Dokumentation aus YAML-Packages, Architektur-Diagrammen und Git-History."
 hint: "HA-Doku pflegen: MkDocs-Seiten, Package-Übersichten, Architektur-Diagramme (Mermaid)"
 tools:

@@ -82,11 +82,15 @@ def _md_to_toml(content: str, stem: str) -> str:
     body = body.replace("$ARGUMENTS", "{{args}}")
     body = body.strip()
 
-    # TOML basic multiline strings cannot contain 3+ consecutive quotes.
-    # Escape the third quote so the sequence no longer terminates the string.
-    escaped = body.replace('"""', '""\\"')
+    # TOML basic multiline strings process backslash escapes — double them
+    # first so regex/Windows-path content (\s, C:\dir) survives parsing.
+    escaped = body.replace("\\", "\\\\")
+    # They also cannot contain 3+ consecutive quotes — escape the third quote
+    # so the sequence no longer terminates the string.
+    escaped = escaped.replace('"""', '""\\"')
 
-    return f'description = "{description}"\nprompt = """\n{escaped}\n"""\n'
+    desc_escaped = description.replace("\\", "\\\\").replace('"', '\\"')
+    return f'description = "{desc_escaped}"\nprompt = """\n{escaped}\n"""\n'
 
 
 def sync_commands_for_provider(

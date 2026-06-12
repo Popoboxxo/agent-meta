@@ -38,6 +38,12 @@ import os
 import sys
 from pathlib import Path
 
+# Windows consoles often default to cp1252 — the sync report contains UTF-8
+# characters (— → ✓), so force UTF-8 output to avoid UnicodeEncodeError.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Add scripts/ directory to sys.path so lib/ is importable regardless of cwd
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:

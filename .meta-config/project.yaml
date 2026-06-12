@@ -9,8 +9,8 @@ agent-meta-version: 0.57.1
 provider-isolation: disabled
 
 ai-providers:
-  - Gemini
-  - Opencode
+  - Claude
+
 
 
 dod-preset: rapid-prototyping
@@ -25,6 +25,8 @@ platforms:
 roles:
   - orchestrator
   - developer
+  - junior-developer
+  - senior-developer
   - requirements
   - documenter
   - git
@@ -229,7 +231,7 @@ orchestrator:
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:
-  enabled: true
+  enabled: false
   mode: "full"
   debug: false                # true = A2A-Events in viz loggen (Token-Kosten)
   a2a_events:                 # Welche A2A-Events loggen? Nur aktiv wenn debug: true

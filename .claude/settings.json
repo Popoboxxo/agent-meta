@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "mcpServers": {
+    "viz-logger": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "scripts/viz-logger.py",
+        "--mcp"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/dod-push-check.sh"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/viz-log.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

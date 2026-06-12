@@ -53,6 +53,28 @@ roles:
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300
 
+  junior-developer:
+    model: fast              # günstige Stufe — triviale, klar umrissene Änderungen
+    memory: ""
+    workflow_tier: optional
+    description: "Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 120
+
+  senior-developer:
+    model: max               # höchste Stufe — Architektur, komplexe Bugs, Risiko-Pfade
+    memory: project          # Architektur-Entscheidungen über Sessions hinweg erinnern
+    workflow_tier: optional
+    description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 600
+
   requirements:
     model: balanced
     memory: project

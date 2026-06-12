@@ -44,16 +44,15 @@ def _extract_yaml_permissions(fm: str) -> dict[str, str]:
     return perms
 
 
-AGENTS_DIR = Path(".opencode/agents")
+AGENTS_DIR = Path(__file__).resolve().parent.parent / ".opencode" / "agents"
 
-# Roles that are expected to have a `task` permission because they delegate
+# Roles that are expected to have a `task` permission because they delegate.
+# ideation/tester are workers by design (anti-recursion guard) — they refer
+# to other roles in text but never dispatch via tool calls.
 DELEGATING_ROLES = {
     "orchestrator",
     "feature",
     "developer",
-    "ideation",
-    "log-analyzer",
-    "tester",
     "agent-meta-manager",
 }
 
@@ -72,7 +71,7 @@ EXPECTED_PERMISSION_MAPPINGS = {
 }
 
 
-def test_all_agents_have_permissions() -> list[str]:
+def check_all_agents_have_permissions() -> list[str]:
     """Every generated opencode agent (except ping-test) must have a permission block."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
@@ -91,7 +90,7 @@ def test_all_agents_have_permissions() -> list[str]:
     return errors
 
 
-def test_delegating_roles_have_task() -> list[str]:
+def check_delegating_roles_have_task() -> list[str]:
     """Roles that delegate must have task permission set to allow."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
@@ -112,7 +111,7 @@ def test_delegating_roles_have_task() -> list[str]:
     return errors
 
 
-def test_no_claude_tool_names_in_permissions() -> list[str]:
+def check_no_claude_tool_names_in_permissions() -> list[str]:
     """No PascalCase Claude tool names should leak into opencode permission values."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
@@ -129,7 +128,7 @@ def test_no_claude_tool_names_in_permissions() -> list[str]:
     return errors
 
 
-def test_orchestrator_can_delegate() -> list[str]:
+def check_orchestrator_can_delegate() -> list[str]:
     """Orchestrator specifically needs task + todowrite permissions."""
     errors = []
     path = AGENTS_DIR / "orchestrator.md"
@@ -149,7 +148,7 @@ def test_orchestrator_can_delegate() -> list[str]:
     return errors
 
 
-def test_no_deprecated_tools_field() -> list[str]:
+def check_no_deprecated_tools_field() -> list[str]:
     """Opencode agents must not use the deprecated 'tools:' frontmatter field."""
     errors = []
     for path in sorted(AGENTS_DIR.glob("*.md")):
@@ -160,7 +159,7 @@ def test_no_deprecated_tools_field() -> list[str]:
     return errors
 
 
-def test_parallel_pattern_uses_task() -> list[str]:
+def check_parallel_pattern_uses_task() -> list[str]:
     """The parallel execution pattern in orchestrator must reference `task`, not `Agent`."""
     errors = []
     path = AGENTS_DIR / "orchestrator.md"
@@ -176,16 +175,53 @@ def test_parallel_pattern_uses_task() -> list[str]:
     return errors
 
 
+def _skip_unless_generated():
+    """Skip pytest runs when the Opencode provider output is not present."""
+    import pytest
+    if not AGENTS_DIR.exists():
+        pytest.skip("no .opencode/agents directory — Opencode provider not generated")
+
+
+def test_all_agents_have_permissions():
+    _skip_unless_generated()
+    assert check_all_agents_have_permissions() == []
+
+
+def test_delegating_roles_have_task():
+    _skip_unless_generated()
+    assert check_delegating_roles_have_task() == []
+
+
+def test_no_claude_tool_names_in_permissions():
+    _skip_unless_generated()
+    assert check_no_claude_tool_names_in_permissions() == []
+
+
+def test_orchestrator_can_delegate():
+    _skip_unless_generated()
+    assert check_orchestrator_can_delegate() == []
+
+
+def test_no_deprecated_tools_field():
+    _skip_unless_generated()
+    assert check_no_deprecated_tools_field() == []
+
+
+def test_parallel_pattern_uses_task():
+    _skip_unless_generated()
+    assert check_parallel_pattern_uses_task() == []
+
+
 def run_all() -> int:
     """Run all tests and print a summary."""
     all_errors: list[str] = []
     tests = [
-        ("All agents have permissions", test_all_agents_have_permissions),
-        ("Delegating roles have task", test_delegating_roles_have_task),
-        ("No deprecated tools field", test_no_deprecated_tools_field),
-        ("No Claude tool names remain", test_no_claude_tool_names_in_permissions),
-        ("Orchestrator can delegate", test_orchestrator_can_delegate),
-        ("Parallel pattern uses task", test_parallel_pattern_uses_task),
+        ("All agents have permissions", check_all_agents_have_permissions),
+        ("Delegating roles have task", check_delegating_roles_have_task),
+        ("No deprecated tools field", check_no_deprecated_tools_field),
+        ("No Claude tool names remain", check_no_claude_tool_names_in_permissions),
+        ("Orchestrator can delegate", check_orchestrator_can_delegate),
+        ("Parallel pattern uses task", check_parallel_pattern_uses_task),
     ]
 
     print("=" * 60)

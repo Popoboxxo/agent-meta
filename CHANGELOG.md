@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **3-tier developer system**: new roles `junior-developer` (tier `fast` — trivial, tightly-scoped changes with a structured ESCALATE protocol) and `senior-developer` (tier `max`, project memory — architecture impact, cross-cutting refactorings, hard bugs, DECISION notes). The orchestrator routes by difficulty and handles escalations without a user round-trip; active only when both roles are enabled (`DEVELOPER_TIERS_ENABLED`).
+- **PAL conditionals**: `{{#if PAL_*}}...{{/if}}` blocks are now evaluated per provider by the DelegationSyntaxEngine (e.g. the orchestrator Tools section appears only for providers with `tool_preamble: true`).
+- **PAL diagnostics**: missing or unknown PAL placeholder definitions now produce sync warnings instead of being silently removed.
+- **Gemini registration notice**: every generated `.gemini/agents/*.md` starts with a note that the agent must be registered via `define_subagent` (Gemini is API-registered, not file-discovered).
+
+### Fixed
+
+- **Orchestrator Tools section leaked to all providers**: the generic conditional cleanup stripped `{{#if PAL_TOOL_PREAMBLE}}` markers before the PAL engine could evaluate them — PAL substitution now runs first.
+- **Provider names in generic orchestrator**: the Provider-Transport table (Claude/Gemini/... names) violated the provider-agnostic policy — replaced with abstract transport wording (orchestrator 3.21.0).
+- **PAL replacement corruption risk**: replacement strings containing backslash sequences are no longer interpreted as regex group references.
+
+- **UnicodeEncodeError on Windows consoles**: sync.py crashed when printing the sync report on cp1252 terminals — stdout/stderr are now forced to UTF-8.
+- **opencode.json JSONC parsing**: trailing commas and BOM in JSONC settings files broke parsing, silently skipping MCP injection and provider isolation. Shared lenient reader now lives in `lib/io.py`.
+- **Scalar template variables**: YAML scalars (`true`, `20`) in `variables:` crashed substitution with TypeError — values are now coerced to template strings (`"true"`/`"false"` for booleans).
+- **Schema gaps**: 5 provider-expert roles (`claude-expert`, `gemini-expert`, `opencode-expert`, `continue-expert`, `copilot-expert`) and the `Copilot` provider were missing from `project-config.schema.json`, producing false validation warnings.
+- **Consistency-check false positives**: placeholder checker now knows all `build_variables()` built-ins (orchestrator flags, generated tables) and the dynamic `PAL_*` / `PIPELINE_*_BLOCK` families; orchestrator-table check now finds roles that share a table cell.
+
+### Changed
+
+- **Deduplicated sync warnings**: identical warnings (one per provider) are now reported once.
+- **Claude provider switch**: project config moved from Gemini/Opencode to Claude-only output — `.claude/` regenerated (including the `doc-now` and `report-bug` commands), `.gemini/` removed.
+
+---
+
 ## [0.57.1] — 2026-06-01
 
 ### Fixed

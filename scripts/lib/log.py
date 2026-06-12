@@ -11,12 +11,18 @@ class SyncLog:
         self.warnings: list[str] = []
         self.skipped: list[str] = []
         self.infos: list[str] = []
+        self._seen_warnings: set[str] = set()
         self.start_time = datetime.now()
 
     def action(self, tag: str, target: str, source: str):
         self.actions.append(f"[{tag:<8}]  {target:<50}  ({source})")
 
     def warn(self, message: str):
+        # The same template is substituted once per provider — emit each
+        # distinct warning only once to keep the report readable.
+        if message in self._seen_warnings:
+            return
+        self._seen_warnings.add(message)
         self.warnings.append(f"[WARN]   {message}")
         print(f"  !  {message}", file=sys.stderr)
 
