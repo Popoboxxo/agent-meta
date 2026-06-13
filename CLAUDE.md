@@ -118,6 +118,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `bug-feature-analyzer` | Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren — vor developer/feature-Delegation |
 | `claude-expert` | Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices |
 | `code-reviewer` | Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit (das macht validator). |
+| `concept-reviewer` | Konzept/Design-Doc reviewen: Vollständigkeit, Logik, Risiken, Approve/Iterate |
 | `continue-expert` | Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices |
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |

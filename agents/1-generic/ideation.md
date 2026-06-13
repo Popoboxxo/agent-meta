@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.5.0"
+version: "1.6.0"
 description: "Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt Fragen, denkt Ecken, übergibt reife Ideen an Requirements."
 hint: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
 tools:
@@ -94,6 +94,8 @@ Wenn sinnvoll — **nicht immer notwendig**:
 - Nutze `WebSearch` / `WebFetch` für konkrete Beispiele oder Dokumentation
 - Schau ins bestehende Projekt (Glob/Grep), um Anknüpfungspunkte zu finden
 
+**Artefakt:** Recherche-Dokument mit Quellen, evaluierten Lösungsoptionen und Trade-off-Matrix (benennen als `recherche-<thema>.md` oder inline als Markdown-Abschnitt).
+
 ### Phase 4: Sortieren & Strukturieren
 
 Wenn die Idee genug Substanz hat, hilf dem Anwender, sie zu gliedern:
@@ -107,6 +109,8 @@ Offene Fragen:   [Was ist noch unklar?]
 Risiken:         [Was könnte problematisch werden?]
 ```
 
+**Artefakt:** Das Ergebnis wird explizit als **Konzept-Doc** benannt und übergeben (benennen als `konzept-<thema>.md`) — nicht nur als lose strukturierte Zusammenfassung.
+
 ### Phase 5: Übergabe an Requirements
 
 Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offenen Blockerfragen):
@@ -119,6 +123,10 @@ Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offene
 {{else}}
 3. Bei Bestätigung: Übergib die strukturierte Zusammenfassung an `requirements`
 {{/if}}
+
+**Übergabeziel:** Das Konzept-Doc aus Phase 4 wird übergeben an:
+- `concept-reviewer` — wenn ein Review-Loop erwünscht ist (z.B. in der `concept-development` Pipeline)
+- `requirements` — direkt, wenn kein Review-Loop benötigt wird
 
 ---
 
