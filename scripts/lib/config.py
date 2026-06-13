@@ -273,6 +273,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
     variables["DIRECT_DISPATCH_ENABLED"] = "true" if orch_config.get("direct-dispatch-enabled", True) else "false"
+    # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
+    # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
+    # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.
+    _handoff_cfg = orch_config.get("handoff", {})
+    _handoff_protocol = _handoff_cfg.get("protocol", "a2a-v1") if isinstance(_handoff_cfg, dict) else _handoff_cfg
+    variables["A2A_PROTOCOL_ENABLED"] = (
+        "false" if str(_handoff_protocol).lower() in ("none", "false", "off", "") else "true"
+    )
     # DIRECT_DISPATCH_SECTION: loaded from central template file; empty when direct dispatch is disabled
     _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
     if _dd_enabled:
@@ -285,6 +293,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["ORCHESTRATOR_OUTCOME_CACHING"] = "true" if oc_config.get("enabled", False) else "false"
     variables["ORCHESTRATOR_CACHE_TTL"] = str(oc_config.get("ttl_seconds", 3600))
     variables["ORCHESTRATOR_CACHE_MAX_ENTRIES"] = str(oc_config.get("max_entries", 100))
+    # CHECKPOINTING_ENABLED: persistent session checkpoints for long orchestrations.
+    # Default on; disable via orchestrator.checkpointing: false for lightweight projects.
+    variables["CHECKPOINTING_ENABLED"] = (
+        "false" if orch_config.get("checkpointing", True) is False else "true"
+    )
     # UNKNOWN_FALLBACK: granular flags (new object format) or legacy string
     unknown_fallback = orch_config.get("unknown-fallback", {})
     if isinstance(unknown_fallback, str):
@@ -384,7 +397,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
-    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED")})
 
     if not conditional_vars:
         return text

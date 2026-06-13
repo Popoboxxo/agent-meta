@@ -146,6 +146,22 @@ FANOUT >2 Agenten → vorher Bestätigung: "[N] parallele [Agent-Type] starten. 
 
 Nach BARRIER(): Ergebnisse sammeln, Konsistenz prüfen, Widersprüche → User informieren (nicht auto-mergen).
 
+### Kontext-Format (Pflicht bei jeder Delegation)
+
+```
+TASK: <eine Zeile>
+CONTEXT:
+  - Branch: <name>
+  - REQ-ID: <id oder n/a>
+  - Vorherige Ergebnisse: <key findings in 1-2 Sätzen>
+CONSTRAINTS:
+  - Nicht anfassen: <Dateien/Bereiche falls zutreffend>
+  - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+EXPECTED_OUTPUT:
+  - <konkret messbares Ergebnis>
+```
+Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
+
 ---
 
 </section>
@@ -160,25 +176,10 @@ Nach BARRIER(): Ergebnisse sammeln, Konsistenz prüfen, Widersprüche → User i
 2. **`schema_ref` bestimmen:** Aus Intent-Routing-Tabelle (Handoff-Contract-Spalte) oder implizit via Route
 3. **`payload` aus User-Request + Kontext extrahieren:**
    - `t`: Task-Beschreibung (Pflicht)
-   - `ctx`: Strukturierter Kontext (optional, Format siehe unten)
+   - `ctx`: Strukturierter Kontext (Format → Sektion »Kontext-Format«)
    - `con`: Constraints (optional)
    - `pri`: Priority (optional, default: medium)
    - `refs`: Referenzen (optional)
-
-**Standardformat für `ctx` (Mindest-Set bei jeder Delegation):**
-```
-TASK: <eine Zeile>
-CONTEXT:
-  - Branch: <name>
-  - REQ-ID: <id oder n/a>
-  - Vorherige Ergebnisse: <key findings in 1-2 Sätzen>
-CONSTRAINTS:
-  - Nicht anfassen: <Dateien/Bereiche falls zutreffend>
-  - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
-EXPECTED_OUTPUT:
-  - <konkret messbares Ergebnis>
-```
-Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
 4. **Envelope zusammenbauen:**
    ```json
    {
@@ -245,13 +246,6 @@ Das konkrete Handoff-Format deiner Umgebung ist in der Sektion »Parallel Execut
 
 ---
 
-</section>
-<section name="outcome-caching">
-## Outcome Caching
-
-Wenn aktiviert: Cache-Key = SHA256(agent + prompt[:200]). Read-only, idempotent, keine Side-Effects. Invalidierung nach git-commit.
-
----
 
 </section>
 <section name="parallel-execution-engine">
@@ -297,8 +291,6 @@ task(subagent_type="developer", description="Fix Bug C", prompt="...")
 
 Limit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.
 
-
----
 
 ---
 
@@ -437,8 +429,6 @@ Bestätigung vor: Commit auf main/master, Branch löschen, sync.py, Rollen/Dod-P
 
 ---
 
----
-
 </section>
 <section name="in-context-delegation-tracker">
 ## In-Context Delegation Tracker
@@ -527,7 +517,6 @@ python scripts/sync.py --dry-run
 ## Context & Checkpointing
 
 **Context Guard:** Nach >5 Delegationen Session-Stand in 2–3 Sätzen zusammenfassen. Bei Verdacht auf Überlauf → priorisieren, nicht-essentielle Tasks verschieben, ggf. User nach Session-Reset fragen.
-
 **Checkpointing** (>5 Schritte):
 - Nach jedem Task: `scripts/lib/checkpoint.py` → `CheckpointStore.save_checkpoint(session_id, checkpoint)`
 - Session-Start: `CheckpointStore.list_sessions()` prüfen → Checkpoint? → User informieren, ab da fortsetzen

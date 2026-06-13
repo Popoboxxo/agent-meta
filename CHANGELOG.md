@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Conditional orchestrator sections (token optimization)**: the A2A Handoff Protocol (~90 lines), Outcome Caching, and Checkpointing sections are now generated only when actually enabled. New flags `A2A_PROTOCOL_ENABLED` (from `orchestrator.handoff.protocol`; disable via `none`/`false`) and `CHECKPOINTING_ENABLED` (disable via `orchestrator.checkpointing: false`) gate them. A project without A2A produces a ~19% smaller orchestrator (423 → 344 lines) with all core functions intact (orchestrator 3.23.0). The delegation context format (`TASK`/`CONTEXT`/`CONSTRAINTS`/`EXPECTED_OUTPUT`) was lifted out of the A2A block so structured context survives even when A2A is off.
 - **3-tier developer system**: new roles `junior-developer` (tier `fast` — trivial, tightly-scoped changes with a structured ESCALATE protocol) and `senior-developer` (tier `max`, project memory — architecture impact, cross-cutting refactorings, hard bugs, DECISION notes). The orchestrator routes by difficulty and handles escalations without a user round-trip; active only when both roles are enabled (`DEVELOPER_TIERS_ENABLED`).
 - **PAL conditionals**: `{{#if PAL_*}}...{{/if}}` blocks are now evaluated per provider by the DelegationSyntaxEngine (e.g. the orchestrator Tools section appears only for providers with `tool_preamble: true`).
 - **PAL diagnostics**: missing or unknown PAL placeholder definitions now produce sync warnings instead of being silently removed.
