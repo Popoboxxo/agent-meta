@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.9.1"
+version: "1.9.2"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -73,6 +73,8 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 ## A2A Handoff — Ein- und Ausgehend
 
 **Eingehend:** Tasks kommen als A2A-Envelope (JSON) vom Orchestrator. Extrahiere `payload.t` (Feature), `payload.ctx` (Kontext), `payload.pri`, `payload.con[]`, `payload.refs[]`.
+
+**Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload.
 
 **Ausgehend:** Jede Delegation an Sub-Agenten als A2A-Envelope: `source_agent: "feature"`, `trace_parent` auf eigene `handoff_id` (PIPELINE-Chain), `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator.
 

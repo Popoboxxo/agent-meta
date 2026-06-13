@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.4.0"
+version: "2.4.1"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -106,6 +106,8 @@ Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten. Extrahiere aus 
 `t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (harte Constraints), `refs[]` (zu lesende Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
 `batch: true` → `payload` ist ein Array, sequentiell abarbeiten (`batch_task_id` je Eintrag).
 Kein Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen, gleiche Infos unstrukturiert.
+
+**Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload.
 
 ---
 

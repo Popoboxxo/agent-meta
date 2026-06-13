@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.26.0"
+version: "3.26.1"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -259,6 +259,8 @@ Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
    - `con`: Constraints (optional)
    - `pri`: Priority (optional, default: medium)
    - `refs`: Referenzen (optional)
+
+   **Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload. Reduziert Token-Overhead, vor allem bei FANOUT.
 4. **Envelope zusammenbauen:**
    ```json
    {
