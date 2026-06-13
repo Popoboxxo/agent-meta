@@ -132,48 +132,13 @@ Neue Funktionalität gehört in das zuständige `lib/`-Modul, nie direkt in `syn
 <section name="a2a-handoff-eingehende-tasks">
 ## A2A Handoff — Eingehende Tasks
 
-Du kannst Tasks vom Orchestrator oder Feature-Agent als strukturiertes A2A-Envelope (JSON) erhalten.
-
-### Envelope parsen
-
-```json
-{
-  "protocol_version": "1.0.0",
-  "handoff_id": "HOFF-YYYYMMDD-NNN",
-  "source_agent": "orchestrator",
-  "target_agent": "developer",
-  "schema_ref": "schemas/handoffs/task-spec.schema.json",
-  "payload": {
-    "t": "Implementiere Login-Flow mit OAuth2",
-    "ctx": "Bestehender Auth-Service unter /internal/auth nutzen",
-    "con": ["Muss OAuth2 mit PKCE unterstützen", "Keine neuen Dependencies"],
-    "refs": ["schemas/auth-api.json", "docs/architecture.md#auth-flow"],
-    "pri": "high",
-    "dep": ["HOFF-20260607-042"]
-  },
-  "trace_parent": "HOFF-20260607-041"
-}
-```
-
-**Extraktion:**
-- `payload.t` → Task-Beschreibung (DEINE Hauptaufgabe)
-- `payload.ctx` → Kontext (bestehende Systeme, Constraints)
-- `payload.con[]` → Harte Randbedingungen (MÜSSEN eingehalten werden)
-- `payload.refs[]` → Referenzen (Dateien, Schemas, Docs die du lesen solltest)
-- `payload.pri` → Priorität (low/medium/high/critical)
-- `payload.dep[]` → Abhängigkeiten (warten bis diese HOFFs erledigt sind)
-
-### Batch-Mode
-
-Wenn `batch: true` gesetzt ist, ist `payload` ein Array. Bearbeite die Tasks sequentiell in der Reihenfolge des Arrays. Jeder Eintrag hat `batch_task_id` zur Identifikation.
-
-### Fallback
-
-Wenn du keinen A2A-Envelope erhältst (Natural-Language-Prompt vom Orchestrator):
-- Führe die Aufgabe normal aus (Backward-Kompatibilität)
-- Der Natural-Language-Prompt enthält die gleichen Informationen, nur unstrukturiert
+Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten. Extrahiere aus `payload`:
+`t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (harte Constraints), `refs[]` (zu lesende Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
+`batch: true` → `payload` ist ein Array, sequentiell abarbeiten (`batch_task_id` je Eintrag).
+Kein Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen, gleiche Infos unstrukturiert.
 
 ---
+
 
 </section>
 <section name="commit-konventionen">

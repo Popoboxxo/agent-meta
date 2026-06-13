@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.8.0"
+version: "1.9.0"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -69,38 +69,16 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 ---
 
-## A2A Handoff — Eingehende Tasks
+{{#if A2A_PROTOCOL_ENABLED}}
+## A2A Handoff — Ein- und Ausgehend
 
-Du empfängst Tasks vom Orchestrator als strukturiertes A2A-Envelope (JSON):
+**Eingehend:** Tasks kommen als A2A-Envelope (JSON) vom Orchestrator. Extrahiere `payload.t` (Feature), `payload.ctx` (Kontext), `payload.pri`, `payload.con[]`, `payload.refs[]`.
 
-```json
-{
-  "protocol_version": "1.0.0",
-  "handoff_id": "HOFF-YYYYMMDD-NNN",
-  "source_agent": "orchestrator",
-  "target_agent": "feature",
-  "schema_ref": "schemas/handoffs/task-spec.schema.json",
-  "payload": {
-    "t": "Feature-Beschreibung",
-    "ctx": "Kontext",
-    "pri": "high",
-    "con": ["Constraint 1", "Constraint 2"],
-    "refs": ["docs/architecture.md"]
-  },
-  "trace_parent": "HOFF-YYYYMMDD-PARENT"
-}
-```
+**Ausgehend:** Jede Delegation an Sub-Agenten als A2A-Envelope: `source_agent: "feature"`, `trace_parent` auf eigene `handoff_id` (PIPELINE-Chain), `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator.
 
-**Parsing:** Extrahiere `payload.t` als Feature-Beschreibung, `payload.ctx` als Kontext, `payload.pri` als Priorität.
+{{/if}}
+## Kontext-Format (Pflicht bei jeder Delegation)
 
-## A2A Handoff — Ausgehende Delegationen
-
-Jede Delegation an Sub-Agenten MUSS als A2A-Envelope erfolgen:
-- `source_agent: "feature"`, `target_agent: "<sub-agent>"`
-- `trace_parent` auf die eigene `handoff_id` setzen (PIPELINE-Chain)
-- `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator
-
-**Standardformat für `ctx` in ausgehenden Delegationen:**
 ```
 TASK: <eine Zeile>
 CONTEXT:
@@ -148,8 +126,6 @@ Aufgabe: Erstelle einen neuen Feature-Branch mit dem Namen "feat/<feature-name>"
          vom aktuellen main/master Branch.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="git"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 ---
 
@@ -165,8 +141,6 @@ Aufgabe: Nimm folgende Anforderung auf und vergib eine REQ-ID:
          Gib die vergebene REQ-ID zurück.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="requirements"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 Merke dir die REQ-ID für alle weiteren Schritte.
 
@@ -183,8 +157,6 @@ Aufgabe: Schreibe Tests für [REQ-ID]: "<Feature-Beschreibung>"
          Benenne alle Tests mit [REQ-ID] im Namen.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="tester"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 ---
 
@@ -199,8 +171,6 @@ Aufgabe: Implementiere [REQ-ID]: "<Feature-Beschreibung>"
          Halte dich strikt an die Code-Konventionen des Projekts.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="developer"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 ---
 
@@ -216,8 +186,6 @@ Aufgabe: Führe alle Tests aus. Stelle sicher dass:
          Gib das Ergebnis zurück.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="tester"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 Bei fehlgeschlagenen Tests: zurück zu Schritt 4 mit dem Testergebnis.
 
@@ -238,8 +206,6 @@ Aufgabe: Validiere die Implementierung von [REQ-ID].
          Gib das Ergebnis zurück.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="validator"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 **Documenter** (Hintergrund, parallel):
 ```
@@ -248,8 +214,6 @@ Aufgabe: Aktualisiere CODEBASE_OVERVIEW.md für die Änderungen aus [REQ-ID].
          Dokumentiere relevante Architektur-Entscheidungen falls vorhanden.
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="documenter"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 Warte auf **beide** Ergebnisse bevor du zu Schritt 8 weitergehst.
 Bei fehlgeschlagener Validierung: zurück zum entsprechenden Schritt.
@@ -271,8 +235,6 @@ Aufgabe:
    - Body: Kurzbeschreibung + REQ-ID Referenz + Testergebnis
 ```
 
-→ Als A2A-Envelope mit `source_agent="feature"`, `target_agent="git"`,
-  `schema_ref="schemas/handoffs/task-spec.schema.json"`, `trace_parent=<meine handoff_id>`
 
 ---
 

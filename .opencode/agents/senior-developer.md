@@ -126,21 +126,11 @@ external/<repo>/
 <section name="a2a-handoff-eingehende-tasks">
 ## A2A Handoff — Eingehende Tasks
 
-Du kannst Tasks vom Orchestrator als strukturiertes A2A-Envelope (JSON) erhalten
-(`schema_ref: schemas/handoffs/task-spec.schema.json`, `target_agent: senior-developer`).
-
-**Extraktion:**
-- `payload.t` → Task-Beschreibung (DEINE Hauptaufgabe)
-- `payload.ctx` → Kontext — bei Eskalationen enthält er die `findings` der vorherigen Stufe: lies sie ZUERST, sie sparen dir Analysezeit
-- `payload.con[]` → Harte Randbedingungen (MÜSSEN eingehalten werden)
-- `payload.refs[]` → Referenzen (Dateien, Schemas, Docs die du lesen solltest)
-- `payload.pri` → Priorität (low/medium/high/critical)
-- `payload.dep[]` → Abhängigkeiten (warten bis diese HOFFs erledigt sind)
-
-**Fallback:** Ohne Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen.
+Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere aus `payload`: `t` (Hauptaufgabe), `con[]` (harte Constraints), `refs[]`, `pri`, `dep[]`.
+**Wichtig:** Bei Eskalationen enthält `payload.ctx` die `findings` der vorherigen Stufe — lies sie ZUERST, sie sparen Analysezeit.
+Kein Envelope → Aufgabe normal ausführen.
 
 ---
-
 </section>
 <section name="development-environment">
 ## Development Environment

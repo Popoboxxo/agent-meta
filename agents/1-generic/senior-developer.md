@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.0.0"
+version: "1.1.0"
 description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs und Cross-Cutting-Refactorings. Analysiert vor der Implementierung und dokumentiert Entscheidungen."
 hint: "High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann"
 tools:
@@ -117,23 +117,16 @@ Falls `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` existiert: Lies sie jetzt s
 
 ---
 
+{{#if A2A_PROTOCOL_ENABLED}}
 ## A2A Handoff — Eingehende Tasks
 
-Du kannst Tasks vom Orchestrator als strukturiertes A2A-Envelope (JSON) erhalten
-(`schema_ref: schemas/handoffs/task-spec.schema.json`, `target_agent: senior-developer`).
-
-**Extraktion:**
-- `payload.t` → Task-Beschreibung (DEINE Hauptaufgabe)
-- `payload.ctx` → Kontext — bei Eskalationen enthält er die `findings` der vorherigen Stufe: lies sie ZUERST, sie sparen dir Analysezeit
-- `payload.con[]` → Harte Randbedingungen (MÜSSEN eingehalten werden)
-- `payload.refs[]` → Referenzen (Dateien, Schemas, Docs die du lesen solltest)
-- `payload.pri` → Priorität (low/medium/high/critical)
-- `payload.dep[]` → Abhängigkeiten (warten bis diese HOFFs erledigt sind)
-
-**Fallback:** Ohne Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen.
+Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere aus `payload`: `t` (Hauptaufgabe), `con[]` (harte Constraints), `refs[]`, `pri`, `dep[]`.
+**Wichtig:** Bei Eskalationen enthält `payload.ctx` die `findings` der vorherigen Stufe — lies sie ZUERST, sie sparen Analysezeit.
+Kein Envelope → Aufgabe normal ausführen.
 
 ---
 
+{{/if}}
 ## Development Environment
 
 {{DEV_COMMANDS}}

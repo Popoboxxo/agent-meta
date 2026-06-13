@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.23.0"
+version: "3.24.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -119,9 +119,8 @@ Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher s
 (`reason`, `recommended_tier`, `findings`, `partial_work`):
 
 1. KEINE Rückfrage an den User — sofort an `recommended_tier` neu dispatchen
-2. `findings` der Card in `payload.ctx` des neuen Handoffs übernehmen (spart Analysezeit)
-3. `trace_parent` auf die ursprüngliche handoff_id setzen
-4. Maximal 1 Eskalation pro Task — eskaliert auch die zweite Stufe, geht der Task an den User
+2. `findings` der Card in den Kontext der neuen Delegation übernehmen (spart Analysezeit){{#if A2A_PROTOCOL_ENABLED}}; `trace_parent` auf die ursprüngliche `handoff_id` setzen{{/if}}
+3. Maximal 1 Eskalation pro Task — eskaliert auch die zweite Stufe, geht der Task an den User
 
 **De-Eskalation:** Enthält ein `senior-developer`-Ergebnis `de_escalation_hint: <tier>`, merke dir das Muster für künftiges Routing ähnlicher Tasks.
 {{/if}}
@@ -277,7 +276,9 @@ Wenn aktiviert: Cache-Key = SHA256(agent + prompt[:200]). Read-only, idempotent,
 {{PAL_DELEGATE}}
 {{PAL_FANOUT}}
 {{PAL_PARALLEL_GROUP}}
+{{#if A2A_PROTOCOL_ENABLED}}
 {{PAL_HANDOFF}}
+{{/if}}
 BARRIER(): Warten bis alle fertig; Ergebnisse sammeln
 REPEAT_UNTIL(gen, critic, max): Generator → Critic → Revision bis max
 PIPELINE(name, stages): Vordefinierte Pipeline sequentiell/parallel

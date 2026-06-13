@@ -100,9 +100,8 @@ Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher s
 (`reason`, `recommended_tier`, `findings`, `partial_work`):
 
 1. KEINE Rückfrage an den User — sofort an `recommended_tier` neu dispatchen
-2. `findings` der Card in `payload.ctx` des neuen Handoffs übernehmen (spart Analysezeit)
-3. `trace_parent` auf die ursprüngliche handoff_id setzen
-4. Maximal 1 Eskalation pro Task — eskaliert auch die zweite Stufe, geht der Task an den User
+2. `findings` der Card in den Kontext der neuen Delegation übernehmen (spart Analysezeit); `trace_parent` auf die ursprüngliche `handoff_id` setzen
+3. Maximal 1 Eskalation pro Task — eskaliert auch die zweite Stufe, geht der Task an den User
 
 **De-Eskalation:** Enthält ein `senior-developer`-Ergebnis `de_escalation_hint: <tier>`, merke dir das Muster für künftiges Routing ähnlicher Tasks.
 
@@ -270,7 +269,6 @@ Füge den JSON-Envelope VOR dem task()-Call in den Prompt ein:
 {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
 ```
 FANOUT mit gleichem target: batch:true, payload als Array.
-
 BARRIER(): Warten bis alle fertig; Ergebnisse sammeln
 REPEAT_UNTIL(gen, critic, max): Generator → Critic → Revision bis max
 PIPELINE(name, stages): Vordefinierte Pipeline sequentiell/parallel
@@ -399,8 +397,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-   + Meta-Feedback im Hintergrund
-
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
