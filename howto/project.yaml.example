@@ -33,6 +33,22 @@ orchestrator:
 max-parallel-agents: 4
 
 # ============================================================
+# MEMORY CONFIGURATION
+# ============================================================
+# memory.enabled: Master kill-switch for all memory fields.
+#   true  → memory: fields generated per role-defaults + memory-overrides (default)
+#   false → ALL memory: fields suppressed during sync — agents get no persistent memory
+# memory.default_scope: Fallback scope for roles without explicit memory config.
+#   ""        → no memory: field injected unless explicitly configured (default)
+#   "project" → .claude/agent-memory/<role>/ (committed to git)
+#   "local"   → .claude/agent-memory-local/<role>/ (gitignored)
+#   "user"    → ~/.claude/agent-memory/<role>/ (machine-local)
+
+# memory:
+#   enabled: true
+#   default_scope: ""
+
+# ============================================================
 # TEST REPOSITORY VALIDATION
 # ============================================================
 # Enables validation of sync output against a separate test repository.

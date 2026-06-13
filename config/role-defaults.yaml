@@ -415,8 +415,8 @@ quality_pipelines:
         task: "Feature implementieren"
         mode: sequential
       - id: review
-        agent: code-reviewer
-        task: "Code-Qualität prüfen"
+        agent: developer
+        task: "Code schreiben und Review-Feedback einarbeiten"
         mode: loop
         loop:
           generator: developer
@@ -439,6 +439,7 @@ quality_pipelines:
         agent: git
         task: "Commit + Push"
         mode: sequential
+    on_error: escalate_to_orchestrator
 
   bugfix:
     description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
@@ -464,6 +465,44 @@ quality_pipelines:
         task: "CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren"
         mode: sequential
     on_error: escalate_to_orchestrator
+
+  refactor:
+    description: "Codebase refactoring: blast-radius analysis → implement → review → commit. Use for cross-cutting refactorings, not trivial renames."
+    stages:
+      - id: analyze
+        agent: senior-developer
+        task: "Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten"
+        mode: sequential
+      - id: implement
+        agent: developer
+        task: "Refactoring implementieren ohne funktionale Änderungen"
+        mode: sequential
+      - id: review
+        agent: developer
+        task: "Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 2
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  docs-update:
+    description: "Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW, ARCHITECTURE, and similar doc-only changes."
+    stages:
+      - id: update
+        agent: documenter
+        task: "Dokumentation aktualisieren"
+        mode: sequential
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+    on_error: skip
 
   se-cascade:
     description: "Systems Engineering 6-Stage Recursive Cascade"

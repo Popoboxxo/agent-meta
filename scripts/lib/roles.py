@@ -136,15 +136,36 @@ def resolve_memory(role: str, project_config: dict, agent_meta_root: Path) -> st
     """Resolve the memory scope for a role.
 
     Precedence (highest to lowest):
+    0. memory.enabled == False → always return "" (master kill-switch, overrides all)
     1. Project override: project_config["memory-overrides"][role]
     2. Meta default:     roles.config.yaml roles[role].memory
-    3. Empty string:     no memory: field injected
+    3. memory.default_scope if set (global fallback for roles with no memory config)
+    4. Empty string:     no memory: field injected
+
+    Backward compatible: if "memory" block is absent, enabled defaults to True.
     """
+    # 0. Master kill-switch
+    memory_cfg = project_config.get("memory", {})
+    if not memory_cfg.get("enabled", True):
+        return ""
+
+    # 1. Project override (role-specific)
     project_overrides = project_config.get("memory-overrides", {})
     if role in project_overrides:
         return str(project_overrides[role])
+
+    # 2. Meta default from role-defaults.yaml
     roles_cfg = load_roles_config(agent_meta_root)
-    return roles_cfg["roles"].get(role, {}).get("memory", "")
+    meta_default = roles_cfg["roles"].get(role, {}).get("memory", "")
+    if meta_default:
+        return meta_default
+
+    # 3. Global default_scope
+    default_scope = memory_cfg.get("default_scope", "")
+    if default_scope:
+        return str(default_scope)
+
+    return ""
 
 
 def resolve_temperature(role: str, project_config: dict, agent_meta_root: Path) -> str:
