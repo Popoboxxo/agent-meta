@@ -486,6 +486,8 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
+   + Meta-Feedback im Hintergrund
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
@@ -555,6 +557,7 @@ Fallback (kein Tool-Call): @orchestrator <task>.
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation | balanced | ✅ (Multi-Issues) |
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit. | powerful | ✅ (Multi-Prüfungen) |
+| `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops | powerful | ✅ (Multi-Tasks) |
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
 | `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
 | `developer` | Feature-Implementierung und Bugfixes | powerful | ✅ (Multi-Dateien) |

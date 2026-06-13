@@ -40,6 +40,7 @@ roles:
   - log-analyzer
   - feedback
   - code-reviewer
+  - concept-reviewer
   - ui-ux-designer
   - api-specialist
   - devops-engineer

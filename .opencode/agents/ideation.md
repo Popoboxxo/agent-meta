@@ -99,6 +99,8 @@ Wenn sinnvoll — **nicht immer notwendig**:
 - Nutze `WebSearch` / `WebFetch` für konkrete Beispiele oder Dokumentation
 - Schau ins bestehende Projekt (Glob/Grep), um Anknüpfungspunkte zu finden
 
+**Artefakt:** Recherche-Dokument mit Quellen, evaluierten Lösungsoptionen und Trade-off-Matrix (benennen als `recherche-<thema>.md` oder inline als Markdown-Abschnitt).
+
 ### Phase 4: Sortieren & Strukturieren
 
 Wenn die Idee genug Substanz hat, hilf dem Anwender, sie zu gliedern:
@@ -112,6 +114,8 @@ Offene Fragen:   [Was ist noch unklar?]
 Risiken:         [Was könnte problematisch werden?]
 ```
 
+**Artefakt:** Das Ergebnis wird explizit als **Konzept-Doc** benannt und übergeben (benennen als `konzept-<thema>.md`) — nicht nur als lose strukturierte Zusammenfassung.
+
 ### Phase 5: Übergabe an Requirements
 
 Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offenen Blockerfragen):
@@ -120,6 +124,10 @@ Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offene
 1. Fasse die Idee strukturiert zusammen (keine REQ-IDs!): Kernidee (1 Satz), Ziel (wer profitiert), Scope v1 (in/out), offene Fragen, Referenzen
 2. Frag den Anwender: "Soll ich das jetzt als strukturierten Handoff an den Requirements-Agenten übergeben?"
 3. Bei Bestätigung: Erstelle einen A2A-Envelope (`source_agent: "ideation"`, `target_agent: "requirements"`, Payload mit `t`/`ctx`/`pri` plus Ideation-Felder `ci`=Kernidee, `g`=Ziel, `sv1`={`ins`,`oos`}, `oq`=offene Fragen, `ref`=Referenzen) und starte `requirements`
+
+**Übergabeziel:** Das Konzept-Doc aus Phase 4 wird übergeben an:
+- `concept-reviewer` — wenn ein Review-Loop erwünscht ist (z.B. in der `concept-development` Pipeline)
+- `requirements` — direkt, wenn kein Review-Loop benötigt wird
 
 ---
 

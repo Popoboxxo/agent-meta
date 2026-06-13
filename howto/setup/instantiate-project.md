@@ -209,6 +209,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-requirements.md` | `1-generic/se-requirements.md` |
 | `.claude/agents/se-architect.md` | `1-generic/se-architect.md` |
 | `.claude/agents/se-critic.md` | `1-generic/se-critic.md` |
+| `.claude/agents/concept-reviewer.md` | `1-generic/concept-reviewer.md` (optional, für concept-development Pipeline) |
 | `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
@@ -412,6 +413,7 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/se-requirements.md` vorhanden
 - [ ] `.claude/agents/se-architect.md` vorhanden
 - [ ] `.claude/agents/se-critic.md` vorhanden
+- [ ] `.claude/agents/concept-reviewer.md` vorhanden (wenn concept-development Pipeline genutzt)
 - [ ] `.claude/agents/se-interface-mgr.md` vorhanden
 - [ ] `.claude/agents/se-termination.md` vorhanden
 - [ ] `.claude/agents/se-orchestrator.md` vorhanden

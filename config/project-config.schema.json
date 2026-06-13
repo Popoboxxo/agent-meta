@@ -64,6 +64,7 @@
           "bug-feature-analyzer",
           "claude-expert",
           "code-reviewer",
+          "concept-reviewer",
           "continue-expert",
           "copilot-expert",
           "developer",
