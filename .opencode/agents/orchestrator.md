@@ -480,7 +480,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
