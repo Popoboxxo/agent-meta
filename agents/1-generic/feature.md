@@ -1,6 +1,6 @@
 ---
 name: template-feature
-version: "1.9.0"
+version: "1.9.1"
 description: "Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung → Validierung → Commit → PR."
 hint: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
 # isolation: worktree   ← Opt-in: aktiviere für parallele Feature-Entwicklung ohne Branch-Konflikte
@@ -88,9 +88,14 @@ CONTEXT:
 CONSTRAINTS:
   - Nicht anfassen: <Dateien falls zutreffend>
   - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+TOOLS/SOURCES: (optional, empfohlen für nicht-triviale Tasks)
+  - Primary tools: <Bash, Read, Write, etc.>
+  - Primary sources: <Dateien, Verzeichnisse, Schemas>
+  - Avoid: <Tools oder Quellen die übersprungen werden sollen>
 EXPECTED_OUTPUT:
   - <konkret messbares Ergebnis>
 ```
+Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`. `TOOLS/SOURCES` optional, verhindert Tool-Drift.
 
 ---
 
