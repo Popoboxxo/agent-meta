@@ -89,6 +89,10 @@ def _build_event_from_args(args: argparse.Namespace) -> dict:
         event["from"] = args.caller
     if args.task_id:
         event["task_id"] = args.task_id
+    if args.tokens_in is not None:
+        event["tokens_in"] = args.tokens_in
+    if args.tokens_out is not None:
+        event["tokens_out"] = args.tokens_out
 
     if args.payload:
         try:
@@ -119,6 +123,10 @@ def _build_event_from_params(params: dict) -> dict:
         event["task_id"] = params["task_id"]
     if "payload" in params:
         event["payload"] = params["payload"]
+    if "tokens_in" in params:
+        event["tokens_in"] = params["tokens_in"]
+    if "tokens_out" in params:
+        event["tokens_out"] = params["tokens_out"]
 
     return event
 
@@ -171,6 +179,14 @@ TOOLS = [
                 "payload": {
                     "type": "object",
                     "description": "Optional JSON payload or error message",
+                },
+                "tokens_in": {
+                    "type": "integer",
+                    "description": "Optional input token count for this agent invocation",
+                },
+                "tokens_out": {
+                    "type": "integer",
+                    "description": "Optional output token count for this agent invocation",
                 },
             },
             "required": ["event", "agent"],
@@ -544,6 +560,8 @@ def main():
     parser.add_argument("--target", help="Target agent role (for delegate_out and agent_end)")
     parser.add_argument("--caller", help="Calling agent role (for agent_start)")
     parser.add_argument("--task_id", help="Correlation UUID to track delegation")
+    parser.add_argument("--tokens_in", type=int, default=None, help="Input token count (optional)")
+    parser.add_argument("--tokens_out", type=int, default=None, help="Output token count (optional)")
 
     args = parser.parse_args()
 
