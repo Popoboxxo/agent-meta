@@ -515,8 +515,8 @@ Fallback (kein Tool-Call): {{PAL_FALLBACK}}.
 <!-- Delegation table auto-generated from config/role-defaults.yaml by sync.py -->
 <!-- Manual changes will be overwritten on next sync. -->
 
-| Agent | Zuständigkeit | Parallel |
-|-------|--------------|----------|
+| Agent | Zuständigkeit | Tier | Parallel |
+|-------|--------------|------|----------|
 {{AGENT_DELEGATION_TABLE}}
 
 Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten für unabhängige Schritte (∥).

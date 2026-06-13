@@ -93,7 +93,8 @@ def generate_agent_delegation_table(agent_meta_root: Path, config: dict, variabl
 
         description = role_info.get("description", "")
         parallel = _PARALLEL_LABELS.get(role_name, "✅ (Multi-Tasks)")
+        model_tier = role_info.get("model", "") or "—"
 
-        lines.append(f"| `{role_name}` | {description} | {parallel} |")
+        lines.append(f"| `{role_name}` | {description} | {model_tier} | {parallel} |")
 
     return "\n".join(lines)
