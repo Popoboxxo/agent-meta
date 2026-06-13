@@ -1,9 +1,9 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 1.0.0
+# version: 1.1.0
 # event: PreToolUse
 # matcher: ""
-# description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true
+# description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
 # enabled_by_default: true
 
 # This hook is always active (enabled_by_default: true).
@@ -75,6 +75,24 @@ except Exception:
   if [ "$STRICT" = "true" ]; then
     echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked."
     echo "Delegate this task to the orchestrator agent."
+    exit 2
+  fi
+fi
+
+# Non-strict mode: still block direct git mutations in Bash calls
+if [ "$TOOL_NAME" = "Bash" ]; then
+  BASH_CMD=$(echo "$INPUT" | $_PY -c "
+import json, sys
+d = json.load(sys.stdin)
+inp = d.get('tool_input', {})
+print(inp.get('command', '') if isinstance(inp, dict) else '')
+" 2>/dev/null || echo "")
+
+  # Pattern match on mutating git subcommands
+  if echo "$BASH_CMD" | grep -qE '\bgit\b.*(commit|push|add|rm\b|branch[[:space:]]+-?[^-]|merge|rebase|reset|restore|checkout[[:space:]]+[^-]|tag|stash[[:space:]]+(pop|drop|clear))'; then
+    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat."
+    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)"
+    echo "Delegate git operations to the \`git\` agent."
     exit 2
   fi
 fi
