@@ -130,12 +130,43 @@ Vor jeder Delegation diese 3 Punkte prüfen — ANY "nein" → erst lösen, dann
 | Gemischte Tasks ("Fix A,B + Test C") | PARALLEL_GROUP(dev, tester) |
 | Komplexes Feature | → `feature` Agent oder Pipeline |
 
+
+### Quick Effort-Scaling Heuristic
+
+Vor jeder Delegation kurz prüfen — vermeidet unnötige Parallelisierung (~15× Token-Overhead):
+
+| Task-Komplexität | Single Agent | 2–4 Parallel | Breiter Fanout |
+|------------------|-------------|--------------|----------------|
+| Fact-finding (eine Quelle) | Ja | — | — |
+| Typo / trivialer Config-Wert | Ja | — | — |
+| Bug-Vergleich (2–3 ähnliche Issues) | Eventuell | Ja | — |
+| Mehrere unabhängige Fixes (A, B, C) | Nein | Ja (disjoint files) | Ja (>4 Tasks) |
+| Architektur-Research / Design | Balanced | Bevorzugt | Bedingt |
+
+**Faustregel:** Kein natürlicher Split in ≥2 unabhängige Branches → zuerst an einen Agent delegieren.
+
 ### Regeln
 
 1. Sub-tasks: disjoint files, keine Kausalität, kein shared state
 2. Max 4 parallel; mehr → batchen
 3. Im Zweifel: sequentiell — falsche Parallelisierung schlimmer als keine
 4. Vor FANOUT ≥2 Tasks: Dateibereiche auf Overlap prüfen (Overlap → BARRIER)
+
+
+### When NOT to Parallelize
+
+Multi-Agent-Parallelisierung überspringen wenn EINES zutrifft:
+
+1. **Sequentielle Abhängigkeiten** — Task 2 braucht Output von Task 1
+   → PIPELINE oder sequentielle Delegation verwenden
+2. **Shared mutable state** — Agenten koordinieren Schreibzugriffe
+   → Single Agent oder BARRIER mit manuellem Merge
+3. **Deterministischer Workflow** — Schritte bekannt und geordnet
+   → Single Agent mit Loop, kein Multi-Agent
+4. **Knappes Budget** — Token-Multiplikator (~15×) nicht absorbierbar
+   → Token-Budget prüfen vor FANOUT
+
+**Default:** Im Zweifel → sequentiell. Falsche Parallelisierung ist teurer als fehlende.
 
 ### Kommunikation
 
@@ -156,10 +187,15 @@ CONTEXT:
 CONSTRAINTS:
   - Nicht anfassen: <Dateien/Bereiche falls zutreffend>
   - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+TOOLS/SOURCES: (optional, empfohlen für nicht-triviale Tasks)
+  - Primary tools: <Bash, Read, Write, etc.>
+  - Primary sources: <Dateien, Verzeichnisse, Schemas>
+  - Avoid: <Tools oder Quellen die übersprungen werden sollen>
 EXPECTED_OUTPUT:
   - <konkret messbares Ergebnis>
 ```
 Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
+`TOOLS/SOURCES` optional, verhindert Tool-Drift und vervollständigt den 4-Part Delegation Contract.
 
 ---
 
@@ -317,6 +353,24 @@ BARRIER() blockiert bis ALLE gestarteten parallelen Agenten geantwortet haben.
 > - Agent-B: [Kurzfassung]
 > Bitte entscheide, welche Version weiterverwendet werden soll."
 
+### Artifact Pattern (für verbose Subagent-Outputs)
+
+Wenn ein Subagent einen umfangreichen Output produziert (>200 Zeilen oder strukturierter Report):
+1. Subagent schreibt Output nach: `.claude/artifacts/<handoff_id>-<type>.md`
+2. Subagent gibt in BARRIER **nur** eine Lightweight-Referenz zurück:
+   ```
+   ||| agent=<name> result_key=<type>_artifact |||
+   Artifact: .claude/artifacts/<handoff_id>-analysis.md (<N> Zeilen)
+   Summary: <1-Satz-Zusammenfassung des Inhalts>
+   |||
+   ```
+3. Downstream-Agenten lesen das Artifact direkt (volle Fidelität, kein Relay-Verlust)
+4. Orchestrator hält nur die Referenz im Kontext — nicht den vollständigen Text
+5. Cleanup: Artifacts nach Pipeline-Ende oder Session-Ende löschen
+
+**Wann anwenden:** Cascading Pipelines (≥3 Relay-Punkte), Analyse-Reports, große Changelogs.
+**Warum:** Referenz (~100 Tokens) statt Report (~5000 Tokens) — verhindert Context-Bloat und Telephone-Effekt.
+
 </section>
 <section name="quality-pipelines-generated">
 ## Quality Pipelines (Generated)
@@ -397,6 +451,7 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
