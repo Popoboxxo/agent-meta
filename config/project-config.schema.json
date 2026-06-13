@@ -363,6 +363,24 @@
         ]
       }
     },
+    "memory": {
+      "description": "Global memory configuration. Controls whether memory fields are generated for agents.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master kill-switch: false = suppress ALL memory: fields during sync (overrides role-defaults and memory-overrides)",
+          "default": true
+        },
+        "default_scope": {
+          "type": "string",
+          "enum": ["", "project", "local", "user"],
+          "description": "Default memory scope for roles that have no explicit memory: in role-defaults.yaml and no entry in memory-overrides. Empty string = no memory injected.",
+          "default": ""
+        }
+      },
+      "additionalProperties": false
+    },
     "memory-overrides": {
       "type": "object",
       "description": "Override the default memory scope per role. Precedence: this > roles.config.json > (none).",
