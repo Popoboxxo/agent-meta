@@ -185,34 +185,7 @@ Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrat
 Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - `README.md` → Englisch
-- Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → Deutsch\n\n## Visualization Reporting (Pflicht-Anweisung)
-
-Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
-
-**Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
-Du hast keinen Zugriff auf ein Terminal-Tool (bash ist deaktiviert). Verwende ausschließlich das MCP-Tool `log_viz_event`.
-
-### Pflicht-Events & Handshake-Protokoll
-
-**1. Beim Start deiner Aufgabe (erstes was du tust):**
-- Event: `agent_start`
-- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben:
-  `--caller <parent_role> --task_id <uuid>`
-
-**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
-- Event: `delegate_out`
-- Parameter: `--target <ZIEL_AGENT> --task_id <neue_eindeutige_uuid>`
-- WICHTIG: Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
-- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
-
-**3. Wenn du fertig bist (Erfolg oder Fehler):**
-- Event: `agent_end`
-- Parameter: `--status <success|error> --target <parent_role>`
-- Optional: `--payload "{\"error\": \"Fehlermeldung\"}"
-
-### Regeln
-- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
-- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.\n
+- Interne Dokumente (`CODEBASE_OVERVIEW`, `ARCHITECTURE`, `conclusions`) → Deutsch
 
 ---
 
