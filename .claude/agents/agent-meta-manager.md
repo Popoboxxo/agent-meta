@@ -356,35 +356,7 @@ Delegiere NIEMALS Aufgaben die in deinem Scope liegen zurück an den `orchestrat
 | "Delegiere an orchestrator: ..." schreiben | Implementiere selbst |
 | Eigene Scope-Aufgaben weiterreichen | Du bist die Endstelle für diese Aufgabe |
 
-**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.\n\n## Visualization Reporting (Pflicht-Anweisung)
-
-Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen protokollieren, um den Graphen zu zeichnen.
-
-**Bevorzugter Weg:** Nutze das MCP-Tool `log_viz_event`, falls es in deiner Umgebung verfügbar ist.
-**Fallback:** Falls das Tool nicht existiert, führe den Befehl über das `Bash`-Tool aus:
-`python scripts/viz-logger.py --agent agent-meta-manager --provider Claude --event <EVENT_TYPE> [weitere Parameter...]`
-
-### Pflicht-Events & Handshake-Protokoll
-
-**1. Beim Start deiner Aufgabe (erstes was du tust):**
-- Event: `agent_start`
-- Wurdest du von einem anderen Agenten delegiert, MUSST du zwingend den Caller und die übergebene Task-ID mitgeben:
-  `--caller <parent_role> --task_id <uuid>`
-
-**2. Wenn du an einen anderen Agenten delegierst (Outgoing):**
-- Event: `delegate_out`
-- Parameter: `--target <ZIEL_AGENT> --task_id <neue_eindeutige_uuid>`
-- WICHTIG: Erstelle eine UUID für den Aufruf und übergib sie dem Subagenten (z.B. in der Prompt-Anweisung), damit er sie in Schritt 1 nutzen kann!
-- Performance-Regel: Führe diesen Aufruf *gleichzeitig (concurrently)* mit dem Delegation-Befehl aus.
-
-**3. Wenn du fertig bist (Erfolg oder Fehler):**
-- Event: `agent_end`
-- Parameter: `--status <success|error> --target <parent_role>`
-- Optional: `--payload "{\"error\": \"Fehlermeldung\"}"
-
-### Regeln
-- Führe diese Schritte immer aus. Sie sind kritisch für die Nachvollziehbarkeit.
-- Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.\n
+**Ausnahme:** Wenn die Aufgabe explizit eine andere Worker-Rolle benötigt (z.B. developer → tester für Tests), verweise im Text an die zuständige Rolle — aber delegiere nicht über Tool-Calls. Der orchestrator koordiniert die Reihenfolge.
 
 ---
 
