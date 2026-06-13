@@ -1,13 +1,17 @@
 # Provider Delegation Syntax Registry
 # Maps abstract {{PAL_*}} placeholders to provider-specific syntax.
 # Used by scripts/lib/delegation_syntax.py during agent generation.
+#
+# IMPORTANT: Do NOT use {{var}} syntax in delegate/fanout/parallel_group values —
+# those look like unresolved sync.py placeholders and confuse the LLM at runtime.
+# Use <angle-brackets> for runtime slots the LLM fills in.
 
 delegation_syntax:
   Claude:
-    delegate: 'Agent(subagent_type="{{agent}}", prompt="{{task}}")'
-    fanout: "# FANOUT: Launch all agents in ONE response — independent calls run concurrently:\n{{calls}}"
-    parallel_group: "{{foreground}}\n\n# Gleichzeitig im Hintergrund (in derselben Antwort):\n{{background}}"
-    fallback: "Delegiere folgende Aufgabe an den Orchestrator: {{task}}"
+    delegate: "Delegiere via `Agent(subagent_type=\"<ziel-agent>\", prompt=\"<vollständiger-task-text>\")`. Ersetze `<ziel-agent>` mit dem Agenten-Namen (z.B. `developer`) und `<vollständiger-task-text>` mit der vollständigen Aufgabenbeschreibung."
+    fanout: "FANOUT — Alle Agent()-Aufrufe in EINER Antwort absetzen, dann laufen sie parallel:\n```\nAgent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\nAgent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")\n# Beide Calls in derselben Antwort → parallele Ausführung\n```"
+    parallel_group: "PARALLEL_GROUP — Hintergrund-Tasks mit `run_in_background=True`, Vordergrund-Tasks normal:\n```\nAgent(subagent_type=\"<fg_agent>\", prompt=\"<fg_task>\")\nAgent(subagent_type=\"<bg_agent>\", prompt=\"<bg_task>\", run_in_background=True)\n# Beide Calls in derselben Antwort absetzen\n```"
+    fallback: "Delegiere diese Aufgabe via `Agent(subagent_type=\"orchestrator\", prompt=\"<task>\")` an den Orchestrator."
     bootstrap: "file-based"
     tool_preamble: "true"
     parallel_pattern: "**Parallel-Pattern (konkret):**\n```\n# Vordergrund:\nAgent(subagent_type=\"validator\", prompt=\"DoD-Check für ...\")\n# Gleichzeitig im Hintergrund:\nAgent(subagent_type=\"documenter\", prompt=\"Update CODEBASE_OVERVIEW ...\", run_in_background=True)\n# Dann warten bis Hintergrund fertig, dann:\nAgent(subagent_type=\"git\", prompt=\"Commit und PR erstellen ...\")\n```\n"
@@ -21,10 +25,10 @@ delegation_syntax:
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Opencode:
-    delegate: 'task(subagent_type="{{agent}}", description="{{short_desc}}", prompt="{{task}}")'
-    fanout: "# FANOUT: Multiple task()-Calls in ONE response mean parallel execution:\n{{calls}}"
-    parallel_group: "{{foreground}}\n\n# Parallel:\n{{background}}"
-    fallback: "@orchestrator {{task}}"
+    delegate: "Delegiere via `task(subagent_type=\"<ziel-agent>\", description=\"<kurzbeschreibung>\", prompt=\"<vollständiger-task-text>\")`. Ersetze die Platzhalter entsprechend."
+    fanout: "FANOUT — Alle task()-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\ntask(subagent_type=\"<agent_1>\", description=\"<desc_1>\", prompt=\"<task_1>\")\ntask(subagent_type=\"<agent_2>\", description=\"<desc_2>\", prompt=\"<task_2>\")\n# Alle Calls in derselben Antwort → parallele Ausführung\n```"
+    parallel_group: "PARALLEL_GROUP — Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort:\n```\ntask(subagent_type=\"<agent_fg>\", description=\"<desc>\", prompt=\"<task>\")\ntask(subagent_type=\"<agent_bg>\", description=\"<desc>\", prompt=\"<task>\")\n```"
+    fallback: "@orchestrator <task>"
     bootstrap: "file-based"
     tool_preamble: "true"
     parallel_pattern: "**Parallel-Dispatch (Opencode):**\nFANOUT: Alle N task()-Calls in EINER Antwort-Nachricht. Kein separater Background-Marker.\nPARALLEL_GROUP: Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort.\nBARRIER: Automatisch — die Antwort kommt erst wenn alle Tasks fertig sind.\n\n```\n# FANOUT(3, developer, [\"Fix A\", \"Fix B\", \"Fix C\"]):\ntask(subagent_type=\"developer\", description=\"Fix Bug A\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug B\", prompt=\"...\")\ntask(subagent_type=\"developer\", description=\"Fix Bug C\", prompt=\"...\")\n# Alle drei Calls in derselben Antwort → parallele Ausführung\n# Ergebnisse: task_results als Array [result_A, result_B, result_C]\n```\n\nLimit: Kein hartes Limit. MAX_PARALLEL_AGENTS steuert die Anzahl.\n"
@@ -38,14 +42,14 @@ delegation_syntax:
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Gemini:
-    delegate: 'Rufe den **{{agent}}-Agenten** auf mit der Aufgabe: "{{task}}"'
-    fanout: "Bearbeite folgende unabhängige Aufgaben — die Gemini-Runtime parallelisiert automatisch bei separaten Tool-Calls:\n{{tasks_list}}"
-    parallel_group: "Delegiere diese unabhängigen Teilaufgaben — Gemini führt sie automatisch parallel aus:\n{{tasks_list}}"
-    fallback: "Bearbeite folgende Aufgabe selbst, mit höchster Sorgfalt: {{task}}"
+    delegate: "Rufe den **<ziel-agent>-Agenten** auf mit der Aufgabe: \"<vollständiger-task-text>\". Ersetze `<ziel-agent>` und `<vollständiger-task-text>` entsprechend."
+    fanout: "Bearbeite folgende unabhängige Aufgaben — die Gemini-Runtime parallelisiert automatisch bei separaten Tool-Calls:\n1. <task_1> → <agent_1>\n2. <task_2> → <agent_2>"
+    parallel_group: "Delegiere diese unabhängigen Teilaufgaben — Gemini führt sie automatisch parallel aus:\n1. <task_1> → <agent_1>\n2. <task_2> → <agent_2>"
+    fallback: "Bearbeite folgende Aufgabe selbst, mit höchster Sorgfalt: <task>"
     bootstrap: "api-define_subagent"
     bootstrap_sequence:
       - type: "api_call"
-        template: 'define_subagent(name="{{name}}", description="{{description}}", system_prompt="{{prompt}}")'
+        template: 'define_subagent(name="<name>", description="<description>", system_prompt="<prompt>")'
     tool_preamble: "false"
     auto_parallel: true
     parallel_pattern: "**Parallel-Pattern (konkret):**\nGemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\nDelegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
@@ -59,10 +63,10 @@ delegation_syntax:
       FANOUT mit gleichem target: batch:true, payload als Array.
 
   Continue:
-    delegate: "@{{agent}} {{task}}"
-    fanout: "Führe folgende Aufgaben nacheinander aus (Continue unterstützt keine parallele Subagent-Ausführung):\n{{tasks_list}}"
-    parallel_group: "Führe folgende Aufgaben nacheinander aus:\n{{tasks_list}}"
-    fallback: "@orchestrator {{task}}"
+    delegate: "@<ziel-agent> <vollständiger-task-text>"
+    fanout: "Führe folgende Aufgaben nacheinander aus (Continue unterstützt keine parallele Subagent-Ausführung):\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
+    parallel_group: "Führe folgende Aufgaben nacheinander aus:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
+    fallback: "@orchestrator <task>"
     bootstrap: "config-based"
     bootstrap_sequence:
       - type: "config_update"
@@ -88,10 +92,10 @@ delegation_syntax:
       Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
 
   Copilot:
-    delegate: "@{{agent}} Führe folgende Aufgabe aus: {{task}}"
-    fanout: "Bearbeite diese Aufgaben der Reihe nach:\n{{tasks_list}}"
-    parallel_group: "Bearbeite diese Aufgaben:\n{{tasks_list}}"
-    fallback: "Bearbeite: {{task}}"
+    delegate: "@<ziel-agent> Führe folgende Aufgabe aus: <vollständiger-task-text>"
+    fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
+    parallel_group: "Bearbeite diese Aufgaben:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
+    fallback: "Bearbeite: <task>"
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false

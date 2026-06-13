@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-07 (A2A-Status auf Vollständig aktualisiert)
+> Letzte Aktualisierung: 2026-06-12 (Orchestrator v3.22.0, 3-Tier-Developer, PAL-Engine-Fix, Delegation-Syntax-Laufzeit-Platzhalter)
 
 ---
 
@@ -392,14 +392,54 @@ Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-sp
 
 ---
 
+## 2.5 3-Tier-Developer-System (v2026-06-12)
+
+Das System wurde vollständig in Orchestrator und Templates integriert. Drei spezialisierte Developer-Agenten mit Eskalations- und De-Eskalations-Protokoll:
+
+### Tier-Übersicht
+
+| Tier | Agent | Modell | Einsatz | Signale | Eskaliert zu |
+|------|-------|--------|--------|---------|--------------|
+| `fast` | `junior-developer` | Günstiger/Fast | Trivialer Fix ≤2 Dateien, offensichtliche Lösung | Typo, Off-by-one, Config-Wert, Logging, Boilerplate-nach-Vorlage | `developer` ODER `senior-developer` |
+| `balanced` | `developer` | Balanced | Standard-Implementierung, klarer Scope | Feature mit Pattern, normaler Bugfix, ≤3 Dateien | `senior-developer` (bei Scope-Überschreitung) |
+| `max` | `senior-developer` | Powerful/Max | Architektur-Impact, Risiko, unklare Ursache | API/Schema-Änderung, Cross-Cutting-Refactoring, Race Condition, Security, Performance | Keine (end-of-line) |
+
+### Eskalations-Protokoll
+
+Wenn Developer mit `ESCALATE`-Card antwortet (`reason`, `recommended_tier`, `findings`, `partial_work`):
+
+1. KEINE Rückfrage an User → sofort an `recommended_tier` neu dispatchen
+2. `findings` in `payload.ctx` des neuen Handoffs übernehmen (Context-Overhead sparen)
+3. `trace_parent` auf ursprüngliche `handoff_id` setzen
+4. **Maximal 1 Eskalation pro Task** — eskaliert auch Stufe 2, geht zum User
+
+### De-Eskalation
+
+Falls `senior-developer` ein Ergebnis mit `de_escalation_hint: <tier>` liefert, merkt Orchestrator sich das Muster für künftiges Routing ähnlicher Tasks.
+
+### Routing-Entscheidung im Orchestrator
+
+Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
+- Trivialer Fix → `junior-developer` (fast)
+- Komplexe Implementierung/Architektur-Impact/schwieriger Bug → `senior-developer` (max)
+- Standard → `developer` (balanced, default)
+
+**Entscheidungsregeln:**
+- Im Zweifel zwischen zwei Stufen → höhere wählen (Fehlrouting nach unten kostet Eskalations-Runde)
+- Batch gleichartiger Trivial-Tasks → FANOUT auf `junior-developer`
+
+---
+
 ## 3. Agent-Templates (1-generic)
 
 ### Nicht-SE Agenten (Bestand)
 
 | Datei | Version | Tools | Kurzbeschreibung |
 |-------|---------|-------|-----------------|
-| `orchestrator.md` | 3.12.0 | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben |
+| `orchestrator.md` | 3.22.0 | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben; Pre-Delegation Gate, BARRIER Protocol, Error-Recovery Matrix, In-Context Tracker, Delegation-Syntax mit Laufzeit-Platzhaltern |
 | `developer.md` | 2.0.1 | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
+| `junior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Fast-Tier: triviale Fixes ≤2 Dateien, kein Design nötig |
+| `senior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Max-Tier: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs |
 | `tester.md` | — | read, write, run_command | TDD, Test-Suite, Testabdeckung |
 | `validator.md` | 2.0.1 | read, run_command | Code gegen REQs prüfen, DoD-Check |
 | `documenter.md` | — | read, write, edit, glob, grep | CODEBASE_OVERVIEW, ARCHITECTURE, README |
@@ -407,7 +447,7 @@ Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-sp
 | `git.md` | 2.2.0 | run_command | Commits, Branches, Tags, Push/Pull |
 | `release.md` | — | read, write, run_command | Versioning, Changelog, GitHub Release |
 | `ideation.md` | — | read, write, ask_question | Neue Ideen explorieren |
-| `feature.md` | — | read, write, edit, glob, grep | Feature-Lifecycle-Subagent |
+| `feature.md` | 1.8.0 | read, write, edit, glob, grep | Feature-Lifecycle-Subagent; A2A-Envelope Integration, standardisiertes Context-Handoff |
 | `agent-meta-manager.md` | 1.9.0 | read, write, edit, glob, grep | agent-meta verwalten |
 | `agent-meta-scout.md` | — | read, write, glob, grep | Ökosystem scouten |
 | `security-auditor.md` | — | read, run_command | Sicherheits-Audit |
@@ -657,6 +697,28 @@ se-cascade:
 - Robustes Cross-Process File-Locking mit Exponential Backoff gegen Windows `PermissionError`
 - Explizites Handshake-Tracking via `task_id`/`caller`/`target` für lückenlose Delegationspfade
 
+### `scripts/lib/pipelines.py`
+
+**Zweck:** Quality Pipeline Configuration Management — definiert Execution-Modes (sequential/loop/parallel_group) und Pipeline-Strukturen.
+
+**Neue Features (v2026-06-12):**
+- **Execution-mode Headers:** Jede Pipeline-Definition erhält einen Ausführungsmodus mit Wait/Check-Cues pro Schritt
+  - `sequential`: Schritte nacheinander, warten bis fertig
+  - `loop`: Generator → Critic → Feedback → Generator (max N Iterationen)
+  - `parallel_group`: Mehrere unabhängige Agenten parallel mit BARRIER
+- **Pipeline Loading:** `load_quality_pipelines()` liest `config/role-defaults.yaml` → `quality_pipelines` Sektion
+- **Overrides Management:** `apply_overrides()` merged base pipelines mit projekt-spezifischen Overrides aus `.meta-config/project.yaml` → `quality-pipelines` Sektion
+- **Validation:** `validate_pipelines()` prüft Agent-Existenz, Loop-Definitionen, Circular-Orchestration-Prevention
+
+**Exportierte API:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `load_quality_pipelines` | `(agent_meta_root: str) → dict` | Lädt `config/role-defaults.yaml` → `quality_pipelines` |
+| `load_pipeline_overrides` | `(config_path: str) → dict` | Lädt `.meta-config/project.yaml` → `quality-pipelines` |
+| `apply_overrides` | `(base: dict, overrides: dict) → dict` | Merged base+overrides, Stage-Level-Merging unterstützt |
+| `validate_pipelines` | `(pipelines: dict, available_roles: list) → list[str]` | Validiert Agent-Existenz, Loop-Definition, Circular-Checks |
+
 ### `scripts/lib/delegation_syntax.py` & `scripts/lib/bootstrap.py`
 
 **Zweck:** Provider Abstraction Layer (PAL) — syntaktische Isolation generischer Templates.
@@ -669,31 +731,39 @@ se-cascade:
 
 Der Provider Abstraction Layer (PAL) isoliert generische Agent-Templates von provider-spezifischer Delegationssyntax. Er verhindert "Syntax Leaks" und handhabt provider-spezifische Bootstrap-Mechanismen.
 
-### 9.1 `config/delegation-syntax.yaml`
+### 9.1 `config/delegation-syntax.yaml` — Provider-Delegation Syntax Registry
 
-**Zweck:** Registry die abstrakte `{{PAL_*}}` Platzhalter auf provider-native Delegationssyntax mappt.
+**Zweck:** Registry die abstrakte `{{PAL_*}}` Platzhalter auf provider-native Delegationssyntax mappt. Neu: Laufzeit-Platzhalter verwenden `<angle-brackets>` statt `{{}}` um LLM-Verwirrung bei Template-Substitution zu vermeiden.
+
+**Root-Cause Bug (Issue #277):** LLM bei Runtime interpretierten `{{agent}}`/`{{task}}`/`{{calls}}`/`{{foreground}}`/`{{background}}` als ungelöste sync.py-Platzhalter → weigerte sich zu delegieren. **Fix:** Umgestellt auf `<angle-brackets>` — die LLM konkret mit Agenten-Namen und Task-Text füllt.
 
 **Struktur:**
 ```yaml
 delegation_syntax:
   <Provider>:
-    delegate: '<native syntax mit {{agent}} und {{task}}>'
+    delegate: '<native syntax mit <ziel-agent> und <vollständiger-task-text>>'
     fanout: '<parallel execution instruction>'
     parallel_group: '<mixed agent parallel instruction>'
     fallback: '<fallback instruction>'
     bootstrap: 'file-based | api-based | config-based'
     tool_preamble: true | false
+    handoff: '<A2A-Envelope-Instruktion mit <quelle> <ziel> <schema-uri>>'
 ```
 
-**Platzhalter-Mapping:**
+**PAL-Platzhalter-Mapping (Compile-Zeit):**
 
-| PAL-Platzhalter | YAML-Key | Bedeutung |
-|-----------------|----------|-----------|
-| `{{PAL_DELEGATE}}` | `delegate` | Native Agent-Delegationssyntax |
-| `{{PAL_FANOUT}}` | `fanout` | Parallele Ausführung gleicher Agenten |
-| `{{PAL_PARALLEL_GROUP}}` | `parallel_group` | Parallele Ausführung verschiedener Agenten |
-| `{{PAL_FALLBACK}}` | `fallback` | Fallback bei nicht verfügbaren Tool-Calls |
-| `{{PAL_TOOL_PREAMBLE}}` | `tool_preamble` | Tool-Auflistung im Agent-Template |
+| PAL-Platzhalter | YAML-Key | Laufzeit-Form | Bedeutung |
+|-----------------|----------|---------------|-----------|
+| `{{PAL_DELEGATE}}` | `delegate` | `<ziel-agent>`, `<vollständiger-task-text>` | Native Agent-Delegationssyntax |
+| `{{PAL_FANOUT}}` | `fanout` | `<agent_1>`, `<task_1>`, `<agent_2>`, `<task_2>` | Parallele Ausführung gleicher Agenten |
+| `{{PAL_PARALLEL_GROUP}}` | `parallel_group` | `<fg_agent>`, `<fg_task>`, `<bg_agent>`, `<bg_task>` | Parallele Ausführung verschiedener Agenten |
+| `{{PAL_FALLBACK}}` | `fallback` | `<task>` | Fallback bei nicht verfügbaren Tool-Calls |
+| `{{PAL_HANDOFF}}` | `handoff` | `<quelle>`, `<ziel>`, `<schema-uri>`, `<parent-HOFF>` | A2A-Envelope-Strukturierung |
+| `{{PAL_TOOL_PREAMBLE}}` | `tool_preamble` | — | Tool-Auflistung im Agent-Template |
+
+**Kritische Änderung v2 (2026-06-12):**
+- Alte Syntax: `{{agent}}`, `{{task}}` → Verwirrung bei LLM
+- Neue Syntax: `<agent>`, `<task>` → LLM erkennt korrekt als Platzhalter für Laufzeit-Substitution
 
 ### 9.2 `config/provider-capabilities.yaml`
 
@@ -748,18 +818,22 @@ PLACEHOLDERS = {
     "PAL_FANOUT": "fanout",
     "PAL_PARALLEL_GROUP": "parallel_group",
     "PAL_FALLBACK": "fallback",
+    "PAL_HANDOFF": "handoff",
     "PAL_TOOL_PREAMBLE": "tool_preamble",
 }
 ```
 
-**Flow:**
+**Flow (überarbeitete Reihenfolge nach Issue #284-286):**
 ```
-1. _compose_agent() ruft DelegationSyntaxEngine.apply(content, provider) auf
-2. Engine lädt delegation-syntax.yaml (lazy, einmalig)
-3. Für jeden PAL-Platzhalter: Regex-Substitution mit provider-spezifischer Syntax
-4. Verbleibende {{PAL_*}} Placeholder werden entfernt (no-op für diesen Provider)
-5. PAL_PREFIX: Marker-Zeilen werden entfernt
-6. Return: bereinigter Content mit nativer Provider-Syntax
+1. Template wird eingelsen, Platzhalter identifiziert
+2. {{#if PAL_*}}-Blöcke werden ZUERST evaluiert (VOR strip_inactive_conditional_blocks)
+   → behebt Bug wo inaktive PAL-Blöcke fälschlicherweise entfernt wurden
+3. _compose_agent() ruft DelegationSyntaxEngine.apply(content, provider) auf
+4. Engine lädt delegation-syntax.yaml (lazy, einmalig)
+5. Für jeden PAL-Platzhalter: Regex-Substitution mit provider-spezifischer Syntax
+6. Verbleibende {{PAL_*}} Placeholder werden entfernt (no-op für diesen Provider)
+7. PAL_PREFIX: Marker-Zeilen werden entfernt
+8. Return: bereinigter Content mit nativer Provider-Syntax
 ```
 
 ### 9.5 `scripts/lib/bootstrap.py`

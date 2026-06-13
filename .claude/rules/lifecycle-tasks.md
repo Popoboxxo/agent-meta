@@ -35,8 +35,8 @@ lifecycle-triggers:
     - agent: documenter
       task: "Update CODEBASE_OVERVIEW.md and ARCHITECTURE.md for this release."
   on-merge:
-    - agent: validator
-      task: "Quick DoD check for merged changes."
+    - agent: code-reviewer
+      task: "Post-Merge Blast-Radius-Analyse: Prüfe betroffene Code-Pfade auf Clean-Code-Verletzungen."
 ```
 
 ## Wenn keine Tasks offen sind

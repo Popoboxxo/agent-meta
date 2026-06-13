@@ -140,7 +140,7 @@ def sync_rules(
     Stale agent-meta-managed rules (tracked in <rules_dir>/.agent-meta-managed) are removed.
     """
     from .platform import substitute_platform
-    from .config import substitute
+    from .config import substitute, strip_inactive_conditional_blocks
 
     pc = (provider_config or {}).get(provider, {})
     provider_vars = {
@@ -191,6 +191,7 @@ def sync_rules(
         rel_source = f"rules/{layer}/{source_path.name}"
 
         source_content = substitute(source_content, merged_vars, rel_source, log)
+        source_content = strip_inactive_conditional_blocks(source_content, merged_vars)
 
         if platform_vars is not None:
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)

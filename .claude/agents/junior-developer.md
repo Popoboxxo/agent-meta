@@ -1,6 +1,6 @@
 ---
 name: junior-developer
-version: 1.0.0
+version: 1.1.0
 description: 'Schnelle, klar umrissene Code-Änderungen: 1-2 Dateien, kein Architektur-Impact.
   Eskaliert strukturiert sobald der Scope wächst.'
 hint: 'Low-Tier-Developer: triviale Fixes, Typos, kleine klar umrissene Änderungen
@@ -113,22 +113,11 @@ Falls `.claude/snippets/` existiert: Lies sie jetzt sofort mit dem Read-Tool und
 <section name="a2a-handoff-eingehende-tasks">
 ## A2A Handoff — Eingehende Tasks
 
-Du kannst Tasks vom Orchestrator als strukturiertes A2A-Envelope (JSON) erhalten
-(`schema_ref: schemas/handoffs/task-spec.schema.json`, `target_agent: junior-developer`).
-
-**Extraktion:**
-- `payload.t` → Task-Beschreibung (DEINE Hauptaufgabe)
-- `payload.ctx` → Kontext (bestehende Systeme, Constraints)
-- `payload.con[]` → Harte Randbedingungen (MÜSSEN eingehalten werden)
-- `payload.refs[]` → Referenzen (Dateien die du lesen solltest)
-- `payload.pri` → Priorität (low/medium/high/critical)
-
-**Batch-Mode:** Wenn `batch: true`, ist `payload` ein Array — bearbeite sequentiell, identifiziere über `batch_task_id`. Batch-Tasks sind dein Kernfall (viele kleine gleichartige Änderungen).
-
-**Fallback:** Ohne Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen.
+Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere aus `payload`: `t` (Hauptaufgabe), `ctx`, `con[]` (harte Constraints), `refs[]`, `pri`.
+`batch: true` → `payload` ist ein Array (dein Kernfall: viele kleine gleichartige Änderungen), sequentiell via `batch_task_id`.
+Kein Envelope → Aufgabe normal ausführen.
 
 ---
-
 </section>
 <section name="donts">
 ## Don'ts
@@ -215,15 +204,19 @@ git branch --show-current
 
 Auf `main`/`master` → Branch anlegen: `feat/<thema>` | `fix/<thema>` | `refactor/<thema>`
 
+Auf anderem Branch → weiterarbeiten (Branch existiert bereits).
+
+Bei detached HEAD oder leerem Branch-Namen → **stoppe** und frage den User nach dem Ziel-Branch. Keinen Branch raten.
+
 </section>
 <section name="branch-pflicht-wenn">
 ## Branch PFLICHT wenn
 
-- Mehr als eine Datei geändert
+- Zwei oder mehr Dateien betroffen (tracked files im working tree, inkl. neuer Dateien)
 - Inhaltliche Änderung an Templates, Rules, Scripts
 - GitHub Issue bearbeitet
 
-**Faustregel: >1 Datei anfassen → Branch.**
+**Faustregel: Änderung betrifft ≥2 Dateien ODER berührt agents/, rules/, hooks/, scripts/, config/ → Branch.**
 
 </section>
 <section name="direkt-auf-main-erlaubt-ausnahmen">

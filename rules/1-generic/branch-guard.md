@@ -10,13 +10,17 @@ git branch --show-current
 
 Auf `main`/`master` → Branch anlegen: `feat/<thema>` | `fix/<thema>` | `refactor/<thema>`
 
+Auf anderem Branch → weiterarbeiten (Branch existiert bereits).
+
+Bei detached HEAD oder leerem Branch-Namen → **stoppe** und frage den User nach dem Ziel-Branch. Keinen Branch raten.
+
 ## Branch PFLICHT wenn
 
-- Mehr als eine Datei geändert
+- Zwei oder mehr Dateien betroffen (tracked files im working tree, inkl. neuer Dateien)
 - Inhaltliche Änderung an Templates, Rules, Scripts
 - GitHub Issue bearbeitet
 
-**Faustregel: >1 Datei anfassen → Branch.**
+**Faustregel: Änderung betrifft ≥2 Dateien ODER berührt agents/, rules/, hooks/, scripts/, config/ → Branch.**
 
 ## Direkt auf main erlaubt (Ausnahmen)
 

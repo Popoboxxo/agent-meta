@@ -466,7 +466,7 @@ def _collect_embedded_rules_md(
     Used to embed rules into AGENTS.md for providers without a native rules directory
     (e.g. opencode). Respects `opencode: skip` rule option and speech-mode config.
     """
-    from .config import substitute
+    from .config import substitute, strip_inactive_conditional_blocks
     from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
 
     pc = (provider_config or {}).get(provider, {})
@@ -476,6 +476,7 @@ def _collect_embedded_rules_md(
         'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
         'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
         'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
+        'AGENTS_DIR': pc.get('agents_dir', '.claude/agents'),
     }
     merged_vars = {**variables, **provider_vars}
 
@@ -505,6 +506,7 @@ def _collect_embedded_rules_md(
         content = source_path.read_text(encoding='utf-8')
         rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
         content = substitute(content, merged_vars, rel_source, log)
+        content = strip_inactive_conditional_blocks(content, merged_vars)
         body = _strip_rule_frontmatter(content).strip()
         if body:
             sections.append(body)
@@ -536,10 +538,21 @@ def _build_opencode_managed_block(
     """Build the managed block for AGENTS.md: agent hints + all embedded rules."""
     from .config import substitute
 
-    template = _load_claude_md_managed_template(agent_meta_root)
-    managed = substitute(template, variables, 'AGENTS.md managed block', log)
+    provider_dirs = {
+        "Claude": ".claude/agents",
+        "Opencode": ".opencode/agents",
+        "Gemini": ".gemini/agents",
+        "Continue": ".continue/agents",
+        "Copilot": ".github/copilot/agents",
+    }
+    local_vars = dict(variables)
+    if provider in provider_dirs:
+        local_vars["AGENTS_DIR"] = provider_dirs[provider]
 
-    rules_md = _collect_embedded_rules_md(agent_meta_root, config, variables, log,
+    template = _load_claude_md_managed_template(agent_meta_root)
+    managed = substitute(template, local_vars, 'AGENTS.md managed block', log)
+
+    rules_md = _collect_embedded_rules_md(agent_meta_root, config, local_vars, log,
                                             provider=provider, provider_config=provider_config)
     if rules_md:
         managed = managed.replace(

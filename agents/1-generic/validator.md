@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "3.2.0"
+version: "3.3.0"
 description: "Formaler Prozess-Wächter: DoD-Checkboxen, REQ-ID-Präsenz, Commit-Konventionen. Bewertet KEINE Code-Qualität — dafür code-reviewer."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
@@ -228,41 +228,19 @@ Prüfe Konsistenz zwischen Dokumenten:
 - Dokumentation veraltet? → Verweise an `documenter`
 - Code-Qualität prüfen? → Verweise an `code-reviewer` (nicht selbst prüfen!)
 
+{{#if A2A_PROTOCOL_ENABLED}}
 ## A2A Handoff — validate_handoff
 
-Wenn du einen eingehenden A2A-Envelope erhältst, validiere ihn VOR der inhaltlichen Prüfung:
+Eingehenden A2A-Envelope VOR der inhaltlichen Prüfung validieren:
 
-### Validierungs-Checkliste
+1. Pflichtfelder: `protocol_version` (= `1.0.0`), `handoff_id` (Regex `^HOFF-\d{8}-\d{3,6}$`), `source_agent`, `target_agent`, `payload`
+2. `schema_ref` (falls gesetzt): referenzierte Schema-Datei muss existieren
+3. `payload`: Object (oder Array wenn `batch: true`); `trace_parent` (falls gesetzt): Format wie handoff_id
 
-1. **Pflichtfelder prüfen:** `protocol_version`, `handoff_id`, `source_agent`, `target_agent`, `payload`
-2. **handoff_id-Format:** `HOFF-YYYYMMDD-NNN` (Regex: `^HOFF-\d{8}-\d{3,6}$`)
-3. **protocol_version:** Muss `1.0.0` sein (oder höhere kompatible Version)
-4. **schema_ref:** Wenn gesetzt, prüfe ob die referenzierte Schema-Datei existiert
-5. **payload:** Muss ein Object sein (oder Array wenn `batch: true`)
-6. **trace_parent:** Wenn gesetzt, Format wie handoff_id prüfen
+Rückgabe: `{"valid": bool, "handoff_id": "...", "errors": [{"field","message"}], "warnings": [...]}`
+Kein Envelope (Natural-Language) → Aufgabe normal ausführen, Warning: "Kein A2A-Envelope — Natural-Language-Fallback".
 
-### Rückgabeformat
-
-```json
-{
-  "valid": true|false,
-  "handoff_id": "HOFF-...",
-  "errors": [
-    {"field": "handoff_id", "message": "Format nicht eingehalten"},
-    {"field": "payload", "message": "Fehlt (Pflichtfeld)"}
-  ],
-  "warnings": [
-    {"field": "schema_ref", "message": "Schema-Datei nicht gefunden, fahre ohne Validierung fort"}
-  ]
-}
-```
-
-### Fallback
-
-Wenn kein Envelope empfangen wurde (Natural-Language-Prompt):
-- Führe die Aufgabe normal aus
-- Gib einen Warning-Hinweis: "Kein A2A-Envelope empfangen — Natural-Language-Fallback"
-
+{{/if}}
 ## Anti-Recursion Guard
 
 **Du bist ein Worker-Agent.** Du implementierst, analysierst oder prüfst selbst.

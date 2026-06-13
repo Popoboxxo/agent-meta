@@ -1,6 +1,6 @@
 ---
 name: ideation
-version: 1.4.0
+version: 1.5.0
 description: Ideenfindung, Visions-Schärfung und Konzept-Konkretisierung — stellt
   Fragen, denkt Ecken, übergibt reife Ideen an Requirements.
 hint: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
@@ -117,43 +117,10 @@ Risiken:         [Was könnte problematisch werden?]
 
 Wenn die Idee konkret genug ist (Kernidee klar, Scope v1 definiert, keine offenen Blockerfragen):
 
-**Übergabe als A2A-Envelope:**
-
-```json
-{
-  "protocol_version": "1.0.0",
-  "handoff_id": "HOFF-YYYYMMDD-NNN",
-  "source_agent": "ideation",
-  "target_agent": "requirements",
-  "schema_ref": "schemas/handoffs/task-spec.schema.json",
-  "payload": {
-    "t": "[Kernidee als Ein-Satz-Task]",
-    "ctx": "[Kontext: Codebase, bestehende Systeme, Rahmenbedingungen]",
-    "pri": "[medium|high|critical]",
-    "ci": "[Kernidee — was soll der Nutzer können?]",
-    "g": "[Ziel — wer profitiert, was ändert sich?]",
-    "sv1": {
-      "ins": ["Scope v1: Mindestanforderungen"],
-      "oos": ["Scope v2+: Ausblick"]
-    },
-    "oq": ["Offene Fragen — was ist noch unklar?"],
-    "ref": ["Referenzen auf bestehende Dateien, Issues oder externe Quellen"]
-  },
-  "requires_human_approval": false
-}
-```
-
-**Payload-Felder (Ideation-Extension):**
-- `ci` (core_idea): Kernidee in einem Satz
-- `g` (goal): Ziel — wer profitiert, was ändert sich?
-- `sv1` (scope_v1): `ins` (in scope) und `oos` (out of scope)
-- `oq` (open_questions): Offene Fragen
-- `ref` (references): URLs oder Dateipfade
-
 **Vor der Übergabe:**
-1. Fasse die Idee strukturiert zusammen (keine REQ-IDs!)
+1. Fasse die Idee strukturiert zusammen (keine REQ-IDs!): Kernidee (1 Satz), Ziel (wer profitiert), Scope v1 (in/out), offene Fragen, Referenzen
 2. Frag den Anwender: "Soll ich das jetzt als strukturierten Handoff an den Requirements-Agenten übergeben?"
-3. Bei Bestätigung: Erstelle den A2A-Envelope und starte `requirements`
+3. Bei Bestätigung: Erstelle einen A2A-Envelope (`source_agent: "ideation"`, `target_agent: "requirements"`, Payload mit `t`/`ctx`/`pri` plus Ideation-Felder `ci`=Kernidee, `g`=Ziel, `sv1`={`ins`,`oos`}, `oq`=offene Fragen, `ref`=Referenzen) und starte `requirements`
 
 ---
 
@@ -266,15 +233,19 @@ git branch --show-current
 
 Auf `main`/`master` → Branch anlegen: `feat/<thema>` | `fix/<thema>` | `refactor/<thema>`
 
+Auf anderem Branch → weiterarbeiten (Branch existiert bereits).
+
+Bei detached HEAD oder leerem Branch-Namen → **stoppe** und frage den User nach dem Ziel-Branch. Keinen Branch raten.
+
 </section>
 <section name="branch-pflicht-wenn">
 ## Branch PFLICHT wenn
 
-- Mehr als eine Datei geändert
+- Zwei oder mehr Dateien betroffen (tracked files im working tree, inkl. neuer Dateien)
 - Inhaltliche Änderung an Templates, Rules, Scripts
 - GitHub Issue bearbeitet
 
-**Faustregel: >1 Datei anfassen → Branch.**
+**Faustregel: Änderung betrifft ≥2 Dateien ODER berührt agents/, rules/, hooks/, scripts/, config/ → Branch.**
 
 </section>
 <section name="direkt-auf-main-erlaubt-ausnahmen">

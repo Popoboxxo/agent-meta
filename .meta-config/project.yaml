@@ -10,6 +10,7 @@ provider-isolation: disabled
 
 ai-providers:
   - Claude
+  - Opencode
 
 
 
@@ -213,8 +214,9 @@ max-parallel-agents: 4
 # Orchestrator-First Architecture (Beta v3.0.0)
 # Steuert das Verhalten des Orchestrator-Delegations-Systems.
 orchestrator:
-  enabled: true        # true = Orchestrator aktiv, false = Main-Chat-Modus
-  strict: true         # true = Immer delegieren, false = Fallback erlaubt
+  enabled: true                  # true = Orchestrator aktiv, false = Main-Chat-Modus
+  strict: true                   # true = Immer delegieren, false = Fallback erlaubt
+  direct-dispatch-enabled: true  # true = Direkter Dispatch für atomare Ops erlaubt, false = ALLES über Orchestrator
   unknown-fallback:
     meta-feedback: true   # Send anonymized feedback to agent-meta
     main-chat: true       # Allow main chat to handle the task
@@ -272,21 +274,7 @@ quality-pipelines:
             max_iterations: 5
     se-cascade:
       enabled: false
-  custom-pipelines:
-    security-hotfix:
-      stages:
-        - id: detect
-          agent: security-auditor
-          task: "Vulnerability analysieren"
-          mode: sequential
-        - id: fix
-          agent: developer
-          task: "Fix implementieren"
-          mode: sequential
-        - id: verify
-          agent: tester
-          task: "Regression-Tests"
-          mode: sequential
+  custom-pipelines: {}
 
 model-overrides:
   Opencode:

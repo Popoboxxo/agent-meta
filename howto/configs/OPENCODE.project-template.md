@@ -5,6 +5,8 @@
 <!-- agent-meta:managed-begin -->
 <!-- agent-meta:managed-end -->
 
+> **Hinweis:** Pfade im managed Block (z.B. `.claude/`) beschreiben die agent-meta-Framework-Architektur. Dieses Projekt verwendet `.opencode/` als Laufzeit-Plattform.
+
 ## Agents
 
 Agent files are in `.opencode/agents/`. Invoke them by name in opencode.
