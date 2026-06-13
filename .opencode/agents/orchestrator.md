@@ -38,6 +38,35 @@ Aufwandsschätzung nur durch `effort-estimator`, nie selbst schätzen.
 ---
 
 </section>
+<section name="pipeline-match-check-vor-ad-hoc-zerlegung">
+## Pipeline Match Check (vor Ad-hoc-Zerlegung)
+
+Bevor der Orchestrator eine Aufgabe ad-hoc zerlegt, prüft er ob eine **aktive Quality Pipeline** besser passt.
+
+**Match-Logik:**
+| Aufgaben-Signal | Pipeline |
+|----------------|---------|
+| "Feature implementieren", "neue Funktion", "Feature bauen" | `standard-feature` |
+| "Bug fixen", "Fehler beheben", "quick fix" | `quick-fix` oder `bugfix` |
+| "Bug analysieren", "Triage", "ist das ein Bug?" | `bugfix` |
+| "Refactoring", "umstrukturieren", "aufräumen" | `refactor` |
+| "Dokumentation aktualisieren", "README", "CODEBASE_OVERVIEW" | `docs-update` |
+
+**Ablauf bei Match:**
+1. Orchestrator erkennt Signal → identifiziert passende Pipeline
+2. Bestätigung einholen (KEIN Auto-Run):
+   > "Aufgabe passt zu Pipeline `<name>` (Stages: <stage-sequence>). Diese nutzen oder ad-hoc zerlegen?"
+3. User wählt Pipeline → Orchestrator fährt sie Schritt für Schritt
+4. User wählt "ad-hoc" → normaler Routing-Pfad (Intent-Tabelle)
+
+**Regeln:**
+- Kein Match oder User lehnt ab → Intent-Routing-Tabelle verwenden
+- Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert aktive Pipelines)
+- Deaktivierte Pipelines (.meta-config/project.yaml → quality-pipelines.overrides.<name>.enabled: false) nicht vorschlagen
+
+---
+
+</section>
 <section name="kernprinzip-router-nicht-worker">
 ## Kernprinzip: Router, nicht Worker
 
@@ -382,7 +411,7 @@ Execution mode: loop
 2. task(subagent_type="developer", prompt="Feature implementieren") → warten bis abgeschlossen
 
 **review** — REPEAT_UNTIL Loop:
-  - task(subagent_type="code-reviewer", prompt="Code-Qualität prüfen")
+  - task(subagent_type="developer", prompt="Code schreiben und Review-Feedback einarbeiten")
   Max iterations: 5 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
 3. task(subagent_type="git", prompt="Commit + Push + PR") → warten bis abgeschlossen
@@ -451,7 +480,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-   + Meta-Feedback im Hintergrund
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
