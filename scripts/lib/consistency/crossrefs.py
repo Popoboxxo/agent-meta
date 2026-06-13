@@ -195,6 +195,43 @@ def check_role_defaults_has_generic_source(agent_meta_root: Path) -> list[Findin
     return findings
 
 
+def check_schema_refs(agent_meta_root: Path) -> list[Finding]:
+    """Every "schema_ref" value in an agent source file must point to an existing file.
+
+    Scans agents/1-generic/*.md and agents/2-platform/*.md (NOT generated outputs)
+    for occurrences of `"schema_ref": "<path>"` and reports an ERROR for each path
+    that does not resolve under the agent-meta root.
+    """
+    findings: list[Finding] = []
+    pattern = re.compile(r'"schema_ref"\s*:\s*"([^"]+)"')
+
+    for layer in ("1-generic", "2-platform"):
+        layer_dir = agent_meta_root / "agents" / layer
+        if not layer_dir.exists():
+            continue
+        for md in sorted(layer_dir.glob("*.md")):
+            try:
+                content = md.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            rel_file = str(md.relative_to(agent_meta_root)).replace("\\", "/")
+            for match in pattern.finditer(content):
+                ref = match.group(1)
+                # Skip angle-bracket placeholders like "<schema-uri>" — these are
+                # documentation examples, not real file paths.
+                if ref.startswith("<") and ref.endswith(">"):
+                    continue
+                ref_path = agent_meta_root / ref
+                if not ref_path.exists():
+                    findings.append(Finding(
+                        Severity.ERROR, "crossrefs.schema-ref-missing",
+                        rel_file,
+                        f"schema_ref '{ref}' in {rel_file} does not exist.",
+                        f"Create '{ref}' or fix the schema_ref value.",
+                    ))
+    return findings
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _load_role_names(roles_path: Path) -> set[str]:

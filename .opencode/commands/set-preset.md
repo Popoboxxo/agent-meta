@@ -20,6 +20,9 @@ If $ARGUMENTS is empty:
 > - `off` — neutral, professional tone
 > - `professional` — structured, formal
 > - `submissive` — deferential style ("Wie Ihr wünscht", "Meister")
+> - `business` — formal corporate tone
+> - `bullshit-bingo` — management speak, buzzwords
+> - `linkedin` — LinkedIn influencer style, inspirational
 >
 > "Please type what you want to change, e.g.: `standard` or `speech: off`"
 
@@ -29,10 +32,10 @@ Stop here and wait for input. Do not proceed until the user specifies what to ch
 
 Determine from $ARGUMENTS (or the user's follow-up):
 - Is it a DoD preset? → look for `rapid-prototyping`, `standard`, `strict`
-- Is it a speech mode? → look for `off`, `professional`, `submissive` (with or without `speech:` prefix)
+- Is it a speech mode? → look for `off`, `professional`, `submissive`, `business`, `bullshit-bingo`, `linkedin` (with or without `speech:` prefix)
 - Unknown value:
   > "Unknown option '<value>'. Valid DoD presets: rapid-prototyping, standard, strict.
-  > Valid speech modes: off, professional, submissive."
+  > Valid speech modes: off, professional, submissive, business, bullshit-bingo, linkedin."
   Stop.
 
 **Step 2 — Show current value and confirm**

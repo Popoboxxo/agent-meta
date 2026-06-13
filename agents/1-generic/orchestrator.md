@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.26.0"
+version: "3.27.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -154,17 +154,19 @@ Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher s
 
 ---
 
-## Task Decomposition & Delegation
+## Pre-Delegation Self-Validation Gate
 
-### Pre-Delegation Gate (Pflicht vor jeder Delegation)
-
-Vor jeder Delegation diese 3 Punkte prüfen — ANY "nein" → erst lösen, dann delegieren:
+**Pflicht vor JEDER Delegation** — diese 3 Punkte prüfen, bevor ein Agent beauftragt wird:
 
 1. **Agent passt zum Intent?** (Intent-Routing-Tabelle konsultieren)
-2. **Kein offener Dependency-Konflikt?** (Hängt dieser Task von einem noch laufenden parallelen Task ab?)
+2. **Kein offener Dependency-Konflikt?** (Hängt dieser Task von einem noch laufenden parallelen Task ab? Delegation-Log prüfen)
 3. **Erwartetes Ergebnis konkret genug zu validieren?** (Vages "verbessere X" → erst präzisieren)
 
-→ Alle drei "ja" → Delegation starten
+→ Alle drei "ja" → Delegation starten. ANY "nein" → erst beheben, dann delegieren.
+
+---
+
+## Task Decomposition & Delegation
 
 ### Dispatch-Entscheidung
 
@@ -259,6 +261,8 @@ Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
    - `con`: Constraints (optional)
    - `pri`: Priority (optional, default: medium)
    - `refs`: Referenzen (optional)
+
+   **Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload. Reduziert Token-Overhead, vor allem bei FANOUT.
 4. **Envelope zusammenbauen:**
    ```json
    {
@@ -511,8 +515,8 @@ Fallback (kein Tool-Call): {{PAL_FALLBACK}}.
 <!-- Delegation table auto-generated from config/role-defaults.yaml by sync.py -->
 <!-- Manual changes will be overwritten on next sync. -->
 
-| Agent | Zuständigkeit | Parallel |
-|-------|--------------|----------|
+| Agent | Zuständigkeit | Tier | Parallel |
+|-------|--------------|------|----------|
 {{AGENT_DELEGATION_TABLE}}
 
 Parallel: max. {{MAX_PARALLEL_AGENTS}} Agenten für unabhängige Schritte (∥).

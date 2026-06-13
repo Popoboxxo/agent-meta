@@ -62,17 +62,24 @@ Ein Agent beginnt mit der Aufgabenbearbeitung.
 
 Ein Agent hat seine Aufgabe beendet.
 
-| Feld      | Typ    | Beschreibung                              |
-|-----------|--------|-------------------------------------------|
-| `event`   | string | `agent_end`                               |
-| `ts`      | string | ISO8601 Timestamp                         |
-| `agent`   | string | Name des Agenten.                         |
-| `status`  | string | `success` oder `error`.                   |
-| `payload` | object | Bei `error`: enthält `error`-Nachricht.   |
+| Feld         | Typ     | Beschreibung                                       |
+|--------------|---------|----------------------------------------------------|
+| `event`      | string  | `agent_end`                                        |
+| `ts`         | string  | ISO8601 Timestamp                                  |
+| `agent`      | string  | Name des Agenten.                                  |
+| `status`     | string  | `success` oder `error`.                            |
+| `payload`    | object  | Bei `error`: enthält `error`-Nachricht.            |
+| `tokens_in`  | integer | Optional. Input-Token-Anzahl dieser Ausführung.    |
+| `tokens_out` | integer | Optional. Output-Token-Anzahl dieser Ausführung.   |
 
 **Beispiel (Erfolg):**
 ```json
 {"event":"agent_end","ts":"2026-05-11T14:35:00+00:00","agent":"developer","status":"success"}
+```
+
+**Beispiel (Erfolg mit Tokens):**
+```json
+{"event":"agent_end","ts":"2026-05-11T14:35:00+00:00","agent":"developer","status":"success","tokens_in":1500,"tokens_out":350}
 ```
 
 **Beispiel (Fehler):**

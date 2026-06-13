@@ -132,6 +132,13 @@ Du kannst Tasks als strukturiertes A2A-Envelope (JSON) erhalten. Extrahiere aus 
 `batch: true` → `payload` ist ein Array, sequentiell abarbeiten (`batch_task_id` je Eintrag).
 Kein Envelope (Natural-Language-Prompt) → Aufgabe normal ausführen, gleiche Infos unstrukturiert.
 
+**Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload.
+
+**HITL:** Bei `requires_human_approval: true` im eingehenden Envelope: **VOR jeder Ausführung pausieren** und User fragen:
+> "[Aufgabe aus payload.t]. Soll ich das ausführen? (yes/no)"
+
+Erst nach Bestätigung fortfahren. Bei "no" → Aufgabe abbrechen, Orchestrator informieren.
+
 ---
 
 
