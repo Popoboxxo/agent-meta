@@ -217,6 +217,10 @@ def check_schema_refs(agent_meta_root: Path) -> list[Finding]:
             rel_file = str(md.relative_to(agent_meta_root)).replace("\\", "/")
             for match in pattern.finditer(content):
                 ref = match.group(1)
+                # Skip angle-bracket placeholders like "<schema-uri>" — these are
+                # documentation examples, not real file paths.
+                if ref.startswith("<") and ref.endswith(">"):
+                    continue
                 ref_path = agent_meta_root / ref
                 if not ref_path.exists():
                     findings.append(Finding(

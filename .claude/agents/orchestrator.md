@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 3.26.0
+version: 3.27.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
@@ -139,18 +139,22 @@ Drei Developer-Stufen — wähle die günstigste Stufe, die die Aufgabe sicher s
 ---
 
 </section>
-<section name="task-decomposition-delegation">
-## Task Decomposition & Delegation
+<section name="pre-delegation-self-validation-gate">
+## Pre-Delegation Self-Validation Gate
 
-### Pre-Delegation Gate (Pflicht vor jeder Delegation)
-
-Vor jeder Delegation diese 3 Punkte prüfen — ANY "nein" → erst lösen, dann delegieren:
+**Pflicht vor JEDER Delegation** — diese 3 Punkte prüfen, bevor ein Agent beauftragt wird:
 
 1. **Agent passt zum Intent?** (Intent-Routing-Tabelle konsultieren)
-2. **Kein offener Dependency-Konflikt?** (Hängt dieser Task von einem noch laufenden parallelen Task ab?)
+2. **Kein offener Dependency-Konflikt?** (Hängt dieser Task von einem noch laufenden parallelen Task ab? Delegation-Log prüfen)
 3. **Erwartetes Ergebnis konkret genug zu validieren?** (Vages "verbessere X" → erst präzisieren)
 
-→ Alle drei "ja" → Delegation starten
+→ Alle drei "ja" → Delegation starten. ANY "nein" → erst beheben, dann delegieren.
+
+---
+
+</section>
+<section name="task-decomposition-delegation">
+## Task Decomposition & Delegation
 
 ### Dispatch-Entscheidung
 
@@ -246,6 +250,8 @@ Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`.
    - `con`: Constraints (optional)
    - `pri`: Priority (optional, default: medium)
    - `refs`: Referenzen (optional)
+
+   **Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload. Reduziert Token-Overhead, vor allem bei FANOUT.
 4. **Envelope zusammenbauen:**
    ```json
    {
@@ -538,36 +544,36 @@ Fallback (kein Tool-Call): Delegiere diese Aufgabe via `Agent(subagent_type="orc
 <!-- Delegation table auto-generated from config/role-defaults.yaml by sync.py -->
 <!-- Manual changes will be overwritten on next sync. -->
 
-| Agent | Zuständigkeit | Parallel |
-|-------|--------------|----------|
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen | ❌ (atomar) |
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken | ✅ (Multi-Quellen) |
-| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. | ❌ (sequentiell) |
-| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation | ✅ (Multi-Issues) |
-| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | ❌ (sequentiell) |
-| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit. | ✅ (Multi-Prüfungen) |
-| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | ❌ (sequentiell) |
-| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | ❌ (sequentiell) |
-| `developer` | Feature-Implementierung und Bugfixes | ✅ (Multi-Dateien) |
-| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. | ✅ (Multi-Targets) |
-| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | ✅ (Multi-Sections) |
-| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. | ❌ (sequentiell) |
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. | ✅ (intern) |
-| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung | ❌ (atomar) |
-| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | ❌ (sequentiell) |
-| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen | ❌ (atomar) |
-| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements | ✅ (Multi-Aspekte) |
-| `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert | ✅ (Multi-Tasks) |
-| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor | ✅ (Multi-Quellen) |
-| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen | ❌ (atomar) |
-| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | ❌ (sequentiell) |
-| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max). | ❌ (Meta-Orchestrator) |
-| `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. | ❌ (sequentiell) |
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | ❌ (sequentiell) |
-| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | ❌ (sequentiell) |
-| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings | ✅ (Multi-Tasks) |
-| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | ✅ (Multi-Suites) |
-| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. | ✅ (Multi-Entwürfe) |
+| Agent | Zuständigkeit | Tier | Parallel |
+|-------|--------------|------|----------|
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen | balanced | ❌ (atomar) |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken | balanced | ✅ (Multi-Quellen) |
+| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. | balanced | ❌ (sequentiell) |
+| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation | balanced | ✅ (Multi-Issues) |
+| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit. | powerful | ✅ (Multi-Prüfungen) |
+| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `developer` | Feature-Implementierung und Bugfixes | powerful | ✅ (Multi-Dateien) |
+| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. | fast | ✅ (Multi-Targets) |
+| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | fast | ✅ (Multi-Sections) |
+| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. | fast | ❌ (sequentiell) |
+| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. | — | ✅ (intern) |
+| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung | fast | ❌ (atomar) |
+| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen | fast | ❌ (atomar) |
+| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements | — | ✅ (Multi-Aspekte) |
+| `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert | fast | ✅ (Multi-Tasks) |
+| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor | balanced | ✅ (Multi-Quellen) |
+| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen | fast | ❌ (atomar) |
+| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max). | balanced | ❌ (Meta-Orchestrator) |
+| `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. | powerful | ❌ (sequentiell) |
+| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | balanced | ❌ (sequentiell) |
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | balanced | ❌ (sequentiell) |
+| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings | max | ✅ (Multi-Tasks) |
+| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | balanced | ✅ (Multi-Suites) |
+| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. | balanced | ✅ (Multi-Entwürfe) |
 
 Parallel: max. 4 Agenten für unabhängige Schritte (∥).
 Nicht parallel: tester↔developer, code-reviewer→git, requirements→tester.

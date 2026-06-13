@@ -1,6 +1,6 @@
 ---
 name: feature
-version: 1.9.0
+version: 1.9.3
 description: 'Vollständiger Feature-Lifecycle: Branch → Requirements → TDD → Implementierung
   → Validierung → Commit → PR.'
 hint: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird
@@ -70,6 +70,13 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 **Eingehend:** Tasks kommen als A2A-Envelope (JSON) vom Orchestrator. Extrahiere `payload.t` (Feature), `payload.ctx` (Kontext), `payload.pri`, `payload.con[]`, `payload.refs[]`.
 
+**Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep` — statt ausgeschriebener Feldnamen im payload.
+
+**HITL:** Bei `requires_human_approval: true` im eingehenden Envelope: **VOR jeder Ausführung pausieren** und User fragen:
+> "[Aufgabe aus payload.t]. Soll ich das ausführen? (yes/no)"
+
+Erst nach Bestätigung fortfahren. Bei "no" → Aufgabe abbrechen, Orchestrator informieren.
+
 **Ausgehend:** Jede Delegation an Sub-Agenten als A2A-Envelope: `source_agent: "feature"`, `trace_parent` auf eigene `handoff_id` (PIPELINE-Chain), `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator.
 </section>
 <section name="kontext-format-pflicht-bei-jeder-delegation">
@@ -84,9 +91,14 @@ CONTEXT:
 CONSTRAINTS:
   - Nicht anfassen: <Dateien falls zutreffend>
   - Muss verwenden: <Pattern/Standard falls vorgeschrieben>
+TOOLS/SOURCES: (optional, empfohlen für nicht-triviale Tasks)
+  - Primary tools: <Bash, Read, Write, etc.>
+  - Primary sources: <Dateien, Verzeichnisse, Schemas>
+  - Avoid: <Tools oder Quellen die übersprungen werden sollen>
 EXPECTED_OUTPUT:
   - <konkret messbares Ergebnis>
 ```
+Felder weglassen wenn nicht zutreffend — Pflicht: `TASK` + `EXPECTED_OUTPUT`. `TOOLS/SOURCES` optional, verhindert Tool-Drift.
 
 ---
 
