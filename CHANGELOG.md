@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.58.0] — 2026-06-14
+
 ### Added
 
 - **Framework-wide conditional A2A (token optimization)**: the A2A Handoff Protocol is now gated behind `A2A_PROTOCOL_ENABLED` across **all** agents (orchestrator, developer, junior/senior-developer, validator, feature, ideation) — not just the orchestrator. When `orchestrator.handoff.protocol` is `none`/`false`, no generated agent mentions envelopes, `handoff_id`, or `payload` anymore. The per-agent A2A sections were also compacted (e.g. developer 216 → 182 lines, feature 305 → 267, ideation 203 → 174), so even with A2A **on** the agents are leaner. Per-provider verified across all 5 providers: with A2A off the orchestrator drops ~18% (e.g. Claude 481 → 394 lines) while native delegation syntax stays intact.
@@ -10,6 +14,9 @@
 - **PAL conditionals**: `{{#if PAL_*}}...{{/if}}` blocks are now evaluated per provider by the DelegationSyntaxEngine (e.g. the orchestrator Tools section appears only for providers with `tool_preamble: true`).
 - **PAL diagnostics**: missing or unknown PAL placeholder definitions now produce sync warnings instead of being silently removed.
 - **Gemini registration notice**: every generated `.gemini/agents/*.md` starts with a note that the agent must be registered via `define_subagent` (Gemini is API-registered, not file-discovered).
+- **SE export adapter** (`scripts/lib/se_export/`, CLI `scripts/se-export.py`): Markdown output (default) and GitHub Issues (Phase 2 config), with tests.
+- **Orchestrator token-budget tracking** (`orchestrator.handoff.token-budget`, default 10 % session overhead cap).
+- **CI workflow** (`.github/workflows/orchestration-test.yml`): orchestration/runtime tests and template validation.
 
 ### Fixed
 
@@ -17,7 +24,6 @@
 - **Orchestrator Tools section leaked to all providers**: the generic conditional cleanup stripped `{{#if PAL_TOOL_PREAMBLE}}` markers before the PAL engine could evaluate them — PAL substitution now runs first.
 - **Provider names in generic orchestrator**: the Provider-Transport table (Claude/Gemini/... names) violated the provider-agnostic policy — replaced with abstract transport wording (orchestrator 3.21.0).
 - **PAL replacement corruption risk**: replacement strings containing backslash sequences are no longer interpreted as regex group references.
-
 - **UnicodeEncodeError on Windows consoles**: sync.py crashed when printing the sync report on cp1252 terminals — stdout/stderr are now forced to UTF-8.
 - **opencode.json JSONC parsing**: trailing commas and BOM in JSONC settings files broke parsing, silently skipping MCP injection and provider isolation. Shared lenient reader now lives in `lib/io.py`.
 - **Scalar template variables**: YAML scalars (`true`, `20`) in `variables:` crashed substitution with TypeError — values are now coerced to template strings (`"true"`/`"false"` for booleans).
@@ -26,6 +32,8 @@
 
 ### Changed
 
+- **All ~41 generic agent templates condensed**: removed redundancy and dead weight (−1077 source lines); `xml-section-wrapping`, `critical-rules-footer`, and `viz.server` disabled in project.yaml — slimmer generated agents.
+- **Concept documents**: verified implementation status annotated; central `CONCEPT_INVENTORY.md` removed.
 - **Deduplicated sync warnings**: identical warnings (one per provider) are now reported once.
 - **Claude provider switch**: project config moved from Gemini/Opencode to Claude-only output — `.claude/` regenerated (including the `doc-now` and `report-bug` commands), `.gemini/` removed.
 

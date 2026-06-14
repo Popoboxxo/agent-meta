@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.57.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.58.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
