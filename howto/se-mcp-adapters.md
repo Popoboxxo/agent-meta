@@ -27,7 +27,7 @@ JSON-Graph (intern)
 | Phase | Adapter | Status |
 |-------|---------|--------|
 | 1 | Markdown (Default) | MVP — immer verfügbar |
-| 2 | GitHub Issues | Geplant |
+| 2 | GitHub Issues | Umgesetzt |
 | 3 | Jira, Linear, ReqIF | Zukunft |
 
 ---

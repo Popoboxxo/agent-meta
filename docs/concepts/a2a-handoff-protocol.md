@@ -7,6 +7,21 @@
 
 ---
 
+## Implementierungsstatus (verifiziert 2026-06-14)
+
+**Umgesetzt:**
+- 6 Schemas (`schemas/handoffs/`, `schemas/a2a-handoff.schema.json`, SE-Schemas)
+- Orchestrator als Envelope-Fabrik (`agents/1-generic/orchestrator.md` → »A2A Handoff Protocol«)
+- `{{PAL_HANDOFF}}` + Provider-Matrix: JSON für Claude/Opencode/Gemini, YAML-Text-Block-Fallback für Continue/Copilot (`config/delegation-syntax.yaml`, `scripts/lib/delegation_syntax.py`)
+- HITL (`human_approval_required`), Retry (`max_retries`), compact-mode, supersession-tracking (`project.yaml` → `orchestrator.handoff.*`)
+- **Token-Budget-Tracking** (`orchestrator.handoff.token-budget`, Default 10% des Session-Budgets) — Offener Punkt #3 erledigt
+
+**Offen:**
+- Response-Envelopes standardisiert (Offener Punkt #2)
+- MCP-Tools `resolve-handoff-schema`, `validate-handoff` (Phase 4)
+
+---
+
 ## 1. Architektur-Entscheidung: A2A als EINZIGES Schema-Austauschformat
 
 ### 1.1 Prinzip

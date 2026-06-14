@@ -2,6 +2,14 @@
 
 Dieses Dokument beschreibt die Architektur-Überarbeitung des `agent-meta` Logging- und Visualisierungs-Mechanismus.
 
+## Implementierungsstatus (verifiziert 2026-06-14)
+
+**Umgesetzt:**
+- `scripts/viz-logger.py`: CLI + MCP (stdio + HTTP/SSE), `.meta-viz/events.jsonl`
+- Cross-Process-File-Locking: `write_event_safe` (atomares `O_EXCL`-Lockfile + Retry + Cleanup) — nicht nur `threading`
+- Handshake-Tracking: Event-Felder `task_id`, `caller`, `target`, `from`, `to` (`viz-logger.py`)
+- Prompt-Injection via `inject_viz_prompt_block` (`scripts/lib/viz.py`)
+
 ## Problemstellung
 Bislang wurde das Event-Logging der Agenten (`agent_start`, `delegate`, `agent_end`) durch das Injizieren sehr langer, plattformabhängiger Inline-Python-Skripte (`python3 -c "import json,os,sys;..."`) in die System-Prompts realisiert. 
 Dies führte zu:

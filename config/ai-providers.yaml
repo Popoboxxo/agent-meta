@@ -112,15 +112,17 @@ providers:
     # opencode-go model IDs — format: opencode-go/<model-id>
     # Full list: https://opencode.ai/docs/go/
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash   # fast & cheap: batch, throughput
-      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback
-      balanced: opencode-go/qwen3.6-plus        # default workhorse: dev, docs, review
-      powerful: opencode-go/kimi-k2.5           # complex reasoning: architecture, security
-      max:      opencode-go/kimi-k2.6           # maximum capability
+      nano:     opencode-go/deepseek-v4-flash   # cheapest, highest throughput: 31,650 req/5h
+      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback, formatting
+      balanced: opencode-go/qwen3.7-plus        # best cost/performance: $0.40/$1.60, 4,300 req/5h
+      powerful: opencode-go/kimi-k2.6           # strong reasoning: architecture, security
+      max:      opencode-go/kimi-k2.7-code      # best coding model: $0.95/$4.00, 1,350 req/5h
     model-aliases:
-      flash:  opencode-go/deepseek-v4-flash
-      qwen:   opencode-go/qwen3.6-plus
-      kimi:   opencode-go/kimi-k2.6
+      flash:      opencode-go/deepseek-v4-flash
+      qwen:       opencode-go/qwen3.7-plus
+      kimi:       opencode-go/kimi-k2.6
+      kimi-code:  opencode-go/kimi-k2.7-code    # best coding model
+      qwen-max:   opencode-go/qwen3.7-max       # fallback alias, removed from tiers
 
   Continue:
     agents_dir: .continue/agents

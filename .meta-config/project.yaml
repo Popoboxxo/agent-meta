@@ -194,6 +194,21 @@ se-export:
   type: markdown
   output_dir: docs/se
 
+# GitHub Issues variant (Phase 2) — uncomment and adjust to use:
+# se-export:
+#   type: github_issues
+#   repo: "my-org/my-project"
+#   milestone: "v1.0"
+#   labels:
+#     l1: "se:l1"
+#     l2: "se:l2"
+#     l3: "se:l3"
+#     leaf: "se:leaf"
+#   mapping:
+#     epic: l1
+#     story: l2
+#     sub_task: l3
+
 # Test-Repository — Validierung der generierten Agenten nach Sync
 test-repo:
   enabled: true
@@ -231,40 +246,20 @@ orchestrator:
     max_retries: 3                  # Maximale Retries pro Handoff (Envelope-Feld: max_retries)
     human_approval_required: false  # true = HITL: downstream-Agent pausiert vor Ausführung
     protocol_routing: static        # static = feste Format-Wahl, dynamic = größenbasiert (Payload <1KB→JSON, 1-10KB→YAML, >10KB→Text)
+    token-budget:
+      enabled: true                 # true = Orchestrator trackt A2A-Handoff-Overhead session-weit
+      session_budget: 200000        # Geschätztes Session-Token-Budget (Referenzwert)
+      max_overhead_pct: 10          # Max. % des Session-Budgets für A2A-Overhead (Envelopes)
+      on_exceed: compact            # compact = auf compact-mode wechseln | warn = nur warnen
 
 # Visualisierung — Agenten-Mindmap und Session-Tracking
 viz:
   enabled: false
-  mode: "full"
-  debug: false                # true = A2A-Events in viz loggen (Token-Kosten)
-  a2a_events:                 # Welche A2A-Events loggen? Nur aktiv wenn debug: true
-    handoff_start: true
-    handoff_validated: true
-    handoff_delivered: true
-    handoff_failed: true
-    supersession: true
+  mode: "off"
   event_log: ".meta-viz/events.jsonl"
   report:
     retention_days: 7
     session_timeout_min: 5
-  server:
-    port: 8765
-    timeout_sec: 300
-
-# XML Section Wrapping — wraps Markdown ## sections in XML tags for better LLM parsing
-xml-section-wrapping:
-  enabled: true
-
-# Critical Rules Footer — appends critical rules to end of generated agent files
-critical-rules-footer:
-  enabled: true
-
-# Path-based Contextual Rules — inject rules based on file path patterns
-pathRules:
-  - path: "*.py"
-    rule: "python-conventions"
-    agents:
-      - developer
 
 quality-pipelines:
   overrides:
@@ -280,6 +275,7 @@ quality-pipelines:
 model-overrides:
   Opencode:
     developer: "opencode-go/deepseek-v4-pro"
+    senior-developer: "opencode-go/kimi-k2.7-code"
 
 reflection-pairs:
   overrides:

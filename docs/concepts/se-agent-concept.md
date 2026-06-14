@@ -5,6 +5,19 @@
 
 ---
 
+## Implementierungsstatus (verifiziert 2026-06-14)
+
+**Umgesetzt:**
+- 11 SE-Agenten-Templates (`agents/1-generic/se-*.md`), in `config/role-defaults.yaml` registriert
+- Schemas (`se-decomposition`, `se-orchestrator`), Templates (`SE-STRATEGY`, `SE-FEATURE`), Howtos
+- **SE-Export-Adapter** (`scripts/lib/se_export/`): Markdown (Default) + GitHub-Issues (`gh`-CLI), Factory + CLI `scripts/se-export.py`, Tests `tests/test_se_export.py` (L4 erledigt)
+
+**Offen / bewusste Abweichung:**
+- Auto-Rekursion: kein Self-Spawn durch Termination-Agent — Rekursion läuft über den `orchestrator` (Anti-Recursion-Guard). Design-Entscheidung, kein Bug.
+- Jira-/Linear-/ReqIF-Adapter (Phase 3), Cost-Limits (`max_total_cells`, `cost_limit_eur`)
+
+---
+
 ## Executive Summary
 
 Dieses Konzept beschreibt einen **Systems-Engineering-Modus** für agent-meta: einen autonomen, rekursiven Agenten-Workflow für Model-Based Systems Engineering (MBSE). Das System zerlegt Anwenderbedarfe über **n dynamische Ebenen** mittels eines fraktalen Black-Box→White-Box→Black-Box-Übergangs, bis atomare, umsetzbare Arbeitsaufträge (Software, Hardware, Mechanik) vorliegen.
