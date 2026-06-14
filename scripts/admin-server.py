@@ -570,6 +570,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/agents/hierarchy":
             return self._send_json(self._build_agent_hierarchy())
 
+        if path == "/api/pipelines":
+            return self._send_json(self._read_pipelines())
+
         if path == "/api/agents/templates":
             return self._send_json(self._list_agent_templates())
 
@@ -601,6 +604,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/agent-template/"):
             role = path[len("/api/agent-template/"):]
             return self._write_template(role)
+
+        if path == "/api/pipelines":
+            body = self._read_body()
+            if not isinstance(body, dict) or "pipelines" not in body:
+                raise ValueError("expected JSON body with 'pipelines' field")
+            pipelines = body["pipelines"]
+            if not isinstance(pipelines, dict):
+                raise ValueError("'pipelines' must be an object")
+            result = self._write_pipelines(pipelines)
+            return self._send_json(result)
 
         raise FileNotFoundError(path)
 
@@ -643,11 +656,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _build_agent_hierarchy(self) -> dict:
         """Derive a lightweight role hierarchy directly from
         ``config/role-defaults.yaml``. Falls back to an empty list if the file
-        is missing (project-admin mode without super-admin configs)."""
-        role_defaults_path = self.__class__.root / "config" / "role-defaults.yaml"
-        if not role_defaults_path.exists():
-            role_defaults_path = self.__class__.root / ".agent-meta" / "config" / "role-defaults.yaml"
+        is missing (project-admin mode without super-admin configs).
 
+        Each role entry includes:
+          * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
+            ``permission_mode``
+          * ``description`` — never empty (falls back to template frontmatter
+            ``description`` field if the role-defaults entry is missing/empty)
+          * ``targets`` — list of delegation target role names from
+            ``handoff.target_roles`` (or ``[]`` if not declared)
+        """
+        role_defaults_path = self._role_defaults_path()
         roles: list[dict] = []
         if role_defaults_path.exists():
             with role_defaults_path.open("r", encoding="utf-8") as fh:
@@ -657,16 +676,100 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 for name, attrs in raw.items():
                     if not isinstance(attrs, dict):
                         continue
+                    handoff = attrs.get("handoff") or {}
+                    targets_raw = handoff.get("target_roles") if isinstance(handoff, dict) else None
+                    targets: list[str] = []
+                    if isinstance(targets_raw, list):
+                        targets = [str(t) for t in targets_raw if isinstance(t, str) and t]
+
+                    description = attrs.get("description") or ""
+                    if not description:
+                        description = self._read_template_description(name)
+                    if not description:
+                        description = f"{name} agent (no description)"
+
                     roles.append({
                         "name": name,
-                        "tier": attrs.get("tier") or attrs.get("workflow-tier") or "optional",
+                        "tier": (attrs.get("workflow_tier")
+                                 or attrs.get("tier")
+                                 or attrs.get("workflow-tier")
+                                 or "optional"),
                         "model": attrs.get("model"),
                         "memory": attrs.get("memory"),
                         "parallel": bool(attrs.get("parallel", False)),
-                        "permission_mode": attrs.get("permissionMode"),
-                        "description": attrs.get("description", ""),
+                        "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
+                        "description": description,
+                        "targets": targets,
                     })
         return {"roles": roles, "count": len(roles)}
+
+    def _role_defaults_path(self) -> Path:
+        """Resolve the path to ``role-defaults.yaml`` for either layout."""
+        primary = self.__class__.root / "config" / "role-defaults.yaml"
+        if primary.exists():
+            return primary
+        return self.__class__.root / ".agent-meta" / "config" / "role-defaults.yaml"
+
+    def _read_pipelines(self) -> dict:
+        """Return the ``quality_pipelines`` block from ``role-defaults.yaml``
+        in a stable envelope shape: ``{"pipelines": {...}}``. Returns an empty
+        dict if the file does not exist or the key is absent."""
+        path = self._role_defaults_path()
+        if not path.exists():
+            return {"pipelines": {}}
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        pipelines = data.get("quality_pipelines") or {}
+        if not isinstance(pipelines, dict):
+            pipelines = {}
+        return {"pipelines": pipelines}
+
+    def _write_pipelines(self, pipelines: dict) -> dict:
+        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``.
+
+        All other top-level keys (``roles``, ``outcome-caching``,
+        ``reflection_pairs`` …) are preserved untouched. Goes through the
+        ConfigManager so the regular backup + atomic-replace contract applies.
+        """
+        cm = self.__class__.config_manager
+        # ``role-defaults`` is the whitelisted key — never accept a raw path.
+        existing = cm.read("role-defaults")
+        if not isinstance(existing, dict):
+            existing = {}
+        existing["quality_pipelines"] = pipelines
+        return cm.write("role-defaults", existing)
+
+    def _read_template_description(self, role: str) -> str:
+        """Read the ``description:`` field from a generic agent template's
+        YAML frontmatter (if available). Used as a fallback when the role in
+        ``role-defaults.yaml`` does not carry a description of its own.
+        """
+        try:
+            path = self._template_path(role)
+        except SecurityError:
+            return ""
+        if not path.exists():
+            return ""
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+        if not text.startswith("---"):
+            return ""
+        # Parse only the YAML frontmatter block (between leading ``---`` and
+        # the next ``---``). Avoids pulling in the entire template body.
+        end = text.find("\n---", 3)
+        if end == -1:
+            return ""
+        try:
+            front = yaml.safe_load(text[3:end]) or {}
+        except yaml.YAMLError:
+            return ""
+        if isinstance(front, dict):
+            desc = front.get("description")
+            if isinstance(desc, str):
+                return desc.strip()
+        return ""
 
     def _list_agent_templates(self) -> dict:
         templates_dir = self.__class__.root / "agents" / "1-generic"

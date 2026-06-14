@@ -1484,6 +1484,19 @@ async function viewRoles() {
     const card = el("div", { class: `role-card ${active.has(role.name) ? "active" : ""}` });
     card.appendChild(el("div", { class: `tier-bar ${role.tier || "optional"}` }));
     card.appendChild(el("div", { class: "name" }, [role.name]));
+    // Description: truncated for the card, full text kept on the title attr
+    // (native browser tooltip) so the user can hover for the complete line.
+    const fullDesc = role.description || "";
+    const shortDesc = fullDesc.length > 80 ? fullDesc.slice(0, 77) + "…" : fullDesc;
+    const descNode = el("div", {
+      class: "meta",
+      style: "font-size:11px; color:var(--text-secondary); margin-top:4px; line-height:1.35;",
+      title: fullDesc,
+    });
+    // textContent ensures the description is rendered as plain text — never
+    // interpreted as markup even if the YAML contains angle brackets/HTML.
+    descNode.textContent = shortDesc;
+    card.appendChild(descNode);
     card.appendChild(el("div", { class: "meta" }, [
       el("span", { class: `badge ${role.tier || "optional"}` }, [role.tier || "optional"]),
       " ",
@@ -1513,10 +1526,22 @@ async function viewRoles() {
   // Single setTimeout: wait one frame for layout to settle, then instantiate
   // the canvas once and bind the toolbar handlers to the live instance. No
   // window.__dg leak, no race between two setTimeout calls.
+  // Seed edges from each role's declared delegation targets so the graph
+  // reflects the actual handoff topology defined in role-defaults.yaml.
+  const initialEdges = [];
+  for (const role of roles) {
+    for (const target of (role.targets || [])) {
+      initialEdges.push({ from: role.name, to: target });
+    }
+  }
   setTimeout(() => {
     canvas.width = canvas.parentElement.clientWidth - 2;
     const dg = new DelegationCanvas(canvas, roles);
-    relayoutBtn.addEventListener("click", () => { dg.layout(roles); dg._render(); });
+    dg.setEdges(initialEdges);
+    relayoutBtn.addEventListener("click", () => {
+      dg.layout(roles);
+      dg.setEdges(initialEdges);
+    });
     clearBtn.addEventListener("click", () => {
       dg.edges = [];
       dg._render();
@@ -1540,73 +1565,801 @@ async function viewRoles() {
 }
 
 /* =========================================================================
- * Views — Pipelines (Phase 4)
+ * Views — Skills registry (Phase 3b)
  * ========================================================================= */
-async function viewPipelines() {
+async function viewSkillsRegistry() {
   const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Quality pipelines"]));
-  let cfg;
-  try { cfg = await api.get("/api/config/project"); }
+  wrap.appendChild(el("h1", {}, ["skills-registry.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/skills-registry"); }
   catch (err) { wrap.appendChild(renderError(err)); return wrap; }
-  cfg.pipelines = cfg.pipelines || {};
 
-  const status = el("div", { class: "muted" });
+  // Defensive defaults — the file can have either top-level layout.
+  data.repos = data.repos || {};
+  data.skills = data.skills || {};
+
+  const status = el("div", { class: "muted" }, [
+    `${Object.keys(data.repos).length} repos · ${Object.keys(data.skills).length} skills`,
+  ]);
   wrap.appendChild(status);
-  wrap.appendChild(el("div", { class: "btn-row" }, [
-    el("button", { class: "btn btn-primary", onclick: async () => {
-      try { await api.put("/api/config/project", cfg); toast("Pipelines saved", "success"); }
-      catch (err) { toast(`Save failed: ${err.message}`, "error"); }
-    } }, ["Save pipelines"]),
-    el("button", { class: "btn", onclick: () => addPipeline(cfg, render) }, ["Add pipeline"]),
-  ]));
 
-  const render = () => {
-    [...wrap.querySelectorAll(".swimlane, .pipeline-block")].forEach(n => n.remove());
-    for (const [name, pipeline] of Object.entries(cfg.pipelines || {})) {
-      const block = el("div", { class: "pipeline-block" });
-      block.appendChild(el("h2", {}, [name]));
-      const swim = el("div", { class: "swimlane" });
-      const stages = pipeline.stages || pipeline || [];
-      const list = Array.isArray(stages) ? stages : [];
-      list.forEach((stage, idx) => {
-        swim.appendChild(stageCard(stage, idx, list, render));
-      });
-      const add = el("div", { class: "stage-add", onclick: () => {
-        list.push({ name: "new-stage", agent: "developer", task: "describe the work" });
-        cfg.pipelines[name].stages = list;
-        render();
-      } }, ["+ Add stage"]);
-      swim.appendChild(add);
-      block.appendChild(swim);
-      wrap.appendChild(block);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/skills-registry", data);
+      toast("skills-registry saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
     }
   };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
 
-  function stageCard(stage, idx, list, refresh) {
-    const node = el("div", { class: "stage" });
-    node.appendChild(el("input", { type: "text", value: stage.name || "", oninput: (ev) => stage.name = ev.target.value }));
-    node.appendChild(el("input", { type: "text", value: stage.agent || "", placeholder: "agent", oninput: (ev) => stage.agent = ev.target.value }));
-    node.appendChild(el("textarea", { placeholder: "task", oninput: (ev) => stage.task = ev.target.value, rows: 2 }, [stage.task || ""]));
-    node.appendChild(el("div", { class: "btn-row" }, [
-      el("button", { class: "btn btn-ghost", onclick: () => { if (idx > 0) { [list[idx-1], list[idx]] = [list[idx], list[idx-1]]; refresh(); } } }, ["←"]),
-      el("button", { class: "btn btn-ghost", onclick: () => { if (idx < list.length-1) { [list[idx+1], list[idx]] = [list[idx], list[idx+1]]; refresh(); } } }, ["→"]),
-      el("button", { class: "btn btn-danger", onclick: () => { list.splice(idx, 1); refresh(); } }, ["×"]),
+  // ----------------------------------- Repos table
+  wrap.appendChild(el("h2", {}, ["Repos"]));
+  const repoTable = el("table", { class: "data" });
+  repoTable.appendChild(el("thead", {}, [
+    el("tr", {}, ["Name", "Repo URL", "Local path", "Pinned commit"].map(h => el("th", {}, [h]))),
+  ]));
+  const repoBody = el("tbody");
+  Object.entries(data.repos).forEach(([name, repo]) => {
+    if (!repo || typeof repo !== "object") return;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    const urlInp = el("input", { type: "url", value: repo.repo || "" });
+    urlInp.addEventListener("input", () => { repo.repo = urlInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [urlInp]));
+    const pathInp = el("input", { type: "text", value: repo.local_path || "" });
+    pathInp.addEventListener("input", () => { repo.local_path = pathInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [pathInp]));
+    const commitInp = el("input", { type: "text", value: repo.pinned_commit || "" });
+    commitInp.addEventListener("input", () => { repo.pinned_commit = commitInp.value; markDirty(); });
+    tr.appendChild(el("td", { class: "mono" }, [commitInp]));
+    repoBody.appendChild(tr);
+  });
+  repoTable.appendChild(repoBody);
+  wrap.appendChild(repoTable);
+
+  // ----------------------------------- Skills table
+  wrap.appendChild(el("h2", {}, ["Skills"]));
+  const skillTable = el("table", { class: "data" });
+  skillTable.appendChild(el("thead", {}, [
+    el("tr", {}, ["Name", "Approved", "Enabled (planned)", "Repo", "Role"].map(h => el("th", {}, [h]))),
+  ]));
+  const skillBody = el("tbody");
+  Object.entries(data.skills).forEach(([name, skill]) => {
+    if (!skill || typeof skill !== "object") return;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    // approved toggle
+    const apprWrap = el("label", { class: "toggle" });
+    const apprCb = el("input", { type: "checkbox" });
+    apprCb.checked = !!skill.approved;
+    apprCb.addEventListener("change", () => { skill.approved = apprCb.checked; markDirty(); });
+    apprWrap.appendChild(apprCb); apprWrap.appendChild(el("span", { class: "slider" }));
+    tr.appendChild(el("td", {}, [apprWrap]));
+    // planned/enabled toggle
+    const enWrap = el("label", { class: "toggle" });
+    const enCb = el("input", { type: "checkbox" });
+    enCb.checked = !skill.planned; // "enabled" = !planned in current schema
+    enCb.addEventListener("change", () => { skill.planned = !enCb.checked; markDirty(); });
+    enWrap.appendChild(enCb); enWrap.appendChild(el("span", { class: "slider" }));
+    tr.appendChild(el("td", {}, [enWrap]));
+    // repo
+    const repoInp = el("input", { type: "text", value: skill.repo || "" });
+    repoInp.addEventListener("input", () => { skill.repo = repoInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [repoInp]));
+    // role
+    const roleInp = el("input", { type: "text", value: skill.role || "" });
+    roleInp.addEventListener("input", () => { skill.role = roleInp.value; markDirty(); });
+    tr.appendChild(el("td", { class: "mono" }, [roleInp]));
+    skillBody.appendChild(tr);
+  });
+  skillTable.appendChild(skillBody);
+  wrap.appendChild(skillTable);
+
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — MCP registry (Phase 3c)
+ * ========================================================================= */
+async function viewMcpRegistry() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["mcp-registry.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/mcp-registry"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data["mcp-servers"] = data["mcp-servers"] || {};
+  const servers = data["mcp-servers"];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(servers).length} MCP servers`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/mcp-registry", data);
+      toast("mcp-registry saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  for (const [id, srv] of Object.entries(servers)) {
+    if (!srv || typeof srv !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
+      id,
+      el("span", { class: "muted", style: "margin-left:8px; font-weight:400;" }, [srv.description || ""]),
     ]));
-    return node;
-  }
 
-  render();
-  if (!Object.keys(cfg.pipelines).length) {
-    wrap.appendChild(el("div", { class: "empty" }, ["No pipelines defined yet — click \"Add pipeline\"."]));
+    // Display name (description)
+    const dField = el("div", { class: "field" });
+    dField.appendChild(el("label", { class: "field-label" }, ["Description"]));
+    const dInp = el("input", { type: "text", value: srv.description || "" });
+    dInp.addEventListener("input", () => { srv.description = dInp.value; markDirty(); });
+    dField.appendChild(dInp);
+    panel.appendChild(dField);
+
+    // Transport
+    srv.connection = srv.connection || { type: "stdio" };
+    const tField = el("div", { class: "field" });
+    tField.appendChild(el("label", { class: "field-label" }, ["Transport"]));
+    const tSel = el("select");
+    for (const t of ["stdio", "http", "sse"]) {
+      const o = el("option", { value: t }, [t]);
+      if ((srv.connection.type || "stdio") === t) o.selected = true;
+      tSel.appendChild(o);
+    }
+    tSel.addEventListener("change", () => { srv.connection.type = tSel.value; markDirty(); });
+    tField.appendChild(tSel);
+    panel.appendChild(tField);
+
+    // Command / URL
+    const cField = el("div", { class: "field" });
+    cField.appendChild(el("label", { class: "field-label" }, ["Command / URL"]));
+    const cInp = el("input", { type: "text" });
+    cInp.value = srv.connection.command || srv.connection.url || "";
+    cInp.addEventListener("input", () => {
+      if (srv.connection.type === "stdio") srv.connection.command = cInp.value;
+      else srv.connection.url = cInp.value;
+      markDirty();
+    });
+    cField.appendChild(cInp);
+    panel.appendChild(cField);
+
+    // Enabled toggle (enabled-by-default)
+    const eField = el("div", { class: "field" });
+    eField.appendChild(el("label", { class: "field-label" }, ["enabled-by-default"]));
+    const eWrap = el("label", { class: "toggle" });
+    const eCb = el("input", { type: "checkbox" });
+    eCb.checked = !!srv["enabled-by-default"];
+    eCb.addEventListener("change", () => { srv["enabled-by-default"] = eCb.checked; markDirty(); });
+    eWrap.appendChild(eCb); eWrap.appendChild(el("span", { class: "slider" }));
+    eField.appendChild(eWrap);
+    panel.appendChild(eField);
+
+    // Tool whitelist / blacklist editors
+    srv.tools = srv.tools || {};
+    const wlField = el("div", { class: "field" });
+    wlField.appendChild(el("label", { class: "field-label" }, ["Allowed tools (comma-separated)"]));
+    wlField.appendChild(tagEditor(srv.tools.allowed || [], v => { srv.tools.allowed = v; markDirty(); }));
+    panel.appendChild(wlField);
+
+    const blField = el("div", { class: "field" });
+    blField.appendChild(el("label", { class: "field-label" }, ["Blocked tools (comma-separated)"]));
+    blField.appendChild(tagEditor(srv.tools.blocked || [], v => { srv.tools.blocked = v; markDirty(); }));
+    panel.appendChild(blField);
+
+    wrap.appendChild(panel);
   }
   return wrap;
 }
 
-function addPipeline(cfg, refresh) {
-  const name = prompt("Pipeline name:", "standard-feature");
-  if (!name) return;
-  cfg.pipelines[name] = { stages: [{ name: "branch", agent: "git", task: "create feature branch" }] };
-  refresh();
+/* Reusable tag editor — comma- or Enter-separated entries; safe DOM build. */
+function tagEditor(initial, onChange) {
+  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px; flex-wrap:wrap;" });
+  const tags = Array.isArray(initial) ? [...initial] : [];
+  const tagsContainer = el("div", { class: "flex-row", style: "gap:4px; flex-wrap:wrap;" });
+  const inp = el("input", { type: "text", placeholder: "add tag, then Enter or comma", style: "min-width:180px;" });
+
+  const render = () => {
+    tagsContainer.replaceChildren();
+    tags.forEach((t, i) => {
+      const tag = el("span", { class: "badge" });
+      tag.appendChild(document.createTextNode(String(t) + " "));
+      const rm = el("button", {
+        class: "btn btn-ghost",
+        style: "padding:0 6px; font-size:11px; margin-left:4px;",
+        title: "remove",
+      }, ["×"]);
+      rm.addEventListener("click", () => {
+        tags.splice(i, 1);
+        onChange([...tags]);
+        render();
+      });
+      tag.appendChild(rm);
+      tagsContainer.appendChild(tag);
+    });
+  };
+  const commit = () => {
+    const raw = inp.value.trim();
+    if (!raw) return;
+    // Accept comma-separated chunks for fast multi-add.
+    for (const piece of raw.split(",").map(s => s.trim()).filter(Boolean)) {
+      if (!tags.includes(piece)) tags.push(piece);
+    }
+    inp.value = "";
+    onChange([...tags]);
+    render();
+  };
+  inp.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === ",") {
+      ev.preventDefault();
+      commit();
+    }
+  });
+  inp.addEventListener("blur", commit);
+  render();
+  wrap.appendChild(tagsContainer);
+  wrap.appendChild(inp);
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — DoD presets (Phase 3d)
+ * ========================================================================= */
+async function viewDodPresets() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["dod-presets.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/dod-presets"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.presets = data.presets || {};
+  const presets = data.presets;
+
+  // Collect every column ever used across presets — keeps the matrix complete
+  // even if individual presets omit certain criteria.
+  const knownCols = new Set();
+  for (const p of Object.values(presets)) {
+    if (p && typeof p === "object") {
+      for (const k of Object.keys(p)) knownCols.add(k);
+    }
+  }
+  // Default columns guarantee a stable layout even for empty configs.
+  for (const k of ["req-traceability", "tests-required", "codebase-overview", "security-audit"]) {
+    knownCols.add(k);
+  }
+  const columns = [...knownCols];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(presets).length} presets · ${columns.length} criteria`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/dod-presets", data);
+      toast("dod-presets saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  const table = el("table", { class: "data" });
+  const headerCells = [el("th", {}, ["Preset"]), ...columns.map(c => el("th", {}, [c]))];
+  table.appendChild(el("thead", {}, [el("tr", {}, headerCells)]));
+  const tbody = el("tbody");
+  for (const [name, preset] of Object.entries(presets)) {
+    if (!preset || typeof preset !== "object") continue;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    for (const col of columns) {
+      const td = el("td");
+      const cb = el("input", { type: "checkbox" });
+      cb.checked = !!preset[col];
+      cb.addEventListener("change", () => { preset[col] = cb.checked; markDirty(); });
+      td.appendChild(cb);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Delegation syntax (Phase 3e)
+ * ========================================================================= */
+async function viewDelegationSyntax() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["delegation-syntax.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/delegation-syntax"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.delegation_syntax = data.delegation_syntax || {};
+  const providers = data.delegation_syntax;
+
+  if (!Object.keys(providers).length) {
+    wrap.appendChild(el("div", { class: "empty" }, [
+      "delegation-syntax.yaml is empty or missing the delegation_syntax key.",
+    ]));
+    return wrap;
+  }
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(providers).length} providers`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/delegation-syntax", data);
+      toast("delegation-syntax saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  for (const [provider, conf] of Object.entries(providers)) {
+    if (!conf || typeof conf !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]));
+    for (const [varName, value] of Object.entries(conf)) {
+      const field = el("div", { class: "field" });
+      field.appendChild(el("label", { class: "field-label" }, [varName]));
+      if (typeof value === "string") {
+        const ta = el("textarea", { rows: Math.min(10, Math.max(2, value.split("\n").length)) });
+        ta.value = value;
+        ta.addEventListener("input", () => { conf[varName] = ta.value; markDirty(); });
+        field.appendChild(ta);
+      } else if (typeof value === "boolean") {
+        const wrapL = el("label", { class: "toggle" });
+        const cb = el("input", { type: "checkbox" });
+        cb.checked = !!value;
+        cb.addEventListener("change", () => { conf[varName] = cb.checked; markDirty(); });
+        wrapL.appendChild(cb); wrapL.appendChild(el("span", { class: "slider" }));
+        field.appendChild(wrapL);
+      } else {
+        // Complex types (arrays/objects) — show as read-only JSON; editing
+        // happens via the raw YAML for now to avoid scope creep.
+        const pre = el("pre");
+        pre.textContent = JSON.stringify(value, null, 2);
+        field.appendChild(pre);
+      }
+      panel.appendChild(field);
+    }
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Export config (Phase 3f)
+ * ========================================================================= */
+async function viewExport() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["export.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/export"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  if (typeof data !== "object" || data === null) data = {};
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(data).length} export mappings`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/export", data);
+      toast("export.yaml saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  const addRow = () => {
+    const name = prompt("Export mapping name (e.g. test-models):", "");
+    if (!name) return;
+    if (data[name]) {
+      toast("Already exists", "warning");
+      return;
+    }
+    data[name] = { target: "markdown", output_dir: `docs/${name}/` };
+    markDirty();
+    render();
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: addRow }, ["Add mapping"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  const tableContainer = el("div");
+  wrap.appendChild(tableContainer);
+
+  const targets = ["markdown", "confluence", "jira-xray", "notion"];
+
+  function render() {
+    tableContainer.replaceChildren();
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Mapping", "Target", "Output dir", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    for (const [name, conf] of Object.entries(data)) {
+      if (!conf || typeof conf !== "object") continue;
+      const tr = el("tr");
+      tr.appendChild(el("td", { class: "mono" }, [name]));
+
+      // target dropdown
+      const tSel = el("select");
+      const knownTargets = new Set(targets);
+      const current = conf.target || "markdown";
+      if (current && !knownTargets.has(current)) {
+        tSel.appendChild(el("option", { value: current }, [current + " (unknown)"]));
+      }
+      for (const t of targets) {
+        const o = el("option", { value: t }, [t]);
+        if (t === current) o.selected = true;
+        tSel.appendChild(o);
+      }
+      tSel.addEventListener("change", () => { conf.target = tSel.value; markDirty(); });
+      tr.appendChild(el("td", {}, [tSel]));
+
+      // output_dir input
+      const dirInp = el("input", { type: "text", value: conf.output_dir || "" });
+      dirInp.addEventListener("input", () => { conf.output_dir = dirInp.value; markDirty(); });
+      tr.appendChild(el("td", {}, [dirInp]));
+
+      // delete row
+      const delBtn = el("button", { class: "btn btn-danger" }, ["×"]);
+      delBtn.addEventListener("click", () => {
+        if (!confirm(`Remove export mapping "${name}"?`)) return;
+        delete data[name];
+        markDirty();
+        render();
+      });
+      tr.appendChild(el("td", {}, [delBtn]));
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tableContainer.appendChild(table);
+  }
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Pipelines (Phase 4)
+ * ========================================================================= */
+const STAGE_MODES = [
+  "sequential",
+  "parallel_group",
+  "fanout",
+  "loop",
+  "conditional",
+  "agent_decision",
+];
+
+async function viewPipelines() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Quality pipelines"]));
+
+  // Two parallel loads: the pipelines themselves (from role-defaults.yaml via
+  // /api/pipelines) and the agent hierarchy (used to populate agent dropdowns).
+  let envelope;
+  let hierarchy;
+  try {
+    [envelope, hierarchy] = await Promise.all([
+      api.get("/api/pipelines"),
+      api.get("/api/agents/hierarchy"),
+    ]);
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+  const pipelines = (envelope && envelope.pipelines && typeof envelope.pipelines === "object")
+    ? envelope.pipelines
+    : {};
+  const agentNames = (hierarchy && Array.isArray(hierarchy.roles))
+    ? hierarchy.roles.map(r => r.name).sort()
+    : [];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(pipelines).length} pipelines loaded.`]);
+  wrap.appendChild(status);
+
+  const savePipelines = async () => {
+    try {
+      await api.put("/api/pipelines", { pipelines });
+      toast("Pipelines saved to role-defaults.yaml", "success");
+      status.textContent = `${Object.keys(pipelines).length} pipelines (saved).`;
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  const addPipelinePrompt = () => {
+    const name = prompt("Pipeline name:", "new-pipeline");
+    if (!name) return;
+    if (pipelines[name]) {
+      toast(`Pipeline ${name} already exists`, "warning");
+      return;
+    }
+    pipelines[name] = {
+      description: "",
+      stages: [{ id: "stage-1", agent: agentNames[0] || "developer", task: "describe the work", mode: "sequential" }],
+      on_error: "escalate_to_orchestrator",
+    };
+    render();
+  };
+
+  const toolbar = el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: savePipelines }, ["Save pipelines"]),
+    el("button", { class: "btn", onclick: addPipelinePrompt }, ["Add pipeline"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]);
+  wrap.appendChild(toolbar);
+
+  const container = el("div", { class: "pipelines-container" });
+  wrap.appendChild(container);
+
+  function render() {
+    container.replaceChildren();
+    const names = Object.keys(pipelines);
+    if (!names.length) {
+      container.appendChild(el("div", { class: "empty" }, ['No pipelines defined yet — click "Add pipeline".']));
+      return;
+    }
+    for (const name of names) {
+      container.appendChild(pipelineBlock(name));
+    }
+    status.textContent = `${names.length} pipelines.`;
+    status.style.color = "";
+  }
+
+  function pipelineBlock(name) {
+    const pipeline = pipelines[name];
+    if (!pipeline || typeof pipeline !== "object") return el("div");
+    const block = el("div", { class: "pipeline-block panel" });
+    const header = el("div", { class: "panel-title" }, [
+      el("h2", { style: "margin:0;" }, [name]),
+      el("button", {
+        class: "btn btn-danger",
+        onclick: () => {
+          if (!confirm(`Delete pipeline "${name}"?`)) return;
+          delete pipelines[name];
+          render();
+        },
+      }, ["Delete pipeline"]),
+    ]);
+    block.appendChild(header);
+
+    // Description field
+    const descField = el("div", { class: "field" });
+    descField.appendChild(el("label", { class: "field-label" }, ["Description"]));
+    const descInp = el("input", { type: "text", value: pipeline.description || "" });
+    descInp.addEventListener("input", () => { pipeline.description = descInp.value; });
+    descField.appendChild(descInp);
+    block.appendChild(descField);
+
+    // on_error select
+    const oeField = el("div", { class: "field" });
+    oeField.appendChild(el("label", { class: "field-label" }, ["on_error"]));
+    const oeSel = el("select");
+    for (const opt of ["escalate_to_orchestrator", "skip", "abort", "retry"]) {
+      const o = el("option", { value: opt }, [opt]);
+      if ((pipeline.on_error || "escalate_to_orchestrator") === opt) o.selected = true;
+      oeSel.appendChild(o);
+    }
+    oeSel.addEventListener("change", () => { pipeline.on_error = oeSel.value; });
+    oeField.appendChild(oeSel);
+    block.appendChild(oeField);
+
+    // Stages swimlane
+    const stages = Array.isArray(pipeline.stages) ? pipeline.stages : [];
+    pipeline.stages = stages;
+    const swim = el("div", { class: "swimlane" });
+    stages.forEach((stage, idx) => {
+      swim.appendChild(stageCard(stage, idx, stages, () => render()));
+    });
+    swim.appendChild(el("div", {
+      class: "stage-add",
+      onclick: () => {
+        stages.push({
+          id: `stage-${stages.length + 1}`,
+          agent: agentNames[0] || "developer",
+          task: "describe the work",
+          mode: "sequential",
+        });
+        render();
+      },
+    }, ["+ Add stage"]));
+    block.appendChild(swim);
+    return block;
+  }
+
+  function stageCard(stage, idx, list, refresh) {
+    const node = el("div", { class: "stage" });
+
+    // id input
+    const idInp = el("input", { type: "text", placeholder: "stage id", value: stage.id || stage.name || "" });
+    idInp.addEventListener("input", () => {
+      stage.id = idInp.value;
+      // Mirror to "name" for backward-compat with older project.yaml entries.
+      stage.name = idInp.value;
+    });
+    node.appendChild(idInp);
+
+    // mode dropdown
+    const modeSel = el("select", { title: "stage mode" });
+    for (const opt of STAGE_MODES) {
+      const o = el("option", { value: opt }, [opt]);
+      if ((stage.mode || "sequential") === opt) o.selected = true;
+      modeSel.appendChild(o);
+    }
+    modeSel.addEventListener("change", () => {
+      stage.mode = modeSel.value;
+      refresh();
+    });
+    node.appendChild(modeSel);
+
+    // agent dropdown (from hierarchy). Fall back to a free-text input if the
+    // hierarchy is empty so the form stays usable in degraded modes.
+    if (agentNames.length) {
+      const ag = el("select", { title: "agent" });
+      // Allow the currently configured agent even if it is not (yet) in the
+      // hierarchy list — avoids silently losing the value.
+      const known = new Set(agentNames);
+      const current = stage.agent || "";
+      if (current && !known.has(current)) {
+        ag.appendChild(el("option", { value: current }, [current + " (unknown)"]));
+      }
+      for (const name of agentNames) {
+        const o = el("option", { value: name }, [name]);
+        if (name === current) o.selected = true;
+        ag.appendChild(o);
+      }
+      ag.addEventListener("change", () => { stage.agent = ag.value; });
+      node.appendChild(ag);
+    } else {
+      const ag = el("input", { type: "text", placeholder: "agent", value: stage.agent || "" });
+      ag.addEventListener("input", () => { stage.agent = ag.value; });
+      node.appendChild(ag);
+    }
+
+    // task textarea
+    const taskTa = el("textarea", { rows: 2, placeholder: "task" });
+    taskTa.value = stage.task || "";
+    taskTa.addEventListener("input", () => { stage.task = taskTa.value; });
+    node.appendChild(taskTa);
+
+    // loop-specific controls
+    if (stage.mode === "loop") {
+      stage.loop = stage.loop || {};
+      const loop = stage.loop;
+      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:6px;" }, ["loop config"]));
+
+      const genWrap = el("div", { class: "field" });
+      genWrap.appendChild(el("label", { class: "field-label" }, ["generator"]));
+      genWrap.appendChild(agentDropdown(loop.generator, v => loop.generator = v));
+      node.appendChild(genWrap);
+
+      const critWrap = el("div", { class: "field" });
+      critWrap.appendChild(el("label", { class: "field-label" }, ["critic"]));
+      critWrap.appendChild(agentDropdown(loop.critic, v => loop.critic = v));
+      node.appendChild(critWrap);
+
+      const maxField = el("div", { class: "field" });
+      maxField.appendChild(el("label", { class: "field-label" }, ["max_iterations"]));
+      const mi = el("input", { type: "number", min: "1", max: "20" });
+      mi.value = loop.max_iterations ?? 3;
+      mi.addEventListener("input", () => {
+        const v = Number(mi.value);
+        loop.max_iterations = Number.isFinite(v) && v > 0 ? v : 1;
+      });
+      maxField.appendChild(mi);
+      node.appendChild(maxField);
+    }
+
+    // Move/delete row
+    node.appendChild(el("div", { class: "btn-row" }, [
+      el("button", {
+        class: "btn btn-ghost",
+        title: "move left",
+        onclick: () => {
+          if (idx > 0) { [list[idx-1], list[idx]] = [list[idx], list[idx-1]]; refresh(); }
+        },
+      }, ["←"]),
+      el("button", {
+        class: "btn btn-ghost",
+        title: "move right",
+        onclick: () => {
+          if (idx < list.length-1) { [list[idx+1], list[idx]] = [list[idx], list[idx+1]]; refresh(); }
+        },
+      }, ["→"]),
+      el("button", {
+        class: "btn btn-danger",
+        title: "delete stage",
+        onclick: () => { list.splice(idx, 1); refresh(); },
+      }, ["×"]),
+    ]));
+    return node;
+  }
+
+  function agentDropdown(value, onChange) {
+    if (!agentNames.length) {
+      const inp = el("input", { type: "text", placeholder: "agent name", value: value || "" });
+      inp.addEventListener("input", () => onChange(inp.value));
+      return inp;
+    }
+    const sel = el("select");
+    const known = new Set(agentNames);
+    if (value && !known.has(value)) {
+      sel.appendChild(el("option", { value: value }, [value + " (unknown)"]));
+    }
+    sel.appendChild(el("option", { value: "" }, ["— select —"]));
+    for (const name of agentNames) {
+      const o = el("option", { value: name }, [name]);
+      if (name === value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => onChange(sel.value));
+    return sel;
+  }
+
+  render();
+  return wrap;
 }
 
 /* =========================================================================
@@ -1766,11 +2519,11 @@ async function init() {
   router.register("/config/project",  configView("project", "project.yaml", schemaP));
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
-  router.register("/config/skills-registry",   configView("skills-registry", "skills-registry.yaml", Promise.resolve({})));
-  router.register("/config/mcp-registry",      configView("mcp-registry", "mcp-registry.yaml", Promise.resolve({})));
-  router.register("/config/dod-presets",       configView("dod-presets", "dod-presets.yaml", Promise.resolve({})));
-  router.register("/config/delegation-syntax", configView("delegation-syntax", "delegation-syntax.yaml", Promise.resolve({})));
-  router.register("/config/export",            configView("export", "export.yaml", Promise.resolve({})));
+  router.register("/config/skills-registry",   viewSkillsRegistry);
+  router.register("/config/mcp-registry",      viewMcpRegistry);
+  router.register("/config/dod-presets",       viewDodPresets);
+  router.register("/config/delegation-syntax", viewDelegationSyntax);
+  router.register("/config/export",            viewExport);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/agents",    viewAgentTemplates);
