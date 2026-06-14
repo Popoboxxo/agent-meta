@@ -180,7 +180,6 @@ Bei correction_hints von einem Critic:
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
-- IMMER zuerst graph tools (z.B. code-review-graph) nutzen — effizienter als Grep/Glob/Read
 
 ## Delegation
 
