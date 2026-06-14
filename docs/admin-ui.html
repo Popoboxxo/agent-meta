@@ -1,0 +1,2538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agent-meta Admin UI</title>
+<style>
+/* =====================================================================
+ * Design tokens
+ * ===================================================================== */
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-input: #0b1220;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-blue-soft: rgba(88,166,255,0.14);
+  --accent-green: #3fb950;
+  --accent-red: #f85149;
+  --accent-yellow: #d29922;
+  --border-color: #30363d;
+  --border-strong: #444c56;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --transition: 150ms ease;
+  --tier-required: #f85149;
+  --tier-recommended: #58a6ff;
+  --tier-optional: #6e7681;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* =====================================================================
+ * Layout
+ * ===================================================================== */
+#app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+}
+
+#sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar .brand {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+#sidebar .brand h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+#sidebar .brand .mode-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: 10px;
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue);
+  text-transform: uppercase;
+}
+#sidebar .brand .mode-badge.project { background: rgba(63,185,80,0.12); color: var(--accent-green); }
+
+#sidebar nav { padding: 8px 0; }
+.nav-group-title {
+  padding: 14px 18px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-left: 3px solid transparent;
+  font-size: 13px;
+}
+.nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+.nav-item.active {
+  color: var(--accent-blue);
+  border-left-color: var(--accent-blue);
+  background: var(--accent-blue-soft);
+}
+.nav-item .icon { width: 16px; opacity: 0.7; }
+.nav-item.disabled { opacity: 0.35; pointer-events: none; }
+
+#content {
+  background: var(--bg-primary);
+  overflow-y: auto;
+  padding: 24px 32px;
+}
+
+/* =====================================================================
+ * Typography
+ * ===================================================================== */
+h1, h2, h3, h4 { margin: 0 0 12px; }
+h1 { font-size: 22px; font-weight: 600; }
+h2 { font-size: 17px; font-weight: 600; color: var(--text-primary); margin-top: 24px; }
+h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+p { color: var(--text-secondary); margin: 0 0 12px; }
+code, pre { font-family: var(--font-mono); }
+code { background: var(--bg-tertiary); padding: 1px 6px; border-radius: var(--radius-sm); font-size: 12px; }
+pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* =====================================================================
+ * Cards / Panels
+ * ===================================================================== */
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.panel .panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.metric .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.metric .value { font-size: 20px; margin-top: 6px; font-weight: 500; }
+.metric .value.mono { font-family: var(--font-mono); font-size: 14px; }
+
+/* =====================================================================
+ * Buttons
+ * ===================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.btn:hover { background: var(--border-color); border-color: var(--border-strong); }
+.btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #0b1220; font-weight: 600; }
+.btn-primary:hover { background: #79b8ff; border-color: #79b8ff; }
+.btn-danger { background: rgba(248,81,73,0.15); border-color: var(--accent-red); color: var(--accent-red); }
+.btn-danger:hover { background: rgba(248,81,73,0.25); }
+.btn-ghost { background: transparent; border-color: var(--border-color); color: var(--text-secondary); }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* =====================================================================
+ * Forms
+ * ===================================================================== */
+.field { margin-bottom: 12px; }
+.field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.field-label .required { color: var(--accent-red); margin-left: 3px; }
+.field-help { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.field-error { font-size: 11px; color: var(--accent-red); margin-top: 3px; }
+
+input[type="text"], input[type="number"], input[type="url"], select, textarea {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--accent-blue-soft);
+}
+textarea { resize: vertical; min-height: 70px; font-family: var(--font-mono); font-size: 12px; }
+input[type="checkbox"] { accent-color: var(--accent-blue); margin-right: 6px; }
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px; height: 22px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 22px;
+  transition: var(--transition);
+}
+.toggle .slider::before {
+  content: ""; position: absolute;
+  height: 16px; width: 16px; left: 2px; bottom: 2px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  transition: var(--transition);
+}
+.toggle input:checked + .slider { background: var(--accent-blue); border-color: var(--accent-blue); }
+.toggle input:checked + .slider::before { transform: translateX(18px); background: #ffffff; }
+
+/* =====================================================================
+ * Tables
+ * ===================================================================== */
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.data th, table.data td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+table.data thead th {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-strong);
+}
+table.data tr:hover td { background: rgba(255,255,255,0.02); }
+table.data td.mono { font-family: var(--font-mono); font-size: 12px; }
+table.data td input,
+table.data td select { padding: 4px 8px; font-size: 12px; }
+
+/* =====================================================================
+ * Badges & status
+ * ===================================================================== */
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+.badge.required { background: rgba(248,81,73,0.12); color: var(--accent-red); border-color: rgba(248,81,73,0.4); }
+.badge.recommended { background: rgba(88,166,255,0.12); color: var(--accent-blue); border-color: rgba(88,166,255,0.4); }
+.badge.optional { background: rgba(110,118,129,0.12); color: var(--text-muted); }
+.badge.ok { color: var(--accent-green); border-color: rgba(63,185,80,0.4); }
+.badge.warn { color: var(--accent-yellow); border-color: rgba(210,153,34,0.4); }
+
+/* =====================================================================
+ * Toast notifications
+ * ===================================================================== */
+#toast-container {
+  position: fixed;
+  top: 20px; right: 20px;
+  z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 360px;
+}
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  font-size: 13px;
+  animation: toastIn 200ms ease;
+}
+.toast-success { border-color: var(--accent-green); color: var(--accent-green); }
+.toast-error { border-color: var(--accent-red); color: var(--accent-red); }
+.toast-warning { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+.toast-info { border-color: var(--accent-blue); color: var(--accent-blue); }
+@keyframes toastIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* =====================================================================
+ * Modal overlay
+ * ===================================================================== */
+#modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9000;
+}
+#modal-overlay[hidden] { display: none; }
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  width: min(900px, 92vw);
+  max-height: 86vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-body { padding: 18px; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 12px 18px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; justify-content: flex-end; }
+.modal-close { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; }
+
+/* =====================================================================
+ * Role cards (Phase 3)
+ * ===================================================================== */
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.role-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition);
+}
+.role-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.role-card.active { border-color: var(--accent-green); background: rgba(63,185,80,0.06); }
+.role-card .name { font-size: 13px; font-weight: 600; }
+.role-card .meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.role-card .tier-bar {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 3px; border-radius: 3px 0 0 3px;
+}
+.role-card .tier-bar.required { background: var(--tier-required); }
+.role-card .tier-bar.recommended { background: var(--tier-recommended); }
+.role-card .tier-bar.optional { background: var(--tier-optional); }
+
+/* =====================================================================
+ * Delegation Canvas
+ * ===================================================================== */
+.canvas-wrap {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+#delegation-canvas {
+  display: block;
+  width: 100%;
+  height: 560px;
+  cursor: grab;
+}
+.canvas-toolbar {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; gap: 6px;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+/* =====================================================================
+ * Pipeline swimlane (Phase 4)
+ * ===================================================================== */
+.swimlane {
+  display: flex; gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+  min-height: 140px;
+  margin-bottom: 18px;
+}
+.swimlane .stage {
+  flex: 0 0 auto;
+  width: 200px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 10px;
+  position: relative;
+}
+.swimlane .stage::after {
+  content: "→";
+  position: absolute;
+  right: -16px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 18px;
+}
+.swimlane .stage:last-child::after { content: ""; }
+.swimlane .stage .stage-name { font-weight: 600; font-size: 13px; }
+.swimlane .stage .stage-agent { font-size: 11px; color: var(--accent-blue); margin-top: 2px; font-family: var(--font-mono); }
+.swimlane .stage .stage-task { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.swimlane .stage-add {
+  align-self: center;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.swimlane .stage-add:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+/* =====================================================================
+ * Agent template editor (Phase 5)
+ * ===================================================================== */
+.split-pane {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  min-height: 560px;
+}
+.template-list {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow-y: auto;
+  max-height: 560px;
+}
+.template-list .template-row {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+.template-list .template-row:hover { background: rgba(255,255,255,0.04); }
+.template-list .template-row.active { background: var(--accent-blue-soft); color: var(--accent-blue); }
+.template-editor textarea {
+  width: 100%;
+  height: 560px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+/* =====================================================================
+ * Sync console + Live events (Phase 6)
+ * ===================================================================== */
+.console {
+  background: #050811;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  height: 420px;
+  overflow-y: auto;
+  color: var(--text-secondary);
+}
+.console .line-info { color: var(--text-secondary); }
+.console .line-write { color: var(--accent-green); }
+.console .line-warn { color: var(--accent-yellow); }
+.console .line-error { color: var(--accent-red); }
+
+/* =====================================================================
+ * Misc
+ * ===================================================================== */
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.muted { color: var(--text-muted); font-size: 12px; }
+.error-box {
+  background: rgba(248,81,73,0.08);
+  border: 1px solid rgba(248,81,73,0.4);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--accent-red);
+  margin-bottom: 12px;
+}
+.success-box {
+  background: rgba(63,185,80,0.08);
+  border: 1px solid rgba(63,185,80,0.4);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--accent-green);
+  margin-bottom: 12px;
+}
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius);
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <h1>agent-meta</h1>
+      <span class="mode-badge" id="mode-badge">loading…</span>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+  <main id="content">
+    <div class="empty">Loading…</div>
+  </main>
+</div>
+<div id="toast-container"></div>
+<div id="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Title</h2>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<script type="module">
+"use strict";
+
+/* =========================================================================
+ * Utilities
+ * ========================================================================= */
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") node.className = v;
+    // NOTE: an "html" branch that piped values into innerHTML used to live
+    // here. It was removed because it allowed any caller to inject untrusted
+    // markup (XSS). All call sites now use text children or build sub-nodes
+    // explicitly with el(); pass nodes/strings via the `children` arg instead.
+    else if (k === "dataset") Object.assign(node.dataset, v);
+    else if (k.startsWith("on") && typeof v === "function") {
+      node.addEventListener(k.slice(2).toLowerCase(), v);
+    } else if (v === true) node.setAttribute(k, "");
+    else if (v === false || v == null) {/* skip */}
+    else node.setAttribute(k, v);
+  }
+  for (const c of [].concat(children)) {
+    if (c == null) continue;
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+
+function clone(obj) { return JSON.parse(JSON.stringify(obj || null)); }
+
+/* =========================================================================
+ * Toast notifications
+ * ========================================================================= */
+function toast(message, type = "info", duration = 3500) {
+  const node = el("div", { class: `toast toast-${type}` }, [message]);
+  document.getElementById("toast-container").appendChild(node);
+  setTimeout(() => {
+    node.style.opacity = "0";
+    setTimeout(() => node.remove(), 200);
+  }, duration);
+}
+
+/* =========================================================================
+ * Modal overlay
+ * ========================================================================= */
+function showModal(title, body, footer = []) {
+  document.getElementById("modal-title").textContent = title;
+  const bodyEl = document.getElementById("modal-body");
+  // Reset previous content via replaceChildren (no innerHTML, no XSS).
+  bodyEl.replaceChildren();
+  if (typeof body === "string") {
+    // Render plain strings via textContent so any markup is shown literally.
+    bodyEl.textContent = body;
+  } else if (body instanceof Node) {
+    bodyEl.appendChild(body);
+  }
+  const footerEl = document.getElementById("modal-footer");
+  footerEl.replaceChildren();
+  for (const f of footer) footerEl.appendChild(f);
+  document.getElementById("modal-overlay").hidden = false;
+}
+function hideModal() { document.getElementById("modal-overlay").hidden = true; }
+document.getElementById("modal-close").addEventListener("click", hideModal);
+document.getElementById("modal-overlay").addEventListener("click", (ev) => {
+  if (ev.target.id === "modal-overlay") hideModal();
+});
+
+/* =========================================================================
+ * API client
+ * ========================================================================= */
+class API {
+  constructor(base = "") { this.base = base; }
+  async get(path) {
+    const res = await fetch(this.base + path);
+    if (!res.ok) throw new APIError(res.status, await safeJson(res));
+    return res.json();
+  }
+  async getText(path) {
+    const res = await fetch(this.base + path);
+    if (!res.ok) throw new APIError(res.status, await safeJson(res));
+    return res.text();
+  }
+  async put(path, body) {
+    const res = await fetch(this.base + path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new APIError(res.status, await safeJson(res));
+    return res.json();
+  }
+  async post(path, body = {}) {
+    const res = await fetch(this.base + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new APIError(res.status, await safeJson(res));
+    return res.json();
+  }
+  streamEvents(path, onEvent) {
+    const source = new EventSource(this.base + path);
+    // Surface persistent reconnect failures as a toast so the user knows the
+    // live event stream is broken. The browser auto-reconnects transiently,
+    // but if it gives up (readyState === CLOSED) we should not stay silent.
+    let errorCount = 0;
+    let toastShown = false;
+    source.onmessage = (ev) => {
+      errorCount = 0;
+      toastShown = false;
+      try { onEvent(JSON.parse(ev.data)); }
+      catch { onEvent({ raw: ev.data }); }
+    };
+    source.onerror = () => {
+      errorCount += 1;
+      if (source.readyState === EventSource.CLOSED) {
+        if (!toastShown) {
+          toast("Live event stream closed by server", "error");
+          toastShown = true;
+        }
+        return;
+      }
+      // After three consecutive transient errors, inform the user once.
+      if (errorCount >= 3 && !toastShown) {
+        toast("Live event stream reconnecting…", "warning");
+        toastShown = true;
+      }
+    };
+    return source;
+  }
+}
+async function safeJson(res) {
+  try { return await res.json(); } catch { return { error: res.statusText }; }
+}
+class APIError extends Error {
+  constructor(status, body) {
+    super(body?.detail || body?.error || `HTTP ${status}`);
+    this.status = status; this.body = body;
+  }
+}
+
+/* =========================================================================
+ * State manager (with undo stack)
+ * ========================================================================= */
+class StateManager {
+  constructor() {
+    this.state = {
+      mode: null,
+      version: null,
+      schema: null,
+      configs: {},          // key -> data (current edit state)
+      originals: {},        // key -> snapshot from server
+      dirty: new Set(),
+      undo: [],
+      redo: [],
+      hierarchy: null,
+      templates: [],
+    };
+    this.listeners = new Map();
+  }
+  on(event, cb) {
+    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+    this.listeners.get(event).add(cb);
+  }
+  emit(event, payload) {
+    const ls = this.listeners.get(event);
+    if (ls) ls.forEach(cb => cb(payload));
+  }
+  setConfig(key, data, isOriginal = false) {
+    this.state.configs[key] = clone(data);
+    if (isOriginal) {
+      this.state.originals[key] = clone(data);
+      this.state.dirty.delete(key);
+    } else {
+      this.state.dirty.add(key);
+    }
+    this.emit("config-changed", { key, data });
+  }
+  pushUndo(key, before) {
+    this.state.undo.push({ key, before: clone(before), ts: Date.now() });
+    if (this.state.undo.length > 30) this.state.undo.shift();
+    this.state.redo = [];
+  }
+  undo(key) {
+    const last = [...this.state.undo].reverse().find(u => u.key === key);
+    if (!last) return false;
+    this.state.undo = this.state.undo.filter(u => u !== last);
+    this.state.redo.push({ key, before: clone(this.state.configs[key]) });
+    this.state.configs[key] = clone(last.before);
+    this.state.dirty.add(key);
+    this.emit("config-changed", { key, data: this.state.configs[key], fromUndo: true });
+    return true;
+  }
+  resetDirty(key) {
+    this.state.configs[key] = clone(this.state.originals[key]);
+    this.state.dirty.delete(key);
+    this.emit("config-changed", { key, data: this.state.configs[key], fromReset: true });
+  }
+}
+
+const state = new StateManager();
+const api = new API("");
+
+/* =========================================================================
+ * Router
+ * ========================================================================= */
+class Router {
+  constructor() {
+    this.routes = new Map();
+    window.addEventListener("hashchange", () => this.resolve());
+  }
+  register(path, view) { this.routes.set(path, view); }
+  navigate(path) {
+    if (location.hash !== "#" + path) location.hash = path;
+    else this.resolve();
+  }
+  resolve() {
+    const hash = location.hash.slice(1) || "/";
+    const view = this.routes.get(hash) || this.routes.get("/") || (() => el("div", {}, ["Not found"]));
+    const content = document.getElementById("content");
+    content.innerHTML = "";
+    try {
+      const node = view();
+      if (node instanceof Promise) {
+        content.appendChild(el("div", { class: "empty" }, ["Loading…"]));
+        node.then(real => { content.innerHTML = ""; content.appendChild(real); })
+            .catch(err => { content.innerHTML = ""; content.appendChild(renderError(err)); });
+      } else {
+        content.appendChild(node);
+      }
+    } catch (err) {
+      content.appendChild(renderError(err));
+    }
+    document.querySelectorAll(".nav-item").forEach(n => {
+      n.classList.toggle("active", n.dataset.route === hash);
+    });
+  }
+}
+function renderError(err) {
+  return el("div", { class: "error-box" }, [String(err.message || err)]);
+}
+
+const router = new Router();
+
+/* =========================================================================
+ * Schema-driven form generator
+ * ========================================================================= */
+class SchemaFormGenerator {
+  constructor(schema, data, onChange) {
+    this.schema = schema || { type: "object", properties: {} };
+    this.data = data || {};
+    this.onChange = onChange || (() => {});
+  }
+  render() {
+    const root = el("div", { class: "schema-form" });
+    if (this.schema.type === "object" || this.schema.properties) {
+      root.appendChild(this._renderObject(this.schema, this.data, ""));
+    } else {
+      root.appendChild(this._renderField("value", this.schema, this.data, ""));
+    }
+    return root;
+  }
+  _renderObject(schema, data, path) {
+    const wrap = el("div", { class: "object-wrap" });
+    const properties = schema.properties || {};
+    const required = new Set(schema.required || []);
+    for (const [key, propSchema] of Object.entries(properties)) {
+      const childPath = path ? `${path}.${key}` : key;
+      const childValue = data?.[key] ?? propSchema.default;
+      wrap.appendChild(this._renderField(key, propSchema, childValue, childPath, required.has(key)));
+    }
+    return wrap;
+  }
+  _renderField(key, schema, value, path, isRequired = false) {
+    const wrap = el("div", { class: "field" });
+    const label = el("label", { class: "field-label" }, [labelize(key)]);
+    if (isRequired) label.appendChild(el("span", { class: "required" }, ["*"]));
+    wrap.appendChild(label);
+
+    const setter = (v) => {
+      this._setNested(this.data, path, v);
+      this.onChange(path, v, this.data);
+    };
+
+    if (schema.enum) {
+      wrap.appendChild(this._renderEnum(schema, value, setter));
+    } else if (schema.type === "boolean") {
+      wrap.appendChild(this._renderBoolean(value, setter));
+    } else if (schema.type === "integer" || schema.type === "number") {
+      wrap.appendChild(this._renderNumber(schema, value, setter));
+    } else if (schema.type === "array") {
+      wrap.appendChild(this._renderArray(schema, value, setter));
+    } else if (schema.type === "object" || schema.properties) {
+      const inner = el("div", { class: "panel", style: "padding:12px 14px; margin: 6px 0 12px;" });
+      inner.appendChild(this._renderObject(schema, value || {}, path));
+      wrap.appendChild(inner);
+    } else {
+      wrap.appendChild(this._renderString(schema, value, setter));
+    }
+    if (schema.description) {
+      wrap.appendChild(el("div", { class: "field-help" }, [schema.description]));
+    }
+    return wrap;
+  }
+  _renderString(schema, value, setter) {
+    const long = typeof value === "string" && value.length > 80;
+    if (long) {
+      const ta = el("textarea", { rows: 3 });
+      ta.value = value ?? "";
+      ta.addEventListener("input", () => setter(ta.value));
+      return ta;
+    }
+    const inp = el("input", { type: "text" });
+    inp.value = value ?? "";
+    if (schema.pattern) inp.pattern = schema.pattern;
+    inp.addEventListener("input", () => setter(inp.value));
+    return inp;
+  }
+  _renderNumber(schema, value, setter) {
+    const inp = el("input", { type: "number" });
+    inp.value = value ?? "";
+    if (schema.minimum != null) inp.min = schema.minimum;
+    if (schema.maximum != null) inp.max = schema.maximum;
+    inp.addEventListener("input", () => {
+      const v = inp.value === "" ? null : Number(inp.value);
+      setter(v);
+    });
+    return inp;
+  }
+  _renderBoolean(value, setter) {
+    const wrap = el("label", { class: "toggle" });
+    const cb = el("input", { type: "checkbox" });
+    cb.checked = !!value;
+    cb.addEventListener("change", () => setter(cb.checked));
+    wrap.appendChild(cb);
+    wrap.appendChild(el("span", { class: "slider" }));
+    return wrap;
+  }
+  _renderEnum(schema, value, setter) {
+    const sel = el("select");
+    if (schema.default == null && !schema.enum.includes(value)) {
+      sel.appendChild(el("option", { value: "" }, ["— select —"]));
+    }
+    for (const opt of schema.enum) {
+      const o = el("option", { value: opt }, [String(opt)]);
+      if (opt === value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => setter(sel.value));
+    return sel;
+  }
+  _renderArray(schema, value, setter) {
+    const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px;" });
+    const tags = Array.isArray(value) ? [...value] : [];
+    const itemType = schema.items?.type;
+    const refresh = () => {
+      wrap.innerHTML = "";
+      tags.forEach((t, i) => {
+        const tag = el("span", { class: "badge" }, [String(t)]);
+        const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "remove" }, ["×"]);
+        rm.addEventListener("click", () => { tags.splice(i, 1); setter([...tags]); refresh(); });
+        tag.appendChild(rm);
+        wrap.appendChild(tag);
+      });
+      const inp = el("input", { type: itemType === "number" ? "number" : "text", placeholder: "add…", style: "max-width:140px;" });
+      inp.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && inp.value.trim()) {
+          ev.preventDefault();
+          const v = itemType === "number" ? Number(inp.value) : inp.value.trim();
+          tags.push(v); setter([...tags]); inp.value = ""; refresh();
+        }
+      });
+      wrap.appendChild(inp);
+    };
+    refresh();
+    return wrap;
+  }
+  _setNested(obj, path, value) {
+    if (!path) return;
+    const keys = path.split(".");
+    let cur = obj;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (cur[keys[i]] == null || typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
+      cur = cur[keys[i]];
+    }
+    cur[keys[keys.length - 1]] = value;
+  }
+}
+function labelize(key) {
+  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/* =========================================================================
+ * Delegation Canvas (Phase 3)
+ * ========================================================================= */
+class DelegationCanvas {
+  constructor(canvas, roles) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.nodes = new Map();
+    this.edges = [];
+    this.dragging = null;
+    this.linkSource = null;
+    this.pan = { x: 0, y: 0 };
+    this.scale = 1;
+    this.layout(roles || []);
+    this._bind();
+    this._render();
+  }
+  layout(roles) {
+    this.nodes.clear();
+    const cols = Math.max(4, Math.ceil(Math.sqrt(roles.length)));
+    const w = this.canvas.width;
+    const cellW = Math.max(160, Math.floor((w - 80) / cols));
+    const cellH = 70;
+    roles.forEach((r, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      this.nodes.set(r.name, {
+        x: 40 + col * cellW,
+        y: 40 + row * cellH,
+        w: 130, h: 44,
+        ...r,
+      });
+    });
+    this.edges = [];
+  }
+  setEdges(edges) {
+    this.edges = edges.filter(e => this.nodes.has(e.from) && this.nodes.has(e.to));
+    this._render();
+  }
+  addEdge(from, to) {
+    if (from === to) return;
+    if (this.edges.some(e => e.from === from && e.to === to)) return;
+    this.edges.push({ from, to });
+    if (this.hasCycle()) {
+      this.edges.pop();
+      toast(`Cycle detected: ${from} → ${to} rejected`, "warning");
+      return;
+    }
+    this._render();
+  }
+  hasCycle() {
+    const adj = new Map();
+    for (const e of this.edges) {
+      if (!adj.has(e.from)) adj.set(e.from, []);
+      adj.get(e.from).push(e.to);
+    }
+    const WHITE = 0, GRAY = 1, BLACK = 2;
+    const color = new Map();
+    for (const n of this.nodes.keys()) color.set(n, WHITE);
+    const dfs = (u) => {
+      color.set(u, GRAY);
+      for (const v of (adj.get(u) || [])) {
+        if (color.get(v) === GRAY) return true;
+        if (color.get(v) === WHITE && dfs(v)) return true;
+      }
+      color.set(u, BLACK);
+      return false;
+    };
+    for (const n of this.nodes.keys()) {
+      if (color.get(n) === WHITE && dfs(n)) return true;
+    }
+    return false;
+  }
+  _bind() {
+    let mouse = { x: 0, y: 0 };
+    this.canvas.addEventListener("mousedown", (ev) => {
+      const p = this._localPoint(ev);
+      const hit = this._hit(p);
+      if (hit) {
+        if (ev.shiftKey) this.linkSource = hit;
+        else this.dragging = { node: hit, dx: p.x - hit.x, dy: p.y - hit.y };
+      }
+    });
+    this.canvas.addEventListener("mousemove", (ev) => {
+      mouse = this._localPoint(ev);
+      if (this.dragging) {
+        this.dragging.node.x = mouse.x - this.dragging.dx;
+        this.dragging.node.y = mouse.y - this.dragging.dy;
+        this._render();
+      } else if (this.linkSource) {
+        this._render(mouse);
+      }
+    });
+    this.canvas.addEventListener("mouseup", (ev) => {
+      const p = this._localPoint(ev);
+      if (this.linkSource) {
+        const hit = this._hit(p);
+        if (hit && hit !== this.linkSource) {
+          this.addEdge(this.linkSource.name, hit.name);
+        }
+        this.linkSource = null;
+      }
+      this.dragging = null;
+      this._render();
+    });
+  }
+  _localPoint(ev) {
+    const r = this.canvas.getBoundingClientRect();
+    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  }
+  _hit(p) {
+    for (const node of this.nodes.values()) {
+      if (p.x >= node.x && p.x <= node.x + node.w && p.y >= node.y && p.y <= node.y + node.h) {
+        return node;
+      }
+    }
+    return null;
+  }
+  _render(mouse) {
+    const { ctx, canvas } = this;
+    ctx.fillStyle = "#0d1117";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // grid
+    ctx.strokeStyle = "rgba(255,255,255,0.03)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 30) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 30) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    // edges
+    for (const e of this.edges) {
+      const a = this.nodes.get(e.from);
+      const b = this.nodes.get(e.to);
+      if (!a || !b) continue;
+      this._arrow(a.x + a.w, a.y + a.h / 2, b.x, b.y + b.h / 2, "#58a6ff");
+    }
+    if (this.linkSource && mouse) {
+      const a = this.linkSource;
+      this._arrow(a.x + a.w, a.y + a.h / 2, mouse.x, mouse.y, "#d29922", true);
+    }
+    // nodes
+    for (const node of this.nodes.values()) {
+      const color = node.tier === "required" ? "#f85149"
+                  : node.tier === "recommended" ? "#58a6ff"
+                  : "#6e7681";
+      ctx.fillStyle = "#161b22";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      this._roundRect(node.x, node.y, node.w, node.h, 6);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#e6edf3";
+      ctx.font = "12px -apple-system, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText(node.name, node.x + 10, node.y + 18);
+      ctx.fillStyle = color;
+      ctx.font = "10px monospace";
+      ctx.fillText(node.tier || "", node.x + 10, node.y + 33);
+    }
+  }
+  _roundRect(x, y, w, h, r) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  _arrow(x1, y1, x2, y2, color, dashed) {
+    const ctx = this.ctx;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash(dashed ? [4, 4] : []);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const ah = 8;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - ah * Math.cos(ang - Math.PI / 6), y2 - ah * Math.sin(ang - Math.PI / 6));
+    ctx.lineTo(x2 - ah * Math.cos(ang + Math.PI / 6), y2 - ah * Math.sin(ang + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/* =========================================================================
+ * Sidebar
+ * ========================================================================= */
+function buildSidebar() {
+  const nav = document.getElementById("nav");
+  const groups = [
+    {
+      title: "Workspace",
+      items: [
+        { route: "/", label: "Dashboard", icon: "■" },
+        { route: "/sync", label: "Sync", icon: "↻" },
+        { route: "/live", label: "Live events", icon: "≡" },
+      ],
+    },
+    {
+      title: "Configs",
+      items: [
+        { route: "/config/project", label: "project.yaml", icon: "□" },
+        { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
+        { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
+        { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
+        { route: "/config/mcp-registry", label: "mcp registry", icon: "□", superOnly: true },
+        { route: "/config/dod-presets", label: "dod presets", icon: "□", superOnly: true },
+        { route: "/config/delegation-syntax", label: "delegation", icon: "□", superOnly: true },
+        { route: "/config/export", label: "export", icon: "□", superOnly: true },
+      ],
+    },
+    {
+      title: "Workflows",
+      items: [
+        { route: "/roles", label: "Roles & graph", icon: "▣" },
+        { route: "/pipelines", label: "Pipelines", icon: "↦" },
+        { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
+      ],
+    },
+  ];
+  nav.innerHTML = "";
+  for (const group of groups) {
+    nav.appendChild(el("div", { class: "nav-group-title" }, [group.title]));
+    for (const item of group.items) {
+      const disabled = item.superOnly && state.state.mode !== "super_admin";
+      const node = el("div", {
+        class: `nav-item ${disabled ? "disabled" : ""}`,
+        dataset: { route: item.route },
+        onclick: () => disabled ? null : router.navigate(item.route),
+      }, [
+        el("span", { class: "icon" }, [item.icon]),
+        item.label,
+      ]);
+      nav.appendChild(node);
+    }
+  }
+}
+
+/* =========================================================================
+ * Views — Dashboard
+ * ========================================================================= */
+async function viewDashboard() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Dashboard"]));
+  const health = await api.get("/api/health").catch(() => ({ status: "unknown" }));
+  const mode = state.state.mode;
+
+  const grid = el("div", { class: "panel-grid" });
+  grid.appendChild(metric("Mode", mode, "info"));
+  grid.appendChild(metric("Version", health.version || "—", "mono"));
+  grid.appendChild(metric("Server status", health.status || "—"));
+  grid.appendChild(metric("Configs available", String((state.state.allowedKeys || []).length || "—")));
+  wrap.appendChild(grid);
+
+  const actions = el("div", { class: "panel" }, [
+    el("div", { class: "panel-title" }, [el("h2", {}, ["Quick actions"])]),
+    el("div", { class: "btn-row" }, [
+      el("button", { class: "btn btn-primary", onclick: () => router.navigate("/sync") }, ["Run sync"]),
+      el("button", { class: "btn", onclick: async () => {
+        toast("Running dry-run…", "info");
+        const r = await api.post("/api/sync/dry-run").catch(e => ({ success: false, output: e.message }));
+        showModal("Dry-run output", el("pre", {}, [r.output || "(no output)"]), [
+          el("button", { class: "btn", onclick: hideModal }, ["Close"]),
+        ]);
+      } }, ["Dry-run"]),
+      el("a", { class: "btn btn-ghost", href: "https://github.com/Popoboxxo/agent-meta", target: "_blank" }, ["Open repo"]),
+    ]),
+  ]);
+  wrap.appendChild(actions);
+
+  if (mode === "super_admin") {
+    wrap.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, ["Super admin"]),
+      el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, mcp-registry, dod-presets, delegation-syntax, export) are editable."]),
+    ]));
+  } else {
+    wrap.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, ["Project admin"]),
+      el("p", {}, ["You're running inside a target project. Only .meta-config/project.yaml is editable; super-admin configs are read-only / hidden."]),
+    ]));
+  }
+  return wrap;
+}
+
+function metric(label, value, mod = "") {
+  return el("div", { class: "metric" }, [
+    el("div", { class: "label" }, [label]),
+    el("div", { class: "value " + mod }, [String(value)]),
+  ]);
+}
+
+/* =========================================================================
+ * Views — Generic config editor (schema-driven)
+ * ========================================================================= */
+function configView(key, title, schemaPromise) {
+  return async () => {
+    const wrap = el("div");
+    wrap.appendChild(el("h1", {}, [title]));
+    let data;
+    try {
+      data = await api.get(`/api/config/${key}`);
+    } catch (err) {
+      wrap.appendChild(renderError(err));
+      return wrap;
+    }
+    state.setConfig(key, data, true);
+    const schema = await schemaPromise;
+
+    const status = el("div", { class: "muted" }, ["Loaded from server."]);
+    wrap.appendChild(status);
+
+    const buttons = el("div", { class: "btn-row" }, [
+      el("button", { class: "btn btn-primary", id: "save-btn", onclick: () => saveConfig(key, status) }, ["Save"]),
+      el("button", { class: "btn", onclick: () => undoConfig(key, status) }, ["Undo"]),
+      el("button", { class: "btn btn-ghost", onclick: () => resetConfig(key, status) }, ["Reset"]),
+      el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+    ]);
+    wrap.appendChild(buttons);
+
+    const formContainer = el("div", { class: "panel" });
+    const form = new SchemaFormGenerator(schema, state.state.configs[key], (path, value, fullData) => {
+      state.pushUndo(key, state.state.originals[key]);
+      state.state.configs[key] = fullData;
+      state.state.dirty.add(key);
+      status.textContent = "Unsaved changes.";
+      status.style.color = "var(--accent-yellow)";
+    });
+    formContainer.appendChild(form.render());
+    wrap.appendChild(formContainer);
+    return wrap;
+  };
+}
+
+async function saveConfig(key, statusEl) {
+  try {
+    const result = await api.put(`/api/config/${key}`, state.state.configs[key]);
+    toast(`Saved ${key} (backup: ${result.backup || "n/a"})`, "success");
+    state.setConfig(key, state.state.configs[key], true);
+    statusEl.textContent = "Saved.";
+    statusEl.style.color = "var(--accent-green)";
+  } catch (err) {
+    toast(`Save failed: ${err.message}`, "error");
+    statusEl.textContent = `Save failed: ${err.message}`;
+    statusEl.style.color = "var(--accent-red)";
+  }
+}
+function undoConfig(key, statusEl) {
+  if (state.undo(key)) {
+    router.resolve();
+    statusEl.textContent = "Undone (re-render).";
+  } else {
+    toast("Nothing to undo", "info");
+  }
+}
+function resetConfig(key, statusEl) {
+  state.resetDirty(key);
+  router.resolve();
+  statusEl.textContent = "Reset to server state.";
+}
+async function runDryRun() {
+  toast("Running dry-run…", "info");
+  const r = await api.post("/api/sync/dry-run").catch(e => ({ success: false, output: e.message }));
+  showModal("Dry-run output", el("pre", {}, [r.output || "(no output)"]), [
+    el("button", { class: "btn", onclick: hideModal }, ["Close"]),
+  ]);
+}
+
+/* =========================================================================
+ * Views — Role-defaults / table-style configs
+ * ========================================================================= */
+async function viewRoleDefaults() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["role-defaults.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/role-defaults"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  state.setConfig("role-defaults", data, true);
+
+  const roles = data.roles || {};
+  const status = el("div", { class: "muted" }, [`${Object.keys(roles).length} roles`]);
+  wrap.appendChild(status);
+
+  const buttons = el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: () => saveConfig("role-defaults", status) }, ["Save"]),
+    el("button", { class: "btn", onclick: () => undoConfig("role-defaults", status) }, ["Undo"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]);
+  wrap.appendChild(buttons);
+
+  const table = el("table", { class: "data" });
+  table.appendChild(el("thead", {}, [el("tr", {}, ["Role", "Model", "Tier", "Parallel", "Permission mode"].map(h => el("th", {}, [h])))]));
+  const tbody = el("tbody");
+  const tierOptions = ["", "required", "recommended", "optional"];
+  const modelOptions = ["", "nano", "fast", "balanced", "powerful", "max", "haiku", "sonnet", "opus"];
+  const permOptions = ["", "default", "acceptEdits", "bypassPermissions", "plan"];
+
+  Object.entries(roles).sort().forEach(([name, attrs]) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    tr.appendChild(el("td", {}, [selectField(modelOptions, attrs.model || "", v => updateRole(name, "model", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(tierOptions, attrs.tier || attrs["workflow-tier"] || "", v => updateRole(name, "tier", v, status))]));
+    tr.appendChild(el("td", {}, [toggleField(!!attrs.parallel, v => updateRole(name, "parallel", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(permOptions, attrs.permissionMode || "", v => updateRole(name, "permissionMode", v, status))]));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+function updateRole(name, field, value, statusEl) {
+  const cfg = state.state.configs["role-defaults"] || {};
+  cfg.roles = cfg.roles || {};
+  cfg.roles[name] = cfg.roles[name] || {};
+  if (value === "" || value == null) delete cfg.roles[name][field];
+  else cfg.roles[name][field] = value;
+  state.state.dirty.add("role-defaults");
+  statusEl.textContent = "Unsaved changes.";
+  statusEl.style.color = "var(--accent-yellow)";
+}
+
+function selectField(options, value, onChange) {
+  const sel = el("select");
+  for (const opt of options) {
+    const o = el("option", { value: opt }, [opt || "—"]);
+    if (opt === value) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener("change", () => onChange(sel.value));
+  return sel;
+}
+function toggleField(value, onChange) {
+  const wrap = el("label", { class: "toggle" });
+  const cb = el("input", { type: "checkbox" });
+  cb.checked = !!value;
+  cb.addEventListener("change", () => onChange(cb.checked));
+  wrap.appendChild(cb); wrap.appendChild(el("span", { class: "slider" }));
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — AI providers (accordion)
+ * ========================================================================= */
+async function viewAIProviders() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["ai-providers.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/ai-providers"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  state.setConfig("ai-providers", data, true);
+
+  const status = el("div", { class: "muted" });
+  wrap.appendChild(status);
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: () => saveConfig("ai-providers", status) }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  const providers = data.providers || data || {};
+  for (const [provider, conf] of Object.entries(providers)) {
+    if (typeof conf !== "object" || conf === null) continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]));
+    const form = new SchemaFormGenerator({ type: "object", properties: inferSchema(conf) }, conf, (path, value, full) => {
+      providers[provider] = full;
+      state.state.dirty.add("ai-providers");
+      status.textContent = "Unsaved changes.";
+      status.style.color = "var(--accent-yellow)";
+    });
+    panel.appendChild(form.render());
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+function inferSchema(obj) {
+  const out = {};
+  if (typeof obj !== "object" || obj === null) return out;
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === "boolean") out[k] = { type: "boolean" };
+    else if (typeof v === "number") out[k] = { type: "number" };
+    else if (Array.isArray(v)) out[k] = { type: "array", items: { type: typeof (v[0] || "") === "number" ? "number" : "string" } };
+    else if (typeof v === "object" && v !== null) out[k] = { type: "object", properties: inferSchema(v) };
+    else out[k] = { type: "string" };
+  }
+  return out;
+}
+
+/* =========================================================================
+ * Views — Roles & delegation canvas (Phase 3)
+ * ========================================================================= */
+async function viewRoles() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Roles & delegation graph"]));
+  const hierarchy = await api.get("/api/agents/hierarchy").catch(() => ({ roles: [] }));
+  const roles = hierarchy.roles || [];
+
+  wrap.appendChild(el("p", {}, [
+    `${roles.length} roles defined in role-defaults.yaml. `,
+    "Click a card to toggle active / inactive. Shift-drag between nodes on the canvas to draw a delegation edge.",
+  ]));
+
+  const grid = el("div", { class: "role-grid" });
+  let active = new Set();
+  try {
+    const project = await api.get("/api/config/project");
+    active = new Set(project.roles || []);
+  } catch { /* project config may be absent in super_admin self-host */ }
+
+  roles.forEach(role => {
+    const card = el("div", { class: `role-card ${active.has(role.name) ? "active" : ""}` });
+    card.appendChild(el("div", { class: `tier-bar ${role.tier || "optional"}` }));
+    card.appendChild(el("div", { class: "name" }, [role.name]));
+    // Description: truncated for the card, full text kept on the title attr
+    // (native browser tooltip) so the user can hover for the complete line.
+    const fullDesc = role.description || "";
+    const shortDesc = fullDesc.length > 80 ? fullDesc.slice(0, 77) + "…" : fullDesc;
+    const descNode = el("div", {
+      class: "meta",
+      style: "font-size:11px; color:var(--text-secondary); margin-top:4px; line-height:1.35;",
+      title: fullDesc,
+    });
+    // textContent ensures the description is rendered as plain text — never
+    // interpreted as markup even if the YAML contains angle brackets/HTML.
+    descNode.textContent = shortDesc;
+    card.appendChild(descNode);
+    card.appendChild(el("div", { class: "meta" }, [
+      el("span", { class: `badge ${role.tier || "optional"}` }, [role.tier || "optional"]),
+      " ",
+      role.model || "—",
+    ]));
+    card.addEventListener("click", () => {
+      card.classList.toggle("active");
+      if (card.classList.contains("active")) active.add(role.name);
+      else active.delete(role.name);
+      toast(`${role.name} ${card.classList.contains("active") ? "activated" : "deactivated"}`, "info", 1500);
+    });
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+
+  wrap.appendChild(el("h2", {}, ["Delegation graph"]));
+  wrap.appendChild(el("p", { class: "muted" }, ["Shift+drag from one node onto another to draw a delegation edge. Cycles are rejected automatically."]));
+  const canvasWrap = el("div", { class: "canvas-wrap" });
+  const canvas = el("canvas", { id: "delegation-canvas", width: 1200, height: 560 });
+  const relayoutBtn = el("button", { class: "btn btn-ghost" }, ["Relayout"]);
+  const clearBtn = el("button", { class: "btn btn-ghost" }, ["Clear edges"]);
+  const toolbar = el("div", { class: "canvas-toolbar" }, [relayoutBtn, clearBtn]);
+  canvasWrap.appendChild(canvas);
+  canvasWrap.appendChild(toolbar);
+  wrap.appendChild(canvasWrap);
+
+  // Single setTimeout: wait one frame for layout to settle, then instantiate
+  // the canvas once and bind the toolbar handlers to the live instance. No
+  // window.__dg leak, no race between two setTimeout calls.
+  // Seed edges from each role's declared delegation targets so the graph
+  // reflects the actual handoff topology defined in role-defaults.yaml.
+  const initialEdges = [];
+  for (const role of roles) {
+    for (const target of (role.targets || [])) {
+      initialEdges.push({ from: role.name, to: target });
+    }
+  }
+  setTimeout(() => {
+    canvas.width = canvas.parentElement.clientWidth - 2;
+    const dg = new DelegationCanvas(canvas, roles);
+    dg.setEdges(initialEdges);
+    relayoutBtn.addEventListener("click", () => {
+      dg.layout(roles);
+      dg.setEdges(initialEdges);
+    });
+    clearBtn.addEventListener("click", () => {
+      dg.edges = [];
+      dg._render();
+      toast("Cleared edges", "info");
+    });
+  }, 0);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        const project = await api.get("/api/config/project").catch(() => ({}));
+        project.roles = Array.from(active);
+        await api.put("/api/config/project", project);
+        toast("Active roles saved to project.yaml", "success");
+      } catch (err) {
+        toast(`Save failed: ${err.message}`, "error");
+      }
+    }}, ["Save active roles"]),
+  ]));
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Skills registry (Phase 3b)
+ * ========================================================================= */
+async function viewSkillsRegistry() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["skills-registry.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/skills-registry"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  // Defensive defaults — the file can have either top-level layout.
+  data.repos = data.repos || {};
+  data.skills = data.skills || {};
+
+  const status = el("div", { class: "muted" }, [
+    `${Object.keys(data.repos).length} repos · ${Object.keys(data.skills).length} skills`,
+  ]);
+  wrap.appendChild(status);
+
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/skills-registry", data);
+      toast("skills-registry saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  // ----------------------------------- Repos table
+  wrap.appendChild(el("h2", {}, ["Repos"]));
+  const repoTable = el("table", { class: "data" });
+  repoTable.appendChild(el("thead", {}, [
+    el("tr", {}, ["Name", "Repo URL", "Local path", "Pinned commit"].map(h => el("th", {}, [h]))),
+  ]));
+  const repoBody = el("tbody");
+  Object.entries(data.repos).forEach(([name, repo]) => {
+    if (!repo || typeof repo !== "object") return;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    const urlInp = el("input", { type: "url", value: repo.repo || "" });
+    urlInp.addEventListener("input", () => { repo.repo = urlInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [urlInp]));
+    const pathInp = el("input", { type: "text", value: repo.local_path || "" });
+    pathInp.addEventListener("input", () => { repo.local_path = pathInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [pathInp]));
+    const commitInp = el("input", { type: "text", value: repo.pinned_commit || "" });
+    commitInp.addEventListener("input", () => { repo.pinned_commit = commitInp.value; markDirty(); });
+    tr.appendChild(el("td", { class: "mono" }, [commitInp]));
+    repoBody.appendChild(tr);
+  });
+  repoTable.appendChild(repoBody);
+  wrap.appendChild(repoTable);
+
+  // ----------------------------------- Skills table
+  wrap.appendChild(el("h2", {}, ["Skills"]));
+  const skillTable = el("table", { class: "data" });
+  skillTable.appendChild(el("thead", {}, [
+    el("tr", {}, ["Name", "Approved", "Enabled (planned)", "Repo", "Role"].map(h => el("th", {}, [h]))),
+  ]));
+  const skillBody = el("tbody");
+  Object.entries(data.skills).forEach(([name, skill]) => {
+    if (!skill || typeof skill !== "object") return;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    // approved toggle
+    const apprWrap = el("label", { class: "toggle" });
+    const apprCb = el("input", { type: "checkbox" });
+    apprCb.checked = !!skill.approved;
+    apprCb.addEventListener("change", () => { skill.approved = apprCb.checked; markDirty(); });
+    apprWrap.appendChild(apprCb); apprWrap.appendChild(el("span", { class: "slider" }));
+    tr.appendChild(el("td", {}, [apprWrap]));
+    // planned/enabled toggle
+    const enWrap = el("label", { class: "toggle" });
+    const enCb = el("input", { type: "checkbox" });
+    enCb.checked = !skill.planned; // "enabled" = !planned in current schema
+    enCb.addEventListener("change", () => { skill.planned = !enCb.checked; markDirty(); });
+    enWrap.appendChild(enCb); enWrap.appendChild(el("span", { class: "slider" }));
+    tr.appendChild(el("td", {}, [enWrap]));
+    // repo
+    const repoInp = el("input", { type: "text", value: skill.repo || "" });
+    repoInp.addEventListener("input", () => { skill.repo = repoInp.value; markDirty(); });
+    tr.appendChild(el("td", {}, [repoInp]));
+    // role
+    const roleInp = el("input", { type: "text", value: skill.role || "" });
+    roleInp.addEventListener("input", () => { skill.role = roleInp.value; markDirty(); });
+    tr.appendChild(el("td", { class: "mono" }, [roleInp]));
+    skillBody.appendChild(tr);
+  });
+  skillTable.appendChild(skillBody);
+  wrap.appendChild(skillTable);
+
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — MCP registry (Phase 3c)
+ * ========================================================================= */
+async function viewMcpRegistry() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["mcp-registry.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/mcp-registry"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data["mcp-servers"] = data["mcp-servers"] || {};
+  const servers = data["mcp-servers"];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(servers).length} MCP servers`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/mcp-registry", data);
+      toast("mcp-registry saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  for (const [id, srv] of Object.entries(servers)) {
+    if (!srv || typeof srv !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
+      id,
+      el("span", { class: "muted", style: "margin-left:8px; font-weight:400;" }, [srv.description || ""]),
+    ]));
+
+    // Display name (description)
+    const dField = el("div", { class: "field" });
+    dField.appendChild(el("label", { class: "field-label" }, ["Description"]));
+    const dInp = el("input", { type: "text", value: srv.description || "" });
+    dInp.addEventListener("input", () => { srv.description = dInp.value; markDirty(); });
+    dField.appendChild(dInp);
+    panel.appendChild(dField);
+
+    // Transport
+    srv.connection = srv.connection || { type: "stdio" };
+    const tField = el("div", { class: "field" });
+    tField.appendChild(el("label", { class: "field-label" }, ["Transport"]));
+    const tSel = el("select");
+    for (const t of ["stdio", "http", "sse"]) {
+      const o = el("option", { value: t }, [t]);
+      if ((srv.connection.type || "stdio") === t) o.selected = true;
+      tSel.appendChild(o);
+    }
+    tSel.addEventListener("change", () => { srv.connection.type = tSel.value; markDirty(); });
+    tField.appendChild(tSel);
+    panel.appendChild(tField);
+
+    // Command / URL
+    const cField = el("div", { class: "field" });
+    cField.appendChild(el("label", { class: "field-label" }, ["Command / URL"]));
+    const cInp = el("input", { type: "text" });
+    cInp.value = srv.connection.command || srv.connection.url || "";
+    cInp.addEventListener("input", () => {
+      if (srv.connection.type === "stdio") srv.connection.command = cInp.value;
+      else srv.connection.url = cInp.value;
+      markDirty();
+    });
+    cField.appendChild(cInp);
+    panel.appendChild(cField);
+
+    // Enabled toggle (enabled-by-default)
+    const eField = el("div", { class: "field" });
+    eField.appendChild(el("label", { class: "field-label" }, ["enabled-by-default"]));
+    const eWrap = el("label", { class: "toggle" });
+    const eCb = el("input", { type: "checkbox" });
+    eCb.checked = !!srv["enabled-by-default"];
+    eCb.addEventListener("change", () => { srv["enabled-by-default"] = eCb.checked; markDirty(); });
+    eWrap.appendChild(eCb); eWrap.appendChild(el("span", { class: "slider" }));
+    eField.appendChild(eWrap);
+    panel.appendChild(eField);
+
+    // Tool whitelist / blacklist editors
+    srv.tools = srv.tools || {};
+    const wlField = el("div", { class: "field" });
+    wlField.appendChild(el("label", { class: "field-label" }, ["Allowed tools (comma-separated)"]));
+    wlField.appendChild(tagEditor(srv.tools.allowed || [], v => { srv.tools.allowed = v; markDirty(); }));
+    panel.appendChild(wlField);
+
+    const blField = el("div", { class: "field" });
+    blField.appendChild(el("label", { class: "field-label" }, ["Blocked tools (comma-separated)"]));
+    blField.appendChild(tagEditor(srv.tools.blocked || [], v => { srv.tools.blocked = v; markDirty(); }));
+    panel.appendChild(blField);
+
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+/* Reusable tag editor — comma- or Enter-separated entries; safe DOM build. */
+function tagEditor(initial, onChange) {
+  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px; flex-wrap:wrap;" });
+  const tags = Array.isArray(initial) ? [...initial] : [];
+  const tagsContainer = el("div", { class: "flex-row", style: "gap:4px; flex-wrap:wrap;" });
+  const inp = el("input", { type: "text", placeholder: "add tag, then Enter or comma", style: "min-width:180px;" });
+
+  const render = () => {
+    tagsContainer.replaceChildren();
+    tags.forEach((t, i) => {
+      const tag = el("span", { class: "badge" });
+      tag.appendChild(document.createTextNode(String(t) + " "));
+      const rm = el("button", {
+        class: "btn btn-ghost",
+        style: "padding:0 6px; font-size:11px; margin-left:4px;",
+        title: "remove",
+      }, ["×"]);
+      rm.addEventListener("click", () => {
+        tags.splice(i, 1);
+        onChange([...tags]);
+        render();
+      });
+      tag.appendChild(rm);
+      tagsContainer.appendChild(tag);
+    });
+  };
+  const commit = () => {
+    const raw = inp.value.trim();
+    if (!raw) return;
+    // Accept comma-separated chunks for fast multi-add.
+    for (const piece of raw.split(",").map(s => s.trim()).filter(Boolean)) {
+      if (!tags.includes(piece)) tags.push(piece);
+    }
+    inp.value = "";
+    onChange([...tags]);
+    render();
+  };
+  inp.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === ",") {
+      ev.preventDefault();
+      commit();
+    }
+  });
+  inp.addEventListener("blur", commit);
+  render();
+  wrap.appendChild(tagsContainer);
+  wrap.appendChild(inp);
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — DoD presets (Phase 3d)
+ * ========================================================================= */
+async function viewDodPresets() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["dod-presets.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/dod-presets"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.presets = data.presets || {};
+  const presets = data.presets;
+
+  // Collect every column ever used across presets — keeps the matrix complete
+  // even if individual presets omit certain criteria.
+  const knownCols = new Set();
+  for (const p of Object.values(presets)) {
+    if (p && typeof p === "object") {
+      for (const k of Object.keys(p)) knownCols.add(k);
+    }
+  }
+  // Default columns guarantee a stable layout even for empty configs.
+  for (const k of ["req-traceability", "tests-required", "codebase-overview", "security-audit"]) {
+    knownCols.add(k);
+  }
+  const columns = [...knownCols];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(presets).length} presets · ${columns.length} criteria`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/dod-presets", data);
+      toast("dod-presets saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  const table = el("table", { class: "data" });
+  const headerCells = [el("th", {}, ["Preset"]), ...columns.map(c => el("th", {}, [c]))];
+  table.appendChild(el("thead", {}, [el("tr", {}, headerCells)]));
+  const tbody = el("tbody");
+  for (const [name, preset] of Object.entries(presets)) {
+    if (!preset || typeof preset !== "object") continue;
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+    for (const col of columns) {
+      const td = el("td");
+      const cb = el("input", { type: "checkbox" });
+      cb.checked = !!preset[col];
+      cb.addEventListener("change", () => { preset[col] = cb.checked; markDirty(); });
+      td.appendChild(cb);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Delegation syntax (Phase 3e)
+ * ========================================================================= */
+async function viewDelegationSyntax() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["delegation-syntax.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/delegation-syntax"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.delegation_syntax = data.delegation_syntax || {};
+  const providers = data.delegation_syntax;
+
+  if (!Object.keys(providers).length) {
+    wrap.appendChild(el("div", { class: "empty" }, [
+      "delegation-syntax.yaml is empty or missing the delegation_syntax key.",
+    ]));
+    return wrap;
+  }
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(providers).length} providers`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/delegation-syntax", data);
+      toast("delegation-syntax saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  for (const [provider, conf] of Object.entries(providers)) {
+    if (!conf || typeof conf !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]));
+    for (const [varName, value] of Object.entries(conf)) {
+      const field = el("div", { class: "field" });
+      field.appendChild(el("label", { class: "field-label" }, [varName]));
+      if (typeof value === "string") {
+        const ta = el("textarea", { rows: Math.min(10, Math.max(2, value.split("\n").length)) });
+        ta.value = value;
+        ta.addEventListener("input", () => { conf[varName] = ta.value; markDirty(); });
+        field.appendChild(ta);
+      } else if (typeof value === "boolean") {
+        const wrapL = el("label", { class: "toggle" });
+        const cb = el("input", { type: "checkbox" });
+        cb.checked = !!value;
+        cb.addEventListener("change", () => { conf[varName] = cb.checked; markDirty(); });
+        wrapL.appendChild(cb); wrapL.appendChild(el("span", { class: "slider" }));
+        field.appendChild(wrapL);
+      } else {
+        // Complex types (arrays/objects) — show as read-only JSON; editing
+        // happens via the raw YAML for now to avoid scope creep.
+        const pre = el("pre");
+        pre.textContent = JSON.stringify(value, null, 2);
+        field.appendChild(pre);
+      }
+      panel.appendChild(field);
+    }
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Export config (Phase 3f)
+ * ========================================================================= */
+async function viewExport() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["export.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/export"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  if (typeof data !== "object" || data === null) data = {};
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(data).length} export mappings`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/export", data);
+      toast("export.yaml saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  const addRow = () => {
+    const name = prompt("Export mapping name (e.g. test-models):", "");
+    if (!name) return;
+    if (data[name]) {
+      toast("Already exists", "warning");
+      return;
+    }
+    data[name] = { target: "markdown", output_dir: `docs/${name}/` };
+    markDirty();
+    render();
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: addRow }, ["Add mapping"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  const tableContainer = el("div");
+  wrap.appendChild(tableContainer);
+
+  const targets = ["markdown", "confluence", "jira-xray", "notion"];
+
+  function render() {
+    tableContainer.replaceChildren();
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Mapping", "Target", "Output dir", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    for (const [name, conf] of Object.entries(data)) {
+      if (!conf || typeof conf !== "object") continue;
+      const tr = el("tr");
+      tr.appendChild(el("td", { class: "mono" }, [name]));
+
+      // target dropdown
+      const tSel = el("select");
+      const knownTargets = new Set(targets);
+      const current = conf.target || "markdown";
+      if (current && !knownTargets.has(current)) {
+        tSel.appendChild(el("option", { value: current }, [current + " (unknown)"]));
+      }
+      for (const t of targets) {
+        const o = el("option", { value: t }, [t]);
+        if (t === current) o.selected = true;
+        tSel.appendChild(o);
+      }
+      tSel.addEventListener("change", () => { conf.target = tSel.value; markDirty(); });
+      tr.appendChild(el("td", {}, [tSel]));
+
+      // output_dir input
+      const dirInp = el("input", { type: "text", value: conf.output_dir || "" });
+      dirInp.addEventListener("input", () => { conf.output_dir = dirInp.value; markDirty(); });
+      tr.appendChild(el("td", {}, [dirInp]));
+
+      // delete row
+      const delBtn = el("button", { class: "btn btn-danger" }, ["×"]);
+      delBtn.addEventListener("click", () => {
+        if (!confirm(`Remove export mapping "${name}"?`)) return;
+        delete data[name];
+        markDirty();
+        render();
+      });
+      tr.appendChild(el("td", {}, [delBtn]));
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tableContainer.appendChild(table);
+  }
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Pipelines (Phase 4)
+ * ========================================================================= */
+const STAGE_MODES = [
+  "sequential",
+  "parallel_group",
+  "fanout",
+  "loop",
+  "conditional",
+  "agent_decision",
+];
+
+async function viewPipelines() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Quality pipelines"]));
+
+  // Two parallel loads: the pipelines themselves (from role-defaults.yaml via
+  // /api/pipelines) and the agent hierarchy (used to populate agent dropdowns).
+  let envelope;
+  let hierarchy;
+  try {
+    [envelope, hierarchy] = await Promise.all([
+      api.get("/api/pipelines"),
+      api.get("/api/agents/hierarchy"),
+    ]);
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+  const pipelines = (envelope && envelope.pipelines && typeof envelope.pipelines === "object")
+    ? envelope.pipelines
+    : {};
+  const agentNames = (hierarchy && Array.isArray(hierarchy.roles))
+    ? hierarchy.roles.map(r => r.name).sort()
+    : [];
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(pipelines).length} pipelines loaded.`]);
+  wrap.appendChild(status);
+
+  const savePipelines = async () => {
+    try {
+      await api.put("/api/pipelines", { pipelines });
+      toast("Pipelines saved to role-defaults.yaml", "success");
+      status.textContent = `${Object.keys(pipelines).length} pipelines (saved).`;
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  const addPipelinePrompt = () => {
+    const name = prompt("Pipeline name:", "new-pipeline");
+    if (!name) return;
+    if (pipelines[name]) {
+      toast(`Pipeline ${name} already exists`, "warning");
+      return;
+    }
+    pipelines[name] = {
+      description: "",
+      stages: [{ id: "stage-1", agent: agentNames[0] || "developer", task: "describe the work", mode: "sequential" }],
+      on_error: "escalate_to_orchestrator",
+    };
+    render();
+  };
+
+  const toolbar = el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: savePipelines }, ["Save pipelines"]),
+    el("button", { class: "btn", onclick: addPipelinePrompt }, ["Add pipeline"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]);
+  wrap.appendChild(toolbar);
+
+  const container = el("div", { class: "pipelines-container" });
+  wrap.appendChild(container);
+
+  function render() {
+    container.replaceChildren();
+    const names = Object.keys(pipelines);
+    if (!names.length) {
+      container.appendChild(el("div", { class: "empty" }, ['No pipelines defined yet — click "Add pipeline".']));
+      return;
+    }
+    for (const name of names) {
+      container.appendChild(pipelineBlock(name));
+    }
+    status.textContent = `${names.length} pipelines.`;
+    status.style.color = "";
+  }
+
+  function pipelineBlock(name) {
+    const pipeline = pipelines[name];
+    if (!pipeline || typeof pipeline !== "object") return el("div");
+    const block = el("div", { class: "pipeline-block panel" });
+    const header = el("div", { class: "panel-title" }, [
+      el("h2", { style: "margin:0;" }, [name]),
+      el("button", {
+        class: "btn btn-danger",
+        onclick: () => {
+          if (!confirm(`Delete pipeline "${name}"?`)) return;
+          delete pipelines[name];
+          render();
+        },
+      }, ["Delete pipeline"]),
+    ]);
+    block.appendChild(header);
+
+    // Description field
+    const descField = el("div", { class: "field" });
+    descField.appendChild(el("label", { class: "field-label" }, ["Description"]));
+    const descInp = el("input", { type: "text", value: pipeline.description || "" });
+    descInp.addEventListener("input", () => { pipeline.description = descInp.value; });
+    descField.appendChild(descInp);
+    block.appendChild(descField);
+
+    // on_error select
+    const oeField = el("div", { class: "field" });
+    oeField.appendChild(el("label", { class: "field-label" }, ["on_error"]));
+    const oeSel = el("select");
+    for (const opt of ["escalate_to_orchestrator", "skip", "abort", "retry"]) {
+      const o = el("option", { value: opt }, [opt]);
+      if ((pipeline.on_error || "escalate_to_orchestrator") === opt) o.selected = true;
+      oeSel.appendChild(o);
+    }
+    oeSel.addEventListener("change", () => { pipeline.on_error = oeSel.value; });
+    oeField.appendChild(oeSel);
+    block.appendChild(oeField);
+
+    // Stages swimlane
+    const stages = Array.isArray(pipeline.stages) ? pipeline.stages : [];
+    pipeline.stages = stages;
+    const swim = el("div", { class: "swimlane" });
+    stages.forEach((stage, idx) => {
+      swim.appendChild(stageCard(stage, idx, stages, () => render()));
+    });
+    swim.appendChild(el("div", {
+      class: "stage-add",
+      onclick: () => {
+        stages.push({
+          id: `stage-${stages.length + 1}`,
+          agent: agentNames[0] || "developer",
+          task: "describe the work",
+          mode: "sequential",
+        });
+        render();
+      },
+    }, ["+ Add stage"]));
+    block.appendChild(swim);
+    return block;
+  }
+
+  function stageCard(stage, idx, list, refresh) {
+    const node = el("div", { class: "stage" });
+
+    // id input
+    const idInp = el("input", { type: "text", placeholder: "stage id", value: stage.id || stage.name || "" });
+    idInp.addEventListener("input", () => {
+      stage.id = idInp.value;
+      // Mirror to "name" for backward-compat with older project.yaml entries.
+      stage.name = idInp.value;
+    });
+    node.appendChild(idInp);
+
+    // mode dropdown
+    const modeSel = el("select", { title: "stage mode" });
+    for (const opt of STAGE_MODES) {
+      const o = el("option", { value: opt }, [opt]);
+      if ((stage.mode || "sequential") === opt) o.selected = true;
+      modeSel.appendChild(o);
+    }
+    modeSel.addEventListener("change", () => {
+      stage.mode = modeSel.value;
+      refresh();
+    });
+    node.appendChild(modeSel);
+
+    // agent dropdown (from hierarchy). Fall back to a free-text input if the
+    // hierarchy is empty so the form stays usable in degraded modes.
+    if (agentNames.length) {
+      const ag = el("select", { title: "agent" });
+      // Allow the currently configured agent even if it is not (yet) in the
+      // hierarchy list — avoids silently losing the value.
+      const known = new Set(agentNames);
+      const current = stage.agent || "";
+      if (current && !known.has(current)) {
+        ag.appendChild(el("option", { value: current }, [current + " (unknown)"]));
+      }
+      for (const name of agentNames) {
+        const o = el("option", { value: name }, [name]);
+        if (name === current) o.selected = true;
+        ag.appendChild(o);
+      }
+      ag.addEventListener("change", () => { stage.agent = ag.value; });
+      node.appendChild(ag);
+    } else {
+      const ag = el("input", { type: "text", placeholder: "agent", value: stage.agent || "" });
+      ag.addEventListener("input", () => { stage.agent = ag.value; });
+      node.appendChild(ag);
+    }
+
+    // task textarea
+    const taskTa = el("textarea", { rows: 2, placeholder: "task" });
+    taskTa.value = stage.task || "";
+    taskTa.addEventListener("input", () => { stage.task = taskTa.value; });
+    node.appendChild(taskTa);
+
+    // loop-specific controls
+    if (stage.mode === "loop") {
+      stage.loop = stage.loop || {};
+      const loop = stage.loop;
+      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:6px;" }, ["loop config"]));
+
+      const genWrap = el("div", { class: "field" });
+      genWrap.appendChild(el("label", { class: "field-label" }, ["generator"]));
+      genWrap.appendChild(agentDropdown(loop.generator, v => loop.generator = v));
+      node.appendChild(genWrap);
+
+      const critWrap = el("div", { class: "field" });
+      critWrap.appendChild(el("label", { class: "field-label" }, ["critic"]));
+      critWrap.appendChild(agentDropdown(loop.critic, v => loop.critic = v));
+      node.appendChild(critWrap);
+
+      const maxField = el("div", { class: "field" });
+      maxField.appendChild(el("label", { class: "field-label" }, ["max_iterations"]));
+      const mi = el("input", { type: "number", min: "1", max: "20" });
+      mi.value = loop.max_iterations ?? 3;
+      mi.addEventListener("input", () => {
+        const v = Number(mi.value);
+        loop.max_iterations = Number.isFinite(v) && v > 0 ? v : 1;
+      });
+      maxField.appendChild(mi);
+      node.appendChild(maxField);
+    }
+
+    // Move/delete row
+    node.appendChild(el("div", { class: "btn-row" }, [
+      el("button", {
+        class: "btn btn-ghost",
+        title: "move left",
+        onclick: () => {
+          if (idx > 0) { [list[idx-1], list[idx]] = [list[idx], list[idx-1]]; refresh(); }
+        },
+      }, ["←"]),
+      el("button", {
+        class: "btn btn-ghost",
+        title: "move right",
+        onclick: () => {
+          if (idx < list.length-1) { [list[idx+1], list[idx]] = [list[idx], list[idx+1]]; refresh(); }
+        },
+      }, ["→"]),
+      el("button", {
+        class: "btn btn-danger",
+        title: "delete stage",
+        onclick: () => { list.splice(idx, 1); refresh(); },
+      }, ["×"]),
+    ]));
+    return node;
+  }
+
+  function agentDropdown(value, onChange) {
+    if (!agentNames.length) {
+      const inp = el("input", { type: "text", placeholder: "agent name", value: value || "" });
+      inp.addEventListener("input", () => onChange(inp.value));
+      return inp;
+    }
+    const sel = el("select");
+    const known = new Set(agentNames);
+    if (value && !known.has(value)) {
+      sel.appendChild(el("option", { value: value }, [value + " (unknown)"]));
+    }
+    sel.appendChild(el("option", { value: "" }, ["— select —"]));
+    for (const name of agentNames) {
+      const o = el("option", { value: name }, [name]);
+      if (name === value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => onChange(sel.value));
+    return sel;
+  }
+
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Agent template editor (Phase 5)
+ * ========================================================================= */
+async function viewAgentTemplates() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Agent templates"]));
+  const info = await api.get("/api/agents/templates").catch(() => ({ templates: [], available: false }));
+  if (!info.available) {
+    wrap.appendChild(el("div", { class: "empty" }, ["Agent templates are only editable in super-admin mode (agents/1-generic/ must exist)."]));
+    return wrap;
+  }
+
+  const split = el("div", { class: "split-pane" });
+  const list = el("div", { class: "template-list" });
+  const editor = el("div", { class: "template-editor" });
+  const textarea = el("textarea", { placeholder: "Select a template…" });
+  const status = el("div", { class: "muted" });
+  const saveBtn = el("button", { class: "btn btn-primary", disabled: true }, ["Save template"]);
+  let activeRole = null;
+
+  info.templates.forEach(role => {
+    const row = el("div", { class: "template-row", onclick: async () => {
+      [...list.querySelectorAll(".template-row")].forEach(r => r.classList.remove("active"));
+      row.classList.add("active");
+      activeRole = role;
+      textarea.value = await api.getText(`/api/agent-template/${role}`).catch(e => `Error: ${e.message}`);
+      saveBtn.disabled = false;
+      status.textContent = `Loaded ${role}.md`;
+    }}, [role]);
+    list.appendChild(row);
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    if (!activeRole) return;
+    try {
+      const r = await api.put(`/api/agent-template/${activeRole}`, { content: textarea.value });
+      toast(`Saved ${activeRole}.md (${r.bytes} bytes)`, "success");
+      status.textContent = `Saved ${activeRole}.md`;
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+    }
+  });
+
+  editor.appendChild(textarea);
+  editor.appendChild(el("div", { class: "btn-row" }, [saveBtn, status]));
+
+  split.appendChild(list);
+  split.appendChild(editor);
+  wrap.appendChild(split);
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Sync controls
+ * ========================================================================= */
+async function viewSync() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Sync"]));
+  wrap.appendChild(el("p", {}, ["Run sync.py and view its output in real time."]));
+
+  // Renamed from ``console`` to avoid shadowing the global console object.
+  const consoleEl = el("div", { class: "console" }, ["(idle)"]);
+  const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
+  const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
+  wrap.appendChild(el("div", { class: "btn-row" }, [runBtn, dryBtn]));
+  wrap.appendChild(consoleEl);
+
+  const setOutput = (text) => {
+    consoleEl.replaceChildren();
+    const lines = String(text || "").split("\n");
+    for (const line of lines) {
+      let cls = "line-info";
+      if (/WRITE|UPDATE|COPY|DONE|✓/i.test(line)) cls = "line-write";
+      else if (/WARN|warning/i.test(line)) cls = "line-warn";
+      else if (/ERROR|FAIL|!!/i.test(line)) cls = "line-error";
+      consoleEl.appendChild(el("div", { class: cls }, [line]));
+    }
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  };
+
+  runBtn.addEventListener("click", async () => {
+    runBtn.disabled = true; dryBtn.disabled = true;
+    setOutput("Running sync.py …");
+    try {
+      const r = await api.post("/api/sync/run");
+      setOutput(r.output);
+      toast(r.success ? "Sync complete" : "Sync failed", r.success ? "success" : "error");
+    } catch (err) { setOutput(err.message); toast(err.message, "error"); }
+    finally { runBtn.disabled = false; dryBtn.disabled = false; }
+  });
+  dryBtn.addEventListener("click", async () => {
+    runBtn.disabled = true; dryBtn.disabled = true;
+    setOutput("Running sync.py --validate …");
+    try {
+      const r = await api.post("/api/sync/dry-run");
+      setOutput(r.output);
+      toast(r.success ? "Dry-run OK" : "Dry-run reported issues", r.success ? "success" : "warning");
+    } catch (err) { setOutput(err.message); toast(err.message, "error"); }
+    finally { runBtn.disabled = false; dryBtn.disabled = false; }
+  });
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Live event stream (Phase 6)
+ * ========================================================================= */
+async function viewLive() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Live events"]));
+  wrap.appendChild(el("p", { class: "muted" }, ["Streams .meta-viz/events.jsonl in real time. Run the server with --watch to also capture filesystem changes to configs."]));
+  // Renamed from ``console`` to avoid shadowing the global console object.
+  const consoleEl = el("div", { class: "console" }, ["(connecting…)"]);
+  wrap.appendChild(consoleEl);
+
+  const append = (event) => {
+    if (consoleEl.textContent === "(connecting…)") consoleEl.replaceChildren();
+    const line = el("div", { class: "line-info" }, [JSON.stringify(event)]);
+    consoleEl.appendChild(line);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  };
+  const stream = api.streamEvents("/api/events", append);
+  // disconnect on route change
+  window.addEventListener("hashchange", () => { try { stream.close(); } catch {} }, { once: true });
+  return wrap;
+}
+
+/* =========================================================================
+ * Bootstrap
+ * ========================================================================= */
+async function init() {
+  // Mode detection
+  try {
+    const mode = await api.get("/api/mode");
+    state.state.mode = mode.mode;
+    state.state.allowedKeys = mode.allowed_keys || [];
+    const badge = document.getElementById("mode-badge");
+    badge.textContent = mode.mode;
+    badge.classList.toggle("project", mode.mode === "project_admin");
+  } catch (err) {
+    document.getElementById("content").innerHTML = "";
+    document.getElementById("content").appendChild(renderError(err));
+    return;
+  }
+
+  // Schema
+  let schema = { type: "object", properties: {} };
+  try { schema = await api.get("/api/schema/project"); } catch { /* optional */ }
+  state.state.schema = schema;
+  const schemaP = Promise.resolve(schema);
+
+  // Routes
+  router.register("/",                viewDashboard);
+  router.register("/sync",            viewSync);
+  router.register("/live",            viewLive);
+  router.register("/config/project",  configView("project", "project.yaml", schemaP));
+  router.register("/config/role-defaults",     viewRoleDefaults);
+  router.register("/config/ai-providers",      viewAIProviders);
+  router.register("/config/skills-registry",   viewSkillsRegistry);
+  router.register("/config/mcp-registry",      viewMcpRegistry);
+  router.register("/config/dod-presets",       viewDodPresets);
+  router.register("/config/delegation-syntax", viewDelegationSyntax);
+  router.register("/config/export",            viewExport);
+  router.register("/roles",     viewRoles);
+  router.register("/pipelines", viewPipelines);
+  router.register("/agents",    viewAgentTemplates);
+
+  buildSidebar();
+  router.resolve();
+}
+
+init();
+</script>
+</body>
+</html>
