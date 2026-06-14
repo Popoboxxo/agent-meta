@@ -4,6 +4,25 @@
 
 ---
 
+## [0.59.0] — 2026-06-15
+
+### Added
+
+- **Admin UI**: new single-file web frontend (`docs/admin-ui.html`) with Vanilla JS and dark theme — zero dependencies, browser-native editor.
+- **Admin Server** (`scripts/admin-server.py`): stdlib HTTP server for config read/write operations, sync.py integration, SSE live events — no external dependencies.
+- **Complete Admin Roadmap**: all 6 phases implemented in a single release:
+  - Phase 1: Static viewer for current agent-meta state
+  - Phase 2: Edit and validate configuration changes inline
+  - Phase 3: Role drag-and-drop with delegation graph visualization
+  - Phase 4: Pipeline builder for orchestrator workflows
+  - Phase 5: Super-admin editors for skills, MCP, DoD, delegation rules, export targets, role-defaults, AI providers, and agent templates
+  - Phase 6: Live-sync watcher for real-time configuration updates
+- **Security hardening**: loopback-only binding, CSRF/Origin validation, no innerHTML sinks, atomic writes with backup.
+- **Admin CLI flags**: `sync.py --admin`, `sync.py --admin-only`, `sync.py --admin-port` for flexible deployment.
+- **Test coverage**: 24 unit tests for admin-server with full integration coverage.
+
+---
+
 ## [0.58.0] — 2026-06-14
 
 ### Added
