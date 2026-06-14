@@ -1,0 +1,47 @@
+name: Orchestration Tests
+
+# Validiert Orchestrator-/Runtime-Verhalten und Template-Konsistenz.
+# Konzept: docs/concepts/orchestrator-first-architecture.md (L3 — CI/CD Orchestration Tests)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'agents/**'
+      - '.github/workflows/orchestration-test.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'agents/**'
+      - '.github/workflows/orchestration-test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11', '3.12']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run orchestration & runtime tests
+        run: python -m pytest tests/ -q
+
+      - name: Validate agent templates
+        run: python scripts/sync.py --validate
