@@ -35,6 +35,7 @@ External skills (config/skills-registry.yaml in agent-meta):
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -314,6 +315,14 @@ def main():
     parser.add_argument("--clear-cache", action="store_true",
                         help="Clear the outcome cache")
 
+    # Admin UI server (zero-dependency stdlib HTTP server)
+    parser.add_argument("--admin", action="store_true",
+                        help="Start Admin UI server after running sync (port: --admin-port)")
+    parser.add_argument("--admin-only", action="store_true",
+                        help="Start Admin UI server without running sync first")
+    parser.add_argument("--admin-port", type=int, default=7420,
+                        help="Admin UI server port (default: 7420)")
+
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
                         help="Register a new external skill: git submodule add + config entry")
@@ -337,6 +346,20 @@ def main():
         from lib.cache import invalidate, CACHE_FILE
         invalidate(CACHE_FILE)
         print("Outcome cache cleared.")
+        return
+
+    if args.admin_only:
+        admin_script = agent_meta_root / "scripts" / "admin-server.py"
+        if not admin_script.exists():
+            print(f"  !  admin-server.py not found at {admin_script}", file=sys.stderr)
+            sys.exit(1)
+        print(f"  i  Starting Admin UI server (admin-only mode) on port {args.admin_port}…")
+        subprocess.run(
+            [sys.executable, str(admin_script),
+             "--port", str(args.admin_port),
+             "--root", str(agent_meta_root)],
+            check=False,
+        )
         return
 
     if args.dry_run:
@@ -653,6 +676,19 @@ def main():
     _speech = config.get("speech-mode", "full") if config else "full"
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run,
               providers=_providers, speech_mode=_speech)
+
+    if getattr(args, "admin", False):
+        admin_script = agent_meta_root / "scripts" / "admin-server.py"
+        if not admin_script.exists():
+            print(f"  !  admin-server.py not found at {admin_script}", file=sys.stderr)
+        else:
+            print(f"  i  Starting Admin UI server on port {args.admin_port}…")
+            subprocess.run(
+                [sys.executable, str(admin_script),
+                 "--port", str(args.admin_port),
+                 "--root", str(agent_meta_root)],
+                check=False,
+            )
 
 
 if __name__ == "__main__":
