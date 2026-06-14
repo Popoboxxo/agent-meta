@@ -5,6 +5,20 @@
 
 ---
 
+## Implementierungsstatus (verifiziert 2026-06-14)
+
+**Umgesetzt:**
+- Orchestrator v3.28 (Intent-Routing, Task-Decomposition, FANOUT/PARALLEL_GROUP/BARRIER, Unknown-Intent)
+- `{{PARALLEL_PATTERN}}`-Injektion, `orchestrator.enabled/strict/unknown-fallback` (`project.yaml`)
+- Selective Rule Embedding: `config/rules-presets.yaml` (`embed: false`)
+- pytest-Tests: `tests/test_barrier_runtime.py`, `tests/orchestration/dry_run/engine.py`
+- **CI/CD Orchestration Tests**: `.github/workflows/orchestration-test.yml` (L3 erledigt)
+
+**Offen:**
+- Main-Session-Thinning: `AGENTS.md` weiterhin ~613 Zeilen Managed Block (Architektur-Entscheidung)
+
+---
+
 ## Executive Summary
 
 Dieses Konzept beschreibt eine **provider-agnostische Neuausrichtung des Delegations-Systems** von agent-meta: Die Main Session wird zur **Smarten Kommunikationsoberfläche**, die zwar initialen Kontext lesen und verstehen darf, aber zwingend **automatisch via Tool** delegiert — alle eigentlichen Aufgaben fließen durch den Orchestrator, der sie als Verwaltungs-Bestie zerlegt, parallelisiert und an spezialisierte Worker-Agents delegiert.

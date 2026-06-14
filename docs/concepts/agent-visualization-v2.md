@@ -5,6 +5,20 @@
 
 ---
 
+## Implementierungsstatus (verifiziert 2026-06-14)
+
+**Umgesetzt:**
+- Feature 1 komplett: `scripts/lib/viz.py`, `docs/agent-mindmap.md`, `docs/agent-graph.html`
+- `scripts/viz-logger.py`, `scripts/viz-server.py`, `scripts/viz-report.py`, `docs/live-dashboard.html`
+- Dashboard ↔ Server verbunden: `viz-report.py` serviert `/api/state` + `/api/events`, `live-dashboard.html` fetcht sie
+- Cross-Process-File-Locking: `viz-logger.py::write_event_safe` (atomares `O_EXCL`-Lockfile + Retry + Cleanup)
+- Event-Prompt-Injection: `inject_viz_prompt_block` (`viz.py`), aufgerufen in `scripts/lib/agents.py`
+
+**Offen:**
+- Default-Aktivierung: `viz.enabled: false` (Dynamic Mode opt-in)
+
+---
+
 ## Executive Summary
 
 Nach Challenge durch den `ideation`-Agenten wurde das Konzept fundamental überarbeitet. Statt eines undurchführbaren Echtzeit-Dashboards wird das Feature in **zwei unabhängige, lösbarere Features** zerlegt:
