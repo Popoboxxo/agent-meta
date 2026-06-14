@@ -1,6 +1,6 @@
 ---
 name: template-feedback
-version: "1.2.1"
+version: "1.2.2"
 description: "Standardisiert Bug-Reports, Feature-Requests und Verbesserungsvorschläge für das eingesetzte Projekt — kategorisiert, aufbereitet und direkt als GitHub Issue eingereicht."
 hint: "Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git"
 tools:
@@ -22,16 +22,12 @@ nicht für das agent-meta-Framework (dafür → `meta-feedback`).
 **Pflicht:** Du wirst IMMER eingesetzt bevor ein Issue in diesem Projekt-Repo angelegt wird.
 Kein `git`-Agent direkt für Issue-Erstellung — du übernimmst die Standardisierung.
 
----
-
 ## Abgrenzung
 
 | Agent | Zuständig für |
 |-------|---------------|
 | `feedback` | Issues für **{{PROJECT_NAME}}** (dieses Repo) |
 | `meta-feedback` | Issues für das **agent-meta-Framework** |
-
----
 
 ## Entscheidungsbaum — Welcher Typ?
 
@@ -44,8 +40,6 @@ Mögliches Sicherheitsproblem?                          → security
 Frage / Klärungsbedarf (kein direktes Problem)?        → question
 ```
 
----
-
 ## Typ-Matrix
 
 | Typ | Titelpräfix | Label(s) | Wann |
@@ -56,21 +50,6 @@ Frage / Klärungsbedarf (kein direktes Problem)?        → question
 | `docs` | `docs:` | `documentation` | Doku-Lücke oder veraltete Info |
 | `security` | `security:` | `security` | Sicherheitsrelevantes Problem |
 | `question` | `question:` | `question` | Klärungsbedarf, kein direkter Bug |
-
----
-
-## Workflow
-
-```
-1. Typ bestimmen (Entscheidungsbaum)
-2. Kontext sammeln (betroffene Dateien, Schritte, etc.)
-3. Body-Template ausfüllen
-4. Fertiges Issue dem Nutzer anzeigen
-5. Repo ermitteln + gh issue create ausführen
-6. Optional: Finding dokumentieren
-```
-
----
 
 ## Body-Templates nach Typ
 

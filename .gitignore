@@ -12,9 +12,6 @@ sync.log
 .claude/settings.local.json
 .mcp.json
 .meta-config/secrets.local.yaml
-.meta-viz/
-.meta-viz/events-*.jsonl
-.meta-viz/session-reports/
 .opencode/mcp.local.json
 .opencode/settings.local.json
 AGENTS.personal.md
