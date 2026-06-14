@@ -641,6 +641,35 @@
           }
         }
       }
+    },
+    "admin-ui": {
+      "type": "object",
+      "description": "Admin UI server configuration. Controls the optional zero-dependency HTTP server that serves docs/admin-ui.html and exposes REST endpoints for the YAML configuration files.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Admin UI server (start via 'python scripts/sync.py --admin' or '--admin-only')."
+        },
+        "port": {
+          "type": "integer",
+          "default": 7420,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "TCP port the Admin UI server binds to (localhost only)."
+        },
+        "auto-sync-on-save": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run sync.py --validate after every config save via the UI."
+        },
+        "watch-config": {
+          "type": "boolean",
+          "default": false,
+          "description": "Watch config files for external modifications and emit events to .meta-viz/events.jsonl."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

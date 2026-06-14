@@ -101,9 +101,10 @@ Falls `.opencode/snippets/` existiert: sofort mit Read lesen und alle Patterns a
 
 agents/
   0-external/  1-generic/  2-platform/
-scripts/sync.py
+scripts/sync.py  scripts/admin-server.py
 snippets/tester/ snippets/developer/
 external/<repo>/
+tests/  docs/architecture/  docs/admin-ui.html
 
 
 ---
@@ -148,7 +149,6 @@ Bei correction_hints von einem Critic:
 - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
-- IMMER zuerst graph tools (z.B. code-review-graph) nutzen — effizienter als Grep/Glob/Read
 
 
 ## Delegation

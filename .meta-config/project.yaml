@@ -1,7 +1,7 @@
 # agent-meta verwendet sich selbst — kein Sharkord, kein Docker-Stack, kein Build-System.
 # Schema-Validierung: agent-meta.schema.json (JSON Schema bleibt JSON — IDE-Standard)
 
-agent-meta-version: 0.58.0
+agent-meta-version: 0.59.0
 
 # agent-meta manages all provider directories itself (1-generic, 2-platform, etc.)
 # Provider isolation must be disabled here — the meta-repo intentionally
@@ -119,13 +119,17 @@ variables:
     agents/
       0-external/       # Wrapper-Template für externe Skills
       1-generic/        # Universelle Agent-Templates
-      2-platform/       # Plattform-Overrides (z.B. sharkord)
+      2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
     scripts/
       sync.py           # Agent-Generator
-    snippets/           # Sprachspezifische Code-Snippets
+      admin-server.py   # Lokaler Admin-UI HTTP-Server
+    snippets/           # Sprachspezifische Code-Snippets (tester/, developer/)
     external/           # Git Submodule (externe Skill-Repos)
     howto/              # Anleitungen und Beispiel-Config
-    docs/architecture/  # Architektur-Diagramme (Mermaid)
+    docs/
+      architecture/     # Architektur-Diagramme (Mermaid)
+      admin-ui.html     # Admin-UI Frontend
+    tests/              # Test-Suite (automated, manual, orchestration)
   ENTRY_POINT_PATTERN: "scripts/sync.py — Haupt-CLI für Agent-Generierung"
   KEY_PATTERNS: |
     - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
@@ -135,9 +139,10 @@ variables:
   ARCHITECTURE: |
     agents/
       0-external/  1-generic/  2-platform/
-    scripts/sync.py
+    scripts/sync.py  scripts/admin-server.py
     snippets/tester/ snippets/developer/
     external/<repo>/
+    tests/  docs/architecture/  docs/admin-ui.html
   CODE_CONVENTIONS: |
     - Python: PEP 8, snake_case, klare Funktionsnamen
     - Keine externen Python-Dependencies außer Stdlib
@@ -147,7 +152,6 @@ variables:
     - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
     - KEINE Breaking Changes ohne Major-Version-Bump
     - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
-    - IMMER zuerst graph tools (z.B. code-review-graph) nutzen — effizienter als Grep/Glob/Read
   CODE_QUALITY_RULES: |
     - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
@@ -260,6 +264,13 @@ viz:
   report:
     retention_days: 7
     session_timeout_min: 5
+
+# Admin-UI — Lokale Verwaltungsoberfläche (optional)
+admin-ui:
+  enabled: true
+  port: 7420
+  auto-sync-on-save: false
+  watch-config: false
 
 quality-pipelines:
   overrides:
