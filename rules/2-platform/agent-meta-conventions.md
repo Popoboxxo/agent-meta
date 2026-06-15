@@ -65,5 +65,6 @@ Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/ak
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
 | `config/skills-registry.yaml` | Projekte neu syncen |
 | `config/role-defaults.yaml` (neue Rolle) | Tabellen in CLAUDE.md + howto-Dateien |
+| `config/project-config.schema.json` | IDE-Autocomplete prüfen, jsonschema-Validation testen |
 | `hint:` Feld in Agent-Template | Projekte syncen (AGENT_HINTS wird neu generiert) |
 | Rules oder Hooks in `rules/` / `hooks/` | Projekte syncen (werden überschrieben) |

@@ -407,6 +407,16 @@
         ]
       }
     },
+    "temperature-overrides": {
+      "type": "object",
+      "description": "Override sampling temperature per role. Float 0.0–1.0.",
+      "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+    },
+    "max-tokens-overrides": {
+      "type": "object",
+      "description": "Override max output tokens per role. Positive integer.",
+      "additionalProperties": { "type": "integer", "minimum": 1 }
+    },
     "dod-preset": {
       "type": "string",
       "description": "DoD quality profile. Sets defaults for all dod criteria. Individual overrides via 'dod' block. Presets defined in dod-presets.config.json.",

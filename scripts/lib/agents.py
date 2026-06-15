@@ -790,7 +790,7 @@ def sync_agents(
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
     from .config import substitute, strip_inactive_conditional_blocks
     from .providers import load_providers_config
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
     from .skills import load_external_skills_config, _skill_is_active
 
     provider_config = load_providers_config(agent_meta_root)
@@ -874,6 +874,18 @@ def sync_agents(
         if permission_mode:
             pm_src = "project override" if role in config.get("permission-mode-overrides", {}) else "meta default"
             log.info(str(target_path.relative_to(project_root)), f"permissionMode: {permission_mode} (from {pm_src})")
+
+        temperature = resolve_temperature(role, config, agent_meta_root)
+        if temperature:
+            content = _update_frontmatter_dict(content, {"temperature": float(temperature)})
+            temp_src = "project override" if role in config.get("temperature-overrides", {}) else "meta default"
+            log.info(str(target_path.relative_to(project_root)), f"temperature: {temperature} (from {temp_src})")
+
+        max_tokens = resolve_max_tokens(role, config, agent_meta_root)
+        if max_tokens:
+            content = _update_frontmatter_dict(content, {"max_tokens": int(max_tokens)})
+            mt_src = "project override" if role in config.get("max-tokens-overrides", {}) else "meta default"
+            log.info(str(target_path.relative_to(project_root)), f"max_tokens: {max_tokens} (from {mt_src})")
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         viz_cfg = config.get("viz", {})
@@ -973,7 +985,7 @@ def sync_agents_for_provider(
     from .config import substitute, strip_inactive_conditional_blocks
     from .pipelines import inject_pipeline_blocks, load_quality_pipelines, apply_overrides
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_steps, resolve_permission_mode, load_roles_config
+    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_max_tokens, resolve_steps, resolve_permission_mode, load_roles_config
     from .skills import load_external_skills_config, _skill_is_active
 
     pc = provider_config.get(provider)
@@ -1217,6 +1229,10 @@ def sync_agents_for_provider(
                 if temperature:
                     src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
                     log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
+                max_tokens = resolve_max_tokens(role, config, agent_meta_root)
+                if max_tokens:
+                    mt_src = 'project override' if role in config.get('max-tokens-overrides', {}) else 'meta default'
+                    log.info(str(target_path.relative_to(project_root)), f'max_tokens: {max_tokens} (from {mt_src})')
                 steps = resolve_steps(role, config, agent_meta_root)
                 if steps:
                     src = 'project override' if role in config.get('steps-overrides', {}) else 'meta default'
@@ -1553,7 +1569,11 @@ def _transform_frontmatter_for_opencode(
     if "temperature" in template_fm:
         updates["temperature"] = template_fm["temperature"]
     elif temperature:
-        updates["temperature"] = temperature
+        updates["temperature"] = float(temperature)
+
+    # Preserve max_tokens: template frontmatter takes precedence over role defaults
+    if "max_tokens" in template_fm:
+        updates["max_tokens"] = template_fm["max_tokens"]
 
     # Remove fields not used by opencode
     removes = [

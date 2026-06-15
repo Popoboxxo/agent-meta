@@ -66,6 +66,8 @@ Geeignet für schnelle, wiederkehrende Einzel-Aktionen.
 agent-meta verwaltet einen Teil der Commands automatisch (generisch und plattformspezifisch,
 analog zu Agenten). Projekt-eigene Commands in `.claude/3-project/commands/` werden nie überschrieben.
 
+> Vollständige Dokumentation: [howto/features/commands.md](../features/commands.md) — Layer-System, Frontmatter-Felder, `$ARGUMENTS`, `--create-command`, Stale-Tracking.
+
 | `.claude/agents/` | `.claude/commands/` |
 |-------------------|---------------------|
 | Vollständige Persona, isolierter Kontext | Schneller Einzel-Workflow im Hauptchat |

@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 1.1.0
+# version: 1.2.0
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
@@ -82,7 +82,7 @@ if [ -z "$TEST_CMD" ]; then
 fi
 
 echo "DoD-Check: Running '$TEST_CMD'..."
-if ! eval "$TEST_CMD" 2>&1; then
+if ! bash -c "$TEST_CMD" 2>&1; then  # Note: TEST_CMD executed via bash -c (no eval) — value from project.yaml
   echo ""
   echo "DoD-Check FAILED: Tests must pass before pushing."
   echo "Fix failing tests and retry, or disable the hook temporarily."
