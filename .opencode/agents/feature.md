@@ -61,7 +61,19 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 Bei "no" → abbrechen, Orchestrator informieren.
 
-**Ausgehend:** Delegationen an Sub-Agenten als A2A-Envelope: `source_agent: "feature"`, `trace_parent` = eigene `handoff_id` (PIPELINE-Chain), `schema_ref: "schemas/handoffs/task-spec.schema.json"` für developer/tester/validator.
+**Ausgehend:** Delegationen an Sub-Agenten als A2A-Envelope:
+```json
+{
+  "protocol_version": "1.0.0",
+  "handoff_id": "HOFF-YYYYMMDD-NNN",
+  "source_agent": "feature",
+  "target_agent": "developer",
+  "schema_ref": "schemas/handoffs/task-spec.schema.json",
+  "trace_parent": "<own-handoff_id>",
+  "payload": { "t": "<task>", "ctx": "<context>", "pri": "high" }
+}
+```
+`trace_parent` = eigene `handoff_id` (PIPELINE-Chain). `schema_ref` immer `schemas/handoffs/task-spec.schema.json` für developer/tester/validator.
 ## Kontext-Format (Pflicht bei jeder Delegation)
 
 ```

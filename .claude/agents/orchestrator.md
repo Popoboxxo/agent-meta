@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 3.28.0
+version: 3.30.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
@@ -162,6 +162,7 @@ Vor jeder Delegation prüfen — vermeidet unnötige Parallelisierung (~15× Tok
 | Architektur-Research / Design | Balanced | Bevorzugt | Bedingt |
 
 **Faustregel:** Kein natürlicher Split in ≥2 unabhängige Branches → zuerst an einen Agent delegieren.
+
 
 ### Regeln
 
@@ -384,6 +385,41 @@ Bei Output >200 Zeilen oder strukturiertem Report:
 **Wann:** Cascading Pipelines (≥3 Relay-Punkte), Analyse-Reports, große Changelogs.
 **Warum:** Referenz (~100 Tokens) statt Report (~5000 Tokens) — verhindert Context-Bloat und Telephone-Effekt.
 
+## Agent Return Format
+
+**Erwartetes Rückgabeformat** für alle Worker-Agenten nach einer Delegation:
+
+Jeder Subagent soll seine Antwort in einem der folgenden Formate zurückgeben — je nach Komplexität des Ergebnisses:
+
+**Standard (kompakt):**
+```
+STATUS: <done|partial|failed|escalate>
+RESULT: <1-2 Sätze was tatsächlich gemacht wurde>
+ARTIFACTS: <geänderte Dateien, optional>
+ERRORS: <Fehlermeldungen, leer wenn keiner>
+```
+
+**Erweitert (bei Eskalation oder Partial-Completion):**
+```
+STATUS: escalate | partial
+RESULT: <was wurde abgeschlossen>
+ESCALATE_REASON: <warum nicht vollständig — kurz>
+RECOMMENDED_TIER: <tier>
+PARTIAL_WORK: <was bereits erledigt ist>
+NEXT_STEPS: <konkrete nächste Schritte>
+```
+
+**Regeln:**
+- `STATUS: done` → Orchestrator fährt mit nächstem Schritt fort
+- `STATUS: partial` → Orchestrator zeigt dem User den Stand, fragt nach weiter/abbrechen
+- `STATUS: failed` → Orchestrator aktiviert Failure Recovery (→ »Delegation Failure Recovery«)
+- `STATUS: escalate` → Orchestrator dispatched sofort an `recommended_tier`, kein User-Gate
+- Kein freier Text ohne STATUS-Header — der Orchestrator muss den Status maschinenlesbar erkennen können
+
+**Schema-Referenz:** `schemas/a2a-handoff.schema.json` (Envelope), `schemas/handoffs/task-spec.schema.json` (Payload)
+
+---
+
 ## Quality Pipelines (Generated)
 
 ### Pipeline: standard-feature
@@ -559,10 +595,41 @@ python scripts/sync.py --dry-run
 ## Context & Checkpointing
 
 **Context Guard:** Nach >5 Delegationen Session-Stand in 2–3 Sätzen zusammenfassen. Bei Überlauf-Verdacht → priorisieren, nicht-essentielle Tasks verschieben, ggf. User nach Session-Reset fragen.
-**Checkpointing** (>5 Schritte):
-- Nach jedem Task: `scripts/lib/checkpoint.py` → `CheckpointStore.save_checkpoint(session_id, checkpoint)`
-- Session-Start: `CheckpointStore.list_sessions()` prüfen → Checkpoint → User informieren, ab da fortsetzen
-- Cleanup: Sessions >24h löschen, nach Erfolg `delete_session()`
+
+## Checkpointing
+
+Persistente Session-Checkpoints für lange Orchestrierungen (>5 Schritte).
+
+**Format** — `.meta-viz/checkpoint-<timestamp>.json`:
+```json
+{
+  "session_id": "<YYYYMMDD-HHMMSS>",
+  "created_at": "<ISO-8601>",
+  "task_summary": "<Ein-Satz-Beschreibung der Gesamtaufgabe>",
+  "completed_steps": [
+    { "step": 1, "agent": "<agent>", "result_key": "<key>", "status": "done" }
+  ],
+  "pending_steps": [
+    { "step": 2, "agent": "<agent>", "task": "<task-summary>" }
+  ],
+  "context": "<Zusammenfassung relevanter Zwischenergebnisse, max. 3 Sätze>"
+}
+```
+
+**Wann schreiben:** Vor jedem BARRIER-Punkt — also nachdem alle parallelen Sub-Tasks
+gestartet wurden, aber bevor auf ihre Ergebnisse gewartet wird. Sichert den
+Fortschritt gegen Context-Reset während laufender Delegation.
+
+**Wann lesen:** Beim Start einer neuen Session prüfen ob Checkpoints existieren:
+1. `.meta-viz/checkpoint-*.json` scannen (neuester zuerst nach `created_at`)
+2. Wenn Checkpoint gefunden → User informieren:
+   > "Es gibt einen unvollständigen Checkpoint vom `<created_at>`: `<task_summary>`.
+   > Fortsetzen ab Schritt `<nächster pending_step>`?"
+3. Bei Bestätigung → `pending_steps` sequentiell abarbeiten, `completed_steps` überspringen
+4. Nach Abschluss: Checkpoint-Datei löschen
+
+**Cleanup:** Checkpoints älter als 24h automatisch löschen (beim nächsten Start).
+Maximale Checkpoint-Größe: 50 KB — große `context`-Felder kürzen.
 
 ---
 

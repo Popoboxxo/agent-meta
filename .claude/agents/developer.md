@@ -122,7 +122,9 @@ agent-meta/
 Neue Funktionalität gehört in das zuständige `lib/`-Modul, nie direkt in `sync.py`.
 ## A2A Handoff — Eingehende Tasks
 
-Tasks können als A2A-Envelope (JSON) eintreffen. Aus `payload` extrahieren: `t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (Constraints), `refs[]` (Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
+**Schema:** `schemas/a2a-handoff.schema.json` (Envelope), `schemas/handoffs/task-spec.schema.json` (Payload).
+
+Tasks können als A2A-Envelope (JSON) eintreffen. Pflichtfelder prüfen: `protocol_version`, `handoff_id`, `source_agent`, `target_agent`, `payload`. Aus `payload` extrahieren: `t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (Constraints), `refs[]` (Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
 `batch: true` → `payload` ist Array, sequentiell abarbeiten (`batch_task_id` je Eintrag).
 Kein Envelope → Aufgabe normal ausführen.
 
@@ -132,6 +134,13 @@ Kein Envelope → Aufgabe normal ausführen.
 > "[Aufgabe aus payload.t]. Soll ich das ausführen? (yes/no)"
 
 Bei "no" → abbrechen, Orchestrator informieren.
+
+**Ausgabe (bei Rückgabe an Orchestrator):**
+```
+STATUS: done|partial|failed|escalate
+SUMMARY: <1-Satz-Zusammenfassung>
+FILES_CHANGED: <komma-separierte Liste>
+```
 
 ---
 

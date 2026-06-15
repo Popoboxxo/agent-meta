@@ -371,6 +371,24 @@ ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
 
 Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
 
+3. **Orchestrator:** Alles andere → an `orchestrator` delegieren.
+
+> **Merksatz:** Mehr als ein Schritt ODER mehr als ein Agent ODER Dateien in kritischen Pfaden → immer Orchestrator. Auch wenn der User eine kurze Lösung erwartet.
+
+## Direkter Dispatch (nur nach Regel 2)
+
+| Operation | Direkt an | Bedingung |
+|-----------|-----------|-----------|
+| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
+| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
+| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
+| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
+
+> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
+
+## Auto-Handoff
+
+Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
 
 ## Git Delegation — Hard Rule
 
@@ -395,6 +413,11 @@ ALLE anderen git-Operationen → an `git`-Agenten delegieren.
 
 **Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
 **Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
+
+# Main-Chat-Modus
+
+Orchestrator ist deaktiviert. Alle Aufgaben werden direkt im Hauptchat ausgeführt.
+Delegation an Subagenten ist optional und erfolgt nach eigenem Ermessen.
 
 ---
 
@@ -533,6 +556,7 @@ Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/ak
 | `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
 | `config/skills-registry.yaml` | Projekte neu syncen |
 | `config/role-defaults.yaml` (neue Rolle) | Tabellen in CLAUDE.md + howto-Dateien |
+| `config/project-config.schema.json` | IDE-Autocomplete prüfen, jsonschema-Validation testen |
 | `hint:` Feld in Agent-Template | Projekte syncen (AGENT_HINTS wird neu generiert) |
 | Rules oder Hooks in `rules/` / `hooks/` | Projekte syncen (werden überschrieben) |
 
