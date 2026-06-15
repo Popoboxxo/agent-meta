@@ -671,6 +671,23 @@ def main():
     if args.viz or viz_cfg.get("enabled", False) or viz_mode in ("static", "full"):
         generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
 
+    # AST dependency analysis summary (analysis.ast: true)
+    _analysis_cfg = config.get("analysis", {}) if config else {}
+    if isinstance(_analysis_cfg, dict) and _analysis_cfg.get("ast", False):
+        try:
+            from lib.analysis import analyze_file_dependencies, is_available
+            if is_available():
+                _deps = analyze_file_dependencies(agent_meta_root)
+                _dep_count = sum(len(v) for v in _deps.values())
+                _files_with_deps = sum(1 for v in _deps.values() if v)
+                print(
+                    f"\n  i  AST analysis: {len(_deps)} files scanned, "
+                    f"{_files_with_deps} with dependencies, "
+                    f"{_dep_count} total import edges in scripts/lib/"
+                )
+        except Exception:
+            pass
+
     log_path = project_root / LOGFILE
     _providers = resolve_providers(config, load_providers_config(agent_meta_root)) if config else []
     _speech = config.get("speech-mode", "full") if config else "full"

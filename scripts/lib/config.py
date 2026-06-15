@@ -71,11 +71,28 @@ def load_config(config_path: Path) -> dict:
             print(f"ERROR: PyYAML not installed but {config_path.name} requires it. "
                   f"Run: pip install pyyaml", file=sys.stderr)
             sys.exit(1)
-        with config_path.open(encoding="utf-8") as f:
-            config = _yaml.safe_load(f) or {}
+        try:
+            with config_path.open(encoding="utf-8") as f:
+                config = _yaml.safe_load(f) or {}
+        except _yaml.YAMLError as exc:
+            # Provide file name and line info for easier debugging
+            mark = getattr(exc, "problem_mark", None)
+            location = f" (line {mark.line + 1}, col {mark.column + 1})" if mark else ""
+            print(
+                f"ERROR: YAML parse error in {config_path}{location}: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     else:
-        with config_path.open(encoding="utf-8") as f:
-            config = json.load(f)
+        try:
+            with config_path.open(encoding="utf-8") as f:
+                config = json.load(f)
+        except json.JSONDecodeError as exc:
+            print(
+                f"ERROR: JSON parse error in {config_path} (line {exc.lineno}, col {exc.colno}): {exc.msg}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     _validate_config(config, config_path)
     return config
@@ -298,6 +315,22 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["CHECKPOINTING_ENABLED"] = (
         "false" if orch_config.get("checkpointing", True) is False else "true"
     )
+    # ANALYSIS_ENABLED: AST-based file affinity analysis for parallelization hints.
+    # Activate via: analysis: enabled: true in project.yaml (default: false).
+    # When enabled, FILE_AFFINITY_HINT is populated with a Markdown dependency table.
+    _analysis_cfg = config.get("analysis", {})
+    _analysis_enabled = bool(_analysis_cfg.get("enabled", False)) if isinstance(_analysis_cfg, dict) else False
+    variables["ANALYSIS_ENABLED"] = "true" if _analysis_enabled else "false"
+    if _analysis_enabled:
+        try:
+            from .analysis import FileAffinityAnalyzer, analyze_project
+            _deps = analyze_project(agent_meta_root)
+            _analyzer = FileAffinityAnalyzer(agent_meta_root)
+            variables["FILE_AFFINITY_HINT"] = _analyzer.format_hint(_deps)
+        except Exception:
+            variables["FILE_AFFINITY_HINT"] = ""
+    else:
+        variables["FILE_AFFINITY_HINT"] = ""
     # UNKNOWN_FALLBACK: granular flags (new object format) or legacy string
     unknown_fallback = orch_config.get("unknown-fallback", {})
     if isinstance(unknown_fallback, str):
@@ -397,7 +430,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
-    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "ANALYSIS_ENABLED")})
 
     if not conditional_vars:
         return text
