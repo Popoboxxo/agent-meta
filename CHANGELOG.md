@@ -4,6 +4,33 @@
 
 ---
 
+## [0.60.0] — 2026-06-15
+
+### Added
+
+- **Integrations Framework Concept**: new concept document (`docs/concepts/integrations-framework.md`) defining the semble-reference integration model — provider-agnostic integration patterns for external skill connectors.
+- **Replacement commands**: `admin.md`, `checkpoint.md`, `analysis.md`, `open-docs.md` replace the former `viz-*` command suite — purpose-built commands for admin UI lifecycle, orchestrator session management, AST dependency analysis, and documentation browser.
+- **Admin UI — target-repo view**: super-admin mode now exposes the meta-repo's own `.meta-config/project.yaml` as a "Target repo" section with a dedicated sidebar nav item (`/config/project-target`).
+- **Unified admin server entry-point**: `admin-server.py` becomes the single entry-point starting Viz dashboard and MCP SSE server as supervised subprocesses; `--no-viz` flag for lightweight / CI use; `/api/subserver-status` endpoint.
+- **A2A handoff schema**: complete schema with `timeout_seconds` and `escalation` fields; `delegation.a2a_envelope` boolean in `project-config.schema.json` for per-project opt-in.
+- **max_tokens support**: Claude provider now supports `max_tokens` injection and corrected temperature handling (`scripts/lib/agents.py`, `scripts/lib/roles.py`).
+- **Commands howto**: `howto/features/commands.md` documents the full Commands System (REQ-CMD-09).
+- **GitHub Actions validation pipeline**: `.github/workflows/validate.yml` — CI workflow validating generated files on every push.
+
+### Fixed
+
+- **PAL delegation engine gaps**: documented build-time vs runtime placeholder split; added schema-awareness (`get_schema_ref()`, `validate_envelope()` with graceful degradation); added Agent Return Format section (`STATUS/RESULT/ARTIFACTS/ERRORS`) to orchestrator (v3.29.0).
+- **Shell injection in dod-push-check.sh**: replaced `eval` with `bash -c` to prevent injection.
+- **Orchestrator-first rule missing for Gemini**: generic orchestrator-first rule now enforced on Gemini platform.
+- **PyYAML missing — graceful fallback**: `reflection.py` and `setup.py` now print a clear actionable error and exit cleanly instead of raising `ImportError` traceback.
+
+### Changed
+
+- **viz-* commands removed**: `viz-mindmap.md`, `viz-report.md`, `viz-toggle.md`, `viz-watch.md` replaced by the four purpose-built commands above.
+- **Orchestrator extended**: `use-orchestrator.md` rule expanded with Main-Chat-Modus section; orchestrator agent gains full `checkpoint`, `analysis`, and `open-docs` awareness.
+
+---
+
 ## [0.59.0] — 2026-06-15
 
 ### Added
