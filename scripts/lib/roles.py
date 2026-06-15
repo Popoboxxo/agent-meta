@@ -183,6 +183,21 @@ def resolve_temperature(role: str, project_config: dict, agent_meta_root: Path) 
     return roles_cfg["roles"].get(role, {}).get("temperature", "")
 
 
+def resolve_max_tokens(role: str, project_config: dict, agent_meta_root: Path) -> str:
+    """Resolve the max_tokens for a role.
+
+    Precedence (highest to lowest):
+    1. Project override: project_config["max-tokens-overrides"][role]
+    2. Meta default:     role-defaults.yaml roles[role].max_tokens
+    3. Empty string:     no max_tokens: field injected
+    """
+    project_overrides = project_config.get("max-tokens-overrides", {})
+    if role in project_overrides:
+        return str(project_overrides[role])
+    roles_cfg = load_roles_config(agent_meta_root)
+    return str(roles_cfg["roles"].get(role, {}).get("max_tokens", "")) or ""
+
+
 def resolve_steps(role: str, project_config: dict, agent_meta_root: Path) -> str:
     """Resolve the steps limit for a role.
 

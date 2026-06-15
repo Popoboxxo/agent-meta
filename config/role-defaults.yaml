@@ -30,6 +30,9 @@
 #
 # workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
 #   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
+#
+# temperature: Sampling-Temperatur. Optional. Float 0.0–1.0. Leer = Provider-Default.
+# max_tokens: Max Output-Tokens. Optional. Positive Ganzzahl. Leer = Provider-Default.
 
 roles:
 
