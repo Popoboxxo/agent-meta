@@ -7,7 +7,11 @@ then optionally runs --init sync.
 import sys
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+    _YAML_AVAILABLE = True
+except ImportError:
+    _YAML_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -258,6 +262,13 @@ def _print_config_summary(config: dict) -> None:
 
 def _write_config(path: Path, config: dict) -> None:
     """Write config as YAML with a short header comment."""
+    if not _YAML_AVAILABLE:
+        print(
+            "ERROR: PyYAML not installed but required for --setup wizard. "
+            "Run: pip install pyyaml",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     header = (
         "# agent-meta project.yaml — generiert von --setup wizard\n"
         "# Bearbeite diese Datei um weitere Variablen zu ergänzen.\n"

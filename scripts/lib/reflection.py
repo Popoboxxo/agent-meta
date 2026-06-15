@@ -1,11 +1,29 @@
 """Reflection-Loop configuration management."""
 
 import os
-import yaml
+import sys
+
+try:
+    import yaml
+    _YAML_AVAILABLE = True
+except ImportError:
+    _YAML_AVAILABLE = False
+
+
+def _require_yaml() -> None:
+    """Abort with a clear message when PyYAML is not installed."""
+    if not _YAML_AVAILABLE:
+        print(
+            "ERROR: PyYAML not installed but required for reflection configuration. "
+            "Run: pip install pyyaml",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def load_reflection_pairs(config_dir=None):
     """Load reflection pairs from role-defaults.yaml."""
+    _require_yaml()
     if config_dir is None:
         config_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'config')
     defaults_path = os.path.join(config_dir, 'role-defaults.yaml')
@@ -16,6 +34,7 @@ def load_reflection_pairs(config_dir=None):
 
 def load_project_overrides(project_config=None):
     """Load project-specific overrides from project.yaml."""
+    _require_yaml()
     if project_config is None:
         project_config = os.path.join(os.path.dirname(__file__), '..', '..', '.meta-config', 'project.yaml')
     if not os.path.exists(project_config):
