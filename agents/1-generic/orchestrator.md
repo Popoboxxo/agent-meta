@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.28.0"
+version: "3.29.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -396,6 +396,41 @@ Bei Output >200 Zeilen oder strukturiertem Report:
 
 **Wann:** Cascading Pipelines (≥3 Relay-Punkte), Analyse-Reports, große Changelogs.
 **Warum:** Referenz (~100 Tokens) statt Report (~5000 Tokens) — verhindert Context-Bloat und Telephone-Effekt.
+
+## Agent Return Format
+
+**Erwartetes Rückgabeformat** für alle Worker-Agenten nach einer Delegation:
+
+Jeder Subagent soll seine Antwort in einem der folgenden Formate zurückgeben — je nach Komplexität des Ergebnisses:
+
+**Standard (kompakt):**
+```
+STATUS: <done|partial|failed|escalate>
+RESULT: <1-2 Sätze was tatsächlich gemacht wurde>
+ARTIFACTS: <geänderte Dateien, optional>
+ERRORS: <Fehlermeldungen, leer wenn keiner>
+```
+
+**Erweitert (bei Eskalation oder Partial-Completion):**
+```
+STATUS: escalate | partial
+RESULT: <was wurde abgeschlossen>
+ESCALATE_REASON: <warum nicht vollständig — kurz>
+RECOMMENDED_TIER: <tier>
+PARTIAL_WORK: <was bereits erledigt ist>
+NEXT_STEPS: <konkrete nächste Schritte>
+```
+
+**Regeln:**
+- `STATUS: done` → Orchestrator fährt mit nächstem Schritt fort
+- `STATUS: partial` → Orchestrator zeigt dem User den Stand, fragt nach weiter/abbrechen
+- `STATUS: failed` → Orchestrator aktiviert Failure Recovery (→ »Delegation Failure Recovery«)
+- `STATUS: escalate` → Orchestrator dispatched sofort an `recommended_tier`, kein User-Gate
+- Kein freier Text ohne STATUS-Header — der Orchestrator muss den Status maschinenlesbar erkennen können
+
+**Schema-Referenz:** `schemas/a2a-handoff.schema.json` (Envelope), `schemas/handoffs/task-spec.schema.json` (Payload)
+
+---
 
 ## Quality Pipelines (Generated)
 
