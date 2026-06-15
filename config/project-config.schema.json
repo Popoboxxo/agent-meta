@@ -680,6 +680,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "delegation": {
+      "type": "object",
+      "description": "Controls agent-to-agent delegation behavior, including the A2A handoff envelope.",
+      "properties": {
+        "a2a_envelope": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, agents wrap all inter-agent handoffs in the structured A2A envelope (schemas/a2a-handoff.schema.json). Enables retry tracking, timeout enforcement, and escalation policies."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

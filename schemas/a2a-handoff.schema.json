@@ -119,6 +119,36 @@
         }
       }
     },
+    "timeout_seconds": {
+      "type": "integer",
+      "description": "Optional. Maximum seconds the target agent may take to process this handoff before the orchestrator treats it as timed out. When exceeded, escalation.on_timeout is triggered. Default: 300 (5 minutes).",
+      "minimum": 1,
+      "default": 300
+    },
+    "escalation": {
+      "type": "object",
+      "description": "Optional. Defines what happens when the handoff cannot be completed normally (timeout, max retries exceeded, or explicit failure).",
+      "properties": {
+        "on_timeout": {
+          "type": "string",
+          "description": "Action to take when timeout_seconds is exceeded.",
+          "enum": ["abort", "retry", "escalate_to_orchestrator", "escalate_to_human"],
+          "default": "escalate_to_orchestrator"
+        },
+        "on_max_retries": {
+          "type": "string",
+          "description": "Action to take when retry_count reaches max_retries.",
+          "enum": ["abort", "escalate_to_orchestrator", "escalate_to_human"],
+          "default": "escalate_to_orchestrator"
+        },
+        "escalation_agent": {
+          "type": "string",
+          "description": "Agent role to escalate to when escalate_to_orchestrator is chosen. Defaults to 'orchestrator'.",
+          "default": "orchestrator"
+        }
+      },
+      "additionalProperties": false
+    },
     "requires_human_approval": {
       "type": "boolean",
       "description": "Optional. When true, the downstream agent MUST pause before execution and wait for user confirmation. Controlled by orchestrator.handoff.human_approval_required in project.yaml. Default: false.",
