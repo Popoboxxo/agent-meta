@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "3.29.0"
+version: "3.30.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -189,6 +189,14 @@ Vor jeder Delegation prüfen — vermeidet unnötige Parallelisierung (~15× Tok
 | Architektur-Research / Design | Balanced | Bevorzugt | Bedingt |
 
 **Faustregel:** Kein natürlicher Split in ≥2 unabhängige Branches → zuerst an einen Agent delegieren.
+
+{{#if ANALYSIS_ENABLED}}
+**File Affinity Map** (automatisch generiert via AST-Analyse — zeigt gegenseitige Imports):
+
+{{FILE_AFFINITY_HINT}}
+
+_Dateien mit gemeinsamen Abhängigkeiten nicht parallelisieren — BARRIER oder sequentiell._
+{{/if}}
 
 ### Regeln
 
@@ -574,12 +582,42 @@ Nicht parallel: tester↔developer, code-reviewer→git, requirements→tester.
 ## Context & Checkpointing
 
 **Context Guard:** Nach >5 Delegationen Session-Stand in 2–3 Sätzen zusammenfassen. Bei Überlauf-Verdacht → priorisieren, nicht-essentielle Tasks verschieben, ggf. User nach Session-Reset fragen.
-{{#if CHECKPOINTING_ENABLED}}
 
-**Checkpointing** (>5 Schritte):
-- Nach jedem Task: `scripts/lib/checkpoint.py` → `CheckpointStore.save_checkpoint(session_id, checkpoint)`
-- Session-Start: `CheckpointStore.list_sessions()` prüfen → Checkpoint → User informieren, ab da fortsetzen
-- Cleanup: Sessions >24h löschen, nach Erfolg `delete_session()`
+{{#if CHECKPOINTING_ENABLED}}
+## Checkpointing
+
+Persistente Session-Checkpoints für lange Orchestrierungen (>5 Schritte).
+
+**Format** — `.meta-viz/checkpoint-<timestamp>.json`:
+```json
+{
+  "session_id": "<YYYYMMDD-HHMMSS>",
+  "created_at": "<ISO-8601>",
+  "task_summary": "<Ein-Satz-Beschreibung der Gesamtaufgabe>",
+  "completed_steps": [
+    { "step": 1, "agent": "<agent>", "result_key": "<key>", "status": "done" }
+  ],
+  "pending_steps": [
+    { "step": 2, "agent": "<agent>", "task": "<task-summary>" }
+  ],
+  "context": "<Zusammenfassung relevanter Zwischenergebnisse, max. 3 Sätze>"
+}
+```
+
+**Wann schreiben:** Vor jedem BARRIER-Punkt — also nachdem alle parallelen Sub-Tasks
+gestartet wurden, aber bevor auf ihre Ergebnisse gewartet wird. Sichert den
+Fortschritt gegen Context-Reset während laufender Delegation.
+
+**Wann lesen:** Beim Start einer neuen Session prüfen ob Checkpoints existieren:
+1. `.meta-viz/checkpoint-*.json` scannen (neuester zuerst nach `created_at`)
+2. Wenn Checkpoint gefunden → User informieren:
+   > "Es gibt einen unvollständigen Checkpoint vom `<created_at>`: `<task_summary>`.
+   > Fortsetzen ab Schritt `<nächster pending_step>`?"
+3. Bei Bestätigung → `pending_steps` sequentiell abarbeiten, `completed_steps` überspringen
+4. Nach Abschluss: Checkpoint-Datei löschen
+
+**Cleanup:** Checkpoints älter als 24h automatisch löschen (beim nächsten Start).
+Maximale Checkpoint-Größe: 50 KB — große `context`-Felder kürzen.
 {{/if}}
 
 ---

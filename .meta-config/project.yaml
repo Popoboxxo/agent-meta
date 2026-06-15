@@ -241,6 +241,8 @@ orchestrator:
     meta-feedback: true   # Send anonymized feedback to agent-meta
     main-chat: true       # Allow main chat to handle the task
     ask-user: false       # Ask user for preference
+  checkpointing: true              # Persistente Checkpoints für lange Orchestrations (default: true)
+                                   # Deaktivieren für leichtgewichtige Projekte: checkpointing: false
   handoff:
     protocol: "a2a-v1"           # Aktives Handoff-Protokoll (a2a-v1 = A2A-Envelope)
     validate-before-delegate: true  # Schema-Validierung vor jeder Delegation (MUSS)
@@ -271,6 +273,11 @@ admin-ui:
   port: 7420
   auto-sync-on-save: false
   watch-config: false
+
+# AST-based file affinity analysis — opt-in parallelization hints for the Orchestrator.
+# When enabled, FILE_AFFINITY_HINT is populated with a dependency table in the orchestrator.
+analysis:
+  enabled: false   # Set to true to activate AST-based import dependency scanning
 
 quality-pipelines:
   overrides:

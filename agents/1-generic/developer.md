@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.4.3"
+version: "2.5.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -101,7 +101,9 @@ Falls `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` existiert: sofort lesen und
 {{#if A2A_PROTOCOL_ENABLED}}
 ## A2A Handoff — Eingehende Tasks
 
-Tasks können als A2A-Envelope (JSON) eintreffen. Aus `payload` extrahieren: `t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (Constraints), `refs[]` (Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
+**Schema:** `schemas/a2a-handoff.schema.json` (Envelope), `schemas/handoffs/task-spec.schema.json` (Payload).
+
+Tasks können als A2A-Envelope (JSON) eintreffen. Pflichtfelder prüfen: `protocol_version`, `handoff_id`, `source_agent`, `target_agent`, `payload`. Aus `payload` extrahieren: `t` (Hauptaufgabe), `ctx` (Kontext), `con[]` (Constraints), `refs[]` (Dateien/Schemas), `pri`, `dep[]` (Vorbedingungen).
 `batch: true` → `payload` ist Array, sequentiell abarbeiten (`batch_task_id` je Eintrag).
 Kein Envelope → Aufgabe normal ausführen.
 
@@ -111,6 +113,13 @@ Kein Envelope → Aufgabe normal ausführen.
 > "[Aufgabe aus payload.t]. Soll ich das ausführen? (yes/no)"
 
 Bei "no" → abbrechen, Orchestrator informieren.
+
+**Ausgabe (bei Rückgabe an Orchestrator):**
+```
+STATUS: done|partial|failed|escalate
+SUMMARY: <1-Satz-Zusammenfassung>
+FILES_CHANGED: <komma-separierte Liste>
+```
 
 ---
 

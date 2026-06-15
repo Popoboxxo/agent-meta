@@ -680,6 +680,107 @@
         }
       },
       "additionalProperties": false
+    },
+    "delegation": {
+      "type": "object",
+      "description": "Controls agent-to-agent delegation behavior, including the A2A handoff envelope.",
+      "properties": {
+        "a2a_envelope": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, agents wrap all inter-agent handoffs in the structured A2A envelope (schemas/a2a-handoff.schema.json). Enables retry tracking, timeout enforcement, and escalation policies."
+        }
+      },
+      "additionalProperties": false
+    },
+    "orchestrator": {
+      "type": "object",
+      "description": "Orchestrator behavior configuration.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable orchestrator mode. When false, all tasks are handled in main chat."
+        },
+        "strict": {
+          "type": "boolean",
+          "default": true,
+          "description": "Strict mode: no fallback to main chat, all unknown intents are escalated."
+        },
+        "checkpointing": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable persistent session checkpoints in .meta-viz/checkpoint-<timestamp>.json. Allows resuming long orchestrations after context reset. Default: false."
+        },
+        "direct-dispatch-enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable direct dispatch section in orchestrator (skip orchestrator for trivial tasks)."
+        },
+        "unknown-fallback": {
+          "description": "Fallback behavior for unknown intents. Object form (recommended) or legacy string.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "meta-feedback": { "type": "boolean" },
+                "main-chat": { "type": "boolean" },
+                "ask-user": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "string",
+              "enum": ["meta-feedback", "main-chat", "ask-user"]
+            }
+          ]
+        },
+        "handoff": {
+          "type": "object",
+          "description": "A2A handoff protocol configuration.",
+          "properties": {
+            "protocol": {
+              "type": "string",
+              "description": "Handoff protocol identifier. Use 'a2a-v1' (default) or 'none'/'false' to disable.",
+              "default": "a2a-v1"
+            },
+            "validate-before-delegate": {
+              "type": "boolean",
+              "default": true,
+              "description": "Validate envelope schema before each delegation."
+            },
+            "token-budget": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": false },
+                "session_budget": { "type": "integer", "default": 200000 },
+                "max_overhead_pct": { "type": "number", "default": 10 },
+                "on_exceed": { "type": "string", "enum": ["compact", "warn"], "default": "compact" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "analysis": {
+      "type": "object",
+      "description": "AST-based file affinity analysis — opt-in parallelization hints for the Orchestrator.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AST-based import dependency scanning. When true, FILE_AFFINITY_HINT is populated in the orchestrator with a dependency table. Default: false."
+        },
+        "ast": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AST dependency analysis during sync. Activates analysis.py scanning and prints a summary after sync completes. Default: false."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
