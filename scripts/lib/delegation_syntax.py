@@ -10,6 +10,7 @@ Usage:
     processed = engine.apply(content, provider="Gemini")
 """
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -19,9 +20,59 @@ try:
 except ImportError:
     yaml = None  # type: ignore[assignment]
 
+# Known A2A schemas shipped with agent-meta (relative to repo root).
+# These paths are intentionally relative so they remain valid when the repo is
+# used as a Git submodule embedded inside another project.
+_SCHEMA_PATHS: dict[str, str] = {
+    "a2a-handoff": "schemas/a2a-handoff.schema.json",
+    "task-spec": "schemas/handoffs/task-spec.schema.json",
+}
+
+# Required fields in an A2A envelope (mirrors a2a-handoff.schema.json).
+# Maintained here as a fast stdlib-only check — no jsonschema dependency needed.
+_A2A_REQUIRED_FIELDS: tuple[str, ...] = (
+    "protocol_version",
+    "handoff_id",
+    "source_agent",
+    "target_agent",
+    "payload",
+)
+
 
 class DelegationSyntaxEngine:
-    """Substitutes abstract delegation placeholders with provider-specific syntax."""
+    """Substitutes abstract delegation placeholders with provider-specific syntax.
+
+    ## Placeholder taxonomy
+
+    This engine handles exclusively **build-time** PAL_* placeholders — they are
+    resolved during `sync.py` and replaced with provider-specific syntax strings
+    (e.g. native tool-call syntax, YAML text blocks).
+
+    **Runtime placeholders** such as ``<agent-name>`` and ``<task-description>``
+    are intentionally NOT handled here.  They are filled in by the LLM at runtime
+    when it constructs an actual delegation call.  Using ``{{double-braces}}``
+    for these tokens is explicitly avoided: the LLM interprets curly-brace syntax
+    as unresolved sync.py placeholders and refuses to delegate (Issue #277 root
+    cause).  The angle-bracket convention (``<agent-name>``) signals a
+    human-readable slot that the LLM is expected to fill with a concrete value.
+
+    See also: docs/conclusions/conclusions-2026-06-12.md for the historical
+    rationale behind this split.
+
+    ## A2A schema integration
+
+    The PAL_HANDOFF placeholder, once substituted, injects provider-specific
+    envelope syntax into templates.  The canonical schema for these envelopes is
+    ``schemas/a2a-handoff.schema.json`` (repo root).
+
+    Use :meth:`get_schema_ref` to obtain the relative path to a named schema and
+    :meth:`validate_envelope` for a lightweight required-fields check that works
+    without any third-party dependencies.  Full JSON Schema validation (if
+    ``jsonschema`` is installed) is available via :meth:`validate_envelope` as
+    well — it degrades gracefully when the library is absent.
+
+    See also: docs/concepts/a2a-handoff-protocol.md for architecture rationale.
+    """
 
     PLACEHOLDERS: dict[str, str] = {
         "PAL_DELEGATE": "delegate",
@@ -39,6 +90,10 @@ class DelegationSyntaxEngine:
         self.config_dir = config_dir
         self._syntax_registry: dict[str, Any] | None = None
         self._capabilities_registry: dict[str, Any] | None = None
+
+    # ------------------------------------------------------------------
+    # Internal registries
+    # ------------------------------------------------------------------
 
     @property
     def syntax_registry(self) -> dict[str, Any]:
@@ -75,6 +130,80 @@ class DelegationSyntaxEngine:
     def get_capabilities(self, provider: str) -> dict[str, Any]:
         """Return capabilities for a provider."""
         return self.capabilities_registry.get("capabilities", {}).get(provider, {})
+
+    # ------------------------------------------------------------------
+    # A2A schema helpers
+    # ------------------------------------------------------------------
+
+    def get_schema_ref(self, schema_name: str) -> str:
+        """Return the relative repo path for a named A2A schema.
+
+        Args:
+            schema_name: Key from the internal registry, e.g. ``"a2a-handoff"``
+                or ``"task-spec"``.
+
+        Returns:
+            Relative path string (e.g. ``"schemas/a2a-handoff.schema.json"``),
+            or an empty string when the name is unknown.
+        """
+        return _SCHEMA_PATHS.get(schema_name, "")
+
+    def validate_envelope(
+        self,
+        envelope: dict[str, Any],
+        schema_name: str = "a2a-handoff",
+        agent_meta_root: Path | None = None,
+    ) -> list[str]:
+        """Validate an A2A envelope dict and return a list of error strings.
+
+        Validation strategy (two tiers):
+
+        1. **Stdlib required-fields check** — always runs, no extra dependencies.
+           Verifies that all fields listed in ``_A2A_REQUIRED_FIELDS`` are present.
+
+        2. **Full JSON Schema validation** — runs only when ``jsonschema`` is
+           importable *and* the schema file can be resolved.  Gracefully skipped
+           when either condition is not met (e.g. lightweight CI environments).
+
+        Args:
+            envelope:        The envelope dict to validate.
+            schema_name:     Schema key (default ``"a2a-handoff"``).
+            agent_meta_root: Repo root path used to locate the schema file.
+                             Derived from ``config_dir`` when not provided.
+
+        Returns:
+            A list of human-readable error strings.  Empty list means valid.
+        """
+        errors: list[str] = []
+
+        # Tier 1: required-fields check (stdlib, always runs)
+        missing = [f for f in _A2A_REQUIRED_FIELDS if f not in envelope]
+        if missing:
+            errors.append(f"Missing required fields: {', '.join(missing)}")
+
+        # Tier 2: full JSON Schema validation (optional, graceful degradation)
+        schema_rel = self.get_schema_ref(schema_name)
+        if schema_rel:
+            if agent_meta_root is None:
+                agent_meta_root = self.config_dir.parent
+            schema_path = agent_meta_root / schema_rel
+            try:
+                import jsonschema  # type: ignore[import]
+                with open(schema_path, encoding="utf-8") as f:
+                    schema = json.load(f)
+                validator = jsonschema.Draft7Validator(schema)
+                for err in sorted(validator.iter_errors(envelope), key=str):
+                    errors.append(str(err.message))
+            except ImportError:
+                pass  # jsonschema not installed — tier-1 check is sufficient
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass  # schema file missing/corrupt — skip silently
+
+        return errors
+
+    # ------------------------------------------------------------------
+    # Template substitution
+    # ------------------------------------------------------------------
 
     def apply(self, content: str, provider: str, log=None) -> str:
         """Apply provider-specific syntax to abstract placeholders in content.
@@ -128,6 +257,10 @@ class DelegationSyntaxEngine:
         content = re.sub(r"PAL_PREFIX:\w+\s*\n", "", content)
 
         return content
+
+    # ------------------------------------------------------------------
+    # Provider capability checks
+    # ------------------------------------------------------------------
 
     def needs_bootstrap(self, provider: str) -> bool:
         """Check if provider needs session bootstrap."""
