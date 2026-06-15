@@ -147,6 +147,25 @@ Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
 
 ---
 
+# Active Integrations — Tool Awareness
+
+This rule lists tools provided by integrations active in this project.
+Integrations are pip/uv-installed tools exposed via MCP servers, gated by
+the registry (approved) and project config (enabled).
+
+When deciding which tool to use:
+
+- Prefer the integration tools listed below over generic alternatives when
+  they fit the task (e.g. semantic search over plain pattern grep when
+  looking up concepts or intent rather than literal text).
+- Each tool entry includes a short hint describing when it is preferable.
+- If no integrations are active, the section below is empty — fall back to
+  built-in tools.
+
+---
+
+---
+
 # GitHub Issue Lifecycle
 
 Wenn deine Arbeit mit einem GitHub Issue verknüpft ist, schließe es nach Abschluss ab.
@@ -371,24 +390,6 @@ ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
 
 Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
 
-3. **Orchestrator:** Alles andere → an `orchestrator` delegieren.
-
-> **Merksatz:** Mehr als ein Schritt ODER mehr als ein Agent ODER Dateien in kritischen Pfaden → immer Orchestrator. Auch wenn der User eine kurze Lösung erwartet.
-
-## Direkter Dispatch (nur nach Regel 2)
-
-| Operation | Direkt an | Bedingung |
-|-----------|-----------|-----------|
-| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
-| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
-| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
-| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
-
-> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
-
-## Auto-Handoff
-
-Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
 
 ## Git Delegation — Hard Rule
 
@@ -413,11 +414,6 @@ ALLE anderen git-Operationen → an `git`-Agenten delegieren.
 
 **Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
 **Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
-
-# Main-Chat-Modus
-
-Orchestrator ist deaktiviert. Alle Aufgaben werden direkt im Hauptchat ausgeführt.
-Delegation an Subagenten ist optional und erfolgt nach eigenem Ermessen.
 
 ---
 

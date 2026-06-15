@@ -8,9 +8,12 @@ sync.log
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/
+.claude/pending-integrations.json
 .claude/pending-tasks.md
 .claude/settings.local.json
+.integrations-state.json
 .mcp.json
+.meta-config/.integrations-state.json
 .meta-config/secrets.local.yaml
 .opencode/mcp.local.json
 .opencode/settings.local.json

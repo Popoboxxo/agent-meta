@@ -193,6 +193,14 @@ def sync_rules(
         source_content = substitute(source_content, merged_vars, rel_source, log)
         source_content = strip_inactive_conditional_blocks(source_content, merged_vars)
 
+        # integrations.md is only meaningful when at least one integration is
+        # active. Skip writing the file (and let the stale-cleanup remove any
+        # leftover from a previous sync) when no INTEGRATION_TOOLS_HINT is set.
+        if rule_stem == "integrations" and not (merged_vars.get("INTEGRATION_TOOLS_HINT") or "").strip():
+            log.skip(str((target_dir / output_name).relative_to(project_root)),
+                     "no active integrations")
+            continue
+
         if platform_vars is not None:
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)
 

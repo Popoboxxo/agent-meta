@@ -1192,6 +1192,12 @@ function buildSidebar() {
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
       ],
     },
+    {
+      title: "Tooling",
+      items: [
+        { route: "/integrations", label: "Integrations", icon: "⌬" },
+      ],
+    },
   ];
   nav.innerHTML = "";
   for (const group of groups) {
@@ -2476,6 +2482,210 @@ async function viewAgentTemplates() {
 /* =========================================================================
  * Views — Sync controls
  * ========================================================================= */
+/* =========================================================================
+ * Views — Integrations
+ * =========================================================================
+ * Lists every integration declared in config/integrations-registry.yaml.
+ * For each entry the panel exposes three actions:
+ *   - read-only summary (description, package, capabilities, install state)
+ *   - enabled toggle (writes integrations.<name>.enabled into project.yaml
+ *     and re-runs sync.py so MCP / rules artefacts pick up the change)
+ *   - initialize button (runs init-integrations.py --yes)
+ *
+ * The view re-fetches state after each mutating action so the displayed
+ * status badges always reflect what is on disk.
+ */
+async function viewIntegrations() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Integrations"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Pip/uv-installed tools with an install → init → index lifecycle. ",
+    "Toggle ", el("code", {}, ["enabled"]), " to add an integration to ",
+    el("code", {}, [".meta-config/project.yaml"]),
+    "; click ", el("strong", {}, ["Initialize"]), " to run ",
+    el("code", {}, ["init-integrations.py --yes"]), ".",
+  ]));
+
+  const container = el("div");
+  wrap.appendChild(container);
+
+  const render = async () => {
+    container.replaceChildren(el("div", { class: "empty" }, ["Loading…"]));
+    let data;
+    try {
+      data = await api.get("/api/integrations");
+    } catch (err) {
+      container.replaceChildren(renderError(err));
+      return;
+    }
+
+    container.replaceChildren();
+
+    if (!data.available || !data.integrations || !data.integrations.length) {
+      container.appendChild(el("div", { class: "panel" }, [
+        el("p", {}, ["No integrations registry found or registry is empty."]),
+        el("p", { class: "muted" }, [
+          "Add entries to ", el("code", {}, ["config/integrations-registry.yaml"]),
+          " to make them appear here.",
+        ]),
+      ]));
+      return;
+    }
+
+    // Pending banner
+    if (Array.isArray(data.pending) && data.pending.length) {
+      container.appendChild(el("div", { class: "panel" }, [
+        el("h3", {}, ["Pending initialization"]),
+        el("p", {}, [
+          "The following integrations are enabled but not yet initialized: ",
+          el("code", {}, [data.pending.join(", ")]),
+          ".",
+        ]),
+      ]));
+    }
+
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [el("tr", {}, [
+      "Name", "Status", "Description", "Package", "Capabilities", "Enabled", "Actions",
+    ].map(h => el("th", {}, [h])))]));
+
+    const tbody = el("tbody");
+    for (const integ of data.integrations) {
+      tbody.appendChild(renderIntegrationRow(integ, render));
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  };
+
+  await render();
+  return wrap;
+}
+
+function renderIntegrationRow(integ, refresh) {
+  const tr = el("tr");
+
+  // Name (mono)
+  tr.appendChild(el("td", { class: "mono" }, [integ.name]));
+
+  // Status badges
+  const statusCell = el("td");
+  if (!integ.approved) {
+    statusCell.appendChild(el("span", { class: "badge", style: "color:var(--accent-yellow); border-color:var(--accent-yellow);" }, ["unapproved"]));
+  } else {
+    statusCell.appendChild(el("span", { class: "badge", style: "color:var(--accent-green); border-color:var(--accent-green);" }, ["approved"]));
+  }
+  if (integ.enabled) {
+    statusCell.appendChild(el("span", { class: "badge", style: "color:var(--accent-blue); border-color:var(--accent-blue); margin-left:4px;" }, ["enabled"]));
+  }
+  if (integ.state && integ.state.installed) {
+    statusCell.appendChild(el("span", { class: "badge", style: "margin-left:4px;" }, ["installed"]));
+  }
+  if (integ.state && integ.state.initialized) {
+    statusCell.appendChild(el("span", { class: "badge", style: "margin-left:4px;" }, ["initialized"]));
+  }
+  if (integ.pending_init) {
+    statusCell.appendChild(el("span", { class: "badge", style: "color:var(--accent-yellow); border-color:var(--accent-yellow); margin-left:4px;" }, ["pending-init"]));
+  }
+  tr.appendChild(statusCell);
+
+  // Description
+  const descCell = el("td");
+  descCell.appendChild(document.createTextNode(integ.description || "—"));
+  if (integ.docs_url) {
+    descCell.appendChild(el("br"));
+    descCell.appendChild(el("a", { href: integ.docs_url, target: "_blank" }, ["docs"]));
+  }
+  tr.appendChild(descCell);
+
+  // Package (mono)
+  tr.appendChild(el("td", { class: "mono" }, [
+    integ.package || "—",
+    integ.installer ? el("div", { class: "muted", style: "font-size:11px;" }, [`via ${integ.installer}`]) : null,
+  ].filter(Boolean)));
+
+  // Capabilities
+  const capCell = el("td");
+  if (Array.isArray(integ.capabilities) && integ.capabilities.length) {
+    for (const cap of integ.capabilities) {
+      capCell.appendChild(el("span", { class: "badge", style: "margin-right:4px;" }, [cap]));
+    }
+  } else {
+    capCell.appendChild(document.createTextNode("—"));
+  }
+  tr.appendChild(capCell);
+
+  // Enabled toggle
+  const toggleCell = el("td");
+  const toggleWrap = el("label", { class: "toggle" });
+  const toggleCb = el("input", { type: "checkbox" });
+  toggleCb.checked = !!integ.enabled;
+  toggleCb.disabled = !integ.approved;
+  toggleCb.addEventListener("change", async () => {
+    toggleCb.disabled = true;
+    toast(`${integ.name}: ${toggleCb.checked ? "enabling" : "disabling"}…`, "info");
+    try {
+      const r = await api.post(`/api/integrations/${encodeURIComponent(integ.name)}/toggle`, {
+        enabled: toggleCb.checked,
+      });
+      if (r.success) {
+        toast(`${integ.name}: ${toggleCb.checked ? "enabled" : "disabled"} (sync OK)`, "success");
+      } else {
+        const detail = r.error || (r.sync && r.sync.output) || "unknown error";
+        toast(`${integ.name}: toggle reported issues — see sync output`, "warning");
+        showModal("Toggle output", el("pre", {}, [String(detail)]), [
+          el("button", { class: "btn", onclick: hideModal }, ["Close"]),
+        ]);
+      }
+    } catch (err) {
+      toast(`${integ.name}: toggle failed — ${err.message}`, "error");
+    } finally {
+      await refresh();
+    }
+  });
+  toggleWrap.appendChild(toggleCb);
+  toggleWrap.appendChild(el("span", { class: "slider" }));
+  toggleCell.appendChild(toggleWrap);
+  if (!integ.approved) {
+    toggleCell.appendChild(el("div", { class: "muted", style: "font-size:11px;" }, ["unapproved"]));
+  }
+  tr.appendChild(toggleCell);
+
+  // Actions
+  const actionsCell = el("td");
+  const initBtn = el("button", { class: "btn btn-primary" }, ["Initialize"]);
+  const alreadyDone = integ.state && integ.state.installed && integ.state.initialized && !integ.pending_init;
+  if (!integ.enabled || alreadyDone) {
+    initBtn.disabled = true;
+    initBtn.title = !integ.enabled
+      ? "Enable the integration first"
+      : "Already initialized — use sync or re-toggle if needed";
+  }
+  initBtn.addEventListener("click", async () => {
+    initBtn.disabled = true;
+    toast(`${integ.name}: initializing…`, "info");
+    try {
+      const r = await api.post(`/api/integrations/${encodeURIComponent(integ.name)}/init`);
+      showModal(
+        `init-integrations.py — ${integ.name}`,
+        el("pre", {}, [r.output || "(no output)"]),
+        [el("button", { class: "btn", onclick: hideModal }, ["Close"])],
+      );
+      toast(
+        r.success ? `${integ.name}: initialized` : `${integ.name}: init reported errors`,
+        r.success ? "success" : "warning",
+      );
+    } catch (err) {
+      toast(`${integ.name}: init failed — ${err.message}`, "error");
+    } finally {
+      await refresh();
+    }
+  });
+  actionsCell.appendChild(initBtn);
+  tr.appendChild(actionsCell);
+
+  return tr;
+}
+
 async function viewSync() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Sync"]));
@@ -2588,9 +2798,10 @@ async function init() {
   router.register("/config/dod-presets",       viewDodPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
-  router.register("/roles",     viewRoles);
-  router.register("/pipelines", viewPipelines);
-  router.register("/agents",    viewAgentTemplates);
+  router.register("/roles",        viewRoles);
+  router.register("/pipelines",    viewPipelines);
+  router.register("/agents",       viewAgentTemplates);
+  router.register("/integrations", viewIntegrations);
 
   buildSidebar();
   router.resolve();

@@ -250,6 +250,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     from .agents import build_agent_hints, build_agent_table
     from .delegation_table import generate_agent_delegation_table
     from .dod import resolve_dod
+    from .integrations import (
+        build_tool_awareness,
+        load_integrations_registry,
+        resolve_enabled_integrations,
+    )
     from .providers import load_providers_config, resolve_providers
 
     variables = {}
@@ -359,6 +364,20 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
+    # INTEGRATIONS_*: Two-Gate (approved in registry AND enabled in project).
+    # Names → comma-separated list for INTEGRATIONS_ENABLED; tool hints → Markdown
+    # block for INTEGRATION_TOOLS_HINT. Empty when no integrations are active.
+    try:
+        _integrations_registry = load_integrations_registry(
+            agent_meta_root / "config" / "integrations-registry.yaml"
+        )
+        _enabled_integrations = resolve_enabled_integrations(_integrations_registry, config)
+        variables["INTEGRATIONS_ENABLED"] = ", ".join(sorted(_enabled_integrations.keys()))
+        variables["INTEGRATION_TOOLS_HINT"] = build_tool_awareness(_enabled_integrations)
+    except Exception as e:  # noqa: BLE001 — graceful degradation for integration wiring
+        print(f"[config] Warning: Integration variable injection failed: {e}", file=sys.stderr)
+        variables["INTEGRATIONS_ENABLED"] = ""
+        variables["INTEGRATION_TOOLS_HINT"] = ""
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)

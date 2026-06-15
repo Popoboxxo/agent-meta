@@ -839,6 +839,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/subserver-status":
             return self._send_json(self.__class__.viz_manager.status())
 
+        if path == "/api/integrations":
+            return self._send_json(self._integrations_overview())
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -886,6 +889,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/sync/run":
             return self._send_json(self.__class__.sync_executor.run())
+
+        if path.startswith("/api/integrations/") and path.endswith("/toggle"):
+            name = path[len("/api/integrations/"):-len("/toggle")]
+            body = self._read_body() or {}
+            enabled = bool(body.get("enabled", False))
+            return self._send_json(self._integrations_toggle(name, enabled))
+
+        if path.startswith("/api/integrations/") and path.endswith("/init"):
+            name = path[len("/api/integrations/"):-len("/init")]
+            return self._send_json(self._integrations_init(name))
 
         raise FileNotFoundError(path)
 
@@ -1063,6 +1076,267 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if safe != role:
             raise SecurityError(f"invalid role name: {role!r}")
         return self.__class__.root / "agents" / "1-generic" / f"{role}.md"
+
+    # ------------------------------------------------------------------ #
+    # Integrations API                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _integrations_registry_path(self) -> Path:
+        """Resolve the path to ``integrations-registry.yaml`` for either layout."""
+        primary = self.__class__.root / "config" / "integrations-registry.yaml"
+        if primary.exists():
+            return primary
+        return self.__class__.root / ".agent-meta" / "config" / "integrations-registry.yaml"
+
+    def _integrations_init_script(self) -> Path:
+        """Resolve the path to ``init-integrations.py`` for either layout."""
+        primary = self.__class__.root / "scripts" / "init-integrations.py"
+        if primary.exists():
+            return primary
+        return self.__class__.root / ".agent-meta" / "scripts" / "init-integrations.py"
+
+    @staticmethod
+    def _validate_integration_name(name: str) -> str:
+        """Reject anything that is not a plain alphanumeric/-/_ identifier."""
+        if not name or any(c in name for c in ("/", "\\", "..")):
+            raise SecurityError(f"invalid integration name: {name!r}")
+        safe = "".join(ch for ch in name if ch.isalnum() or ch in ("-", "_"))
+        if safe != name:
+            raise SecurityError(f"invalid integration name: {name!r}")
+        return name
+
+    def _integrations_overview(self) -> dict:
+        """Return the combined registry + project + state snapshot for the UI.
+
+        Shape::
+
+            {
+                "integrations": [
+                    {
+                        "name": "semble",
+                        "approved": true,
+                        "enabled": false,
+                        "description": "...",
+                        "package": "semble==0.3.4",
+                        "capabilities": ["code-search", ...],
+                        "installer": "uv",
+                        "docs_url": "...",
+                        "state": {
+                            "installed": true,
+                            "initialized": false,
+                            "indexed": false,
+                            "installed_at": "...",
+                        },
+                        "pending_init": true,
+                    },
+                    ...
+                ],
+                "pending": ["semble", ...],   # from .claude/pending-integrations.json
+                "project_yaml_path": "...",
+            }
+        """
+        registry_path = self._integrations_registry_path()
+        registry: dict = {}
+        if registry_path.exists():
+            try:
+                with registry_path.open("r", encoding="utf-8") as fh:
+                    raw = yaml.safe_load(fh) or {}
+                registry = raw.get("integrations") or {}
+                if not isinstance(registry, dict):
+                    registry = {}
+            except (OSError, yaml.YAMLError):
+                registry = {}
+
+        # Project-side enabled flags live in .meta-config/project.yaml.
+        project_data = self.__class__.config_manager.read("project") or {}
+        project_integrations = project_data.get("integrations") or {}
+        if not isinstance(project_integrations, dict):
+            project_integrations = {}
+
+        # Installation/init state — written by init-integrations.py
+        state_path = self.__class__.root / ".meta-config" / ".integrations-state.json"
+        state_data: dict = {}
+        if state_path.exists():
+            try:
+                state_data = json.loads(state_path.read_text(encoding="utf-8")) or {}
+            except (OSError, json.JSONDecodeError):
+                state_data = {}
+        state_by_name = state_data.get("integrations") or {}
+        if not isinstance(state_by_name, dict):
+            state_by_name = {}
+
+        # Pending-init marker (set by sync.py when an enabled integration has
+        # not yet been initialized).
+        pending_path = self.__class__.root / ".claude" / "pending-integrations.json"
+        pending: list = []
+        if pending_path.exists():
+            try:
+                marker = json.loads(pending_path.read_text(encoding="utf-8")) or {}
+                if isinstance(marker, dict):
+                    pending_raw = marker.get("pending") or []
+                    if isinstance(pending_raw, list):
+                        pending = [str(p) for p in pending_raw if isinstance(p, str)]
+            except (OSError, json.JSONDecodeError):
+                pending = []
+
+        items: list[dict] = []
+        for name, entry in registry.items():
+            if not isinstance(entry, dict):
+                continue
+            user_cfg = project_integrations.get(name) or {}
+            if not isinstance(user_cfg, dict):
+                user_cfg = {}
+            integ_state = state_by_name.get(name) or {}
+            if not isinstance(integ_state, dict):
+                integ_state = {}
+
+            items.append({
+                "name": name,
+                "approved": bool(entry.get("approved")),
+                "enabled": bool(user_cfg.get("enabled")),
+                "description": str(entry.get("description") or ""),
+                "package": str(entry.get("package") or ""),
+                "capabilities": list(entry.get("capabilities") or []),
+                "installer": str(entry.get("installer") or "pip"),
+                "docs_url": str(entry.get("docs_url") or ""),
+                "min_python": str(entry.get("min_python") or ""),
+                "state": {
+                    "installed": bool(integ_state.get("installed")),
+                    "initialized": bool(integ_state.get("initialized")),
+                    "indexed": bool(integ_state.get("indexed")),
+                    "installed_at": integ_state.get("installed_at") or "",
+                    "initialized_at": integ_state.get("initialized_at") or "",
+                    "indexed_at": integ_state.get("indexed_at") or "",
+                },
+                "pending_init": name in pending,
+            })
+
+        items.sort(key=lambda d: d["name"])
+        return {
+            "integrations": items,
+            "pending": pending,
+            "registry_path": str(registry_path) if registry_path.exists() else "",
+            "project_yaml_path": ".meta-config/project.yaml",
+            "available": bool(registry),
+        }
+
+    def _integrations_toggle(self, name: str, enabled: bool) -> dict:
+        """Set ``integrations.<name>.enabled`` in ``.meta-config/project.yaml``.
+
+        Only the enabled flag is touched; all other keys (per-integration
+        options like ``content``, ``top_k``) are preserved. After the YAML is
+        rewritten, ``sync.py`` is run so MCP entries / rules get regenerated
+        immediately.
+        """
+        name = self._validate_integration_name(name)
+
+        # Verify the integration is known to the registry — silently allowing
+        # arbitrary names would write garbage into project.yaml.
+        registry_path = self._integrations_registry_path()
+        if not registry_path.exists():
+            return {
+                "success": False,
+                "error": "integrations-registry.yaml not found",
+                "name": name,
+            }
+        try:
+            with registry_path.open("r", encoding="utf-8") as fh:
+                raw = yaml.safe_load(fh) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            return {"success": False, "error": f"registry unreadable: {exc}", "name": name}
+        registry = raw.get("integrations") or {}
+        if not isinstance(registry, dict) or name not in registry:
+            return {
+                "success": False,
+                "error": f"integration '{name}' not in registry",
+                "name": name,
+            }
+        if not registry[name].get("approved"):
+            return {
+                "success": False,
+                "error": f"integration '{name}' is not approved",
+                "name": name,
+            }
+
+        # Read-modify-write project.yaml through ConfigManager so the regular
+        # backup + atomic-replace contract applies.
+        cm = self.__class__.config_manager
+        project = cm.read("project")
+        if not isinstance(project, dict):
+            project = {}
+        integrations = project.get("integrations")
+        if not isinstance(integrations, dict):
+            integrations = {}
+            project["integrations"] = integrations
+        existing = integrations.get(name)
+        if not isinstance(existing, dict):
+            existing = {}
+        existing["enabled"] = bool(enabled)
+        integrations[name] = existing
+        write_result = cm.write("project", project)
+
+        # Re-run sync so MCP entries / rules/integrations.md reflect the change.
+        sync_result = self.__class__.sync_executor.run()
+
+        return {
+            "success": bool(sync_result.get("success")),
+            "name": name,
+            "enabled": bool(enabled),
+            "write": write_result,
+            "sync": sync_result,
+        }
+
+    def _integrations_init(self, name: str) -> dict:
+        """Run ``init-integrations.py --yes`` and report the captured output.
+
+        ``init-integrations.py`` does not support an explicit per-integration
+        target on the command line — it works through everything currently
+        enabled in ``project.yaml``. We surface the full output so the user
+        can see what happened. We still pass ``name`` so the caller knows
+        which trigger fired in the response payload.
+        """
+        name = self._validate_integration_name(name)
+        script = self._integrations_init_script()
+        if not script.exists():
+            return {
+                "success": False,
+                "output": f"init-integrations.py not found at {script}",
+                "returncode": -1,
+                "name": name,
+            }
+        cmd = [sys.executable, str(script), "--yes"]
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(self.__class__.root),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=600,
+            )
+            output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+            return {
+                "success": proc.returncode == 0,
+                "output": output,
+                "returncode": proc.returncode,
+                "command": " ".join(cmd),
+                "name": name,
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "output": "init-integrations.py timed out (600s)",
+                "returncode": -1,
+                "name": name,
+            }
+        except Exception as exc:  # pragma: no cover
+            return {
+                "success": False,
+                "output": f"init-integrations.py failed: {exc}",
+                "returncode": -1,
+                "name": name,
+            }
 
     # ------------------------------------------------------------------ #
     # Server-Sent Events                                                 #

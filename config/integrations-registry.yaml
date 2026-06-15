@@ -1,0 +1,47 @@
+# agent-meta Integrations Registry
+# =================================
+# Verwaltet pip/uv-installierte Tools die einen Lifecycle haben:
+#   installieren → initialisieren → indexieren → als MCP-Server bereitstellen
+#
+# Two-Gate-Muster: approved (Meta-Maintainer-Gate) + enabled (Projekt-Gate)
+# installer: uv|pip — PRO Integration konfigurierbar, kein globaler Default
+#
+# Neue Integration hinzufügen:
+#   1. Eintrag hier anlegen (approved: false bis reviewed)
+#   2. In Ziel-Repo project.yaml: integrations.<name>.enabled: true
+#   3. sync.py ausführen → MCP-Config + rules/integrations.md generiert
+#   4. init-integrations.py ausführen → installiert und initialisiert
+
+version: 1
+integrations:
+  semble:
+    approved: true
+    package: "semble==0.3.4"
+    installer: uv                     # PRO INTEGRATION frei wählbar (uv|pip), KEIN globaler Default
+    min_python: "3.10"
+    mcp:
+      command: ["semble", "mcp"]
+      transport: stdio
+      tools:
+        - name: search
+          hint: "Semantische Code-Suche statt grep für Konzept-/Intent-Lookups"
+        - name: find_related
+          hint: "Ähnliche Snippets zu einer Fundstelle finden"
+    lifecycle:
+      init:  ["semble", "install"]
+      index: ["semble", "index", "{{TARGET_ROOT}}"]
+      reindex_on: [manual]
+      healthcheck: ["semble", "--version"]
+    options:
+      content:
+        type: array
+        items: [code, docs, config]
+        default: [code]
+        maps_to_arg: "--content"
+      top_k:
+        type: integer
+        default: 5
+        maps_to_arg: "--top-k"
+    capabilities: [code-search, semantic-retrieval]
+    description: "Hybrid semantic + lexical code search (Model2Vec + BM25)"
+    docs_url: "https://github.com/MinishLab/semble"

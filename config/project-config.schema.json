@@ -635,6 +635,22 @@
         "additionalProperties": false
       }
     },
+    "integrations": {
+      "type": "object",
+      "description": "Opt-in integration activation. Two-Gate: approved in config/integrations-registry.yaml AND enabled here. Integrations are pip/uv-managed tools with install/init/index lifecycle (install via init-integrations.py, never via sync.py).",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Per-integration configuration. Key = integration name (must match integrations-registry.yaml). Options are validated at runtime against the registry schema — no hardcoding per integration in this schema.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Activate this integration (Two-Gate: approved in registry AND enabled here)."
+          }
+        },
+        "required": ["enabled"],
+        "additionalProperties": true
+      }
+    },
     "quality-pipelines": {
       "type": "object",
       "properties": {
