@@ -15,10 +15,18 @@ Two modes:
     integrated as a submodule. Only ``.meta-config/project.yaml`` is exposed.
 
 Start:
-  python scripts/admin-server.py
+  python scripts/admin-server.py               (Admin UI + Viz dashboard + MCP server)
+  python scripts/admin-server.py --no-viz      (Admin UI only, lightweight mode)
   python scripts/admin-server.py --port 7420 --root .
-  python scripts/sync.py --admin            (after a normal sync)
-  python scripts/sync.py --admin-only       (skip sync)
+  python scripts/sync.py --admin               (after a normal sync)
+  python scripts/sync.py --admin-only          (skip sync)
+
+Unified entry-point:
+  In super_admin mode the server also starts the Viz dashboard (viz-report.py)
+  and the MCP SSE server (viz-logger.py) as supervised subprocesses unless
+  ``--no-viz`` is passed.  PID-files and logs are written to ``.meta-viz/``.
+  In project_admin (target-repo) mode the same subprocesses are started via
+  the submodule path (``.agent-meta/scripts/``).
 """
 
 from __future__ import annotations
@@ -52,6 +60,16 @@ DEFAULT_HOST = "127.0.0.1"
 MAX_BACKUPS = 5
 SSE_HEARTBEAT_SECONDS = 15
 
+# PID files and logs for supervised sub-servers (relative to project root).
+VIZ_PID_FILE   = ".meta-viz/.server-pid"
+VIZ_LOG_FILE   = ".meta-viz/server.log"
+MCP_PID_FILE   = ".meta-viz/.mcp-server-pid"
+MCP_LOG_FILE   = ".meta-viz/mcp-server.log"
+
+_DEFAULT_VIZ_PORT    = 8765
+_DEFAULT_VIZ_TIMEOUT = 300
+_DEFAULT_MCP_PORT    = 9090
+
 # Loopback addresses are the ONLY values the ``--host`` flag accepts. The admin
 # UI exposes write access to every editable config file; binding the server to
 # anything reachable from the network would be a privilege-escalation vector.
@@ -72,6 +90,233 @@ SUPER_ADMIN_FILES: dict[str, str] = {
 PROJECT_FILES: dict[str, str] = {
     "project": ".meta-config/project.yaml",
 }
+
+
+# --------------------------------------------------------------------------- #
+# Viz / MCP sub-server manager                                               #
+# --------------------------------------------------------------------------- #
+
+
+def _load_viz_config(root: Path) -> dict:
+    """Load viz server ports/timeouts from ``.meta-config/project.yaml``."""
+    config_path = root / ".meta-config" / "project.yaml"
+    try:
+        sys.path.insert(0, str(root / "scripts"))
+        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        from lib.config import load_config  # type: ignore[import]
+        config = load_config(config_path)
+        viz_cfg = config.get("viz", {})
+        server_cfg = viz_cfg.get("server", {})
+        mcp_cfg = viz_cfg.get("mcp", {})
+        return {
+            "viz_port":    int(server_cfg.get("port", _DEFAULT_VIZ_PORT)),
+            "viz_timeout": int(server_cfg.get("timeout_sec", _DEFAULT_VIZ_TIMEOUT)),
+            "mcp_port":    int(mcp_cfg.get("port", _DEFAULT_MCP_PORT)),
+        }
+    except Exception:
+        return {
+            "viz_port":    _DEFAULT_VIZ_PORT,
+            "viz_timeout": _DEFAULT_VIZ_TIMEOUT,
+            "mcp_port":    _DEFAULT_MCP_PORT,
+        }
+
+
+def _is_pid_running(pid: Optional[int]) -> bool:
+    if not pid:
+        return False
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.OpenProcess(1, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _read_pid(pid_file: Path) -> Optional[int]:
+    if pid_file.exists():
+        try:
+            return int(pid_file.read_text(encoding="utf-8").strip())
+        except (ValueError, OSError):
+            pass
+    return None
+
+
+class VizManager:
+    """Manages the Viz dashboard and MCP SSE server as supervised subprocesses.
+
+    Both sub-servers run in detached sessions (``start_new_session=True`` on
+    POSIX, ``CREATE_NEW_PROCESS_GROUP`` on Windows) so they survive a parent
+    process re-exec but are cleaned up when :meth:`stop_all` is called.
+
+    Resolution order for script paths (same pattern as SyncExecutor):
+      1. ``<root>/scripts/viz-report.py``              -- top-level checkout
+      2. ``<root>/.agent-meta/scripts/viz-report.py``  -- submodule layout
+    """
+
+    def __init__(self, root: Path) -> None:
+        self.root = root.resolve()
+        self._viz_report = self._resolve_script("viz-report.py")
+        self._viz_logger = self._resolve_script("viz-logger.py")
+
+    # ---------------------------------------------------------------------- #
+    # Internal helpers                                                       #
+    # ---------------------------------------------------------------------- #
+
+    def _resolve_script(self, name: str) -> Path:
+        primary  = self.root / "scripts" / name
+        fallback = self.root / ".agent-meta" / "scripts" / name
+        return primary if primary.exists() else fallback
+
+    def _start(
+        self,
+        args: list,
+        pid_file: Path,
+        log_file: Path,
+        label: str,
+    ) -> bool:
+        """Start a detached subprocess, record its PID, return True on success."""
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        if log_file.exists():
+            try:
+                log_file.unlink()
+            except PermissionError:
+                pass
+
+        if sys.platform == "win32":
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            proc = subprocess.Popen(
+                args,
+                stdout=open(log_file, "a", encoding="utf-8"),
+                stderr=subprocess.STDOUT,
+                startupinfo=si,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                cwd=str(self.root),
+            )
+        else:
+            proc = subprocess.Popen(
+                args,
+                stdout=open(log_file, "a", encoding="utf-8"),
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                cwd=str(self.root),
+            )
+
+        pid_file.write_text(str(proc.pid), encoding="utf-8")
+        time.sleep(1.5)
+
+        if _is_pid_running(proc.pid):
+            print(f"  +  {label} started (PID: {proc.pid})")
+            return True
+        else:
+            print(f"  !  {label} failed to start -- see {log_file}")
+            pid_file.unlink(missing_ok=True)
+            return False
+
+    def _stop(self, pid_file: Path, label: str) -> None:
+        pid = _read_pid(pid_file)
+        if not pid or not _is_pid_running(pid):
+            pid_file.unlink(missing_ok=True)
+            return
+        try:
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/F"],
+                    check=True, capture_output=True,
+                )
+            else:
+                os.kill(pid, 15)
+                time.sleep(1)
+                if _is_pid_running(pid):
+                    os.kill(pid, 9)
+            print(f"  -  {label} stopped (PID: {pid})")
+        except Exception as exc:
+            print(f"  !  Error stopping {label}: {exc}")
+        finally:
+            pid_file.unlink(missing_ok=True)
+
+    # ---------------------------------------------------------------------- #
+    # Public interface                                                       #
+    # ---------------------------------------------------------------------- #
+
+    def start_all(self) -> None:
+        """Start both the Viz dashboard and the MCP server."""
+        cfg = _load_viz_config(self.root)
+
+        # --- Viz dashboard ---
+        viz_pid = self.root / VIZ_PID_FILE
+        viz_log = self.root / VIZ_LOG_FILE
+        if not _is_pid_running(_read_pid(viz_pid)):
+            if self._viz_report.exists():
+                self._start(
+                    [
+                        sys.executable,
+                        str(self._viz_report),
+                        "--serve",
+                        "--port", str(cfg["viz_port"]),
+                        "--timeout", str(cfg["viz_timeout"]),
+                    ],
+                    viz_pid, viz_log,
+                    f"Viz dashboard (port {cfg['viz_port']})",
+                )
+            else:
+                print("  -  viz-report.py not found, skipping Viz dashboard")
+
+        # --- MCP server ---
+        mcp_pid = self.root / MCP_PID_FILE
+        mcp_log = self.root / MCP_LOG_FILE
+        if not _is_pid_running(_read_pid(mcp_pid)):
+            if self._viz_logger.exists():
+                self._start(
+                    [
+                        sys.executable, "-u",
+                        str(self._viz_logger),
+                        "--http", str(cfg["mcp_port"]),
+                    ],
+                    mcp_pid, mcp_log,
+                    f"MCP server (port {cfg['mcp_port']})",
+                )
+            else:
+                print("  -  viz-logger.py not found, skipping MCP server")
+
+    def stop_all(self) -> None:
+        """Terminate both sub-servers."""
+        self._stop(self.root / VIZ_PID_FILE, "Viz dashboard")
+        self._stop(self.root / MCP_PID_FILE, "MCP server")
+
+    def status(self) -> dict:
+        """Return a status dict for the ``/api/subserver-status`` endpoint."""
+        cfg = _load_viz_config(self.root)
+        viz_pid_val = _read_pid(self.root / VIZ_PID_FILE)
+        mcp_pid_val = _read_pid(self.root / MCP_PID_FILE)
+        viz_running = _is_pid_running(viz_pid_val)
+        mcp_running = _is_pid_running(mcp_pid_val)
+        return {
+            "viz": {
+                "running": viz_running,
+                "pid":     viz_pid_val,
+                "port":    cfg["viz_port"],
+                "url":     f"http://localhost:{cfg['viz_port']}/",
+                "log":     VIZ_LOG_FILE,
+            },
+            "mcp": {
+                "running": mcp_running,
+                "pid":     mcp_pid_val,
+                "port":    cfg["mcp_port"],
+                "url":     f"http://127.0.0.1:{cfg['mcp_port']}/sse",
+                "log":     MCP_LOG_FILE,
+            },
+        }
+
 
 # --------------------------------------------------------------------------- #
 # Exceptions                                                                  #
@@ -389,6 +634,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     config_manager: ConfigManager
     sync_executor: SyncExecutor
+    viz_manager: "VizManager"
     mode: str
     root: Path
     version: str
@@ -549,11 +795,18 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             })
 
         if path == "/api/mode":
-            return self._send_json({
+            payload: dict = {
                 "mode": self.__class__.mode,
                 "root": str(self.__class__.root),
                 "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
-            })
+            }
+            # In super_admin mode the project.yaml of the meta-repo is also
+            # available as the "target repo" view.  Signal this to the UI so
+            # it can render the combined dashboard.
+            if self.__class__.mode == "super_admin":
+                project_yaml = self.__class__.root / ".meta-config" / "project.yaml"
+                payload["project_admin_available"] = project_yaml.exists()
+            return self._send_json(payload)
 
         if path.startswith("/api/config/"):
             key = path[len("/api/config/"):]
@@ -582,6 +835,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/events":
             return self._stream_events()
+
+        if path == "/api/subserver-status":
+            return self._send_json(self.__class__.viz_manager.status())
 
         raise FileNotFoundError(path)
 
@@ -873,6 +1129,7 @@ class AdminServer:
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
         enable_watcher: bool = False,
+        enable_viz: bool = True,
     ) -> None:
         if host not in ALLOWED_HOSTS:
             raise ValueError(
@@ -885,9 +1142,12 @@ class AdminServer:
         self.mode = detect_mode(self.root)
         self.watcher: Optional[ConfigWatcher] = None
         self.enable_watcher = enable_watcher
+        self.enable_viz = enable_viz
+        self.viz_manager = VizManager(self.root)
 
         AdminRequestHandler.config_manager = ConfigManager(self.root, self.mode)
         AdminRequestHandler.sync_executor = SyncExecutor(self.root)
+        AdminRequestHandler.viz_manager = self.viz_manager
         AdminRequestHandler.mode = self.mode
         AdminRequestHandler.root = self.root
         AdminRequestHandler.version = self._read_version()
@@ -912,6 +1172,10 @@ class AdminServer:
             self.watcher = ConfigWatcher(self.root)
             self.watcher.start()
 
+        # Start Viz dashboard + MCP server as supervised subprocesses.
+        if self.enable_viz:
+            self.viz_manager.start_all()
+
         print(f"  i  agent-meta Admin UI")
         print(f"  i  Mode:    {self.mode}")
         print(f"  i  Version: {AdminRequestHandler.version}")
@@ -919,6 +1183,8 @@ class AdminServer:
         print(f"  i  Root:    {self.root}")
         if self.enable_watcher:
             print(f"  i  Watcher: enabled (.meta-viz/events.jsonl)")
+        if not self.enable_viz:
+            print(f"  i  Viz/MCP: disabled (--no-viz)")
         print(f"  i  Press Ctrl+C to stop")
         print()
 
@@ -930,6 +1196,10 @@ class AdminServer:
             self.httpd.server_close()
             if self.watcher is not None:
                 self.watcher.stop()
+            # Sub-servers are intentionally left running — they are detached
+            # processes with their own PID-files. The user can stop them via
+            # ``python scripts/viz-server.py stop`` or a subsequent
+            # ``admin-server.py`` invocation with ``--stop-viz`` (future).
 
 
 # --------------------------------------------------------------------------- #
@@ -944,11 +1214,21 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT,
                         help=f"Server port (default: {DEFAULT_PORT})")
     parser.add_argument("--host", default=DEFAULT_HOST, choices=list(ALLOWED_HOSTS),
-                        help=f"Bind host — loopback only (default: {DEFAULT_HOST})")
+                        help=f"Bind host -- loopback only (default: {DEFAULT_HOST})")
     parser.add_argument("--root", default=".",
                         help="Project root directory (default: current directory)")
     parser.add_argument("--watch", action="store_true",
                         help="Enable filesystem watcher (polls config files every 2s)")
+    parser.add_argument(
+        "--no-viz",
+        dest="no_viz",
+        action="store_true",
+        help=(
+            "Skip starting the Viz dashboard and MCP server as subprocesses. "
+            "Useful for lightweight / CI environments where only the Admin UI "
+            "itself is needed."
+        ),
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -956,7 +1236,13 @@ def main() -> None:
         print(f"  !  root directory does not exist: {root}", file=sys.stderr)
         sys.exit(1)
 
-    server = AdminServer(root, host=args.host, port=args.port, enable_watcher=args.watch)
+    server = AdminServer(
+        root,
+        host=args.host,
+        port=args.port,
+        enable_watcher=args.watch,
+        enable_viz=not args.no_viz,
+    )
     server.start()
 
 

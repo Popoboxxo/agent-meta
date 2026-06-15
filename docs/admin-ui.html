@@ -727,6 +727,7 @@ class StateManager {
       redo: [],
       hierarchy: null,
       templates: [],
+      projectAdminAvailable: false,  // true when super_admin + .meta-config/project.yaml exists
     };
     this.listeners = new Map();
   }
@@ -1173,6 +1174,7 @@ function buildSidebar() {
       title: "Configs",
       items: [
         { route: "/config/project", label: "project.yaml", icon: "□" },
+        { route: "/config/project-target", label: "target project.yaml", icon: "□", superAdminProjectOnly: true },
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
         { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
@@ -1195,7 +1197,10 @@ function buildSidebar() {
   for (const group of groups) {
     nav.appendChild(el("div", { class: "nav-group-title" }, [group.title]));
     for (const item of group.items) {
-      const disabled = item.superOnly && state.state.mode !== "super_admin";
+      const disabled = (item.superOnly && state.state.mode !== "super_admin")
+                    || (item.superAdminProjectOnly && !state.state.projectAdminAvailable);
+      const hidden = item.superAdminProjectOnly && state.state.mode !== "super_admin";
+      if (hidden) continue;
       const node = el("div", {
         class: `nav-item ${disabled ? "disabled" : ""}`,
         dataset: { route: item.route },
@@ -1246,12 +1251,66 @@ async function viewDashboard() {
       el("h2", {}, ["Super admin"]),
       el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, mcp-registry, dod-presets, delegation-syntax, export) are editable."]),
     ]));
+    // Target repo section — only when .meta-config/project.yaml exists
+    if (state.state.projectAdminAvailable) {
+      wrap.appendChild(el("div", { class: "panel" }, [
+        el("h2", {}, ["Target repo"]),
+        el("p", {}, [
+          "This agent-meta repository also has its own ",
+          el("code", {}, [".meta-config/project.yaml"]),
+          " (it uses itself as a target). ",
+          el("a", { href: "#/config/project-target" }, ["Edit target project.yaml"]),
+          ".",
+        ]),
+      ]));
+    }
   } else {
     wrap.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, ["Project admin"]),
       el("p", {}, ["You're running inside a target project. Only .meta-config/project.yaml is editable; super-admin configs are read-only / hidden."]),
     ]));
   }
+
+  // Sub-server status panel (Viz dashboard + MCP server)
+  try {
+    const sub = await api.get("/api/subserver-status").catch(() => null);
+    if (sub) {
+      const vizStatus = sub.viz.running
+        ? el("span", { style: "color:var(--accent-green)" }, ["running"])
+        : el("span", { style: "color:var(--text-muted)" }, ["stopped"]);
+      const mcpStatus = sub.mcp.running
+        ? el("span", { style: "color:var(--accent-green)" }, ["running"])
+        : el("span", { style: "color:var(--text-muted)" }, ["stopped"]);
+
+      const vizLine = sub.viz.running
+        ? [vizStatus, ` — port ${sub.viz.port} · PID ${sub.viz.pid} · `, el("a", { href: sub.viz.url, target: "_blank" }, [sub.viz.url])]
+        : [vizStatus, ` — port ${sub.viz.port}`];
+      const mcpLine = sub.mcp.running
+        ? [mcpStatus, ` — port ${sub.mcp.port} · PID ${sub.mcp.pid} · `, el("a", { href: sub.mcp.url, target: "_blank" }, [sub.mcp.url])]
+        : [mcpStatus, ` — port ${sub.mcp.port}`];
+
+      wrap.appendChild(el("div", { class: "panel" }, [
+        el("h2", {}, ["Sub-servers"]),
+        el("table", { class: "data", style: "margin-top:8px;" }, [
+          el("thead", {}, [el("tr", {}, ["Server", "Status / URL"].map(h => el("th", {}, [h])))]),
+          el("tbody", {}, [
+            el("tr", {}, [el("td", { class: "mono" }, ["Viz dashboard"]), el("td", {}, vizLine)]),
+            el("tr", {}, [el("td", { class: "mono" }, ["MCP SSE server"]), el("td", {}, mcpLine)]),
+          ]),
+        ]),
+        el("p", { class: "muted", style: "font-size:12px; margin-top:8px;" }, [
+          "Start/stop: ",
+          el("code", {}, ["python scripts/admin-server.py"]),
+          " (unified) or ",
+          el("code", {}, ["python scripts/viz-server.py start"]),
+          " (legacy). Use ",
+          el("code", {}, ["--no-viz"]),
+          " to run Admin UI only.",
+        ]),
+      ]));
+    }
+  } catch { /* sub-server status is best-effort */ }
+
   return wrap;
 }
 
@@ -2497,6 +2556,7 @@ async function init() {
     const mode = await api.get("/api/mode");
     state.state.mode = mode.mode;
     state.state.allowedKeys = mode.allowed_keys || [];
+    state.state.projectAdminAvailable = !!mode.project_admin_available;
     const badge = document.getElementById("mode-badge");
     badge.textContent = mode.mode;
     badge.classList.toggle("project", mode.mode === "project_admin");
@@ -2517,6 +2577,10 @@ async function init() {
   router.register("/sync",            viewSync);
   router.register("/live",            viewLive);
   router.register("/config/project",  configView("project", "project.yaml", schemaP));
+  // Target repo view — only visible in super_admin when .meta-config/project.yaml exists.
+  // Uses the same "project" config key because the server resolves it to the
+  // same file in super_admin mode.
+  router.register("/config/project-target", configView("project", "project.yaml (target repo)", schemaP));
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);
