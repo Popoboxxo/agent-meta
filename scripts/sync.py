@@ -34,6 +34,7 @@ External skills (config/skills-registry.yaml in agent-meta):
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -73,6 +74,11 @@ from lib.skills import (
 )
 from lib.extensions import create_extension, update_extensions
 from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
+from lib.integrations import (
+    load_integrations_registry,
+    resolve_enabled_integrations,
+    write_pending_marker,
+)
 from lib.isolation import sync_provider_isolation
 from lib.io import SyncError
 from lib.context import (
@@ -258,6 +264,49 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         log.info("test-repo", "sync.log not found in test repository (first validation run)")
 
     return validation_errors == 0
+
+
+# ---------------------------------------------------------------------------
+# Pending integrations handling
+# ---------------------------------------------------------------------------
+
+def _handle_pending_integrations(
+    config: dict,
+    project_root: Path,
+    agent_meta_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Write pending-init marker for enabled-but-uninitialized integrations.
+
+    The marker is consumed by `python scripts/init-integrations.py` which performs
+    the install + index lifecycle. State file `.meta-config/.integrations-state.json`
+    tracks already-initialized integrations so re-runs do not re-trigger them.
+    """
+    _integrations_reg = load_integrations_registry(
+        agent_meta_root / "config" / "integrations-registry.yaml"
+    )
+    _enabled = resolve_enabled_integrations(_integrations_reg, config)
+    _initialised: set[str] = set()
+    _state_path = project_root / ".meta-config" / ".integrations-state.json"
+    if _state_path.exists():
+        try:
+            _state = json.loads(_state_path.read_text(encoding="utf-8"))
+            if isinstance(_state, dict):
+                for _name, _info in (_state.get("integrations") or {}).items():
+                    if isinstance(_info, dict) and _info.get("initialised"):
+                        _initialised.add(_name)
+        except (OSError, ValueError):
+            pass
+    _pending = [name for name in _enabled if name not in _initialised]
+    _marker_path = project_root / ".claude" / "pending-integrations.json"
+    if not dry_run:
+        write_pending_marker(_marker_path, _pending)
+    if _pending:
+        log.warn(
+            f"integrations: {len(_pending)} pending init ({', '.join(_pending)}) — "
+            f"run: python scripts/init-integrations.py"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -534,6 +583,14 @@ def main():
         claude_pc = provider_config.get("Claude", {})
         gitignore_cfg = config.get("gitignore", {})
         base_gitignore_entries: list[str] = []
+        # Integrations runtime state — always gitignored, regardless of provider.
+        # These files may be written by the lifecycle scripts and pending-marker
+        # logic at any time, so we add them unconditionally.
+        integrations_gitignore_entries = [
+            ".meta-config/.integrations-state.json",
+            ".claude/pending-integrations.json",
+            ".integrations-state.json",
+        ]
         if is_claude:
             if gitignore_cfg.get("local", True):
                 base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
@@ -542,6 +599,7 @@ def main():
                     "CLAUDE.personal.md",
                     "sync.log",
                 ]))
+            base_gitignore_entries.extend(integrations_gitignore_entries)
             if gitignore_cfg.get("generated", False):
                 for _prov in providers:
                     _pc = provider_config.get(_prov, {})
@@ -661,10 +719,16 @@ def main():
             )
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      exact_entries=all_gitignore_entries)
-        elif extra_provider_entries or mcp_gitignore_extras:
+        elif extra_provider_entries or mcp_gitignore_extras or integrations_gitignore_entries:
             # No Claude active but other providers have gitignore entries to manage
-            ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+            ensure_gitignore_entries(
+                project_root, log, args.dry_run,
+                gitignore_entries=extra_provider_entries + mcp_gitignore_extras
+                                  + integrations_gitignore_entries,
+            )
+
+        # Integrations: write pending-init marker for enabled-but-uninitialised integrations.
+        _handle_pending_integrations(config, project_root, agent_meta_root, log, args.dry_run)
 
     # Visualization: generate static mindmap if requested (static or full mode)
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")

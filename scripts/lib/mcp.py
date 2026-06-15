@@ -13,8 +13,15 @@ import json
 import re
 from pathlib import Path
 
+from .integrations import (
+    build_mcp_entries as build_integration_mcp_entries,
+    load_integrations_registry,
+    resolve_enabled_integrations,
+)
 from .io import SyncError, _load_yaml_or_json, read_json_lenient, safe_path, write_checked
 from .log import SyncLog
+
+INTEGRATIONS_REGISTRY_YAML = "config/integrations-registry.yaml"
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
 MCP_RULE_PREFIX = "mcp-"
@@ -226,6 +233,52 @@ def _build_mcp_entries(
     return entries
 
 
+def _integration_entries_to_provider_format(
+    integration_entries: list[dict],
+    fmt: str | None,
+) -> dict:
+    """Convert build_mcp_entries() output to provider-config-compatible dicts.
+
+    Input shape:  [{"name", "command": list[str], "transport": str}]
+    Output shape: {name: {provider-specific connection dict}}
+
+    Translates the abstract integration record into the same nested format
+    the MCP-registry-based _build_mcp_entries() produces, so both can be
+    merged into a single mcpServers/mcp block.
+    """
+    result: dict = {}
+    if not integration_entries:
+        return result
+
+    is_opencode = fmt == "opencode-json"
+    for entry in integration_entries:
+        name = entry.get("name")
+        command = entry.get("command")
+        transport = entry.get("transport", "stdio")
+        if not name or not command:
+            continue
+        if not isinstance(command, list):
+            command = [str(command)]
+
+        if is_opencode:
+            if transport == "stdio":
+                kind = "local"
+            elif transport in ("sse", "http"):
+                kind = "remote"
+            else:
+                kind = transport
+            cfg: dict = {"type": kind, "enabled": True}
+            if kind == "local":
+                cfg["command"] = list(command)
+        else:
+            cfg = {"type": transport}
+            if transport == "stdio":
+                cfg["command"] = command[0]
+                cfg["args"] = list(command[1:])
+        result[name] = cfg
+    return result
+
+
 def _read_json_lenient(path: Path) -> dict | None:
     """Read a JSON file, tolerating JSONC comments and trailing commas."""
     return read_json_lenient(path)
@@ -260,7 +313,6 @@ def _update_json_config(
 
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
-    rel_out = str(path.relative_to(path.parent.parent)) if path.parent.name else rel
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -379,13 +431,23 @@ def generate_provider_configs(
 
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
+
+    Integrations (config/integrations-registry.yaml + project.yaml integrations)
+    are resolved via the two-gate (approved + enabled) and merged into the
+    same mcpServers/mcp block alongside the registry-based servers.
     """
     registry = load_mcp_registry(agent_meta_root)
-    if not registry:
-        return
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root) if registry else []
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root)
-    if not active_servers:
+    # Integrations: two-gate resolution against integrations-registry.yaml
+    integrations_registry = load_integrations_registry(
+        agent_meta_root / INTEGRATIONS_REGISTRY_YAML
+    )
+    enabled_integrations = resolve_enabled_integrations(integrations_registry, config)
+    integration_mcp_entries = build_integration_mcp_entries(enabled_integrations)
+
+    # Skip entirely when neither registry servers nor integrations contribute anything
+    if not active_servers and not integration_mcp_entries:
         return
 
     pc = provider_config.get(provider, {})
@@ -409,6 +471,22 @@ def generate_provider_configs(
 
     committed_entries = _build_mcp_entries(active_servers, registry, secrets=None, fmt=fmt)
     local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets, fmt=fmt) if secrets else {}
+
+    # Merge integration entries (transport-translated to provider format).
+    # Registry-based servers take precedence on name collision — log a warning.
+    integration_entries_fmt = _integration_entries_to_provider_format(
+        integration_mcp_entries, fmt
+    )
+    for name, cfg in integration_entries_fmt.items():
+        if name in committed_entries:
+            log.warn(
+                f"mcp: integration '{name}' shadowed by registry server of the same "
+                "name — registry entry kept, integration skipped"
+            )
+            continue
+        committed_entries[name] = cfg
+        if secrets is not None:
+            local_entries[name] = cfg
 
     # --- Committed provider config ---
     committed_path = safe_path(project_root, committed_file)
@@ -545,17 +623,22 @@ def generate_mcp_artifacts(
       - .meta-config/secrets.local.yaml (central secret store)
     """
     registry = load_mcp_registry(agent_meta_root)
-    if not registry:
-        return []
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root) if registry else []
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root)
-    if not active_servers:
+    # Integrations contribute to provider configs even when the MCP registry
+    # is empty or has no active servers — check both before bailing out.
+    integrations_registry = load_integrations_registry(
+        agent_meta_root / INTEGRATIONS_REGISTRY_YAML
+    )
+    enabled_integrations = resolve_enabled_integrations(integrations_registry, config)
+
+    if not active_servers and not enabled_integrations:
         return []
 
     pc = provider_config.get(provider, {})
 
-    # --- Rule file generation ---
-    if pc.get("has_rules") and rules_dir:
+    # --- Rule file generation (only for registry-based MCP servers) ---
+    if active_servers and pc.get("has_rules") and rules_dir:
         target_dir = project_root / rules_dir
         if not dry_run:
             target_dir.mkdir(parents=True, exist_ok=True)
