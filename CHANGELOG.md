@@ -4,6 +4,29 @@
 
 ---
 
+## [0.61.0] — 2026-06-16
+
+### Added
+
+- **Admin UI — viz dashboard integration**: new `/viz-dashboard` page embeds the Viz dashboard via iframe; Start/Stop/Restart toggle for Viz and MCP subprocesses via new CSRF-protected routes `POST /api/subserver/{viz|mcp}/{start|stop|restart}`.
+- **VizManager lifecycle methods**: `start_viz`, `stop_viz`, `restart_viz`, `start_mcp`, `stop_mcp`, `restart_mcp` in `scripts/admin-server.py`.
+- **project.yaml thematic sub-pages**: dedicated editor pages (General, Providers & Platforms, Roles, Orchestrator, Viz & Admin, Model overrides, Advanced/Raw) replace the previous single generic schema editor.
+- **Non-destructive section save**: new route `PUT /api/config/project/section` performs read-modify-write deep-merge, preserving unrelated top-level keys.
+- **Typo-safe config data sources**: new API routes `GET /api/providers` (with model_tiers and model_aliases per provider), `GET /api/platforms`, and `GET /api/roles` back dropdowns, checkboxes, and multi-selects from real data instead of free-text inputs.
+- **Visual model-overrides table editor**: provider → role → provider-specific model dropdown; replaces raw JSON textarea for `model-overrides` config.
+- **Views separation in Admin UI**: Dashboard panels explain the Framework Defaults vs. Project Instance Config mental model; `config/*.yaml` (global, read-only) and `.meta-config/project.yaml` (project instance) are now visually distinguished.
+
+### Changed
+
+- **Admin UI navigation**: redundant `/config/project-target` nav entry removed — it pointed to the same file as `/config/project` and is superseded by the new thematic sub-pages.
+- **Nested forms replace JSON textareas**: `orchestrator.handoff`/`token-budget` and `provider-options` use structured form inputs rather than raw JSON editing.
+
+### Removed
+
+- **`config/project.yaml`**: deleted 15-line stub file — it was dead configuration never read by `sync.py`; the canonical project config lives at `.meta-config/project.yaml`.
+
+---
+
 ## [0.60.0] — 2026-06-15
 
 ### Added
