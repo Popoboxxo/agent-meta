@@ -1171,10 +1171,14 @@ function buildSidebar() {
       ],
     },
     {
-      title: "Configs",
+      title: "Project instance",
       items: [
         { route: "/config/project", label: "project.yaml", icon: "□" },
-        { route: "/config/project-target", label: "target project.yaml", icon: "□", superAdminProjectOnly: true },
+      ],
+    },
+    {
+      title: "Framework defaults",
+      items: [
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
         { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
@@ -1197,10 +1201,7 @@ function buildSidebar() {
   for (const group of groups) {
     nav.appendChild(el("div", { class: "nav-group-title" }, [group.title]));
     for (const item of group.items) {
-      const disabled = (item.superOnly && state.state.mode !== "super_admin")
-                    || (item.superAdminProjectOnly && !state.state.projectAdminAvailable);
-      const hidden = item.superAdminProjectOnly && state.state.mode !== "super_admin";
-      if (hidden) continue;
+      const disabled = item.superOnly && state.state.mode !== "super_admin";
       const node = el("div", {
         class: `nav-item ${disabled ? "disabled" : ""}`,
         dataset: { route: item.route },
@@ -1250,16 +1251,17 @@ async function viewDashboard() {
     wrap.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, ["Super admin"]),
       el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, mcp-registry, dod-presets, delegation-syntax, export) are editable."]),
+      el("p", {}, ["Framework defaults (config/*.yaml) apply to all projects using this agent-meta instance."]),
     ]));
     // Target repo section — only when .meta-config/project.yaml exists
     if (state.state.projectAdminAvailable) {
       wrap.appendChild(el("div", { class: "panel" }, [
         el("h2", {}, ["Target repo"]),
         el("p", {}, [
-          "This agent-meta repository also has its own ",
+          "Instance config (",
           el("code", {}, [".meta-config/project.yaml"]),
-          " (it uses itself as a target). ",
-          el("a", { href: "#/config/project-target" }, ["Edit target project.yaml"]),
+          ") configures this project specifically. ",
+          el("a", { href: "#/config/project" }, ["Edit instance config (.meta-config/project.yaml)"]),
           ".",
         ]),
       ]));
@@ -2577,10 +2579,6 @@ async function init() {
   router.register("/sync",            viewSync);
   router.register("/live",            viewLive);
   router.register("/config/project",  configView("project", "project.yaml", schemaP));
-  // Target repo view — only visible in super_admin when .meta-config/project.yaml exists.
-  // Uses the same "project" config key because the server resolves it to the
-  // same file in super_admin mode.
-  router.register("/config/project-target", configView("project", "project.yaml (target repo)", schemaP));
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);
