@@ -45,6 +45,7 @@ roles:
   - api-specialist
   - devops-engineer
   - performance-optimizer
+  - explorer
   - export-manager
   - bug-feature-analyzer
   - claude-expert
