@@ -47,6 +47,7 @@ roles:
   - performance-optimizer
   - explorer
   - export-manager
+  - effort-estimator
   - bug-feature-analyzer
   - claude-expert
   - gemini-expert

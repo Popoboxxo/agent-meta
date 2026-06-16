@@ -103,6 +103,11 @@ test-repo:
 #   - agent-meta-scout
 #   - log-analyzer
 #   - feedback
+#   # - effort-estimator   # Aktiviert {{EFFORT_ESTIMATOR_ENABLED}} im Orchestrator (Routing-Gate)
+#   # - tester             # Aktiviert Tester-Route nur wenn dod.tests-required: true
+#   # - validator          # Aktiviert {{VALIDATOR_ENABLED}} (DoD-/REQ-Audit)
+#   # - junior-developer   # Aktiviert mit senior-developer das 3-Tier-Dev-System ({{DEVELOPER_TIERS_ENABLED}})
+#   # - senior-developer
 #
 # project:
 #   name: my-project

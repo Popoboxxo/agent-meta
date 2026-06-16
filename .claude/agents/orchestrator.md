@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 4.0.0
+version: 4.1.0
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
@@ -84,7 +84,6 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Git-Operationen | `git` | — | `fast` / Nein |
 | Dokumentation aktualisieren | `documenter` | `task-spec-v1` | `balanced` / Ja |
 | Anforderungen / REQ-ID | `requirements` | `task-spec-v1` | `balanced` / Nein |
-| Tests schreiben oder ausführen | `tester` | `task-spec-v1` | `balanced` / Ja |
 | Code validieren / DoD prüfen | `code-reviewer` | `task-spec-v1` | `balanced` / Nein |
 | Meta-Fragen (Agent-Setup, Sync, Rules) | `agent-meta-manager` | — | `fast`→`balanced` / Nein |
 | Projekt-Feedback als GitHub Issue | `feedback` | — | `fast` / Nein |
@@ -93,7 +92,7 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Release / Version bump | `release` | — | `balanced` / Nein |
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | `task-spec-v1` (batch: true) | — / Ja |
-| Aufwandsschätzung | `effort-estimator` | — | `fast` / Nein |
+| Aufwandsschätzung                   | `effort-estimator` | —                | `fast` / Nein |
 | Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | supersession | `balanced`→`powerful` / Nein |
 | Nicht in Tabelle | Frag den User | — | — / — |
 
@@ -493,8 +492,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-   + Meta-Feedback im Hintergrund
-
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
@@ -560,6 +557,7 @@ Fallback (kein Tool-Call): Delegiere diese Aufgabe via `Agent(subagent_type="orc
 | `developer` | Feature-Implementierung und Bugfixes | powerful | ✅ (Multi-Dateien) |
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. | fast | ✅ (Multi-Targets) |
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | fast | ✅ (Multi-Sections) |
+| `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung | fast | ❌ (sequentiell) |
 | `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche. | balanced | ✅ (Multi-Tasks) |
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. | fast | ❌ (sequentiell) |
 | `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. | — | ✅ (intern) |

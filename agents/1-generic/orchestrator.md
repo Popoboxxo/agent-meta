@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.0.0"
+version: "4.1.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -46,7 +46,9 @@ Du bist der **Orchestrator** für {{PROJECT_NAME}}.
 
 - >1 Delegationsschritt → Plan (3–7 Schritte) zeigen, Bestätigung einholen
 - Trivial oder expliziter "mach jetzt"-Befehl → überspringen
+{{#if EFFORT_ESTIMATOR_ENABLED}}
 - Aufwandsschätzung nur durch `effort-estimator`
+{{/if}}
 
 ---
 
@@ -100,7 +102,9 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Git-Operationen | `git` | — | `fast` / Nein |
 | Dokumentation aktualisieren | `documenter` | `task-spec-v1` | `balanced` / Ja |
 | Anforderungen / REQ-ID | `requirements` | `task-spec-v1` | `balanced` / Nein |
-| Tests schreiben oder ausführen | `tester` | `task-spec-v1` | `balanced` / Ja |
+{{#if DOD_TESTS_REQUIRED}}
+| Tests schreiben oder ausführen      | `tester`           | `task-spec-v1`   | `balanced` / Ja |
+{{/if}}
 | Code validieren / DoD prüfen | `code-reviewer`{{#if VALIDATOR_ENABLED}} oder `validator`{{/if}} | `task-spec-v1` | `balanced` / Nein |
 | Meta-Fragen (Agent-Setup, Sync, Rules) | `agent-meta-manager` | — | `fast`→`balanced` / Nein |
 | Projekt-Feedback als GitHub Issue | `feedback` | — | `fast` / Nein |
@@ -118,7 +122,9 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 {{/if}}
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | `task-spec-v1` (batch: true) | — / Ja |
-| Aufwandsschätzung | `effort-estimator` | — | `fast` / Nein |
+{{#if EFFORT_ESTIMATOR_ENABLED}}
+| Aufwandsschätzung                   | `effort-estimator` | —                | `fast` / Nein |
+{{/if}}
 | Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | supersession | `balanced`→`powerful` / Nein |
 | Nicht in Tabelle | Frag den User | — | — / — |
 
