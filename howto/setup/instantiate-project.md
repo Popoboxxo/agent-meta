@@ -216,6 +216,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
 | `.claude/agents/bug-feature-analyzer.md` | `1-generic/bug-feature-analyzer.md` |
+| `.claude/agents/explorer.md` | `1-generic/explorer.md` |
 
 ---
 
@@ -412,6 +413,7 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/log-analyzer.md` vorhanden
 - [ ] `.claude/agents/feedback.md` vorhanden
 - [ ] `.claude/agents/bug-feature-analyzer.md` vorhanden
+- [ ] `.claude/agents/explorer.md` vorhanden
 - [ ] `.claude/agents/se-requirements.md` vorhanden
 - [ ] `.claude/agents/se-architect.md` vorhanden
 - [ ] `.claude/agents/se-critic.md` vorhanden
