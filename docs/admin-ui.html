@@ -216,6 +216,26 @@ pre {
 .field-label .required { color: var(--accent-red); margin-left: 3px; }
 .field-help { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 .field-error { font-size: 11px; color: var(--accent-red); margin-top: 3px; }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.field-row .field-label { margin-bottom: 0; min-width: 160px; }
+select.select, .select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-sans, inherit);
+  font-size: 13px;
+}
+select.select:focus, .select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
 
 input[type="text"], input[type="number"], input[type="url"], select, textarea {
   width: 100%;
@@ -1166,15 +1186,26 @@ function buildSidebar() {
       title: "Workspace",
       items: [
         { route: "/", label: "Dashboard", icon: "■" },
+        { route: "/viz-dashboard", label: "Viz Dashboard", icon: "▦" },
         { route: "/sync", label: "Sync", icon: "↻" },
         { route: "/live", label: "Live events", icon: "≡" },
       ],
     },
     {
-      title: "Configs",
+      title: "Project instance",
       items: [
-        { route: "/config/project", label: "project.yaml", icon: "□" },
-        { route: "/config/project-target", label: "target project.yaml", icon: "□", superAdminProjectOnly: true },
+        { route: "/project/general",   label: "General", icon: "□" },
+        { route: "/project/providers", label: "Providers & Platforms", icon: "□" },
+        { route: "/project/roles",     label: "Roles", icon: "□" },
+        { route: "/project/orchestrator", label: "Orchestrator", icon: "□" },
+        { route: "/project/viz-admin", label: "Viz & Admin", icon: "□" },
+        { route: "/project/model-overrides", label: "Model Overrides", icon: "□" },
+        { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "□" },
+      ],
+    },
+    {
+      title: "Framework defaults",
+      items: [
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
         { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
@@ -1197,10 +1228,7 @@ function buildSidebar() {
   for (const group of groups) {
     nav.appendChild(el("div", { class: "nav-group-title" }, [group.title]));
     for (const item of group.items) {
-      const disabled = (item.superOnly && state.state.mode !== "super_admin")
-                    || (item.superAdminProjectOnly && !state.state.projectAdminAvailable);
-      const hidden = item.superAdminProjectOnly && state.state.mode !== "super_admin";
-      if (hidden) continue;
+      const disabled = item.superOnly && state.state.mode !== "super_admin";
       const node = el("div", {
         class: `nav-item ${disabled ? "disabled" : ""}`,
         dataset: { route: item.route },
@@ -1250,16 +1278,17 @@ async function viewDashboard() {
     wrap.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, ["Super admin"]),
       el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, mcp-registry, dod-presets, delegation-syntax, export) are editable."]),
+      el("p", {}, ["Framework defaults (config/*.yaml) apply to all projects using this agent-meta instance."]),
     ]));
     // Target repo section — only when .meta-config/project.yaml exists
     if (state.state.projectAdminAvailable) {
       wrap.appendChild(el("div", { class: "panel" }, [
         el("h2", {}, ["Target repo"]),
         el("p", {}, [
-          "This agent-meta repository also has its own ",
+          "Instance config (",
           el("code", {}, [".meta-config/project.yaml"]),
-          " (it uses itself as a target). ",
-          el("a", { href: "#/config/project-target" }, ["Edit target project.yaml"]),
+          ") configures this project specifically. ",
+          el("a", { href: "#/config/project" }, ["Edit instance config (.meta-config/project.yaml)"]),
           ".",
         ]),
       ]));
@@ -2548,6 +2577,826 @@ async function viewLive() {
 }
 
 /* =========================================================================
+ * Views — Project instance sub-pages (project.yaml split by theme)
+ * ========================================================================= */
+
+/** Load project.yaml; returns {} on error so forms still render. */
+async function loadProject() {
+  try { return await api.get("/api/config/project"); }
+  catch { return {}; }
+}
+
+/** Save one top-level section of project.yaml via the partial-update route. */
+async function saveProjectSection(key, value, statusEl) {
+  try {
+    await api.put("/api/config/project/section", { key, value });
+    toast(`Saved project.${key}`, "success");
+    if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
+  } catch (err) {
+    toast(`Save failed: ${err.message}`, "error");
+    if (statusEl) { statusEl.textContent = `Save failed: ${err.message}`; statusEl.style.color = "var(--accent-red)"; }
+    throw err;
+  }
+}
+
+/** Save multiple sections sequentially. */
+async function saveProjectSections(entries, statusEl) {
+  for (const [key, value] of entries) {
+    await saveProjectSection(key, value, null);
+  }
+  toast("All sections saved", "success");
+  if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
+}
+
+function textField(label, value, onInput, help) {
+  const field = el("div", { class: "field" });
+  field.appendChild(el("label", { class: "field-label" }, [label]));
+  const inp = el("input", { type: "text", value: value ?? "" });
+  inp.addEventListener("input", () => onInput(inp.value));
+  field.appendChild(inp);
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
+  return field;
+}
+
+function dropdownField(label, options, value, onChange) {
+  const field = el("div", { class: "field" });
+  field.appendChild(el("label", { class: "field-label" }, [label]));
+  const sel = el("select");
+  for (const opt of options) {
+    const o = el("option", { value: opt }, [opt || "—"]);
+    if (opt === value) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener("change", () => onChange(sel.value));
+  field.appendChild(sel);
+  return field;
+}
+
+function checkboxField(label, value, onChange) {
+  const field = el("div", { class: "field" });
+  const wrapL = el("label", { class: "toggle", style: "margin-right:8px;" });
+  const cb = el("input", { type: "checkbox" });
+  cb.checked = !!value;
+  cb.addEventListener("change", () => onChange(cb.checked));
+  wrapL.appendChild(cb); wrapL.appendChild(el("span", { class: "slider" }));
+  field.appendChild(el("label", { class: "field-label" }, [label]));
+  field.appendChild(wrapL);
+  return field;
+}
+
+/* ----------------------------------- General ----------------------------- */
+async function viewProjectGeneral() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — General"]));
+  const data = await loadProject();
+  const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
+  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "" };
+
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const panel = el("div", { class: "panel" });
+  panel.appendChild(textField("project.name", project.name, v => project.name = v));
+  panel.appendChild(textField("project.prefix", project.prefix, v => project.prefix = v));
+  panel.appendChild(textField("project.short", project.short, v => project.short = v));
+  panel.appendChild(dropdownField("dod-preset", ["rapid-prototyping", "standard", "strict"], top["dod-preset"], v => top["dod-preset"] = v));
+  panel.appendChild(textField("rules-preset", top["rules-preset"], v => top["rules-preset"] = v));
+  panel.appendChild(dropdownField("speech-mode", ["short", "medium", "verbose", "full"], top["speech-mode"], v => top["speech-mode"] = v));
+  wrap.appendChild(panel);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        await saveProjectSections([
+          ["project", project],
+          ["dod-preset", top["dod-preset"]],
+          ["rules-preset", top["rules-preset"]],
+          ["speech-mode", top["speech-mode"]],
+        ], status);
+      } catch { /* toast already shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ------------------------- Providers & Platforms ------------------------- */
+async function viewProjectProviders() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Providers & Platforms"]));
+  const [data, providers, platforms] = await Promise.all([
+    loadProject(),
+    api.get("/api/providers").catch(() => []),
+    api.get("/api/platforms").catch(() => []),
+  ]);
+
+  const selProviders = new Set(Array.isArray(data["ai-providers"]) ? data["ai-providers"] : []);
+  const selPlatforms = new Set(Array.isArray(data.platforms) ? data.platforms : []);
+  const providerOptions = (data["provider-options"] && typeof data["provider-options"] === "object")
+    ? clone(data["provider-options"]) : {};
+  let isolation = data["provider-isolation"];
+
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  // Providers checklist
+  const provPanel = el("div", { class: "panel" });
+  provPanel.appendChild(el("h2", {}, ["AI providers"]));
+  if (!providers.length) provPanel.appendChild(el("div", { class: "empty" }, ["No providers available (super-admin config not found)."]));
+  for (const p of providers) {
+    const line = el("label", { class: "flex-row", style: "gap:8px; margin-bottom:6px; cursor:pointer;" });
+    const cb = el("input", { type: "checkbox" });
+    cb.checked = selProviders.has(p.name);
+    cb.addEventListener("change", () => { cb.checked ? selProviders.add(p.name) : selProviders.delete(p.name); });
+    line.appendChild(cb);
+    line.appendChild(el("span", { class: "mono" }, [p.name]));
+    if (!p.has_model_tiers) line.appendChild(el("span", { class: "muted", title: "manages models centrally" }, ["(central models)"]));
+    provPanel.appendChild(line);
+  }
+  wrap.appendChild(provPanel);
+
+  // Platforms checklist
+  const platPanel = el("div", { class: "panel" });
+  platPanel.appendChild(el("h2", {}, ["Platforms"]));
+  if (!platforms.length) platPanel.appendChild(el("div", { class: "empty" }, ["No platforms available."]));
+  for (const pl of platforms) {
+    const line = el("label", { class: "flex-row", style: "gap:8px; margin-bottom:6px; cursor:pointer;" });
+    const cb = el("input", { type: "checkbox" });
+    cb.checked = selPlatforms.has(pl.name);
+    cb.addEventListener("change", () => { cb.checked ? selPlatforms.add(pl.name) : selPlatforms.delete(pl.name); });
+    line.appendChild(cb);
+    line.appendChild(el("span", { class: "mono" }, [pl.name]));
+    platPanel.appendChild(line);
+  }
+  wrap.appendChild(platPanel);
+
+  // provider-isolation + provider-options (nested KV editor)
+  const optPanel = el("div", { class: "panel" });
+  optPanel.appendChild(el("h2", {}, ["Options"]));
+  optPanel.appendChild(textField("provider-isolation", typeof isolation === "string" ? isolation : "", v => { isolation = v; }, "e.g. disabled / enabled"));
+
+  // Provider Options — per-provider collapsible KV editors
+  optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["provider-options"]));
+
+  // Determine provider names: union of providers from API + keys already in providerOptions
+  const providerNames = new Set([
+    ...providers.map(p => p.name),
+    ...Object.keys(providerOptions),
+  ]);
+
+  if (providerNames.size === 0) {
+    optPanel.appendChild(el("div", { class: "empty" }, ["No providers configured."]));
+  }
+
+  for (const provName of providerNames) {
+    if (!providerOptions[provName] || typeof providerOptions[provName] !== "object") {
+      providerOptions[provName] = {};
+    }
+    const provOpts = providerOptions[provName];
+
+    // Collapsible section per provider
+    const section = el("div", { style: "margin-bottom:12px; border:1px solid var(--border-color); border-radius:var(--radius);" });
+
+    const header = el("div", {
+      style: "display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; background:var(--bg-tertiary); border-radius:var(--radius);",
+    });
+    header.appendChild(el("span", { class: "mono", style: "font-weight:600;" }, [provName]));
+    const toggleBtn = el("span", { style: "color:var(--text-muted); font-size:11px;" }, ["▼"]);
+    header.appendChild(toggleBtn);
+
+    const body = el("div", { style: "padding:8px 12px; display:block;" });
+
+    // KV table
+    const table = el("table", { style: "width:100%; border-collapse:collapse;" });
+    const thead = el("tr", {}, [
+      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Key"]),
+      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Value"]),
+      el("th", { style: "width:20%;" }, [""]),
+    ]);
+    table.appendChild(thead);
+
+    // Render existing rows
+    function addKVRow(key, val) {
+      const row = el("tr", {});
+      const keyCell = el("td", { style: "padding:2px 4px 2px 0;" });
+      const keyInput = el("input", { type: "text", style: "width:100%; font-family:var(--font-mono); font-size:12px;", placeholder: "key" });
+      keyInput.value = key;
+      keyCell.appendChild(keyInput);
+
+      const valCell = el("td", { style: "padding:2px 4px;" });
+      // Detect bool vs string
+      const isBool = val === true || val === false;
+      const valSel = el("select", { style: "margin-right:4px; font-size:12px;" });
+      const typeOpts = [["string", "string"], ["bool", "bool"]];
+      for (const [tv, tl] of typeOpts) {
+        const o = el("option", { value: tv }, [tl]);
+        if (isBool && tv === "bool") o.setAttribute("selected", "");
+        else if (!isBool && tv === "string") o.setAttribute("selected", "");
+        valSel.appendChild(o);
+      }
+      const valInput = el("input", { type: "text", style: "width:calc(100% - 70px); font-size:12px; font-family:var(--font-mono);", placeholder: "value" });
+      valInput.value = isBool ? String(val) : (val != null ? String(val) : "");
+      valCell.appendChild(valSel);
+      valCell.appendChild(valInput);
+
+      const removeCell = el("td", { style: "padding:2px 0 2px 4px; text-align:right;" });
+      const removeBtn = el("button", { class: "btn", style: "font-size:11px; padding:2px 6px; color:var(--accent-red);", onclick: () => {
+        const oldKey = keyInput.value.trim();
+        if (oldKey) delete provOpts[oldKey];
+        row.remove();
+      } }, ["✕"]);
+      removeCell.appendChild(removeBtn);
+
+      // On change: update provOpts
+      function sync() {
+        const k = keyInput.value.trim();
+        if (!k) return;
+        // Remove old key if renamed
+        // We can't easily track old key here, so we rebuild on save instead
+        let v;
+        if (valSel.value === "bool") {
+          v = valInput.value.trim().toLowerCase() === "true";
+        } else {
+          v = valInput.value;
+        }
+        provOpts[k] = v;
+      }
+      keyInput.addEventListener("change", sync);
+      valInput.addEventListener("change", sync);
+      valSel.addEventListener("change", sync);
+
+      row.appendChild(keyCell);
+      row.appendChild(valCell);
+      row.appendChild(removeCell);
+      table.appendChild(row);
+    }
+
+    for (const [k, v] of Object.entries(provOpts)) {
+      addKVRow(k, v);
+    }
+
+    body.appendChild(table);
+
+    const addBtn = el("button", { class: "btn", style: "margin-top:6px; font-size:12px;", onclick: () => {
+      addKVRow("", "");
+    } }, ["+ Add option"]);
+    body.appendChild(addBtn);
+
+    // Toggle collapse
+    let expanded = true;
+    header.addEventListener("click", () => {
+      expanded = !expanded;
+      body.style.display = expanded ? "block" : "none";
+      toggleBtn.textContent = expanded ? "▼" : "▶";
+    });
+
+    section.appendChild(header);
+    section.appendChild(body);
+    optPanel.appendChild(section);
+  }
+
+  wrap.appendChild(optPanel);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      // Rebuild providerOptions from current table state before saving
+      // (rows may have been added/removed; re-read from DOM)
+      // We rely on the sync() callbacks having kept provOpts up-to-date.
+      // Empty-key rows are ignored by sync(), so provOpts stays clean.
+      try {
+        await saveProjectSections([
+          ["ai-providers", Array.from(selProviders)],
+          ["platforms", Array.from(selPlatforms)],
+          ["provider-options", providerOptions],
+          ["provider-isolation", isolation],
+        ], status);
+      } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ----------------------------------- Roles ------------------------------- */
+async function viewProjectRoles() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Roles"]));
+  const [data, allRoles] = await Promise.all([
+    loadProject(),
+    api.get("/api/roles").catch(() => []),
+  ]);
+  const roleNames = allRoles.map(r => r.name);
+  const selected = Array.isArray(data.roles) ? [...data.roles] : [];
+
+  const status = el("div", { class: "muted" }, [`${selected.length} roles selected.`]);
+  wrap.appendChild(status);
+
+  const panel = el("div", { class: "panel" });
+  const listWrap = el("div");
+  panel.appendChild(listWrap);
+  wrap.appendChild(panel);
+
+  const render = () => {
+    listWrap.replaceChildren();
+    selected.forEach((name, idx) => {
+      const row = el("div", { class: "flex-row", style: "gap:8px; margin-bottom:6px;" });
+      const sel = el("select", { style: "max-width:280px;" });
+      const known = new Set(roleNames);
+      if (name && !known.has(name)) sel.appendChild(el("option", { value: name }, [name + " (unknown)"]));
+      for (const rn of roleNames) {
+        const o = el("option", { value: rn }, [rn]);
+        if (rn === name) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.addEventListener("change", () => { selected[idx] = sel.value; });
+      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      rm.addEventListener("click", () => { selected.splice(idx, 1); render(); });
+      row.appendChild(sel);
+      row.appendChild(rm);
+      listWrap.appendChild(row);
+    });
+    status.textContent = `${selected.length} roles selected.`;
+  };
+  render();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => { selected.push(roleNames[0] || ""); render(); } }, ["Add role"]),
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try { await saveProjectSection("roles", selected.filter(Boolean), status); } catch { /* shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ------------------------------- Orchestrator ---------------------------- */
+async function viewProjectOrchestrator() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Orchestrator"]));
+  const data = await loadProject();
+  const orch = (data.orchestrator && typeof data.orchestrator === "object") ? clone(data.orchestrator) : {};
+
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  // ── General ──────────────────────────────────────────────────────────────
+  const genPanel = el("div", { class: "panel" });
+  genPanel.appendChild(el("h2", {}, ["General"]));
+  genPanel.appendChild(checkboxField("enabled", orch.enabled, v => { orch.enabled = v; }));
+  genPanel.appendChild(checkboxField("strict", orch.strict, v => { orch.strict = v; }));
+  genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
+  genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
+  wrap.appendChild(genPanel);
+
+  // ── Unknown Fallback ──────────────────────────────────────────────────────
+  const uf = (orch["unknown-fallback"] && typeof orch["unknown-fallback"] === "object") ? orch["unknown-fallback"] : {};
+  const ufPanel = el("div", { class: "panel" });
+  ufPanel.appendChild(el("h2", {}, ["Unknown Fallback"]));
+  ufPanel.appendChild(checkboxField("meta-feedback", uf["meta-feedback"], v => { uf["meta-feedback"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("main-chat", uf["main-chat"], v => { uf["main-chat"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("ask-user", uf["ask-user"], v => { uf["ask-user"] = v; orch["unknown-fallback"] = uf; }));
+  wrap.appendChild(ufPanel);
+
+  // ── Handoff ───────────────────────────────────────────────────────────────
+  const hf = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
+  const hPanel = el("div", { class: "panel" });
+  hPanel.appendChild(el("h2", {}, ["Handoff"]));
+  hPanel.appendChild(textField("protocol", typeof hf.protocol === "string" ? hf.protocol : "", v => { hf.protocol = v; orch.handoff = hf; }, "e.g. a2a-v1"));
+  hPanel.appendChild(checkboxField("validate-before-delegate", hf["validate-before-delegate"], v => { hf["validate-before-delegate"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("supersession-tracking", hf["supersession-tracking"], v => { hf["supersession-tracking"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("strict-validation", hf["strict-validation"], v => { hf["strict-validation"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("compact-mode", hf["compact-mode"], v => { hf["compact-mode"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("human_approval_required", hf["human_approval_required"], v => { hf["human_approval_required"] = v; orch.handoff = hf; }));
+
+  // max_retries — number input
+  const retriesRow = el("div", { class: "field-row" });
+  retriesRow.appendChild(el("label", { class: "field-label" }, ["max_retries"]));
+  const retriesInput = el("input", { type: "number", min: "0", style: "width:80px;" });
+  retriesInput.value = hf.max_retries != null ? String(hf.max_retries) : "";
+  retriesInput.addEventListener("change", () => {
+    const v = parseInt(retriesInput.value, 10);
+    hf.max_retries = isNaN(v) ? undefined : v;
+    orch.handoff = hf;
+  });
+  retriesRow.appendChild(retriesInput);
+  hPanel.appendChild(retriesRow);
+
+  // protocol_routing — dropdown
+  const prRow = el("div", { class: "field-row" });
+  prRow.appendChild(el("label", { class: "field-label" }, ["protocol_routing"]));
+  const prSel = el("select", { class: "select" });
+  for (const opt of ["", "static", "dynamic"]) {
+    const o = el("option", { value: opt }, [opt || "(not set)"]);
+    if ((hf.protocol_routing || "") === opt) o.setAttribute("selected", "");
+    prSel.appendChild(o);
+  }
+  prSel.addEventListener("change", () => {
+    hf.protocol_routing = prSel.value || undefined;
+    orch.handoff = hf;
+  });
+  prRow.appendChild(prSel);
+  hPanel.appendChild(prRow);
+
+  wrap.appendChild(hPanel);
+
+  // ── Token Budget ──────────────────────────────────────────────────────────
+  const tb = (hf["token-budget"] && typeof hf["token-budget"] === "object") ? hf["token-budget"] : {};
+  const tbPanel = el("div", { class: "panel" });
+  tbPanel.appendChild(el("h2", {}, ["Token Budget"]));
+  tbPanel.appendChild(checkboxField("enabled", tb.enabled, v => { tb.enabled = v; hf["token-budget"] = tb; orch.handoff = hf; }));
+
+  // session_budget — number input
+  const sbRow = el("div", { class: "field-row" });
+  sbRow.appendChild(el("label", { class: "field-label" }, ["session_budget"]));
+  const sbInput = el("input", { type: "number", min: "0", style: "width:120px;" });
+  sbInput.value = tb.session_budget != null ? String(tb.session_budget) : "";
+  sbInput.addEventListener("change", () => {
+    const v = parseInt(sbInput.value, 10);
+    tb.session_budget = isNaN(v) ? undefined : v;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  sbRow.appendChild(sbInput);
+  tbPanel.appendChild(sbRow);
+
+  // max_overhead_pct — number input
+  const pctRow = el("div", { class: "field-row" });
+  pctRow.appendChild(el("label", { class: "field-label" }, ["max_overhead_pct"]));
+  const pctInput = el("input", { type: "number", min: "0", max: "100", style: "width:80px;" });
+  pctInput.value = tb.max_overhead_pct != null ? String(tb.max_overhead_pct) : "";
+  pctInput.addEventListener("change", () => {
+    const v = parseInt(pctInput.value, 10);
+    tb.max_overhead_pct = isNaN(v) ? undefined : v;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  pctRow.appendChild(pctInput);
+  tbPanel.appendChild(pctRow);
+
+  // on_exceed — dropdown
+  const oeRow = el("div", { class: "field-row" });
+  oeRow.appendChild(el("label", { class: "field-label" }, ["on_exceed"]));
+  const oeSel = el("select", { class: "select" });
+  for (const opt of ["", "compact", "warn"]) {
+    const o = el("option", { value: opt }, [opt || "(not set)"]);
+    if ((tb.on_exceed || "") === opt) o.setAttribute("selected", "");
+    oeSel.appendChild(o);
+  }
+  oeSel.addEventListener("change", () => {
+    tb.on_exceed = oeSel.value || undefined;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  oeRow.appendChild(oeSel);
+  tbPanel.appendChild(oeRow);
+
+  wrap.appendChild(tbPanel);
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      // Ensure nested objects are written back before saving
+      if (Object.keys(uf).length > 0 || orch["unknown-fallback"] !== undefined) {
+        orch["unknown-fallback"] = uf;
+      }
+      if (Object.keys(hf).length > 0 || orch.handoff !== undefined) {
+        hf["token-budget"] = tb;
+        orch.handoff = hf;
+      }
+      try { await saveProjectSection("orchestrator", orch, status); } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ------------------------------- Viz & Admin ----------------------------- */
+async function viewProjectVizAdmin() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Viz & Admin"]));
+  const data = await loadProject();
+  const viz = (data.viz && typeof data.viz === "object") ? clone(data.viz) : {};
+  const admin = (data["admin-ui"] && typeof data["admin-ui"] === "object") ? clone(data["admin-ui"]) : {};
+
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const vizPanel = el("div", { class: "panel" });
+  vizPanel.appendChild(el("h2", {}, ["viz"]));
+  vizPanel.appendChild(checkboxField("enabled", viz.enabled, v => viz.enabled = v));
+  vizPanel.appendChild(textField("mode", viz.mode, v => viz.mode = v));
+  vizPanel.appendChild(textField("event_log", viz.event_log, v => viz.event_log = v));
+  wrap.appendChild(vizPanel);
+
+  const adminPanel = el("div", { class: "panel" });
+  adminPanel.appendChild(el("h2", {}, ["admin-ui"]));
+  adminPanel.appendChild(checkboxField("enabled", admin.enabled, v => admin.enabled = v));
+  const portField = el("div", { class: "field" });
+  portField.appendChild(el("label", { class: "field-label" }, ["port"]));
+  const portInp = el("input", { type: "number" });
+  portInp.value = admin.port ?? "";
+  portInp.addEventListener("input", () => { admin.port = portInp.value === "" ? null : Number(portInp.value); });
+  portField.appendChild(portInp);
+  adminPanel.appendChild(portField);
+  adminPanel.appendChild(checkboxField("auto-sync-on-save", admin["auto-sync-on-save"], v => admin["auto-sync-on-save"] = v));
+  adminPanel.appendChild(checkboxField("watch-config", admin["watch-config"], v => admin["watch-config"] = v));
+  wrap.appendChild(adminPanel);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        await saveProjectSections([["viz", viz], ["admin-ui", admin]], status);
+      } catch { /* shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ----------------------------- Model Overrides --------------------------- */
+async function viewProjectModelOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Model Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override the model used per provider + role. Providers that manage models centrally are excluded.",
+  ]));
+  const [data, providers, roles] = await Promise.all([
+    loadProject(),
+    api.get("/api/providers").catch(() => []),
+    api.get("/api/roles").catch(() => []),
+  ]);
+
+  // Only providers with model tiers can carry overrides.
+  const tierProviders = providers.filter(p => p.has_model_tiers);
+  const providerByName = new Map(providers.map(p => [p.name, p]));
+  const roleNames = roles.map(r => r.name);
+
+  // Flatten existing model-overrides into editable rows.
+  const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
+  const rows = [];
+  for (const [prov, roleMap] of Object.entries(existing)) {
+    if (!roleMap || typeof roleMap !== "object") continue;
+    for (const [role, model] of Object.entries(roleMap)) {
+      rows.push({ provider: prov, role, model });
+    }
+  }
+
+  const status = el("div", { class: "muted" }, [`${rows.length} overrides.`]);
+  wrap.appendChild(status);
+
+  // Build the model option list for a given provider: tier names + alias names
+  // + concrete model IDs.
+  const modelOptionsFor = (provName) => {
+    const p = providerByName.get(provName);
+    if (!p) return [];
+    const tiers = p.model_tiers || {};
+    const aliases = p.model_aliases || {};
+    const opts = new Set();
+    for (const t of Object.keys(tiers)) opts.add(t);
+    for (const a of Object.keys(aliases)) opts.add(a);
+    for (const v of Object.values(tiers)) opts.add(v);
+    for (const v of Object.values(aliases)) opts.add(v);
+    return [...opts];
+  };
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  const render = () => {
+    tableWrap.replaceChildren();
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Provider", "Role", "Model", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    rows.forEach((row, idx) => {
+      const tr = el("tr");
+
+      // Provider dropdown (tier-capable providers only).
+      const provSel = el("select");
+      const provNames = tierProviders.map(p => p.name);
+      if (row.provider && !provNames.includes(row.provider)) {
+        provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
+      }
+      provSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const pn of provNames) {
+        const o = el("option", { value: pn }, [pn]);
+        if (pn === row.provider) o.selected = true;
+        provSel.appendChild(o);
+      }
+      provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
+      tr.appendChild(el("td", {}, [provSel]));
+
+      // Role dropdown.
+      const roleSel = el("select");
+      const known = new Set(roleNames);
+      if (row.role && !known.has(row.role)) roleSel.appendChild(el("option", { value: row.role }, [row.role + " (unknown)"]));
+      roleSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const rn of roleNames) {
+        const o = el("option", { value: rn }, [rn]);
+        if (rn === row.role) o.selected = true;
+        roleSel.appendChild(o);
+      }
+      roleSel.addEventListener("change", () => { row.role = roleSel.value; });
+      tr.appendChild(el("td", {}, [roleSel]));
+
+      // Model dropdown (depends on provider).
+      const modelSel = el("select");
+      const modelOpts = modelOptionsFor(row.provider);
+      if (row.model && !modelOpts.includes(row.model)) modelSel.appendChild(el("option", { value: row.model }, [row.model]));
+      modelSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const m of modelOpts) {
+        const o = el("option", { value: m }, [m]);
+        if (m === row.model) o.selected = true;
+        modelSel.appendChild(o);
+      }
+      modelSel.addEventListener("change", () => { row.model = modelSel.value; });
+      tr.appendChild(el("td", {}, [modelSel]));
+
+      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
+      tr.appendChild(el("td", {}, [rm]));
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    status.textContent = `${rows.length} overrides.`;
+  };
+  render();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => { rows.push({ provider: "", role: "", model: "" }); render(); } }, ["Add override"]),
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      // Rebuild nested object {Provider: {role: model}}.
+      const out = {};
+      for (const row of rows) {
+        if (!row.provider || !row.role || !row.model) continue;
+        out[row.provider] = out[row.provider] || {};
+        out[row.provider][row.role] = row.model;
+      }
+      try { await saveProjectSection("model-overrides", out, status); } catch { /* shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ------------------------------- Advanced -------------------------------- */
+async function viewProjectAdvanced() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Advanced (raw YAML)"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Full project.yaml as JSON. Saving replaces the entire file. Edit with care.",
+  ]));
+  const data = await loadProject();
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const ta = el("textarea", { rows: 28, style: "width:100%; min-height:520px;" });
+  ta.value = JSON.stringify(data, null, 2);
+  wrap.appendChild(el("div", { class: "panel" }, [ta]));
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      let parsed;
+      try { parsed = JSON.parse(ta.value); }
+      catch (e) { toast("Invalid JSON: " + e.message, "error"); return; }
+      try {
+        // Full replace via the existing whole-file route.
+        await api.put("/api/config/project", parsed);
+        toast("project.yaml saved (full replace)", "success");
+        status.textContent = "Saved."; status.style.color = "var(--accent-green)";
+      } catch (err) {
+        toast(`Save failed: ${err.message}`, "error");
+        status.textContent = `Save failed: ${err.message}`; status.style.color = "var(--accent-red)";
+      }
+    } }, ["Save (full replace)"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Viz Dashboard (embedded iframe + subserver controls)
+ * ========================================================================= */
+async function viewVizDashboard() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Viz Dashboard"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Embeds the Viz dashboard subserver and lets you start, stop and restart the Viz and MCP subservers.",
+  ]));
+
+  // Control panel — Start/Stop/Restart per service.
+  const controls = el("div", { class: "panel" });
+  controls.appendChild(el("div", { class: "panel-title" }, [el("h2", { style: "margin:0;" }, ["Subserver controls"])]));
+  const controlBody = el("div");
+  controls.appendChild(controlBody);
+  wrap.appendChild(controls);
+
+  // Embed area — iframe (running) or placeholder (stopped).
+  const embed = el("div", { class: "panel" });
+  embed.appendChild(el("div", { class: "panel-title" }, [el("h2", { style: "margin:0;" }, ["Viz dashboard"])]));
+  const embedBody = el("div");
+  embed.appendChild(embedBody);
+  wrap.appendChild(embed);
+
+  let inFlight = false;
+  let lastVizUrl = null;
+
+  const renderControls = (status) => {
+    controlBody.replaceChildren();
+    const row = (label, name, running) => {
+      const line = el("div", { class: "flex-row", style: "margin-bottom:8px;" });
+      const dot = running
+        ? el("span", { style: "color:var(--accent-green)" }, ["● running"])
+        : el("span", { style: "color:var(--text-muted)" }, ["○ stopped"]);
+      line.appendChild(el("span", { style: "min-width:120px; font-weight:600;" }, [label]));
+      line.appendChild(dot);
+      const mkBtn = (text, action, cls) => {
+        const b = el("button", { class: `btn ${cls || ""}` }, [text]);
+        b.disabled = inFlight;
+        b.addEventListener("click", () => doAction(name, action));
+        return b;
+      };
+      line.appendChild(mkBtn("Start", "start", "btn-primary"));
+      line.appendChild(mkBtn("Stop", "stop", "btn-danger"));
+      line.appendChild(mkBtn("Restart", "restart", ""));
+      return line;
+    };
+    controlBody.appendChild(row("Viz dashboard", "viz", status?.viz?.running));
+    controlBody.appendChild(row("MCP server", "mcp", status?.mcp?.running));
+  };
+
+  const renderEmbed = (status) => {
+    const viz = status?.viz || {};
+    if (viz.running && viz.url) {
+      // Only rebuild the iframe when the URL changes — avoids reloading on
+      // every 5s poll.
+      if (lastVizUrl !== viz.url || !embedBody.querySelector("iframe")) {
+        embedBody.replaceChildren();
+        const frame = el("iframe", {
+          src: viz.url,
+          style: "width:100%; height:600px; border:1px solid var(--border-color); border-radius:var(--radius); background:#fff;",
+        });
+        embedBody.appendChild(frame);
+        lastVizUrl = viz.url;
+      }
+    } else {
+      lastVizUrl = null;
+      embedBody.replaceChildren();
+      const placeholder = el("div", { class: "empty" });
+      placeholder.appendChild(el("div", {}, ["Viz dashboard is not running."]));
+      const startBtn = el("button", { class: "btn btn-primary", style: "margin-top:12px;" }, ["Start Viz Server"]);
+      startBtn.disabled = inFlight;
+      startBtn.addEventListener("click", () => doAction("viz", "start"));
+      placeholder.appendChild(startBtn);
+      embedBody.appendChild(placeholder);
+    }
+  };
+
+  const applyStatus = (status) => {
+    renderControls(status);
+    renderEmbed(status);
+  };
+
+  const doAction = async (name, action) => {
+    if (inFlight) return;
+    inFlight = true;
+    renderControls(lastStatus);
+    toast(`${action} ${name}…`, "info", 1500);
+    try {
+      const r = await api.post(`/api/subserver/${name}/${action}`);
+      lastStatus = r.status;
+      toast(
+        r.success ? `${name} ${action} ok` : `${name} ${action} failed`,
+        r.success ? "success" : "error",
+      );
+    } catch (err) {
+      toast(`${name} ${action} failed: ${err.message}`, "error");
+    } finally {
+      inFlight = false;
+      applyStatus(lastStatus);
+    }
+  };
+
+  let lastStatus = null;
+  try {
+    lastStatus = await api.get("/api/subserver-status");
+  } catch { /* best effort */ }
+  applyStatus(lastStatus);
+
+  // Poll every 5s while this view is mounted. Stop on route change.
+  const poll = setInterval(async () => {
+    if (inFlight) return;
+    try {
+      lastStatus = await api.get("/api/subserver-status");
+      applyStatus(lastStatus);
+    } catch { /* best effort */ }
+  }, 5000);
+  window.addEventListener("hashchange", () => clearInterval(poll), { once: true });
+
+  return wrap;
+}
+
+/* =========================================================================
  * Bootstrap
  * ========================================================================= */
 async function init() {
@@ -2574,13 +3423,19 @@ async function init() {
 
   // Routes
   router.register("/",                viewDashboard);
+  router.register("/viz-dashboard",   viewVizDashboard);
   router.register("/sync",            viewSync);
   router.register("/live",            viewLive);
-  router.register("/config/project",  configView("project", "project.yaml", schemaP));
-  // Target repo view — only visible in super_admin when .meta-config/project.yaml exists.
-  // Uses the same "project" config key because the server resolves it to the
-  // same file in super_admin mode.
-  router.register("/config/project-target", configView("project", "project.yaml (target repo)", schemaP));
+  // Project instance — thematic sub-pages (split from the old single config page)
+  router.register("/project/general",         viewProjectGeneral);
+  router.register("/project/providers",       viewProjectProviders);
+  router.register("/project/roles",           viewProjectRoles);
+  router.register("/project/orchestrator",    viewProjectOrchestrator);
+  router.register("/project/viz-admin",       viewProjectVizAdmin);
+  router.register("/project/model-overrides", viewProjectModelOverrides);
+  router.register("/project/advanced",        viewProjectAdvanced);
+  // Backward-compat: keep the old route pointing at the raw editor.
+  router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);

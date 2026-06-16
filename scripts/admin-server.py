@@ -293,6 +293,80 @@ class VizManager:
         self._stop(self.root / VIZ_PID_FILE, "Viz dashboard")
         self._stop(self.root / MCP_PID_FILE, "MCP server")
 
+    # ---------------------------------------------------------------------- #
+    # Individual service control                                             #
+    # ---------------------------------------------------------------------- #
+
+    def start_viz(self) -> bool:
+        """Start only the Viz dashboard subserver.
+
+        Returns ``True`` if the server is running afterwards (either freshly
+        started or already alive), ``False`` if the launch failed or the
+        ``viz-report.py`` script could not be resolved.
+        """
+        cfg = _load_viz_config(self.root)
+        viz_pid = self.root / VIZ_PID_FILE
+        viz_log = self.root / VIZ_LOG_FILE
+        if _is_pid_running(_read_pid(viz_pid)):
+            return True
+        if not self._viz_report.exists():
+            return False
+        return self._start(
+            [
+                sys.executable,
+                str(self._viz_report),
+                "--serve",
+                "--port", str(cfg["viz_port"]),
+                "--timeout", str(cfg["viz_timeout"]),
+            ],
+            viz_pid, viz_log,
+            f"Viz dashboard (port {cfg['viz_port']})",
+        )
+
+    def stop_viz(self) -> bool:
+        """Stop only the Viz dashboard subserver. Always returns ``True``."""
+        self._stop(self.root / VIZ_PID_FILE, "Viz dashboard")
+        return True
+
+    def restart_viz(self) -> bool:
+        """Restart the Viz dashboard subserver."""
+        self.stop_viz()
+        return self.start_viz()
+
+    def start_mcp(self) -> bool:
+        """Start only the MCP SSE server subserver.
+
+        Returns ``True`` if the server is running afterwards (either freshly
+        started or already alive), ``False`` if the launch failed or the
+        ``viz-logger.py`` script could not be resolved.
+        """
+        cfg = _load_viz_config(self.root)
+        mcp_pid = self.root / MCP_PID_FILE
+        mcp_log = self.root / MCP_LOG_FILE
+        if _is_pid_running(_read_pid(mcp_pid)):
+            return True
+        if not self._viz_logger.exists():
+            return False
+        return self._start(
+            [
+                sys.executable, "-u",
+                str(self._viz_logger),
+                "--http", str(cfg["mcp_port"]),
+            ],
+            mcp_pid, mcp_log,
+            f"MCP server (port {cfg['mcp_port']})",
+        )
+
+    def stop_mcp(self) -> bool:
+        """Stop only the MCP SSE server subserver. Always returns ``True``."""
+        self._stop(self.root / MCP_PID_FILE, "MCP server")
+        return True
+
+    def restart_mcp(self) -> bool:
+        """Restart the MCP SSE server subserver."""
+        self.stop_mcp()
+        return self.start_mcp()
+
     def status(self) -> dict:
         """Return a status dict for the ``/api/subserver-status`` endpoint."""
         cfg = _load_viz_config(self.root)
@@ -839,6 +913,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/subserver-status":
             return self._send_json(self.__class__.viz_manager.status())
 
+        if path == "/api/providers":
+            return self._send_json(self._list_providers())
+
+        if path == "/api/platforms":
+            return self._send_json(self._list_platforms())
+
+        if path == "/api/roles":
+            return self._send_json(self._list_roles())
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -848,6 +931,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _dispatch_put(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+
+        # Partial update of a single top-level section of project.yaml. Must be
+        # matched BEFORE the generic /api/config/ handler (which would treat
+        # "project/section" as a config key).
+        if path == "/api/config/project/section":
+            return self._write_project_section()
 
         if path.startswith("/api/config/"):
             key = path[len("/api/config/"):]
@@ -887,7 +976,43 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/sync/run":
             return self._send_json(self.__class__.sync_executor.run())
 
+        # Individual subserver control: /api/subserver/{name}/{action}
+        # name in {viz, mcp}, action in {start, stop, restart}.
+        subserver = self._match_subserver_route(path)
+        if subserver is not None:
+            name, action = subserver
+            return self._handle_subserver_action(name, action)
+
         raise FileNotFoundError(path)
+
+    @staticmethod
+    def _match_subserver_route(path: str) -> Optional[tuple[str, str]]:
+        """Return ``(name, action)`` if ``path`` matches the subserver control
+        route ``/api/subserver/{name}/{action}`` with a whitelisted name and
+        action, otherwise ``None``."""
+        prefix = "/api/subserver/"
+        if not path.startswith(prefix):
+            return None
+        parts = path[len(prefix):].split("/")
+        if len(parts) != 2:
+            return None
+        name, action = parts
+        if name in ("viz", "mcp") and action in ("start", "stop", "restart"):
+            return name, action
+        return None
+
+    def _handle_subserver_action(self, name: str, action: str) -> None:
+        """Dispatch a validated subserver control action to the VizManager and
+        return the resulting status."""
+        vm = self.__class__.viz_manager
+        method = getattr(vm, f"{action}_{name}")
+        ok = bool(method())
+        return self._send_json({
+            "success": ok,
+            "service": name,
+            "action": action,
+            "status": vm.status(),
+        })
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
@@ -995,6 +1120,50 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         existing["quality_pipelines"] = pipelines
         return cm.write("role-defaults", existing)
 
+    @staticmethod
+    def _deep_merge(base: dict, overlay: dict) -> dict:
+        """Recursively merge ``overlay`` into ``base`` and return ``base``.
+
+        Nested dicts are merged key-by-key; every other value type (scalars,
+        lists) is replaced wholesale. Mutates and returns ``base``.
+        """
+        for key, value in overlay.items():
+            if (
+                key in base
+                and isinstance(base[key], dict)
+                and isinstance(value, dict)
+            ):
+                AdminRequestHandler._deep_merge(base[key], value)
+            else:
+                base[key] = value
+        return base
+
+    def _write_project_section(self) -> None:
+        """Apply a partial update to a single top-level section of
+        ``project.yaml`` using a read-modify-write deep merge.
+
+        Body shape: ``{"key": "<top-level-yaml-key>", "value": <section-data>}``.
+        The remaining top-level keys are preserved untouched. Goes through the
+        whitelisted ``project`` config key so backup + atomic-replace apply.
+        """
+        body = self._read_body()
+        if not isinstance(body, dict) or "key" not in body or "value" not in body:
+            raise ValueError("expected JSON body with 'key' and 'value' fields")
+        key = body["key"]
+        value = body["value"]
+        if not isinstance(key, str) or not key:
+            raise ValueError("'key' must be a non-empty string")
+
+        existing = self.__class__.config_manager.read("project")
+        if not isinstance(existing, dict):
+            existing = {}
+        if isinstance(existing.get(key), dict) and isinstance(value, dict):
+            self._deep_merge(existing[key], value)
+        else:
+            existing[key] = value
+        result = self.__class__.config_manager.write("project", existing)
+        return self._send_json(result)
+
     def _read_template_description(self, role: str) -> str:
         """Read the ``description:`` field from a generic agent template's
         YAML frontmatter (if available). Used as a fallback when the role in
@@ -1033,6 +1202,102 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return {"templates": [], "available": False}
         names = sorted(p.stem for p in templates_dir.glob("*.md") if p.is_file())
         return {"templates": names, "available": True}
+
+    def _ai_providers_path(self) -> Path:
+        """Resolve the path to ``ai-providers.yaml`` for either layout."""
+        primary = self.__class__.root / "config" / "ai-providers.yaml"
+        if primary.exists():
+            return primary
+        return self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+
+    def _list_providers(self) -> list[dict]:
+        """Return the configured AI providers with their model tiers/aliases.
+
+        Each entry exposes:
+          * ``name`` — provider key (e.g. ``Claude``)
+          * ``has_model_tiers`` — ``True`` if the provider declares any model
+            tiers (providers like Continue/Copilot manage models centrally and
+            report ``False``)
+          * ``model_tiers`` — mapping of tier name → concrete model ID
+          * ``model_aliases`` — mapping of alias name → concrete model ID
+
+        Sorted alphabetically by provider name. Returns ``[]`` if the file is
+        absent (project-admin mode without super-admin configs).
+        """
+        path = self._ai_providers_path()
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        providers = data.get("providers") or {}
+        if not isinstance(providers, dict):
+            return []
+        out: list[dict] = []
+        for name, conf in providers.items():
+            if not isinstance(conf, dict):
+                continue
+            tiers = conf.get("model-tiers") or {}
+            aliases = conf.get("model-aliases") or {}
+            if not isinstance(tiers, dict):
+                tiers = {}
+            if not isinstance(aliases, dict):
+                aliases = {}
+            out.append({
+                "name": name,
+                "has_model_tiers": bool(tiers),
+                "model_tiers": tiers,
+                "model_aliases": aliases,
+            })
+        out.sort(key=lambda p: p["name"].lower())
+        return out
+
+    def _list_platforms(self) -> list[dict]:
+        """Return distinct platform prefixes derived from ``agents/2-platform/``.
+
+        Filenames follow the ``<prefix>-<role>.md`` convention. Roles can
+        themselves contain hyphens (e.g. ``claude-expert``), so the prefix is
+        resolved by stripping the longest known role name from the end of the
+        filename stem. If no known role matches, fall back to everything before
+        the last ``-``. ``agent-meta`` and ``generic`` are always included.
+        Sorted alphabetically.
+        """
+        names: set[str] = {"agent-meta", "generic"}
+        # Known role names (longest first) so multi-segment roles strip cleanly.
+        known_roles = sorted(
+            (r["name"] for r in self._list_roles()),
+            key=len,
+            reverse=True,
+        )
+        platform_dir = self.__class__.root / "agents" / "2-platform"
+        if not platform_dir.is_dir():
+            platform_dir = self.__class__.root / ".agent-meta" / "agents" / "2-platform"
+        if platform_dir.is_dir():
+            for entry in platform_dir.glob("*.md"):
+                stem = entry.stem
+                if "-" not in stem:
+                    continue
+                prefix = None
+                for role in known_roles:
+                    suffix = f"-{role}"
+                    if stem.endswith(suffix) and len(stem) > len(suffix):
+                        prefix = stem[: -len(suffix)]
+                        break
+                if prefix is None:
+                    prefix = stem.rsplit("-", 1)[0]
+                if prefix:
+                    names.add(prefix)
+        return [{"name": n} for n in sorted(names, key=str.lower)]
+
+    def _list_roles(self) -> list[dict]:
+        """Return the role names declared in ``role-defaults.yaml``.
+
+        Reuses :meth:`_build_agent_hierarchy` so the role list stays consistent
+        with the delegation graph. Sorted alphabetically.
+        """
+        hierarchy = self._build_agent_hierarchy()
+        roles = hierarchy.get("roles") or []
+        names = sorted((r.get("name") for r in roles if r.get("name")), key=str.lower)
+        return [{"name": n} for n in names]
 
     def _send_template(self, role: str) -> None:
         path = self._template_path(role)
