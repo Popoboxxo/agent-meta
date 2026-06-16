@@ -216,6 +216,26 @@ pre {
 .field-label .required { color: var(--accent-red); margin-left: 3px; }
 .field-help { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 .field-error { font-size: 11px; color: var(--accent-red); margin-top: 3px; }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.field-row .field-label { margin-bottom: 0; min-width: 160px; }
+select.select, .select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-sans, inherit);
+  font-size: 13px;
+}
+select.select:focus, .select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
 
 input[type="text"], input[type="number"], input[type="url"], select, textarea {
   width: 100%;
@@ -2710,26 +2730,144 @@ async function viewProjectProviders() {
   }
   wrap.appendChild(platPanel);
 
-  // provider-isolation + provider-options (raw-ish)
+  // provider-isolation + provider-options (nested KV editor)
   const optPanel = el("div", { class: "panel" });
   optPanel.appendChild(el("h2", {}, ["Options"]));
-  optPanel.appendChild(textField("provider-isolation", typeof isolation === "string" ? isolation : "", v => isolation = v, "e.g. disabled / enabled"));
-  optPanel.appendChild(el("label", { class: "field-label" }, ["provider-options (JSON)"]));
-  const optTa = el("textarea", { rows: 6 });
-  optTa.value = JSON.stringify(providerOptions, null, 2);
-  optPanel.appendChild(optTa);
+  optPanel.appendChild(textField("provider-isolation", typeof isolation === "string" ? isolation : "", v => { isolation = v; }, "e.g. disabled / enabled"));
+
+  // Provider Options — per-provider collapsible KV editors
+  optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["provider-options"]));
+
+  // Determine provider names: union of providers from API + keys already in providerOptions
+  const providerNames = new Set([
+    ...providers.map(p => p.name),
+    ...Object.keys(providerOptions),
+  ]);
+
+  if (providerNames.size === 0) {
+    optPanel.appendChild(el("div", { class: "empty" }, ["No providers configured."]));
+  }
+
+  for (const provName of providerNames) {
+    if (!providerOptions[provName] || typeof providerOptions[provName] !== "object") {
+      providerOptions[provName] = {};
+    }
+    const provOpts = providerOptions[provName];
+
+    // Collapsible section per provider
+    const section = el("div", { style: "margin-bottom:12px; border:1px solid var(--border-color); border-radius:var(--radius);" });
+
+    const header = el("div", {
+      style: "display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; background:var(--bg-tertiary); border-radius:var(--radius);",
+    });
+    header.appendChild(el("span", { class: "mono", style: "font-weight:600;" }, [provName]));
+    const toggleBtn = el("span", { style: "color:var(--text-muted); font-size:11px;" }, ["▼"]);
+    header.appendChild(toggleBtn);
+
+    const body = el("div", { style: "padding:8px 12px; display:block;" });
+
+    // KV table
+    const table = el("table", { style: "width:100%; border-collapse:collapse;" });
+    const thead = el("tr", {}, [
+      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Key"]),
+      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Value"]),
+      el("th", { style: "width:20%;" }, [""]),
+    ]);
+    table.appendChild(thead);
+
+    // Render existing rows
+    function addKVRow(key, val) {
+      const row = el("tr", {});
+      const keyCell = el("td", { style: "padding:2px 4px 2px 0;" });
+      const keyInput = el("input", { type: "text", style: "width:100%; font-family:var(--font-mono); font-size:12px;", placeholder: "key" });
+      keyInput.value = key;
+      keyCell.appendChild(keyInput);
+
+      const valCell = el("td", { style: "padding:2px 4px;" });
+      // Detect bool vs string
+      const isBool = val === true || val === false;
+      const valSel = el("select", { style: "margin-right:4px; font-size:12px;" });
+      const typeOpts = [["string", "string"], ["bool", "bool"]];
+      for (const [tv, tl] of typeOpts) {
+        const o = el("option", { value: tv }, [tl]);
+        if (isBool && tv === "bool") o.setAttribute("selected", "");
+        else if (!isBool && tv === "string") o.setAttribute("selected", "");
+        valSel.appendChild(o);
+      }
+      const valInput = el("input", { type: "text", style: "width:calc(100% - 70px); font-size:12px; font-family:var(--font-mono);", placeholder: "value" });
+      valInput.value = isBool ? String(val) : (val != null ? String(val) : "");
+      valCell.appendChild(valSel);
+      valCell.appendChild(valInput);
+
+      const removeCell = el("td", { style: "padding:2px 0 2px 4px; text-align:right;" });
+      const removeBtn = el("button", { class: "btn", style: "font-size:11px; padding:2px 6px; color:var(--accent-red);", onclick: () => {
+        const oldKey = keyInput.value.trim();
+        if (oldKey) delete provOpts[oldKey];
+        row.remove();
+      } }, ["✕"]);
+      removeCell.appendChild(removeBtn);
+
+      // On change: update provOpts
+      function sync() {
+        const k = keyInput.value.trim();
+        if (!k) return;
+        // Remove old key if renamed
+        // We can't easily track old key here, so we rebuild on save instead
+        let v;
+        if (valSel.value === "bool") {
+          v = valInput.value.trim().toLowerCase() === "true";
+        } else {
+          v = valInput.value;
+        }
+        provOpts[k] = v;
+      }
+      keyInput.addEventListener("change", sync);
+      valInput.addEventListener("change", sync);
+      valSel.addEventListener("change", sync);
+
+      row.appendChild(keyCell);
+      row.appendChild(valCell);
+      row.appendChild(removeCell);
+      table.appendChild(row);
+    }
+
+    for (const [k, v] of Object.entries(provOpts)) {
+      addKVRow(k, v);
+    }
+
+    body.appendChild(table);
+
+    const addBtn = el("button", { class: "btn", style: "margin-top:6px; font-size:12px;", onclick: () => {
+      addKVRow("", "");
+    } }, ["+ Add option"]);
+    body.appendChild(addBtn);
+
+    // Toggle collapse
+    let expanded = true;
+    header.addEventListener("click", () => {
+      expanded = !expanded;
+      body.style.display = expanded ? "block" : "none";
+      toggleBtn.textContent = expanded ? "▼" : "▶";
+    });
+
+    section.appendChild(header);
+    section.appendChild(body);
+    optPanel.appendChild(section);
+  }
+
   wrap.appendChild(optPanel);
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
     el("button", { class: "btn btn-primary", onclick: async () => {
-      let parsedOpts = providerOptions;
-      try { parsedOpts = JSON.parse(optTa.value || "{}"); }
-      catch (e) { toast("provider-options is not valid JSON", "error"); return; }
+      // Rebuild providerOptions from current table state before saving
+      // (rows may have been added/removed; re-read from DOM)
+      // We rely on the sync() callbacks having kept provOpts up-to-date.
+      // Empty-key rows are ignored by sync(), so provOpts stays clean.
       try {
         await saveProjectSections([
           ["ai-providers", Array.from(selProviders)],
           ["platforms", Array.from(selPlatforms)],
-          ["provider-options", parsedOpts],
+          ["provider-options", providerOptions],
           ["provider-isolation", isolation],
         ], status);
       } catch { /* toast shown */ }
@@ -2801,28 +2939,128 @@ async function viewProjectOrchestrator() {
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
 
-  const panel = el("div", { class: "panel" });
-  panel.appendChild(checkboxField("enabled", orch.enabled, v => orch.enabled = v));
-  panel.appendChild(checkboxField("strict", orch.strict, v => orch.strict = v));
-  panel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => orch["direct-dispatch-enabled"] = v));
-  panel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => orch.checkpointing = v));
-  wrap.appendChild(panel);
+  // ── General ──────────────────────────────────────────────────────────────
+  const genPanel = el("div", { class: "panel" });
+  genPanel.appendChild(el("h2", {}, ["General"]));
+  genPanel.appendChild(checkboxField("enabled", orch.enabled, v => { orch.enabled = v; }));
+  genPanel.appendChild(checkboxField("strict", orch.strict, v => { orch.strict = v; }));
+  genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
+  genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
+  wrap.appendChild(genPanel);
 
-  // Handoff sub-block (raw JSON to avoid scope creep on deeply nested fields).
-  const handoff = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
+  // ── Unknown Fallback ──────────────────────────────────────────────────────
+  const uf = (orch["unknown-fallback"] && typeof orch["unknown-fallback"] === "object") ? orch["unknown-fallback"] : {};
+  const ufPanel = el("div", { class: "panel" });
+  ufPanel.appendChild(el("h2", {}, ["Unknown Fallback"]));
+  ufPanel.appendChild(checkboxField("meta-feedback", uf["meta-feedback"], v => { uf["meta-feedback"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("main-chat", uf["main-chat"], v => { uf["main-chat"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("ask-user", uf["ask-user"], v => { uf["ask-user"] = v; orch["unknown-fallback"] = uf; }));
+  wrap.appendChild(ufPanel);
+
+  // ── Handoff ───────────────────────────────────────────────────────────────
+  const hf = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
   const hPanel = el("div", { class: "panel" });
-  hPanel.appendChild(el("h2", {}, ["handoff"]));
-  hPanel.appendChild(el("label", { class: "field-label" }, ["handoff (JSON)"]));
-  const hTa = el("textarea", { rows: 12 });
-  hTa.value = JSON.stringify(handoff, null, 2);
-  hPanel.appendChild(hTa);
+  hPanel.appendChild(el("h2", {}, ["Handoff"]));
+  hPanel.appendChild(textField("protocol", typeof hf.protocol === "string" ? hf.protocol : "", v => { hf.protocol = v; orch.handoff = hf; }, "e.g. a2a-v1"));
+  hPanel.appendChild(checkboxField("validate-before-delegate", hf["validate-before-delegate"], v => { hf["validate-before-delegate"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("supersession-tracking", hf["supersession-tracking"], v => { hf["supersession-tracking"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("strict-validation", hf["strict-validation"], v => { hf["strict-validation"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("compact-mode", hf["compact-mode"], v => { hf["compact-mode"] = v; orch.handoff = hf; }));
+  hPanel.appendChild(checkboxField("human_approval_required", hf["human_approval_required"], v => { hf["human_approval_required"] = v; orch.handoff = hf; }));
+
+  // max_retries — number input
+  const retriesRow = el("div", { class: "field-row" });
+  retriesRow.appendChild(el("label", { class: "field-label" }, ["max_retries"]));
+  const retriesInput = el("input", { type: "number", min: "0", style: "width:80px;" });
+  retriesInput.value = hf.max_retries != null ? String(hf.max_retries) : "";
+  retriesInput.addEventListener("change", () => {
+    const v = parseInt(retriesInput.value, 10);
+    hf.max_retries = isNaN(v) ? undefined : v;
+    orch.handoff = hf;
+  });
+  retriesRow.appendChild(retriesInput);
+  hPanel.appendChild(retriesRow);
+
+  // protocol_routing — dropdown
+  const prRow = el("div", { class: "field-row" });
+  prRow.appendChild(el("label", { class: "field-label" }, ["protocol_routing"]));
+  const prSel = el("select", { class: "select" });
+  for (const opt of ["", "static", "dynamic"]) {
+    const o = el("option", { value: opt }, [opt || "(not set)"]);
+    if ((hf.protocol_routing || "") === opt) o.setAttribute("selected", "");
+    prSel.appendChild(o);
+  }
+  prSel.addEventListener("change", () => {
+    hf.protocol_routing = prSel.value || undefined;
+    orch.handoff = hf;
+  });
+  prRow.appendChild(prSel);
+  hPanel.appendChild(prRow);
+
   wrap.appendChild(hPanel);
 
+  // ── Token Budget ──────────────────────────────────────────────────────────
+  const tb = (hf["token-budget"] && typeof hf["token-budget"] === "object") ? hf["token-budget"] : {};
+  const tbPanel = el("div", { class: "panel" });
+  tbPanel.appendChild(el("h2", {}, ["Token Budget"]));
+  tbPanel.appendChild(checkboxField("enabled", tb.enabled, v => { tb.enabled = v; hf["token-budget"] = tb; orch.handoff = hf; }));
+
+  // session_budget — number input
+  const sbRow = el("div", { class: "field-row" });
+  sbRow.appendChild(el("label", { class: "field-label" }, ["session_budget"]));
+  const sbInput = el("input", { type: "number", min: "0", style: "width:120px;" });
+  sbInput.value = tb.session_budget != null ? String(tb.session_budget) : "";
+  sbInput.addEventListener("change", () => {
+    const v = parseInt(sbInput.value, 10);
+    tb.session_budget = isNaN(v) ? undefined : v;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  sbRow.appendChild(sbInput);
+  tbPanel.appendChild(sbRow);
+
+  // max_overhead_pct — number input
+  const pctRow = el("div", { class: "field-row" });
+  pctRow.appendChild(el("label", { class: "field-label" }, ["max_overhead_pct"]));
+  const pctInput = el("input", { type: "number", min: "0", max: "100", style: "width:80px;" });
+  pctInput.value = tb.max_overhead_pct != null ? String(tb.max_overhead_pct) : "";
+  pctInput.addEventListener("change", () => {
+    const v = parseInt(pctInput.value, 10);
+    tb.max_overhead_pct = isNaN(v) ? undefined : v;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  pctRow.appendChild(pctInput);
+  tbPanel.appendChild(pctRow);
+
+  // on_exceed — dropdown
+  const oeRow = el("div", { class: "field-row" });
+  oeRow.appendChild(el("label", { class: "field-label" }, ["on_exceed"]));
+  const oeSel = el("select", { class: "select" });
+  for (const opt of ["", "compact", "warn"]) {
+    const o = el("option", { value: opt }, [opt || "(not set)"]);
+    if ((tb.on_exceed || "") === opt) o.setAttribute("selected", "");
+    oeSel.appendChild(o);
+  }
+  oeSel.addEventListener("change", () => {
+    tb.on_exceed = oeSel.value || undefined;
+    hf["token-budget"] = tb; orch.handoff = hf;
+  });
+  oeRow.appendChild(oeSel);
+  tbPanel.appendChild(oeRow);
+
+  wrap.appendChild(tbPanel);
+
+  // ── Save ─────────────────────────────────────────────────────────────────
   wrap.appendChild(el("div", { class: "btn-row" }, [
     el("button", { class: "btn btn-primary", onclick: async () => {
-      try { orch.handoff = JSON.parse(hTa.value || "{}"); }
-      catch { toast("handoff is not valid JSON", "error"); return; }
-      try { await saveProjectSection("orchestrator", orch, status); } catch { /* shown */ }
+      // Ensure nested objects are written back before saving
+      if (Object.keys(uf).length > 0 || orch["unknown-fallback"] !== undefined) {
+        orch["unknown-fallback"] = uf;
+      }
+      if (Object.keys(hf).length > 0 || orch.handoff !== undefined) {
+        hf["token-budget"] = tb;
+        orch.handoff = hf;
+      }
+      try { await saveProjectSection("orchestrator", orch, status); } catch { /* toast shown */ }
     } }, ["Save"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
   ]));
