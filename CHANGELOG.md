@@ -4,6 +4,32 @@
 
 ---
 
+## [0.62.0] — 2026-06-18
+
+### Added
+
+- **SE cascade rebuild**: Pipeline von 5 auf 9 Stages erweitert (l0-stakeholder, l1-requirements, l1-architecture, l2-requirements, l2-architecture, l2-interface, l3-requirements, l3-architecture, termination, validation)
+- **SE-spec DoD presets**: Drei neue DoD-Presets (spec-optional, spec-driven, spec-certified) mit se-required Feld
+- **Configurable SE output directory**: SE/L{n}/{SystemName}/L{n}_{SystemName}_{Requirements|Architecture}.md
+- **Component/system designation**: designation-Feld in se-termination Output (ISO terminology)
+
+### Changed
+
+- **SE mode integration**: SE-Mode direkt im normalen Orchestrator via {{#if SE_ENABLED}} — se-orchestrator deprecated
+- **Dynamic depth control**: SE_MAX_DEPTH → SE_MIN_DEPTH + SE_MAX_DEPTH (dynamisch)
+- **Generic ID prefixes**: REQ-L{n}-NNN / ARCH-L{n}-NNN statt component/sub-system-spezifisch
+- **Pipeline validation**: Actionable hints bei fehlenden Rollen
+
+### Removed
+
+- **Strict Stop Rule L3**: Entfernt für flexible Tiefensteuerung
+
+### Fixed
+
+- Issue #323 geschlossen: DoD/SE-Beziehung dokumentiert
+
+---
+
 ## [0.61.1] — 2026-06-17
 
 ### Fixed
