@@ -4,6 +4,14 @@
 
 ---
 
+## [0.61.1] — 2026-06-17
+
+### Fixed
+
+- Add `.agent-meta/` fallback path for admin UI bundle resolution ([#322](https://github.com/Popoboxxo/agent-meta/pull/322), fixes [#321](https://github.com/Popoboxxo/agent-meta/issues/321))
+
+---
+
 ## [0.61.0] — 2026-06-16
 
 ### Added
