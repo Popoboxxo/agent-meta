@@ -2775,7 +2775,7 @@ async function viewProjectProviders() {
   // means "not set" (default = isolation enabled). Render an explicit "(unset)"
   // option so users can clear the field.
   const isolationOptions = ["", "disabled"];
-  const isolationLabels  = { "": "(unset — isolation enabled)", "disabled": "disabled" };
+  const isolationLabels  = { "": "enabled (default)", "disabled": "disabled" };
   optPanel.appendChild(dropdownField(
     "provider-isolation",
     isolationOptions,
@@ -3119,7 +3119,21 @@ async function viewProjectOrchestrator() {
   const hf = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
   const hPanel = el("div", { class: "panel" });
   hPanel.appendChild(el("h2", {}, ["Handoff"]));
-  hPanel.appendChild(textField("protocol", typeof hf.protocol === "string" ? hf.protocol : "", v => { hf.protocol = v; orch.handoff = hf; }, "a2a-v1 or none"));
+  // protocol — dropdown
+  const protRow = el("div", { class: "field-row" });
+  protRow.appendChild(el("label", { class: "field-label" }, ["protocol"]));
+  const protSel = el("select", { class: "select" });
+  for (const [val, label] of [["a2a-v1", "a2a-v1 (default)"], ["none", "none (disabled)"]]) {
+    const o = el("option", { value: val }, [label]);
+    if ((hf.protocol || "a2a-v1") === val) o.setAttribute("selected", "");
+    protSel.appendChild(o);
+  }
+  protSel.addEventListener("change", () => {
+    hf.protocol = protSel.value;
+    orch.handoff = hf;
+  });
+  protRow.appendChild(protSel);
+  hPanel.appendChild(protRow);
   hPanel.appendChild(checkboxField("validate-before-delegate", hf["validate-before-delegate"], v => { hf["validate-before-delegate"] = v; orch.handoff = hf; }));
   hPanel.appendChild(checkboxField("supersession-tracking", hf["supersession-tracking"], v => { hf["supersession-tracking"] = v; orch.handoff = hf; }));
   hPanel.appendChild(checkboxField("strict-validation", hf["strict-validation"], v => { hf["strict-validation"] = v; orch.handoff = hf; }));
