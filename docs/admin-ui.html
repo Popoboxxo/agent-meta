@@ -3078,11 +3078,35 @@ async function viewProjectVizAdmin() {
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
 
+  // Ensure nested objects exist so the editor can attach to them.
+  if (!viz.server || typeof viz.server !== "object") viz.server = {};
+  if (!viz.mcp    || typeof viz.mcp    !== "object") viz.mcp    = {};
+  if (!viz.report || typeof viz.report !== "object") viz.report = {};
+
+  // Inline helper: number input that round-trips null/empty cleanly.
+  const numField = (label, value, onChange) => {
+    const field = el("div", { class: "field" });
+    field.appendChild(el("label", { class: "field-label" }, [label]));
+    const inp = el("input", { type: "number" });
+    inp.value = value ?? "";
+    inp.addEventListener("input", () => onChange(inp.value === "" ? null : Number(inp.value)));
+    field.appendChild(inp);
+    return field;
+  };
+
   const vizPanel = el("div", { class: "panel" });
   vizPanel.appendChild(el("h2", {}, ["viz"]));
   vizPanel.appendChild(checkboxField("enabled", viz.enabled, v => viz.enabled = v));
   vizPanel.appendChild(textField("mode", viz.mode, v => viz.mode = v));
   vizPanel.appendChild(textField("event_log", viz.event_log, v => viz.event_log = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["server (Viz dashboard)"]));
+  vizPanel.appendChild(numField("server.port",         viz.server.port,         v => viz.server.port = v));
+  vizPanel.appendChild(numField("server.timeout_sec",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["mcp (SSE server)"]));
+  vizPanel.appendChild(numField("mcp.port", viz.mcp.port, v => viz.mcp.port = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["report"]));
+  vizPanel.appendChild(numField("report.retention_days",      viz.report.retention_days,      v => viz.report.retention_days = v));
+  vizPanel.appendChild(numField("report.session_timeout_min", viz.report.session_timeout_min, v => viz.report.session_timeout_min = v));
   wrap.appendChild(vizPanel);
 
   const adminPanel = el("div", { class: "panel" });

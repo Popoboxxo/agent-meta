@@ -681,6 +681,81 @@
       },
       "additionalProperties": false
     },
+    "viz": {
+      "type": "object",
+      "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the viz dashboard and MCP SSE server subprocesses."
+        },
+        "mode": {
+          "type": "string",
+          "default": "off",
+          "description": "Viz mode. 'off' = no event emission; other values reserved for future modes."
+        },
+        "event_log": {
+          "type": "string",
+          "default": ".meta-viz/events.jsonl",
+          "description": "Path (relative to project root) to the JSONL event log shared by all viz components."
+        },
+        "server": {
+          "type": "object",
+          "description": "Viz dashboard HTTP server configuration.",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535,
+              "default": 8765,
+              "description": "TCP port the Viz dashboard (viz-report.py --serve) binds to."
+            },
+            "timeout_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 300,
+              "description": "Idle timeout (seconds) for the Viz dashboard server."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcp": {
+          "type": "object",
+          "description": "MCP SSE server configuration.",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535,
+              "default": 9090,
+              "description": "TCP port the MCP SSE server (viz-logger.py --http) binds to."
+            }
+          },
+          "additionalProperties": false
+        },
+        "report": {
+          "type": "object",
+          "description": "Reporting policy for the Viz dashboard.",
+          "properties": {
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 7,
+              "description": "Number of days session reports are retained on disk."
+            },
+            "session_timeout_min": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5,
+              "description": "Idle time (minutes) after which a session is considered closed."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "delegation": {
       "type": "object",
       "description": "Controls agent-to-agent delegation behavior, including the A2A handoff envelope.",

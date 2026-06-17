@@ -66,9 +66,14 @@ VIZ_LOG_FILE   = ".meta-viz/server.log"
 MCP_PID_FILE   = ".meta-viz/.mcp-server-pid"
 MCP_LOG_FILE   = ".meta-viz/mcp-server.log"
 
-_DEFAULT_VIZ_PORT    = 8765
-_DEFAULT_VIZ_TIMEOUT = 300
-_DEFAULT_MCP_PORT    = 9090
+_DEFAULT_VIZ_PORT          = 8765
+_DEFAULT_VIZ_TIMEOUT       = 300
+_DEFAULT_MCP_PORT          = 9090
+_DEFAULT_VIZ_ENABLED       = False
+_DEFAULT_VIZ_MODE          = "off"
+_DEFAULT_VIZ_EVENT_LOG     = ".meta-viz/events.jsonl"
+_DEFAULT_VIZ_RETENTION     = 7
+_DEFAULT_VIZ_SESSION_TIMEOUT = 5
 
 # Loopback addresses are the ONLY values the ``--host`` flag accepts. The admin
 # UI exposes write access to every editable config file; binding the server to
@@ -97,28 +102,58 @@ PROJECT_FILES: dict[str, str] = {
 # --------------------------------------------------------------------------- #
 
 
+def _viz_defaults() -> dict:
+    """Return the full default viz configuration block."""
+    return {
+        "enabled":     _DEFAULT_VIZ_ENABLED,
+        "mode":        _DEFAULT_VIZ_MODE,
+        "event_log":   _DEFAULT_VIZ_EVENT_LOG,
+        "viz_port":    _DEFAULT_VIZ_PORT,
+        "viz_timeout": _DEFAULT_VIZ_TIMEOUT,
+        "mcp_port":    _DEFAULT_MCP_PORT,
+        "retention_days":      _DEFAULT_VIZ_RETENTION,
+        "session_timeout_min": _DEFAULT_VIZ_SESSION_TIMEOUT,
+    }
+
+
 def _load_viz_config(root: Path) -> dict:
-    """Load viz server ports/timeouts from ``.meta-config/project.yaml``."""
+    """Load the full viz configuration from ``.meta-config/project.yaml``.
+
+    Returns a flat dict with all viz fields the Admin UI exposes:
+      * ``enabled``              (bool)        — viz.enabled
+      * ``mode``                 (str)         — viz.mode
+      * ``event_log``            (str)         — viz.event_log
+      * ``viz_port``             (int)         — viz.server.port
+      * ``viz_timeout``          (int)         — viz.server.timeout_sec
+      * ``mcp_port``             (int)         — viz.mcp.port
+      * ``retention_days``       (int)         — viz.report.retention_days
+      * ``session_timeout_min``  (int)         — viz.report.session_timeout_min
+
+    Falls back to the documented defaults on any read/parse error so the
+    Viz/MCP supervisor can still start with sensible values.
+    """
     config_path = root / ".meta-config" / "project.yaml"
     try:
         sys.path.insert(0, str(root / "scripts"))
         sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
         from lib.config import load_config  # type: ignore[import]
         config = load_config(config_path)
-        viz_cfg = config.get("viz", {})
-        server_cfg = viz_cfg.get("server", {})
-        mcp_cfg = viz_cfg.get("mcp", {})
+        viz_cfg = config.get("viz") or {}
+        server_cfg = viz_cfg.get("server") or {}
+        mcp_cfg = viz_cfg.get("mcp") or {}
+        report_cfg = viz_cfg.get("report") or {}
         return {
+            "enabled":     bool(viz_cfg.get("enabled", _DEFAULT_VIZ_ENABLED)),
+            "mode":        str(viz_cfg.get("mode", _DEFAULT_VIZ_MODE)),
+            "event_log":   str(viz_cfg.get("event_log", _DEFAULT_VIZ_EVENT_LOG)),
             "viz_port":    int(server_cfg.get("port", _DEFAULT_VIZ_PORT)),
             "viz_timeout": int(server_cfg.get("timeout_sec", _DEFAULT_VIZ_TIMEOUT)),
             "mcp_port":    int(mcp_cfg.get("port", _DEFAULT_MCP_PORT)),
+            "retention_days":      int(report_cfg.get("retention_days", _DEFAULT_VIZ_RETENTION)),
+            "session_timeout_min": int(report_cfg.get("session_timeout_min", _DEFAULT_VIZ_SESSION_TIMEOUT)),
         }
     except Exception:
-        return {
-            "viz_port":    _DEFAULT_VIZ_PORT,
-            "viz_timeout": _DEFAULT_VIZ_TIMEOUT,
-            "mcp_port":    _DEFAULT_MCP_PORT,
-        }
+        return _viz_defaults()
 
 
 def _is_pid_running(pid: Optional[int]) -> bool:
@@ -368,7 +403,12 @@ class VizManager:
         return self.start_mcp()
 
     def status(self) -> dict:
-        """Return a status dict for the ``/api/subserver-status`` endpoint."""
+        """Return a status dict for the ``/api/subserver-status`` endpoint.
+
+        Includes both the live subserver state (running flags, PIDs, URLs) and
+        the full viz configuration so the Admin UI can render the editor
+        without a second round-trip.
+        """
         cfg = _load_viz_config(self.root)
         viz_pid_val = _read_pid(self.root / VIZ_PID_FILE)
         mcp_pid_val = _read_pid(self.root / MCP_PID_FILE)
@@ -388,6 +428,16 @@ class VizManager:
                 "port":    cfg["mcp_port"],
                 "url":     f"http://127.0.0.1:{cfg['mcp_port']}/sse",
                 "log":     MCP_LOG_FILE,
+            },
+            "config": {
+                "enabled":             cfg["enabled"],
+                "mode":                cfg["mode"],
+                "event_log":           cfg["event_log"],
+                "server_port":         cfg["viz_port"],
+                "server_timeout_sec":  cfg["viz_timeout"],
+                "mcp_port":            cfg["mcp_port"],
+                "retention_days":      cfg["retention_days"],
+                "session_timeout_min": cfg["session_timeout_min"],
             },
         }
 
@@ -825,6 +875,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except FileNotFoundError as exc:
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
+        except ConnectionError:
+            # Client disconnected (covers BrokenPipeError, ConnectionResetError,
+            # ConnectionAbortedError / Windows WinError 10053). Writing an error
+            # response on a dead socket would raise another exception and cause
+            # a confusing double traceback — bail out silently.
+            return
         except Exception as exc:  # pragma: no cover
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
@@ -838,6 +894,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except FileNotFoundError as exc:
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
+        except ConnectionError:
+            # See ``do_GET`` — silently bail on dead client socket.
+            return
         except Exception as exc:  # pragma: no cover
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
@@ -847,6 +906,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._dispatch_post()
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ConnectionError:
+            # See ``do_GET`` — silently bail on dead client socket.
+            return
         except Exception as exc:  # pragma: no cover
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
@@ -1346,7 +1408,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(b": stream-open\n\n")
             self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:
+            # ConnectionError is the base class covering BrokenPipeError,
+            # ConnectionResetError, ConnectionAbortedError (Windows WinError
+            # 10053) and platform-specific variants. Client disconnected
+            # before the stream even opened — nothing to do.
             return
 
         offset = events_path.stat().st_size if events_path.exists() else 0
@@ -1368,7 +1434,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     self.wfile.flush()
                     last_heartbeat = time.time()
                 time.sleep(1.0)
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:
+            # ConnectionError is the base class covering BrokenPipeError,
+            # ConnectionResetError, ConnectionAbortedError (Windows WinError
+            # 10053) and platform-specific variants. Normal client disconnect.
             return
 
 
