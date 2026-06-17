@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.6.0
+version: 1.6.1
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
 tools:
@@ -72,8 +72,8 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
   "payload": {
     "t": "Termination-Entscheidung",
     "decisions": [
-      {"system_id": "REQ-L2-001", "decision": "leaf", "reason": "Atomic Code Unit"},
-      {"system_id": "REQ-L2-002", "decision": "continue", "reason": "Multi-domain"}
+      {"system_id": "REQ-L2-001", "decision": "leaf", "designation": "component", "reason": "Atomic Code Unit"},
+      {"system_id": "REQ-L2-002", "decision": "continue", "designation": "system", "reason": "Multi-domain"}
     ],
     "summary": "2 systems: 1 leaf, 1 continue"
   },
@@ -108,16 +108,19 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
     {
       "system_id": "REQ-L2-001",
       "decision": "continue",
+      "designation": "system",
       "rationale": "Heating element controller contains multiple responsibilities: power stage, drive logic, temperature sensor evaluation. Requires further decomposition into hardware sub-systems."
     },
     {
       "system_id": "REQ-L2-002",
       "decision": "leaf",
+      "designation": "component",
       "rationale": "PID control algorithm is atomic and implementable as a Python class (single responsibility). Standard PID parameters can be configured."
     },
     {
       "system_id": "REQ-L2-003",
       "decision": "leaf",
+      "designation": "component",
       "rationale": "Water container is a standard mechanical part with defined parameters (500ml, food-safe). Available as COTS component."
     }
   ],
@@ -132,7 +135,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 }
 ```
 
-> **Handover:** `decision: leaf` → final leaf system als strukturierter Task/Spec für die umsetzende Disziplin (Software-Dev, Hardware-Engineer). `decision: continue` → Systemdefinition + Black-Box-Requirement an orchestrator für die nächste Ebene.
+> **Handover:** `decision: leaf` → **designation: "component"** — final leaf system as structured Task/Spec for the implementing discipline (Software-Dev, Hardware-Engineer). `decision: continue` → **designation: "system"** (or "subsystem" when parent context exists) — System definition + Black-Box-Requirement to orchestrator for the next level.
 
 ## Anti-Recursion Guard
 

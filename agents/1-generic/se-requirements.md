@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.8.0
+version: 1.8.1
 description: Elicits stakeholder needs and uses a multi-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
@@ -84,6 +84,16 @@ Example: water-heater declares "230V AC power supply" as `physical input`, "Hot 
 - `optional` — nice to have; may be deferred without blocking acceptance.
 
 Requirements mutually consistent. On conflict: flag explicitly, document rationale, recommend resolution (downgrade priority or split).
+
+## Designation-Aware Processing
+
+The `designation` field in the A2A envelope payload indicates the ISO-compliant designation of this system:
+
+- **`designation: "system"`** — requirements are at an intermediate level; further architecture decomposition is expected downstream.
+- **`designation: "subsystem"`** — relative to a parent system; further decomposition may follow.
+- **`designation: "component"`** — requirements are **final** (atomic leaf). No further architecture decomposition is needed. Note this in the output remark: `"decomposition_status": "terminal"`.
+
+When `designation: "component"` is received, the requirements agent produces a self-contained specification suitable for direct handover to an implementing discipline (developer, hardware-engineer, etc.).
 
 ## JSON Output Schema
 Return your final output **only** as a JSON object matching the following schema. Do not wrap it in Markdown code fences inside the JSON payload.

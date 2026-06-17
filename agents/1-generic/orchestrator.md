@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.3.0"
+version: "4.3.1"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -496,13 +496,15 @@ Each Requirements↔Architecture pair forms a REPEAT_UNTIL loop (generator + cri
 ### Recursive Cell Spawns
 
 When the `termination` stage decides `continue` for a system:
-1. Orchestrator spawns a **new cell** at level n+1
-2. Context is **sanitized** — only `BB-REQ` + `propagation_map` row (~800 tokens)
-3. New cell starts at the Requirements stage for that level
-4. `trace_parent` links to parent cell's handoff_id
+1. System is further decomposable — **designated as System** (or Subsystem in parent context)
+2. Orchestrator spawns a **new cell** at level n+1
+3. Context is **sanitized** — only `BB-REQ` + `propagation_map` row (~800 tokens)
+4. New cell starts at the Requirements stage for that level
+5. `trace_parent` links to parent cell's handoff_id
 
 When `termination` decides `leaf`:
-- Leaf system is final — handover to implementation discipline (developer, hardware-engineer, etc.)
+- Leaf system is final — **designated as Component**
+- Handover to implementation discipline (developer, hardware-engineer, etc.)
 
 ### Context Hygiene Rules
 
@@ -530,10 +532,11 @@ The `se-termination` agent receives both values in its input envelope and enforc
 
 ### Level ID Prefixes
 
-| Level | Requirements Prefix | Architecture Prefix |
-|-------|-------------------|-------------------|
-| L0 | `SN-xxx` | — |
-| L1..Ln | `REQ-L{n}-xxx` | `ARCH-L{n}-xxx` |
+| Level | Requirements Prefix | Architecture Prefix | Designation |
+|-------|-------------------|-------------------|-------------|
+| L0 | `SN-xxx` | — | Stakeholder Needs |
+| L1..Ln (continue) | `REQ-L{n}-xxx` | `ARCH-L{n}-xxx` | System (Subsystem) |
+| L1..Ln (leaf) | `REQ-L{n}-xxx` | — | Component (final) |
 
 ### Relationship to DoD Preset
 

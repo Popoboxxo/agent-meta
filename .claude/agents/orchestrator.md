@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 4.3.0
+version: 4.3.1
 description: 'Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
   parallel
@@ -458,7 +458,6 @@ Execution mode: loop
 
 3. background(agent="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
-| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, leaf system requirements become acceptance criteria with REQ-Traceability in commits.
 
 **SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
 

@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.6.0
+version: 1.6.1
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
@@ -68,6 +68,15 @@ Architektur-Output MUSS als A2A-Envelope an den Critic gehen:
 ```
 
 Bei Supersession: `supersession`-Block setzen mit `supersedes` auf die abgelehnte HOFF und `history` aus vorheriger Chain + abgelehnter HOFF.
+
+## Designation-Aware Processing
+
+The `designation` field in the A2A envelope payload indicates the ISO-compliant designation of this system:
+
+- **`designation: "component"`** — skip white-box decomposition entirely. The system is an atomic leaf; no further architecture breakdown is needed. Directly note as leaf in the output and do NOT generate sub-components.
+- **`designation: "system"` or `"subsystem"`** — proceed with normal white-box decomposition as described below.
+
+When `designation: "component"` is received, the architect output shall contain only the parent-level architecture note with `decomposition_completeness: "terminal — component-level leaf, no further decomposition"`.
 
 ## Responsibilities:
 1. **ANALYZE** input requirement for functional, non-functional, constraint aspects. What must the Black-Box achieve vs. how built.
