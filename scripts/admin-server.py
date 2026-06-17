@@ -87,6 +87,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "skills-registry":   "config/skills-registry.yaml",
     "mcp-registry":      "config/mcp-registry.yaml",
     "dod-presets":       "config/dod-presets.yaml",
+    "rules-presets":     "config/rules-presets.yaml",
     "delegation-syntax": "config/delegation-syntax.yaml",
     "export":            "config/export.yaml",
 }
