@@ -2618,12 +2618,16 @@ function textField(label, value, onInput, help) {
   return field;
 }
 
-function dropdownField(label, options, value, onChange) {
+function dropdownField(label, options, value, onChange, labels) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
   const sel = el("select");
+  const labelMap = labels && typeof labels === "object" ? labels : null;
   for (const opt of options) {
-    const o = el("option", { value: opt }, [opt || "—"]);
+    const display = labelMap && Object.prototype.hasOwnProperty.call(labelMap, opt)
+      ? labelMap[opt]
+      : (opt || "—");
+    const o = el("option", { value: opt }, [display]);
     if (opt === value) o.selected = true;
     sel.appendChild(o);
   }
@@ -2648,7 +2652,32 @@ function checkboxField(label, value, onChange) {
 async function viewProjectGeneral() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — General"]));
-  const data = await loadProject();
+
+  // Fallback enums (used if /api/config/<preset> is unavailable, e.g. when the
+  // admin server is not running in super_admin mode).
+  const DOD_FALLBACK   = ["rapid-prototyping", "standard", "strict"];
+  const RULES_FALLBACK = ["default", "minimal", "silent"];
+  // sync with schema speech-mode enum (config/project-config.schema.json)
+  const SPEECH_MODES   = ["full", "short", "childish", "caveman", "asozial", "submissive", "business", "bullshit-bingo", "linkedin"];
+
+  // Load project.yaml and presets in parallel. Each preset endpoint may fail
+  // independently — fall back to the hardcoded list in that case.
+  const [data, dodPresetsResp, rulesPresetsResp] = await Promise.all([
+    loadProject(),
+    api.get("/api/config/dod-presets").catch(() => null),
+    api.get("/api/config/rules-presets").catch(() => null),
+  ]);
+
+  // dod-presets.yaml has either a top-level mapping of preset-name → config,
+  // or wraps presets under a "presets" key. Handle both shapes defensively.
+  const extractPresetKeys = (obj, fallback) => {
+    if (!obj || typeof obj !== "object") return fallback;
+    if (obj.presets && typeof obj.presets === "object") return Object.keys(obj.presets);
+    return Object.keys(obj);
+  };
+  const dodOptions   = extractPresetKeys(dodPresetsResp, DOD_FALLBACK);
+  const rulesOptions = extractPresetKeys(rulesPresetsResp, RULES_FALLBACK);
+
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
   const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "" };
 
@@ -2659,9 +2688,9 @@ async function viewProjectGeneral() {
   panel.appendChild(textField("project.name", project.name, v => project.name = v));
   panel.appendChild(textField("project.prefix", project.prefix, v => project.prefix = v));
   panel.appendChild(textField("project.short", project.short, v => project.short = v));
-  panel.appendChild(dropdownField("dod-preset", ["rapid-prototyping", "standard", "strict"], top["dod-preset"], v => top["dod-preset"] = v));
-  panel.appendChild(textField("rules-preset", top["rules-preset"], v => top["rules-preset"] = v));
-  panel.appendChild(dropdownField("speech-mode", ["short", "medium", "verbose", "full"], top["speech-mode"], v => top["speech-mode"] = v));
+  panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
+  panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => top["rules-preset"] = v));
+  panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
   wrap.appendChild(panel);
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
@@ -2715,11 +2744,13 @@ async function viewProjectProviders() {
   }
   wrap.appendChild(provPanel);
 
-  // Platforms checklist
+  // Platforms checklist — "generic" is the always-active base layer and is
+  // excluded from the selection list (it cannot be toggled off).
   const platPanel = el("div", { class: "panel" });
   platPanel.appendChild(el("h2", {}, ["Platforms"]));
-  if (!platforms.length) platPanel.appendChild(el("div", { class: "empty" }, ["No platforms available."]));
-  for (const pl of platforms) {
+  const selectablePlatforms = platforms.filter(pl => pl.name !== "generic");
+  if (!selectablePlatforms.length) platPanel.appendChild(el("div", { class: "empty" }, ["No platforms available."]));
+  for (const pl of selectablePlatforms) {
     const line = el("label", { class: "flex-row", style: "gap:8px; margin-bottom:6px; cursor:pointer;" });
     const cb = el("input", { type: "checkbox" });
     cb.checked = selPlatforms.has(pl.name);
@@ -2728,12 +2759,30 @@ async function viewProjectProviders() {
     line.appendChild(el("span", { class: "mono" }, [pl.name]));
     platPanel.appendChild(line);
   }
+  platPanel.appendChild(el("div", { class: "field-help", style: "margin-top:10px;" }, [
+    "Multiple platform layers can be active simultaneously. Agents from ",
+    el("code", {}, ["agents/2-platform/<platform>-*.md"]),
+    " override generic agents. The ",
+    el("code", {}, ["1-generic"]),
+    " base is always active and cannot be selected.",
+  ]));
   wrap.appendChild(platPanel);
 
   // provider-isolation + provider-options (nested KV editor)
   const optPanel = el("div", { class: "panel" });
   optPanel.appendChild(el("h2", {}, ["Options"]));
-  optPanel.appendChild(textField("provider-isolation", typeof isolation === "string" ? isolation : "", v => { isolation = v; }, "e.g. disabled / enabled"));
+  // provider-isolation: schema enum allows only "disabled". An empty value
+  // means "not set" (default = isolation enabled). Render an explicit "(unset)"
+  // option so users can clear the field.
+  const isolationOptions = ["", "disabled"];
+  const isolationLabels  = { "": "(unset — isolation enabled)", "disabled": "disabled" };
+  optPanel.appendChild(dropdownField(
+    "provider-isolation",
+    isolationOptions,
+    typeof isolation === "string" ? isolation : "",
+    v => { isolation = v; },
+    isolationLabels,
+  ));
 
   // Provider Options — per-provider collapsible KV editors
   optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["provider-options"]));
@@ -2881,48 +2930,157 @@ async function viewProjectProviders() {
 async function viewProjectRoles() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — Roles"]));
-  const [data, allRoles] = await Promise.all([
+
+  // Load names + descriptions in parallel. Hierarchy is the authoritative
+  // source for descriptions; /api/roles is the alphabetically sorted list.
+  const [data, allRoles, hierarchy] = await Promise.all([
     loadProject(),
     api.get("/api/roles").catch(() => []),
+    api.get("/api/agents/hierarchy").catch(() => ({ roles: [] })),
   ]);
-  const roleNames = allRoles.map(r => r.name);
-  const selected = Array.isArray(data.roles) ? [...data.roles] : [];
 
-  const status = el("div", { class: "muted" }, [`${selected.length} roles selected.`]);
+  const descByName = new Map();
+  for (const r of (hierarchy.roles || [])) {
+    if (r && r.name) descByName.set(r.name, r.description || "");
+  }
+  const roleNames = allRoles.map(r => r.name);
+  const knownSet  = new Set(roleNames);
+
+  // Active list keeps insertion order (= project.yaml order). Unknown names
+  // referenced by project.yaml are preserved so users can clean them up
+  // explicitly.
+  const active = Array.isArray(data.roles) ? data.roles.filter(Boolean) : [];
+
+  const status = el("div", { class: "muted" }, [`${active.length} roles selected.`]);
   wrap.appendChild(status);
 
-  const panel = el("div", { class: "panel" });
-  const listWrap = el("div");
-  panel.appendChild(listWrap);
-  wrap.appendChild(panel);
+  // Two-column layout: Available ↔ Active
+  const grid = el("div", {
+    class: "panel",
+    style: "display:grid; grid-template-columns:1fr 1fr; gap:16px;",
+  });
+
+  const availPanel  = el("div");
+  const activePanel = el("div");
+  availPanel.appendChild(el("h2", { style: "margin-top:0;" }, ["Available"]));
+  activePanel.appendChild(el("h2", { style: "margin-top:0;" }, ["Active"]));
+
+  const availList  = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:8px;" });
+  const activeList = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:8px;" });
+  availPanel.appendChild(availList);
+  activePanel.appendChild(activeList);
+  grid.appendChild(availPanel);
+  grid.appendChild(activePanel);
+  wrap.appendChild(grid);
+
+  /** Build a single role card. ``side`` is "available" or "active". */
+  const buildCard = (name, side) => {
+    const desc = descByName.get(name) || (knownSet.has(name) ? "" : "Unknown role — not declared in role-defaults.yaml.");
+    const card = el("div", {
+      class: "role-card",
+      draggable: "true",
+      "data-role": name,
+      style: "display:flex; align-items:flex-start; gap:8px; padding:8px 10px; margin-bottom:6px; border:1px solid var(--border-color); border-radius:var(--radius); background:var(--bg-secondary); cursor:grab;",
+    });
+
+    // Move button: → adds to active, ← removes from active
+    const moveBtn = el("button", {
+      class: "btn",
+      style: "flex-shrink:0; padding:2px 8px; font-size:14px; line-height:1;",
+      title: side === "available" ? "Add to active" : "Remove from active",
+    }, [side === "available" ? "→" : "←"]);
+    moveBtn.addEventListener("click", () => {
+      if (side === "available") {
+        if (!active.includes(name)) active.push(name);
+      } else {
+        const idx = active.indexOf(name);
+        if (idx >= 0) active.splice(idx, 1);
+      }
+      render();
+    });
+
+    const text = el("div", { style: "flex:1; min-width:0;" });
+    const nameLine = el("div", { class: "mono", style: "font-weight:600;" }, [name]);
+    if (!knownSet.has(name)) nameLine.appendChild(el("span", { class: "muted", style: "margin-left:6px; font-weight:normal;" }, [" (unknown)"]));
+    text.appendChild(nameLine);
+    if (desc) text.appendChild(el("div", { class: "muted", style: "font-size:12px; margin-top:2px; white-space:normal; word-break:break-word;" }, [desc]));
+
+    card.appendChild(moveBtn);
+    card.appendChild(text);
+
+    // Drag handlers — payload is the role name; drop targets read it
+    // and call the same move logic the button uses.
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", JSON.stringify({ name, from: side }));
+      e.dataTransfer.effectAllowed = "move";
+      card.style.opacity = "0.5";
+    });
+    card.addEventListener("dragend", () => { card.style.opacity = ""; });
+
+    return card;
+  };
+
+  /** Attach drop-zone handlers to a column list. */
+  const wireDropZone = (zone, targetSide) => {
+    zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      zone.style.background = "var(--bg-tertiary, rgba(127,127,127,0.08))";
+    });
+    zone.addEventListener("dragleave", () => { zone.style.background = ""; });
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.style.background = "";
+      let payload;
+      try { payload = JSON.parse(e.dataTransfer.getData("text/plain") || "{}"); }
+      catch { return; }
+      if (!payload.name || payload.from === targetSide) return;
+      if (targetSide === "active") {
+        if (!active.includes(payload.name)) active.push(payload.name);
+      } else {
+        const idx = active.indexOf(payload.name);
+        if (idx >= 0) active.splice(idx, 1);
+      }
+      render();
+    });
+  };
+  wireDropZone(availList,  "available");
+  wireDropZone(activeList, "active");
 
   const render = () => {
-    listWrap.replaceChildren();
-    selected.forEach((name, idx) => {
-      const row = el("div", { class: "flex-row", style: "gap:8px; margin-bottom:6px;" });
-      const sel = el("select", { style: "max-width:280px;" });
-      const known = new Set(roleNames);
-      if (name && !known.has(name)) sel.appendChild(el("option", { value: name }, [name + " (unknown)"]));
-      for (const rn of roleNames) {
-        const o = el("option", { value: rn }, [rn]);
-        if (rn === name) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener("change", () => { selected[idx] = sel.value; });
-      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
-      rm.addEventListener("click", () => { selected.splice(idx, 1); render(); });
-      row.appendChild(sel);
-      row.appendChild(rm);
-      listWrap.appendChild(row);
-    });
-    status.textContent = `${selected.length} roles selected.`;
+    availList.replaceChildren();
+    activeList.replaceChildren();
+
+    const activeSet = new Set(active);
+    const availableNames = roleNames.filter(n => !activeSet.has(n));
+
+    if (!availableNames.length) {
+      availList.appendChild(el("div", { class: "empty muted", style: "padding:8px;" }, ["All known roles are active."]));
+    } else {
+      for (const n of availableNames) availList.appendChild(buildCard(n, "available"));
+    }
+
+    if (!active.length) {
+      activeList.appendChild(el("div", { class: "empty muted", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
+    } else {
+      for (const n of active) activeList.appendChild(buildCard(n, "active"));
+    }
+
+    status.textContent = `${active.length} roles selected.`;
   };
   render();
 
+  wrap.appendChild(el("div", { class: "field-help", style: "margin-top:10px;" }, [
+    "Drag cards between columns or use the arrow buttons. Active roles are saved in their current order to ",
+    el("code", {}, ["project.yaml"]),
+    " under the ",
+    el("code", {}, ["roles"]),
+    " key.",
+  ]));
+
   wrap.appendChild(el("div", { class: "btn-row" }, [
-    el("button", { class: "btn", onclick: () => { selected.push(roleNames[0] || ""); render(); } }, ["Add role"]),
     el("button", { class: "btn btn-primary", onclick: async () => {
-      try { await saveProjectSection("roles", selected.filter(Boolean), status); } catch { /* shown */ }
+      try { await saveProjectSection("roles", active.filter(Boolean), status); } catch { /* shown */ }
     } }, ["Save"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
   ]));
@@ -2961,7 +3119,7 @@ async function viewProjectOrchestrator() {
   const hf = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
   const hPanel = el("div", { class: "panel" });
   hPanel.appendChild(el("h2", {}, ["Handoff"]));
-  hPanel.appendChild(textField("protocol", typeof hf.protocol === "string" ? hf.protocol : "", v => { hf.protocol = v; orch.handoff = hf; }, "e.g. a2a-v1"));
+  hPanel.appendChild(textField("protocol", typeof hf.protocol === "string" ? hf.protocol : "", v => { hf.protocol = v; orch.handoff = hf; }, "a2a-v1 or none"));
   hPanel.appendChild(checkboxField("validate-before-delegate", hf["validate-before-delegate"], v => { hf["validate-before-delegate"] = v; orch.handoff = hf; }));
   hPanel.appendChild(checkboxField("supersession-tracking", hf["supersession-tracking"], v => { hf["supersession-tracking"] = v; orch.handoff = hf; }));
   hPanel.appendChild(checkboxField("strict-validation", hf["strict-validation"], v => { hf["strict-validation"] = v; orch.handoff = hf; }));
