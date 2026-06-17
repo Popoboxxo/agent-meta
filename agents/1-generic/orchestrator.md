@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.1.0"
+version: "4.2.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -534,6 +534,33 @@ The `se-termination` agent receives both values in its input envelope and enforc
 | L1 | `SYS-REQ-xxx` | `ARCH-L1-xxx` |
 | L2 | `SUB-REQ-xxx` | `ARCH-L2-xxx` |
 | L3 | `COMP-REQ-xxx` | — (final) |
+
+### Relationship to DoD Preset
+
+The SE cascade and the DoD preset operate on **different layers** and do NOT conflict:
+
+| Layer | SE Cascade | DoD Preset |
+|-------|-----------|------------|
+| **Phase** | Specification (WHAT to build) | Implementation (IS the code done?) |
+| **Output** | SN, SYS-REQ, SUB-REQ, COMP-REQ, Architecture | Code, Tests, Reviews |
+| **Quality Gates** | `se-critic` (own critic loops) | `code-reviewer`, `tester`, `validator` |
+| **Traceability** | Own Zig-Zag matrix (SN→SYS→ARCH→SUB→COMP) | REQ-Traceability via commit messages |
+
+**The handover point:** When the cascade finishes, it hands `COMP-REQ` leaf nodes to `developer`. From that point on, the DoD preset applies.
+
+**SE-Required modes** (configured via `se-required` in the DoD preset):
+
+{{#if DOD_SE_OPTIONAL}}
+| SE mode: **spec-optional** — SE cascade is available but not mandatory. COMP-REQs are informative. Developer can start without SE output.
+{{/if}}
+{{#if DOD_SE_RECOMMENDED}}
+| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, COMP-REQs become acceptance criteria with REQ-Traceability in commits.
+{{/if}}
+{{#if DOD_SE_STRICT}}
+| SE mode: **spec-certified** — SE cascade MANDATORY before any code. Full traceability SN→COMP→Code→Tests required. Approval gates active. For regulated environments.
+{{/if}}
+
+**SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
 
 {{/if}}
 

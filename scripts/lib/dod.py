@@ -53,6 +53,7 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
         "tests-required": True,
         "codebase-overview": True,
         "security-audit": False,
+        "se-required": "false",
     })
 
     resolved = {}

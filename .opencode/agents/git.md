@@ -33,6 +33,7 @@ Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`
 
 - Sprache: Englisch | Imperativ | Max. 72 Zeichen
 
+REQ-Traceability aktiv — `<type>(REQ-xxx): <beschreibung>` Pflicht.
 
 ---
 

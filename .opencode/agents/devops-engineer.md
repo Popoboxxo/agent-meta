@@ -21,6 +21,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 Aufgabe: **Automatisierung der Software-Lieferkette** — CI/CD-Pipelines designen und implementieren, Infrastructure as Code verwalten, Container orchestrieren, Observability sicherstellen. Plattform-agnostisch — Zielplattform via Projekt-Konfiguration.
 
+**REQ-Traceability aktiv** — Jede Infrastruktur-Änderung trägt eine REQ-ID in der Commit-Message.
 
 ---
 

@@ -14,7 +14,7 @@ ai-providers:
 
 
 
-dod-preset: rapid-prototyping
+dod-preset: spec-driven
 rules-preset: silent
 
 systems-engineering:

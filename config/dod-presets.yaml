@@ -19,6 +19,7 @@ presets:
     tests-required: true
     codebase-overview: true
     security-audit: false
+    se-required: "false"
 
   # Goldener Mittelweg — Tests ja, aber keine REQ-IDs und kein CODEBASE_OVERVIEW.
   # Guter Start für die meisten Projekte.
@@ -36,3 +37,40 @@ presets:
     tests-required: false
     codebase-overview: false
     security-audit: false
+
+  # --- SE-Spec Presets (Beta) ---
+  # Koppeln SE-Kaskaden-Output an Code-DoD.
+  # Das Feld 'se-required' steuert den Verbindlichkeitsgrad
+  # der Systems-Engineering-Spezifikation für die Implementierung.
+
+  # SE-Kaskade verfügbar, aber nicht verpflichtend.
+  # COMP-REQs sind informativ — Developer kann auch ohne starten.
+  # Ideal für Teams die SE erkunden wollen.
+  spec-optional:
+    req-traceability: false
+    tests-required: true
+    codebase-overview: false
+    security-audit: false
+    se-required: "false"
+
+  # SE-Kaskade empfohlen für komplexe Features (>1 Datei).
+  # COMP-REQs werden zu Akzeptanzkriterien — REQ-Traceability on.
+  # Wenn kein SE-Output vorhanden: Standard-DoD ohne Traceability.
+  # Ideal für SE-geführte Teams.
+  spec-driven:
+    req-traceability: true
+    tests-required: true
+    codebase-overview: false
+    security-audit: false
+    se-required: "recommended"
+
+  # SE-Kaskade PFLICHT vor jedem Commit.
+  # Vollständige Traceability SN→SYS→SUB→COMP→Code→Tests.
+  # Approval-Gates, Audit-Trail, Coverage-Nachweis.
+  # Für regulierte Umgebungen (Automotive, Medical, Aerospace).
+  spec-certified:
+    req-traceability: true
+    tests-required: true
+    codebase-overview: true
+    security-audit: true
+    se-required: "true"

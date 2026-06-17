@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.4.0
+version: 1.5.0
 description: Deterministic per-component leaf/continue decision with dynamic depth control.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
 tools:
@@ -33,6 +33,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 
 4. **Additional Protection Rules:**
    - `max_depth`: enforce leaf when current depth >= configured limit.
+   - `spec-certified gate`: When `{{DOD_SE_STRICT}}` is "true", `decision: continue` is ONLY allowed when `current_depth < min_depth`. If `current_depth >= min_depth` and normal criteria would say `continue`, override to `leaf` with rationale "spec-certified: minimum depth reached, forced termination".
    - `max_total_cells`: enforce leaf when total cell count >= limit.
    - **Circular Reference:** enforce leaf when `parent_id` chain contains a cycle.
 

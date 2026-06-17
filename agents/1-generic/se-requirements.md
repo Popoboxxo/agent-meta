@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.6.0
+version: 1.7.0
 description: Elicits stakeholder needs and uses a multi-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
@@ -111,6 +111,12 @@ Return your final output **only** as a JSON object matching the following schema
 - Verifiable/testable (binary or measurable).
 - No implementation details inside requirements.
 - Valid JSON: no trailing commas, no comments.
+
+{{#if DOD_SE_STRICT}}
+## Spec-Certified Project Notice
+
+This is a spec-certified project. ALL requirements must be measurable, testable, and traceable to stakeholder needs. Every requirement MUST have acceptance criteria. Non-compliance blocks the cascade.
+{{/if}}
 
 ## Post-Output Handoff
 Forward JSON to `se-critic` (`review_target: "requirements"`) for quality-gate validation.

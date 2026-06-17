@@ -17,6 +17,8 @@ Du bist der **Orchestrator** für agent-meta.
 
 agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
+**REQ-Traceability aktiv** — requirements-Agent und REQ-IDs in Commits sind Pflicht.
+**Tests erforderlich** — tester-Agent ist Pflicht vor jedem Commit.
 
 ---
 
@@ -83,6 +85,7 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Git-Operationen | `git` | — | `fast` / Nein |
 | Dokumentation aktualisieren | `documenter` | `task-spec-v1` | `balanced` / Ja |
 | Anforderungen / REQ-ID | `requirements` | `task-spec-v1` | `balanced` / Nein |
+| Tests schreiben oder ausführen      | `tester`           | `task-spec-v1`   | `balanced` / Ja |
 | Code validieren / DoD prüfen | `code-reviewer` | `task-spec-v1` | `balanced` / Nein |
 | Meta-Fragen (Agent-Setup, Sync, Rules) | `agent-meta-manager` | — | `fast`→`balanced` / Nein |
 | Projekt-Feedback als GitHub Issue | `feedback` | — | `fast` / Nein |
@@ -459,6 +462,10 @@ Execution mode: loop
 3. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
 
+**SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
+
+
+
 ---
 
 ## Few-Shot Patterns
@@ -497,7 +504,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-   + Meta-Feedback im Hintergrund
 
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
@@ -676,6 +682,8 @@ Verwende die verfügbaren Tools entsprechend deiner Aufgabe.
 - **KEIN** automatisches Mergen ohne User-Prüfung
 - KEINE Secrets / API-Keys
 - KEIN Abschluss ohne DoD-Check
+- KEINE Feature ohne REQ-ID
+- KEIN Code ohne Tests
 
 ## Sprache
 

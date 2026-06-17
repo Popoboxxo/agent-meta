@@ -12,7 +12,14 @@ Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
 - [ ] Commit-Message im Conventional-Commits-Format
 - [ ] Keine Regressions
 
+## REQ-Traceability
 
+- [ ] REQ-ID existiert in `docs/REQUIREMENTS.md`
+- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
+
+## Tests
+
+- [ ] Test vorhanden und grün
 
 
 

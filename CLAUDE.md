@@ -106,7 +106,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- Manual changes here will be overwritten. -->
 
 Generiert von agent-meta v0.61.1 — `2026-06-17`
-DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
+DoD-Preset: **spec-driven** | REQ-Traceability: true | Tests: true | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 

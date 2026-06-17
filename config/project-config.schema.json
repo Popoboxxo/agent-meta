@@ -423,7 +423,10 @@
       "enum": [
         "full",
         "standard",
-        "rapid-prototyping"
+        "rapid-prototyping",
+        "spec-optional",
+        "spec-driven",
+        "spec-certified"
       ],
       "default": "full"
     },
@@ -450,6 +453,12 @@
           "type": "boolean",
           "description": "Require security audit before release. Default: false.",
           "default": false
+        },
+        "se-required": {
+          "type": "string",
+          "description": "SE cascade binding strength. 'false' = optional, 'recommended' = advised for complex features, 'true' = mandatory before any code. Default: false.",
+          "enum": ["false", "recommended", "true"],
+          "default": "false"
         }
       },
       "additionalProperties": false

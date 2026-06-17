@@ -98,7 +98,8 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
             if agent and agent not in available_roles:
                 errors.append(
                     f"Pipeline '{name}': stage '{stage.get('id')}' agent '{agent}' "
-                    f"not found in available roles"
+                    f"not found in available roles. "
+                    f"Add '{agent}' to roles: in .meta-config/project.yaml to enable this pipeline."
                 )
 
             mode = stage.get("mode")
@@ -108,11 +109,13 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                 crit = loop.get("critic")
                 if gen and gen not in available_roles:
                     errors.append(
-                        f"Pipeline '{name}': loop generator '{gen}' not found in available roles"
+                        f"Pipeline '{name}': loop generator '{gen}' not found in available roles. "
+                        f"Add '{gen}' to roles: in .meta-config/project.yaml to enable this pipeline."
                     )
                 if crit and crit not in available_roles:
                     errors.append(
-                        f"Pipeline '{name}': loop critic '{crit}' not found in available roles"
+                        f"Pipeline '{name}': loop critic '{crit}' not found in available roles. "
+                        f"Add '{crit}' to roles: in .meta-config/project.yaml to enable this pipeline."
                     )
 
             if mode == "parallel_group":
@@ -122,7 +125,8 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                     if sub_agent and sub_agent not in available_roles:
                         errors.append(
                             f"Pipeline '{name}': parallel_group agent '{sub_agent}' "
-                            f"not found in available roles"
+                            f"not found in available roles. "
+                            f"Add '{sub_agent}' to roles: in .meta-config/project.yaml to enable this pipeline."
                         )
 
             # Circular orchestration guard
@@ -131,6 +135,26 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                     f"Pipeline '{name}': stage '{stage.get('id')}' uses orchestrator "
                     f"agent '{agent}' — would create circular delegation"
                 )
+
+    # Consolidated hint for missing roles
+    missing_roles = set()
+    for err in errors:
+        if "not found in available roles" in err:
+            # Extract agent name from error message
+            match = re.search(r"agent '([^']+)'", err)
+            if match:
+                missing_roles.add(match.group(1))
+            match = re.search(r"generator '([^']+)'", err)
+            if match:
+                missing_roles.add(match.group(1))
+            match = re.search(r"critic '([^']+)'", err)
+            if match:
+                missing_roles.add(match.group(1))
+    if missing_roles:
+        errors.append(
+            f"Summary: {len(missing_roles)} missing role(s): {', '.join(sorted(missing_roles))}. "
+            f"Add them to 'roles:' in .meta-config/project.yaml."
+        )
 
     return errors
 

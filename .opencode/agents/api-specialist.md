@@ -21,6 +21,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 Aufgabe: **Contract-First API Design** — Verträge erstellen, pflegen und validieren bevor Implementierungscode geschrieben wird. Schnittstellen müssen konsistent, versioniert und dokumentiert sein.
 
+**REQ-Traceability aktiv** — Jede API-Änderung trägt eine REQ-ID in der Commit-Message.
 
 ---
 
@@ -218,6 +219,7 @@ components:
 | Dokumentation | `docs` | `docs(api): update OpenAPI description for auth flows` |
 | Version-Bump | `chore` | `chore(api): bump API version to 2.0.0` |
 
+Mit REQ-ID: `feat(REQ-xxx)(api): add GET /users endpoint`
 
 ---
 

@@ -43,6 +43,7 @@ _DOD_FIELD_DEFAULTS: dict = {
     "tests-required": True,
     "codebase-overview": True,
     "security-audit": False,
+    "se-required": "false",
 }
 
 
@@ -370,6 +371,12 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
     variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
+    # SE-Required mode: derive boolean flags from the se-required string field
+    se_required = str(dod_resolved.get("se-required", "false")).lower()
+    variables["DOD_SE_REQUIRED"]    = se_required  # "false" | "recommended" | "true"
+    variables["DOD_SE_OPTIONAL"]    = "true" if se_required == "false" else "false"
+    variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
+    variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops

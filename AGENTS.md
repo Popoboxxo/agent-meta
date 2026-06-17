@@ -7,7 +7,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- Manual changes here will be overwritten. -->
 
 Generiert von agent-meta v0.61.1 — `2026-06-17`
-DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
+DoD-Preset: **spec-driven** | REQ-Traceability: true | Tests: true | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
@@ -141,7 +141,14 @@ Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
 - [ ] Commit-Message im Conventional-Commits-Format
 - [ ] Keine Regressions
 
+## REQ-Traceability
 
+- [ ] REQ-ID existiert in `docs/REQUIREMENTS.md`
+- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
+
+## Tests
+
+- [ ] Test vorhanden und grün
 
 
 
@@ -373,6 +380,24 @@ ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
 
 Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
 
+3. **Orchestrator:** Alles andere → an `orchestrator` delegieren.
+
+> **Merksatz:** Mehr als ein Schritt ODER mehr als ein Agent ODER Dateien in kritischen Pfaden → immer Orchestrator. Auch wenn der User eine kurze Lösung erwartet.
+
+## Direkter Dispatch (nur nach Regel 2)
+
+| Operation | Direkt an | Bedingung |
+|-----------|-----------|-----------|
+| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
+| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
+| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
+| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
+
+> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
+
+## Auto-Handoff
+
+Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
 
 ## Git Delegation — Hard Rule
 
@@ -397,6 +422,11 @@ ALLE anderen git-Operationen → an `git`-Agenten delegieren.
 
 **Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
 **Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
+
+# Main-Chat-Modus
+
+Orchestrator ist deaktiviert. Alle Aufgaben werden direkt im Hauptchat ausgeführt.
+Delegation an Subagenten ist optional und erfolgt nach eigenem Ermessen.
 
 ---
 
