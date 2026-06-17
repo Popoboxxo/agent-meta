@@ -64,6 +64,7 @@ Vor Ad-hoc-Zerlegung prüfen, ob eine aktive Quality Pipeline besser passt.
 | "Bug analysieren", "Triage", "ist das ein Bug?" | `bugfix` |
 | "Refactoring", "umstrukturieren", "aufräumen" | `refactor` |
 | "Dokumentation aktualisieren", "README", "CODEBASE_OVERVIEW" | `docs-update` |
+| "SE-Kaskade", "Systems Engineering", "Stakeholder Requirements", "Zerlegung" | `se-cascade` |
 
 **Ablauf bei Match:**
 1. Signal erkannt → passende Pipeline identifizieren
@@ -112,7 +113,7 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Log-Analyse | `log-analyzer` | `task-spec-v1` | `balanced` / Ja |
 | Release / Version bump | `release` | — | `balanced` / Nein |
 {{#if SE_ENABLED}}
-| Systems Engineering / SE-Kaskade | `se-orchestrator` | — | `balanced`→`powerful` / Nein |
+| Systems Engineering / SE-Kaskade | Pipeline `se-cascade` (SE-Mode) | — | `balanced`→`powerful` / Nein |
 | Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `task-spec-v1` | `powerful` / Nein |
 | UI-Design / Mockups | `ui-ux-designer` | `task-spec-v1` | `balanced` / Ja |
 | API-Design / OpenAPI | `api-specialist` | `task-spec-v1` | `balanced` / Nein |
@@ -467,6 +468,73 @@ NEXT_STEPS: <konkrete nächste Schritte>
 {{#if PIPELINE_BUGFIX_ENABLED}}
 ### Pipeline: bugfix
 {{PIPELINE_BUGFIX_BLOCK}}
+{{/if}}
+
+{{#if SE_ENABLED}}
+## Systems Engineering Mode
+
+The `se-cascade` pipeline implements a recursive Zig-Zag decomposition (L0→L3) with V-Model integration.
+
+### Zig-Zag Workflow
+
+The cascade follows a strict alternating pattern between Requirements and Architecture:
+
+```
+L0: Stakeholder Needs (SN-xxx)
+ ↓
+L1: Requirements (SYS-REQ-xxx) ←→ Architecture (ARCH-L1-xxx)
+ ↓
+L2: Requirements (SUB-REQ-xxx) ←→ Architecture (ARCH-L2-xxx) → Interface Registry
+ ↓
+L3: Components (COMP-REQ-xxx) → Termination → Validation
+```
+
+Each Requirements↔Architecture pair forms a REPEAT_UNTIL loop (generator + critic, max {{SE_MAX_CRITIC_ITERATIONS}} iterations).
+
+### Recursive Cell Spawns
+
+When the `termination` stage decides `continue` for a component:
+1. Orchestrator spawns a **new cell** at level n+1
+2. Context is **sanitized** — only `BB-REQ` + `propagation_map` row (~800 tokens)
+3. New cell starts at the Requirements stage for that level
+4. `trace_parent` links to parent cell's handoff_id
+
+When `termination` decides `leaf`:
+- Component is final — handover to implementation discipline (developer, hardware-engineer, etc.)
+
+### Context Hygiene Rules
+
+- **Never** pass full parent context to child cells — only sanitized BB-REQ + propagation row
+- Each cell operates independently with its own critic loop
+- Interface specs from `se-interface-mgr` are the only cross-cell communication channel
+- Max {{SE_MAX_PARALLEL_CELLS}} parallel cells at any level
+
+### Depth Configuration
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SE_MIN_DEPTH` | {{SE_MIN_DEPTH}} | Minimum decomposition depth (never terminate before) |
+| `SE_MAX_DEPTH` | {{SE_MAX_DEPTH}} | Maximum decomposition depth (always terminate at) |
+
+The `se-termination` agent receives both values in its input envelope and enforces them deterministically.
+
+### V-Model Integration
+
+- **Left wing** (Decomposition): L0→L1→L2→L3 — each level produces requirements + architecture
+- **Right wing** (V&V): Validation stage runs after termination
+  - `se-validator`: L1 User-Journey validation
+  - `se-verifier`: Multi-Level verification (cross-level traceability)
+  - `se-integration-and-test-manager`: V&V orchestration
+
+### Level ID Prefixes
+
+| Level | Requirements Prefix | Architecture Prefix |
+|-------|-------------------|-------------------|
+| L0 | `SN-xxx` | — |
+| L1 | `SYS-REQ-xxx` | `ARCH-L1-xxx` |
+| L2 | `SUB-REQ-xxx` | `ARCH-L2-xxx` |
+| L3 | `COMP-REQ-xxx` | — (final) |
+
 {{/if}}
 
 ---

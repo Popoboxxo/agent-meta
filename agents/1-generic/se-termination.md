@@ -1,8 +1,8 @@
 ---
 name: se-termination
-version: 1.3.1
-description: Deterministic termination at L3 (Component Requirement).
-hint: Deterministic termination at L3 (Component Requirement)
+version: 1.4.0
+description: Deterministic per-component leaf/continue decision with dynamic depth control.
+hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
 tools:
 - Read
 - Write
@@ -52,7 +52,8 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
     "sub_components": [ ... ],
     "propagation_map": { ... },
     "current_depth": 2,
-    "max_depth": 3
+    "min_depth": 2,
+    "max_depth": 6
   },
   "trace_parent": "HOFF-YYYYMMDD-PARENT"
 }
@@ -81,7 +82,11 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 
 ## Rules & Compliance
 
-- **Strict Stop Rule:** no L4/L5 — systems engineering ends at L3.
+- **Dynamic Depth Control:** respect `min_depth` and `max_depth` from input envelope.
+  - Below `min_depth`: always `continue` (never leaf before minimum depth).
+  - At or above `max_depth`: always `leaf` (never continue beyond maximum depth).
+  - Between min and max: apply leaf/continue criteria normally.
+  - Default values: `min_depth: {{SE_MIN_DEPTH}}`, `max_depth: {{SE_MAX_DEPTH}}`.
 - **Completeness:** terminate a branch only after the critic approved requirements (traceability, orthogonality, interface compliance).
 - **Determinism:** same input + same depth → identical result.
 
@@ -120,7 +125,8 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
     "leaf_nodes": 2,
     "continue_nodes": 1,
     "current_depth": 1,
-    "max_depth": 5
+    "min_depth": 2,
+    "max_depth": 6
   }
 }
 ```

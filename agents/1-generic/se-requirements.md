@@ -1,7 +1,7 @@
 ---
 name: se-requirements
-version: 1.5.1
-description: Elicits stakeholder needs and uses a 6-level template for requirements
+version: 1.6.0
+description: Elicits stakeholder needs and uses a multi-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
 tools:
@@ -45,10 +45,20 @@ Strict 3-phase process; user is iteratively involved before the cascade starts.
 
 Domain-agnostic. Universally applicable.
 
-## REQ-ID Schema
-- Format: `REQ-NNN` (zero-padded 3-digit). Examples: REQ-001, REQ-042.
+## REQ-ID Schema — Level-Specific Prefixes
+
+Each decomposition level uses a distinct ID prefix for traceability:
+
+| Level | Prefix | Example | Description |
+|-------|--------|---------|-------------|
+| L0 Stakeholder Needs | `SN-xxx` | SN-001 | Raw stakeholder needs, elicited in Phase 1 |
+| L1 System Requirements | `SYS-REQ-xxx` | SYS-REQ-001 | Formal system-level requirements |
+| L2 Sub-System Requirements | `SUB-REQ-xxx` | SUB-REQ-001 | Derived from L1 architecture decomposition |
+
+- Format: `<PREFIX>-NNN` (zero-padded 3-digit). Examples: SN-001, SYS-REQ-042, SUB-REQ-007.
 - Unique within the current decomposition level.
 - Multiple stakeholders: tag only in `rationale`, never in `req_id`.
+- The `req_id` field in JSON output MUST use the prefix matching the current call level.
 
 ## Domain Assignment
 Tag every requirement with exactly one domain:
@@ -79,7 +89,7 @@ Return your final output **only** as a JSON object matching the following schema
 {
   "requirements": [
     {
-      "req_id": "REQ-001",
+      "req_id": "SYS-REQ-001",
       "statement": "The system shall heat 500ml of water to 90°C within 120 seconds.",
       "domain": "system",
       "priority": "mandatory",

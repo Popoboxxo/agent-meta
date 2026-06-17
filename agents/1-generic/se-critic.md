@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.5.1
+version: 1.5.2
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural

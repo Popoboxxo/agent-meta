@@ -48,6 +48,7 @@ Vor Ad-hoc-Zerlegung prüfen, ob eine aktive Quality Pipeline besser passt.
 | "Bug analysieren", "Triage", "ist das ein Bug?" | `bugfix` |
 | "Refactoring", "umstrukturieren", "aufräumen" | `refactor` |
 | "Dokumentation aktualisieren", "README", "CODEBASE_OVERVIEW" | `docs-update` |
+| "SE-Kaskade", "Systems Engineering", "Stakeholder Requirements", "Zerlegung" | `se-cascade` |
 
 **Ablauf bei Match:**
 1. Signal erkannt → passende Pipeline identifizieren
@@ -453,6 +454,7 @@ Execution mode: loop
   Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
 
 3. background(agent="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
+
 
 ---
 

@@ -191,7 +191,8 @@ variables:
     sync.py generiert .claude/agents/ im Zielprojekt —
     kein Build-Artifact im Meta-Repo selbst.
   VERSION_DIST_BEHAVIOUR: "Release: 1. version in Frontmatter erhöhen, 2. CHANGELOG.md aktualisieren, 3. VERSION + README.md setzen, 4. git commit & tag."
-  SE_MAX_DEPTH: 5
+  SE_MIN_DEPTH: 2
+  SE_MAX_DEPTH: 6
   SE_MAX_CELLS: 20
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4

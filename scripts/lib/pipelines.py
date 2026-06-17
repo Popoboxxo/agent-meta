@@ -345,6 +345,8 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
             cond = stage.get("condition", {})
             if cond.get("type") == "agent_decision":
                 lines.append(f"  Decision agent: {cond.get('agent', agent)}")
+                lines.append(f"  If 'continue': Orchestrator spawns new cell at level n+1 with sanitized context")
+                lines.append(f"  If 'leaf': Component is final — handover to implementation discipline")
             lines.append("")
 
     if not lines:

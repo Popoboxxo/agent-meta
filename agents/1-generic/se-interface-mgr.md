@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.3.1
+version: 1.4.0
 description: Manages generic signal flow and deterministic synchronization across
   systems.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -29,6 +29,7 @@ You are the **Interface Manager Agent** (`se-interface-mgr`) in the generic syst
 3. **Propagation Map (Central Mechanism):** identify propagation needs — which external interfaces of the parent black-box pass to which sub-components, which new internal interfaces must be reported to parallel cells. Build the propagation map: one entry per sub-component with `inherited_external`, `new_internal_incoming`, `new_internal_outgoing`.
 
 4. **Interface Spec per Component:** per sub-component, list all interfaces it participates in (incoming/outgoing). This spec becomes input payload for the cell at level n+1.
+5. **Level Awareness:** the `current_level` field in the input envelope indicates which decomposition level (L0/L1/L2/L3) this interface registration applies to. Use it to validate interface inheritance across levels.
 
 ## A2A Handoff — Input/Output
 
@@ -47,7 +48,8 @@ You are the **Interface Manager Agent** (`se-interface-mgr`) in the generic syst
       "sub_components": [ ... ],
       "internal_interfaces": [ ... ],
       "architectural_rationale": "..."
-    }
+    },
+    "current_level": "L2"
   },
   "trace_parent": "HOFF-YYYYMMDD-PARENT"
 }
@@ -65,6 +67,7 @@ You are the **Interface Manager Agent** (`se-interface-mgr`) in the generic syst
   "payload": {
     "t": "Termination-Entscheidung für Sub-Components treffen",
     "propagation_map": { ... },
+    "current_level": "L2",
     "interface_specs": [ ... ]
   },
   "trace_parent": "<eingehende handoff_id>"

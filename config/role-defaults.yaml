@@ -549,11 +549,35 @@ quality_pipelines:
     on_error: skip
 
   se-cascade:
-    description: "Systems Engineering 6-Stage Recursive Cascade"
+    description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→L3)"
     stages:
+      - id: l0-stakeholder
+        agent: se-requirements
+        task: "Stakeholder Needs → formal SN-xxx Requirements"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
       - id: l1-requirements
         agent: se-requirements
-        task: "L1 Stakeholder Needs"
+        task: "L1 System Requirements (SYS-REQ) from Stakeholder Needs"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l1-architecture
+        agent: se-architect
+        task: "L1 System White-Box Decomposition (ARCH-L1)"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
+      - id: l2-requirements
+        agent: se-requirements
+        task: "L2 Sub-System Requirements (SUB-REQ) derived from L1 Architecture"
         mode: loop
         loop:
           generator: se-requirements
@@ -561,29 +585,46 @@ quality_pipelines:
           max_iterations: 3
       - id: l2-architecture
         agent: se-architect
-        task: "L2 White-Box Decomposition"
+        task: "L2 Sub-System White-Box Decomposition (ARCH-L2)"
         mode: loop
         loop:
           generator: se-architect
           critic: se-critic
           max_iterations: 3
-      - id: interface
+      - id: l2-interface
         agent: se-interface-mgr
-        task: "Signal flow synchronization"
+        task: "Interface Registry + Propagation Map for L2"
         mode: sequential
+      - id: l3-components
+        agent: se-architect
+        task: "L3 Component Requirements (COMP-REQ) — final decomposition"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
       - id: termination
         agent: se-termination
-        task: "Leaf or recurse decision"
+        task: "Per-component leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)"
         mode: conditional
         condition:
           type: agent_decision
           agent: se-termination
       - id: validation
         agent: se-validator
-        task: "L1 User-Journey validation"
+        task: "L1 System Validation + Multi-Level Verification"
         mode: parallel_group
         parallel_group:
+          - agent: se-validator
+            task: "L1 User-Journey validation"
           - agent: se-verifier
             task: "Multi-Level verification"
           - agent: se-integration-and-test-manager
             task: "V&V orchestration"
+
+# SE cascade variables (defaults, overridden by .meta-config/project.yaml)
+se_variables:
+  SE_MIN_DEPTH: 2
+  SE_MAX_DEPTH: 6
+  SE_MAX_CRITIC_ITERATIONS: 3
+  SE_MAX_PARALLEL_CELLS: 4

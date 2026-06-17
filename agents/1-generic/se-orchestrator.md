@@ -1,9 +1,10 @@
 ---
 name: se-orchestrator
-version: 1.6.1
-description: Coordinates the 6-level recursive breakdown with zig-zag traceability
-  and V&V.
-hint: Coordinates the 6-level recursive breakdown
+version: 1.7.0
+description: "DEPRECATED — SE functionality is now handled directly by the orchestrator via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility only."
+hint: "DEPRECATED — Use orchestrator with SE-Mode instead"
+deprecated: true
+deprecated_by: "orchestrator (SE-Mode via {{#if SE_ENABLED}})"
 tools:
 - Read
 - Write

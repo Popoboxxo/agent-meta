@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.4.1
+version: 1.5.0
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
@@ -88,6 +88,21 @@ L1-Blackbox → L1-Whitebox. Abstract sub-systems, no technical pre-emption. "Wh
 ## L2 (Component-Level)
 L2-Blackbox → L2-Whitebox with concrete components. Interfaces become specific. Domains may diverge per component. Include concrete interface specs where known.
 
+## Level-Specific Architecture Element IDs
+
+Each decomposition level uses a distinct ID prefix for architecture elements:
+
+| Level | Prefix | Example | Description |
+|-------|--------|---------|-------------|
+| L1 System Architecture | `ARCH-L1-xxx` | ARCH-L1-001 | System-level white-box decomposition |
+| L2 Sub-System Architecture | `ARCH-L2-xxx` | ARCH-L2-001 | Sub-system white-box decomposition |
+| L3 Component Requirements | `COMP-REQ-xxx` | COMP-REQ-001 | Final component-level requirements |
+
+- The `id` field in sub_components MUST use the prefix matching the current call level.
+- L1: Use `ARCH-L1-NNN` for sub-system identifiers.
+- L2: Use `ARCH-L2-NNN` for sub-system identifiers.
+- L3: Use `COMP-REQ-NNN` for component identifiers (final decomposition).
+
 ## Communication & Routing
 Universal CQRS/Event-Driven pattern (Commands, Events, State Mutation, Queries, Rejections). Interface definitions abstract enough to allow transport substitution. No provider-specific protocols unless a constraint dictates.
 
@@ -111,20 +126,20 @@ Return your final output **only** as a JSON object matching the following schema
   "parent_req_id": "REQ-001",
   "sub_components": [
     {
-      "id": "COMP-001-01",
+      "id": "ARCH-L1-001",
       "name": "Heating Element Controller",
       "domain": "hardware",
       "black_box_requirement": "The heating element controller shall provide 2000W electrical heating power via a temperature control loop with ±2°C accuracy.",
       "assigned_external_interfaces": ["230V AC power supply"]
     },
     {
-      "id": "COMP-001-02",
+      "id": "ARCH-L1-002",
       "name": "Temperature Control Algorithm",
       "domain": "software",
       "black_box_requirement": "The control algorithm shall implement a PID controller with a 90°C temperature setpoint, computing actuator values for the heating element."
     },
     {
-      "id": "COMP-001-03",
+      "id": "ARCH-L1-003",
       "name": "Water Reservoir",
       "domain": "mechanics",
       "black_box_requirement": "The water reservoir shall hold 500ml volume, be food-safe, and thermally rated for 100°C."
@@ -132,14 +147,14 @@ Return your final output **only** as a JSON object matching the following schema
   ],
   "internal_interfaces": [
     {
-      "source_id": "COMP-001-02",
-      "target_id": "COMP-001-01",
+      "source_id": "ARCH-L1-002",
+      "target_id": "ARCH-L1-001",
       "interface_type": "analog_signal",
       "data_payload": "PWM control signal 0-100%, 5V logic level"
     },
     {
-      "source_id": "COMP-001-01",
-      "target_id": "COMP-001-03",
+      "source_id": "ARCH-L1-001",
+      "target_id": "ARCH-L1-003",
       "interface_type": "thermal",
       "data_payload": "Heat transfer 2000W max, contact surface min 50cm²"
     }
