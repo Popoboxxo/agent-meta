@@ -1019,7 +1019,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _serve_ui(self) -> None:
-        ui_path = self.__class__.root / "docs" / "admin-ui.html"
+        primary  = self.root / "docs" / "admin-ui.html"
+        fallback = self.root / ".agent-meta" / "docs" / "admin-ui.html"
+        ui_path = primary if primary.exists() else fallback
         if not ui_path.exists():
             raise FileNotFoundError("docs/admin-ui.html (UI bundle missing)")
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
