@@ -461,8 +461,64 @@ Execution mode: loop
 
 3. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
+| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, leaf system requirements become acceptance criteria with REQ-Traceability in commits.
 
 **SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
+
+### Output Directory Structure
+
+Configurable via `.meta-config/project.yaml` → `se_output`:
+
+```yaml
+se_output:
+  base_dir: "SE"              # Hauptordner
+  per_level_dirs: true        # L0/, L1/, L2/, ...
+  per_system_dirs: true       # L2/AuthService/, L3/TokenValidator/, ...
+```
+
+Generated structure (example with SE_MAX_DEPTH=4):
+```
+SE/
+├── STRATEGY.md                    # System-Ziel, Constraints
+├── traceability-matrix.md         # REQ-L1-001 → ARCH-L1-001 → REQ-L2-001 → ...
+├── interface-registry.md          # Zentrale Interface-Tabelle
+│
+├── L0/
+│   └── SN_Stakeholder_Needs.md
+│
+├── L1/
+│   └── Gesamtsystem/
+│       ├── L1_Gesamtsystem_Requirements.md
+│       └── L1_Gesamtsystem_Architecture.md
+│
+├── L2/
+│   ├── AuthService/
+│   │   ├── L2_AuthService_Requirements.md
+│   │   └── L2_AuthService_Architecture.md
+│   └── MCPServer/
+│       ├── L2_MCPServer_Requirements.md
+│       └── L2_MCPServer_Architecture.md
+│
+├── L3/
+│   ├── TokenValidator/
+│   │   ├── L3_TokenValidator_Requirements.md
+│   │   └── L3_TokenValidator_Architecture.md
+│   └── JWTHandler/
+│       ├── L3_JWTHandler_Requirements.md
+│       └── L3_JWTHandler_Architecture.md
+│
+└── L4/
+    └── CryptoEngine/
+        ├── L4_CryptoEngine_Requirements.md
+        └── L4_CryptoEngine_Architecture.md
+```
+
+**Rules:**
+- Jedes System hat genau eine Requirements- und eine Architecture-Datei
+- Cross-cutting Dokumente (STRATEGY, traceability-matrix, interface-registry) liegen direkt in SE/
+- L0 hat nur Stakeholder-Needs (keine Architektur)
+- Leaf-Systeme (termination=leaf) haben nur Requirements (keine weitere Architecture)
+- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an
 
 
 
@@ -504,7 +560,6 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
-
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 

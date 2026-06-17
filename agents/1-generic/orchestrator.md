@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.2.0"
+version: "4.3.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -473,7 +473,7 @@ NEXT_STEPS: <konkrete nächste Schritte>
 {{#if SE_ENABLED}}
 ## Systems Engineering Mode
 
-The `se-cascade` pipeline implements a recursive Zig-Zag decomposition (L0→L3) with V-Model integration.
+The `se-cascade` pipeline implements a recursive Zig-Zag decomposition (L0→L{{SE_MAX_DEPTH}}) with V-Model integration.
 
 ### Zig-Zag Workflow
 
@@ -482,25 +482,27 @@ The cascade follows a strict alternating pattern between Requirements and Archit
 ```
 L0: Stakeholder Needs (SN-xxx)
  ↓
-L1: Requirements (SYS-REQ-xxx) ←→ Architecture (ARCH-L1-xxx)
+L1: Requirements (REQ-L1-xxx) ←→ Architecture (ARCH-L1-xxx)
  ↓
-L2: Requirements (SUB-REQ-xxx) ←→ Architecture (ARCH-L2-xxx) → Interface Registry
+L2: Requirements (REQ-L2-xxx) ←→ Architecture (ARCH-L2-xxx) → Interface Registry
  ↓
-L3: Components (COMP-REQ-xxx) → Termination → Validation
+L3: Requirements (REQ-L3-xxx) ←→ Architecture (ARCH-L3-xxx)
+ ↓
+L4...Ln: (rekursiv, gleiches Muster bis {{SE_MAX_DEPTH}})
 ```
 
 Each Requirements↔Architecture pair forms a REPEAT_UNTIL loop (generator + critic, max {{SE_MAX_CRITIC_ITERATIONS}} iterations).
 
 ### Recursive Cell Spawns
 
-When the `termination` stage decides `continue` for a component:
+When the `termination` stage decides `continue` for a system:
 1. Orchestrator spawns a **new cell** at level n+1
 2. Context is **sanitized** — only `BB-REQ` + `propagation_map` row (~800 tokens)
 3. New cell starts at the Requirements stage for that level
 4. `trace_parent` links to parent cell's handoff_id
 
 When `termination` decides `leaf`:
-- Component is final — handover to implementation discipline (developer, hardware-engineer, etc.)
+- Leaf system is final — handover to implementation discipline (developer, hardware-engineer, etc.)
 
 ### Context Hygiene Rules
 
@@ -531,9 +533,7 @@ The `se-termination` agent receives both values in its input envelope and enforc
 | Level | Requirements Prefix | Architecture Prefix |
 |-------|-------------------|-------------------|
 | L0 | `SN-xxx` | — |
-| L1 | `SYS-REQ-xxx` | `ARCH-L1-xxx` |
-| L2 | `SUB-REQ-xxx` | `ARCH-L2-xxx` |
-| L3 | `COMP-REQ-xxx` | — (final) |
+| L1..Ln | `REQ-L{n}-xxx` | `ARCH-L{n}-xxx` |
 
 ### Relationship to DoD Preset
 
@@ -542,25 +542,80 @@ The SE cascade and the DoD preset operate on **different layers** and do NOT con
 | Layer | SE Cascade | DoD Preset |
 |-------|-----------|------------|
 | **Phase** | Specification (WHAT to build) | Implementation (IS the code done?) |
-| **Output** | SN, SYS-REQ, SUB-REQ, COMP-REQ, Architecture | Code, Tests, Reviews |
+| **Output** | SN, REQ-L{n}, ARCH-L{n} | Code, Tests, Reviews |
 | **Quality Gates** | `se-critic` (own critic loops) | `code-reviewer`, `tester`, `validator` |
-| **Traceability** | Own Zig-Zag matrix (SN→SYS→ARCH→SUB→COMP) | REQ-Traceability via commit messages |
+| **Traceability** | Own Zig-Zag matrix (SN→REQ-L1→ARCH-L1→REQ-L2→ARCH-L2→...→leaf) | REQ-Traceability via commit messages |
 
-**The handover point:** When the cascade finishes, it hands `COMP-REQ` leaf nodes to `developer`. From that point on, the DoD preset applies.
+**The handover point:** When the cascade finishes, it hands leaf system requirements to `developer`. From that point on, the DoD preset applies.
 
 **SE-Required modes** (configured via `se-required` in the DoD preset):
 
 {{#if DOD_SE_OPTIONAL}}
-| SE mode: **spec-optional** — SE cascade is available but not mandatory. COMP-REQs are informative. Developer can start without SE output.
+| SE mode: **spec-optional** — SE cascade is available but not mandatory. Leaf system requirements are informative. Developer can start without SE output.
 {{/if}}
 {{#if DOD_SE_RECOMMENDED}}
-| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, COMP-REQs become acceptance criteria with REQ-Traceability in commits.
+| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, leaf system requirements become acceptance criteria with REQ-Traceability in commits.
 {{/if}}
 {{#if DOD_SE_STRICT}}
-| SE mode: **spec-certified** — SE cascade MANDATORY before any code. Full traceability SN→COMP→Code→Tests required. Approval gates active. For regulated environments.
+| SE mode: **spec-certified** — SE cascade MANDATORY before any code. Full traceability SN→REQ-L1→ARCH-L1→...→leaf→Code→Tests required. Approval gates active. For regulated environments.
 {{/if}}
 
 **SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
+
+### Output Directory Structure
+
+Configurable via `.meta-config/project.yaml` → `se_output`:
+
+```yaml
+se_output:
+  base_dir: "SE"              # Hauptordner
+  per_level_dirs: true        # L0/, L1/, L2/, ...
+  per_system_dirs: true       # L2/AuthService/, L3/TokenValidator/, ...
+```
+
+Generated structure (example with SE_MAX_DEPTH=4):
+```
+SE/
+├── STRATEGY.md                    # System-Ziel, Constraints
+├── traceability-matrix.md         # REQ-L1-001 → ARCH-L1-001 → REQ-L2-001 → ...
+├── interface-registry.md          # Zentrale Interface-Tabelle
+│
+├── L0/
+│   └── SN_Stakeholder_Needs.md
+│
+├── L1/
+│   └── Gesamtsystem/
+│       ├── L1_Gesamtsystem_Requirements.md
+│       └── L1_Gesamtsystem_Architecture.md
+│
+├── L2/
+│   ├── AuthService/
+│   │   ├── L2_AuthService_Requirements.md
+│   │   └── L2_AuthService_Architecture.md
+│   └── MCPServer/
+│       ├── L2_MCPServer_Requirements.md
+│       └── L2_MCPServer_Architecture.md
+│
+├── L3/
+│   ├── TokenValidator/
+│   │   ├── L3_TokenValidator_Requirements.md
+│   │   └── L3_TokenValidator_Architecture.md
+│   └── JWTHandler/
+│       ├── L3_JWTHandler_Requirements.md
+│       └── L3_JWTHandler_Architecture.md
+│
+└── L4/
+    └── CryptoEngine/
+        ├── L4_CryptoEngine_Requirements.md
+        └── L4_CryptoEngine_Architecture.md
+```
+
+**Rules:**
+- Jedes System hat genau eine Requirements- und eine Architecture-Datei
+- Cross-cutting Dokumente (STRATEGY, traceability-matrix, interface-registry) liegen direkt in SE/
+- L0 hat nur Stakeholder-Needs (keine Architektur)
+- Leaf-Systeme (termination=leaf) haben nur Requirements (keine weitere Architecture)
+- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an
 
 {{/if}}
 

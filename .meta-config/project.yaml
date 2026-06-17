@@ -196,10 +196,16 @@ variables:
   SE_MAX_CELLS: 20
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4
+  SE_BASE_DIR: "SE"
 
 se-export:
   type: markdown
   output_dir: docs/se
+
+se_output:
+  base_dir: "SE"
+  per_level_dirs: true
+  per_system_dirs: true
 
 # GitHub Issues variant (Phase 2) — uncomment and adjust to use:
 # se-export:

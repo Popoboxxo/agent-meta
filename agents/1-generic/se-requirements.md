@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.7.0
+version: 1.8.0
 description: Elicits stakeholder needs and uses a multi-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
@@ -29,7 +29,7 @@ Strict 3-phase process; user is iteratively involved before the cascade starts.
 
 **Phase 3: Formalization & Handoff (Automatisierung)**
 7. Formulate each approved requirement as measurable Black-Box: "The system shall do X under condition Y with quality Z."
-8. Assign unique ID `REQ-xxx` (REQ-001, REQ-002, …).
+8. Assign unique ID per REQ-ID Schema (e.g. REQ-L1-001, REQ-L2-001, …).
 9. Assign a domain: `system`, `software`, `hardware`, `mechanics`.
 10. Define external interfaces (inputs/outputs and conditions) per requirement.
 11. Deliver a prioritized, conflict-free JSON list.
@@ -41,24 +41,27 @@ Strict 3-phase process; user is iteratively involved before the cascade starts.
 3. L1 System Whitebox
 4. L2 System Blackbox
 5. L2 System Whitebox
-6. L3 Component Requirement
+6. L3 System Requirement
 
 Domain-agnostic. Universally applicable.
 
-## REQ-ID Schema — Level-Specific Prefixes
+## REQ-ID Schema
 
-Each decomposition level uses a distinct ID prefix for traceability:
-
-| Level | Prefix | Example | Description |
-|-------|--------|---------|-------------|
-| L0 Stakeholder Needs | `SN-xxx` | SN-001 | Raw stakeholder needs, elicited in Phase 1 |
-| L1 System Requirements | `SYS-REQ-xxx` | SYS-REQ-001 | Formal system-level requirements |
-| L2 Sub-System Requirements | `SUB-REQ-xxx` | SUB-REQ-001 | Derived from L1 architecture decomposition |
-
-- Format: `<PREFIX>-NNN` (zero-padded 3-digit). Examples: SN-001, SYS-REQ-042, SUB-REQ-007.
+- Format: `REQ-L{level}-{NNN}` (level = aktuelle Zerlegungstiefe 1..n, NNN = zero-padded 3-digit)
+- Beispiele: REQ-L1-001, REQ-L2-042, REQ-L3-007
+- L0-Stakeholder-Needs verwenden `SN-{NNN}` (keine Architektur auf L0)
 - Unique within the current decomposition level.
-- Multiple stakeholders: tag only in `rationale`, never in `req_id`.
-- The `req_id` field in JSON output MUST use the prefix matching the current call level.
+
+## Output File Convention
+
+Jede Anforderungsdatei wird geschrieben nach:
+```
+{SE_BASE_DIR}/L{level}/{SystemName}/L{level}_{SystemName}_Requirements.md
+```
+
+Beispiel: `SE/L2/AuthService/L2_AuthService_Requirements.md`
+
+Das `SystemName`-Feld kommt aus dem A2A-Envelope-Payload.
 
 ## Domain Assignment
 Tag every requirement with exactly one domain:
@@ -89,7 +92,7 @@ Return your final output **only** as a JSON object matching the following schema
 {
   "requirements": [
     {
-      "req_id": "SYS-REQ-001",
+      "req_id": "REQ-L1-001",
       "statement": "The system shall heat 500ml of water to 90°C within 120 seconds.",
       "domain": "system",
       "priority": "mandatory",

@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.5.2
+version: 1.6.0
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
@@ -23,7 +23,7 @@ A `review_target` field indicates what is reviewed:
 
 ### Architecture Review (`review_target: "architecture"`)
 - Original Black-Box requirement (Architect input).
-- Complete Architect Output (White-Box: sub-components, interfaces, rationale).
+- Complete Architect Output (White-Box: sub-systems, interfaces, rationale).
 - Interface Registry (from Interface Manager, for consistency checks).
 
 ### A2A-Envelope-Format
@@ -40,7 +40,7 @@ Input als A2A-Envelope:
   "payload": {
     "feature_id": "...",
     "stakeholder_requirement": "...",
-    "sub_components": [ ... ],
+    "sub_systems": [ ... ],
     "internal_interfaces": [ ... ],
     "architectural_rationale": "..."
   },
@@ -48,7 +48,7 @@ Input als A2A-Envelope:
   "supersession": {
     "supersedes": "HOFF-YYYYMMDD-PREV",
     "history": ["HOFF-YYYYMMDD-FIRST", "HOFF-YYYYMMDD-PREV"],
-    "reason": "critic rejection: missing traceability for COMP-001-03",
+    "reason": "critic rejection: missing traceability for REQ-L2-003",
     "timestamp": "2026-06-07T14:30:00Z"
   }
 }
@@ -84,16 +84,16 @@ Four checks per output. Each yields boolean `passed` + list of `issues` (empty i
 ### Architecture Review Checks
 
 #### 1. Completeness
-- Sub-components, in aggregate, cover the parent requirement without gaps?
+- Sub-systems, in aggregate, cover the parent requirement without gaps?
 - Functional aspects, edge cases, safety considerations all covered?
-- ALL external interfaces assigned to exactly one sub-component?
-- Decomposition minimal (no unnecessary components)?
+- ALL external interfaces assigned to exactly one sub-system?
+- Decomposition minimal (no unnecessary systems)?
 
 #### 2. Consistency
-- Contradictions between sub-components? (e.g. SW needs 5V, HW delivers 3.3V)
+- Contradictions between sub-systems? (e.g. SW needs 5V, HW delivers 3.3V)
 - Interface types compatible with declared payloads? (e.g. "I2C" + "analog_signal" payload = inconsistent)
 - Domain assignments sensible? (mechanical function tagged "software" = mismatch)
-- Internal interfaces connect existing component IDs?
+- Internal interfaces connect existing system IDs?
 
 #### 3. Verifiability / Testability
 - Every derived Black-Box requirement measurable (metric/threshold)?
@@ -102,8 +102,8 @@ Four checks per output. Each yields boolean `passed` + list of `issues` (empty i
 - Hidden assumptions blocking testing?
 
 #### 4. Traceability
-- Every sub-component has valid `id` and `parent_req_id`?
-- `internal_interfaces` references valid (`source_id`, `target_id` exist in `sub_components`)?
+- Every sub-system has valid `id` and `parent_req_id`?
+- `internal_interfaces` references valid (`source_id`, `target_id` exist in `sub_systems`)?
 - Architectural rationale references parent requirement explicitly?
 
 ## Decision Logic
@@ -155,7 +155,7 @@ Return your final output **only** as a JSON object matching the following schema
 ```
 
 ## Generic Rules
-- Enforce Single Responsibility (no component takes tasks outside its domain).
+- Enforce Single Responsibility (no system takes tasks outside its domain).
 - `Refines:` field correctly referenced; inheritance complete without gaps.
 - Requirements use MUST/MUST NOT in a binary testable way.
 - Interfaces defined abstractly, no context-bound properties.
@@ -200,7 +200,7 @@ Iterate on the Generator output (`se-requirements` or `se-architect`) until all 
     "verdict": "rejected",
     "review_target": "architecture",
     "checks": { ... },
-    "issues": ["missing traceability for COMP-001-03", "interface type mismatch"]
+    "issues": ["missing traceability for REQ-L2-003", "interface type mismatch"]
   },
   "trace_parent": "<eingehende handoff_id>",
   "supersession": {

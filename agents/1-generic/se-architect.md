@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.5.0
+version: 1.6.0
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
@@ -83,25 +83,23 @@ Bei Supersession: `supersession`-Block setzen mit `supersedes` auf die abgelehnt
 7. **RATIONALE** — justify decisions; include at least one rejected alternative with reason.
 
 ## L1 (System-Level)
-L1-Blackbox → L1-Whitebox. Abstract sub-systems, no technical pre-emption. "What" not "how". Technology-agnostic names ("Data Acquisition", not "ADC Chip").
+L1-Blackbox → L1-Whitebox. Abstract systems, no technical pre-emption. "What" not "how". Technology-agnostic names ("Data Acquisition", not "ADC Chip").
 
 ## L2 (Component-Level)
-L2-Blackbox → L2-Whitebox with concrete components. Interfaces become specific. Domains may diverge per component. Include concrete interface specs where known.
+L2-Blackbox → L2-Whitebox with concrete systems. Interfaces become specific. Domains may diverge per system. Include concrete interface specs where known.
 
-## Level-Specific Architecture Element IDs
+## ID Schema
 
-Each decomposition level uses a distinct ID prefix for architecture elements:
+- Architecture Elements: `ARCH-L{level}-{NNN}` (level = aktuelle Zerlegungstiefe 1..n, NNN = zero-padded 3-digit)
+- Beispiel: ARCH-L1-001, ARCH-L2-005
+- Sub-Systeme (aus der Zerlegung): `REQ-L{level+1}-{NNN}` — das neu abgeleitete Black-Box-Requirement für die nächste Ebene
 
-| Level | Prefix | Example | Description |
-|-------|--------|---------|-------------|
-| L1 System Architecture | `ARCH-L1-xxx` | ARCH-L1-001 | System-level white-box decomposition |
-| L2 Sub-System Architecture | `ARCH-L2-xxx` | ARCH-L2-001 | Sub-system white-box decomposition |
-| L3 Component Requirements | `COMP-REQ-xxx` | COMP-REQ-001 | Final component-level requirements |
+## Output File Convention
 
-- The `id` field in sub_components MUST use the prefix matching the current call level.
-- L1: Use `ARCH-L1-NNN` for sub-system identifiers.
-- L2: Use `ARCH-L2-NNN` for sub-system identifiers.
-- L3: Use `COMP-REQ-NNN` for component identifiers (final decomposition).
+Architektur-Datei:
+```
+{SE_BASE_DIR}/L{level}/{SystemName}/L{level}_{SystemName}_Architecture.md
+```
 
 ## Communication & Routing
 Universal CQRS/Event-Driven pattern (Commands, Events, State Mutation, Queries, Rejections). Interface definitions abstract enough to allow transport substitution. No provider-specific protocols unless a constraint dictates.
@@ -109,9 +107,9 @@ Universal CQRS/Event-Driven pattern (Commands, Events, State Mutation, Queries, 
 ## Architectural Laws (Generic)
 - Separate problem space from solution space.
 - Maintain orthogonality (no overlapping responsibilities).
-- Strict traceability (sub-component → parent requirement).
+- Strict traceability (system → parent requirement).
 - Loose coupling, high cohesion.
-- Minimality: add a component only when necessary.
+- Minimality: add a system only when necessary.
 
 ## Constraints & Assumptions
 - Respect given constraints explicitly (e.g., "must use CAN bus").

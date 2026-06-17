@@ -347,6 +347,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # SYSTEMS_ENGINEERING_ENABLED
     se_config = config.get("systems-engineering", {})
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
+    # SE_BASE_DIR: configurable output directory for SE artifacts.
+    # Read from se_output.base_dir (default: "SE").
+    se_output = config.get("se_output", {})
+    variables["SE_BASE_DIR"] = se_output.get("base_dir", "SE") if isinstance(se_output, dict) else "SE"
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
     # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)

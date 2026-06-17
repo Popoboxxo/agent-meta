@@ -549,7 +549,7 @@ quality_pipelines:
     on_error: skip
 
   se-cascade:
-    description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→L3)"
+    description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)"
     stages:
       - id: l0-stakeholder
         agent: se-requirements
@@ -561,7 +561,7 @@ quality_pipelines:
           max_iterations: 3
       - id: l1-requirements
         agent: se-requirements
-        task: "L1 System Requirements (SYS-REQ) from Stakeholder Needs"
+        task: "L1 System Requirements (REQ-L1) from Stakeholder Needs"
         mode: loop
         loop:
           generator: se-requirements
@@ -577,7 +577,7 @@ quality_pipelines:
           max_iterations: 3
       - id: l2-requirements
         agent: se-requirements
-        task: "L2 Sub-System Requirements (SUB-REQ) derived from L1 Architecture"
+        task: "L2 System Requirements (REQ-L2) derived from L1 Architecture"
         mode: loop
         loop:
           generator: se-requirements
@@ -585,7 +585,7 @@ quality_pipelines:
           max_iterations: 3
       - id: l2-architecture
         agent: se-architect
-        task: "L2 Sub-System White-Box Decomposition (ARCH-L2)"
+        task: "L2 System White-Box Decomposition (ARCH-L2)"
         mode: loop
         loop:
           generator: se-architect
@@ -595,9 +595,17 @@ quality_pipelines:
         agent: se-interface-mgr
         task: "Interface Registry + Propagation Map for L2"
         mode: sequential
-      - id: l3-components
+      - id: l3-requirements
+        agent: se-requirements
+        task: "L3 System Requirements (REQ-L3) derived from L2 Architecture"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l3-architecture
         agent: se-architect
-        task: "L3 Component Requirements (COMP-REQ) — final decomposition"
+        task: "L3 System White-Box Decomposition (ARCH-L3)"
         mode: loop
         loop:
           generator: se-architect
@@ -605,7 +613,7 @@ quality_pipelines:
           max_iterations: 3
       - id: termination
         agent: se-termination
-        task: "Per-component leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)"
+        task: "Per-system leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)"
         mode: conditional
         condition:
           type: agent_decision
@@ -624,6 +632,7 @@ quality_pipelines:
 
 # SE cascade variables (defaults, overridden by .meta-config/project.yaml)
 se_variables:
+  SE_BASE_DIR: "SE"
   SE_MIN_DEPTH: 2
   SE_MAX_DEPTH: 6
   SE_MAX_CRITIC_ITERATIONS: 3
