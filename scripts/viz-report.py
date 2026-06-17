@@ -664,13 +664,33 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
     shutdown_event = threading.Event()
     last_request_time = [time.time()]  # updated on every HTTP request
 
+    def _resolve_docs_asset(rel_path: str) -> Path:
+        """Resolve a docs asset path with fallback to the submodule layout.
+
+        Mirrors the resolution order used by SyncExecutor / VizManager:
+          1. ``<project_root>/docs/<rel_path>``              -- top-level checkout
+          2. ``<project_root>/.agent-meta/docs/<rel_path>``  -- submodule layout
+
+        Returns the primary path even when neither file exists, so callers can
+        log the expected location in their 404 responses.
+        """
+        rel_clean = rel_path.lstrip("/")
+        primary  = docs_dir / rel_clean
+        fallback = project_root / ".agent-meta" / "docs" / rel_clean
+        if primary.exists():
+            return primary
+        if fallback.exists():
+            return fallback
+        return primary
+
     # ── Startup info ────────────────────────────────────────────────────────
     log.info(f"=== viz-server start ===  port={port}  debug={debug}")
     log.info(f"project_root : {project_root}")
     log.info(f"event_log    : {event_log}  exists={event_log.exists()}")
     log.info(f"docs_dir     : {docs_dir}  exists={docs_dir.exists()}")
-    log.info(f"dashboard    : {docs_dir / 'live-dashboard.html'}  "
-             f"exists={(docs_dir / 'live-dashboard.html').exists()}")
+    _dashboard_path = _resolve_docs_asset("live-dashboard.html")
+    log.info(f"dashboard    : {_dashboard_path}  "
+             f"exists={_dashboard_path.exists()}")
     if event_log.exists():
         try:
             n = sum(1 for ln in event_log.read_text(encoding="utf-8-sig").splitlines() if ln.strip())
@@ -700,10 +720,10 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
         try:
             # ── Static HTML files ──────────────────────────────────────────
             if path in ("/", "/live-dashboard.html"):
-                html_path = docs_dir / "live-dashboard.html"
+                html_path = _resolve_docs_asset("live-dashboard.html")
                 if html_path.exists():
                     body = html_path.read_bytes()
-                    log.req(method, path, 200, extra=f"{len(body)//1024}KB")
+                    log.req(method, path, 200, extra=f"{len(body)//1024}KB  src={html_path}")
                     start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
                     return [body]
                 log.warn(f"live-dashboard.html not found at {html_path}")
@@ -711,11 +731,12 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                 return [b'{"error":"live-dashboard.html not found"}']
 
             if path == "/agent-graph.html":
-                html_path = docs_dir / "agent-graph.html"
+                html_path = _resolve_docs_asset("agent-graph.html")
                 if html_path.exists():
                     start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
-                    log.req(method, path, 200)
+                    log.req(method, path, 200, extra=f"src={html_path}")
                     return [html_path.read_bytes()]
+                log.warn(f"agent-graph.html not found at {html_path}")
                 start_response("404 Not Found", json_hdr)
                 return [b'{"error":"agent-graph.html not found"}']
 
@@ -823,11 +844,11 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                 return [body]
 
             # ── Static files from docs/ ────────────────────────────────────
-            static_path = docs_dir / path.lstrip("/")
+            static_path = _resolve_docs_asset(path)
             if static_path.exists() and static_path.is_file():
                 ctype, _ = mimetypes.guess_type(str(static_path))
                 start_response("200 OK", [("Content-Type", (ctype or "application/octet-stream") + "; charset=utf-8")])
-                log.req(method, path, 200)
+                log.req(method, path, 200, extra=f"src={static_path}")
                 return [static_path.read_bytes()]
 
             log.req(method, path, 404)
