@@ -351,6 +351,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # Read from se_output.base_dir (default: "SE").
     se_output = config.get("se_output", {})
     variables["SE_BASE_DIR"] = se_output.get("base_dir", "SE") if isinstance(se_output, dict) else "SE"
+    # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
+    t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
+    variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
+    variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
     # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)

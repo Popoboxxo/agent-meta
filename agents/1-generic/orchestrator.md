@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.4.0"
+version: "4.5.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -271,6 +271,9 @@ Pflicht: `TASK` + `EXPECTED_OUTPUT`. `TOOLS/SOURCES` optional, verhindert Tool-D
    - `refs`: Referenzen (optional)
 
    **Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep`. Reduziert Token-Overhead, vor allem bei FANOUT.
+
+   **T-Size-Gate:** `payload.t` max. **{{A2A_T_SIZE_LIMIT}} Zeichen** (~{{A2A_T_SIZE_LIMIT_TOKENS}} Tokens). Kein Context-Dump. Keine Aufzählungen. Kein Expected-Output. Nur die Essenz des Tasks — ein Satz. Wer mehr als einen Satz in `t` schreibt, hat den Task nicht verstanden.
+
 4. **Envelope:**
    ```json
    {
@@ -279,10 +282,12 @@ Pflicht: `TASK` + `EXPECTED_OUTPUT`. `TOOLS/SOURCES` optional, verhindert Tool-D
      "source_agent": "orchestrator",
      "target_agent": "<ziel>",
      "schema_ref": "<schema-uri>",
-     "payload": { "t": "...", "pri": "..." },
+     "payload": { "t": "<ein Satz>", "pri": "..." },
      "trace_parent": "<parent-HOFF>"
    }
    ```
+
+   Bei FANOUT: `payload` als Array mit `batch_task_id`, jedes `t` einzeln ≤{{A2A_T_SIZE_LIMIT}} Zeichen.
 
 ### FANOUT — Batch-Mode
 
@@ -342,8 +347,8 @@ Konfiguriert in `project.yaml` → `orchestrator.handoff.token-budget`. Bei `ena
 - **Budget:** `session_budget × max_overhead_pct%` (Default 200000 × 10% = 20000 Tokens für alle Envelopes zusammen).
 - **Pro-Handoff-Richtwert:** `Budget ÷ erwartete Handoff-Anzahl`. Bei ~20 Handoffs → ~1000 Tokens/Handoff (Envelope + Payload).
 - **Laufende Schätzung:** Summiere die geschätzte Envelope-Größe jeder Delegation (Felder + Payload).
-- **Bei Überschreitung** (`on_exceed`): `compact` → ab sofort Compact-Mode (kurze Feldnamen `t/ctx/con/pri/refs/dep`, Artifact-Pattern für verbose Payloads); `warn` → im Output vermerken, normal weiter.
-- Große Payloads niemals inline duplizieren → `schema_ref`/Artifact-Referenz statt Volltext.
+- **Bei Überschreitung** (`on_exceed`): `compact` → ab sofort Compact-Mode (kurze Feldnamen `t/ctx/con/pri/refs/dep`); `warn` → im Output vermerken, normal weiter.
+- **T-Size-Gate** (hart): `payload.t` > {{A2A_T_SIZE_LIMIT}} Zeichen → **kein Dispatch.** Kürzen. Ein Satz. Keine Aufzählung. Kein Expected-Output.
 
 ---
 {{/if}}

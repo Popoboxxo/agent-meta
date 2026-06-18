@@ -60,6 +60,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Feature flags (injected by build_variables)
     "SE_ENABLED", "SE_BASE_DIR", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
     "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
+    "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS",
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     # Paths
