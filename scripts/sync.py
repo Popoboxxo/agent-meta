@@ -57,6 +57,7 @@ from lib.config import (
     fill_defaults, read_version, read_git_version, substitute,
 )
 from lib.roles import build_role_map
+from lib.schema import update_roles_enum
 from lib.dod import resolve_dod
 from lib.providers import load_providers_config, resolve_providers, resolve_provider_options
 from lib.platform import load_platform_config
@@ -364,6 +365,11 @@ def main():
 
     if args.dry_run:
         print("DRY-RUN — no files will be written\n")
+
+    # Regenerate derived schema fields (roles enum) from role-defaults.yaml.
+    # Runs early so even short-circuit modes (--create-rule, --validate, …)
+    # pick up the latest enum. Honors --dry-run.
+    update_roles_enum(agent_meta_root, log, dry_run=args.dry_run)
 
     if args.add_skill:
         mode = "add-skill"

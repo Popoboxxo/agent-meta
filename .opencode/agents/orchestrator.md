@@ -461,6 +461,7 @@ Execution mode: loop
 
 3. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
+| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, leaf system requirements become acceptance criteria with REQ-Traceability in commits.
 
 **SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
 
@@ -559,6 +560,8 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
+   + Meta-Feedback im Hintergrund
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
