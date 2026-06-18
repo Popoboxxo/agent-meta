@@ -1051,11 +1051,15 @@ def sync_agents_for_provider(
         description = description.replace('{{PROJECT_NAME}}', project_name)
 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
+        from .delegation_syntax import DelegationSyntaxEngine
+        _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+        file_based = _ds_engine.has_file_based_agents(provider)
         provider_vars = {
             'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
             'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
             'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
             'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+            'FILE_BASED_AGENTS': 'true' if file_based else 'false',
         }
         merged_vars = {**variables, **provider_vars}
 

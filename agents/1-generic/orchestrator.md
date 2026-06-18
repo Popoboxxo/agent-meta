@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "4.3.1"
+version: "4.4.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -572,9 +572,11 @@ Configurable via `.meta-config/project.yaml` → `se_output`:
 ```yaml
 se_output:
   base_dir: "SE"              # Hauptordner
-  per_level_dirs: true        # L0/, L1/, L2/, ...
-  per_system_dirs: true       # L2/AuthService/, L3/TokenValidator/, ...
+  per_level_dirs: true        # L1/, L2/, L3/, ... (rekursiv geschachtelt)
+  per_system_dirs: true       # .../L1/Gesamtsystem/L2/AuthServiceSystem/, ...
 ```
+
+**Folder naming:** System folders get `System` postfix, Component folders get `Component` postfix.
 
 Generated structure (example with SE_MAX_DEPTH=4):
 ```
@@ -586,39 +588,35 @@ SE/
 ├── L0/
 │   └── SN_Stakeholder_Needs.md
 │
-├── L1/
-│   └── Gesamtsystem/
-│       ├── L1_Gesamtsystem_Requirements.md
-│       └── L1_Gesamtsystem_Architecture.md
-│
-├── L2/
-│   ├── AuthService/
-│   │   ├── L2_AuthService_Requirements.md
-│   │   └── L2_AuthService_Architecture.md
-│   └── MCPServer/
-│       ├── L2_MCPServer_Requirements.md
-│       └── L2_MCPServer_Architecture.md
-│
-├── L3/
-│   ├── TokenValidator/
-│   │   ├── L3_TokenValidator_Requirements.md
-│   │   └── L3_TokenValidator_Architecture.md
-│   └── JWTHandler/
-│       ├── L3_JWTHandler_Requirements.md
-│       └── L3_JWTHandler_Architecture.md
-│
-└── L4/
-    └── CryptoEngine/
-        ├── L4_CryptoEngine_Requirements.md
-        └── L4_CryptoEngine_Architecture.md
+└── L1/
+    └── Gesamtsystem/
+        ├── L1_Gesamtsystem_Requirements.md
+        ├── L1_Gesamtsystem_Architecture.md
+        └── L2/
+            ├── AuthServiceSystem/
+            │   ├── L2_AuthServiceSystem_Requirements.md
+            │   ├── L2_AuthServiceSystem_Architecture.md
+            │   └── L3/
+            │       ├── TokenValidatorComponent/
+            │       │   └── L3_TokenValidatorComponent_Requirements.md
+            │       └── JWTHandlerComponent/
+            │           └── L3_JWTHandlerComponent_Requirements.md
+            └── MCPServerSystem/
+                ├── L2_MCPServerSystem_Requirements.md
+                ├── L2_MCPServerSystem_Architecture.md
+                └── L3/
+                    └── CryptoEngineComponent/
+                        └── L3_CryptoEngineComponent_Requirements.md
 ```
 
 **Rules:**
 - Jedes System hat genau eine Requirements- und eine Architecture-Datei
+- L{level}-Ordner sind **rekursiv geschachtelt**: L2 liegt in `L1/{System}/`, L3 in `L1/{System}/L2/{System}/`, usw.
+- System-Ordner erhalten Postfix `System`, Component-Ordner Postfix `Component`
 - Cross-cutting Dokumente (STRATEGY, traceability-matrix, interface-registry) liegen direkt in SE/
 - L0 hat nur Stakeholder-Needs (keine Architektur)
-- Leaf-Systeme (termination=leaf) haben nur Requirements (keine weitere Architecture)
-- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an
+- Leaf-Systeme (termination=leaf, designation=Component) haben nur Requirements (keine weitere Architecture)
+- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an und setzt `output_parent_path` und `FolderName` im A2A-Envelope-Payload
 
 {{/if}}
 

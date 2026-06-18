@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.6.1
+version: 1.7.0
 description: Designs system architecture using generic laws, CQRS routing, and defines
   L1/L2 whiteboxes.
 hint: Use this agent to design L1 and L2 architectures from requirements.
@@ -105,10 +105,26 @@ L2-Blackbox → L2-Whitebox with concrete systems. Interfaces become specific. D
 
 ## Output File Convention
 
+Die SE-Ordnerstruktur ist **rekursiv-hierarchisch**: Jedes System liegt **innerhalb** seines Eltern-Systems, mit L{level}-Präfix auf jeder Ebene. Keine flache Peer-Struktur.
+
+**Ordner-Namenskonvention:** System-Ordner erhalten den Postfix `System`, Component-Ordner den Postfix `Component`.
+
 Architektur-Datei:
 ```
-{SE_BASE_DIR}/L{level}/{SystemName}/L{level}_{SystemName}_Architecture.md
+{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md
 ```
+
+| Platzhalter | Quelle | Beispiel |
+|-------------|--------|---------|
+| `{parent_path}` | A2A-Envelope-Payload: `output_parent_path` | `L1/Gesamtsystem` (für L2-Kinder) |
+| `{FolderName}` | `{SystemName}` + Designation-Postfix (`System`\|`Component`) | `AuthServiceSystem`, `TokenValidatorComponent` |
+
+**Ebenen-Beispiele:**
+- L1: `SE/L1/Gesamtsystem/L1_Gesamtsystem_Architecture.md`
+- L2 unter Gesamtsystem: `SE/L1/Gesamtsystem/L2/AuthServiceSystem/L2_AuthServiceSystem_Architecture.md`
+- L3 unter AuthServiceSystem: `SE/L1/Gesamtsystem/L2/AuthServiceSystem/L3/TokenValidatorComponent/L3_TokenValidatorComponent_Architecture.md`
+
+`{parent_path}` und `{FolderName}` werden vom se-orchestrator im A2A-Envelope-Payload bereitgestellt.
 
 ## Communication & Routing
 Universal CQRS/Event-Driven pattern (Commands, Events, State Mutation, Queries, Rejections). Interface definitions abstract enough to allow transport substitution. No provider-specific protocols unless a constraint dictates.

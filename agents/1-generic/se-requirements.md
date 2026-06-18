@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.8.1
+version: 1.9.0
 description: Elicits stakeholder needs and uses a multi-level template for requirements
   engineering.
 hint: Use this agent to clarify requirements and start the SE cascade.
@@ -54,14 +54,26 @@ Domain-agnostic. Universally applicable.
 
 ## Output File Convention
 
+Die SE-Ordnerstruktur ist **rekursiv-hierarchisch**: Jedes System liegt **innerhalb** seines Eltern-Systems, mit L{level}-Präfix auf jeder Ebene. Keine flache Peer-Struktur.
+
+**Ordner-Namenskonvention:** System-Ordner erhalten den Postfix `System`, Component-Ordner den Postfix `Component`.
+
 Jede Anforderungsdatei wird geschrieben nach:
 ```
-{SE_BASE_DIR}/L{level}/{SystemName}/L{level}_{SystemName}_Requirements.md
+{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md
 ```
 
-Beispiel: `SE/L2/AuthService/L2_AuthService_Requirements.md`
+| Platzhalter | Quelle | Beispiel |
+|-------------|--------|---------|
+| `{parent_path}` | A2A-Envelope-Payload: `output_parent_path` | `L1/Gesamtsystem` (für L2-Kinder) |
+| `{FolderName}` | `{SystemName}` + Designation-Postfix (`System`\|`Component`) | `AuthServiceSystem`, `TokenValidatorComponent` |
 
-Das `SystemName`-Feld kommt aus dem A2A-Envelope-Payload.
+**Ebenen-Beispiele:**
+- L1: `SE/L1/Gesamtsystem/L1_Gesamtsystem_Requirements.md`
+- L2 unter Gesamtsystem: `SE/L1/Gesamtsystem/L2/AuthServiceSystem/L2_AuthServiceSystem_Requirements.md`
+- L3 unter AuthServiceSystem: `SE/L1/Gesamtsystem/L2/AuthServiceSystem/L3/TokenValidatorComponent/L3_TokenValidatorComponent_Requirements.md`
+
+`{parent_path}` und `{FolderName}` werden vom se-orchestrator im A2A-Envelope-Payload bereitgestellt.
 
 ## Domain Assignment
 Tag every requirement with exactly one domain:
