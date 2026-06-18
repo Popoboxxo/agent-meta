@@ -47,6 +47,7 @@ Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/ak
 | `.claude/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
 | `.gemini/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
 | `.continue/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
+| `config/project-config.schema.json` (roles enum) | `config/role-defaults.yaml` | `properties.roles.items.enum` wird bei jedem sync.py-Lauf neu generiert |
 
 **Merksatz:** Nur `1-generic/<rolle>.md`, `config/role-defaults.yaml` und `howto/setup/instantiate-project.md` sind manuell zu pflegen. Alles andere → `sync.py` ausführen.
 
