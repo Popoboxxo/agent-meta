@@ -4,6 +4,15 @@
 
 ---
 
+## [0.62.1] — 2026-06-18
+
+### Fixed
+
+- **SE recursive folder structure**: SE file-based output now uses recursive folder nesting with System/Component designation postfix naming; SE output conventions updated in orchestrator, se-requirements, and se-architect agents.
+- **A2A payload.t size limit**: Hard 300-character limit on A2A `payload.t` field to prevent inline prose dumps in agent-to-agent handoff envelopes.
+
+---
+
 ## [0.62.0] — 2026-06-18
 
 ### Added
