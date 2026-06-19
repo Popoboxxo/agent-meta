@@ -1,21 +1,22 @@
 ---
 name: se-orchestrator
-version: 1.8.0
-description: "DEPRECATED — SE functionality is now handled directly by the orchestrator via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility only."
-hint: "DEPRECATED — Use orchestrator with SE-Mode instead"
+description: DEPRECATED — SE functionality is now handled directly by the orchestrator
+  via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility
+  only.
 deprecated: true
-deprecated_by: "orchestrator (SE-Mode via {{#if SE_ENABLED}})"
-tools:
-- Read
-- Write
-- Edit
-- Glob
-- Grep
+deprecated_by: orchestrator (SE-Mode via )
+mode: subagent
+model: opencode-go/qwen3.7-plus
+permission:
+  read: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  bash: deny
 ---
-
 # Orchestrator Agent (SE)
 
-> **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-se-orchestrator-ext.md` exists → read and apply it immediately.
+> **Extension:** If `.opencode/3-project/am-se-orchestrator-ext.md` exists → read and apply it immediately.
 
 ---
 
@@ -76,7 +77,7 @@ Independent same-level cells run in parallel. Respect `max_parallel_cells` (defa
 
 ### The 6-Stage Recursive Breakdown (Zig-Zag Traceability)
 
-{{PIPELINE_SE_CASCADE_BLOCK}}
+
 
 ### Zig-Zag Traceability Matrix
 

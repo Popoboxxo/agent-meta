@@ -1,21 +1,24 @@
 ---
 name: se-orchestrator
 version: 1.8.0
-description: "DEPRECATED — SE functionality is now handled directly by the orchestrator via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility only."
-hint: "DEPRECATED — Use orchestrator with SE-Mode instead"
+description: DEPRECATED — SE functionality is now handled directly by the orchestrator
+  via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility
+  only.
+hint: DEPRECATED — Use orchestrator with SE-Mode instead
 deprecated: true
-deprecated_by: "orchestrator (SE-Mode via {{#if SE_ENABLED}})"
+deprecated_by: orchestrator (SE-Mode via )
 tools:
 - Read
 - Write
 - Edit
 - Glob
 - Grep
+model: claude-sonnet-4-6
 ---
 
 # Orchestrator Agent (SE)
 
-> **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-se-orchestrator-ext.md` exists → read and apply it immediately.
+> **Extension:** If `.claude/3-project/am-se-orchestrator-ext.md` exists → read and apply it immediately.
 
 ---
 
@@ -76,7 +79,7 @@ Independent same-level cells run in parallel. Respect `max_parallel_cells` (defa
 
 ### The 6-Stage Recursive Breakdown (Zig-Zag Traceability)
 
-{{PIPELINE_SE_CASCADE_BLOCK}}
+
 
 ### Zig-Zag Traceability Matrix
 

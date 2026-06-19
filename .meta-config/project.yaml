@@ -54,6 +54,20 @@ roles:
   - opencode-expert
   - continue-expert
   - copilot-expert
+  - se-orchestrator
+  - se-requirements
+  - se-architect
+  - se-interface-mgr
+  - se-junior-developer
+  - se-developer
+  - se-senior-developer
+  - se-test-engineer
+  - se-integration-and-test-manager
+  - se-validator
+  - se-verifier
+  - se-critic
+  - se-testreviewer
+  - se-termination
 
 # Architektur-Policy: Generische Agenten muessen provider-agnostisch bleiben.
 # Siehe rules/1-generic/provider-agnostic.md — Provider-Namen, Tool-Syntax und

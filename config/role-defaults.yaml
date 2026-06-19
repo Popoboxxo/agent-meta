@@ -258,7 +258,43 @@ roles:
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "task-spec-v1"
-      target_roles: ["se-architect", "se-requirements"]
+      target_roles: ["se-architect", "se-requirements", "se-junior-developer", "se-developer", "se-senior-developer"]
+
+  se-junior-developer:
+    model: fast              # günstige Stufe — triviale SE-Leafs, 0-1 Interfaces
+    memory: ""
+    workflow_tier: optional
+    parallel: true
+    description: "Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 120
+
+  se-developer:
+    model: powerful          # Standard-SE-Leafs mit mehreren Interfaces
+    memory: ""
+    workflow_tier: optional
+    parallel: true
+    description: "Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 300
+
+  se-senior-developer:
+    model: max               # höchste Stufe — komplexe SE-Leafs, cross-cutting, boundary-level
+    memory: project          # Architektur-/Interface-Entscheidungen über Sessions hinweg erinnern
+    workflow_tier: optional
+    parallel: true
+    description: "Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 600
 
   se-test-engineer:
     model: balanced
@@ -424,6 +460,12 @@ reflection_pairs:
     generator: se-test-engineer
     critic: se-testreviewer
     max_iterations: 3
+
+  - id: se-dev-review-loop
+    generator: se-developer
+    critic: code-reviewer
+    max_iterations: 3
+    on_blocked: escalate_to_orchestrator
 
 quality_pipelines:
   standard-feature:
@@ -618,6 +660,21 @@ quality_pipelines:
         condition:
           type: agent_decision
           agent: se-termination
+      - id: implementation
+        agent: se-orchestrator
+        task: |
+          For each leaf node with domain: software from the termination phase:
+          - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
+          - Route to se-developer for standard leafs (2-4 interfaces)
+          - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting, boundary-level, security/performance-critical)
+          Implement each leaf against its Black-Box specification and interface contracts from the interface-registry.
+          Each implementation must reference its req_id and leaf_id in code artifacts.
+          hardware/mechanics leafs → document as COTS/spec (not implemented).
+        mode: loop
+        loop:
+          generator: se-developer
+          critic: code-reviewer
+          max_iterations: 2
       - id: validation
         agent: se-validator
         task: "L1 System Validation + Multi-Level Verification"

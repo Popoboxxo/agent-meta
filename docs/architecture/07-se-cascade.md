@@ -10,7 +10,7 @@ Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System 
 
 ---
 
-## Gesamtsystem-Diagramm
+## Gesamtsystem-Diagramm — V-Modell mit Implementation-Boden
 
 ```mermaid
 graph TD
@@ -27,11 +27,18 @@ graph TD
         IFM -->|Propagation Map| TERM["se-termination"]
     end
 
-    TERM -->|leaf| LEAF["Leaf Node<br/>implementierbarer Auftrag"]
+    TERM -->|leaf| IMP["Implementation Floor"]
     TERM -->|continue| SPAWN["Cell Spawn (n+1)<br/>sanitized context"]
     SPAWN --> ORCH
 
-    LEAF --> EXPORT["Export-Adapter<br/>Markdown / GitHub / Jira"]
+    IMP -->|junior leaf| JUNIOR["se-junior-developer<br/>0-1 interfaces"]
+    IMP -->|standard leaf| DEV["se-developer<br/>2-4 interfaces"]
+    IMP -->|complex leaf| SENIOR["se-senior-developer<br/>5+ interfaces"]
+
+    JUNIOR --> VALIDATE["Validation & Test"]
+    DEV --> VALIDATE
+    SENIOR --> VALIDATE
+    VALIDATE --> EXPORT["Export-Adapter<br/>Markdown / GitHub / Jira"]
 
     style USER fill:#e1f5e1
     style ORCH fill:#f0e1ff
@@ -39,9 +46,97 @@ graph TD
     style CRIT fill:#ffe1e1
     style IFM fill:#e1eaff
     style TERM fill:#f0e1ff
-    style LEAF fill:#e1f5e1
+    style IMP fill:#ffe6cc
+    style JUNIOR fill:#c8e6c9
+    style DEV fill:#81c784
+    style SENIOR fill:#388e3c
+    style VALIDATE fill:#b3e5fc
     style EXPORT fill:#e1f5e1
 ```
+
+Das V-Modell zeigt den **horizontalen Übergang** bei Termination: Während die Decomposition (links) und Validation (rechts) abstrahieren, implementieren die 3 Developers am Boden konkrete Leaf Nodes. Sie bilden zusammen die **Implementation Floor** des V.
+
+---
+
+## Implementation-Phase — Die 3 Developer-Tiers
+
+Nach Termination (`decision: leaf`) wird die Komponente an einen der **3 SE-Developer-Agenten** delegiert:
+
+| Tier | Agent | Scope | Beispiele |
+|------|-------|-------|----------|
+| **Junior** | `se-junior-developer` | 0–1 Interfaces, atomare Einheiten | COTS-Wrapper, single-Interface-Validator, triviale Data-Converter |
+| **Standard** | `se-developer` | 2–4 Interfaces, contained | Multi-Interface Services, Adapter (2–3 Protokolle), komplette Single-Module-Requirements |
+| **Senior** | `se-senior-developer` | 5+ Interfaces, cross-cutting | Security-critical, Performance-bound, Boundary-Level, Pre-Analysis erforderlich |
+
+**Dispatch-Regel (vom Termination-Agent):**
+Basierend auf `interface_count` in `propagation_map`:
+- `count == 0–1` → `se-junior-developer`
+- `count == 2–4` → `se-developer`
+- `count >= 5` → `se-senior-developer`
+
+**Input pro Developer:** `task-spec-v1` mit SE Leaf-Node-Daten:
+- `leaf_id`, `req_id`, `domain`, `description`, `acceptance_criteria`
+- `interface_specs`: Vollständiger Interface-Katalog (vom `se-interface-mgr`)
+- `propagation_map`: Welche Interfaces diese Komponente erbt/erstellt
+- `context_boundary`: Modul-/Directory-Scope der Implementierung
+
+**Output pro Developer:** `dev-result-v1` mit:
+- `status`: `done | partial | escalate`
+- `artifacts`: Implementierte Dateien
+- `interfaces_implemented`: Welche Interfaces erfolgreich implementiert
+- `test_coverage`: Test-Referenzen
+
+---
+
+## Interface-Kommunikationsregel (Orthogonalität)
+
+Dies ist die **kritischste Regel** beim Übergang von Architektur zu Implementation. Sie verhindert direktes Chaos zwischen Komponenten auf der gleichen Ebene:
+
+### Regel: Same-Level-Isolation
+
+- **Elemente auf der GLEICHEN Decomposition-Ebene kommunizieren NICHT direkt miteinander.**
+- **Alle Kommunikation läuft ÜBER das nächst höhere Element (Parent), das den Interface-Vertrag mediiert.**
+
+### Beispiel (Ebene 2)
+
+```
+Ebene 1:
+  Parent REQ-001 (Wassererhitzungssystem)
+    → zerlegt in Ebene 2:
+
+Ebene 2 (GLEICHE EBENE, dürfen NICHT direkt kommunizieren):
+  - COMP-001-01: Heizelement-Steuerung (Hardware)
+  - COMP-001-02: Temperatur-Regelungsalgorithmus (Software)
+  - COMP-001-03: Wasserbehälter (Mechanik)
+
+VERBOTEN: COMP-001-01 ruft direkt COMP-001-02 auf
+ERLAUBT:  COMP-001-02 (SW) → interface IF-001-01 → COMP-001-01 (HW)
+          (Interface wurde vom Parent / Interface Manager genehmigt)
+```
+
+### Implementierungs-Konsequenzen für Developer
+
+Wenn ein `se-developer` eine Komponente implementiert:
+
+1. **Lese nur deine `propagation_map`-Zeile:**
+   ```json
+   "COMP-001-02": {
+     "inherited_external": [],
+     "new_internal_incoming": [],
+     "new_internal_outgoing": ["IF-001-01"]
+   }
+   ```
+
+2. **Implementiere NUR die Interfaces in deiner Zeile:**
+   - `inherited_external` → Pass through / implement inbound
+   - `new_internal_outgoing` → Expose as code interface
+
+3. **NICHT implementieren:**
+   - Interfaces anderer Komponenten (auch wenn "logisch" wäre)
+   - Direkte Calls zu Nachbar-Komponenten ohne registrierten Interface
+   - Unregistrierte Interface-Änderungen
+
+4. **Bei Bedarf anders:** Escalate zu `se-interface-mgr` / `se-architect`, kein Maverick-Change.
 
 ---
 
@@ -58,6 +153,10 @@ graph TD
 | `se-critic` → `se-orchestrator` | blocked | Eskalation mit Fehlerbeschreibung |
 | `se-critic` → `se-interface-mgr` | approved | White-Box JSON + Interface Registry |
 | `se-interface-mgr` → `se-termination` | Validiert | White-Box + Propagation Map |
+| `se-termination` → `se-junior-developer` | decision: leaf (0–1 IF) | Leaf-Node + interface_specs + propagation_map |
+| `se-termination` → `se-developer` | decision: leaf (2–4 IF) | Leaf-Node + interface_specs + propagation_map |
+| `se-termination` → `se-senior-developer` | decision: leaf (5+ IF) | Leaf-Node + interface_specs + propagation_map |
+| `se-junior/developer/senior-dev` → `se-interface-mgr` | Escalation | Interface change required / ambiguity |
 | `se-termination` → `se-orchestrator` | Alle Entscheidungen | termination_decisions[] + summary |
 | `se-orchestrator` → neue Zelle (n+1) | decision: continue | BB-REQ + Propagation-Map-Zeile (sanitized) |
 
@@ -260,14 +359,17 @@ variables:
 
 ### `config/role-defaults.yaml` (SE-Rollen)
 
-| Rolle | Model | Memory | Tier |
-|-------|-------|--------|------|
-| `se-requirements` | balanced | project | optional |
-| `se-architect` | powerful | project | optional |
-| `se-critic` | powerful | — | optional |
-| `se-interface-mgr` | balanced | project | optional |
-| `se-termination` | fast | — | optional |
-| `se-orchestrator` | balanced | — | optional |
+| Rolle | Model | Memory | Tier | Scope |
+|-------|-------|--------|------|-------|
+| `se-requirements` | balanced | project | optional | Elicitation |
+| `se-architect` | powerful | project | optional | Decomposition |
+| `se-critic` | powerful | — | optional | Quality Gate |
+| `se-interface-mgr` | balanced | project | optional | Registry |
+| `se-termination` | fast | — | optional | Leaf Decision |
+| `se-junior-developer` | balanced | — | optional | 0–1 Interface Leaf |
+| `se-developer` | balanced | project | optional | 2–4 Interface Leaf |
+| `se-senior-developer` | powerful | project | optional | 5+ Interface Leaf |
+| `se-orchestrator` | balanced | — | optional | Workflow Coordinator |
 
 ---
 
