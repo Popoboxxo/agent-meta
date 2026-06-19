@@ -215,6 +215,9 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
+| `.claude/agents/se-junior-developer.md` | `1-generic/se-junior-developer.md` |
+| `.claude/agents/se-developer.md` | `1-generic/se-developer.md` |
+| `.claude/agents/se-senior-developer.md` | `1-generic/se-senior-developer.md` |
 | `.claude/agents/bug-feature-analyzer.md` | `1-generic/bug-feature-analyzer.md` |
 | `.claude/agents/explorer.md` | `1-generic/explorer.md` |
 
@@ -421,6 +424,9 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/se-interface-mgr.md` vorhanden
 - [ ] `.claude/agents/se-termination.md` vorhanden
 - [ ] `.claude/agents/se-orchestrator.md` vorhanden
+- [ ] `.claude/agents/se-junior-developer.md` vorhanden
+- [ ] `.claude/agents/se-developer.md` vorhanden
+- [ ] `.claude/agents/se-senior-developer.md` vorhanden
 - [ ] `.claude/commands/analyze-logs.md` vorhanden (nach Sync)
 - [ ] `.claude/commands/feedback.md` vorhanden (nach Sync)
 - [ ] Bei `"Gemini"` in `ai-providers`: `.gemini/GEMINI.md` vorhanden, `.gemini/agents/` befüllt

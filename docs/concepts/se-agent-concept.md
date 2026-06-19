@@ -5,12 +5,19 @@
 
 ---
 
-## Implementierungsstatus (verifiziert 2026-06-14)
+## Implementierungsstatus (verifiziert 2026-06-20)
 
 **Umgesetzt:**
-- 11 SE-Agenten-Templates (`agents/1-generic/se-*.md`), in `config/role-defaults.yaml` registriert
+- 14 SE-Agenten-Templates (`agents/1-generic/se-*.md`), in `config/role-defaults.yaml` registriert
+  - Decomposition (Requirem., Architect, Critic, Interface-Mgr, Termination, Orchestrator): 6 Agenten
+  - **Implementation Floor (neu, 2026-06-20):** 3 SE-Developer-Tiers (Junior, Standard, Senior)
 - Schemas (`se-decomposition`, `se-orchestrator`), Templates (`SE-STRATEGY`, `SE-FEATURE`), Howtos
 - **SE-Export-Adapter** (`scripts/lib/se_export/`): Markdown (Default) + GitHub-Issues (`gh`-CLI), Factory + CLI `scripts/se-export.py`, Tests `tests/test_se_export.py` (L4 erledigt)
+
+**Implementierungs-Phasen:**
+- **Phase 1 (MVP):** Decomposition + Implementation-Floor komplett. Manuelle Rekursion über Orchestrator.
+- **Phase 2 (Automatisierung):** Auto-Rekursion, Parallele Zellen, Schema-Cache.
+- **Phase 3 (MCP):** Jira-/Linear-/ReqIF-Adapter, Cost-Limits.
 
 **Offen / bewusste Abweichung:**
 - Auto-Rekursion: kein Self-Spawn durch Termination-Agent — Rekursion läuft über den `orchestrator` (Anti-Recursion-Guard). Design-Entscheidung, kein Bug.
@@ -30,41 +37,59 @@ Dieses Konzept beschreibt einen **Systems-Engineering-Modus** für agent-meta: e
 
 ---
 
-## Das Grundprinzip: Die Rekursive System-Zelle
+## Das Grundprinzip: Die Rekursive System-Zelle mit V-Modell-Architektur
 
-Anstatt zu versuchen, alles auf einmal zu lösen, durchläuft jede Ebene — egal wie tief — exakt denselben systematischen Ablauf:
+Anstatt zu versuchen, alles auf einmal zu lösen, folgt das System einem **V-Modell**:
+- **Linke Seite des V:** Decomposition (Architekt, Critic, Interface Manager) — abstrahiert von unten nach oben
+- **Boden des V:** **Implementation Floor** (3 SE-Developer-Tiers) — konkrete Arbeit an Leaf Nodes
+- **Rechte Seite des V:** Validation (zukünftig) — Verifikation nach oben
+
+Jede Ebene — egal wie tief — durchläuft exakt denselben Ablauf:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     SYSTEM-ZELLE (EBENE n)                      │
-│                                                                 │
-│  Input (Black-Box)                                              │
-│  "Das System muss X leisten"                                    │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────────┐    ┌──────────────┐    ┌───────────────────┐  │
-│  │  ARCHITECT   │───▶│   CRITIC     │───▶│ INTERFACE MANAGER │  │
-│  │  Synthese    │    │  Quality Gate│    │  Verträge sichern │  │
-│  └──────────────┘    └──────────────┘    └───────────────────┘  │
-│       │                                         │               │
-│       └──────────────┬──────────────────────────┘               │
-│                      ▼                                          │
-│  Output (White-Box)                                             │
-│  Sub-Komponenten + Interface Contracts                          │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────────────┐                                           │
-│  │   TERMINATOR     │  Pro Sub-Komponente:                      │
-│  │   Abbruch-       │  Leaf Node? → Fertig                      │
-│  │   Entscheidung   │  Sonst → Neue Zelle auf n+1               │
-│  └──────────────────┘                                           │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        SYSTEM-ZELLE (EBENE n)                            │
+│                                                                          │
+│  Input (Black-Box)                                                      │
+│  "Das System muss X leisten"                                            │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌───────────────────┐        │
+│  │  ARCHITECT   │───▶│   CRITIC     │───▶│ INTERFACE MANAGER │        │
+│  │  Synthese    │    │  Quality Gate│    │  Verträge sichern │        │
+│  └──────────────┘    └──────────────┘    └───────────────────┘        │
+│       │                                         │                       │
+│       └──────────────┬──────────────────────────┘                       │
+│                      ▼                                                  │
+│  Output (White-Box)                                                     │
+│  Sub-Komponenten + Interface Contracts                                  │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌────────────────────────────────────────────────────────────┐        │
+│  │              TERMINATION FLOOR                              │        │
+│  │  Pro Sub-Komponente:                                        │        │
+│  │  - Leaf Node? → dispatch zur IMPLEMENTATION FLOOR          │        │
+│  │  - Continue? → Neue Zelle auf n+1 (Rekursion)             │        │
+│  └────────────────────────────────────────────────────────────┘        │
+│       │                                      │                         │
+│       │ (leaf)                               │ (continue)              │
+│       ▼                                      ▼                         │
+│  ╔═════════════════════════════════╗   Spawn n+1                       │
+│  ║   IMPLEMENTATION FLOOR (BODEN)  ║                                   │
+│  ║  se-junior-developer (0–1 IF)   ║                                   │
+│  ║  se-developer (2–4 IF)          ║                                   │
+│  ║  se-senior-developer (5+ IF)    ║                                   │
+│  ╚═════════════════════════════════╝                                   │
+│       │                                                                 │
+│       ▼                                                                 │
+│  Validation + Test Coverage                                             │
+└──────────────────────────────────────────────────────────────────────────┘
 
 Übergang n→n+1: White-Box-Elemente der Ebene n werden zu
 Black-Box-Anforderungen der Ebene n+1.
 ```
 
-**Der fraktale Charakter:** Die Zelle auf Ebene n+1 arbeitet identisch — sie empfängt eine Black-Box, synthetisiert Architektur, lässt kritisieren, sichert Interfaces und entscheidet über Terminierung. Kein Unterschied zu Ebene n — nur die Granularität ändert sich.
+**Der fraktale Charakter:** Die Zelle auf Ebene n+1 arbeitet identisch — sie empfängt eine Black-Box, synthetisiert Architektur, lässt kritisieren, sichert Interfaces und entscheidet über Terminierung oder Implementation. Kein Unterschied zu Ebene n — nur die Granularität ändert sich.
 
 ---
 
@@ -419,6 +444,47 @@ ZUSÄTZLICHE SCHUTZREGELN:
 
 ---
 
+### 6. Die 3 SE-Developer-Tiers (`se-junior-developer`, `se-developer`, `se-senior-developer`)
+
+**Zuständigkeit:** Implementation der Leaf Nodes am Boden des V-Modells. Diese Agenten bilden das konkrete Gegenstück zum Architect — während der Architect abstrahiert, implementieren sie die abstrakten Entscheidungen als Code.
+
+**Dispatch-Logik (vom Termination-Agent):**
+Nach der Entscheidung `decision: leaf` wird jede Komponente basierend auf ihrer Interface-Komplexität (aus `propagation_map`) an einen der 3 Tiers delegiert:
+
+| Tier | Trigger | Scope | Characteristika |
+|------|---------|-------|---|
+| **Junior** | `interface_count == 0–1` | Trivial leaf nodes | COTS-Wrapper, single-Interface-Validator, data converter. Kein architecturales Urteil erforderlich. **Escalation bei Scope-Wachstum.** |
+| **Standard** | `interface_count == 2–4` | Normal complexity | Multi-Interface Services, Adapter (mehrere Protokolle), complete single-module requirements. Follows discipline, escalates bei Cross-Cutting-Concerns. |
+| **Senior** | `interface_count >= 5` | High complexity | Security/Performance-Critical, Boundary-Level, Cross-Cutting. **Pre-Implementation Interface Analysis erforderlich** — keine Implementierung vor Validation. |
+
+**Fraktales Prinzip der Developer-Tiers:**
+Die 3 Tiers implementieren das gleiche **SE Interface Discipline**:
+1. **Strict Context Boundary:** Implementiere AUSSCHLIESSLICH gegen deine Black-Box-Anforderung (description + acceptance_criteria). Kein Zugriff auf andere Komponenten direkt.
+2. **Orthogonalität (Orthogonality):** Implementiere NUR die Interfaces aus deiner `propagation_map`-Zeile. Keine direkten Calls zu Nachbar-Komponenten ohne registrierten Interface-Contract.
+3. **Interface Contract Fidelity:** Halte dich STRIKT an die `interface_specs`. Unilaterale Interface-Änderungen sind verboten — escalate stattdessen zu `se-interface-mgr`.
+4. **Traceability:** Jedes Code-Artefakt referenziert seine `req_id` und `leaf_id` (in Kommentaren oder Docstrings).
+5. **Domain Gate:** `domain: software` → implementieren. `domain: hardware | mechanics` → COTS-Spec oder Stub, kein Code.
+
+**Mandatory Escalation (alle 3 Tiers):**
+- Scope wächst über Tier hinaus (mehr Interfaces)
+- Interface specs sind unklar, widersprüchlich oder unvollständig
+- Implementation würde Context Boundary kreuzen
+- Interface-Änderung ist nötig
+- Cross-Cutting-Concern surfaced (auth, crypto, secrets, performance)
+
+Escalation ist SUCCESS, nicht Fehler. Ein sauberes Escalate nach 5 Minuten ist besser als ein riskantes Out-of-Scope-Change.
+
+**Output pro Developer:**
+```
+STATUS: done|partial|escalate
+SUMMARY: <one-sentence summary>
+FILES_CHANGED: <file list>
+INTERFACES_IMPLEMENTED: <interface list>
+TEST_COVERAGE: <test file references>
+```
+
+---
+
 ## Bewertung: Compound Engineering Plugin
 
 **Frage:** Ist Compound Engineering (EveryInc/compound-engineering-plugin, 17k Stars, MIT) als External Skill sinnvoll?
@@ -588,12 +654,16 @@ JSON-Graph (intern)
 
 ```
 agents/1-generic/
-├── se-requirements.md           # Requirements Elicitor (neu)
-├── se-architect.md              # Architect Agent (neu)
-├── se-critic.md                 # Quality Gate (neu)
-├── se-interface-mgr.md          # Interface Registry (neu)
-├── se-termination.md            # Abbruch-Entscheider (neu)
-└── se-orchestrator.md           # SE-Workflow-Koordinator (neu, delegiert an obige)
+├── se-requirements.md              # Requirements Elicitor
+├── se-architect.md                 # Architect Agent (Decomposition)
+├── se-critic.md                    # Quality Gate
+├── se-interface-mgr.md             # Interface Registry
+├── se-termination.md               # Leaf/Continue Entscheider
+├── se-orchestrator.md              # SE-Workflow-Koordinator
+│
+├── se-junior-developer.md          # Implementation: 0–1 Interface Leaf (NEU 2026-06-20)
+├── se-developer.md                 # Implementation: 2–4 Interface Leaf (NEU 2026-06-20)
+└── se-senior-developer.md          # Implementation: 5+ Interface Leaf (NEU 2026-06-20)
 
 schemas/
 └── se-decomposition.schema.json  # Structured Output Schema für Architect
@@ -605,22 +675,38 @@ howto/
 ├── se-workflow.md                # Workflow-Doku + State-Graph
 ├── se-blackbox-to-whitebox.md    # Methodik der BB→WB Transition
 ├── se-interface-management.md    # Interface-Propagation detailliert
+├── se-implementation-tiers.md    # SE-Developer-Tiers und Orthogonalität (NEU)
 └── se-mcp-adapters.md            # MCP-Adapter-Entwicklung
 
 config/
-└── role-defaults.yaml            # +6 neue Rollen-Einträge (SE)
+└── role-defaults.yaml            # +9 neue Rollen-Einträge (SE mit Developers)
+
+docs/architecture/
+├── 07-se-cascade.md              # SE-Kaskade Detail (incl. Implementation Floor)
+└── ...
+
+docs/concepts/
+└── se-agent-concept.md           # Dieses Konzept (aktualisiert 2026-06-20)
 ```
 
 ---
 
 ## Empfohlener Scope
 
-### Phase 1: MVP (1-generic Templates + MD-Output)
+### Phase 1: MVP (VOLLSTÄNDIG 2026-06-20)
 
-- 6 Agenten-Templates (`se-*`) als `1-generic` — manuell triggerbar via Orchestrator
+**Decomposition Floor (6 Agenten):**
+- `se-requirements`, `se-architect`, `se-critic`, `se-interface-mgr`, `se-termination`, `se-orchestrator`
+
+**Implementation Floor (3 Agenten — NEU):**
+- `se-junior-developer`, `se-developer`, `se-senior-developer`
+
+**Features:**
+- 9 Agenten-Templates (`se-*`) als `1-generic` — manuell triggerbar via Orchestrator
 - MD-basierte Outputs mit Mermaid-Diagrammen (Default-Adapter)
 - Keine MCP-Abhängigkeiten, keine automatische Rekursion
 - Manuelle Rekursion: Nutzer oder Orchestrator triggert Zellen
+- V-Modell-Architektur: Decomposition (Links) → Implementation Floor (Boden) → V&V (Rechts, zukünftig)
 
 ### Phase 2: Automatisierung
 
@@ -628,6 +714,7 @@ config/
 - Parallele Zellen-Ausführung (Fan-out bis max_parallel_cells)
 - Schema-Cache für wiederkehrende Decompositions
 - GitHub-Issues-Adapter (basierend auf CCPM-Pattern)
+- Developer-Tier Auto-Dispatch basierend auf Interface-Komplexität
 
 ### Phase 3: MCP-Integration
 
@@ -635,6 +722,7 @@ config/
 - ReqIF-Export für Enterprise-ALM-Tools
 - `se-orchestrator.md` als vollwertiger Workflow-Koordinator
 - Externe Skills: CCPM (Traceability), Harness (Team-Patterns)
+- Validation Floor (V&V) als 9.+10.+11. Agenten-Tier
 
 ---
 
