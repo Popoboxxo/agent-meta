@@ -18,7 +18,7 @@ dod-preset: spec-driven
 rules-preset: silent
 
 systems-engineering:
-  enabled: true
+  enabled: false
 
 platforms:
   - agent-meta
