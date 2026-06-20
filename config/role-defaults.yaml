@@ -254,7 +254,9 @@ roles:
     model: balanced
     memory: ""
     workflow_tier: optional
-    description: "Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch."
+    deprecated: true
+    deprecated_by: "orchestrator"
+    description: "DEPRECATED — SE-Funktionalität wird nun direkt vom orchestrator via SE-Mode übernommen. Wird nur aus Backward-Compatibility-Gründen behalten."
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "task-spec-v1"
@@ -661,7 +663,7 @@ quality_pipelines:
           type: agent_decision
           agent: se-termination
       - id: implementation
-        agent: se-orchestrator
+        agent: orchestrator
         task: |
           For each leaf node with domain: software from the termination phase:
           - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
@@ -694,3 +696,5 @@ se_variables:
   SE_MAX_DEPTH: 6
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4
+  SE_MAX_CELLS: 20
+  cost_limit_eur: 5.00

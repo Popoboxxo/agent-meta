@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.6.0
+version: 1.7.0
 description: Audits requirements and architecture against generic laws (orthogonality,
   testability, traceability).
 hint: Use this agent to validate requirements before architecture, and audit architectural
@@ -57,7 +57,7 @@ Input als A2A-Envelope:
 Bei `supersession`: Prüfe ob beanstandete Issues aus `supersession.reason` behoben wurden.
 
 ## Audit Criteria
-Four checks per output. Each yields boolean `passed` + list of `issues` (empty if passed).
+Five checks per output. Each yields boolean `passed` + list of `issues` (empty if passed).
 
 ### Requirements Review Checks
 
@@ -80,6 +80,12 @@ Four checks per output. Each yields boolean `passed` + list of `issues` (empty i
 - Every requirement has a valid `req_id`?
 - `rationale` field present and linked to a stakeholder need?
 - External interface references consistent across requirements?
+
+#### 5. Resilience
+- Failure modes documented (what fails, how, with what impact)?
+- Timeout / retry / backoff strategies defined for time-bounded operations?
+- Graceful degradation paths identified for partial-failure scenarios?
+- Stateless design applied where applicable (no hidden coupling via implicit state)?
 
 ### Architecture Review Checks
 
@@ -105,6 +111,12 @@ Four checks per output. Each yields boolean `passed` + list of `issues` (empty i
 - Every sub-system has valid `id` and `parent_req_id`?
 - `internal_interfaces` references valid (`source_id`, `target_id` exist in `sub_systems`)?
 - Architectural rationale references parent requirement explicitly?
+
+#### 5. Resilience
+- Failure modes documented per sub-system (what fails, how, with what impact)?
+- Timeout / retry / backoff strategies defined for cross-system interactions?
+- Graceful degradation paths identified (which interfaces tolerate partial failure)?
+- Stateless design applied where applicable (no hidden coupling via implicit state)?
 
 ## Decision Logic
 Up to `max_iterations: {{MAX_ITERATIONS}}`. Verdicts:
@@ -142,6 +154,10 @@ Return your final output **only** as a JSON object matching the following schema
       "issues": []
     },
     "traceability": {
+      "passed": true,
+      "issues": []
+    },
+    "resilience": {
       "passed": true,
       "issues": []
     }

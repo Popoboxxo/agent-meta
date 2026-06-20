@@ -467,6 +467,63 @@ Execution mode: loop
 3. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
 
+**SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
+
+### Output Directory Structure
+
+Configurable via `.meta-config/project.yaml` → `se_output`:
+
+```yaml
+se_output:
+  base_dir: "SE"              # Hauptordner
+  per_level_dirs: true        # L1/, L2/, L3/, ... (rekursiv geschachtelt)
+  per_system_dirs: true       # .../L1/Gesamtsystem/L2/AuthServiceSystem/, ...
+```
+
+**Folder naming:** System folders get `System` postfix, Component folders get `Component` postfix.
+
+Generated structure (example with SE_MAX_DEPTH=4):
+```
+SE/
+├── STRATEGY.md                    # System-Ziel, Constraints
+├── traceability-matrix.md         # REQ-L1-001 → ARCH-L1-001 → REQ-L2-001 → ...
+├── interface-registry.md          # Zentrale Interface-Tabelle
+│
+├── L0/
+│   └── SN_Stakeholder_Needs.md
+│
+└── L1/
+    └── Gesamtsystem/
+        ├── L1_Gesamtsystem_Requirements.md
+        ├── L1_Gesamtsystem_Architecture.md
+        └── L2/
+            ├── AuthServiceSystem/
+            │   ├── L2_AuthServiceSystem_Requirements.md
+            │   ├── L2_AuthServiceSystem_Architecture.md
+            │   └── L3/
+            │       ├── TokenValidatorComponent/
+            │       │   └── L3_TokenValidatorComponent_Requirements.md
+            │       └── JWTHandlerComponent/
+            │           └── L3_JWTHandlerComponent_Requirements.md
+            └── MCPServerSystem/
+                ├── L2_MCPServerSystem_Requirements.md
+                ├── L2_MCPServerSystem_Architecture.md
+                └── L3/
+                    └── CryptoEngineComponent/
+                        └── L3_CryptoEngineComponent_Requirements.md
+```
+
+**Rules:**
+- Jedes System hat genau eine Requirements- und eine Architecture-Datei
+- L{level}-Ordner sind **rekursiv geschachtelt**: L2 liegt in `L1/{System}/`, L3 in `L1/{System}/L2/{System}/`, usw.
+- System-Ordner erhalten Postfix `System`, Component-Ordner Postfix `Component`
+- Cross-cutting Dokumente (STRATEGY, traceability-matrix, interface-registry) liegen direkt in SE/
+- L0 hat nur Stakeholder-Needs (keine Architektur)
+- Leaf-Systeme (termination=leaf, designation=Component) haben nur Requirements (keine weitere Architecture)
+- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an und setzt `output_parent_path` und `FolderName` im A2A-Envelope-Payload
+
+
+
 ---
 
 ## Few-Shot Patterns
@@ -505,6 +562,7 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
