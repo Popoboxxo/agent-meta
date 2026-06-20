@@ -1279,6 +1279,7 @@ function buildSidebar() {
         { route: "/roles", label: "Roles & graph", icon: "▣" },
         { route: "/pipelines", label: "Pipelines", icon: "↦" },
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
+        { route: "/config-audit", label: "Config audit", icon: "✓" },
       ],
     },
   ];
@@ -2671,6 +2672,124 @@ async function viewSync() {
 }
 
 /* =========================================================================
+ * Views — Config Audit
+ * Detects deprecated roles, missing templates, missing role-defaults and
+ * orphaned pipeline references in the active project.yaml. Mirrors the
+ * `python scripts/sync.py --audit-config` CLI.
+ * ========================================================================= */
+async function viewConfigAudit() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Config Audit"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Compares .meta-config/project.yaml against role-defaults.yaml and the ",
+    "generic agent templates. Deprecated roles can be auto-disabled (a ",
+    "timestamped backup of project.yaml is kept).",
+  ]));
+
+  const runBtn   = el("button", { class: "btn btn-primary" }, ["Audit ausführen"]);
+  const applyBtn = el("button", { class: "btn", disabled: true }, ["Deprecated auskommentieren"]);
+  wrap.appendChild(el("div", { class: "btn-row" }, [runBtn, applyBtn]));
+
+  const summary = el("div", { class: "muted", style: "margin-top:1rem;" }, ["(no audit run yet)"]);
+  wrap.appendChild(summary);
+
+  const resultsEl = el("div", { style: "margin-top:1rem;" });
+  wrap.appendChild(resultsEl);
+
+  // Maps the four backend categories to UI presentation metadata. Order is
+  // significant: auto-fixable items come first so the user sees the actionable
+  // findings before informational ones.
+  const SECTIONS = [
+    { key: "deprecated_roles",         label: "Deprecated roles (auto-fixable)", severity: "warn"  },
+    { key: "roles_without_template",   label: "Roles without template",          severity: "error" },
+    { key: "templates_without_default",label: "Templates without role-default",  severity: "info"  },
+    { key: "orphaned_pipelines",       label: "Orphaned pipeline references",    severity: "warn"  },
+  ];
+
+  const severityColor = (sev) => ({
+    error: "var(--accent-red)",
+    warn:  "var(--accent-yellow, #c9a227)",
+    info:  "var(--text-muted)",
+  }[sev] || "var(--text-muted)");
+
+  function render(report) {
+    resultsEl.replaceChildren();
+    if (!report || !report.categories) {
+      resultsEl.appendChild(el("p", { class: "muted" }, ["(no data)"]));
+      return;
+    }
+
+    const deprecated = report.categories.deprecated_roles || [];
+    applyBtn.disabled = deprecated.length === 0;
+
+    if (!report.has_issues) {
+      summary.textContent = "Config audit: no issues found.";
+      summary.style.color = "var(--accent-green)";
+      return;
+    }
+    summary.textContent = `${report.total} issue(s) found.`;
+    summary.style.color = "var(--text-default)";
+
+    for (const sec of SECTIONS) {
+      const items = report.categories[sec.key] || [];
+      if (!items.length) continue;
+      const panel = el("div", { class: "panel" });
+      panel.appendChild(el("div", { class: "panel-title" }, [
+        el("h2", { style: `margin:0; color:${severityColor(sec.severity)};` },
+           [`${sec.label} (${items.length})`]),
+      ]));
+      const list = el("div");
+      for (const issue of items) {
+        const row = el("div", { style: "padding:0.4rem 0; border-bottom:1px solid var(--border);" });
+        row.appendChild(el("div", { style: "font-weight:600;" }, [issue.role || "(no role)"]));
+        row.appendChild(el("div", { class: "muted", style: "font-size:0.9em;" }, [issue.message || ""]));
+        if (issue.detail && issue.detail !== issue.message) {
+          row.appendChild(el("div", { class: "muted", style: "font-size:0.8em;" }, [issue.detail]));
+        }
+        list.appendChild(row);
+      }
+      panel.appendChild(list);
+      resultsEl.appendChild(panel);
+    }
+  }
+
+  async function runAudit() {
+    runBtn.disabled = true; applyBtn.disabled = true;
+    summary.textContent = "Running audit…";
+    try {
+      const r = await api.get("/api/config-audit");
+      render(r);
+    } catch (err) {
+      summary.textContent = `Audit failed: ${err.message}`;
+      summary.style.color = "var(--accent-red)";
+      toast(`Audit failed: ${err.message}`, "error");
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  runBtn.addEventListener("click", runAudit);
+
+  applyBtn.addEventListener("click", async () => {
+    runBtn.disabled = true; applyBtn.disabled = true;
+    try {
+      const r = await api.post("/api/config-audit/apply");
+      const changed = r && typeof r.changed === "number" ? r.changed : 0;
+      toast(`Disabled ${changed} deprecated role line(s)`, "success");
+      render(r);
+    } catch (err) {
+      toast(`Apply failed: ${err.message}`, "error");
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+
+  // Auto-run on view open so users get immediate feedback.
+  runAudit();
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Live event stream (Phase 6)
  * ========================================================================= */
 async function viewLive() {
@@ -3759,6 +3878,7 @@ async function init() {
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/agents",    viewAgentTemplates);
+  router.register("/config-audit", viewConfigAudit);
 
   buildSidebar();
   router.resolve();

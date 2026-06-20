@@ -19,3 +19,11 @@
 | REQ-CMD-07 | Das Repository enthält einen generischen Claude-Slash-Command `commands/1-generic/doc-now.md`. Der Command `/doc-now` delegiert an den `documenter`-Agenten und veranlasst diesen, `CODEBASE_OVERVIEW.md` sofort zu aktualisieren. Der Command akzeptiert ein optionales `$ARGUMENTS`-Token, mit dem der Nutzer den zu dokumentierenden Bereich eingrenzen kann. | Should |
 | REQ-CMD-08 | `sync.py --create-command <name>` legt eine projektspezifische Command-Datei unter `.claude/commands/<name>.md` an. Die so erstellte Datei wird von sync.py bei späteren Syncs nie überschrieben oder gelöscht. Das Verhalten ist analog zu `--create-rule <name>`. | Should |
 | REQ-CMD-09 | Das Commands-System ist vollständig dokumentiert in `howto/commands.md` (Schichten-Modell, Sync-Verhalten, Frontmatter-Felder, Anleitung zum Anlegen eines projektspezifischen Commands). Zusätzlich werden `CLAUDE.md` (Verzeichnisstruktur, Sync-Verhalten-Tabelle) und `howto/instantiate-project.md` (Verweis auf Commands) aktualisiert. | Should |
+
+---
+
+## Agent-Generierung
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-GEN-01 | Agent-Templates mit `deprecated: true` im YAML-Frontmatter werden von sync.py aus der Generierung ausgeschlossen — sie erzeugen keine Agent-Datei und erscheinen nicht in CLAUDE.md-Tabelle/-Hints oder Visualisierung. Die Filterung erfolgt zentral in `collect_sources()` nach Auflösung der Layer-Override-Kette (1-generic < 2-platform < 3-project), sodass ein nicht-deprecated Override ein deprecated Basis-Template ersetzen kann. Fehlt das Feld oder ist es nicht explizit `true`, gilt das Template als aktiv (rückwärtskompatibler Default). | Must |
