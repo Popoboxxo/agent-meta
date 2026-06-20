@@ -183,6 +183,25 @@
           "data_payload": {
             "type": "string",
             "description": "Description of the data or energy exchanged."
+          },
+          "version": {
+            "type": "string",
+            "description": "Interface version (semver). Bump on breaking change."
+          },
+          "preconditions": {
+            "type": "array",
+            "description": "Caller obligations — what MUST be true before the call.",
+            "items": { "type": "string" }
+          },
+          "postconditions": {
+            "type": "array",
+            "description": "Implementation guarantees — what WILL be true after a successful call.",
+            "items": { "type": "string" }
+          },
+          "invariants": {
+            "type": "array",
+            "description": "Properties that hold both before AND after every call.",
+            "items": { "type": "string" }
           }
         }
       }
@@ -277,6 +296,9 @@
               "$ref": "#/definitions/checkResult"
             },
             "traceability": {
+              "$ref": "#/definitions/checkResult"
+            },
+            "resilience": {
               "$ref": "#/definitions/checkResult"
             }
           }

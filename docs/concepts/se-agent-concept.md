@@ -9,19 +9,22 @@
 
 **Umgesetzt:**
 - 14 SE-Agenten-Templates (`agents/1-generic/se-*.md`), in `config/role-defaults.yaml` registriert
-  - Decomposition (Requirem., Architect, Critic, Interface-Mgr, Termination, Orchestrator): 6 Agenten
+  - Decomposition (Requirem., Architect, Critic, Interface-Mgr, Termination): 5 aktive Agenten
   - **Implementation Floor (neu, 2026-06-20):** 3 SE-Developer-Tiers (Junior, Standard, Senior)
+  - **V&V Floor (implementiert, im se-cascade `validation`-Stage verdrahtet):** `se-validator`, `se-verifier`, `se-test-engineer`, `se-testreviewer`, `se-integration-and-test-manager` — 5 Agenten
+  - **Deprecated:** `se-orchestrator` — SE-Funktionalität wird nun direkt vom Haupt-`orchestrator` via SE-Mode übernommen. Wrapper bleibt aus Backward-Compatibility-Gründen erhalten.
 - Schemas (`se-decomposition`, `se-orchestrator`), Templates (`SE-STRATEGY`, `SE-FEATURE`), Howtos
 - **SE-Export-Adapter** (`scripts/lib/se_export/`): Markdown (Default) + GitHub-Issues (`gh`-CLI), Factory + CLI `scripts/se-export.py`, Tests `tests/test_se_export.py` (L4 erledigt)
 
 **Implementierungs-Phasen:**
-- **Phase 1 (MVP):** Decomposition + Implementation-Floor komplett. Manuelle Rekursion über Orchestrator.
+- **Phase 1 (MVP):** Decomposition + Implementation-Floor + **V&V-Floor** komplett. V&V-Agenten sind im `se-cascade`-Pipeline-`validation`-Stage verdrahtet (`se-validator`, `se-verifier`, `se-integration-and-test-manager` als `parallel_group`). Manuelle Rekursion über Orchestrator.
 - **Phase 2 (Automatisierung):** Auto-Rekursion, Parallele Zellen, Schema-Cache.
-- **Phase 3 (MCP):** Jira-/Linear-/ReqIF-Adapter, Cost-Limits.
+- **Phase 3 (MCP):** Jira-/Linear-/ReqIF-Adapter.
 
 **Offen / bewusste Abweichung:**
 - Auto-Rekursion: kein Self-Spawn durch Termination-Agent — Rekursion läuft über den `orchestrator` (Anti-Recursion-Guard). Design-Entscheidung, kein Bug.
-- Jira-/Linear-/ReqIF-Adapter (Phase 3), Cost-Limits (`max_total_cells`, `cost_limit_eur`)
+- Jira-/Linear-/ReqIF-Adapter (Phase 3)
+- **Cost-Limits (`SE_MAX_CELLS`, `cost_limit_eur`):** in `config/role-defaults.yaml` `se_variables` definiert (Defaults: 20 Zellen / 5.00 EUR). Enforcement im Orchestrator-Runtime ist Phase 2.
 
 ---
 
@@ -42,7 +45,7 @@ Dieses Konzept beschreibt einen **Systems-Engineering-Modus** für agent-meta: e
 Anstatt zu versuchen, alles auf einmal zu lösen, folgt das System einem **V-Modell**:
 - **Linke Seite des V:** Decomposition (Architekt, Critic, Interface Manager) — abstrahiert von unten nach oben
 - **Boden des V:** **Implementation Floor** (3 SE-Developer-Tiers) — konkrete Arbeit an Leaf Nodes
-- **Rechte Seite des V:** Validation (zukünftig) — Verifikation nach oben
+- **Rechte Seite des V:** **Validation Floor** (implementiert): `se-validator` (L1 User-Journeys), `se-verifier` (Multi-Level Verification), `se-test-engineer` + `se-testreviewer` (MBSE-Testmodelle mit Reflection Loop), `se-integration-and-test-manager` (V&V-Orchestrierung) — im `se-cascade`-`validation`-Stage als `parallel_group` verdrahtet.
 
 Jede Ebene — egal wie tief — durchläuft exakt denselben Ablauf:
 
@@ -93,7 +96,9 @@ Black-Box-Anforderungen der Ebene n+1.
 
 ---
 
-## Die 5 Agenten-Rollen im Detail
+## Die Agenten-Rollen im Detail
+
+> **Hinweis:** Dieser Abschnitt beschreibt die 5 ursprünglichen Decomposition-Rollen ausführlich. Zusätzlich aktiv (verlinkt, siehe `agents/1-generic/`): 3 SE-Developer-Tiers (Implementation Floor) und 5 V&V-Agenten (`se-validator`, `se-verifier`, `se-test-engineer`, `se-testreviewer`, `se-integration-and-test-manager`). Gesamt: **13 aktive SE-Agenten + 1 deprecated (`se-orchestrator`) = 14 Templates**.
 
 ### 1. Requirements Agent (`se-requirements`)
 
@@ -695,18 +700,23 @@ docs/concepts/
 
 ### Phase 1: MVP (VOLLSTÄNDIG 2026-06-20)
 
-**Decomposition Floor (6 Agenten):**
-- `se-requirements`, `se-architect`, `se-critic`, `se-interface-mgr`, `se-termination`, `se-orchestrator`
+**Decomposition Floor (5 aktive Agenten + 1 deprecated):**
+- `se-requirements`, `se-architect`, `se-critic`, `se-interface-mgr`, `se-termination`
+- `se-orchestrator` — DEPRECATED, Funktionalität im Haupt-`orchestrator` (SE-Mode)
 
-**Implementation Floor (3 Agenten — NEU):**
+**Implementation Floor (3 Agenten):**
 - `se-junior-developer`, `se-developer`, `se-senior-developer`
 
+**Validation Floor / V&V (5 Agenten — implementiert):**
+- `se-validator`, `se-verifier`, `se-test-engineer`, `se-testreviewer`, `se-integration-and-test-manager`
+- Verdrahtet im `se-cascade`-`validation`-Stage als `parallel_group`
+
 **Features:**
-- 9 Agenten-Templates (`se-*`) als `1-generic` — manuell triggerbar via Orchestrator
+- 14 Agenten-Templates (`se-*`) als `1-generic` — manuell triggerbar via Haupt-Orchestrator
 - MD-basierte Outputs mit Mermaid-Diagrammen (Default-Adapter)
 - Keine MCP-Abhängigkeiten, keine automatische Rekursion
 - Manuelle Rekursion: Nutzer oder Orchestrator triggert Zellen
-- V-Modell-Architektur: Decomposition (Links) → Implementation Floor (Boden) → V&V (Rechts, zukünftig)
+- **V-Modell vollständig:** Decomposition (Links) → Implementation Floor (Boden) → V&V Floor (Rechts)
 
 ### Phase 2: Automatisierung
 
@@ -720,9 +730,9 @@ docs/concepts/
 
 - MCP-Adapter für Jira, Linear
 - ReqIF-Export für Enterprise-ALM-Tools
-- `se-orchestrator.md` als vollwertiger Workflow-Koordinator
 - Externe Skills: CCPM (Traceability), Harness (Team-Patterns)
-- Validation Floor (V&V) als 9.+10.+11. Agenten-Tier
+
+> **Validation Floor (V&V):** Bereits in Phase 1 als 5 zusätzliche Agenten implementiert und im `se-cascade`-`validation`-Stage verdrahtet. `se-orchestrator` ist deprecated — SE-Funktionalität läuft über den Haupt-`orchestrator` im SE-Mode.
 
 ---
 

@@ -2,6 +2,9 @@
 
 Dieses Dokument beschreibt den vollständigen Ablauf des fraktalen SE-Workflows in agent-meta.
 
+> **Aktuell aktiv (Stand 2026-06-20):** 14 SE-Agenten-Templates — davon 13 aktiv und 1 deprecated (`se-orchestrator`).
+> Die SE-Koordination läuft direkt über den Haupt-`orchestrator` im SE-Mode; `se-orchestrator` bleibt nur als Wrapper aus Backward-Compatibility-Gründen erhalten.
+
 ---
 
 ## Grundprinzip: Die System-Zelle
@@ -55,7 +58,9 @@ graph TD
 
 ---
 
-## Die 5 Rollen im Detail
+## Die Rollen im Detail
+
+> Decomposition Floor (5 Rollen unten ausführlich) + Implementation Floor (3 Developer-Tiers, siehe Abschnitt »Implementation Floor«) + Validation Floor / V&V (5 Agenten, siehe Abschnitt »Validation Floor (V&V)«) = **13 aktive Rollen**. `se-orchestrator` ist deprecated.
 
 ### se-requirements
 - Nimmt unstrukturierte Stakeholder-Bedarfe entgegen
@@ -85,6 +90,34 @@ graph TD
 - Entscheidet pro Sub-Komponente: Leaf oder Continue
 - Leaf-Kriterien: atomare Code-Einheit, Standard-Bauteil, ausgereizte Domäne, explizite Grenze
 - Schutzregeln: max_depth, max_total_cells, Zirkular-Check
+
+---
+
+## Implementation Floor (Boden des V-Modells)
+
+Nach `decision: leaf` werden Software-Komponenten an einen der 3 SE-Developer-Tiers dispatched (Routing nach Interface-Komplexität aus `propagation_map`):
+
+| Tier | Trigger | Scope |
+|------|---------|-------|
+| `se-junior-developer` | 0–1 Interfaces | Atomare Wrapper, COTS-Adapter, trivial Data-Converter |
+| `se-developer` | 2–4 Interfaces | Multi-Interface Services, contained Modules |
+| `se-senior-developer` | 5+ Interfaces | Cross-Cutting, Boundary-Level, Security/Performance-Critical, Pre-Implementation Interface-Analyse |
+
+Hardware-/Mechanik-Leafs werden als COTS-Spec dokumentiert, nicht implementiert.
+
+---
+
+## Validation Floor (V&V — Rechte Seite des V-Modells)
+
+Im `se-cascade`-`validation`-Stage als `parallel_group` verdrahtet — läuft nach der Decomposition + Implementation:
+
+| Agent | Zuständigkeit |
+|-------|---------------|
+| `se-validator` | L1 System-Validierung — End-to-End User Journeys gegen Stakeholder-Bedürfnisse |
+| `se-verifier` | Multi-Level Verification (L1–Ln) — integrierte Systeme vs. Architektur-Spec |
+| `se-test-engineer` | MBSE-Testmodelle, Integration Test Design (im Reflection Loop mit `se-testreviewer`) |
+| `se-testreviewer` | Audit der Teststrategien (Edge-Cases, Boundary Values, Äquivalenzklassen, Flakiness) |
+| `se-integration-and-test-manager` | V&V-Orchestrierung, Integrationsstrategie, Test-Ebenen-Koordination |
 
 ---
 
@@ -167,6 +200,7 @@ variables:
   SE_MAX_CELLS: 20
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4
+  cost_limit_eur: 5.00
 ```
 
 ---

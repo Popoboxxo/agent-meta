@@ -6,7 +6,12 @@
 
 ## Übersicht
 
-Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System das aus 6 spezialisierten Agenten besteht. Zusammen implementieren sie eine 6-stufige Black-Box → White-Box-Zerlegung nach INCOSE-Methodik.
+Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit drei Floors:
+- **Decomposition Floor** — 5 aktive Agenten (`se-requirements`, `se-architect`, `se-critic`, `se-interface-mgr`, `se-termination`) implementieren die 6-stufige Black-Box → White-Box-Zerlegung nach INCOSE-Methodik.
+- **Implementation Floor** — 3 SE-Developer-Tiers für Leaf-Node-Implementierung.
+- **Validation Floor (V&V)** — 5 Agenten (`se-validator`, `se-verifier`, `se-test-engineer`, `se-testreviewer`, `se-integration-and-test-manager`) für die rechte V-Modell-Seite, im `se-cascade`-`validation`-Stage als `parallel_group` verdrahtet.
+
+> **Hinweis (Deprecation):** Der frühere `se-orchestrator`-Agent ist deprecated. Die SE-Koordination läuft direkt über den Haupt-`orchestrator` im SE-Mode. Der Wrapper bleibt aus Backward-Compatibility-Gründen erhalten.
 
 ---
 
@@ -352,9 +357,10 @@ roles:
 
 variables:
   SE_MAX_DEPTH: 5              # Maximale Rekursionstiefe
-  SE_MAX_CELLS: 20             # Maximale Gesamtzellen
+  SE_MAX_CELLS: 20             # Maximale Gesamtzellen (Cost-Guard)
   SE_MAX_CRITIC_ITERATIONS: 3  # Max. Critic-Korrekturschleifen
   SE_MAX_PARALLEL_CELLS: 4     # Parallele Zellen pro Ebene
+  cost_limit_eur: 5.00         # Budget-Grenze (Cost-Guard, Enforcement in Phase 2)
 ```
 
 ### `config/role-defaults.yaml` (SE-Rollen)
@@ -369,7 +375,7 @@ variables:
 | `se-junior-developer` | balanced | — | optional | 0–1 Interface Leaf |
 | `se-developer` | balanced | project | optional | 2–4 Interface Leaf |
 | `se-senior-developer` | powerful | project | optional | 5+ Interface Leaf |
-| `se-orchestrator` | balanced | — | optional | Workflow Coordinator |
+| `se-orchestrator` | balanced | — | optional (deprecated) | Wrapper — Funktionalität jetzt im Haupt-`orchestrator` (SE-Mode) |
 
 ---
 
