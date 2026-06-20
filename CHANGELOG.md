@@ -4,6 +4,22 @@
 
 ---
 
+## [0.64.0] — 2026-06-20
+
+### Added
+
+- **Config audit routine** (`scripts/lib/config_audit.py`): Detects 4 categories of config drift — roles without template, templates without role-default, deprecated roles (auto-fixable), and orphaned pipelines/reflection-pairs.
+- **`--audit-config` / `--audit-config --apply` CLI flags**: `--audit-config` reports findings; `--audit-config --apply` auto-fixes deprecated roles by commenting them out in `project.yaml` (idempotent, comment-preserving, reversible).
+- **Admin-UI "Config audit" panel**: New panel with REST endpoints `GET /api/config-audit` and `POST /api/config-audit` for interactive audit and apply from the admin interface.
+- **End-of-sync audit warnings**: Non-blocking warnings for all 4 audit categories printed at the end of every `sync.py` run.
+
+### Fixed
+
+- **Deprecated agent templates excluded from sync**: Templates with `deprecated: true` frontmatter (e.g. `se-orchestrator`) are no longer generated or listed in any output — central filter applied in `collect_sources`.
+- **Config audit false-positive for multi-instance roles**: Roles using `based-on` with multiple instances are no longer incorrectly flagged as missing role-defaults in the audit output.
+
+---
+
 ## [0.63.0] — 2026-06-20
 
 ### Added
