@@ -105,7 +105,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.62.1 — `2026-06-20`
+Generiert von agent-meta v0.63.0 — `2026-06-20`
 DoD-Preset: **spec-driven** | REQ-Traceability: true | Tests: true | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -140,23 +140,6 @@ DoD-Preset: **spec-driven** | REQ-Traceability: true | Tests: true | Codebase-Ov
 | `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-| `se-architect` | Use this agent to design L1 and L2 architectures from requirements. |
-| `se-critic` | Use this agent to validate requirements before architecture, and audit architectural decompositions. |
-| `se-developer` | Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
- |
-| `se-integration-and-test-manager` | Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down, Integrationsplanung. |
-| `se-interface-mgr` | Manages generic signal flow, deterministic sync across systems |
-| `se-junior-developer` | Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
- |
-| `se-orchestrator` | DEPRECATED — Use orchestrator with SE-Mode instead |
-| `se-requirements` | Use this agent to clarify requirements and start the SE cascade. |
-| `se-senior-developer` | Use for complex SE leaf nodes: cross-cutting, boundary-level, security/performance-critical, or high interface density (5+). Analyzes interface implications before implementing.
- |
-| `se-termination` | Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control |
-| `se-test-engineer` | Use this agent to create model-based test models and integration test strategies from architectural decompositions. |
-| `se-testreviewer` | Use this agent to review and audit test models and integration test strategies before execution. |
-| `se-validator` | Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert Code, prüft ob der User-Need erfüllt ist. |
-| `se-verifier` | Use this agent to verify integrated systems against their specifications on all architecture levels (L1 through Ln). |
 | `senior-developer` | High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 <!-- agent-meta:managed-end -->

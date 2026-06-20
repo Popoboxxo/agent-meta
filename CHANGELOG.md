@@ -4,6 +4,25 @@
 
 ---
 
+## [0.63.0] — 2026-06-20
+
+### Added
+
+- **3-tier SE developer cascade**: Three new agent roles (`se-junior-developer`, `se-developer`, `se-senior-developer`) implement a tier-based leaf-node strategy with interface discipline — same-level communication only via the next-higher tier; contract-first implementation against `se-interface-mgr` specs.
+- **`implementation` stage in SE cascade pipeline**: New pipeline stage inserted after `termination` and before `validation`; `se-orchestrator` routes leaf nodes tier-based depending on interface count and cross-cutting concerns.
+
+### Changed
+
+- **SE cascade pipeline routing**: `se-orchestrator` now dispatches to `se-junior-developer` (0–1 interfaces, trivial), `se-developer` (2–4 interfaces, standard), or `se-senior-developer` (5+ interfaces, boundary-level, security/performance-critical) based on interface complexity.
+
+### Docs
+
+- Updated `07-se-cascade.md` with implementation stage documentation.
+- Updated `se-agent-concept.md` with the 3-tier developer model.
+- Updated `instantiate-project.md` with new SE developer roles.
+
+---
+
 ## [0.62.1] — 2026-06-18
 
 ### Fixed

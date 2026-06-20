@@ -94,13 +94,6 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Bug/Feature triagieren | `bug-feature-analyzer` | `task-spec-v1` | `balanced` / Ja |
 | Log-Analyse | `log-analyzer` | `task-spec-v1` | `balanced` / Ja |
 | Release / Version bump | `release` | — | `balanced` / Nein |
-| Systems Engineering / SE-Kaskade | Pipeline `se-cascade` (SE-Mode) | — | `balanced`→`powerful` / Nein |
-| Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `task-spec-v1` | `powerful` / Nein |
-| UI-Design / Mockups | `ui-ux-designer` | `task-spec-v1` | `balanced` / Ja |
-| API-Design / OpenAPI | `api-specialist` | `task-spec-v1` | `balanced` / Nein |
-| CI/CD / Infrastruktur | `devops-engineer` | `task-spec-v1` | `fast` / Ja |
-| Performance / Bottlenecks | `performance-optimizer` | `task-spec-v1` | `powerful` / Nein |
-| Export / Target-Routing | `export-manager` | `task-spec-v1` | `fast` / Nein |
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | `task-spec-v1` (batch: true) | — / Ja |
 | Aufwandsschätzung                   | `effort-estimator` | —                | `fast` / Nein |
@@ -470,144 +463,6 @@ Execution mode: loop
 
 3. background(agent="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
 
-## Systems Engineering Mode
-
-The `se-cascade` pipeline implements a recursive Zig-Zag decomposition (L0→L6) with V-Model integration.
-
-### Zig-Zag Workflow
-
-The cascade follows a strict alternating pattern between Requirements and Architecture:
-
-```
-L0: Stakeholder Needs (SN-xxx)
- ↓
-L1: Requirements (REQ-L1-xxx) ←→ Architecture (ARCH-L1-xxx)
- ↓
-L2: Requirements (REQ-L2-xxx) ←→ Architecture (ARCH-L2-xxx) → Interface Registry
- ↓
-L3: Requirements (REQ-L3-xxx) ←→ Architecture (ARCH-L3-xxx)
- ↓
-L4...Ln: (rekursiv, gleiches Muster bis 6)
-```
-
-Each Requirements↔Architecture pair forms a REPEAT_UNTIL loop (generator + critic, max 3 iterations).
-
-### Recursive Cell Spawns
-
-When the `termination` stage decides `continue` for a system:
-1. System is further decomposable — **designated as System** (or Subsystem in parent context)
-2. Orchestrator spawns a **new cell** at level n+1
-3. Context is **sanitized** — only `BB-REQ` + `propagation_map` row (~800 tokens)
-4. New cell starts at the Requirements stage for that level
-5. `trace_parent` links to parent cell's handoff_id
-
-When `termination` decides `leaf`:
-- Leaf system is final — **designated as Component**
-- Handover to implementation discipline (developer, hardware-engineer, etc.)
-
-### Context Hygiene Rules
-
-- **Never** pass full parent context to child cells — only sanitized BB-REQ + propagation row
-- Each cell operates independently with its own critic loop
-- Interface specs from `se-interface-mgr` are the only cross-cell communication channel
-- Max 4 parallel cells at any level
-
-### Depth Configuration
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `SE_MIN_DEPTH` | 2 | Minimum decomposition depth (never terminate before) |
-| `SE_MAX_DEPTH` | 6 | Maximum decomposition depth (always terminate at) |
-
-The `se-termination` agent receives both values in its input envelope and enforces them deterministically.
-
-### V-Model Integration
-
-- **Left wing** (Decomposition): L0→L1→L2→L3 — each level produces requirements + architecture
-- **Right wing** (V&V): Validation stage runs after termination
-  - `se-validator`: L1 User-Journey validation
-  - `se-verifier`: Multi-Level verification (cross-level traceability)
-  - `se-integration-and-test-manager`: V&V orchestration
-
-### Level ID Prefixes
-
-| Level | Requirements Prefix | Architecture Prefix | Designation |
-|-------|-------------------|-------------------|-------------|
-| L0 | `SN-xxx` | — | Stakeholder Needs |
-| L1..Ln (continue) | `REQ-L{n}-xxx` | `ARCH-L{n}-xxx` | System (Subsystem) |
-| L1..Ln (leaf) | `REQ-L{n}-xxx` | — | Component (final) |
-
-### Relationship to DoD Preset
-
-The SE cascade and the DoD preset operate on **different layers** and do NOT conflict:
-
-| Layer | SE Cascade | DoD Preset |
-|-------|-----------|------------|
-| **Phase** | Specification (WHAT to build) | Implementation (IS the code done?) |
-| **Output** | SN, REQ-L{n}, ARCH-L{n} | Code, Tests, Reviews |
-| **Quality Gates** | `se-critic` (own critic loops) | `code-reviewer`, `tester`, `validator` |
-| **Traceability** | Own Zig-Zag matrix (SN→REQ-L1→ARCH-L1→REQ-L2→ARCH-L2→...→leaf) | REQ-Traceability via commit messages |
-
-**The handover point:** When the cascade finishes, it hands leaf system requirements to `developer`. From that point on, the DoD preset applies.
-
-**SE-Required modes** (configured via `se-required` in the DoD preset):
-
-| SE mode: **spec-driven** — SE cascade recommended for complex features (>1 file). If SE output exists, leaf system requirements become acceptance criteria with REQ-Traceability in commits.
-
-**SE cascade does NOT replace the DoD preset** — it adds a specification layer BEFORE implementation. Choose your DoD preset independently, then add SE via the `se-required` field.
-
-### Output Directory Structure
-
-Configurable via `.meta-config/project.yaml` → `se_output`:
-
-```yaml
-se_output:
-  base_dir: "SE"              # Hauptordner
-  per_level_dirs: true        # L1/, L2/, L3/, ... (rekursiv geschachtelt)
-  per_system_dirs: true       # .../L1/Gesamtsystem/L2/AuthServiceSystem/, ...
-```
-
-**Folder naming:** System folders get `System` postfix, Component folders get `Component` postfix.
-
-Generated structure (example with SE_MAX_DEPTH=4):
-```
-SE/
-├── STRATEGY.md                    # System-Ziel, Constraints
-├── traceability-matrix.md         # REQ-L1-001 → ARCH-L1-001 → REQ-L2-001 → ...
-├── interface-registry.md          # Zentrale Interface-Tabelle
-│
-├── L0/
-│   └── SN_Stakeholder_Needs.md
-│
-└── L1/
-    └── Gesamtsystem/
-        ├── L1_Gesamtsystem_Requirements.md
-        ├── L1_Gesamtsystem_Architecture.md
-        └── L2/
-            ├── AuthServiceSystem/
-            │   ├── L2_AuthServiceSystem_Requirements.md
-            │   ├── L2_AuthServiceSystem_Architecture.md
-            │   └── L3/
-            │       ├── TokenValidatorComponent/
-            │       │   └── L3_TokenValidatorComponent_Requirements.md
-            │       └── JWTHandlerComponent/
-            │           └── L3_JWTHandlerComponent_Requirements.md
-            └── MCPServerSystem/
-                ├── L2_MCPServerSystem_Requirements.md
-                ├── L2_MCPServerSystem_Architecture.md
-                └── L3/
-                    └── CryptoEngineComponent/
-                        └── L3_CryptoEngineComponent_Requirements.md
-```
-
-**Rules:**
-- Jedes System hat genau eine Requirements- und eine Architecture-Datei
-- L{level}-Ordner sind **rekursiv geschachtelt**: L2 liegt in `L1/{System}/`, L3 in `L1/{System}/L2/{System}/`, usw.
-- System-Ordner erhalten Postfix `System`, Component-Ordner Postfix `Component`
-- Cross-cutting Dokumente (STRATEGY, traceability-matrix, interface-registry) liegen direkt in SE/
-- L0 hat nur Stakeholder-Needs (keine Architektur)
-- Leaf-Systeme (termination=leaf, designation=Component) haben nur Requirements (keine weitere Architecture)
-- Der Orchestrator legt die Ordnerstruktur VOR Delegation an die SE-Agenten an und setzt `output_parent_path` und `FolderName` im A2A-Envelope-Payload
 
 ---
 
@@ -647,6 +502,8 @@ Intent nicht in Tabelle:
 2. Fallback:
 ```
   → Anonymisieren → meta-feedback + Neuformulierung erbitten
+   + Meta-Feedback im Hintergrund
+
 ```
 3. Nie selbst ausführen, nie raten, nie abbrechen.
 
@@ -728,20 +585,6 @@ Fallback (kein Tool-Call): Delegiere diese Aufgabe via `Agent(subagent_type="orc
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. | powerful | ❌ (sequentiell) |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | balanced | ❌ (sequentiell) |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | balanced | ❌ (sequentiell) |
-| `se-architect` | Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität). | powerful | ✅ (Multi-Systeme) |
-| `se-critic` | Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit. | powerful | ✅ (Multi-Prüfungen) |
-| `se-developer` | Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin | powerful | ✅ (Multi-Tasks) |
-| `se-integration-and-test-manager` | V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen. | balanced | ❌ (Meta-Orchestrator) |
-| `se-interface-mgr` | Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend. | balanced | ❌ (zentral) |
-| `se-junior-developer` | Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert | fast | ✅ (Multi-Tasks) |
-| `se-orchestrator` | Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch. | balanced | ❌ (Meta-Orchestrator) |
-| `se-requirements` | Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement. | balanced | ❌ (sequentiell) |
-| `se-senior-developer` | Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse | max | ✅ (Multi-Tasks) |
-| `se-termination` | Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde. | fast | ❌ (schnell) |
-| `se-test-engineer` | Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel. | balanced | ✅ (Multi-Strategien) |
-| `se-testreviewer` | Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness. | powerful | ✅ (Multi-Reviews) |
-| `se-validator` | L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse. | powerful | ❌ (sequentiell) |
-| `se-verifier` | Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen. | balanced | ✅ (Multi-Ebenen) |
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings | max | ✅ (Multi-Tasks) |
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | balanced | ✅ (Multi-Suites) |
 | `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. | balanced | ✅ (Multi-Entwürfe) |
