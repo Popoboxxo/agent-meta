@@ -4,6 +4,24 @@
 
 ---
 
+## [0.64.1] — 2026-06-20
+
+### Added
+
+- **SE_MAX_CELLS and cost_limit_eur variables**: New configuration variables for SE decomposition control — limits cell count and estimated cost per decomposition run.
+- **Resilience criterion in se-critic (v1.7.0)**: Fifth evaluation dimension added to SE architectural critique — assesses fault tolerance and recovery capabilities.
+- **Design-by-Contract fields in se-interface-mgr (v1.6.0)**: Interface specifications now support preconditions, postconditions, and invariants per DbC methodology.
+
+### Changed
+
+- **se-orchestrator deprecated in role-defaults**: SE cascade implementation stage now routed through main orchestrator (SE-Mode) instead of separate se-orchestrator role.
+
+### Fixed
+
+- **SE-framework consistency**: Aligned config, templates, and documentation — V&V agents marked as implemented, corrected agent count to 14 in concept docs.
+
+---
+
 ## [0.64.0] — 2026-06-20
 
 ### Added
