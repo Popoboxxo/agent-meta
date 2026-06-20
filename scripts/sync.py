@@ -66,6 +66,7 @@ from lib.agents import (
     build_agent_hints, build_agent_table,
     extract_frontmatter_field,
 )
+from lib.config_audit import audit_config, apply_audit, format_report
 from lib.rules import sync_rules, sync_speech_mode, create_rule, resolve_rules
 from lib.hooks import sync_hooks, create_hook
 from lib.commands import sync_commands_for_provider, create_command
@@ -316,6 +317,17 @@ def main():
     parser.add_argument("--clear-cache", action="store_true",
                         help="Clear the outcome cache")
 
+    # Config audit
+    parser.add_argument("--audit-config", action="store_true",
+                        help="Audit project config against templates + role-defaults. "
+                             "Reports roles_without_template (error), templates_without_default "
+                             "(info), deprecated_roles (warning), orphaned_pipelines (warning). "
+                             "Use --apply to additionally comment out deprecated roles in "
+                             ".meta-config/project.yaml (idempotent, comment-preserving).")
+    parser.add_argument("--apply", action="store_true",
+                        help="When combined with --audit-config: rewrite project.yaml to comment "
+                             "out deprecated roles. No-op without --audit-config.")
+
     # Admin UI server (zero-dependency stdlib HTTP server)
     parser.add_argument("--admin", action="store_true",
                         help="Start Admin UI server after running sync (port: --admin-port)")
@@ -448,6 +460,25 @@ def main():
     if args.fill_defaults:
         mode = "fill-defaults"
         fill_defaults(config_path, agent_meta_root, log, args.dry_run)
+
+    elif args.audit_config:
+        mode = "audit-config"
+        report = audit_config(agent_meta_root, config_path)
+        print(format_report(report))
+        if args.apply:
+            if args.dry_run:
+                log.info("audit-config",
+                         f"--apply skipped (dry-run): would disable "
+                         f"{len(report.deprecated_roles)} deprecated role(s)")
+            else:
+                changed = apply_audit(report, config_path)
+                if changed:
+                    log.info("audit-config",
+                             f"commented out {changed} deprecated role line(s) in "
+                             f"{config_path}")
+                else:
+                    log.info("audit-config",
+                             "no changes applied (nothing to disable)")
 
     elif args.only_variables:
         mode = "only-variables"
@@ -671,6 +702,24 @@ def main():
             # No Claude active but other providers have gitignore entries to manage
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+
+        # Lightweight deprecated-role hint at the end of a normal sync. Full
+        # auditing is opt-in via --audit-config; here we only warn about the
+        # one auto-fixable category so projects do not silently keep stale
+        # roles in their config.
+        try:
+            _audit_report = audit_config(agent_meta_root, config_path)
+            _depr = _audit_report.deprecated_roles
+            if _depr:
+                log.warn(
+                    "config-audit: "
+                    f"{len(_depr)} deprecated role(s) still in project.yaml: "
+                    f"{', '.join(_depr)}. "
+                    "Run: python scripts/sync.py --audit-config --apply"
+                )
+        except Exception as exc:
+            # Audit must never break a sync — degrade gracefully.
+            log.info("config-audit", f"skipped (error: {exc})")
 
     # Visualization: generate static mindmap if requested (static or full mode)
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")

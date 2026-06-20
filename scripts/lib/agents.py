@@ -163,6 +163,26 @@ def extract_frontmatter_field(content: str, field: str) -> str | None:
     return single.group(1).strip() if single else None
 
 
+def is_deprecated_template(content: str) -> bool:
+    """Return True if the template frontmatter declares `deprecated: true`.
+
+    A template is deprecated only when the field is explicitly truthy. Absent
+    field or any other value (False, missing) means the template is active
+    (backward-compatible default: not deprecated).
+    """
+    if _YAML_AVAILABLE:
+        fm = _parse_frontmatter_yaml(content)
+        return fm.get("deprecated") is True
+
+    # Regex fallback when PyYAML is unavailable: match `deprecated: true`
+    # (case-insensitive value), allowing optional surrounding quotes.
+    match = re.search(
+        r"^deprecated:\s*['\"]?(true)['\"]?\s*$",
+        content, flags=re.MULTILINE | re.IGNORECASE,
+    )
+    return match is not None
+
+
 def build_frontmatter(content: str, name: str, description: str,
                       generated_from: str | None = None) -> str:
     """Replace name and description in YAML frontmatter.
@@ -775,6 +795,16 @@ def collect_sources(
                 known_ext_roles.add(stem[: -len(EXT_SUFFIX)])
             else:
                 overrides[stem] = f
+
+    # Filter out deprecated templates. Applied after the full override chain is
+    # resolved so a non-deprecated 2-platform/3-project override can still win
+    # over a deprecated 1-generic base (and vice versa: a deprecated override
+    # removes the role entirely). This is the single central gate — all
+    # consumers (agent generation, viz, CLAUDE.md hints/table) inherit it.
+    for role in list(overrides):
+        source_path = overrides[role]
+        if is_deprecated_template(source_path.read_text(encoding="utf-8")):
+            del overrides[role]
 
     return overrides, known_ext_roles
 

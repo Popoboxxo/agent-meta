@@ -985,6 +985,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/roles":
             return self._send_json(self._list_roles())
 
+        if path == "/api/config-audit":
+            return self._send_json(self._run_config_audit())
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1038,6 +1041,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/sync/run":
             return self._send_json(self.__class__.sync_executor.run())
+
+        if path == "/api/config-audit/apply":
+            return self._send_json(self._apply_config_audit())
 
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
@@ -1363,6 +1369,83 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         roles = hierarchy.get("roles") or []
         names = sorted((r.get("name") for r in roles if r.get("name")), key=str.lower)
         return [{"name": n} for n in names]
+
+    # ------------------------------------------------------------------ #
+    # Config audit                                                       #
+    # ------------------------------------------------------------------ #
+
+    def _audit_paths(self) -> tuple[Path, Path]:
+        """Return ``(agent_meta_root, project_config_path)`` for the audit.
+
+        In project-admin mode the agent-meta sources live under
+        ``<root>/.agent-meta/`` — fall back to that layout when the top-level
+        ``agents/`` directory is missing. The project config is always
+        ``<root>/.meta-config/project.yaml``.
+        """
+        root = self.__class__.root
+        agents_top = root / "agents" / "1-generic"
+        if agents_top.exists():
+            meta_root = root
+        else:
+            submodule_root = root / ".agent-meta"
+            if (submodule_root / "agents" / "1-generic").exists():
+                meta_root = submodule_root
+            else:
+                meta_root = root
+        project_config = root / ".meta-config" / "project.yaml"
+        return meta_root, project_config
+
+    def _ensure_lib_on_path(self) -> None:
+        """Make sure ``lib.config_audit`` is importable in both layouts."""
+        root = self.__class__.root
+        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
+            if candidate.exists() and str(candidate) not in sys.path:
+                sys.path.insert(0, str(candidate))
+
+    def _run_config_audit(self) -> dict:
+        """Execute a read-only config audit and return a JSON-friendly dict."""
+        self._ensure_lib_on_path()
+        try:
+            from lib.config_audit import audit_config, report_to_dict
+        except ImportError as exc:
+            raise FileNotFoundError(f"config_audit module unavailable: {exc}")
+        meta_root, project_config = self._audit_paths()
+        if not project_config.exists():
+            raise FileNotFoundError(f"project config not found: {project_config}")
+        report = audit_config(meta_root, project_config)
+        return report_to_dict(report)
+
+    def _apply_config_audit(self) -> dict:
+        """Apply the auto-fix step: comment out deprecated roles in project.yaml.
+
+        Creates a timestamped backup beforehand to allow recovery and returns
+        the number of modified lines plus the resulting issue list.
+        """
+        self._ensure_lib_on_path()
+        try:
+            from lib.config_audit import audit_config, apply_audit, report_to_dict
+        except ImportError as exc:
+            raise FileNotFoundError(f"config_audit module unavailable: {exc}")
+        meta_root, project_config = self._audit_paths()
+        if not project_config.exists():
+            raise FileNotFoundError(f"project config not found: {project_config}")
+        # Backup via the existing ConfigManager so the file rotation policy
+        # (timestamped ``.bak.<stamp>``, ``MAX_BACKUPS`` retention) stays
+        # consistent with regular PUT writes.
+        cm = self.__class__.config_manager
+        try:
+            cm._backup(project_config)  # type: ignore[attr-defined]
+            cm._prune_backups(project_config)  # type: ignore[attr-defined]
+        except Exception:
+            # The backup is best-effort — never block the apply step.
+            pass
+        report = audit_config(meta_root, project_config)
+        changed = apply_audit(report, project_config)
+        # Re-audit after apply so the UI immediately reflects the new state.
+        report_after = audit_config(meta_root, project_config)
+        result = report_to_dict(report_after)
+        result["changed"] = changed
+        return result
 
     def _send_template(self, role: str) -> None:
         path = self._template_path(role)
