@@ -151,6 +151,55 @@ def test_clean_config_has_no_issues(meta_root: Path) -> None:
     assert report.by_category("orphaned_pipelines") == []
 
 
+def test_based_on_multi_instance_roles_excluded(meta_root: Path) -> None:
+    """Roles produced via ``based-on:`` from a 2-platform override must not
+    be reported as ``roles_without_template`` — they share a base template
+    (e.g. provider-expert.md) instead of having their own 1-generic file.
+    """
+    # Base template that serves as the multi-instance source.
+    _write(
+        meta_root / "agents" / "1-generic" / "provider-expert.md",
+        _template("provider-expert"),
+    )
+    # 2-platform override generates two roles via based-on against the
+    # provider-expert base. Frontmatter mirrors the real-world pattern
+    # (name: "{{PREFIX}}<role>", based-on: "1-generic/<base>.md@<ver>").
+    _write(
+        meta_root / "agents" / "2-platform" / "agent-meta-claude-expert.md",
+        "---\n"
+        "name: \"{{PREFIX}}claude-expert\"\n"
+        "version: 1.0.0\n"
+        "description: \"Claude expert (test).\"\n"
+        "based-on: \"1-generic/provider-expert.md@1.0.0\"\n"
+        "---\n\n# claude-expert\n",
+    )
+    _write(
+        meta_root / "agents" / "2-platform" / "agent-meta-gemini-expert.md",
+        "---\n"
+        "name: \"{{PREFIX}}gemini-expert\"\n"
+        "version: 1.0.0\n"
+        "description: \"Gemini expert (test).\"\n"
+        "based-on: \"1-generic/provider-expert.md@1.0.0\"\n"
+        "---\n\n# gemini-expert\n",
+    )
+    cfg = _config_path(
+        meta_root,
+        "roles:\n"
+        "  - developer\n"
+        "  - claude-expert\n"
+        "  - gemini-expert\n"
+        "  - ghost-role\n",
+    )
+    report = audit_config(meta_root, cfg)
+
+    # claude-expert / gemini-expert must not show up — they are covered by
+    # the provider-expert base via based-on. ghost-role still must.
+    missing = {i.role for i in report.by_category("roles_without_template")}
+    assert "claude-expert" not in missing
+    assert "gemini-expert" not in missing
+    assert missing == {"ghost-role"}
+
+
 # ---------------------------------------------------------------------------
 # apply_audit
 # ---------------------------------------------------------------------------

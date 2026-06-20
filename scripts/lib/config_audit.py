@@ -185,6 +185,25 @@ def _collect_role_defaults(agent_meta_root: Path) -> set[str]:
     return set()
 
 
+def _collect_based_on_roles(agent_meta_root: Path) -> set[str]:
+    """Return roles generated via ``based-on`` from a 2-platform override.
+
+    Thin local wrapper that defers to :func:`crossrefs.get_based_on_role_names`
+    (DRY — the cross-reference scanner is the single source of truth for the
+    ``based-on:`` multi-instance pattern). The import is local because the
+    consistency package would otherwise pull in heavier transitive deps that
+    config_audit does not need.
+
+    Returns an empty set when the consistency module is unavailable so callers
+    can treat the result as "no exclusions" without special-casing imports.
+    """
+    try:
+        from .consistency.crossrefs import get_based_on_role_names
+    except ImportError:
+        return set()
+    return get_based_on_role_names(agent_meta_root)
+
+
 def _collect_pipeline_role_refs(config: dict) -> set[str]:
     """Return every role referenced by a quality pipeline ``agent:`` field.
 
@@ -247,12 +266,21 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
     role_defaults = _collect_role_defaults(agent_meta_root)
     generic_dir = agent_meta_root / "agents" / "1-generic"
 
+    # Roles produced by a 2-platform override via ``based-on:`` (e.g. the five
+    # provider-expert instances). They have no own 1-generic template by design
+    # and must not be reported as "roles_without_template".
+    based_on_roles = _collect_based_on_roles(agent_meta_root)
+
     # --- 1. roles_without_template + 3. deprecated_roles -------------------
     for role in project_roles:
         if not isinstance(role, str):
             continue
         template = _template_path_for_role(agent_meta_root, role)
         if not template.exists():
+            if role in based_on_roles:
+                # Generated via based-on from a 2-platform override — not a
+                # missing template.
+                continue
             report.add(
                 category="roles_without_template",
                 severity="error",

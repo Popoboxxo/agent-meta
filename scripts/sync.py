@@ -703,12 +703,37 @@ def main():
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
-        # Lightweight deprecated-role hint at the end of a normal sync. Full
-        # auditing is opt-in via --audit-config; here we only warn about the
-        # one auto-fixable category so projects do not silently keep stale
-        # roles in their config.
+        # Lightweight config-audit summary at the end of a normal sync. Full
+        # reporting stays opt-in via --audit-config; here we emit one log line
+        # per non-empty category so projects do not silently keep stale or
+        # broken config. Severity mapping mirrors --audit-config:
+        #   roles_without_template    → ERROR
+        #   templates_without_default → INFO
+        #   deprecated_roles          → WARN (auto-fixable via --apply)
+        #   orphaned_pipelines        → WARN
+        # The audit itself must never break a sync — wrapped in try/except.
         try:
             _audit_report = audit_config(agent_meta_root, config_path)
+
+            _missing = _audit_report.by_category("roles_without_template")
+            if _missing:
+                _names = ", ".join(sorted({i.role for i in _missing if i.role}))
+                # SyncLog has no .error() level — emit as WARN with explicit
+                # [ERROR] severity tag to keep parity with --audit-config output.
+                log.warn(
+                    "config-audit [ERROR]: "
+                    f"{len(_missing)} role(s) without generic template: {_names}. "
+                    "Run: python scripts/sync.py --audit-config"
+                )
+
+            _templ_noref = _audit_report.by_category("templates_without_default")
+            if _templ_noref:
+                _names = ", ".join(sorted({i.role for i in _templ_noref if i.role}))
+                log.info(
+                    "config-audit",
+                    f"{len(_templ_noref)} template(s) without role-defaults entry: {_names}."
+                )
+
             _depr = _audit_report.deprecated_roles
             if _depr:
                 log.warn(
@@ -716,6 +741,15 @@ def main():
                     f"{len(_depr)} deprecated role(s) still in project.yaml: "
                     f"{', '.join(_depr)}. "
                     "Run: python scripts/sync.py --audit-config --apply"
+                )
+
+            _orphans = _audit_report.by_category("orphaned_pipelines")
+            if _orphans:
+                _names = ", ".join(sorted({i.role for i in _orphans if i.role}))
+                log.warn(
+                    "config-audit: "
+                    f"{len(_orphans)} orphaned pipeline reference(s): {_names}. "
+                    "Run: python scripts/sync.py --audit-config"
                 )
         except Exception as exc:
             # Audit must never break a sync — degrade gracefully.

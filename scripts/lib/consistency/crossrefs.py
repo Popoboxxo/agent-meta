@@ -24,7 +24,7 @@ def _parse_frontmatter_yaml(path: Path) -> dict:
         return {}
 
 
-def _load_based_on_references(agent_meta_root: Path) -> dict[str, str]:
+def _load_based_on_references(agent_meta_root: Path) -> dict[str, set[str]]:
     """Scan 2-platform overrides for based-on references.
 
     Returns: {generic_template_stem: set of role_names}
@@ -52,6 +52,31 @@ def _load_based_on_references(agent_meta_root: Path) -> dict[str, str]:
             continue
         refs[generic_stem].add(role)
     return {k: v for k, v in refs.items()}
+
+
+def get_based_on_role_names(agent_meta_root: Path) -> set[str]:
+    """Return the flat set of role names generated via ``based-on`` references.
+
+    Public wrapper around :func:`_load_based_on_references` that collapses the
+    ``{generic_stem: {role, ...}}`` mapping into a single set of role names.
+
+    These roles do not have their own ``agents/1-generic/<role>.md`` file —
+    they are produced by a 2-platform override extending a multi-instance base
+    template (e.g. ``provider-expert.md`` → ``claude-expert``,
+    ``gemini-expert``, ...). Callers that check for "role has no template"
+    must exclude these names to avoid false-positives.
+
+    Args:
+        agent_meta_root: Repository root containing ``agents/2-platform/``.
+
+    Returns:
+        Flat set of role names. Empty when no based-on references exist.
+    """
+    refs = _load_based_on_references(agent_meta_root)
+    result: set[str] = set()
+    for roles in refs.values():
+        result.update(roles)
+    return result
 
 
 def check_role_defaults_coverage(agent_meta_root: Path) -> list[Finding]:
