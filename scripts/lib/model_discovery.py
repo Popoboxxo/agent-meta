@@ -30,7 +30,7 @@ def fetch_openrouter_models(excluded_models=None) -> List[Dict[str, Any]]:
     models = []
     try:
         req = urllib.request.Request("https://openrouter.ai/api/v1/models")
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=20) as response:
             data = json.loads(response.read().decode('utf-8'))
             
             for m in data.get("data", []):
@@ -44,7 +44,7 @@ def fetch_openrouter_models(excluded_models=None) -> List[Dict[str, Any]]:
                 elif model_id.startswith("google/"):
                     provider = "gemini"
                 elif model_id.startswith("openai/"):
-                    provider = "opencode-zen"
+                    provider = "openai"
                 else:
                     provider = "opencode-go"
                 
@@ -94,9 +94,7 @@ def discover_models() -> Dict[str, Any]:
     registry = {
         "models": models
     }
-    
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
+
     registry_path = os.path.join(project_root, 'config', 'generated', 'model-registry.json')
     
     os.makedirs(os.path.dirname(registry_path), exist_ok=True)

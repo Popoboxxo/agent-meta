@@ -90,7 +90,7 @@ def main():
       el("th", {}, ["Category", el("br"), createFilterInput("category")]),
       el("th", {}, ["Input Cost ($/1M)"]),
       el("th", {}, ["Output Cost ($/1M)"]),
-      el("th", {}, ["Cost Factor (1-100)"]),
+      el("th", {}, ["Blended $/1M (30/70)"]),
       el("th", {}, ["Actions / Ref"]),
     ]));
     table.appendChild(thead);
@@ -251,10 +251,11 @@ def main():
     thead.appendChild(el("tr", {}, [
       el("th", {}, ["Preset ID"]),
       el("th", {}, ["Description"]),
-      el("th", {}, ["Default"]),
-      el("th", {}, ["Trivial"]),
-      el("th", {}, ["Standard"]),
-      el("th", {}, ["Complex"])
+      el("th", {}, ["nano"]),
+      el("th", {}, ["fast"]),
+      el("th", {}, ["balanced"]),
+      el("th", {}, ["powerful"]),
+      el("th", {}, ["max"])
     ]));
     table.appendChild(thead);
     
@@ -274,22 +275,15 @@ def main():
         tr.appendChild(el("td", {}, [data.description || "-"]));
       }
       
-      const tiers = ["nano", "fast", "balanced", "powerful", "max"];
       const mapping = data.mapping || {};
-      
-      ["default", "trivial", "standard", "complex"].forEach(taskComplexity => {
+
+      ["nano", "fast", "balanced", "powerful", "max"].forEach(tierKey => {
         const td = el("td", {});
-        const val = mapping[taskComplexity] || "";
-        
+        const val = mapping[tierKey] || "";
+
         if (editMode) {
-          const select = el("select", { class: `preset-mapping-${taskComplexity}`, style: "width: 100%;" });
-          select.appendChild(el("option", { value: "" }, ["(none)"]));
-          tiers.forEach(t => {
-            const opt = el("option", { value: t }, [t]);
-            if (t === val) opt.selected = true;
-            select.appendChild(opt);
-          });
-          td.appendChild(select);
+          const input = el("input", { type: "text", class: `preset-mapping-${tierKey}`, value: val, style: "width: 100%; box-sizing: border-box;" });
+          td.appendChild(input);
         } else {
           td.appendChild(el("span", { class: "badge" }, [val || "-"]));
         }
@@ -399,12 +393,12 @@ def main():
         }
         
         if (!newPresetsData[pid].mapping) newPresetsData[pid].mapping = {};
-        
-        ["default", "trivial", "standard", "complex"].forEach(comp => {
-          const select = tr.querySelector(`.preset-mapping-${comp}`);
-          if (select) {
-            if (select.value) newPresetsData[pid].mapping[comp] = select.value;
-            else delete newPresetsData[pid].mapping[comp];
+
+        ["nano", "fast", "balanced", "powerful", "max"].forEach(tierKey => {
+          const input = tr.querySelector(`.preset-mapping-${tierKey}`);
+          if (input) {
+            if (input.value) newPresetsData[pid].mapping[tierKey] = input.value;
+            else delete newPresetsData[pid].mapping[tierKey];
           }
         });
       });

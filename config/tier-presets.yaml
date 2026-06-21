@@ -38,19 +38,3 @@ Expensive as Hell:
     balanced: max
     powerful: max
     max: max
-Normal (SE):
-  description: "Normal, aber Systems-Engineering Rollen künstlich hochgestuft."
-  mapping:
-    nano: nano
-    fast: fast
-    balanced: balanced
-    powerful: powerful
-    max: max
-Advanced (SE):
-  description: "Advanced, aber Systems-Engineering Rollen künstlich hochgestuft."
-  mapping:
-    nano: fast
-    fast: balanced
-    balanced: powerful
-    powerful: max
-    max: max

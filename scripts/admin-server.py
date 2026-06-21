@@ -1320,6 +1320,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            # Validate: each top-level preset value must be a dict with a "mapping" key
+            if not isinstance(data, dict):
+                return self._send_json({"error": "Payload must be a JSON object"}, status=400)
+            for preset_id, preset_val in data.items():
+                if not isinstance(preset_val, dict) or "mapping" not in preset_val:
+                    return self._send_json(
+                        {"error": f"Preset '{preset_id}' must be an object with a 'mapping' key"},
+                        status=400,
+                    )
             path = self.__class__.root / "config" / "tier-presets.yaml"
             if not (self.__class__.root / "config").exists():
                 path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
