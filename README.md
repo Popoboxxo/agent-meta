@@ -43,6 +43,9 @@
 - **Config-Driven Generation:** All configuration lives in `config/` (role defaults, DoD presets, MCP registry, AI providers, skills registry) — `sync.py` reads and generates everything.
 - **Versioned Templates:** Every agent template carries a semantic version in its frontmatter; platform agents track their base version.
 - **AI Provider Tier Routing:** Five abstract model tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) are mapped per provider to concrete model IDs — cost-efficient model selection.
+- **Dynamic Model Tracking:** Automatically fetch and cache the latest model IDs from AI providers using `sync.py --update-models`.
+- **Tier-Presets Matrix:** Dynamically resolve model IDs based on provider, preset (e.g., standard, fast-prototyping, max-quality) and tier.
+- **Admin UI:** A local web interface to manage AI providers, models, presets, and token pricing mapping.
 - **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
 - **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
 - **Provider Tool Whitelists:** Per-provider tool capability declarations prevent agents from referencing tools unavailable in their target provider environment.
@@ -316,6 +319,24 @@ speech-mode: submissive        # full | short | childish | caveman | asozial | s
 | **strict** | ✅ | ✅ | ✅ | ❌ |
 | **enterprise** | ✅ | ✅ | ✅ | ✅ |
 
+### Dynamic Model Tiers & Presets
+
+agent-meta supports dynamic model routing through a preset matrix defined in `.meta-config/project.yaml`. The rigid assignment of models in `ai-providers.yaml` is replaced by a tier-based preset system that allows cost-efficient and task-specific model selection.
+
+```yaml
+# In .meta-config/project.yaml
+ai-provider: Claude
+model-preset: standard  # standard | cheap | advanced | expensive
+```
+
+**Key components:**
+1. **Dynamic Model Crawling:** Update the local model cache with the latest models from the provider APIs (Anthropic, Gemini, Opencode) by running:
+   ```bash
+   python scripts/sync.py --update-models
+   ```
+2. **Tier-Presets Matrix:** Maps agent tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) dynamically to model classes, considering a normalized cost factor (1-100). Systems-Engineering (SE) roles receive an automatic 1-2 tier upgrade via an `(SE)` preset variant.
+3. **Admin UI:** A "Model Discovery & Pricing" Dashboard inside the Admin UI (`docs/admin-ui.html`) provides a sortable model table, crawl button, heatmap, and a preset selector with live preview. Start the UI using `scripts/admin-server.py`.
+
 ### Speech Modes
 
 | Mode | Description |
@@ -338,6 +359,9 @@ agent-meta/
   config/                    # Framework configuration (managed by agent-meta)
     role-defaults.yaml       # Model/memory/permissionMode defaults per role
     ai-providers.yaml        # Provider settings (Claude, Gemini, Opencode, Continue, Copilot)
+    pricing-overlay.yaml     # Pricing data for cost factor calculation
+    generated/
+      model-registry.json    # Cached models from provider APIs
     dod-presets.yaml         # DoD quality presets
     mcp-registry.yaml        # Global MCP server catalog
     provider-tools.yaml      # Per-provider tool capability whitelists
@@ -349,6 +373,7 @@ agent-meta/
     provider-capabilities.yaml  # PAL: capability matrix per provider
     provider-bootstrap.yaml  # PAL: bootstrap mechanism definitions
   docs/                      # Documentation
+    admin-ui.html            # Web frontend for the Admin UI
     agent-graph.html         # Interactive agent visualization graph
     agent-mindmap.md         # Mermaid mindmap of all agents
     live-dashboard.html      # Live session monitoring dashboard
@@ -375,6 +400,7 @@ agent-meta/
     2-platform/              # Platform-specific rule overrides
   scripts/                   # Build and utility scripts
     sync.py                  # Main generation script (CLI entrypoint)
+    admin-server.py          # Backend server for the Admin UI
     viz-logger.py            # MCP server & CLI fallback for agent event logging
     viz-logger-mcp.mjs       # HTTP/SSE MCP transport for OpenCode (Windows)
     viz-server.py            # Live dashboard HTTP server

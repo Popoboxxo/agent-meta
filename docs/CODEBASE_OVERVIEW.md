@@ -483,6 +483,13 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `se-termination` | fast | — | optional | L3-Component-Leaf-Node Entscheidung |
 | `se-orchestrator` | balanced | — | optional | 6-stufiger rekursiver SE-Herunterbruch |
 
+### `config/ai-providers.yaml` & `config/generated/model-registry.json`
+
+**Zweck:** Verwaltung von dynamischen Modellen und Tiers über eine Preset-Matrix.
+- **Model Registry (`model-registry.json`):** Enthält dynamisch abgerufene Modelle von Provider-APIs (Anthropic, Gemini, Opencode).
+- **Pricing Overlay (`pricing-overlay.yaml`):** Reichert Modelle um Input/Output-Kosten an, woraus ein normalisierter *Cost Factor* (Score 1-100) berechnet wird.
+- **Tier-Presets Matrix (`project.yaml`):** Mappt dynamisch Agenten-Tiers (nano, fast, balanced, powerful, max) auf konkrete Modelle, basierend auf dem eingestellten Preset (z.B. cheap, normal, advanced, expensive). Systems-Engineering (SE) Rollen werden zusätzlich über ein SE-spezifisches Prefix künstlich aufgewertet.
+
 ---
 
 ## 5. Schemas
@@ -683,6 +690,16 @@ se-cascade:
 3. Composition-Auflösung (`extends:` + `patches:`)
 4. Output nach `.claude/agents/<rolle>.md`
 5. Rules und Hooks werden nach `.claude/rules/` und `.claude/hooks/` kopiert
+
+**Dynamisches Crawling (`--update-models`):**
+Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
+
+### `scripts/admin-server.py` & `docs/admin-ui.html`
+
+**Zweck:** Bereitstellung einer interaktiven, webbasierten Admin UI.
+- **Dashboard:** Bietet ein "Model Discovery & Pricing" Dashboard mit sortierbaren Modell-Tabellen, Preis-Heatmaps und einem Button zum direkten Ausführen von `sync.py --update-models`.
+- **Config Management:** Visuelle Bearbeitung der Tier-Presets Matrix und Provider-Konfiguration inklusive Live-Vorschau.
+- **Architektur:** Single-File Web Frontend (`docs/admin-ui.html`) in Vanilla JS (Zero Dependencies) und ein Python-Backend (`scripts/admin-server.py`).
 
 ### `scripts/viz-logger.py` & `scripts/viz-logger-mcp.mjs` & `scripts/lib/viz.py`
 
