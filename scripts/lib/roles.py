@@ -1,8 +1,12 @@
 """Roles config loading and model/memory/permissionMode resolution."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .io import _load_yaml_or_json
+
+if TYPE_CHECKING:
+    from .log import SyncLog
 
 ROLES_CONFIG = "config/role-defaults.yaml"
 _ROLES_CONFIG_LEGACY = "roles.config.yaml"
@@ -96,6 +100,7 @@ def resolve_model(
     agent_meta_root: Path,
     provider: str = "Claude",
     provider_config: dict | None = None,
+    log: "SyncLog" | None = None,
 ) -> str:
     """Resolve the model ID for a role and provider using tier presets and registry."""
     pc = provider_config or {}
@@ -107,25 +112,31 @@ def resolve_model(
     provider_specific = provider_overrides.get(provider, {})
     if isinstance(provider_specific, dict) and role in provider_specific:
         tier_or_id = str(provider_specific[role])
+        if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
     elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):
             if provider == "Claude":
                 tier_or_id = str(flat_value)
+                if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden via flat map: {tier_or_id}")
 
     # 2. Meta default from role-defaults.yaml
     if not tier_or_id:
         roles_cfg = load_roles_config(agent_meta_root)
         tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
+        if tier_or_id and log: log.debug(f"{provider}/{role}", f"Model/Tier from role-defaults: {tier_or_id}")
         
     # Check if role has an explicit tier override
     tier_overrides = project_config.get("tier-overrides", {})
     if role in tier_overrides:
         tier_or_id = tier_overrides[role]
+        if log: log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
 
     # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
     if tier_or_id and tier_or_id not in _KNOWN_TIERS:
-        return _resolve_tier_to_model(tier_or_id, provider, pc)
+        resolved = _resolve_tier_to_model(tier_or_id, provider, pc)
+        if log: log.debug(f"{provider}/{role}", f"Tier '{tier_or_id}' resolved directly to: {resolved}")
+        return resolved
 
     base_tier = tier_or_id
 
@@ -136,25 +147,34 @@ def resolve_model(
         preset_name = preset_name.replace(" (SE)", "")
         if role.startswith("se-"):
             base_tier = _upgrade_tier(base_tier, 1)
+            if log: log.debug(f"{provider}/{role}", f"SE Focus applied, tier upgraded to: {base_tier}")
 
     presets = load_tier_presets(agent_meta_root).get("presets", {})
     preset_matrix = presets.get(preset_name, {})
     
     mapped_tier = preset_matrix.get(base_tier, base_tier)
+    if log and mapped_tier != base_tier:
+        log.debug(f"{provider}/{role}", f"Tier '{base_tier}' mapped to '{mapped_tier}' via preset '{preset_name}'")
 
     pto = project_config.get("provider-tier-overrides", {})
     if provider in pto and mapped_tier in pto[provider]:
-        return str(pto[provider][mapped_tier])
+        resolved = str(pto[provider][mapped_tier])
+        if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' explicitly overriden for provider '{provider}': {resolved}")
+        return resolved
 
     # 4. Lookup in registry
     registry = load_model_registry(agent_meta_root)
     models = registry.get("models", [])
     for m in models:
         if m.get("provider", "").lower() == provider.lower() and m.get("tier", "").lower() == mapped_tier.lower():
-            return m.get("id", "")
+            resolved = m.get("id", "")
+            if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved from registry to: {resolved}")
+            return resolved
 
     # Fallback if not in registry
-    return _resolve_tier_to_model(mapped_tier, provider, pc)
+    resolved = _resolve_tier_to_model(mapped_tier, provider, pc)
+    if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved via fallback to: {resolved}")
+    return resolved
 
 
 def resolve_permission_mode(role: str, project_config: dict, agent_meta_root: Path) -> str:

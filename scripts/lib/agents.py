@@ -887,7 +887,7 @@ def sync_agents(
                                     generated_from=generated_from)
 
         model = resolve_model(role, config, agent_meta_root,
-                              provider="Claude", provider_config=provider_config)
+                              provider="Claude", provider_config=provider_config, log=log)
         content = inject_model_field(content, model)
         if model:
             model_src = "project override" if role in config.get("model-overrides", {}) else "meta default"
@@ -1122,7 +1122,7 @@ def sync_agents_for_provider(
             # Continue agents: preserve original frontmatter, inject model/memory, add alwaysApply
             content = build_frontmatter(content, name, description, generated_from=generated_from)
             model = resolve_model(role, config, agent_meta_root,
-                                  provider=provider, provider_config=provider_config)
+                                  provider=provider, provider_config=provider_config, log=log)
             if not model:
                 # Continue has no model-tiers mapping; fall back to raw role-defaults value
                 roles_cfg = load_roles_config(agent_meta_root)
@@ -1166,7 +1166,7 @@ def sync_agents_for_provider(
 
             if provider == 'Claude':
                 model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config)
+                                      provider=provider, provider_config=provider_config, log=log)
                 content = inject_model_field(content, model)
                 if model:
                     po = config.get('model-overrides', {})
@@ -1202,7 +1202,7 @@ def sync_agents_for_provider(
                 # max_output_tokens) plus memory and permissionMode, then
                 # strip Claude-specific lines.
                 model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config)
+                                      provider=provider, provider_config=provider_config, log=log)
                 content = inject_model_field(content, model)
                 if model:
                     po = config.get('model-overrides', {})
@@ -1253,7 +1253,7 @@ def sync_agents_for_provider(
                 # Opencode: native frontmatter (description + mode: subagent + model)
                 # Model IDs use "provider/model-id" format (e.g. anthropic/claude-sonnet-4-6)
                 model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config)
+                                      provider=provider, provider_config=provider_config, log=log)
                 if model:
                     po = config.get('model-overrides', {})
                     is_override = role in po.get('Opencode', {})

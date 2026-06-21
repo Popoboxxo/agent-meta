@@ -2636,13 +2636,36 @@ async function viewSync() {
   const consoleEl = el("div", { class: "console" }, ["(idle)"]);
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
   const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
-  wrap.appendChild(el("div", { class: "btn-row" }, [runBtn, dryBtn]));
+  const statsWrap = el("div", { style: "margin-top: 16px; display: none;" });
+  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: 12px;" }, [runBtn, dryBtn]));
   wrap.appendChild(consoleEl);
+  wrap.appendChild(statsWrap);
 
   const setOutput = (text) => {
     consoleEl.replaceChildren();
+    statsWrap.style.display = "none";
+    statsWrap.replaceChildren();
+
     const lines = String(text || "").split("\n");
-    for (const line of lines) {
+    let inDebug = false;
+    const debugLines = [];
+    let summaryLine = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line === "DEBUG" && lines[i+1] === "-----") {
+        inDebug = true;
+      } else if (inDebug && (line === "WARNINGS" || line === "SUMMARY") && lines[i+1] && lines[i+1].startsWith("---")) {
+        inDebug = false;
+      } else if (inDebug && line.trim() && !line.startsWith("-----")) {
+        debugLines.push(line);
+      }
+
+      if (line === "SUMMARY" && lines[i+1] === "-------") {
+        summaryLine = lines[i+2];
+      }
+
       let cls = "line-info";
       if (/WRITE|UPDATE|COPY|DONE|✓/i.test(line)) cls = "line-write";
       else if (/WARN|warning/i.test(line)) cls = "line-warn";
@@ -2650,6 +2673,41 @@ async function viewSync() {
       consoleEl.appendChild(el("div", { class: cls }, [line]));
     }
     consoleEl.scrollTop = consoleEl.scrollHeight;
+
+    if (summaryLine) {
+      const parts = summaryLine.split("|").map(p => p.trim());
+      const actions = parts[0] || "0 actions";
+      const skipped = parts[1] || "0 skipped";
+      const warnings = parts[2] || "0 warnings";
+
+      statsWrap.style.display = "block";
+      const cards = el("div", { class: "panel-grid", style: "margin-bottom: 12px;" });
+
+      const makeCard = (label, valStr) => {
+        const numMatch = valStr.match(/\d+/);
+        const num = numMatch ? numMatch[0] : "0";
+        const isWarn = label === "Warnings" && num !== "0";
+        const isInfo = label === "Actions" && num !== "0";
+        return el("div", { class: "metric", style: isWarn ? "border-color: var(--accent-yellow);" : "" }, [
+          el("div", { class: "label", style: isWarn ? "color: var(--accent-yellow);" : "" }, [label]),
+          el("div", { class: "value mono", style: isWarn ? "color: var(--accent-yellow);" : (isInfo ? "color: var(--accent-green);" : "") }, [valStr])
+        ]);
+      };
+
+      cards.appendChild(makeCard("Actions", actions));
+      cards.appendChild(makeCard("Skipped", skipped));
+      cards.appendChild(makeCard("Warnings", warnings));
+      statsWrap.appendChild(cards);
+
+      if (debugLines.length > 0) {
+        const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px;" });
+        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug-Output (Model-Ersetzungen)"]);
+        const pre = el("pre", { style: "margin-top: 10px; background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
+        details.appendChild(summary);
+        details.appendChild(pre);
+        statsWrap.appendChild(details);
+      }
+    }
   };
 
   runBtn.addEventListener("click", async () => {

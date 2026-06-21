@@ -11,6 +11,7 @@ class SyncLog:
         self.warnings: list[str] = []
         self.skipped: list[str] = []
         self.infos: list[str] = []
+        self.debugs: list[str] = []
         self._seen_warnings: set[str] = set()
         self.start_time = datetime.now()
 
@@ -31,6 +32,9 @@ class SyncLog:
 
     def info(self, target: str, reason: str):
         self.infos.append(f"[INFO]   {target:<50}  ({reason})")
+
+    def debug(self, target: str, message: str):
+        self.debugs.append(f"[DEBUG]  {target:<50}  {message}")
 
     def provider_header(self, provider: str):
         self.infos.append("")
@@ -62,6 +66,10 @@ class SyncLog:
         if self.infos:
             lines += ["", "INFO", "----"]
             lines += self.infos
+
+        if self.debugs:
+            lines += ["", "DEBUG", "-----"]
+            lines += self.debugs
 
         if self.warnings:
             lines += ["", "WARNINGS", "--------"]
