@@ -1258,6 +1258,7 @@ function buildSidebar() {
         { route: "/project/orchestrator", label: "Orchestrator", icon: "□" },
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "□" },
         { route: "/project/model-overrides", label: "Model Overrides", icon: "□" },
+        { route: "/project/provider-tier-overrides", label: "Provider Tier Overrides", icon: "❖" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "□" },
       ],
     },
@@ -2896,15 +2897,20 @@ async function viewProjectGeneral() {
   // admin server is not running in super_admin mode).
   const DOD_FALLBACK   = ["rapid-prototyping", "standard", "strict"];
   const RULES_FALLBACK = ["default", "minimal", "silent"];
+  const TIER_FALLBACK = [
+    "Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell",
+    "Cheap (SE)", "Normal (SE)", "Advanced (SE)", "Expensive (SE)", "Expensive as Hell (SE)"
+  ];
   // sync with schema speech-mode enum (config/project-config.schema.json)
   const SPEECH_MODES   = ["full", "short", "childish", "caveman", "asozial", "submissive", "business", "bullshit-bingo", "linkedin"];
 
   // Load project.yaml and presets in parallel. Each preset endpoint may fail
   // independently — fall back to the hardcoded list in that case.
-  const [data, dodPresetsResp, rulesPresetsResp] = await Promise.all([
+  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp] = await Promise.all([
     loadProject(),
     api.get("/api/config/dod-presets").catch(() => null),
     api.get("/api/config/rules-presets").catch(() => null),
+    api.get("/api/tier-presets").catch(() => null),
   ]);
 
   // dod-presets.yaml has either a top-level mapping of preset-name → config,
@@ -2920,10 +2926,14 @@ async function viewProjectGeneral() {
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
   const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal" };
 
-  const TIER_PRESETS = [
-    "Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell",
-    "Cheap (SE)", "Normal (SE)", "Advanced (SE)", "Expensive (SE)", "Expensive as Hell (SE)"
-  ];
+  let TIER_PRESETS = TIER_FALLBACK;
+  if (tierPresetsResp && tierPresetsResp.presets) {
+    TIER_PRESETS = [];
+    for (const key of Object.keys(tierPresetsResp.presets)) {
+      TIER_PRESETS.push(key);
+      TIER_PRESETS.push(`${key} (SE)`);
+    }
+  }
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
@@ -3675,6 +3685,118 @@ async function viewProjectModelOverrides() {
   return wrap;
 }
 
+/* ------------------------ Provider Tier Overrides ------------------------ */
+async function viewProjectProviderTierOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Provider Tier Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override the model used per provider + tier. Providers that manage models centrally are excluded.",
+  ]));
+  const [data, providers, modelsRes] = await Promise.all([
+    loadProject(),
+    api.get("/api/providers").catch(() => []),
+    api.get("/api/models").catch(() => ({ models: [] })),
+  ]);
+
+  const tierProviders = providers.filter(p => p.has_model_tiers);
+  const specificModels = modelsRes.models || [];
+  const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
+
+  const datalist = el("datalist", { id: "global-model-list-tier" });
+  for (const m of specificModels) {
+    const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+    datalist.appendChild(el("option", { value: m.id }, [label]));
+  }
+  wrap.appendChild(datalist);
+
+  // Flatten existing
+  const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
+  const rows = [];
+  for (const [prov, tierMap] of Object.entries(existing)) {
+    if (!tierMap || typeof tierMap !== "object") continue;
+    for (const [tier, model] of Object.entries(tierMap)) {
+      rows.push({ provider: prov, tier, model });
+    }
+  }
+
+  const status = el("div", { class: "muted" }, [`${rows.length} overrides.`]);
+  wrap.appendChild(status);
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  const render = () => {
+    tableWrap.replaceChildren();
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Provider", "Tier", "Model", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    rows.forEach((row, idx) => {
+      const tr = el("tr");
+
+      // Provider dropdown
+      const provSel = el("select");
+      const provNames = tierProviders.map(p => p.name);
+      if (row.provider && !provNames.includes(row.provider)) {
+        provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
+      }
+      provSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const pn of provNames) {
+        const o = el("option", { value: pn }, [pn]);
+        if (pn === row.provider) o.selected = true;
+        provSel.appendChild(o);
+      }
+      provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
+      tr.appendChild(el("td", {}, [provSel]));
+
+      // Tier dropdown
+      const tierSel = el("select");
+      const known = new Set(tierNames);
+      if (row.tier && !known.has(row.tier)) tierSel.appendChild(el("option", { value: row.tier }, [row.tier + " (unknown)"]));
+      tierSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const tn of tierNames) {
+        const o = el("option", { value: tn }, [tn]);
+        if (tn === row.tier) o.selected = true;
+        tierSel.appendChild(o);
+      }
+      tierSel.addEventListener("change", () => { row.tier = tierSel.value; });
+      tr.appendChild(el("td", {}, [tierSel]));
+
+      // Model input
+      const modelInp = el("input", { type: "text", list: "global-model-list-tier", placeholder: "Preset Standard (Kein Override)" });
+      if (row.model) modelInp.value = row.model;
+      modelInp.addEventListener("change", () => { row.model = modelInp.value; });
+      tr.appendChild(el("td", {}, [modelInp]));
+
+      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
+      tr.appendChild(el("td", {}, [rm]));
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    status.textContent = `${rows.length} overrides.`;
+  };
+  render();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => { rows.push({ provider: "", tier: "", model: "" }); render(); } }, ["Add override"]),
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const out = {};
+      for (const row of rows) {
+        if (!row.provider || !row.tier || !row.model) continue;
+        out[row.provider] = out[row.provider] || {};
+        out[row.provider][row.tier] = row.model;
+      }
+      try { await saveProjectSection("provider-tier-overrides", out, status); } catch { /* shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------------- Advanced -------------------------------- */
 async function viewProjectAdvanced() {
   const wrap = el("div");
@@ -4373,6 +4495,7 @@ async function init() {
   router.register("/project/orchestrator",    viewProjectOrchestrator);
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/model-overrides", viewProjectModelOverrides);
+  router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
   router.register("/project/advanced",        viewProjectAdvanced);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);

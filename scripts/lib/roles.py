@@ -142,6 +142,10 @@ def resolve_model(
     
     mapped_tier = preset_matrix.get(base_tier, base_tier)
 
+    pto = project_config.get("provider-tier-overrides", {})
+    if provider in pto and mapped_tier in pto[provider]:
+        return str(pto[provider][mapped_tier])
+
     # 4. Lookup in registry
     registry = load_model_registry(agent_meta_root)
     models = registry.get("models", [])
