@@ -4030,7 +4030,7 @@ async function viewModelDashboard() {
     applyFilters();
   };
 
-  const getDatalistId = (provider) => `dl-${provider.replace(/[^a-zA-Z0-9]/g, '-')}`;
+  const getDatalistId = (provider) => `model-list-${provider.replace(/[^a-zA-Z0-9]/g, '-')}`;
 
   const renderProviders = () => {
     providersWrap.innerHTML = "";
