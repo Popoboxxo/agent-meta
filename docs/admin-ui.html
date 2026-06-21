@@ -1268,7 +1268,6 @@ function buildSidebar() {
         { route: "/provider-tiers", label: "Provider Tier Mappings", icon: "❖", superOnly: true },
         { route: "/tier-presets", label: "Tier Presets", icon: "❖", superOnly: true },
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
-        { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
         { route: "/config/mcp-registry", label: "mcp registry", icon: "□", superOnly: true },
         { route: "/config/dod-presets", label: "dod presets", icon: "□", superOnly: true },
@@ -3579,6 +3578,13 @@ async function viewProjectModelOverrides() {
   const roleNames = roles.map(r => r.name);
   const specificModels = modelsRes.models || [];
 
+  const datalist = el("datalist", { id: "global-model-list" });
+  for (const m of specificModels) {
+    const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+    datalist.appendChild(el("option", { value: m.id }, [label]));
+  }
+  wrap.appendChild(datalist);
+
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
   const rows = [];
@@ -3633,39 +3639,11 @@ async function viewProjectModelOverrides() {
       roleSel.addEventListener("change", () => { row.role = roleSel.value; });
       tr.appendChild(el("td", {}, [roleSel]));
 
-      // Model dropdown (depends on provider).
-      const modelSel = el("select");
-      modelSel.appendChild(el("option", { value: "" }, ["-- Preset Standard (Kein Override) --"]));
-      
-      const p = providerByName.get(row.provider);
-      let found = false;
-      if (p) {
-        const tierGroup = el("optgroup", { label: "Abstrakte Tiers (Via Matrix aufgelöst)" });
-        for (const t of Object.keys(p.model_tiers || {})) {
-           const o = el("option", { value: t }, ["Tier: " + t.charAt(0).toUpperCase() + t.slice(1)]);
-           if (row.model === t) { o.selected = true; found = true; }
-           tierGroup.appendChild(o);
-        }
-        modelSel.appendChild(tierGroup);
-
-        const specificGroup = el("optgroup", { label: "Spezifische Modelle (Hard Override)" });
-        const providerModels = specificModels.filter(m => m.provider === row.provider);
-        for (const m of providerModels) {
-           const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
-           const o = el("option", { value: m.id }, [label]);
-           if (row.model === m.id) { o.selected = true; found = true; }
-           specificGroup.appendChild(o);
-        }
-        modelSel.appendChild(specificGroup);
-      }
-      
-      if (row.model && !found) {
-        const o = el("option", { value: row.model }, [row.model]);
-        o.selected = true;
-        modelSel.appendChild(o);
-      }
-      modelSel.addEventListener("change", () => { row.model = modelSel.value; });
-      tr.appendChild(el("td", {}, [modelSel]));
+      // Model input with datalist.
+      const modelInp = el("input", { type: "text", list: "global-model-list", placeholder: "Preset Standard (Kein Override)" });
+      if (row.model) modelInp.value = row.model;
+      modelInp.addEventListener("change", () => { row.model = modelInp.value; });
+      tr.appendChild(el("td", {}, [modelInp]));
 
       const rm = el("button", { class: "btn btn-danger" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
@@ -4398,7 +4376,6 @@ async function init() {
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/role-defaults",     viewRoleDefaults);
-  router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);
   router.register("/config/mcp-registry",      viewMcpRegistry);
   router.register("/config/dod-presets",       viewDodPresets);

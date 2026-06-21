@@ -7,6 +7,23 @@ from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
+OPENCODE_GO_MODELS = [
+    {"id": "opencode-go/glm-5.2", "name": "glm-5.2", "provider": "opencode-go", "input_cost_api": 1.40, "output_cost_api": 4.40},
+    {"id": "opencode-go/glm-5.1", "name": "glm-5.1", "provider": "opencode-go", "input_cost_api": 1.40, "output_cost_api": 4.40},
+    {"id": "opencode-go/kimi-k2.7-code", "name": "kimi-k2.7-code", "provider": "opencode-go", "input_cost_api": 0.95, "output_cost_api": 4.00},
+    {"id": "opencode-go/kimi-k2.6", "name": "kimi-k2.6", "provider": "opencode-go", "input_cost_api": 0.95, "output_cost_api": 4.00},
+    {"id": "opencode-go/mimo-v2.5", "name": "mimo-v2.5", "provider": "opencode-go", "input_cost_api": 0.14, "output_cost_api": 0.28},
+    {"id": "opencode-go/mimo-v2.5-pro", "name": "mimo-v2.5-pro", "provider": "opencode-go", "input_cost_api": 1.74, "output_cost_api": 3.48},
+    {"id": "opencode-go/minimax-m3", "name": "minimax-m3", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
+    {"id": "opencode-go/minimax-m2.7", "name": "minimax-m2.7", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
+    {"id": "opencode-go/minimax-m2.5", "name": "minimax-m2.5", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
+    {"id": "opencode-go/qwen3.7-max", "name": "qwen3.7-max", "provider": "opencode-go", "input_cost_api": 2.50, "output_cost_api": 7.50},
+    {"id": "opencode-go/qwen3.7-plus", "name": "qwen3.7-plus", "provider": "opencode-go", "input_cost_api": 0.40, "output_cost_api": 1.60},
+    {"id": "opencode-go/qwen3.6-plus", "name": "qwen3.6-plus", "provider": "opencode-go", "input_cost_api": 0.50, "output_cost_api": 3.00},
+    {"id": "opencode-go/deepseek-v4-pro", "name": "deepseek-v4-pro", "provider": "opencode-go", "input_cost_api": 1.74, "output_cost_api": 3.48},
+    {"id": "opencode-go/deepseek-v4-flash", "name": "deepseek-v4-flash", "provider": "opencode-go", "input_cost_api": 0.14, "output_cost_api": 0.28},
+]
+
 def fetch_openrouter_models(excluded_models=None) -> List[Dict[str, Any]]:
     if excluded_models is None:
         excluded_models = []
@@ -71,6 +88,8 @@ def discover_models() -> Dict[str, Any]:
         logger.error(f"Failed to read pricing-overlay.yaml: {e}")
 
     models = fetch_openrouter_models(excluded_models)
+    
+    models.extend(OPENCODE_GO_MODELS)
     
     registry = {
         "models": models
