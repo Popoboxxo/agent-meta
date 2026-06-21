@@ -106,18 +106,21 @@ def resolve_model(
     pc = provider_config or {}
 
     tier_or_id = ""
+    explicit_override = False
 
     # 1. Provider-specific project override
     provider_overrides = project_config.get("model-overrides", {})
     provider_specific = provider_overrides.get(provider, {})
     if isinstance(provider_specific, dict) and role in provider_specific:
         tier_or_id = str(provider_specific[role])
+        explicit_override = True
         if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
     elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):
             if provider == "Claude":
                 tier_or_id = str(flat_value)
+                explicit_override = True
                 if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden via flat map: {tier_or_id}")
 
     # 2. Meta default from role-defaults.yaml
@@ -125,12 +128,13 @@ def resolve_model(
         roles_cfg = load_roles_config(agent_meta_root)
         tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
         if tier_or_id and log: log.debug(f"{provider}/{role}", f"Model/Tier from role-defaults: {tier_or_id}")
-        
-    # Check if role has an explicit tier override
-    tier_overrides = project_config.get("tier-overrides", {})
-    if role in tier_overrides:
-        tier_or_id = tier_overrides[role]
-        if log: log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
+
+    # Check if role has an explicit tier override (skip when user already set explicit model-override)
+    if not explicit_override:
+        tier_overrides = project_config.get("tier-overrides", {})
+        if role in tier_overrides:
+            tier_or_id = tier_overrides[role]
+            if log: log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
 
     # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
     if tier_or_id and tier_or_id not in _KNOWN_TIERS:

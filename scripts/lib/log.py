@@ -9,6 +9,7 @@ class SyncLog:
     def __init__(self):
         self.actions: list[str] = []
         self.warnings: list[str] = []
+        self.errors: list[str] = []
         self.skipped: list[str] = []
         self.infos: list[str] = []
         self.debugs: list[str] = []
@@ -26,6 +27,11 @@ class SyncLog:
         self._seen_warnings.add(message)
         self.warnings.append(f"[WARN]   {message}")
         print(f"  !  {message}", file=sys.stderr)
+
+    def error(self, target: str, message: str):
+        line = f"[ERROR]  {target:<50}  {message}"
+        self.errors.append(line)
+        print(f"  X  {target}: {message}", file=sys.stderr)
 
     def skip(self, target: str, reason: str):
         self.skipped.append(f"[SKIP]   {target:<50}  ({reason})")
@@ -71,17 +77,27 @@ class SyncLog:
             lines += ["", "DEBUG", "-----"]
             lines += self.debugs
 
+        if self.errors:
+            lines += ["", "ERRORS", "------"]
+            lines += self.errors
+
         if self.warnings:
             lines += ["", "WARNINGS", "--------"]
             lines += self.warnings
         else:
             lines += ["", "WARNINGS", "--------", "(none)"]
 
+        summary = (
+            f"{len(self.actions)} action(s)  |  {len(self.skipped)} skipped  |  "
+            f"{len(self.warnings)} warning(s)"
+        )
+        if self.errors:
+            summary += f"  |  {len(self.errors)} error(s)"
         lines += [
             "",
             "SUMMARY",
             "-------",
-            f"{len(self.actions)} action(s)  |  {len(self.skipped)} skipped  |  {len(self.warnings)} warning(s)",
+            summary,
             f"Logfile: {log_path}",
         ]
 

@@ -130,7 +130,7 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                         )
 
             # Circular orchestration guard
-            if agent in orchestrator_roles:
+            if agent in orchestrator_roles and not stage.get("allow_orchestrator"):
                 errors.append(
                     f"Pipeline '{name}': stage '{stage.get('id')}' uses orchestrator "
                     f"agent '{agent}' — would create circular delegation"
