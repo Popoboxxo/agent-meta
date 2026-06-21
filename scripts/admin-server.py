@@ -991,6 +991,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models":
             return self._handle_get_models()
 
+        if path == "/api/ai-providers":
+            return self._handle_get_ai_providers()
+
+        if path == "/api/tier-presets":
+            return self._handle_get_tier_presets()
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1053,6 +1059,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/pricing/update":
             return self._handle_post_pricing_update()
+
+        if path == "/api/pricing/reset":
+            return self._handle_post_pricing_reset()
+
+        if path == "/api/ai-providers/update":
+            return self._handle_post_ai_providers_update()
+
+        if path == "/api/tier-presets/update":
+            return self._handle_post_tier_presets_update()
 
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
@@ -1197,6 +1212,86 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             with pricing_path.open("w", encoding="utf-8") as fh:
                 yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
                 
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_pricing_reset(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0:
+                return self._send_json({"error": "Empty body"}, status=400)
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not (self.__class__.root / "config").exists():
+                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+                if "prices" in pricing:
+                    provider = data.get("provider")
+                    model_id = data.get("id")
+                    if provider in pricing["prices"] and model_id in pricing["prices"][provider]:
+                        del pricing["prices"][provider][model_id]
+                        if not pricing["prices"][provider] and "_url" not in pricing["prices"][provider]:
+                             # Maybe don't delete empty providers to be safe, but they have _url usually
+                             pass
+                        with pricing_path.open("w", encoding="utf-8") as fh:
+                            yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
+                            
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_ai_providers(self) -> None:
+        try:
+            path = self.__class__.root / "config" / "ai-providers.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            data = {}
+            if path.exists():
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_ai_providers_update(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            path = self.__class__.root / "config" / "ai-providers.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_tier_presets(self) -> None:
+        try:
+            path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            data = {}
+            if path.exists():
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_tier_presets_update(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
             return self._send_json({"success": True})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)

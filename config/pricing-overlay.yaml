@@ -27,3 +27,7 @@ prices:
     opencode-go-small:
       input: 0.00
       output: 0.00
+  opencode-go:
+    _url: https://opencode.ai/docs/de/go/
+  opencode-zen:
+    _url: https://opencode.ai/zen
