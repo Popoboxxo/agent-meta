@@ -3564,16 +3564,18 @@ async function viewProjectModelOverrides() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Override the model used per provider + role. Providers that manage models centrally are excluded.",
   ]));
-  const [data, providers, roles] = await Promise.all([
+  const [data, providers, roles, modelsRes] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
     api.get("/api/roles").catch(() => []),
+    api.get("/api/models").catch(() => ({ models: [] })),
   ]);
 
   // Only providers with model tiers can carry overrides.
   const tierProviders = providers.filter(p => p.has_model_tiers);
   const providerByName = new Map(providers.map(p => [p.name, p]));
   const roleNames = roles.map(r => r.name);
+  const specificModels = modelsRes.models || [];
 
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
@@ -3587,21 +3589,6 @@ async function viewProjectModelOverrides() {
 
   const status = el("div", { class: "muted" }, [`${rows.length} overrides.`]);
   wrap.appendChild(status);
-
-  // Build the model option list for a given provider: tier names + alias names
-  // + concrete model IDs.
-  const modelOptionsFor = (provName) => {
-    const p = providerByName.get(provName);
-    if (!p) return [];
-    const tiers = p.model_tiers || {};
-    const aliases = p.model_aliases || {};
-    const opts = new Set();
-    for (const t of Object.keys(tiers)) opts.add(t);
-    for (const a of Object.keys(aliases)) opts.add(a);
-    for (const v of Object.values(tiers)) opts.add(v);
-    for (const v of Object.values(aliases)) opts.add(v);
-    return [...opts];
-  };
 
   const tableWrap = el("div");
   wrap.appendChild(tableWrap);
@@ -3646,12 +3633,33 @@ async function viewProjectModelOverrides() {
 
       // Model dropdown (depends on provider).
       const modelSel = el("select");
-      const modelOpts = modelOptionsFor(row.provider);
-      if (row.model && !modelOpts.includes(row.model)) modelSel.appendChild(el("option", { value: row.model }, [row.model]));
-      modelSel.appendChild(el("option", { value: "" }, ["— select —"]));
-      for (const m of modelOpts) {
-        const o = el("option", { value: m }, [m]);
-        if (m === row.model) o.selected = true;
+      modelSel.appendChild(el("option", { value: "" }, ["-- Preset Standard (Kein Override) --"]));
+      
+      const p = providerByName.get(row.provider);
+      let found = false;
+      if (p) {
+        const tierGroup = el("optgroup", { label: "Abstrakte Tiers (Via Matrix aufgelöst)" });
+        for (const t of Object.keys(p.model_tiers || {})) {
+           const o = el("option", { value: t }, ["Tier: " + t.charAt(0).toUpperCase() + t.slice(1)]);
+           if (row.model === t) { o.selected = true; found = true; }
+           tierGroup.appendChild(o);
+        }
+        modelSel.appendChild(tierGroup);
+
+        const specificGroup = el("optgroup", { label: "Spezifische Modelle (Hard Override)" });
+        const providerModels = specificModels.filter(m => m.provider === row.provider);
+        for (const m of providerModels) {
+           const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+           const o = el("option", { value: m.id }, [label]);
+           if (row.model === m.id) { o.selected = true; found = true; }
+           specificGroup.appendChild(o);
+        }
+        modelSel.appendChild(specificGroup);
+      }
+      
+      if (row.model && !found) {
+        const o = el("option", { value: row.model }, [row.model]);
+        o.selected = true;
         modelSel.appendChild(o);
       }
       modelSel.addEventListener("change", () => { row.model = modelSel.value; });
@@ -3873,7 +3881,7 @@ async function viewModelDashboard() {
       const thead = el("thead");
       thead.appendChild(el("tr", {}, [
         el("th", {}, ["Provider"]),
-        el("th", {}, ["Model ID"]),
+        el("th", {}, ["Model (Name & ID)"]),
         el("th", {}, ["Tier"]),
         el("th", {}, ["Input Cost ($/1M)"]),
         el("th", {}, ["Output Cost ($/1M)"]),
@@ -3885,7 +3893,11 @@ async function viewModelDashboard() {
       models.forEach(m => {
         const tr = el("tr");
         tr.appendChild(el("td", {}, [m.provider]));
-        tr.appendChild(el("td", { class: "mono" }, [m.id]));
+        tr.appendChild(el("td", {}, [
+          el("strong", {}, [m.name || m.id]),
+          el("br"),
+          el("small", { class: "muted mono" }, [m.id])
+        ]));
         tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier])]));
         tr.appendChild(el("td", { class: "mono" }, [m.input_cost?.toFixed(2) || "0.00"]));
         tr.appendChild(el("td", { class: "mono" }, [m.output_cost?.toFixed(2) || "0.00"]));

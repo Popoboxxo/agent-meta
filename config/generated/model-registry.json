@@ -1,0 +1,39 @@
+{
+  "models": [
+    {
+      "id": "claude-3-5-sonnet-20240620",
+      "provider": "anthropic",
+      "tier": "Advanced"
+    },
+    {
+      "id": "claude-3-opus-20240229",
+      "provider": "anthropic",
+      "tier": "Expensive"
+    },
+    {
+      "id": "claude-3-haiku-20240307",
+      "provider": "anthropic",
+      "tier": "Normal"
+    },
+    {
+      "id": "gemini-1.5-pro",
+      "provider": "gemini",
+      "tier": "Advanced"
+    },
+    {
+      "id": "gemini-1.5-flash",
+      "provider": "gemini",
+      "tier": "Normal"
+    },
+    {
+      "id": "opencode-go-large",
+      "provider": "opencode",
+      "tier": "Advanced"
+    },
+    {
+      "id": "opencode-go-small",
+      "provider": "opencode",
+      "tier": "Normal"
+    }
+  ]
+}

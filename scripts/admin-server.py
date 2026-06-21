@@ -1112,6 +1112,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             for m in models:
                 provider = m.get("provider", "")
                 model_id = m.get("id", "")
+                model_name = m.get("name") or model_id
                 provider_prices = prices.get(provider, {})
                 model_prices = provider_prices.get(model_id, {})
                 input_cost = model_prices.get("input", 0.0)
@@ -1120,6 +1121,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 # Blended cost per 1M tokens (30% input, 70% output)
                 cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
                 
+                m["name"] = model_name
                 m["input_cost"] = input_cost
                 m["output_cost"] = output_cost
                 m["cost_factor"] = cost_factor
