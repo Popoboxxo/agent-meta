@@ -1057,6 +1057,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models/update":
             return self._handle_post_models_update()
 
+        if path == "/api/models/exclude":
+            return self._handle_post_models_exclude()
+
         if path == "/api/pricing/update":
             return self._handle_post_pricing_update()
 
@@ -1167,6 +1170,37 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             res = self.__class__.sync_executor._run(["--update-models"])
             return self._send_json(res)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_exclude(self) -> None:
+        """Append IDs to excluded_models in pricing-overlay.yaml."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0:
+                return self._send_json({"error": "Empty body"}, status=400)
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            ids_to_exclude = data.get("ids", [])
+            
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not (self.__class__.root / "config").exists():
+                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                
+            pricing = {}
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+                
+            excluded = pricing.get("excluded_models", [])
+            for model_id in ids_to_exclude:
+                if model_id not in excluded:
+                    excluded.append(model_id)
+            pricing["excluded_models"] = excluded
+            
+            pricing_path.parent.mkdir(parents=True, exist_ok=True)
+            with pricing_path.open("w", encoding="utf-8") as fh:
+                yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
+                
+            return self._send_json({"success": True})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 

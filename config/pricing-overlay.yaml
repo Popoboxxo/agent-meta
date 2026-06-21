@@ -1,4 +1,5 @@
 # Basispreise ($ pro 1M Tokens)
+excluded_models: []
 prices:
   anthropic:
     _url: https://www.anthropic.com/pricing
