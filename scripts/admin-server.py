@@ -1125,6 +1125,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 m["input_cost"] = input_cost
                 m["output_cost"] = output_cost
                 m["cost_factor"] = cost_factor
+                m["source_url"] = provider_prices.get("_url", "")
 
             return self._send_json({"models": models})
         except Exception as exc:

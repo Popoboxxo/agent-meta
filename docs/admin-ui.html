@@ -3886,6 +3886,7 @@ async function viewModelDashboard() {
         el("th", {}, ["Input Cost ($/1M)"]),
         el("th", {}, ["Output Cost ($/1M)"]),
         el("th", {}, ["Cost Factor (1-100)"]),
+        el("th", {}, ["Reference"]),
       ]));
       table.appendChild(thead);
       
@@ -3895,19 +3896,38 @@ async function viewModelDashboard() {
         tr.appendChild(el("td", {}, [m.provider]));
         tr.appendChild(el("td", {}, [
           el("strong", {}, [m.name || m.id]),
+          el("span", { class: "badge ok", style: "margin-left: 8px;" }, ["API"]),
           el("br"),
           el("small", { class: "muted mono" }, [m.id])
         ]));
         tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier])]));
-        tr.appendChild(el("td", { class: "mono" }, [m.input_cost?.toFixed(2) || "0.00"]));
-        tr.appendChild(el("td", { class: "mono" }, [m.output_cost?.toFixed(2) || "0.00"]));
+        tr.appendChild(el("td", { class: "mono" }, [
+          (m.input_cost?.toFixed(2) || "0.00"),
+          el("span", { class: "badge warn", style: "margin-left: 8px;" }, ["Overlay"])
+        ]));
+        tr.appendChild(el("td", { class: "mono" }, [
+          (m.output_cost?.toFixed(2) || "0.00"),
+          el("span", { class: "badge warn", style: "margin-left: 8px;" }, ["Overlay"])
+        ]));
         
         const cf = m.cost_factor || 0;
         let heatColor = "var(--accent-blue)";
         if (cf > 20) heatColor = "var(--accent-yellow)";
         if (cf > 50) heatColor = "var(--accent-red)";
         
-        tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [cf.toFixed(2)]));
+        tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [
+          cf.toFixed(2),
+          el("span", { class: "badge optional", style: "margin-left: 8px;" }, ["Calc"])
+        ]));
+        
+        if (m.source_url) {
+          tr.appendChild(el("td", {}, [
+            el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"])
+          ]));
+        } else {
+          tr.appendChild(el("td", {}, ["-"]));
+        }
+        
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
