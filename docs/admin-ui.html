@@ -4121,7 +4121,13 @@ async function viewProviderTiers() {
     providersWrap.innerHTML = "";
     const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
     uniqueProviders.forEach(p => {
-      const dl = el("datalist", { id: getDatalistId(p) });
+      let dl = document.getElementById(getDatalistId(p));
+      if (!dl) {
+        dl = el("datalist", { id: getDatalistId(p) });
+        document.body.appendChild(dl);
+      } else {
+        dl.innerHTML = "";
+      }
       const addedIds = new Set();
       modelsData.filter(m => m.provider === p).forEach(m => {
         dl.appendChild(el("option", { value: m.id }, [m.name]));
@@ -4136,7 +4142,6 @@ async function viewProviderTiers() {
           }
         });
       }
-      providersWrap.appendChild(dl);
     });
     
     const table = el("table", { class: "data provider-tiers-table" });
@@ -4230,7 +4235,35 @@ async function viewTierPresets() {
   const editToggle = el("input", { type: "checkbox" });
   editLabel.prepend(editToggle);
   
+  const addBtn = el("button", { class: "btn" }, ["Add Preset"]);
+  addBtn.onclick = async () => {
+    const name = prompt("Enter new Preset ID:");
+    if (!name) return;
+    if (tierPresetsData[name]) {
+      toast("Preset already exists!", "error");
+      return;
+    }
+    tierPresetsData[name] = {
+      description: "",
+      mapping: {
+        nano: "nano",
+        fast: "nano",
+        balanced: "nano",
+        powerful: "nano",
+        max: "nano"
+      }
+    };
+    try {
+      await api.post("/api/tier-presets/update", tierPresetsData);
+      toast("Preset added!", "success");
+      await loadData();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  };
+  
   controls.appendChild(saveBtn);
+  controls.appendChild(addBtn);
   controls.appendChild(editLabel);
   wrap.appendChild(controls);
 
@@ -4241,7 +4274,7 @@ async function viewTierPresets() {
     presetsWrap.innerHTML = "";
     const table = el("table", { class: "data tier-presets-table" });
     const thead = el("thead");
-    thead.appendChild(el("tr", {}, ["Preset ID", "Description", "Default", "Trivial", "Standard", "Complex"].map(h => el("th", {}, [h]))));
+    thead.appendChild(el("tr", {}, ["Preset ID", "Description", "nano", "fast", "balanced", "powerful", "max"].map(h => el("th", {}, [h]))));
     table.appendChild(thead);
     
     const tbody = el("tbody");
@@ -4260,7 +4293,7 @@ async function viewTierPresets() {
       const tiers = ["nano", "fast", "balanced", "powerful", "max"];
       const mapping = data.mapping || {};
       
-      ["default", "trivial", "standard", "complex"].forEach(comp => {
+      ["nano", "fast", "balanced", "powerful", "max"].forEach(comp => {
         const td = el("td", {});
         const val = mapping[comp] || "";
         if (editMode) {
@@ -4305,7 +4338,7 @@ async function viewTierPresets() {
         const descInput = tr.querySelector(".preset-desc");
         if (descInput) newPresetsData[pid].description = descInput.value;
         if (!newPresetsData[pid].mapping) newPresetsData[pid].mapping = {};
-        ["default", "trivial", "standard", "complex"].forEach(comp => {
+        ["nano", "fast", "balanced", "powerful", "max"].forEach(comp => {
           const select = tr.querySelector(`.preset-mapping-${comp}`);
           if (select) {
             if (select.value) newPresetsData[pid].mapping[comp] = select.value;

@@ -1,31 +1,56 @@
-presets:
-  Cheap:
+Cheap:
+  description: "Flacht die Kurve radikal ab."
+  mapping:
     nano: nano
     fast: nano
     balanced: fast
     powerful: fast
     max: balanced
-  Normal:
+Normal:
+  description: "Das 1:1 Mapping (Status Quo)."
+  mapping:
     nano: nano
     fast: fast
     balanced: balanced
     powerful: powerful
     max: max
-  Advanced:
+Advanced:
+  description: "Shifft alles eine Stufe nach oben."
+  mapping:
     nano: fast
     fast: balanced
     balanced: powerful
     powerful: max
     max: max
-  Expensive:
+Expensive:
+  description: "Sehr starker Shift."
+  mapping:
     nano: balanced
     fast: powerful
     balanced: max
     powerful: max
-    max: ultra
-  Expensive as Hell:
+    max: max
+Expensive as Hell:
+  description: "Fast alle Agenten laufen auf powerful oder max."
+  mapping:
     nano: powerful
     fast: max
     balanced: max
-    powerful: ultra
-    max: ultra
+    powerful: max
+    max: max
+Normal (SE):
+  description: "Normal, aber Systems-Engineering Rollen künstlich hochgestuft."
+  mapping:
+    nano: nano
+    fast: fast
+    balanced: balanced
+    powerful: powerful
+    max: max
+Advanced (SE):
+  description: "Advanced, aber Systems-Engineering Rollen künstlich hochgestuft."
+  mapping:
+    nano: fast
+    fast: balanced
+    balanced: powerful
+    powerful: max
+    max: max
