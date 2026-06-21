@@ -1051,6 +1051,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models/update":
             return self._handle_post_models_update()
 
+        if path == "/api/pricing/update":
+            return self._handle_post_pricing_update()
+
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
         subserver = self._match_subserver_route(path)
@@ -1113,10 +1116,21 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 provider = m.get("provider", "")
                 model_id = m.get("id", "")
                 model_name = m.get("name") or model_id
+                
+                api_input = m.get("input_cost_api", 0.0)
+                api_output = m.get("output_cost_api", 0.0)
+                
                 provider_prices = prices.get(provider, {})
                 model_prices = provider_prices.get(model_id, {})
-                input_cost = model_prices.get("input", 0.0)
-                output_cost = model_prices.get("output", 0.0)
+                
+                overlay_input = model_prices.get("input")
+                overlay_output = model_prices.get("output")
+                
+                input_cost = overlay_input if overlay_input is not None else api_input
+                output_cost = overlay_output if overlay_output is not None else api_output
+                
+                input_source = "Overlay" if overlay_input is not None else "API"
+                output_source = "Overlay" if overlay_output is not None else "API"
                 
                 # Blended cost per 1M tokens (30% input, 70% output)
                 cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
@@ -1124,6 +1138,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 m["name"] = model_name
                 m["input_cost"] = input_cost
                 m["output_cost"] = output_cost
+                m["input_source"] = input_source
+                m["output_source"] = output_source
                 m["cost_factor"] = cost_factor
                 m["source_url"] = provider_prices.get("_url", "")
 
@@ -1136,6 +1152,52 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             res = self.__class__.sync_executor._run(["--update-models"])
             return self._send_json(res)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_pricing_update(self) -> None:
+        """Update pricing-overlay.yaml with new prices from UI."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0:
+                return self._send_json({"error": "Empty body"}, status=400)
+            body = self.rfile.read(length).decode("utf-8")
+            data = json.loads(body)
+            
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not (self.__class__.root / "config").exists():
+                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                
+            pricing = {}
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+            
+            if "prices" not in pricing:
+                pricing["prices"] = {}
+                
+            updates = data.get("updates", [])
+            for u in updates:
+                provider = u.get("provider")
+                model_id = u.get("id")
+                input_c = u.get("input_cost")
+                output_c = u.get("output_cost")
+                
+                if provider not in pricing["prices"]:
+                    pricing["prices"][provider] = {}
+                    
+                if model_id not in pricing["prices"][provider]:
+                    pricing["prices"][provider][model_id] = {}
+                    
+                if input_c is not None:
+                    pricing["prices"][provider][model_id]["input"] = float(input_c)
+                if output_c is not None:
+                    pricing["prices"][provider][model_id]["output"] = float(output_c)
+                    
+            pricing_path.parent.mkdir(parents=True, exist_ok=True)
+            with pricing_path.open("w", encoding="utf-8") as fh:
+                yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
+                
+            return self._send_json({"success": True})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 

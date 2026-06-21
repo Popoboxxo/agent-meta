@@ -3861,7 +3861,9 @@ async function viewModelDashboard() {
   const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px;" });
   
   const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white;" }, ["Save Pricing"]);
   controls.appendChild(refreshBtn);
+  controls.appendChild(saveBtn);
   wrap.appendChild(controls);
 
   const tableWrap = el("div", { id: "models-table-wrap" });
@@ -3877,12 +3879,12 @@ async function viewModelDashboard() {
         return;
       }
       
-      const table = el("table", { class: "data" });
+      const table = el("table", { class: "data", id: "models-table" });
       const thead = el("thead");
       thead.appendChild(el("tr", {}, [
         el("th", {}, ["Provider"]),
         el("th", {}, ["Model (Name & ID)"]),
-        el("th", {}, ["Tier"]),
+        el("th", {}, ["Category"]),
         el("th", {}, ["Input Cost ($/1M)"]),
         el("th", {}, ["Output Cost ($/1M)"]),
         el("th", {}, ["Cost Factor (1-100)"]),
@@ -3893,21 +3895,30 @@ async function viewModelDashboard() {
       const tbody = el("tbody");
       models.forEach(m => {
         const tr = el("tr");
+        tr.dataset.provider = m.provider;
+        tr.dataset.modelId = m.id;
+
         tr.appendChild(el("td", {}, [m.provider]));
         tr.appendChild(el("td", {}, [
           el("strong", {}, [m.name || m.id]),
-          el("span", { class: "badge ok", style: "margin-left: 8px;" }, ["API"]),
           el("br"),
           el("small", { class: "muted mono" }, [m.id])
         ]));
-        tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier])]));
+        tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier || "Standard"])]));
+        
+        const inInput = el("input", { type: "number", step: "0.01", style: "width: 80px;", value: m.input_cost?.toFixed(2) || "0.00", class: "cost-input-in" });
+        const outInput = el("input", { type: "number", step: "0.01", style: "width: 80px;", value: m.output_cost?.toFixed(2) || "0.00", class: "cost-input-out" });
+
+        const inBadgeClass = (m.input_source === "Overlay") ? "badge warn" : "badge ok";
+        const outBadgeClass = (m.output_source === "Overlay") ? "badge warn" : "badge ok";
+
         tr.appendChild(el("td", { class: "mono" }, [
-          (m.input_cost?.toFixed(2) || "0.00"),
-          el("span", { class: "badge warn", style: "margin-left: 8px;" }, ["Overlay"])
+          inInput,
+          el("span", { class: inBadgeClass, style: "margin-left: 8px;" }, [m.input_source || "API"])
         ]));
         tr.appendChild(el("td", { class: "mono" }, [
-          (m.output_cost?.toFixed(2) || "0.00"),
-          el("span", { class: "badge warn", style: "margin-left: 8px;" }, ["Overlay"])
+          outInput,
+          el("span", { class: outBadgeClass, style: "margin-left: 8px;" }, [m.output_source || "API"])
         ]));
         
         const cf = m.cost_factor || 0;
@@ -3956,6 +3967,38 @@ async function viewModelDashboard() {
     } finally {
       refreshBtn.disabled = false;
       refreshBtn.textContent = "Refresh via sync.py";
+    }
+  };
+
+  saveBtn.onclick = async () => {
+    const updates = [];
+    const rows = tableWrap.querySelectorAll("tr[data-provider]");
+    rows.forEach(tr => {
+      const inVal = tr.querySelector(".cost-input-in").value;
+      const outVal = tr.querySelector(".cost-input-out").value;
+      updates.push({
+        provider: tr.dataset.provider,
+        id: tr.dataset.modelId,
+        input_cost: inVal ? parseFloat(inVal) : 0,
+        output_cost: outVal ? parseFloat(outVal) : 0
+      });
+    });
+    
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    try {
+      const r = await api.post("/api/pricing/update", { updates });
+      if (r.success) {
+        toast("Pricing updated successfully", "success");
+        await loadData();
+      } else {
+        toast("Pricing update failed: " + (r.error || "Unknown error"), "error");
+      }
+    } catch (err) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Pricing";
     }
   };
 
