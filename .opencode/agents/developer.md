@@ -12,6 +12,7 @@ permission:
   glob: allow
   grep: allow
   todowrite: allow
+  task: allow
 ---
 # Developer — agent-meta
 

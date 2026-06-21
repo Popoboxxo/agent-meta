@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.5.0"
+version: "2.5.1"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -11,6 +11,7 @@ tools:
   - Glob
   - Grep
   - TodoWrite
+  - Agent
 ---
 
 # Developer — {{PROJECT_NAME}}
