@@ -427,6 +427,31 @@
         "maximum": 1.0
       }
     },
+    "tier-preset": {
+      "type": "string",
+      "description": "The active tier preset mapped against config/tier-presets.yaml. Adjusts model selection globally.",
+      "enum": [
+        "Cheap",
+        "Normal",
+        "Advanced",
+        "Expensive",
+        "Expensive as Hell",
+        "Cheap (SE)",
+        "Normal (SE)",
+        "Advanced (SE)",
+        "Expensive (SE)",
+        "Expensive as Hell (SE)"
+      ],
+      "default": "Normal"
+    },
+    "tier-overrides": {
+      "type": "object",
+      "description": "Override the resolved tier per role.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+      }
+    },
     "max-tokens-overrides": {
       "type": "object",
       "description": "Override max output tokens per role. Positive integer.",

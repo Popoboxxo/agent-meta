@@ -1280,6 +1280,7 @@ function buildSidebar() {
         { route: "/pipelines", label: "Pipelines", icon: "↦" },
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
         { route: "/config-audit", label: "Config audit", icon: "✓" },
+        { route: "/models", label: "Models & Pricing", icon: "❖" },
       ],
     },
   ];
@@ -2915,7 +2916,12 @@ async function viewProjectGeneral() {
   const rulesOptions = extractPresetKeys(rulesPresetsResp, RULES_FALLBACK);
 
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
-  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "" };
+  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal" };
+
+  const TIER_PRESETS = [
+    "Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell",
+    "Cheap (SE)", "Normal (SE)", "Advanced (SE)", "Expensive (SE)", "Expensive as Hell (SE)"
+  ];
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
@@ -2927,6 +2933,14 @@ async function viewProjectGeneral() {
   panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
   panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => top["rules-preset"] = v));
   panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
+  
+  // Tier Preset logic
+  const onTierPresetChange = (v) => {
+      top["tier-preset"] = v;
+      // Triggers live preview update if needed
+  };
+  panel.appendChild(dropdownField("tier-preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange));
+
   wrap.appendChild(panel);
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
@@ -2937,6 +2951,7 @@ async function viewProjectGeneral() {
           ["dod-preset", top["dod-preset"]],
           ["rules-preset", top["rules-preset"]],
           ["speech-mode", top["speech-mode"]],
+          ["tier-preset", top["tier-preset"]],
         ], status);
       } catch { /* toast already shown */ }
     } }, ["Save"]),
@@ -3829,6 +3844,95 @@ async function viewVizDashboard() {
 }
 
 /* =========================================================================
+ * Models & Pricing Dashboard
+ * ========================================================================= */
+async function viewModelDashboard() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Model Discovery & Pricing"]));
+
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px;" });
+  
+  const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+  controls.appendChild(refreshBtn);
+  wrap.appendChild(controls);
+
+  const tableWrap = el("div", { id: "models-table-wrap" });
+  wrap.appendChild(tableWrap);
+
+  const loadData = async () => {
+    tableWrap.innerHTML = "<div class='empty'>Loading models...</div>";
+    try {
+      const res = await api.get("/api/models");
+      const models = res.models || [];
+      if (models.length === 0) {
+        tableWrap.innerHTML = "<div class='empty'>No models found in registry. Click refresh to discover.</div>";
+        return;
+      }
+      
+      const table = el("table", { class: "data" });
+      const thead = el("thead");
+      thead.appendChild(el("tr", {}, [
+        el("th", {}, ["Provider"]),
+        el("th", {}, ["Model ID"]),
+        el("th", {}, ["Tier"]),
+        el("th", {}, ["Input Cost ($/1M)"]),
+        el("th", {}, ["Output Cost ($/1M)"]),
+        el("th", {}, ["Cost Factor (1-100)"]),
+      ]));
+      table.appendChild(thead);
+      
+      const tbody = el("tbody");
+      models.forEach(m => {
+        const tr = el("tr");
+        tr.appendChild(el("td", {}, [m.provider]));
+        tr.appendChild(el("td", { class: "mono" }, [m.id]));
+        tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier])]));
+        tr.appendChild(el("td", { class: "mono" }, [m.input_cost?.toFixed(2) || "0.00"]));
+        tr.appendChild(el("td", { class: "mono" }, [m.output_cost?.toFixed(2) || "0.00"]));
+        
+        const cf = m.cost_factor || 0;
+        let heatColor = "var(--accent-blue)";
+        if (cf > 20) heatColor = "var(--accent-yellow)";
+        if (cf > 50) heatColor = "var(--accent-red)";
+        
+        tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [cf.toFixed(2)]));
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      
+      tableWrap.innerHTML = "";
+      tableWrap.appendChild(table);
+    } catch (err) {
+      tableWrap.innerHTML = "";
+      tableWrap.appendChild(renderError(err));
+    }
+  };
+
+  refreshBtn.onclick = async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = "Running sync.py --update-models...";
+    try {
+      const r = await api.post("/api/models/update");
+      if (r.success) {
+        toast("Models updated successfully", "success");
+        await loadData();
+      } else {
+        toast("Model update failed: " + (r.output || "Unknown error"), "error");
+      }
+    } catch (err) {
+      toast("Error: " + err.message, "error");
+    } finally {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "Refresh via sync.py";
+    }
+  };
+
+  loadData();
+
+  return wrap;
+}
+
+/* =========================================================================
  * Bootstrap
  * ========================================================================= */
 async function init() {
@@ -3879,6 +3983,7 @@ async function init() {
   router.register("/pipelines", viewPipelines);
   router.register("/agents",    viewAgentTemplates);
   router.register("/config-audit", viewConfigAudit);
+  router.register("/models", viewModelDashboard);
 
   buildSidebar();
   router.resolve();

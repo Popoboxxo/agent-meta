@@ -1,0 +1,31 @@
+presets:
+  Cheap:
+    nano: nano
+    fast: nano
+    balanced: fast
+    powerful: fast
+    max: balanced
+  Normal:
+    nano: nano
+    fast: fast
+    balanced: balanced
+    powerful: powerful
+    max: max
+  Advanced:
+    nano: fast
+    fast: balanced
+    balanced: powerful
+    powerful: max
+    max: max
+  Expensive:
+    nano: balanced
+    fast: powerful
+    balanced: max
+    powerful: max
+    max: ultra
+  Expensive as Hell:
+    nano: powerful
+    fast: max
+    balanced: max
+    powerful: ultra
+    max: ultra

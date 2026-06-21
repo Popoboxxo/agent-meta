@@ -9,9 +9,28 @@ _ROLES_CONFIG_LEGACY = "roles.config.yaml"
 _ROLES_CONFIG_JSON = "roles.config.json"  # legacy fallback
 
 # Abstract tier names defined in role-defaults.yaml
-_KNOWN_TIERS = {"nano", "fast", "balanced", "powerful", "max"}
+_KNOWN_TIERS = {"nano", "fast", "balanced", "powerful", "max", "ultra"}
+_TIER_SEQUENCE = ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+
 # Legacy Claude aliases — resolved only when no provider context is available
 _CLAUDE_ALIASES = {"haiku", "sonnet", "opus"}
+
+def load_tier_presets(agent_meta_root: Path) -> dict:
+    presets_path = agent_meta_root / "config" / "tier-presets.yaml"
+    data, _ = _load_yaml_or_json(presets_path)
+    return data or {"presets": {}}
+
+def load_model_registry(agent_meta_root: Path) -> dict:
+    registry_path = agent_meta_root / "config" / "generated" / "model-registry.json"
+    data, _ = _load_yaml_or_json(registry_path)
+    return data or {"models": []}
+
+def _upgrade_tier(tier: str, steps: int) -> str:
+    if tier not in _TIER_SEQUENCE:
+        return tier
+    idx = _TIER_SEQUENCE.index(tier)
+    new_idx = min(len(_TIER_SEQUENCE) - 1, idx + steps)
+    return _TIER_SEQUENCE[new_idx]
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
@@ -78,43 +97,60 @@ def resolve_model(
     provider: str = "Claude",
     provider_config: dict | None = None,
 ) -> str:
-    """Resolve the model ID for a role and provider.
-
-    Precedence (highest to lowest):
-    1. Provider-specific project override: project_config["model-overrides"][<provider>][role]
-    2. Legacy flat project override:       project_config["model-overrides"][role]
-       (treated as Claude-only when provider != Claude)
-    3. Meta default from role-defaults.yaml (tier name → provider model ID)
-    4. Empty string → no model: field injected (agent inherits from parent context)
-
-    Tier resolution:
-    - nano/fast/balanced/powerful/max → looked up in ai-providers.yaml model-tiers[provider]
-    - haiku/sonnet/opus → legacy aliases, mapped via model-aliases or tier fallback
-    - Full model IDs (claude-*, gemini-*) → passed through unchanged
-    """
+    """Resolve the model ID for a role and provider using tier presets and registry."""
     pc = provider_config or {}
+
+    tier_or_id = ""
 
     # 1. Provider-specific project override
     provider_overrides = project_config.get("model-overrides", {})
     provider_specific = provider_overrides.get(provider, {})
     if isinstance(provider_specific, dict) and role in provider_specific:
         tier_or_id = str(provider_specific[role])
-        return _resolve_tier_to_model(tier_or_id, provider, pc)
-
-    # 2. Legacy flat override (only applied to Claude; for other providers skip)
-    if isinstance(provider_overrides, dict) and role in provider_overrides:
+    elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):
-            tier_or_id = str(flat_value)
             if provider == "Claude":
-                return _resolve_tier_to_model(tier_or_id, provider, pc)
-            # For non-Claude providers: flat override is Claude-specific — skip it,
-            # fall through to meta default so Gemini gets correct model
+                tier_or_id = str(flat_value)
 
-    # 3. Meta default from role-defaults.yaml
-    roles_cfg = load_roles_config(agent_meta_root)
-    tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
-    return _resolve_tier_to_model(tier_or_id, provider, pc)
+    # 2. Meta default from role-defaults.yaml
+    if not tier_or_id:
+        roles_cfg = load_roles_config(agent_meta_root)
+        tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
+        
+    # Check if role has an explicit tier override
+    tier_overrides = project_config.get("tier-overrides", {})
+    if role in tier_overrides:
+        tier_or_id = tier_overrides[role]
+
+    # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
+    if tier_or_id and tier_or_id not in _KNOWN_TIERS:
+        return _resolve_tier_to_model(tier_or_id, provider, pc)
+
+    base_tier = tier_or_id
+
+    # 3. Apply SE Focus and Presets
+    preset_name = project_config.get("tier-preset", "Normal")
+    se_focus = preset_name.endswith(" (SE)")
+    if se_focus:
+        preset_name = preset_name.replace(" (SE)", "")
+        if role.startswith("se-"):
+            base_tier = _upgrade_tier(base_tier, 1)
+
+    presets = load_tier_presets(agent_meta_root).get("presets", {})
+    preset_matrix = presets.get(preset_name, {})
+    
+    mapped_tier = preset_matrix.get(base_tier, base_tier)
+
+    # 4. Lookup in registry
+    registry = load_model_registry(agent_meta_root)
+    models = registry.get("models", [])
+    for m in models:
+        if m.get("provider", "").lower() == provider.lower() and m.get("tier", "").lower() == mapped_tier.lower():
+            return m.get("id", "")
+
+    # Fallback if not in registry
+    return _resolve_tier_to_model(mapped_tier, provider, pc)
 
 
 def resolve_permission_mode(role: str, project_config: dict, agent_meta_root: Path) -> str:

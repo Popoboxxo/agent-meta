@@ -988,6 +988,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
 
+        if path == "/api/models":
+            return self._handle_get_models()
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1045,6 +1048,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/config-audit/apply":
             return self._send_json(self._apply_config_audit())
 
+        if path == "/api/models/update":
+            return self._handle_post_models_update()
+
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
         subserver = self._match_subserver_route(path)
@@ -1082,6 +1088,53 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "action": action,
             "status": vm.status(),
         })
+
+    def _handle_get_models(self) -> None:
+        """Return models from registry + pricing."""
+        try:
+            registry_path = self.__class__.root / "config" / "generated" / "model-registry.json"
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not registry_path.exists():
+                fallback_registry = self.__class__.root / ".agent-meta" / "config" / "generated" / "model-registry.json"
+                if fallback_registry.exists():
+                    registry_path = fallback_registry
+                    pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+
+            models = []
+            if registry_path.exists():
+                models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
+
+            pricing = {}
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+            prices = pricing.get("prices", {})
+
+            for m in models:
+                provider = m.get("provider", "")
+                model_id = m.get("id", "")
+                provider_prices = prices.get(provider, {})
+                model_prices = provider_prices.get(model_id, {})
+                input_cost = model_prices.get("input", 0.0)
+                output_cost = model_prices.get("output", 0.0)
+                
+                # Blended cost per 1M tokens (30% input, 70% output)
+                cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
+                
+                m["input_cost"] = input_cost
+                m["output_cost"] = output_cost
+                m["cost_factor"] = cost_factor
+
+            return self._send_json({"models": models})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_update(self) -> None:
+        """Trigger sync.py --update-models"""
+        try:
+            res = self.__class__.sync_executor._run(["--update-models"])
+            return self._send_json(res)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
