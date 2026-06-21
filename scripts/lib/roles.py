@@ -22,12 +22,7 @@ _CLAUDE_ALIASES = {"haiku", "sonnet", "opus"}
 def load_tier_presets(agent_meta_root: Path) -> dict:
     presets_path = agent_meta_root / "config" / "tier-presets.yaml"
     data, _ = _load_yaml_or_json(presets_path)
-    return data or {"presets": {}}
-
-def load_model_registry(agent_meta_root: Path) -> dict:
-    registry_path = agent_meta_root / "config" / "generated" / "model-registry.json"
-    data, _ = _load_yaml_or_json(registry_path)
-    return data or {"models": []}
+    return data or {}
 
 def _upgrade_tier(tier: str, steps: int) -> str:
     if tier not in _TIER_SEQUENCE:
@@ -114,48 +109,57 @@ def resolve_model(
     if isinstance(provider_specific, dict) and role in provider_specific:
         tier_or_id = str(provider_specific[role])
         explicit_override = True
-        if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
+        if log:
+            log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
     elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):
             if provider == "Claude":
                 tier_or_id = str(flat_value)
                 explicit_override = True
-                if log: log.debug(f"{provider}/{role}", f"Model explicitly overriden via flat map: {tier_or_id}")
+                if log:
+                    log.debug(f"{provider}/{role}", f"Model explicitly overriden via flat map: {tier_or_id}")
 
     # 2. Meta default from role-defaults.yaml
     if not tier_or_id:
         roles_cfg = load_roles_config(agent_meta_root)
         tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
-        if tier_or_id and log: log.debug(f"{provider}/{role}", f"Model/Tier from role-defaults: {tier_or_id}")
+        if tier_or_id and log:
+            log.debug(f"{provider}/{role}", f"Model/Tier from role-defaults: {tier_or_id}")
 
     # Check if role has an explicit tier override (skip when user already set explicit model-override)
     if not explicit_override:
         tier_overrides = project_config.get("tier-overrides", {})
         if role in tier_overrides:
             tier_or_id = tier_overrides[role]
-            if log: log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
+            if log:
+                log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
 
     # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
     if tier_or_id and tier_or_id not in _KNOWN_TIERS:
         resolved = _resolve_tier_to_model(tier_or_id, provider, pc)
-        if log: log.debug(f"{provider}/{role}", f"Tier '{tier_or_id}' resolved directly to: {resolved}")
+        if log:
+            log.debug(f"{provider}/{role}", f"Tier '{tier_or_id}' resolved directly to: {resolved}")
         return resolved
 
     base_tier = tier_or_id
 
     # 3. Apply SE Focus and Presets
     preset_name = project_config.get("tier-preset", "Normal")
-    se_focus = preset_name.endswith(" (SE)")
-    if se_focus:
+    se_focus = bool(project_config.get("se-focus", False))
+    # Backward compat: old configs may have " (SE)" suffix in tier-preset value
+    if preset_name.endswith(" (SE)"):
+        se_focus = True
         preset_name = preset_name.replace(" (SE)", "")
-        if role.startswith("se-"):
-            base_tier = _upgrade_tier(base_tier, 1)
-            if log: log.debug(f"{provider}/{role}", f"SE Focus applied, tier upgraded to: {base_tier}")
+    if se_focus and role.startswith("se-"):
+        base_tier = _upgrade_tier(base_tier, 1)
+        if log:
+            log.debug(f"{provider}/{role}", f"SE Focus applied, tier upgraded to: {base_tier}")
 
-    presets = load_tier_presets(agent_meta_root).get("presets", {})
-    preset_matrix = presets.get(preset_name, {})
-    
+    # C1 fix: presets are top-level keys in tier-presets.yaml, not nested under "presets:"
+    presets = load_tier_presets(agent_meta_root)
+    preset_matrix = presets.get(preset_name, {}).get("mapping", {})
+
     mapped_tier = preset_matrix.get(base_tier, base_tier)
     if log and mapped_tier != base_tier:
         log.debug(f"{provider}/{role}", f"Tier '{base_tier}' mapped to '{mapped_tier}' via preset '{preset_name}'")
@@ -163,21 +167,14 @@ def resolve_model(
     pto = project_config.get("provider-tier-overrides", {})
     if provider in pto and mapped_tier in pto[provider]:
         resolved = str(pto[provider][mapped_tier])
-        if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' explicitly overriden for provider '{provider}': {resolved}")
+        if log:
+            log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' explicitly overriden for provider '{provider}': {resolved}")
         return resolved
 
-    # 4. Lookup in registry
-    registry = load_model_registry(agent_meta_root)
-    models = registry.get("models", [])
-    for m in models:
-        if m.get("provider", "").lower() == provider.lower() and m.get("tier", "").lower() == mapped_tier.lower():
-            resolved = m.get("id", "")
-            if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved from registry to: {resolved}")
-            return resolved
-
-    # Fallback if not in registry
+    # Resolve tier to provider-specific model ID
     resolved = _resolve_tier_to_model(mapped_tier, provider, pc)
-    if log: log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved via fallback to: {resolved}")
+    if log:
+        log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved to: {resolved}")
     return resolved
 
 
