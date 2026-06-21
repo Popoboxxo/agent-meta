@@ -2955,10 +2955,7 @@ async function viewProjectGeneral() {
   // admin server is not running in super_admin mode).
   const DOD_FALLBACK   = ["rapid-prototyping", "standard", "strict"];
   const RULES_FALLBACK = ["default", "minimal", "silent"];
-  const TIER_FALLBACK = [
-    "Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell",
-    "Cheap (SE)", "Normal (SE)", "Advanced (SE)", "Expensive (SE)", "Expensive as Hell (SE)"
-  ];
+  const TIER_FALLBACK = ["Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell", "Normal (SE)", "Advanced (SE)"];
   // sync with schema speech-mode enum (config/project-config.schema.json)
   const SPEECH_MODES   = ["full", "short", "childish", "caveman", "asozial", "submissive", "business", "bullshit-bingo", "linkedin"];
 
@@ -2986,11 +2983,7 @@ async function viewProjectGeneral() {
 
   let TIER_PRESETS = TIER_FALLBACK;
   if (tierPresetsResp && tierPresetsResp.presets) {
-    TIER_PRESETS = [];
-    for (const key of Object.keys(tierPresetsResp.presets)) {
-      TIER_PRESETS.push(key);
-      TIER_PRESETS.push(`${key} (SE)`);
-    }
+    TIER_PRESETS = Object.keys(tierPresetsResp.presets);
   }
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
