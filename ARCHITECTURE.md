@@ -447,6 +447,40 @@ Der Orchestrator ist die primäre Envelope-Fabrik:
 
 ---
 
+## Keyless Discovery & Pricing Overlay — Architektur
+
+Mit der Implementierung von dynamischer Modellerfassung und Tier-Presets (REQ-MOD-01) wird ein Keyless Discovery Ansatz sowie ein transparentes Pricing Overlay für die Modell-Auswahl eingeführt.
+
+### Keyless Discovery via OpenRouter
+
+`scripts/lib/model_discovery.py` verwendet die öffentliche OpenRouter API (`https://openrouter.ai/api/v1/models`) als globalen Proxy. Dies ermöglicht:
+- Abrufen von Echtzeit-Modelldaten (Anthropic, Gemini, Open-Source) **ohne** lokale API-Keys.
+- Echtzeit-Abfrage der Preise für Input/Output Tokens (`pricing.prompt`, `pricing.completion`).
+- Die Liste der verfügbaren Modelle sowie deren Kontextfenster und Pricing wird in `config/generated/model-registry.json` gecached.
+
+### Provider Mapping: Go vs. Zen
+
+Es erfolgt eine explizite Provider-Klassifizierung für OpenCode-Modelle:
+- **`opencode-go`**: Für offene Modelle (z.B. Llama, Qwen, Mistral).
+- **`opencode-zen`**: Für Enterprise / Closed-Source Modelle.
+
+### Pricing Overlay
+
+Das `config/pricing-overlay.yaml` fungiert als manueller Überschreib-Mechanismus für die automatisierten API-Preise:
+- API-Preise werden standardmäßig bevorzugt.
+- Ist im Overlay ein eigener Preis definiert (z.B. `0.00$` für Go-Abonnenten), überschreibt dieser den API-Preis.
+- Die Admin-UI (Web-Dashboard) ermöglicht das direkte Editieren dieser Custom-Preise.
+
+### UI Transparenz
+
+Im Dashboard wird die Datenherkunft und Berechnungsmethodik für den User transparent visualisiert:
+- **`[API]`**: Echtzeit-Daten vom Provider / OpenRouter.
+- **`[Overlay]`**: Vom User / Administrator manuell im Overlay überschriebene Preise.
+- **`[Calc]`**: Intern berechnete Score-Faktoren (Cost Factor).
+- Weiterhin werden Reference-Links direkt zu den Providern in der UI eingebunden, um die Herkunft verifizierbar zu machen.
+
+---
+
 ## Update Instructions
 
 Bei jedem **Major Release** aktualisieren:
