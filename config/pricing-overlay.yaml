@@ -1,4 +1,6 @@
-excluded_models: []
+excluded_models:
+- google/gemini-3.1-flash-image
+- google/gemini-3-pro-image
 prices:
   anthropic:
     _url: https://www.anthropic.com/pricing

@@ -1268,6 +1268,7 @@ function buildSidebar() {
         { route: "/provider-tiers", label: "Provider Tier Mappings", icon: "❖", superOnly: true },
         { route: "/tier-presets", label: "Tier Presets", icon: "❖", superOnly: true },
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
+        { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
         { route: "/config/mcp-registry", label: "mcp registry", icon: "□", superOnly: true },
         { route: "/config/dod-presets", label: "dod presets", icon: "□", superOnly: true },
@@ -4376,6 +4377,7 @@ async function init() {
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/role-defaults",     viewRoleDefaults);
+  router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);
   router.register("/config/mcp-registry",      viewMcpRegistry);
   router.register("/config/dod-presets",       viewDodPresets);
