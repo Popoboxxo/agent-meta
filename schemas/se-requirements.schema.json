@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SE Requirements Output Schema",
+  "description": "Structured output schema for the se-requirements agent. Defines stakeholder requirements with arch-impact flags for role boundary enforcement per ISO/IEC 15288.",
+  "type": "object",
+  "required": ["requirements"],
+  "properties": {
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["req_id", "statement", "domain", "priority"],
+        "properties": {
+          "req_id": {
+            "type": "string",
+            "description": "Unique requirement ID (e.g., REQ-L1-001)."
+          },
+          "statement": {
+            "type": "string",
+            "description": "Measurable black-box requirement statement."
+          },
+          "domain": {
+            "type": "string",
+            "enum": ["system", "software", "hardware", "mechanics"],
+            "description": "Engineering domain of the requirement."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["mandatory", "desired", "optional"],
+            "description": "Requirement priority."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Stakeholder need this requirement traces back to."
+          },
+          "external_interfaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["direction", "type", "description"],
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": ["input", "output"]
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["physical", "data", "energy", "control", "user"]
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "arch_impact": {
+            "type": "boolean",
+            "description": "Whether this requirement implies architectural decisions that must be made by se-architect. Default: false.",
+            "default": false
+          },
+          "arch_trigger": {
+            "type": "string",
+            "description": "Why architecture is affected. Never a solution, always a problem statement. Only present when arch_impact is true."
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "description": "Measurable criteria against which the architect's chosen solution can later be validated.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["system", "component", "both"],
+            "description": "Classification for pipeline routing. system = needs full decomposition, component = refinement-level, both = both levels affected. Default: system.",
+            "default": "system"
+          },
+          "decomposition_status": {
+            "type": "string",
+            "enum": ["terminal", "decomposable"],
+            "description": "Whether further decomposition is expected downstream."
+          }
+        }
+      }
+    }
+  }
+}

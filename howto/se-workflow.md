@@ -65,20 +65,26 @@ graph TD
 ### se-requirements
 - Nimmt unstrukturierte Stakeholder-Bedarfe entgegen
 - Formuliert messbare Black-Box-Anforderungen mit REQ-ID
-- Definiert externe Schnittstellen und Domänen
+- Definiert externe Schnittstellen und Domaenen
+- **NEU: `arch_impact`-Flag** — signalisiert Architekturbedarf ohne die Entscheidung zu treffen (ISO/IEC 15288 Rollentrennung)
+- **NEU: Teilresultat-Protokoll** — persistiert Output nach `requirements/...Requirements.md`
 
 ### se-architect
 - Zerlegt Black-Box in White-Box-Architektur
-- Weist Domänen zu (software, hardware, mechanics, system)
+- Weist Domaenen zu (software, hardware, mechanics, system)
 - Definiert interne Schnittstellen und Sub-Komponenten
-- Begründet Architekturentscheidungen (Trade-offs)
+- Begruendet Architekturentscheidungen (Trade-offs)
+- **NEU:** Verarbeitet `arch_trigger`-Liste aus Requirements — muss auf jeden Trigger in `architectural_rationale` eingehen
+- **NEU: Teilresultat-Protokoll** — persistiert Output nach `architecture/...Architecture.iter-{N}.md`
 
 ### se-critic
-- Prüft auf Vollständigkeit (Completeness)
-- Prüft auf Konsistenz (Consistency)
-- Prüft auf Testbarkeit (Verifiability)
-- Prüft auf Traceability
-- Erzwingt Korrekturschleifen bei Mängeln (max. 3 Iterationen)
+- Prueft auf Vollstaendigkeit (Completeness)
+- Prueft auf Konsistenz (Consistency)
+- Prueft auf Testbarkeit (Verifiability)
+- Prueft auf Traceability
+- **NEU: Role Boundary Check** — prueft Requirements auf verbotene Architekturbegriffe und Rollenverstoesse
+- Erzwingt Korrekturschleifen bei Maengeln (max. 3 Iterationen)
+- **NEU: Teilresultat-Protokoll** — persistiert Output nach `...critic.iter-{N}.md`
 
 ### se-interface-mgr
 - Zentrale Registry für alle Interface Contracts
@@ -209,7 +215,38 @@ variables:
 
 Der SE-Workflow ist ein **fraktaler, rekursiver Prozess**:
 - Jede Ebene arbeitet identisch
-- Die Granularität ändert sich, nicht die Methodik
+- Die Granularitaet aendert sich, nicht die Methodik
 - Harte Schutzmechanismen verhindern Endlosschleifen und Kostenexplosion
-- Interface-Propagation sichert Konsistenz über alle Ebenen
+- Interface-Propagation sichert Konsistenz ueber alle Ebenen
 - Der Output ist menschenlesbar (Markdown + Mermaid) und optional exportierbar
+
+---
+
+## Teilresultat-Protokoll (NEU — Loesung A)
+
+Jeder SE-Agent persistiert seinen Output atomar nach jedem Schritt. Ermoeglicht Wiederaufnahme nach Session-Abbruch.
+
+**Prinzip:** Write-Through-Cache auf Dateisystem-Ebene. Neue Session liest `.se-state.yaml` und setzt am letzten abgeschlossenen Schritt auf.
+
+Siehe `howto/se-resume-session.md` fuer Details.
+
+---
+
+## Rollentrennung Requirements vs. Architect (NEU — Loesung B)
+
+`se-requirements` signalisiert Architekturbedarf via `arch_impact: true` / `arch_trigger`, trifft aber KEINE Architekturentscheidung. `se-critic` erzwingt dies mit dem Role Boundary Check.
+
+Siehe `howto/se-role-boundaries.md` fuer Details.
+
+---
+
+## Pipeline-Trennung (NEU — Loesung C, optional)
+
+Zwei getrennte Pipelines reduzieren Overhead:
+
+| Pipeline | Trigger | Stack |
+|----------|---------|-------|
+| **A — System-Level** | `scope: system` ODER `arch_impact: true` | requirements → architect → critic → interface-mgr → termination |
+| **B — Component-Level** | `scope: component` AND `arch_impact: false` | requirements(refinement) → developer-tier → code-reviewer → validator + verifier |
+
+Default: Pipeline A (sicherer Default — vollstaendige Kaskade).

@@ -1,7 +1,8 @@
 ---
 name: se-termination
-version: 1.6.1
+version: 1.7.0
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
+  Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
 tools:
 - Read
@@ -136,6 +137,31 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 ```
 
 > **Handover:** `decision: leaf` → **designation: "component"** — final leaf system as structured Task/Spec for the implementing discipline (Software-Dev, Hardware-Engineer). `decision: continue` → **designation: "system"** (or "subsystem" when parent context exists) — System definition + Black-Box-Requirement to orchestrator for the next level.
+>
+> **Pipeline Routing:** For `decision: leaf` nodes, additionally set `scope: "component"` in the output — this signals the downstream orchestrator to use Pipeline B (Component-Level) for implementation dispatch, skipping architect/interface-mgr/termination for these leaves.
+
+## Step Persistence — Teilresultat-Protokoll
+
+After completing termination decisions, persist your output atomically:
+
+**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Decisions.md`
+
+**Frontmatter format:**
+```yaml
+---
+step: termination
+agent: se-termination
+iteration: 1
+status: done
+timestamp: "<ISO 8601>"
+schema_version: "1.0.0"
+---
+```
+
+**Atomic write procedure:**
+1. Write full output (frontmatter + JSON + decision summary) to a temporary file
+2. Rename temp file to target path
+3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Anti-Recursion Guard
 

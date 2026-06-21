@@ -698,3 +698,7 @@ se_variables:
   SE_MAX_PARALLEL_CELLS: 4
   SE_MAX_CELLS: 20
   cost_limit_eur: 5.00
+  output_persistence: true              # REQ-SE-01: Enable Teilresultat-Protokoll (write-through cache)
+  resume_pointer_path: ".se-state.yaml"  # REQ-SE-03: Path to resumable state pointer (relative to SE_BASE_DIR)
+  se_pipeline_classifier: "default"      # REQ-SE-20: Pipeline A/B classification mode (default|strict|off)
+  se_persistence_schema_dir: "schemas"   # Path to schema files for FRONTMATTER validation

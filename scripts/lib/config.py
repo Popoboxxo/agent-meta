@@ -245,6 +245,25 @@ def read_git_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
+def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
+    """Load SE cascade variable defaults from config/role-defaults.yaml se_variables block.
+
+    Returns a dict of {TEMPLATE_VAR_NAME: default_value} for variables not set
+    in the project config. Template var names are the same as the YAML keys (uppercase).
+    """
+    defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
+    if not defaults_path.exists():
+        return {}
+    try:
+        raw = _load_yaml_or_json(defaults_path)
+        se_vars = raw.get("se_variables", {})
+        if not isinstance(se_vars, dict):
+            return {}
+        return {str(k): v for k, v in se_vars.items()}
+    except Exception:
+        return {}
+
+
 def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str]]:
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
@@ -351,6 +370,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # Read from se_output.base_dir (default: "SE").
     se_output = config.get("se_output", {})
     variables["SE_BASE_DIR"] = se_output.get("base_dir", "SE") if isinstance(se_output, dict) else "SE"
+    # SE cascade variables — fall back to role-defaults.yaml defaults if not set in project config.
+    _se_vars_defaults = _load_se_variable_defaults(agent_meta_root)
+    for _sv_key, _sv_val in _se_vars_defaults.items():
+        if _sv_key not in variables:
+            variables[_sv_key] = str(_sv_val)
     # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
     t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
     variables["A2A_T_SIZE_LIMIT"] = str(t_limit)

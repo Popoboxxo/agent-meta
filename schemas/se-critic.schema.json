@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SE Critic Output Schema",
+  "description": "Structured output schema for the se-critic agent. Includes role_boundary_check for requirements review to enforce ISO/IEC 15288 role separation.",
+  "type": "object",
+  "required": ["review_target", "status", "checks", "iteration", "max_iterations"],
+  "properties": {
+    "review_target": {
+      "type": "string",
+      "enum": ["requirements", "architecture"],
+      "description": "What the critic is reviewing."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["approved", "rejected", "blocked"],
+      "description": "Overall critic verdict."
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "completeness": {
+          "$ref": "#/definitions/checkResult"
+        },
+        "consistency": {
+          "$ref": "#/definitions/checkResult"
+        },
+        "verifiability": {
+          "$ref": "#/definitions/checkResult"
+        },
+        "traceability": {
+          "$ref": "#/definitions/checkResult"
+        },
+        "resilience": {
+          "$ref": "#/definitions/checkResult"
+        },
+        "role_boundary": {
+          "type": "object",
+          "description": "Role Boundary Check — only applicable when review_target: requirements. Verifies se-requirements does not make architecture decisions.",
+          "required": ["passed"],
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether all requirements respect role boundaries."
+            },
+            "issues": {
+              "type": "array",
+              "description": "List of role boundary violations found.",
+              "items": {
+                "type": "object",
+                "required": ["req_id", "violation_type", "description"],
+                "properties": {
+                  "req_id": {
+                    "type": "string",
+                    "description": "The REQ-ID that violates the boundary."
+                  },
+                  "violation_type": {
+                    "type": "string",
+                    "enum": [
+                      "architecture_pattern",
+                      "technology_fixation",
+                      "internal_interface",
+                      "deployment_topology",
+                      "protocol_choice",
+                      "data_model",
+                      "tradeoff_decision"
+                    ],
+                    "description": "Type of role boundary violation."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "What was violated and why it belongs to the architect."
+                  },
+                  "forbidden_term": {
+                    "type": "string",
+                    "description": "The specific term that triggered the violation detection."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "correction_hints": {
+      "type": "array",
+      "description": "Actionable hints to fix rejected or blocked issues.",
+      "items": { "type": "string" }
+    },
+    "iteration": {
+      "type": "integer",
+      "description": "Current critic iteration count."
+    },
+    "max_iterations": {
+      "type": "integer",
+      "description": "Maximum allowed iterations."
+    }
+  },
+  "definitions": {
+    "checkResult": {
+      "type": "object",
+      "required": ["passed"],
+      "properties": {
+        "passed": {
+          "type": "boolean",
+          "description": "Whether this check passed."
+        },
+        "issues": {
+          "type": "array",
+          "description": "List of issues found in this category.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

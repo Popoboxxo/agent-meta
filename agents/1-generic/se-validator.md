@@ -1,8 +1,8 @@
 ---
 name: se-validator
-version: 1.1.2
+version: 1.2.0
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
-  abgleichen. ''Did we build the right system?'''
+  abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
   Code, prüft ob der User-Need erfüllt ist.
 tools:
@@ -164,6 +164,29 @@ Return your final output **only** as a JSON object matching the following schema
 - Architecture redesign for blocked journeys → `se-architect`
 - Unclear/missing stakeholder needs → `se-requirements`
 - Cross-level validation coordination → `se-integration-and-test-manager`
+
+## Step Persistence — Teilresultat-Protokoll
+
+After completing validation, persist your output atomically:
+
+**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Validation.md`
+
+**Frontmatter format:**
+```yaml
+---
+step: validation
+agent: se-validator
+iteration: 1
+status: done
+timestamp: "<ISO 8601>"
+schema_version: "1.0.0"
+---
+```
+
+**Atomic write procedure:**
+1. Write full output (frontmatter + JSON) to a temporary file
+2. Rename temp file to target path
+3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Anti-Recursion Guard
 

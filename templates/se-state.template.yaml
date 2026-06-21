@@ -1,0 +1,20 @@
+# SE State Resume Pointer
+# This file enables session recovery after token-loss or interruption.
+# Managed by the SE cascade agents — do not edit manually between sessions.
+
+project: {{PROJECT_NAME}}
+last_updated: {{TIMESTAMP}}
+current_level: L1
+current_node: {{SYSTEM_NAME}}
+last_completed_step:
+  agent: ""
+  status: ""
+  output_file: ""
+next_expected_step:
+  agent: "se-requirements"
+  input_files: []
+pending_decisions: []
+budget_consumed:
+  cells: 0
+  tokens: 0
+  estimated_eur: 0.0

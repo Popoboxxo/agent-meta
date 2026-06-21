@@ -1,8 +1,8 @@
 ---
 name: se-interface-mgr
-version: 1.6.0
+version: 1.7.0
 description: Manages generic signal flow and deterministic synchronization across
-  systems.
+  systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
 tools:
 - Read
@@ -141,6 +141,29 @@ Define these explicitly per interface — they become the binding test oracle fo
 ```
 
 > **Propagation Map = central mechanism:** before a new cell for a sub-system starts, it receives — alongside its `black_box_requirement` — all interfaces from its row in the `propagation_map`. So level n+1 knows that and how it communicates with other systems.
+
+## Step Persistence — Teilresultat-Protokoll
+
+After completing interface registration, persist your output atomically:
+
+**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Interfaces.md`
+
+**Frontmatter format:**
+```yaml
+---
+step: interfaces
+agent: se-interface-mgr
+iteration: 1
+status: done
+timestamp: "<ISO 8601>"
+schema_version: "1.0.0"
+---
+```
+
+**Atomic write procedure:**
+1. Write full output (frontmatter + JSON + human-readable table) to a temporary file
+2. Rename temp file to target path
+3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Anti-Recursion Guard
 

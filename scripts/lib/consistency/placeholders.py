@@ -61,6 +61,12 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "SE_ENABLED", "SE_BASE_DIR", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
     "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS",
+    # SE cascade variables (from role-defaults.yaml se_variables)
+    "SE_MIN_DEPTH", "SE_MAX_DEPTH", "SE_MAX_CRITIC_ITERATIONS", "SE_MAX_PARALLEL_CELLS",
+    "SE_MAX_CELLS", "cost_limit_eur",
+    # SE pipeline extension (REQ-SE-01..REQ-SE-22)
+    "output_persistence", "resume_pointer_path", "se_pipeline_classifier",
+    "se_persistence_schema_dir",
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     # Paths

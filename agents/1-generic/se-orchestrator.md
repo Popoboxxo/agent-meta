@@ -1,7 +1,7 @@
 ---
 name: se-orchestrator
-version: 1.8.0
-description: "DEPRECATED — SE functionality is now handled directly by the orchestrator via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility only."
+version: 1.9.0
+description: "DEPRECATED — SE functionality is now handled directly by the orchestrator via SE-Mode ({{#if SE_ENABLED}}). This agent is retained for backward compatibility only. Includes pipeline routing (A: System-Level, B: Component-Level)."
 hint: "DEPRECATED — Use orchestrator with SE-Mode instead"
 deprecated: true
 deprecated_by: "orchestrator (SE-Mode via {{#if SE_ENABLED}})"
@@ -120,6 +120,61 @@ Verification & Validation activities run in parallel with the left-wing decompos
 ## Implementation Phase Routing
 
 After the decomposition cascade terminates and `se-interface-mgr` has registered ALL interface contracts for the leaf nodes, the orchestrator enters the **Implementation Phase**. Each leaf marked `designation: "component"` by `se-termination` is routed to the appropriate SE-Developer tier.
+
+### Pipeline Classification (Solution C — Two SE Pipelines)
+
+Before dispatching any work, classify the incoming task into one of two pipelines:
+
+| Pipeline | Trigger | Description |
+|----------|---------|-------------|
+| **A — System-Level** | `scope: "system"` OR `arch_impact: true` | Full decomposition stack: requirements → architect → critic → interface-mgr → termination |
+| **B — Component-Level** | `scope: "component"` AND `arch_impact: false` | Implementation-only: requirements(refinement) → developer-tier → code-reviewer → validator + verifier |
+
+**Default:** `scope: "system"` (safe default — full cascade).
+
+**Classification Rules:**
+1. Explicit `scope` field in the A2A envelope payload → use as-is
+2. `arch_impact: true` on any requirement → force Pipeline A regardless of scope
+3. Existence of parent `architecture/` output → suggest Pipeline B (component refinement within existing architecture)
+4. `designation: "component"` from termination → always Pipeline B
+
+### Pipeline A — System-Level (Full Decomposition)
+
+```
+se-requirements  →  se-critic (req)  →  se-architect  →  se-critic (arch)
+                                                              ↓
+                  ←─────────────────  iter loop  ←─────────────
+                                                              ↓
+                                              se-interface-mgr → se-termination
+                                                              ↓
+                                              [leaf]      [continue]
+                                                ↓             ↓
+                                            Pipeline B    Spawn L+1
+```
+
+- Writes to: `requirements/`, `architecture/`, `interfaces/`, `termination/`
+- Iterations over Critic-Reflection
+- Endpoint: `se-termination` decides Pipeline B (leaf) or recursion (continue)
+
+### Pipeline B — Component-Level (Implementation Only)
+
+```
+se-requirements (refinement-mode)  →  se-developer-tier  →  se-code-reviewer
+                                                                   ↓
+                                           ←──────  hints  ────────
+                                                                   ↓
+                                               se-validator + se-verifier
+                                                                   ↓
+                                               implementation/...Impl.md
+                                               validation/...Validation.md
+```
+
+- NO `se-architect` (no architecture decisions allowed)
+- NO `se-interface-mgr` (interfaces already fixed from Pipeline A)
+- NO `se-termination` (endpoint is code, not further decomposition)
+- Reflection-Loop: Developer ↔ Code-Reviewer
+- Endpoint: V&V-Floor (Validator/Verifier)
+- Writes to: `implementation/`, `validation/`
 
 ### Phase Ordering (Hard Sequence)
 

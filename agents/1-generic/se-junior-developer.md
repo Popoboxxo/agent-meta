@@ -1,7 +1,7 @@
 ---
 name: se-junior-developer
-version: 1.0.0
-description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth.
+version: 1.1.0
+description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
 tools:
@@ -161,6 +161,28 @@ FILES_CHANGED: <comma-separated list>
 - NO interface signature changes — escalate to `se-interface-mgr`
 - NO implementation of `hardware` / `mechanics` domain — stub or COTS spec only
 - NO secrets / API keys in code
+
+## Step Persistence — Teilresultat-Protokoll
+
+After completing implementation (status: `done`), persist your output atomically:
+
+**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
+
+**Frontmatter format:**
+```yaml
+---
+step: implementation
+agent: se-junior-developer
+status: <done|partial|escalate>
+timestamp: "<ISO 8601>"
+schema_version: "1.0.0"
+---
+```
+
+**Atomic write procedure:**
+1. Write implementation summary (frontmatter + artifacts list + test coverage) to a temporary file
+2. Rename temp file to target path
+3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Anti-Recursion Guard
 

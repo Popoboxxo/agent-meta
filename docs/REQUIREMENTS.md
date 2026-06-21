@@ -27,3 +27,36 @@
 | ID | Anforderung | Priorität |
 |----|-------------|-----------|
 | REQ-GEN-01 | Agent-Templates mit `deprecated: true` im YAML-Frontmatter werden von sync.py aus der Generierung ausgeschlossen — sie erzeugen keine Agent-Datei und erscheinen nicht in CLAUDE.md-Tabelle/-Hints oder Visualisierung. Die Filterung erfolgt zentral in `collect_sources()` nach Auflösung der Layer-Override-Kette (1-generic < 2-platform < 3-project), sodass ein nicht-deprecated Override ein deprecated Basis-Template ersetzen kann. Fehlt das Feld oder ist es nicht explizit `true`, gilt das Template als aktiv (rückwärtskompatibler Default). | Must |
+
+---
+
+## SE-Pipeline-Erweiterung — Teilresultat-Protokoll & Rollentrennung
+
+> Quelle: `docs/concepts/se-pipeline-extension.md`
+
+### Lösung A — Teilresultat-Protokoll (Persistence)
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-SE-01 | Jeder SE-Agent persistiert nach Abschluss seines Schrittes seinen strukturierten Output atomar (write-to-tmp + rename) in die definierte Datei innerhalb `docs/se/<projektname>/`. Das Frontmatter jeder Output-Datei enthält `step`, `agent`, `iteration`, `status`, `timestamp`, `schema_version`. | Must |
+| REQ-SE-02 | Iterations-Suffix-Konvention: `*.iter-1.md`, `*.iter-2.md`, ... `*.iter-N.md` für Zwischenstände, `*.final.md` für die vom Critic approved finale Version. Single-Shot-Schritte (Requirements, Interfaces, Termination) ohne Iteration erhalten kein Suffix. | Must |
+| REQ-SE-03 | Eine `.se-state.yaml`-Datei dient als Wiederaufnahme-Pointer mit `last_completed_step`, `next_expected_step` und `budget_consumed`. Eine neue Session liest diesen Pointer, identifiziert den letzten abgeschlossenen Schritt und setzt dort auf. | Must |
+| REQ-SE-04 | Die `.se-state.yaml` wird atomar geschrieben (write-to-tmp + rename). Beim Lesen wird Schema-Validation durchgeführt; bei Korruption wird auf Verzeichnis-Inspektion als Fallback zurückgefallen. | Should |
+| REQ-SE-05 | Die `output_parent_path`- und `FolderName`-Felder im A2A-Envelope-Payload legen den Zielpfad für die Persistenz fest. Die Verzeichnisstruktur folgt: `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/`. | Must |
+
+### Lösung B — Rollentrennung Requirements vs. Architect
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-SE-10 | Der `se-requirements`-Agent DARF KEINE Architektur-Pattern, Technologien, Deployment-Topologien, interne Schnittstellen oder Protokolle festlegen. Stattdessen signalisiert er Architekturbedarf via `arch_impact: true`-Flag mit `arch_trigger`-Beschreibung. | Must |
+| REQ-SE-11 | Das JSON-Output-Schema von `se-requirements` wird um die Felder `arch_impact` (bool, default false), `arch_trigger` (string, nur bei arch_impact=true), `acceptance_criteria` (string[]) und `scope` (enum: system/component/both) erweitert. | Must |
+| REQ-SE-12 | Der `se-critic` erhält einen zusätzlichen Prüfschritt "Role Boundary Check" bei `review_target: "requirements"`. Dieser prüft auf verbotene Architektur-Begriffe und lehnt Requirements mit Rollenverstoß ab (status: rejected, correction_hint zur Reformulierung). | Must |
+| REQ-SE-13 | Der `se-architect` empfängt mit der Black-Box-Anforderung die Liste aller `arch_impact: true`-Triggers und muss in seinem `architectural_rationale` explizit auf jeden eingehen. | Must |
+
+### Lösung C — Pipeline-Trennung (optional)
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-SE-20 | Der Orchestrator klassifiziert eingehende SE-Aufträge basierend auf `scope` (system/component/both) und `arch_impact`-Flag in Pipeline A (System-Level, vollständiger Decomposition-Stack) oder Pipeline B (Component-Level, nur Developer + Reviewer + Validator). Default: `scope: system`. | Should |
+| REQ-SE-21 | Pipeline A durchläuft: se-requirements → se-critic(req) → se-architect → se-critic(arch) → se-interface-mgr → se-termination. Endpunkt ist entweder leaf (Dispatch zu Pipeline B) oder continue (Spawn L+1). | Should |
+| REQ-SE-22 | Pipeline B durchläuft: se-requirements(refinement) → se-developer-tier → se-code-reviewer → se-validator + se-verifier. Kein se-architect, kein se-interface-mgr, kein se-termination. Endpunkt ist V&V-Floor. | Should |

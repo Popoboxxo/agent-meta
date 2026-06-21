@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SE State Resume Pointer Schema",
+  "description": "Schema for .se-state.yaml — the resumable state pointer for SE cascade. Enables session recovery after token-loss without re-running completed steps.",
+  "type": "object",
+  "required": ["project", "last_updated", "current_level", "current_node", "last_completed_step"],
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "Project name this state belongs to."
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last state mutation."
+    },
+    "current_level": {
+      "type": "string",
+      "pattern": "^L[0-9]+$",
+      "description": "Current decomposition level (e.g., L1, L2)."
+    },
+    "current_node": {
+      "type": "string",
+      "description": "Name of the current system/node being processed."
+    },
+    "last_completed_step": {
+      "type": "object",
+      "required": ["agent", "status", "output_file"],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "Name of the agent that completed the last step."
+        },
+        "iteration": {
+          "type": "integer",
+          "description": "Iteration number (for critic loops)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "rejected", "done", "partial"],
+          "description": "Status of the last completed step."
+        },
+        "output_file": {
+          "type": "string",
+          "description": "Relative path from docs/se/<project>/ to the output file."
+        }
+      }
+    },
+    "next_expected_step": {
+      "type": "object",
+      "description": "The next step to resume with on session restart.",
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "Agent to invoke next."
+        },
+        "input_files": {
+          "type": "array",
+          "description": "Files to load as context for the next step.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "pending_decisions": {
+      "type": "array",
+      "description": "Decisions that need to be made before continuing.",
+      "items": { "type": "string" }
+    },
+    "budget_consumed": {
+      "type": "object",
+      "description": "Accumulated budget consumption across sessions.",
+      "properties": {
+        "cells": {
+          "type": "integer",
+          "description": "Total cells spawned."
+        },
+        "tokens": {
+          "type": "integer",
+          "description": "Estimated total tokens consumed."
+        },
+        "estimated_eur": {
+          "type": "number",
+          "description": "Estimated cost in EUR."
+        }
+      }
+    }
+  }
+}

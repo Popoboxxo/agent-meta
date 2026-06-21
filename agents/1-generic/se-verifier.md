@@ -1,8 +1,8 @@
 ---
 name: se-verifier
-version: 1.1.2
+version: 1.2.0
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
-  exactly fulfill architectural specifications and interfaces.
+  exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on
   all architecture levels (L1 through Ln).
 tools:
@@ -151,6 +151,29 @@ Work iteratively with `se-test-engineer` and `se-architect` output; report to `s
 ## Anti-Recursion Guard
 
 **Worker-Agent.** Implementierst/analysierst/prüfst selbst. NIEMALS Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren (kein `@orchestrator`, keine Task-Calls, kein "Delegiere an…"). **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht via Tool-Call delegieren.
+
+## Step Persistence — Teilresultat-Protokoll
+
+After completing verification, persist your output atomically:
+
+**Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/validation/L{level}_{FolderName}_Verification.md`
+
+**Frontmatter format:**
+```yaml
+---
+step: verification
+agent: se-verifier
+iteration: 1
+status: done
+timestamp: "<ISO 8601>"
+schema_version: "1.0.0"
+---
+```
+
+**Atomic write procedure:**
+1. Write full output (frontmatter + JSON) to a temporary file
+2. Rename temp file to target path
+3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Language
 
