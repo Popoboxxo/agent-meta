@@ -109,20 +109,20 @@ providers:
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
     orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode-go model IDs — format: opencode-go/<model-id>
-    # Full list: https://opencode.ai/docs/go/
+    # opencode-zen model IDs — format: opencode/<raw_id>
+    # Full list: https://opencode.ai/zen
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash   # cheapest, highest throughput: 31,650 req/5h
-      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback, formatting
-      balanced: opencode-go/qwen3.7-plus        # best cost/performance: $0.40/$1.60, 4,300 req/5h
-      powerful: opencode-go/kimi-k2.6           # strong reasoning: architecture, security
-      max:      opencode-go/kimi-k2.7-code      # best coding model: $0.95/$4.00, 1,350 req/5h
+      nano:     opencode/deepseek-v4-flash-free   # free tier, lowest cost
+      fast:     opencode/deepseek-v4-flash        # quick ops: git, meta-feedback, formatting
+      balanced: opencode/qwen3.6-plus             # best cost/performance default workhorse
+      powerful: opencode/kimi-k2.6                # strong reasoning: architecture, security
+      max:      opencode/deepseek-v4-pro          # premium reasoning, complex coding
     model-aliases:
-      flash:      opencode-go/deepseek-v4-flash
-      qwen:       opencode-go/qwen3.7-plus
-      kimi:       opencode-go/kimi-k2.6
-      kimi-code:  opencode-go/kimi-k2.7-code    # best coding model
-      qwen-max:   opencode-go/qwen3.7-max       # fallback alias, removed from tiers
+      flash:      opencode/deepseek-v4-flash
+      flash-free: opencode/deepseek-v4-flash-free
+      qwen:       opencode/qwen3.6-plus
+      kimi:       opencode/kimi-k2.6
+      deepseek:   opencode/deepseek-v4-pro
 
   Continue:
     agents_dir: .continue/agents
