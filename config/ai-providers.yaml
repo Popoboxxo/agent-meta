@@ -82,6 +82,7 @@ providers:
     model-aliases: {}
 
   Opencode:
+    display-name: "OpenCode Zen"
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
@@ -125,6 +126,7 @@ providers:
       deepseek:   opencode/deepseek-v4-pro
 
   OpencodeGo:
+    display-name: "OpenCode Go"
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
