@@ -3146,7 +3146,7 @@ async function viewProjectProviders() {
     cb.checked = selProviders.has(p.name);
     cb.addEventListener("change", () => { cb.checked ? selProviders.add(p.name) : selProviders.delete(p.name); });
     line.appendChild(cb);
-    line.appendChild(el("span", { class: "mono" }, [p.name]));
+    line.appendChild(el("span", { class: "mono" }, [p.display_name || p.name]));
     if (!p.has_model_tiers) line.appendChild(el("span", { class: "muted", title: "manages models centrally" }, ["(central models)"]));
     provPanel.appendChild(line);
   }
@@ -3775,9 +3775,9 @@ async function viewProjectModelOverrides() {
         provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
       }
       provSel.appendChild(el("option", { value: "" }, ["— select —"]));
-      for (const pn of provNames) {
-        const o = el("option", { value: pn }, [pn]);
-        if (pn === row.provider) o.selected = true;
+      for (const tp of tierProviders) {
+        const o = el("option", { value: tp.name }, [tp.display_name || tp.name]);
+        if (tp.name === row.provider) o.selected = true;
         provSel.appendChild(o);
       }
       provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
@@ -3889,9 +3889,9 @@ async function viewProjectProviderTierOverrides() {
         provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
       }
       provSel.appendChild(el("option", { value: "" }, ["— select —"]));
-      for (const pn of provNames) {
-        const o = el("option", { value: pn }, [pn]);
-        if (pn === row.provider) o.selected = true;
+      for (const tp of tierProviders) {
+        const o = el("option", { value: tp.name }, [tp.display_name || tp.name]);
+        if (tp.name === row.provider) o.selected = true;
         provSel.appendChild(o);
       }
       provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
@@ -4444,6 +4444,7 @@ async function viewProviderTiers() {
   let editMode = false;
   let modelsData = [];
   let aiProvidersData = {};
+  let displayNameMap = {};
 
   const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
   const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
@@ -4537,13 +4538,14 @@ async function viewProviderTiers() {
         tr.dataset.provider = p;
 
         // Provider name cell: indent if it's part of a group
+        const provDisplayName = displayNameMap[p] || p;
         const nameCell = el("td", {});
         if (isGroup) {
           const nameSpan = el("span", { style: "padding-left: 16px;" });
-          nameSpan.textContent = p;
+          nameSpan.textContent = provDisplayName;
           nameCell.appendChild(nameSpan);
         } else {
-          nameCell.appendChild(el("strong", {}, [p]));
+          nameCell.appendChild(el("strong", {}, [provDisplayName]));
         }
         tr.appendChild(nameCell);
 
@@ -4611,9 +4613,14 @@ async function viewProviderTiers() {
   const loadData = async () => {
     try {
       // Tier mapping dropdowns should only offer active (enabled, non-blacklisted) models.
-      const [resModels, resProviders] = await Promise.all([api.get("/api/models/active"), api.get("/api/ai-providers")]);
+      const [resModels, resProviders, provList] = await Promise.all([
+        api.get("/api/models/active"),
+        api.get("/api/ai-providers"),
+        api.get("/api/providers").catch(() => []),
+      ]);
       modelsData = resModels.models || [];
       aiProvidersData = resProviders || {};
+      displayNameMap = Object.fromEntries((Array.isArray(provList) ? provList : []).map(p => [p.name, p.display_name || p.name]));
       renderProviders();
     } catch (err) { providersWrap.replaceChildren(renderError(err)); }
   };

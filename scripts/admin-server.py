@@ -1817,6 +1817,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 aliases = {}
             out.append({
                 "name": name,
+                "display_name": conf.get("display-name") or name,
                 "has_model_tiers": bool(tiers),
                 "model_tiers": tiers,
                 "model_aliases": aliases,
