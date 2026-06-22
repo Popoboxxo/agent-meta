@@ -3633,7 +3633,8 @@ async function viewProjectModelOverrides() {
     loadProject(),
     api.get("/api/providers").catch(() => []),
     api.get("/api/roles").catch(() => []),
-    api.get("/api/models").catch(() => ({ models: [] })),
+    // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
+    api.get("/api/models/active").catch(() => ({ models: [] })),
   ]);
 
   // Only providers with model tiers can carry overrides.
@@ -3748,7 +3749,8 @@ async function viewProjectProviderTierOverrides() {
   const [data, providers, modelsRes] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
-    api.get("/api/models").catch(() => ({ models: [] })),
+    // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
+    api.get("/api/models/active").catch(() => ({ models: [] })),
   ]);
 
   const tierProviders = providers.filter(p => p.has_model_tiers);
@@ -4110,6 +4112,7 @@ async function viewModels() {
       el("th", {}, ["Input Cost ($/1M)"]),
       el("th", {}, ["Output Cost ($/1M)"]),
       el("th", {}, ["Cost Factor (1-100)"]),
+      el("th", {}, ["Status"]),
       el("th", {}, ["Actions / Ref"]),
     ]));
     table.appendChild(thead);
@@ -4119,6 +4122,9 @@ async function viewModels() {
       const tr = el("tr");
       tr.dataset.provider = m.provider;
       tr.dataset.modelId = m.id;
+      // Visual indicator for disabled models — gray out the entire row.
+      const isEnabled = m.enabled !== false;
+      if (!isEnabled) tr.style.opacity = "0.5";
 
       const cb = el("input", { type: "checkbox", class: "model-cb", value: m.id });
       cb.addEventListener("change", updateDeleteBtnVisibility);
@@ -4161,7 +4167,34 @@ async function viewModels() {
       tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [
         cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left: 8px;" }, ["Calc"])
       ]));
-      
+
+      // Status column — enable/disable toggle button per row.
+      const statusTd = el("td", {});
+      const toggleBtn = el("button", {
+        class: "btn",
+        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow, #c08b00)" : "var(--accent-green, #2a8a2a)"}; color: white; border: none; border-radius: 4px;`,
+        title: isEnabled ? "Disable this model (exclude from active model picker without removing from registry)" : "Enable this model",
+      }, [isEnabled ? "Disable" : "Enable"]);
+      toggleBtn.onclick = async () => {
+        const endpoint = isEnabled ? "/api/models/disable" : "/api/models/enable";
+        toggleBtn.disabled = true;
+        try {
+          const r = await api.post(endpoint, { ids: [m.id] });
+          if (r && r.success !== false) {
+            toast(isEnabled ? "Model disabled" : "Model enabled", "success");
+            await loadData();
+          } else {
+            toast((r && r.error) || "Toggle failed", "error");
+          }
+        } catch (err) {
+          toast(`Toggle failed: ${err.message}`, "error");
+        } finally {
+          toggleBtn.disabled = false;
+        }
+      };
+      statusTd.appendChild(toggleBtn);
+      tr.appendChild(statusTd);
+
       const actionTd = el("td", {});
       if (m.source_url && !editMode) actionTd.appendChild(el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"]));
       const resetBtn = el("button", { class: "btn-icon", style: "cursor: pointer; background: transparent; border: none; font-size: 1.2em;", title: "Reset Pricing Overlay" }, ["🗑️"]);
@@ -4172,8 +4205,33 @@ async function viewModels() {
         if (r.success) { toast("Pricing reset", "success"); await loadData(); }
       };
       actionTd.appendChild(resetBtn);
+
+      // Blacklist button — permanently excludes model from discovery.
+      const blacklistBtn = el("button", {
+        class: "btn btn-danger",
+        style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: 6px;",
+        title: "Blacklist this model permanently (removed from registry, won't reappear on next sync)",
+      }, ["Blacklist"]);
+      blacklistBtn.onclick = async () => {
+        if (!confirm(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`)) return;
+        blacklistBtn.disabled = true;
+        try {
+          const r = await api.post("/api/models/exclude", { ids: [m.id] });
+          if (r && r.success !== false) {
+            toast("Model blacklisted", "success");
+            await loadData();
+          } else {
+            toast((r && r.error) || "Blacklist failed", "error");
+          }
+        } catch (err) {
+          toast(`Blacklist failed: ${err.message}`, "error");
+        } finally {
+          blacklistBtn.disabled = false;
+        }
+      };
+      actionTd.appendChild(blacklistBtn);
       tr.appendChild(actionTd);
-      
+
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -4334,7 +4392,8 @@ async function viewProviderTiers() {
 
   const loadData = async () => {
     try {
-      const [resModels, resProviders] = await Promise.all([api.get("/api/models"), api.get("/api/ai-providers")]);
+      // Tier mapping dropdowns should only offer active (enabled, non-blacklisted) models.
+      const [resModels, resProviders] = await Promise.all([api.get("/api/models/active"), api.get("/api/ai-providers")]);
       modelsData = resModels.models || [];
       aiProvidersData = resProviders || {};
       renderProviders();

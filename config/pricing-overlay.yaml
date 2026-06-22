@@ -1,6 +1,3 @@
-excluded_models:
-- google/gemini-3.1-flash-image
-- google/gemini-3-pro-image
 prices:
   anthropic:
     _url: https://www.anthropic.com/pricing
@@ -21,15 +18,5 @@ prices:
     gemini-1.5-flash:
       input: 0.35
       output: 1.05
-  opencode:
-    _url: https://opencode.de
-    opencode-go-large:
-      input: 0.0
-      output: 0.0
-    opencode-go-small:
-      input: 0.0
-      output: 0.0
-  opencode-go:
-    _url: https://opencode.ai/docs/de/go/
   opencode-zen:
     _url: https://opencode.ai/zen
