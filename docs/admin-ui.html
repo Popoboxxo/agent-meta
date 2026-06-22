@@ -2998,7 +2998,7 @@ async function viewProjectGeneral() {
     loadProject(),
     api.get("/api/config/dod-presets").catch(() => null),
     api.get("/api/config/rules-presets").catch(() => null),
-    api.get("/api/tier-presets").catch(() => null),
+    api.get("/api/tier-presets/merged").catch(() => null),
   ]);
 
   // dod-presets.yaml has either a top-level mapping of preset-name → config,
@@ -3014,9 +3014,17 @@ async function viewProjectGeneral() {
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
   const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal", "se-focus": !!data["se-focus"] };
 
-  let TIER_PRESETS = TIER_FALLBACK;
-  if (tierPresetsResp && tierPresetsResp.presets) {
-    TIER_PRESETS = Object.keys(tierPresetsResp.presets);
+  const TIER_PRESETS = extractPresetKeys(tierPresetsResp, TIER_FALLBACK);
+  // Build label map: project-local presets get a ★ prefix so they stand out
+  // visually in the dropdown. Global presets render unchanged.
+  const TIER_PRESET_LABELS = {};
+  if (tierPresetsResp && typeof tierPresetsResp === "object") {
+    for (const key of TIER_PRESETS) {
+      const entry = tierPresetsResp[key];
+      if (entry && typeof entry === "object" && entry.source === "project") {
+        TIER_PRESET_LABELS[key] = `★ ${key}`;
+      }
+    }
   }
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
@@ -3035,10 +3043,16 @@ async function viewProjectGeneral() {
       top["tier-preset"] = v;
       // Triggers live preview update if needed
   };
-  panel.appendChild(dropdownField("tier-preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange));
+  panel.appendChild(dropdownField("tier-preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange, TIER_PRESET_LABELS));
   panel.appendChild(checkboxField("se-focus", top["se-focus"], v => { top["se-focus"] = v; }));
 
   wrap.appendChild(panel);
+
+  wrap.appendChild(el("div", { class: "panel", style: "margin-top: 16px;" }, [
+    el("h2", {}, ["Global Framework Setup"]),
+    el("p", { class: "muted" }, ["Configure provider model tiers, tier mappings and other global settings."]),
+    el("a", { href: "#/config/ai-providers", class: "btn" }, ["Open ai-providers.yaml →"]),
+  ]));
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
     el("button", { class: "btn btn-primary", onclick: async () => {
@@ -4570,6 +4584,9 @@ async function viewTierPresets() {
           const presetTd = el("td", { rowspan: String(providerNames.length) });
           presetTd.appendChild(el("strong", {}, [presetId]));
           if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+          if (preset.source === "project") {
+            presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+          }
           if (preset.description) {
             presetTd.appendChild(el("div", { class: "muted", style: "font-size: 0.85em; margin-top: 4px;" }, [preset.description]));
           }
@@ -4604,7 +4621,7 @@ async function viewTierPresets() {
   const loadData = async () => {
     try {
       const [tp, ap] = await Promise.all([
-        api.get("/api/tier-presets"),
+        api.get("/api/tier-presets/merged"),
         api.get("/api/ai-providers")
       ]);
       tierPresetsData = tp;
