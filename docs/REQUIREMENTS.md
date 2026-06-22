@@ -60,3 +60,20 @@
 | REQ-SE-20 | Der Orchestrator klassifiziert eingehende SE-Aufträge basierend auf `scope` (system/component/both) und `arch_impact`-Flag in Pipeline A (System-Level, vollständiger Decomposition-Stack) oder Pipeline B (Component-Level, nur Developer + Reviewer + Validator). Default: `scope: system`. | Should |
 | REQ-SE-21 | Pipeline A durchläuft: se-requirements → se-critic(req) → se-architect → se-critic(arch) → se-interface-mgr → se-termination. Endpunkt ist entweder leaf (Dispatch zu Pipeline B) oder continue (Spawn L+1). | Should |
 | REQ-SE-22 | Pipeline B durchläuft: se-requirements(refinement) → se-developer-tier → se-code-reviewer → se-validator + se-verifier. Kein se-architect, kein se-interface-mgr, kein se-termination. Endpunkt ist V&V-Floor. | Should |
+
+---
+
+## Dynamische Modellerfassung & Tier-Presets
+
+> Quelle: `docs/concepts/planned/dynamic-model-presets.md`
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-MOD-01 | `sync.py` erhält den CLI-Parameter `--update-models`, welcher das neue Modul `scripts/lib/model_discovery.py` aufruft, um verfügbare Modelle von den Provider-APIs (Anthropic, Gemini, Opencode-GO) abzurufen. | Must |
+| REQ-MOD-02 | Abgerufene Modelle werden zentral in `config/generated/model-registry.json` gespeichert. | Must |
+| REQ-MOD-03 | Ein Preis-Overlay (`config/pricing-overlay.yaml`) reichert die Modell-Daten um Input/Output-Kosten an, woraus ein normalisierter `Cost Factor` (Score 1-100) berechnet wird. | Must |
+| REQ-MOD-04 | Die starre Modell-Zuweisung in `ai-providers.yaml` wird durch ein Preset-System (Verschiebungs-Matrix) ersetzt. Presets (Cheap, Normal, Advanced, Expensive, Expensive as Hell) mappen Agenten-Tiers dynamisch auf Modell-Klassen unter Berücksichtigung von Kostendifferenzierung (Verdünnung). | Must |
+| REQ-MOD-05 | Jedes Preset besitzt eine `(SE)` Variante, die speziell Systems-Engineering Rollen (se-architect, se-critic etc.) künstlich um 1-2 Tiers aufwertet, bevor das Matrix-Mapping greift. | Must |
+| REQ-MOD-06 | Projekte können ihr gewünschtes Preset global oder lokal über `.meta-config/project.yaml` definieren. Fehlt die Angabe, wird ein Standard-Preset (z.B. Normal) verwendet. | Must |
+| REQ-MOD-07 | Die Admin UI (`scripts/admin-server.py`) erhält ein "Model Discovery & Pricing" Dashboard mit sortierbarer Modell-Tabelle, Crawl-Button und Heatmap, sowie einen Preset-Selector mit Live-Vorschau in den Project Settings. | Should |
+

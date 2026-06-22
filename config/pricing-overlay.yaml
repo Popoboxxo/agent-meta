@@ -1,0 +1,22 @@
+prices:
+  anthropic:
+    _url: https://www.anthropic.com/pricing
+    claude-3-5-sonnet-20240620:
+      input: 3.0
+      output: 15.0
+    claude-3-opus-20240229:
+      input: 15.0
+      output: 75.0
+    claude-3-haiku-20240307:
+      input: 0.25
+      output: 1.25
+  gemini:
+    _url: https://ai.google.dev/pricing
+    gemini-1.5-pro:
+      input: 3.5
+      output: 10.5
+    gemini-1.5-flash:
+      input: 0.35
+      output: 1.05
+  opencode-zen:
+    _url: https://opencode.ai/zen

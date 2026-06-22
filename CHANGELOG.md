@@ -4,6 +4,42 @@
 
 ---
 
+## [0.65.0] - 2026-06-22
+
+### Added
+- Model discovery from OpenRouter (338 models) and OpenCode Zen/Go (68 models) via keyless APIs
+- Model curation system: blacklist, disable, enable states (`config/model-curation.yaml`)
+- Registry persistence guard: populated registry preserved on network failure
+- Tier presets redesign: direct model-id assignment (`tiers:`) replaces tier-to-tier mapping
+- Backward-compatible: old `mapping:` format still resolved
+- Project-local tier presets override global ones in `resolve_model`
+- OpenCode unified provider: Zen + Go merged, `display-name` field in ai-providers.yaml
+- Admin UI: Edit/Save/Cancel flow for pricing, per-model enable/disable/blacklist
+- Admin UI: Quick-filter strip (Claude/OpenCode/GitHub/OpenAI/Google) in model dashboard
+- Admin UI: Resolved View + Edit Mappings tabs in Tier Presets
+- Admin UI: Per-provider datalist filtering in Provider Tier Mappings
+- Admin UI: Project Tier Override panel on ai-providers page
+- `display-name` field for providers, surfaced in all admin dialogs
+
+### Fixed
+- `SyncLog.error` missing method caused `AttributeError` crash in target repos
+- `resolve_model` passed `pc` instead of `provider_config` (wrong type, runtime error)
+- Tier-preset dropdown fell back to stale hardcoded list with removed SE variants
+- Fabricated `OPENCODE_GO_MODELS` replaced with real API data from `opencode.ai/zen/go/v1/models`
+- HTTP 403 from OpenCode endpoints fixed with correct `User-Agent` header
+
+### Changed
+- `tier-presets.yaml` migrated to new `tiers:` format (all 5 presets)
+- OpenCode provider: `Opencode` (Zen) and `OpencodeGo` (Go) merged into single `Opencode`
+- Model registry now sourced from live APIs, not hardcoded data
+
+### Removed
+- Fabricated hardcoded `OPENCODE_GO_MODELS` list
+- `scripts/patch_ui.py` (obsolete one-shot script)
+- `Normal (SE)` and `Advanced (SE)` pseudo-presets (SE is now a boolean flag)
+
+---
+
 ## [0.64.1] — 2026-06-20
 
 ### Added

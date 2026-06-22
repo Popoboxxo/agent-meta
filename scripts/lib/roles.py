@@ -1,17 +1,35 @@
 """Roles config loading and model/memory/permissionMode resolution."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .io import _load_yaml_or_json
+
+if TYPE_CHECKING:
+    from .log import SyncLog
 
 ROLES_CONFIG = "config/role-defaults.yaml"
 _ROLES_CONFIG_LEGACY = "roles.config.yaml"
 _ROLES_CONFIG_JSON = "roles.config.json"  # legacy fallback
 
 # Abstract tier names defined in role-defaults.yaml
-_KNOWN_TIERS = {"nano", "fast", "balanced", "powerful", "max"}
+_KNOWN_TIERS = {"nano", "fast", "balanced", "powerful", "max", "ultra"}
+_TIER_SEQUENCE = ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+
 # Legacy Claude aliases — resolved only when no provider context is available
 _CLAUDE_ALIASES = {"haiku", "sonnet", "opus"}
+
+def load_tier_presets(agent_meta_root: Path) -> dict:
+    presets_path = agent_meta_root / "config" / "tier-presets.yaml"
+    data, _ = _load_yaml_or_json(presets_path)
+    return data or {}
+
+def _upgrade_tier(tier: str, steps: int) -> str:
+    if tier not in _TIER_SEQUENCE:
+        return tier
+    idx = _TIER_SEQUENCE.index(tier)
+    new_idx = min(len(_TIER_SEQUENCE) - 1, idx + steps)
+    return _TIER_SEQUENCE[new_idx]
 
 
 def load_roles_config(agent_meta_root: Path) -> dict:
@@ -77,44 +95,113 @@ def resolve_model(
     agent_meta_root: Path,
     provider: str = "Claude",
     provider_config: dict | None = None,
+    log: "SyncLog" | None = None,
 ) -> str:
-    """Resolve the model ID for a role and provider.
-
-    Precedence (highest to lowest):
-    1. Provider-specific project override: project_config["model-overrides"][<provider>][role]
-    2. Legacy flat project override:       project_config["model-overrides"][role]
-       (treated as Claude-only when provider != Claude)
-    3. Meta default from role-defaults.yaml (tier name → provider model ID)
-    4. Empty string → no model: field injected (agent inherits from parent context)
-
-    Tier resolution:
-    - nano/fast/balanced/powerful/max → looked up in ai-providers.yaml model-tiers[provider]
-    - haiku/sonnet/opus → legacy aliases, mapped via model-aliases or tier fallback
-    - Full model IDs (claude-*, gemini-*) → passed through unchanged
-    """
+    """Resolve the model ID for a role and provider using tier presets and registry."""
     pc = provider_config or {}
+
+    tier_or_id = ""
+    explicit_override = False
 
     # 1. Provider-specific project override
     provider_overrides = project_config.get("model-overrides", {})
     provider_specific = provider_overrides.get(provider, {})
     if isinstance(provider_specific, dict) and role in provider_specific:
         tier_or_id = str(provider_specific[role])
-        return _resolve_tier_to_model(tier_or_id, provider, pc)
-
-    # 2. Legacy flat override (only applied to Claude; for other providers skip)
-    if isinstance(provider_overrides, dict) and role in provider_overrides:
+        explicit_override = True
+        if log:
+            log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
+    elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):
-            tier_or_id = str(flat_value)
             if provider == "Claude":
-                return _resolve_tier_to_model(tier_or_id, provider, pc)
-            # For non-Claude providers: flat override is Claude-specific — skip it,
-            # fall through to meta default so Gemini gets correct model
+                tier_or_id = str(flat_value)
+                explicit_override = True
+                if log:
+                    log.debug(f"{provider}/{role}", f"Model explicitly overriden via flat map: {tier_or_id}")
 
-    # 3. Meta default from role-defaults.yaml
-    roles_cfg = load_roles_config(agent_meta_root)
-    tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
-    return _resolve_tier_to_model(tier_or_id, provider, pc)
+    # 2. Meta default from role-defaults.yaml
+    if not tier_or_id:
+        roles_cfg = load_roles_config(agent_meta_root)
+        tier_or_id = roles_cfg["roles"].get(role, {}).get("model", "")
+        if tier_or_id and log:
+            log.debug(f"{provider}/{role}", f"Model/Tier from role-defaults: {tier_or_id}")
+
+    # Check if role has an explicit tier override (skip when user already set explicit model-override)
+    if not explicit_override:
+        tier_overrides = project_config.get("tier-overrides", {})
+        if role in tier_overrides:
+            tier_or_id = tier_overrides[role]
+            if log:
+                log.debug(f"{provider}/{role}", f"Tier explicitly overridden: {tier_or_id}")
+
+    # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
+    if tier_or_id and tier_or_id not in _KNOWN_TIERS:
+        resolved = _resolve_tier_to_model(tier_or_id, provider, provider_config)
+        if log:
+            log.debug(f"{provider}/{role}", f"Tier '{tier_or_id}' resolved directly to: {resolved}")
+        return resolved
+
+    base_tier = tier_or_id
+
+    # 3. Apply SE Focus and Presets
+    preset_name = project_config.get("tier-preset", "Normal")
+    se_focus = bool(project_config.get("se-focus", False))
+    # Backward compat: old configs may have " (SE)" suffix in tier-preset value
+    if preset_name.endswith(" (SE)"):
+        se_focus = True
+        preset_name = preset_name.replace(" (SE)", "")
+    if se_focus and role.startswith("se-"):
+        base_tier = _upgrade_tier(base_tier, 1)
+        if log:
+            log.debug(f"{provider}/{role}", f"SE Focus applied, tier upgraded to: {base_tier}")
+
+    # C1 fix: presets are top-level keys in tier-presets.yaml, not nested under "presets:"
+    # Merge: project-local presets (project_config["tier-presets"]) override global ones.
+    global_presets = load_tier_presets(agent_meta_root)
+    project_presets = project_config.get("tier-presets", {}) or {}
+
+    if isinstance(project_presets, dict) and preset_name in project_presets:
+        preset_data = project_presets[preset_name] or {}
+        if log:
+            log.debug(f"{provider}/{role}", f"Preset '{preset_name}' resolved from project-local tier-presets")
+    else:
+        preset_data = global_presets.get(preset_name, {}) or {}
+
+    # --- New format: tiers: {tier → model_id} direct ---
+    if "tiers" in preset_data:
+        direct_model = preset_data["tiers"].get(base_tier, "")
+        if direct_model:
+            # provider-tier-overrides take priority over preset tiers
+            pto = project_config.get("provider-tier-overrides", {})
+            if provider in pto and base_tier in pto[provider]:
+                resolved = str(pto[provider][base_tier])
+                if log:
+                    log.debug(f"{provider}/{role}", f"Tier '{base_tier}' explicitly overriden for provider '{provider}': {resolved}")
+                return resolved
+            if log:
+                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved directly from preset '{preset_name}': {direct_model}")
+            return direct_model
+
+    # --- Old format: mapping: {tier → tier} + provider model-tiers ---
+    preset_matrix = preset_data.get("mapping", {}) or {}
+
+    mapped_tier = preset_matrix.get(base_tier, base_tier)
+    if log and mapped_tier != base_tier:
+        log.debug(f"{provider}/{role}", f"Tier '{base_tier}' mapped to '{mapped_tier}' via preset '{preset_name}'")
+
+    pto = project_config.get("provider-tier-overrides", {})
+    if provider in pto and mapped_tier in pto[provider]:
+        resolved = str(pto[provider][mapped_tier])
+        if log:
+            log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' explicitly overriden for provider '{provider}': {resolved}")
+        return resolved
+
+    # Resolve tier to provider-specific model ID
+    resolved = _resolve_tier_to_model(mapped_tier, provider, provider_config)
+    if log:
+        log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved to: {resolved}")
+    return resolved
 
 
 def resolve_permission_mode(role: str, project_config: dict, agent_meta_root: Path) -> str:

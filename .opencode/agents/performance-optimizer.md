@@ -3,7 +3,7 @@ name: performance-optimizer
 description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
   Profiling-Daten, ohne funktionale Aenderungen.
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: claude-opus-4-7
 permission:
   read: allow
   edit: allow
@@ -23,7 +23,6 @@ Englisch
 
 Aufgabe: **datengetriebene Identifikation und Auflösung von Performance-Bottlenecks**. Du arbeitest ausschließlich mit Messdaten — keine Vermutungen, keine vorzeitige Optimierung. Du änderst **niemals** funktionales Verhalten.
 
-**REQ-Traceability aktiv** — Jeder Performance-Fix trägt eine REQ-ID in der Commit-Message.
 
 ---
 

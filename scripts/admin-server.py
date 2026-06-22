@@ -988,6 +988,21 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
 
+        if path == "/api/models":
+            return self._handle_get_models()
+
+        if path == "/api/models/active":
+            return self._handle_get_models_active()
+
+        if path == "/api/ai-providers":
+            return self._handle_get_ai_providers()
+
+        if path == "/api/tier-presets":
+            return self._handle_get_tier_presets()
+
+        if path == "/api/tier-presets/merged":
+            return self._handle_get_tier_presets_merged()
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1045,6 +1060,30 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/config-audit/apply":
             return self._send_json(self._apply_config_audit())
 
+        if path == "/api/models/update":
+            return self._handle_post_models_update()
+
+        if path == "/api/models/exclude":
+            return self._handle_post_models_exclude()
+
+        if path == "/api/models/disable":
+            return self._handle_post_models_disable()
+
+        if path == "/api/models/enable":
+            return self._handle_post_models_enable()
+
+        if path == "/api/pricing/update":
+            return self._handle_post_pricing_update()
+
+        if path == "/api/pricing/reset":
+            return self._handle_post_pricing_reset()
+
+        if path == "/api/ai-providers/update":
+            return self._handle_post_ai_providers_update()
+
+        if path == "/api/tier-presets/update":
+            return self._handle_post_tier_presets_update()
+
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
         subserver = self._match_subserver_route(path)
@@ -1082,6 +1121,469 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "action": action,
             "status": vm.status(),
         })
+
+    def _curation_root(self) -> Path:
+        """Return the project root that owns ``config/model-curation.yaml``.
+
+        Mirrors the layout-resolution used elsewhere in this handler: prefers
+        the top-level checkout (``<root>/config/``) and falls back to the
+        submodule layout (``<root>/.agent-meta/config/``) when the framework
+        is embedded in a target repo.
+        """
+        root = self.__class__.root
+        if (root / "config").exists():
+            return root
+        if (root / ".agent-meta" / "config").exists():
+            return root / ".agent-meta"
+        return root
+
+    def _load_curation(self) -> dict:
+        """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
+
+        The import is performed lazily (and ``sys.path`` is extended on demand)
+        to mirror the pattern used by ``_load_viz_config`` at module level:
+        the admin server must keep starting even when the ``lib`` package is
+        not on ``sys.path`` at process boot.
+        """
+        root = self.__class__.root
+        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
+            if candidate.exists() and str(candidate) not in sys.path:
+                sys.path.insert(0, str(candidate))
+        from lib.curation import load_curation  # type: ignore[import]
+        curation = load_curation(str(self._curation_root()))
+        # ``load_curation`` already normalises shape; ensure keys exist for
+        # downstream callers regardless of any future schema changes.
+        curation.setdefault("blacklist", [])
+        curation.setdefault("disabled", [])
+        return curation
+
+    def _save_curation(self, curation: dict) -> None:
+        """Persist a curation document via ``scripts.lib.curation.save_curation``."""
+        root = self.__class__.root
+        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
+            if candidate.exists() and str(candidate) not in sys.path:
+                sys.path.insert(0, str(candidate))
+        from lib.curation import save_curation  # type: ignore[import]
+        save_curation(str(self._curation_root()), curation)
+
+    def _collect_models(self) -> list[dict]:
+        """Resolve the model registry + pricing overlay + curation into the
+        enriched ``models`` list that powers both ``/api/models`` and
+        ``/api/models/active``.
+
+        Each entry exposes the legacy pricing fields (``input_cost``,
+        ``output_cost``, ``cost_factor`` …) plus the new curation flags:
+
+        * ``enabled``     — ``True`` unless the id is in ``curation.disabled``.
+        * ``blacklisted`` — always ``False`` here. Blacklisted ids are filtered
+          out during registry generation, so a blacklisted model never reaches
+          this code path; the field is included for response-shape stability.
+        """
+        registry_path = self.__class__.root / "config" / "generated" / "model-registry.json"
+        pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+        if not registry_path.exists():
+            fallback_registry = (
+                self.__class__.root / ".agent-meta" / "config" / "generated" / "model-registry.json"
+            )
+            if fallback_registry.exists():
+                registry_path = fallback_registry
+                pricing_path = (
+                    self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                )
+
+        models: list[dict] = []
+        if registry_path.exists():
+            models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
+
+        pricing: dict = {}
+        if pricing_path.exists():
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+
+        curation = self._load_curation()
+        disabled_ids = set(curation.get("disabled", []))
+
+        for m in models:
+            provider = m.get("provider", "")
+            model_id = m.get("id", "")
+            model_name = m.get("name") or model_id
+
+            api_input = m.get("input_cost_api", 0.0)
+            api_output = m.get("output_cost_api", 0.0)
+
+            provider_prices = prices.get(provider, {}) if isinstance(prices, dict) else {}
+            model_prices = provider_prices.get(model_id, {}) if isinstance(provider_prices, dict) else {}
+
+            overlay_input = model_prices.get("input") if isinstance(model_prices, dict) else None
+            overlay_output = model_prices.get("output") if isinstance(model_prices, dict) else None
+
+            input_cost = overlay_input if overlay_input is not None else api_input
+            output_cost = overlay_output if overlay_output is not None else api_output
+
+            input_source = "Overlay" if overlay_input is not None else "API"
+            output_source = "Overlay" if overlay_output is not None else "API"
+
+            # Blended cost per 1M tokens (30% input, 70% output)
+            cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
+
+            m["name"] = model_name
+            m["input_cost"] = input_cost
+            m["output_cost"] = output_cost
+            m["input_source"] = input_source
+            m["output_source"] = output_source
+            m["cost_factor"] = cost_factor
+            m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
+            m["enabled"] = model_id not in disabled_ids
+            # Blacklisted ids are filtered during discovery and never appear in
+            # the registry; surfaced models are therefore always non-blacklisted.
+            m["blacklisted"] = False
+
+        return models
+
+    def _handle_get_models(self) -> None:
+        """Return all registered models with curation + pricing metadata."""
+        try:
+            models = self._collect_models()
+            return self._send_json({"models": models})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_models_active(self) -> None:
+        """Return only models that are currently active.
+
+        A model is active when it is not blacklisted (always true here, see
+        ``_collect_models``) and not in ``curation.disabled``. Tier dropdowns
+        and model pickers in the admin UI consume this endpoint so disabled
+        ids disappear from selectable options without rebuilding the registry.
+        """
+        try:
+            models = [m for m in self._collect_models() if m.get("enabled")]
+            return self._send_json({"models": models})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_update(self) -> None:
+        """Trigger sync.py --update-models"""
+        try:
+            res = self.__class__.sync_executor._run(["--update-models"])
+            return self._send_json(res)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _read_id_list(self) -> list[str]:
+        """Parse the request body and return a deduplicated list of model ids.
+
+        Body shape: ``{"ids": ["model-id-1", ...]}``. Raises ``ValueError``
+        on an empty or invalid body so the dispatcher returns HTTP 400.
+        """
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0:
+            raise ValueError("empty body")
+        raw = self.rfile.read(length).decode("utf-8")
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid JSON body: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ValueError("body must be a JSON object with 'ids' field")
+        ids = data.get("ids")
+        if not isinstance(ids, list):
+            raise ValueError("'ids' must be a list of strings")
+        seen: set[str] = set()
+        result: list[str] = []
+        for item in ids:
+            if not isinstance(item, str) or not item:
+                continue
+            if item in seen:
+                continue
+            seen.add(item)
+            result.append(item)
+        return result
+
+    def _handle_post_models_exclude(self) -> None:
+        """Add model ids to the curation blacklist (hard exclusion).
+
+        Blacklisted ids are filtered out during model-registry generation, so
+        the next ``sync.py --update-models`` run will drop them entirely. The
+        response shape (``{"success": true, "blacklisted_count": N}``) keeps
+        backward compatibility with the existing UI while signalling that the
+        backing store is now ``config/model-curation.yaml`` rather than
+        ``config/pricing-overlay.yaml``.
+        """
+        try:
+            try:
+                ids_to_blacklist = self._read_id_list()
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, status=400)
+
+            curation = self._load_curation()
+            blacklist = list(curation.get("blacklist", []))
+            existing = set(blacklist)
+            added = 0
+            for model_id in ids_to_blacklist:
+                if model_id not in existing:
+                    blacklist.append(model_id)
+                    existing.add(model_id)
+                    added += 1
+            curation["blacklist"] = blacklist
+            self._save_curation(curation)
+
+            return self._send_json({
+                "success": True,
+                "blacklisted_count": added,
+                "total": len(blacklist),
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_disable(self) -> None:
+        """Add model ids to the curation ``disabled`` list (soft exclusion).
+
+        Disabled ids stay in the registry (so historical references remain
+        resolvable) but are hidden from tier dropdowns and model pickers via
+        ``/api/models/active``.
+        """
+        try:
+            try:
+                ids_to_disable = self._read_id_list()
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, status=400)
+
+            curation = self._load_curation()
+            disabled = list(curation.get("disabled", []))
+            existing = set(disabled)
+            added = 0
+            for model_id in ids_to_disable:
+                if model_id not in existing:
+                    disabled.append(model_id)
+                    existing.add(model_id)
+                    added += 1
+            curation["disabled"] = disabled
+            self._save_curation(curation)
+
+            return self._send_json({
+                "status": "ok",
+                "disabled_count": added,
+                "total": len(disabled),
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_enable(self) -> None:
+        """Remove model ids from the curation ``disabled`` list.
+
+        Re-enables previously soft-excluded models. Ids that are not currently
+        disabled are silently skipped so the call is idempotent.
+        """
+        try:
+            try:
+                ids_to_enable = self._read_id_list()
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, status=400)
+
+            curation = self._load_curation()
+            disabled = list(curation.get("disabled", []))
+            to_remove = set(ids_to_enable)
+            removed = 0
+            new_disabled = []
+            for model_id in disabled:
+                if model_id in to_remove:
+                    removed += 1
+                else:
+                    new_disabled.append(model_id)
+            curation["disabled"] = new_disabled
+            self._save_curation(curation)
+
+            return self._send_json({
+                "status": "ok",
+                "enabled_count": removed,
+                "total": len(new_disabled),
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_pricing_update(self) -> None:
+        """Update pricing-overlay.yaml with new prices from UI."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0:
+                return self._send_json({"error": "Empty body"}, status=400)
+            body = self.rfile.read(length).decode("utf-8")
+            data = json.loads(body)
+            
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not (self.__class__.root / "config").exists():
+                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                
+            pricing = {}
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+            
+            if "prices" not in pricing:
+                pricing["prices"] = {}
+                
+            updates = data.get("updates", [])
+            for u in updates:
+                provider = u.get("provider")
+                model_id = u.get("id")
+                input_c = u.get("input_cost")
+                output_c = u.get("output_cost")
+                
+                if provider not in pricing["prices"]:
+                    pricing["prices"][provider] = {}
+                    
+                if model_id not in pricing["prices"][provider]:
+                    pricing["prices"][provider][model_id] = {}
+                    
+                if input_c is not None:
+                    pricing["prices"][provider][model_id]["input"] = float(input_c)
+                if output_c is not None:
+                    pricing["prices"][provider][model_id]["output"] = float(output_c)
+                    
+            pricing_path.parent.mkdir(parents=True, exist_ok=True)
+            with pricing_path.open("w", encoding="utf-8") as fh:
+                yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
+                
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_pricing_reset(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0:
+                return self._send_json({"error": "Empty body"}, status=400)
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            
+            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
+            if not (self.__class__.root / "config").exists():
+                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
+                
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+                if "prices" in pricing:
+                    provider = data.get("provider")
+                    model_id = data.get("id")
+                    if provider in pricing["prices"] and model_id in pricing["prices"][provider]:
+                        del pricing["prices"][provider][model_id]
+                        if not pricing["prices"][provider] and "_url" not in pricing["prices"][provider]:
+                             # Maybe don't delete empty providers to be safe, but they have _url usually
+                             pass
+                        with pricing_path.open("w", encoding="utf-8") as fh:
+                            yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
+                            
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_ai_providers(self) -> None:
+        try:
+            path = self.__class__.root / "config" / "ai-providers.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            data = {}
+            if path.exists():
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_ai_providers_update(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            path = self.__class__.root / "config" / "ai-providers.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_tier_presets(self) -> None:
+        try:
+            path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            data = {}
+            if path.exists():
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_tier_presets_merged(self) -> None:
+        """Return merged tier presets: global + project-local.
+
+        Each preset carries a ``source`` field (``"global"`` or ``"project"``).
+        Project-local presets (from ``.meta-config/project.yaml`` →
+        ``tier-presets``) override global ones with the same key. The Admin UI
+        uses this endpoint to surface both sets in tier-preset dropdowns and
+        the tier-presets matrix view.
+        """
+        try:
+            # 1. Load global tier presets (mirrors _handle_get_tier_presets).
+            global_path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                global_path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            global_data: dict = {}
+            if global_path.exists():
+                global_data = yaml.safe_load(global_path.read_text(encoding="utf-8")) or {}
+
+            # 2. Load project-local tier-presets from .meta-config/project.yaml.
+            project_data: dict = {}
+            try:
+                project_cfg = self.__class__.config_manager.read("project") or {}
+                if isinstance(project_cfg, dict):
+                    raw = project_cfg.get("tier-presets") or {}
+                    if isinstance(raw, dict):
+                        project_data = raw
+            except Exception:
+                project_data = {}
+
+            # 3. Merge — global first, project overrides per-key with source tag.
+            merged: dict = {}
+            for key, val in (global_data or {}).items():
+                if not isinstance(val, dict):
+                    continue
+                entry = dict(val)
+                entry["source"] = "global"
+                merged[key] = entry
+            for key, val in (project_data or {}).items():
+                if not isinstance(val, dict):
+                    continue
+                entry = dict(val)
+                entry["source"] = "project"
+                merged[key] = entry
+
+            return self._send_json(merged)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_tier_presets_update(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            # Validate: each top-level preset value must be a dict with a "mapping" key
+            if not isinstance(data, dict):
+                return self._send_json({"error": "Payload must be a JSON object"}, status=400)
+            for preset_id, preset_val in data.items():
+                if not isinstance(preset_val, dict) or "mapping" not in preset_val:
+                    return self._send_json(
+                        {"error": f"Preset '{preset_id}' must be an object with a 'mapping' key"},
+                        status=400,
+                    )
+            path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+            return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
@@ -1315,6 +1817,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 aliases = {}
             out.append({
                 "name": name,
+                "display_name": conf.get("display-name") or name,
                 "has_model_tiers": bool(tiers),
                 "model_tiers": tiers,
                 "model_aliases": aliases,

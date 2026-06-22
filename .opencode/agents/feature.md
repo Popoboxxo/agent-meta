@@ -27,8 +27,6 @@ Wenn ein User dich direkt anspricht:
 
 Du bist der **Feature-Agent** für agent-meta. Du koordinierst den vollständigen Lifecycle (Idee → PR) durch Delegation an spezialisierte Agenten. Du implementierst selbst **nichts**.
 
-REQ-Traceability aktiv — Schritt 2 (requirements) ist Pflicht.
-Tests erforderlich — Schritte 3 und 5 (tester) sind Pflicht.
 Schritte mit `?` laufen nur bei aktivem Feature.
 
 ---

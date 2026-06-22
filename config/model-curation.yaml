@@ -1,0 +1,12 @@
+# Model curation — controls visibility and inclusion of models.
+#
+# blacklist: hard exclusion — filtered during discovery, never appears in the
+#            generated model-registry.json.
+# disabled:  soft exclusion — stays in the registry but is hidden from tier
+#            dropdowns and pickers in the admin UI.
+#
+# Migrated from pricing-overlay.yaml:excluded_models on 2026-06-21 (REQ-MOD-01).
+blacklist:
+  - google/gemini-3.1-flash-image
+  - google/gemini-3-pro-image
+disabled: []

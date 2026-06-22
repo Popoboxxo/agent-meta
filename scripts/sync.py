@@ -336,6 +336,10 @@ def main():
     parser.add_argument("--admin-port", type=int, default=7420,
                         help="Admin UI server port (default: 7420)")
 
+    # Model discovery
+    parser.add_argument("--update-models", action="store_true",
+                        help="Update model registry from provider APIs")
+
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
                         help="Register a new external skill: git submodule add + config entry")
@@ -359,6 +363,12 @@ def main():
         from lib.cache import invalidate, CACHE_FILE
         invalidate(CACHE_FILE)
         print("Outcome cache cleared.")
+        return
+
+    if args.update_models:
+        from lib.model_discovery import discover_models
+        print("  i  Updating model registry...")
+        discover_models()
         return
 
     if args.admin_only:

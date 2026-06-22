@@ -621,6 +621,39 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   border: 1px dashed var(--border-color);
   border-radius: var(--radius);
 }
+
+/* =====================================================================
+ * Quick-filter button strip (model discovery)
+ * ===================================================================== */
+.quick-filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.quick-filter-strip .badge {
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  user-select: none;
+}
+.quick-filter-strip .badge:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+.quick-filter-strip .badge.active {
+  background: var(--accent-blue-soft);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -1258,12 +1291,16 @@ function buildSidebar() {
         { route: "/project/orchestrator", label: "Orchestrator", icon: "□" },
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "□" },
         { route: "/project/model-overrides", label: "Model Overrides", icon: "□" },
+        { route: "/project/provider-tier-overrides", label: "Provider Tier Overrides", icon: "❖" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "□" },
       ],
     },
     {
       title: "Framework defaults",
       items: [
+        { route: "/models", label: "Models & Pricing", icon: "❖", superOnly: true },
+        { route: "/provider-tiers", label: "Provider Tier Mappings", icon: "❖", superOnly: true },
+        { route: "/tier-presets", label: "Tier Presets", icon: "❖", superOnly: true },
         { route: "/config/role-defaults", label: "role-defaults", icon: "□", superOnly: true },
         { route: "/config/ai-providers", label: "ai-providers", icon: "□", superOnly: true },
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
@@ -1590,6 +1627,51 @@ async function viewAIProviders() {
     panel.appendChild(form.render());
     wrap.appendChild(panel);
   }
+
+  // — Project Tier Overrides section —
+  const overridePanel = el("div", { class: "panel", style: "margin-top: 24px;" });
+  overridePanel.appendChild(el("h2", {}, ["Project Tier Overrides"]));
+  const overrideDesc = el("p", { class: "muted" });
+  overrideDesc.textContent = "Per-provider, per-tier overrides stored in .meta-config/project.yaml. These take priority over the tier mappings above.";
+  const overrideLink = el("a", { href: "#/project/provider-tier-overrides", style: "margin-left: 8px;" });
+  overrideLink.textContent = "→ Open full editor";
+  overrideDesc.appendChild(overrideLink);
+  overridePanel.appendChild(overrideDesc);
+
+  (async () => {
+    try {
+      const proj = await api.get("/api/config/project");
+      const pto = proj["provider-tier-overrides"] || {};
+      if (Object.keys(pto).length === 0) {
+        overridePanel.appendChild(el("div", { class: "empty" }, ["No provider-tier-overrides configured in project.yaml."]));
+      } else {
+        const t = el("table", { class: "data" });
+        const thead = el("thead");
+        const hrow = el("tr");
+        ["Provider", "Tier", "Model Override"].forEach(h => {
+          const th = el("th"); th.textContent = h; hrow.appendChild(th);
+        });
+        thead.appendChild(hrow);
+        t.appendChild(thead);
+        const tb = el("tbody");
+        Object.entries(pto).forEach(([prov, tiers]) => {
+          Object.entries(tiers || {}).forEach(([tier, model]) => {
+            const row = el("tr");
+            const tdProv = el("td"); tdProv.appendChild(el("span", { class: "mono" }, [prov])); row.appendChild(tdProv);
+            const tdTier = el("td"); tdTier.appendChild(el("span", { class: "badge" }, [tier])); row.appendChild(tdTier);
+            const tdModel = el("td"); tdModel.appendChild(el("span", { class: "mono" }, [String(model)])); row.appendChild(tdModel);
+            tb.appendChild(row);
+          });
+        });
+        t.appendChild(tb);
+        overridePanel.appendChild(t);
+      }
+    } catch (e) {
+      overridePanel.appendChild(el("p", { class: "muted" }, ["Could not load project.yaml."]));
+    }
+  })();
+
+  wrap.appendChild(overridePanel);
   return wrap;
 }
 
@@ -2632,13 +2714,36 @@ async function viewSync() {
   const consoleEl = el("div", { class: "console" }, ["(idle)"]);
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
   const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
-  wrap.appendChild(el("div", { class: "btn-row" }, [runBtn, dryBtn]));
+  const statsWrap = el("div", { style: "margin-top: 16px; display: none;" });
+  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: 12px;" }, [runBtn, dryBtn]));
   wrap.appendChild(consoleEl);
+  wrap.appendChild(statsWrap);
 
   const setOutput = (text) => {
     consoleEl.replaceChildren();
+    statsWrap.style.display = "none";
+    statsWrap.replaceChildren();
+
     const lines = String(text || "").split("\n");
-    for (const line of lines) {
+    let inDebug = false;
+    const debugLines = [];
+    let summaryLine = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line === "DEBUG" && lines[i+1] === "-----") {
+        inDebug = true;
+      } else if (inDebug && (line === "WARNINGS" || line === "SUMMARY") && lines[i+1] && lines[i+1].startsWith("---")) {
+        inDebug = false;
+      } else if (inDebug && line.trim() && !line.startsWith("-----")) {
+        debugLines.push(line);
+      }
+
+      if (line === "SUMMARY" && lines[i+1] === "-------") {
+        summaryLine = lines[i+2];
+      }
+
       let cls = "line-info";
       if (/WRITE|UPDATE|COPY|DONE|✓/i.test(line)) cls = "line-write";
       else if (/WARN|warning/i.test(line)) cls = "line-warn";
@@ -2646,6 +2751,41 @@ async function viewSync() {
       consoleEl.appendChild(el("div", { class: cls }, [line]));
     }
     consoleEl.scrollTop = consoleEl.scrollHeight;
+
+    if (summaryLine) {
+      const parts = summaryLine.split("|").map(p => p.trim());
+      const actions = parts[0] || "0 actions";
+      const skipped = parts[1] || "0 skipped";
+      const warnings = parts[2] || "0 warnings";
+
+      statsWrap.style.display = "block";
+      const cards = el("div", { class: "panel-grid", style: "margin-bottom: 12px;" });
+
+      const makeCard = (label, valStr) => {
+        const numMatch = valStr.match(/\d+/);
+        const num = numMatch ? numMatch[0] : "0";
+        const isWarn = label === "Warnings" && num !== "0";
+        const isInfo = label === "Actions" && num !== "0";
+        return el("div", { class: "metric", style: isWarn ? "border-color: var(--accent-yellow);" : "" }, [
+          el("div", { class: "label", style: isWarn ? "color: var(--accent-yellow);" : "" }, [label]),
+          el("div", { class: "value mono", style: isWarn ? "color: var(--accent-yellow);" : (isInfo ? "color: var(--accent-green);" : "") }, [valStr])
+        ]);
+      };
+
+      cards.appendChild(makeCard("Actions", actions));
+      cards.appendChild(makeCard("Skipped", skipped));
+      cards.appendChild(makeCard("Warnings", warnings));
+      statsWrap.appendChild(cards);
+
+      if (debugLines.length > 0) {
+        const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px;" });
+        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug-Output (Model-Ersetzungen)"]);
+        const pre = el("pre", { style: "margin-top: 10px; background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
+        details.appendChild(summary);
+        details.appendChild(pre);
+        statsWrap.appendChild(details);
+      }
+    }
   };
 
   runBtn.addEventListener("click", async () => {
@@ -2893,15 +3033,17 @@ async function viewProjectGeneral() {
   // admin server is not running in super_admin mode).
   const DOD_FALLBACK   = ["rapid-prototyping", "standard", "strict"];
   const RULES_FALLBACK = ["default", "minimal", "silent"];
+  const TIER_FALLBACK = ["Cheap", "Normal", "Advanced", "Expensive", "Expensive as Hell", "Normal (SE)", "Advanced (SE)"];
   // sync with schema speech-mode enum (config/project-config.schema.json)
   const SPEECH_MODES   = ["full", "short", "childish", "caveman", "asozial", "submissive", "business", "bullshit-bingo", "linkedin"];
 
   // Load project.yaml and presets in parallel. Each preset endpoint may fail
   // independently — fall back to the hardcoded list in that case.
-  const [data, dodPresetsResp, rulesPresetsResp] = await Promise.all([
+  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp] = await Promise.all([
     loadProject(),
     api.get("/api/config/dod-presets").catch(() => null),
     api.get("/api/config/rules-presets").catch(() => null),
+    api.get("/api/tier-presets/merged").catch(() => null),
   ]);
 
   // dod-presets.yaml has either a top-level mapping of preset-name → config,
@@ -2915,7 +3057,20 @@ async function viewProjectGeneral() {
   const rulesOptions = extractPresetKeys(rulesPresetsResp, RULES_FALLBACK);
 
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
-  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "" };
+  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal", "se-focus": !!data["se-focus"] };
+
+  const TIER_PRESETS = extractPresetKeys(tierPresetsResp, TIER_FALLBACK);
+  // Build label map: project-local presets get a ★ prefix so they stand out
+  // visually in the dropdown. Global presets render unchanged.
+  const TIER_PRESET_LABELS = {};
+  if (tierPresetsResp && typeof tierPresetsResp === "object") {
+    for (const key of TIER_PRESETS) {
+      const entry = tierPresetsResp[key];
+      if (entry && typeof entry === "object" && entry.source === "project") {
+        TIER_PRESET_LABELS[key] = `★ ${key}`;
+      }
+    }
+  }
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
@@ -2927,7 +3082,22 @@ async function viewProjectGeneral() {
   panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
   panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => top["rules-preset"] = v));
   panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
+  
+  // Tier Preset logic
+  const onTierPresetChange = (v) => {
+      top["tier-preset"] = v;
+      // Triggers live preview update if needed
+  };
+  panel.appendChild(dropdownField("tier-preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange, TIER_PRESET_LABELS));
+  panel.appendChild(checkboxField("se-focus", top["se-focus"], v => { top["se-focus"] = v; }));
+
   wrap.appendChild(panel);
+
+  wrap.appendChild(el("div", { class: "panel", style: "margin-top: 16px;" }, [
+    el("h2", {}, ["Global Framework Setup"]),
+    el("p", { class: "muted" }, ["Configure provider model tiers, tier mappings and other global settings."]),
+    el("a", { href: "#/config/ai-providers", class: "btn" }, ["Open ai-providers.yaml →"]),
+  ]));
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
     el("button", { class: "btn btn-primary", onclick: async () => {
@@ -2937,6 +3107,8 @@ async function viewProjectGeneral() {
           ["dod-preset", top["dod-preset"]],
           ["rules-preset", top["rules-preset"]],
           ["speech-mode", top["speech-mode"]],
+          ["tier-preset", top["tier-preset"]],
+          ["se-focus", top["se-focus"]],
         ], status);
       } catch { /* toast already shown */ }
     } }, ["Save"]),
@@ -2974,7 +3146,7 @@ async function viewProjectProviders() {
     cb.checked = selProviders.has(p.name);
     cb.addEventListener("change", () => { cb.checked ? selProviders.add(p.name) : selProviders.delete(p.name); });
     line.appendChild(cb);
-    line.appendChild(el("span", { class: "mono" }, [p.name]));
+    line.appendChild(el("span", { class: "mono" }, [p.display_name || p.name]));
     if (!p.has_model_tiers) line.appendChild(el("span", { class: "muted", title: "manages models centrally" }, ["(central models)"]));
     provPanel.appendChild(line);
   }
@@ -3549,16 +3721,26 @@ async function viewProjectModelOverrides() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Override the model used per provider + role. Providers that manage models centrally are excluded.",
   ]));
-  const [data, providers, roles] = await Promise.all([
+  const [data, providers, roles, modelsRes] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
     api.get("/api/roles").catch(() => []),
+    // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
+    api.get("/api/models/active").catch(() => ({ models: [] })),
   ]);
 
   // Only providers with model tiers can carry overrides.
   const tierProviders = providers.filter(p => p.has_model_tiers);
   const providerByName = new Map(providers.map(p => [p.name, p]));
   const roleNames = roles.map(r => r.name);
+  const specificModels = modelsRes.models || [];
+
+  const datalist = el("datalist", { id: "global-model-list" });
+  for (const m of specificModels) {
+    const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+    datalist.appendChild(el("option", { value: m.id }, [label]));
+  }
+  wrap.appendChild(datalist);
 
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
@@ -3572,21 +3754,6 @@ async function viewProjectModelOverrides() {
 
   const status = el("div", { class: "muted" }, [`${rows.length} overrides.`]);
   wrap.appendChild(status);
-
-  // Build the model option list for a given provider: tier names + alias names
-  // + concrete model IDs.
-  const modelOptionsFor = (provName) => {
-    const p = providerByName.get(provName);
-    if (!p) return [];
-    const tiers = p.model_tiers || {};
-    const aliases = p.model_aliases || {};
-    const opts = new Set();
-    for (const t of Object.keys(tiers)) opts.add(t);
-    for (const a of Object.keys(aliases)) opts.add(a);
-    for (const v of Object.values(tiers)) opts.add(v);
-    for (const v of Object.values(aliases)) opts.add(v);
-    return [...opts];
-  };
 
   const tableWrap = el("div");
   wrap.appendChild(tableWrap);
@@ -3608,9 +3775,9 @@ async function viewProjectModelOverrides() {
         provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
       }
       provSel.appendChild(el("option", { value: "" }, ["— select —"]));
-      for (const pn of provNames) {
-        const o = el("option", { value: pn }, [pn]);
-        if (pn === row.provider) o.selected = true;
+      for (const tp of tierProviders) {
+        const o = el("option", { value: tp.name }, [tp.display_name || tp.name]);
+        if (tp.name === row.provider) o.selected = true;
         provSel.appendChild(o);
       }
       provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
@@ -3629,18 +3796,11 @@ async function viewProjectModelOverrides() {
       roleSel.addEventListener("change", () => { row.role = roleSel.value; });
       tr.appendChild(el("td", {}, [roleSel]));
 
-      // Model dropdown (depends on provider).
-      const modelSel = el("select");
-      const modelOpts = modelOptionsFor(row.provider);
-      if (row.model && !modelOpts.includes(row.model)) modelSel.appendChild(el("option", { value: row.model }, [row.model]));
-      modelSel.appendChild(el("option", { value: "" }, ["— select —"]));
-      for (const m of modelOpts) {
-        const o = el("option", { value: m }, [m]);
-        if (m === row.model) o.selected = true;
-        modelSel.appendChild(o);
-      }
-      modelSel.addEventListener("change", () => { row.model = modelSel.value; });
-      tr.appendChild(el("td", {}, [modelSel]));
+      // Model input with datalist.
+      const modelInp = el("input", { type: "text", list: "global-model-list", placeholder: "Preset Standard (Kein Override)" });
+      if (row.model) modelInp.value = row.model;
+      modelInp.addEventListener("change", () => { row.model = modelInp.value; });
+      tr.appendChild(el("td", {}, [modelInp]));
 
       const rm = el("button", { class: "btn btn-danger" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
@@ -3665,6 +3825,119 @@ async function viewProjectModelOverrides() {
         out[row.provider][row.role] = row.model;
       }
       try { await saveProjectSection("model-overrides", out, status); } catch { /* shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* ------------------------ Provider Tier Overrides ------------------------ */
+async function viewProjectProviderTierOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Provider Tier Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override the model used per provider + tier. Providers that manage models centrally are excluded.",
+  ]));
+  const [data, providers, modelsRes] = await Promise.all([
+    loadProject(),
+    api.get("/api/providers").catch(() => []),
+    // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
+    api.get("/api/models/active").catch(() => ({ models: [] })),
+  ]);
+
+  const tierProviders = providers.filter(p => p.has_model_tiers);
+  const specificModels = modelsRes.models || [];
+  const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
+
+  const datalist = el("datalist", { id: "global-model-list-tier" });
+  for (const m of specificModels) {
+    const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+    datalist.appendChild(el("option", { value: m.id }, [label]));
+  }
+  wrap.appendChild(datalist);
+
+  // Flatten existing
+  const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
+  const rows = [];
+  for (const [prov, tierMap] of Object.entries(existing)) {
+    if (!tierMap || typeof tierMap !== "object") continue;
+    for (const [tier, model] of Object.entries(tierMap)) {
+      rows.push({ provider: prov, tier, model });
+    }
+  }
+
+  const status = el("div", { class: "muted" }, [`${rows.length} overrides.`]);
+  wrap.appendChild(status);
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  const render = () => {
+    tableWrap.replaceChildren();
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Provider", "Tier", "Model", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    rows.forEach((row, idx) => {
+      const tr = el("tr");
+
+      // Provider dropdown
+      const provSel = el("select");
+      const provNames = tierProviders.map(p => p.name);
+      if (row.provider && !provNames.includes(row.provider)) {
+        provSel.appendChild(el("option", { value: row.provider }, [row.provider + " (no tiers)"]));
+      }
+      provSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const tp of tierProviders) {
+        const o = el("option", { value: tp.name }, [tp.display_name || tp.name]);
+        if (tp.name === row.provider) o.selected = true;
+        provSel.appendChild(o);
+      }
+      provSel.addEventListener("change", () => { row.provider = provSel.value; render(); });
+      tr.appendChild(el("td", {}, [provSel]));
+
+      // Tier dropdown
+      const tierSel = el("select");
+      const known = new Set(tierNames);
+      if (row.tier && !known.has(row.tier)) tierSel.appendChild(el("option", { value: row.tier }, [row.tier + " (unknown)"]));
+      tierSel.appendChild(el("option", { value: "" }, ["— select —"]));
+      for (const tn of tierNames) {
+        const o = el("option", { value: tn }, [tn]);
+        if (tn === row.tier) o.selected = true;
+        tierSel.appendChild(o);
+      }
+      tierSel.addEventListener("change", () => { row.tier = tierSel.value; });
+      tr.appendChild(el("td", {}, [tierSel]));
+
+      // Model input
+      const modelInp = el("input", { type: "text", list: "global-model-list-tier", placeholder: "Preset Standard (Kein Override)" });
+      if (row.model) modelInp.value = row.model;
+      modelInp.addEventListener("change", () => { row.model = modelInp.value; });
+      tr.appendChild(el("td", {}, [modelInp]));
+
+      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
+      tr.appendChild(el("td", {}, [rm]));
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    status.textContent = `${rows.length} overrides.`;
+  };
+  render();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn", onclick: () => { rows.push({ provider: "", tier: "", model: "" }); render(); } }, ["Add override"]),
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const out = {};
+      for (const row of rows) {
+        if (!row.provider || !row.tier || !row.model) continue;
+        out[row.provider] = out[row.provider] || {};
+        out[row.provider][row.tier] = row.model;
+      }
+      try { await saveProjectSection("provider-tier-overrides", out, status); } catch { /* shown */ }
     } }, ["Save"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
   ]));
@@ -3829,6 +4102,792 @@ async function viewVizDashboard() {
 }
 
 /* =========================================================================
+ * Models & Pricing
+ * ========================================================================= */
+async function viewModels() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Models & Pricing"]));
+
+  let editMode = false;
+  let modelsData = [];
+
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+
+  const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+  const editBtn = el("button", { class: "btn" }, ["Edit Prices"]);
+  const saveBtn = el("button", {
+    class: "btn btn-primary",
+    style: "background: var(--accent-green); border-color: var(--accent-green); color: white;",
+    disabled: true,
+  }, ["Save Prices"]);
+  const cancelBtn = el("button", { class: "btn", style: "display: none;" }, ["Cancel"]);
+  const deleteBtn = el("button", { class: "btn btn-danger", style: "display: none;" }, ["Delete Selected"]);
+
+  controls.appendChild(refreshBtn);
+  controls.appendChild(editBtn);
+  controls.appendChild(saveBtn);
+  controls.appendChild(cancelBtn);
+  controls.appendChild(deleteBtn);
+  wrap.appendChild(controls);
+
+  const filterState = { provider: "", model: "", category: "" };
+
+  // Quick-filter button strip — appears above the table filter row
+  const QUICK_FILTERS = [
+    { label: "All",      value: "" },
+    { label: "Claude",   value: "claude" },
+    { label: "OpenCode", value: "opencode" },
+    { label: "GitHub",   value: "github" },
+    { label: "OpenAI",   value: "openai" },
+    { label: "Google",   value: "google" },
+  ];
+  const quickFilterStrip = el("div", { class: "quick-filter-strip" });
+  const quickBtns = QUICK_FILTERS.map(({ label, value }) => {
+    const btn = el("button", { class: "badge" + (value === "" ? " active" : "") }, [label]);
+    btn.addEventListener("click", () => {
+      filterState.provider = value;
+      quickBtns.forEach(b => b.classList.toggle("active", b === btn));
+      applyFilters();
+    });
+    return btn;
+  });
+  quickBtns.forEach(b => quickFilterStrip.appendChild(b));
+  wrap.appendChild(quickFilterStrip);
+
+  const tableWrap = el("div", { id: "models-table-wrap" });
+  wrap.appendChild(tableWrap);
+
+  const applyFilters = () => {
+    const rows = tableWrap.querySelectorAll("tbody tr");
+    rows.forEach(tr => {
+      const pText = tr.children[1]?.textContent.toLowerCase() || "";
+      const mText = tr.children[2]?.textContent.toLowerCase() || "";
+      const cText = tr.children[3]?.textContent.toLowerCase() || "";
+
+      const pMatch = !filterState.provider || pText.includes(filterState.provider.toLowerCase());
+      const mMatch = !filterState.model || mText.includes(filterState.model.toLowerCase());
+      const cMatch = !filterState.category || cText === filterState.category.toLowerCase();
+      
+      tr.style.display = (pMatch && mMatch && cMatch) ? "" : "none";
+    });
+  };
+
+  const createSelectFilter = (key, options) => {
+    const select = el("select", { style: "width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
+    select.appendChild(el("option", { value: "" }, ["All"]));
+    options.forEach(opt => select.appendChild(el("option", { value: opt }, [opt])));
+    select.addEventListener("change", (e) => {
+      filterState[key] = e.target.value;
+      applyFilters();
+    });
+    return select;
+  };
+
+  const createTextFilter = (key) => {
+    const input = el("input", { type: "text", placeholder: "Filter...", style: "width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
+    input.addEventListener("input", (e) => {
+      filterState[key] = e.target.value;
+      applyFilters();
+    });
+    return input;
+  };
+
+  const updateDeleteBtnVisibility = () => {
+    const anyChecked = Array.from(tableWrap.querySelectorAll(".model-cb")).some(cb => cb.checked);
+    deleteBtn.style.display = anyChecked ? "inline-block" : "none";
+  };
+
+  const renderTable = () => {
+    tableWrap.innerHTML = "";
+    if (modelsData.length === 0) {
+      tableWrap.innerHTML = "<div class='empty'>No models found.</div>";
+      return;
+    }
+    
+    const uniqueProviders = [...new Set(modelsData.map(m => m.provider))].sort();
+    const uniqueCategories = [...new Set(modelsData.map(m => m.tier || "Standard"))].sort();
+
+    const table = el("table", { class: "data", id: "models-table" });
+    const thead = el("thead");
+    
+    const selectAllCb = el("input", { type: "checkbox" });
+    selectAllCb.addEventListener("change", (e) => {
+      tableWrap.querySelectorAll(".model-cb").forEach(cb => {
+        if (cb.closest("tr").style.display !== "none") {
+            cb.checked = e.target.checked;
+        }
+      });
+      updateDeleteBtnVisibility();
+    });
+
+    thead.appendChild(el("tr", {}, [
+      el("th", { style: "width: 40px;" }, [selectAllCb]),
+      el("th", {}, ["Provider", el("br"), createSelectFilter("provider", uniqueProviders)]),
+      el("th", {}, ["Model (Name & ID)", el("br"), createTextFilter("model")]),
+      el("th", {}, ["Category", el("br"), createSelectFilter("category", uniqueCategories)]),
+      el("th", {}, ["Input Cost ($/1M)"]),
+      el("th", {}, ["Output Cost ($/1M)"]),
+      el("th", {}, ["Cost Factor (1-100)"]),
+      el("th", {}, ["Status"]),
+      el("th", {}, ["Actions / Ref"]),
+    ]));
+    table.appendChild(thead);
+    
+    const tbody = el("tbody");
+    modelsData.forEach(m => {
+      const tr = el("tr");
+      tr.dataset.provider = m.provider;
+      tr.dataset.modelId = m.id;
+      // Visual indicator for disabled models — gray out the entire row.
+      const isEnabled = m.enabled !== false;
+      if (!isEnabled) tr.style.opacity = "0.5";
+
+      const cb = el("input", { type: "checkbox", class: "model-cb", value: m.id });
+      cb.addEventListener("change", updateDeleteBtnVisibility);
+      tr.appendChild(el("td", {}, [cb]));
+
+      tr.appendChild(el("td", {}, [m.provider]));
+      tr.appendChild(el("td", {}, [
+        el("strong", {}, [m.name || m.id]), el("br"), el("small", { class: "muted mono" }, [m.id])
+      ]));
+      tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier || "Standard"])]));
+      
+      const inVal = m.input_cost?.toFixed(2) || "0.00";
+      const outVal = m.output_cost?.toFixed(2) || "0.00";
+      
+      const inTd = el("td", { class: "mono" });
+      const outTd = el("td", { class: "mono" });
+      
+      const inInput = el("input", { type: "number", step: "0.01", style: "width: 80px;", value: inVal, class: "cost-input-in" });
+      const outInput = el("input", { type: "number", step: "0.01", style: "width: 80px;", value: outVal, class: "cost-input-out" });
+      const inSpan = el("span", { class: "cost-text" }, [inVal]);
+      const outSpan = el("span", { class: "cost-text" }, [outVal]);
+      
+      inInput.style.display = editMode ? "inline-block" : "none";
+      outInput.style.display = editMode ? "inline-block" : "none";
+      inSpan.style.display = editMode ? "none" : "inline-block";
+      outSpan.style.display = editMode ? "none" : "inline-block";
+
+      inTd.appendChild(inInput); inTd.appendChild(inSpan);
+      inTd.appendChild(el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: 8px;" }, [m.input_source || "API"]));
+      outTd.appendChild(outInput); outTd.appendChild(outSpan);
+      outTd.appendChild(el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: 8px;" }, [m.output_source || "API"]));
+      
+      tr.appendChild(inTd); tr.appendChild(outTd);
+      
+      const cf = m.cost_factor || 0;
+      let heatColor = "var(--accent-blue)";
+      if (cf > 20) heatColor = "var(--accent-yellow)";
+      if (cf > 50) heatColor = "var(--accent-red)";
+      
+      tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [
+        cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left: 8px;" }, ["Calc"])
+      ]));
+
+      // Status column — enable/disable toggle button per row.
+      const statusTd = el("td", {});
+      const toggleBtn = el("button", {
+        class: "btn",
+        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow, #c08b00)" : "var(--accent-green, #2a8a2a)"}; color: white; border: none; border-radius: 4px;`,
+        title: isEnabled ? "Disable this model (exclude from active model picker without removing from registry)" : "Enable this model",
+      }, [isEnabled ? "Disable" : "Enable"]);
+      toggleBtn.onclick = async () => {
+        const endpoint = isEnabled ? "/api/models/disable" : "/api/models/enable";
+        toggleBtn.disabled = true;
+        try {
+          const r = await api.post(endpoint, { ids: [m.id] });
+          if (r && r.success !== false) {
+            toast(isEnabled ? "Model disabled" : "Model enabled", "success");
+            await loadData();
+          } else {
+            toast((r && r.error) || "Toggle failed", "error");
+          }
+        } catch (err) {
+          toast(`Toggle failed: ${err.message}`, "error");
+        } finally {
+          toggleBtn.disabled = false;
+        }
+      };
+      statusTd.appendChild(toggleBtn);
+      tr.appendChild(statusTd);
+
+      const actionTd = el("td", {});
+      if (m.source_url && !editMode) actionTd.appendChild(el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"]));
+      const resetBtn = el("button", { class: "btn-icon", style: "cursor: pointer; background: transparent; border: none; font-size: 1.2em;", title: "Reset Pricing Overlay" }, ["🗑️"]);
+      resetBtn.style.display = editMode ? "inline-block" : "none";
+      resetBtn.onclick = async () => {
+        if (!confirm(`Reset pricing overlay for ${m.id}?`)) return;
+        const r = await api.post("/api/pricing/reset", { provider: m.provider, id: m.id });
+        if (r.success) { toast("Pricing reset", "success"); await loadData(); }
+      };
+      actionTd.appendChild(resetBtn);
+
+      // Blacklist button — permanently excludes model from discovery.
+      const blacklistBtn = el("button", {
+        class: "btn btn-danger",
+        style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: 6px;",
+        title: "Blacklist this model permanently (removed from registry, won't reappear on next sync)",
+      }, ["Blacklist"]);
+      blacklistBtn.onclick = async () => {
+        if (!confirm(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`)) return;
+        blacklistBtn.disabled = true;
+        try {
+          const r = await api.post("/api/models/exclude", { ids: [m.id] });
+          if (r && r.success !== false) {
+            toast("Model blacklisted", "success");
+            await loadData();
+          } else {
+            toast((r && r.error) || "Blacklist failed", "error");
+          }
+        } catch (err) {
+          toast(`Blacklist failed: ${err.message}`, "error");
+        } finally {
+          blacklistBtn.disabled = false;
+        }
+      };
+      actionTd.appendChild(blacklistBtn);
+      tr.appendChild(actionTd);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    applyFilters();
+  };
+
+  const loadData = async () => {
+    try {
+      const resModels = await api.get("/api/models");
+      modelsData = resModels.models || [];
+      renderTable();
+      updateDeleteBtnVisibility();
+    } catch (err) {
+      tableWrap.replaceChildren(renderError(err));
+    }
+  };
+
+  editBtn.onclick = () => {
+    editMode = true;
+    editBtn.style.display = "none";
+    cancelBtn.style.display = "inline-block";
+    saveBtn.disabled = false;
+    renderTable();
+  };
+
+  cancelBtn.onclick = async () => {
+    editMode = false;
+    editBtn.style.display = "inline-block";
+    cancelBtn.style.display = "none";
+    saveBtn.disabled = true;
+    await loadData();
+  };
+
+  refreshBtn.onclick = async () => {
+    refreshBtn.disabled = true; refreshBtn.textContent = "Running sync.py...";
+    try {
+      const r = await api.post("/api/models/update");
+      if (r.success) { toast("Models updated", "success"); await loadData(); }
+    } finally {
+      refreshBtn.disabled = false; refreshBtn.textContent = "Refresh via sync.py";
+    }
+  };
+
+  deleteBtn.onclick = async () => {
+    const ids = Array.from(tableWrap.querySelectorAll(".model-cb:checked")).map(cb => cb.value);
+    if (!ids.length) return;
+    if (!confirm(`Exclude ${ids.length} models?`)) return;
+    deleteBtn.disabled = true; deleteBtn.textContent = "Deleting...";
+    try {
+      const r = await api.post("/api/models/exclude", { ids });
+      if (r.success) { toast("Models excluded", "success"); await loadData(); }
+    } finally {
+      deleteBtn.disabled = false; deleteBtn.textContent = "Delete Selected";
+    }
+  };
+
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    try {
+      const updates = [];
+      tableWrap.querySelectorAll("tr[data-provider]").forEach(tr => {
+        const inInput = tr.querySelector(".cost-input-in");
+        const outInput = tr.querySelector(".cost-input-out");
+        if (inInput && outInput) {
+            updates.push({
+              provider: tr.dataset.provider, id: tr.dataset.modelId,
+              input_cost: inInput.value ? parseFloat(inInput.value) : 0,
+              output_cost: outInput.value ? parseFloat(outInput.value) : 0
+            });
+        }
+      });
+      await api.post("/api/pricing/update", { updates });
+      toast("Saved", "success");
+      editMode = false;
+      editBtn.style.display = "inline-block";
+      cancelBtn.style.display = "none";
+      await loadData();
+    } finally {
+      saveBtn.textContent = "Save Prices";
+      saveBtn.disabled = editMode ? false : true;
+    }
+  };
+
+  loadData();
+  return wrap;
+}
+
+async function viewProviderTiers() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Provider Tier Mappings"]));
+  wrap.appendChild(el("p", { class: "muted" }, ["Map specific models to abstract performance tiers for each provider. Readings from ai-providers.yaml"]));
+  
+  let editMode = false;
+  let modelsData = [];
+  let aiProvidersData = {};
+  let displayNameMap = {};
+
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
+  const editLabel = el("label", { style: "margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;" }, [el("span", {}, ["Edit Mode"])]);
+  const editToggle = el("input", { type: "checkbox" });
+  editLabel.prepend(editToggle);
+  
+  controls.appendChild(saveBtn);
+  controls.appendChild(editLabel);
+  wrap.appendChild(controls);
+
+  const providersWrap = el("div", { id: "providers-wrap" });
+  wrap.appendChild(providersWrap);
+
+  // Infer which registry-provider labels belong to a given ai-providers entry,
+  // by looking at existing tier values and matching them to registry models.
+  // Returns an array of registry provider names (e.g. ["anthropic"], ["opencode-go"]).
+  const inferRegistryProviders = (pData, models) => {
+    const tierValues = Object.values((pData && pData["model-tiers"]) || {}).filter(Boolean);
+    const providers = new Set();
+
+    tierValues.forEach(modelId => {
+      if (modelId.includes("/")) {
+        // namespaced id like "opencode/deepseek-v4-flash" or "opencode-go/kimi-k2.6"
+        const prefix = modelId.split("/")[0];
+        models
+          .filter(m => m.id.startsWith(prefix + "/"))
+          .forEach(m => providers.add(m.provider));
+      } else {
+        // native id like "claude-sonnet-4-6" → look up by exact id in registry
+        const match = models.find(m => m.id === modelId);
+        if (match) providers.add(match.provider);
+      }
+    });
+
+    return [...providers];
+  };
+
+  const renderProviders = () => {
+    providersWrap.innerHTML = "";
+
+    // Remove obsolete global datalist if it exists (replaced by per-row datalists)
+    const obsoleteDl = document.getElementById("global-tier-model-list");
+    if (obsoleteDl) obsoleteDl.remove();
+
+    const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
+
+    const table = el("table", { class: "data provider-tiers-table" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, ["Provider", "Tier: nano", "Tier: fast", "Tier: balanced", "Tier: powerful", "Tier: max"].map(h => el("th", {}, [h]))));
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    const providersList = aiProvidersData.providers ? Object.keys(aiProvidersData.providers) : (Object.keys(aiProvidersData).length > 0 ? Object.keys(aiProvidersData) : uniqueProviders);
+
+    // Render each provider as a single row (no grouping — providers are 1:1 now).
+    providersList.forEach(p => {
+      const tr = el("tr");
+      tr.dataset.provider = p;
+
+      const provDisplayName = displayNameMap[p] || p;
+      const nameCell = el("td", {});
+      nameCell.appendChild(el("strong", {}, [provDisplayName]));
+      tr.appendChild(nameCell);
+
+      const tiers = ["nano", "fast", "balanced", "powerful", "max"];
+      const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
+      const tData = pData["model-tiers"] || {};
+
+      // Build per-provider datalist filtered to relevant registry providers.
+      // inferRegistryProviders handles mixed-prefix tier values automatically
+      // (e.g. Opencode with both opencode/ and opencode-go/ tiers).
+      const registryProviders = inferRegistryProviders(pData, modelsData);
+
+      const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      let dl = document.getElementById(dlId);
+      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+      else { dl.innerHTML = ""; }
+
+      // If we identified registry providers from existing tier values, use them.
+      // Otherwise fall back to all active models so free-text input still gets suggestions.
+      const candidates = registryProviders.length > 0
+        ? modelsData.filter(m => registryProviders.includes(m.provider))
+        : modelsData;
+
+      const addedIds = new Set();
+      candidates.forEach(m => {
+        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+        addedIds.add(m.id);
+      });
+
+      // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
+      Object.values(tData).forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
+          addedIds.add(val);
+        }
+      });
+
+      tiers.forEach(t => {
+        const td = el("td", {});
+        const val = tData[t] || "";
+        if (editMode) {
+          const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
+          td.appendChild(input);
+        } else {
+          td.appendChild(el("span", { class: "mono" }, [val || "-"]));
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    providersWrap.appendChild(table);
+  };
+
+  const loadData = async () => {
+    try {
+      // Tier mapping dropdowns should only offer active (enabled, non-blacklisted) models.
+      const [resModels, resProviders, provList] = await Promise.all([
+        api.get("/api/models/active"),
+        api.get("/api/ai-providers"),
+        api.get("/api/providers").catch(() => []),
+      ]);
+      modelsData = resModels.models || [];
+      aiProvidersData = resProviders || {};
+      displayNameMap = Object.fromEntries((Array.isArray(provList) ? provList : []).map(p => [p.name, p.display_name || p.name]));
+      renderProviders();
+    } catch (err) { providersWrap.replaceChildren(renderError(err)); }
+  };
+
+  editToggle.addEventListener("change", (e) => {
+    editMode = e.target.checked;
+    saveBtn.style.display = editMode ? "inline-block" : "none";
+    renderProviders();
+  });
+
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    try {
+      const newProvidersData = JSON.parse(JSON.stringify(aiProvidersData));
+      const targetMap = newProvidersData.providers ? newProvidersData.providers : newProvidersData;
+      providersWrap.querySelectorAll("tr[data-provider]").forEach(tr => {
+        const p = tr.dataset.provider;
+        if (!targetMap[p]) targetMap[p] = { "model-tiers": {} };
+        if (!targetMap[p]["model-tiers"]) targetMap[p]["model-tiers"] = {};
+        ["nano", "fast", "balanced", "powerful", "max"].forEach(t => {
+          const input = tr.querySelector(`.tier-input-${t}`);
+          if (input) {
+            if (input.value) targetMap[p]["model-tiers"][t] = input.value;
+            else delete targetMap[p]["model-tiers"][t];
+          }
+        });
+      });
+      await api.post("/api/ai-providers/update", newProvidersData);
+      toast("Saved", "success"); await loadData();
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = "Save Configs";
+    }
+  };
+
+  loadData();
+  return wrap;
+}
+
+async function viewTierPresets() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Tier Presets"]));
+  const intro = el("p", { class: "muted" }, ["Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"]);
+  wrap.appendChild(intro);
+
+  let tierPresetsData = {};
+  let aiProvidersData = {};
+  let modelsData = [];
+  let currentTab = "resolved"; // "resolved" | "edit"
+
+  const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
+
+  // ---- Tab strip --------------------------------------------------------
+  const tabStrip = el("div", { class: "btn-row", style: "margin-bottom: 16px; display: flex; gap: 8px;" });
+  const tabResolved = el("button", { class: "btn btn-primary" }, ["Resolved View"]);
+  const tabEdit = el("button", { class: "btn" }, ["Edit Mappings"]);
+  tabStrip.appendChild(tabResolved);
+  tabStrip.appendChild(tabEdit);
+  wrap.appendChild(tabStrip);
+
+  const updateTabStyles = () => {
+    tabResolved.className = currentTab === "resolved" ? "btn btn-primary" : "btn";
+    tabEdit.className = currentTab === "edit" ? "btn btn-primary" : "btn";
+    intro.textContent = currentTab === "resolved"
+      ? "Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"
+      : "Edit direct model assignments per preset. Each cell sets the model ID for that tier. (tier-presets.yaml)";
+  };
+
+  // ---- Controls (Add / Save) -------------------------------------------
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+
+  const addBtn = el("button", { class: "btn" }, ["Add Preset"]);
+  addBtn.onclick = async () => {
+    const name = prompt("Enter new Preset ID:");
+    if (!name) return;
+    if (tierPresetsData[name]) {
+      toast("Preset already exists!", "error");
+      return;
+    }
+    tierPresetsData[name] = {
+      description: "",
+      tiers: {
+        nano: "",
+        fast: "",
+        balanced: "",
+        powerful: "",
+        max: ""
+      }
+    };
+    try {
+      await api.post("/api/tier-presets/update", tierPresetsData);
+      toast("Preset added!", "success");
+      await loadData();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  };
+
+  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    try {
+      const newPresetsData = JSON.parse(JSON.stringify(tierPresetsData));
+      presetsWrap.querySelectorAll("tr[data-preset-id]").forEach(tr => {
+        const pid = tr.dataset.presetId;
+        if (!newPresetsData[pid]) return;
+        const descInput = tr.querySelector(".preset-desc");
+        if (descInput) newPresetsData[pid].description = descInput.value;
+        newPresetsData[pid].tiers = {};
+        delete newPresetsData[pid].mapping;
+        TIERS.forEach(comp => {
+          const inp = tr.querySelector(`.preset-tier-${comp}`);
+          if (inp && inp.value) newPresetsData[pid].tiers[comp] = inp.value;
+        });
+      });
+      await api.post("/api/tier-presets/update", newPresetsData);
+      toast("Saved", "success");
+      await loadData();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Configs";
+    }
+  };
+
+  controls.appendChild(addBtn);
+  controls.appendChild(saveBtn);
+  wrap.appendChild(controls);
+
+  const presetsWrap = el("div", { id: "presets-wrap" });
+  wrap.appendChild(presetsWrap);
+
+  // ---- Renderers --------------------------------------------------------
+  const renderResolved = () => {
+    // ai-providers.yaml may be returned wrapped in {providers: {...}} or flat.
+    const providersMap = aiProvidersData.providers || aiProvidersData || {};
+    const providerNames = Object.keys(providersMap).filter(p => providersMap[p] && providersMap[p]["model-tiers"]);
+
+    const table = el("table", { class: "data tier-presets-table" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, [
+      el("th", {}, ["Preset"]),
+      el("th", {}, ["Provider"]),
+      ...TIERS.map(t => el("th", {}, [t]))
+    ]));
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    const presetIds = Object.keys(tierPresetsData);
+
+    presetIds.forEach(presetId => {
+      const preset = tierPresetsData[presetId] || {};
+      const presetTiers = preset.tiers || null;
+      const mapping = preset.mapping || {};
+      const isDefault = presetId === "Normal";
+
+      providerNames.forEach((pName, pIdx) => {
+        const tr = el("tr");
+        if (isDefault) tr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
+
+        if (pIdx === 0) {
+          const presetTd = el("td", { rowspan: String(providerNames.length) });
+          presetTd.appendChild(el("strong", {}, [presetId]));
+          if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+          if (preset.source === "project") {
+            presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+          }
+          if (preset.description) {
+            presetTd.appendChild(el("div", { class: "muted", style: "font-size: 0.85em; margin-top: 4px;" }, [preset.description]));
+          }
+          tr.appendChild(presetTd);
+        }
+
+        tr.appendChild(el("td", {}, [el("span", { class: "mono" }, [pName])]));
+
+        const providerTiers = (providersMap[pName] || {})["model-tiers"] || {};
+        TIERS.forEach(tier => {
+          let fullId;
+          if (presetTiers) {
+            // New format: value IS the resolved model id
+            fullId = presetTiers[tier] || tier;
+          } else {
+            // Old format: mapping + provider model-tiers lookup
+            const mappedTier = mapping[tier] || tier;
+            fullId = providerTiers[mappedTier] || mappedTier;
+          }
+          const short = (typeof fullId === "string" && fullId.includes("/")) ? fullId.split("/").pop() : fullId;
+          const td = el("td", {});
+          td.appendChild(el("span", { class: "badge mono", title: String(fullId) }, [String(short || "-")]));
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      // Visual separator row between presets.
+      const sep = el("tr");
+      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border); padding: 0;" }));
+      tbody.appendChild(sep);
+    });
+
+    table.appendChild(tbody);
+    presetsWrap.appendChild(table);
+  };
+
+  const renderEdit = () => {
+    const table = el("table", { class: "data tier-presets-table" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, [
+      el("th", {}, ["Preset"]),
+      el("th", {}, ["Description"]),
+      ...TIERS.map(t => el("th", {}, [t]))
+    ]));
+    table.appendChild(thead);
+
+    // Build global datalist for model autocomplete
+    const existingDl = document.getElementById("tier-presets-model-list");
+    if (existingDl) existingDl.remove();
+    const datalist = el("datalist", { id: "tier-presets-model-list" });
+    modelsData.forEach(m => {
+      const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+      datalist.appendChild(el("option", { value: m.id }, [label]));
+    });
+    presetsWrap.appendChild(datalist);
+
+    const tbody = el("tbody");
+    Object.keys(tierPresetsData).forEach(presetId => {
+      const preset = tierPresetsData[presetId] || {};
+      const currentTiers = preset.tiers || {};
+      const isDefault = presetId === "Normal";
+
+      const tr = el("tr");
+      tr.dataset.presetId = presetId;
+      if (isDefault) tr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
+
+      const presetTd = el("td", {});
+      presetTd.appendChild(el("strong", {}, [presetId]));
+      if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+      if (preset.source === "project") {
+        presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+      }
+      tr.appendChild(presetTd);
+
+      const descInput = el("input", {
+        type: "text",
+        class: "preset-desc",
+        value: preset.description || "",
+        style: "width: 100%; box-sizing: border-box;"
+      });
+      tr.appendChild(el("td", {}, [descInput]));
+
+      TIERS.forEach(comp => {
+        const td = el("td", {});
+        const input = el("input", {
+          type: "text",
+          list: "tier-presets-model-list",
+          class: `preset-tier-${comp}`,
+          value: currentTiers[comp] || "",
+          placeholder: "model id…",
+          style: "width:100%; box-sizing:border-box;"
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    presetsWrap.appendChild(table);
+  };
+
+  const renderPresets = () => {
+    presetsWrap.innerHTML = "";
+    updateTabStyles();
+    if (currentTab === "edit") {
+      saveBtn.style.display = "";
+      renderEdit();
+    } else {
+      saveBtn.style.display = "none";
+      renderResolved();
+    }
+  };
+
+  tabResolved.onclick = () => {
+    if (currentTab === "resolved") return;
+    currentTab = "resolved";
+    renderPresets();
+  };
+  tabEdit.onclick = () => {
+    if (currentTab === "edit") return;
+    currentTab = "edit";
+    renderPresets();
+  };
+
+  const loadData = async () => {
+    try {
+      const [tp, ap, modelsRes] = await Promise.all([
+        api.get("/api/tier-presets/merged"),
+        api.get("/api/ai-providers"),
+        api.get("/api/models/active").catch(() => ({ models: [] })),
+      ]);
+      tierPresetsData = tp;
+      aiProvidersData = ap;
+      modelsData = modelsRes.models || [];
+      renderPresets();
+    } catch (err) { presetsWrap.replaceChildren(renderError(err)); }
+  };
+
+  loadData();
+  return wrap;
+}
+
+/* =========================================================================
  * Bootstrap
  * ========================================================================= */
 async function init() {
@@ -3865,6 +4924,7 @@ async function init() {
   router.register("/project/orchestrator",    viewProjectOrchestrator);
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/model-overrides", viewProjectModelOverrides);
+  router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
   router.register("/project/advanced",        viewProjectAdvanced);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
@@ -3878,7 +4938,9 @@ async function init() {
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/agents",    viewAgentTemplates);
-  router.register("/config-audit", viewConfigAudit);
+  router.register("/models", viewModels);
+  router.register("/provider-tiers", viewProviderTiers);
+  router.register("/tier-presets", viewTierPresets);
 
   buildSidebar();
   router.resolve();

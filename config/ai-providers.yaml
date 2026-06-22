@@ -82,6 +82,7 @@ providers:
     model-aliases: {}
 
   Opencode:
+    display-name: "OpenCode"
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
@@ -109,20 +110,21 @@ providers:
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
     orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode-go model IDs — format: opencode-go/<model-id>
-    # Full list: https://opencode.ai/docs/go/
+    # opencode model IDs — merged from Zen (opencode/) and Go (opencode-go/) catalogs.
+    # Full lists: https://opencode.ai/zen and https://opencode.ai/zen/go
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash   # cheapest, highest throughput: 31,650 req/5h
-      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback, formatting
-      balanced: opencode-go/qwen3.7-plus        # best cost/performance: $0.40/$1.60, 4,300 req/5h
-      powerful: opencode-go/kimi-k2.6           # strong reasoning: architecture, security
-      max:      opencode-go/kimi-k2.7-code      # best coding model: $0.95/$4.00, 1,350 req/5h
+      nano:     opencode/deepseek-v4-flash-free   # Zen free tier
+      fast:     opencode/deepseek-v4-flash        # Zen
+      balanced: opencode/qwen3.6-plus             # Zen
+      powerful: opencode/kimi-k2.6                # Zen
+      max:      opencode-go/kimi-k2.7-code        # Go (k2.7 > k2.6 and deepseek-v4-pro)
     model-aliases:
-      flash:      opencode-go/deepseek-v4-flash
-      qwen:       opencode-go/qwen3.7-plus
-      kimi:       opencode-go/kimi-k2.6
-      kimi-code:  opencode-go/kimi-k2.7-code    # best coding model
-      qwen-max:   opencode-go/qwen3.7-max       # fallback alias, removed from tiers
+      flash-free: opencode/deepseek-v4-flash-free
+      flash:      opencode/deepseek-v4-flash
+      qwen:       opencode/qwen3.6-plus
+      kimi:       opencode/kimi-k2.6
+      kimi-max:   opencode-go/kimi-k2.7-code
+      deepseek:   opencode/deepseek-v4-pro
 
   Continue:
     agents_dir: .continue/agents

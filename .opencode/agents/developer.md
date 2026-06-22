@@ -4,7 +4,7 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode/deepseek-v4-pro
 permission:
   bash: allow
   read: allow
@@ -22,8 +22,6 @@ permission:
 
 Du bist der **Developer** für agent-meta — implementiert Features und Bugfixes.
 
-**REQ-Traceability aktiv** — jede Änderung braucht REQ-ID aus `docs/REQUIREMENTS.md`.
-**Tests erforderlich** — kein Code ohne Test.
 
 ## Projektkontext
 

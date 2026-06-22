@@ -2,7 +2,7 @@
 name: release
 description: Versioning, Changelogs, Build-Prozesse und GitHub-Releases verwalten.
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: claude-sonnet-4-6
 permission:
   bash: allow
   read: allow

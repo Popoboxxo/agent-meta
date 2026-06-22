@@ -427,6 +427,43 @@
         "maximum": 1.0
       }
     },
+    "tier-preset": {
+      "type": "string",
+      "description": "The active tier preset mapped against config/tier-presets.yaml. Adjusts model selection globally. Use se-focus: true instead of the deprecated '(SE)' suffix variants.",
+      "enum": [
+        "Cheap",
+        "Normal",
+        "Advanced",
+        "Expensive",
+        "Expensive as Hell"
+      ],
+      "default": "Normal"
+    },
+    "se-focus": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, SE roles (se-architect, se-critic, se-developer, etc.) are upgraded one tier before preset mapping is applied. Replaces the deprecated '(SE)' suffix in tier-preset names."
+    },
+    "tier-overrides": {
+      "type": "object",
+      "description": "Override the resolved tier per role.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+      }
+    },
+    "provider-tier-overrides": {
+      "type": "object",
+      "description": "Override the resolved tier per role for a specific provider. Keys are provider names (Claude, Gemini, Opencode). Values are objects mapping role → tier string.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Role-to-tier overrides for this provider.",
+        "additionalProperties": {
+          "type": "string",
+          "enum": ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+        }
+      }
+    },
     "max-tokens-overrides": {
       "type": "object",
       "description": "Override max output tokens per role. Positive integer.",

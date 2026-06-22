@@ -664,6 +664,7 @@ quality_pipelines:
           agent: se-termination
       - id: implementation
         agent: orchestrator
+        allow_orchestrator: true
         task: |
           For each leaf node with domain: software from the termination phase:
           - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)

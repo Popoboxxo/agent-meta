@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.61.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.65.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -43,6 +43,10 @@
 - **Config-Driven Generation:** All configuration lives in `config/` (role defaults, DoD presets, MCP registry, AI providers, skills registry) — `sync.py` reads and generates everything.
 - **Versioned Templates:** Every agent template carries a semantic version in its frontmatter; platform agents track their base version.
 - **AI Provider Tier Routing:** Five abstract model tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) are mapped per provider to concrete model IDs — cost-efficient model selection.
+- **Dynamic Model Discovery:** Keyless API fetching from OpenRouter (338 models), OpenCode Zen (48 models), and OpenCode Go — cached in `config/generated/model-registry.json` with network-outage resilience.
+- **Model Curation:** Hard-block (blacklist) and soft-hide (disabled) models via `config/model-curation.yaml` — single source of truth for model visibility.
+- **Tier-Presets Matrix:** Dynamically resolve model IDs based on provider, preset (cheap, normal, advanced, expensive), and tier — direct `tiers.tier: model_id` format with backward-compat `mapping:` fallback.
+- **Admin UI Overhaul:** Interactive dashboard for Models & Pricing, Provider Tier Mappings, Tier Presets (Resolved View + Edit tabs), Quick-Filter strips, Enable/Disable/Blacklist buttons, pricing source badges (`[API]`, `[Overlay]`, `[Calc]`).
 - **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
 - **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
 - **Provider Tool Whitelists:** Per-provider tool capability declarations prevent agents from referencing tools unavailable in their target provider environment.
@@ -108,6 +112,42 @@ config/provider-bootstrap.yaml
 | Gemini | api-based | `define_subagent` API call required at every session start |
 | Continue | config-based | `sync.py` writes agent entries into `.continue/config.yaml` |
 ```
+
+### Model Discovery & Dynamic Tier Resolution
+
+agent-meta v0.65.0 introduces **keyless model discovery** — automatically fetch and cache real models from public AI provider APIs without needing API keys:
+
+```bash
+# Fetch latest models from OpenRouter, OpenCode Zen, and OpenCode Go
+python scripts/sync.py --update-models
+```
+
+**Architecture:**
+- **OpenRouter:** Keyless API at `https://openrouter.ai/api/v1/models` → 338 models with live pricing
+- **OpenCode Zen:** Keyless endpoint `https://opencode.ai/zen/v1/models` → 48 models (nano-powerful tier)
+- **OpenCode Go:** Keyless endpoint `https://opencode.ai/zen/go/v1/models` → max-tier models (e.g. kimi-k2.7-code)
+- **Registry Guard:** If discovery returns <10 models (network outage), preserves existing registry
+- **Model Curation:** `config/model-curation.yaml` blacklist (hard exclusion) and disabled (soft-hide in UI)
+
+**Tier-Presets (Direct Model Assignment):**
+```yaml
+# config/tier-presets.yaml — new format (REQ-MOD-01)
+cheap:
+  tiers:
+    nano: openai/gpt-4-mini
+    fast: openrouter/mistral/mistral-7b
+    balanced: anthropic/claude-3-haiku
+    powerful: anthropic/claude-3.5-sonnet
+    max: anthropic/claude-opus
+```
+
+**Admin UI Enhancement:**
+- Models & Pricing: 400+ model table with quick-filter strips (Claude/OpenCode/GitHub/OpenAI/Google)
+- Provider Tier Mappings: Datalist-filtered model picker per provider
+- Tier Presets: Resolved view (current state) + edit mappings (direct input)
+- Price badges: `[API]` (OpenRouter live), `[Overlay]` (manual), `[Calc]` (derived)
+
+→ Full details: `scripts/lib/model_discovery.py`, `scripts/lib/curation.py`, `config/model-curation.yaml`, `config/tier-presets.yaml`
 
 ### A2A Handoff Protocol
 
@@ -316,6 +356,24 @@ speech-mode: submissive        # full | short | childish | caveman | asozial | s
 | **strict** | ✅ | ✅ | ✅ | ❌ |
 | **enterprise** | ✅ | ✅ | ✅ | ✅ |
 
+### Dynamic Model Tiers & Presets
+
+agent-meta supports dynamic model routing through a preset matrix defined in `.meta-config/project.yaml`. The rigid assignment of models in `ai-providers.yaml` is replaced by a tier-based preset system that allows cost-efficient and task-specific model selection.
+
+```yaml
+# In .meta-config/project.yaml
+ai-provider: Claude
+model-preset: standard  # standard | cheap | advanced | expensive
+```
+
+**Key components:**
+1. **Dynamic Model Crawling:** Update the local model cache with the latest models from the provider APIs (Anthropic, Gemini, Opencode) by running:
+   ```bash
+   python scripts/sync.py --update-models
+   ```
+2. **Tier-Presets Matrix:** Maps agent tiers (`nano`, `fast`, `balanced`, `powerful`, `max`) dynamically to model classes, considering a normalized cost factor (1-100). Systems-Engineering (SE) roles receive an automatic 1-2 tier upgrade via an `(SE)` preset variant.
+3. **Admin UI:** A "Model Discovery & Pricing" Dashboard inside the Admin UI (`docs/admin-ui.html`) provides a sortable model table, crawl button, heatmap, and a preset selector with live preview. Start the UI using `scripts/admin-server.py`.
+
 ### Speech Modes
 
 | Mode | Description |
@@ -338,6 +396,11 @@ agent-meta/
   config/                    # Framework configuration (managed by agent-meta)
     role-defaults.yaml       # Model/memory/permissionMode defaults per role
     ai-providers.yaml        # Provider settings (Claude, Gemini, Opencode, Continue, Copilot)
+    tier-presets.yaml        # Tier-to-model mappings (cheap, normal, advanced, expensive) — NEW v0.65.0
+    model-curation.yaml      # Model visibility: blacklist (hard) and disabled (soft) — NEW v0.65.0
+    pricing-overlay.yaml     # Pricing data for cost factor calculation
+    generated/
+      model-registry.json    # Cached real models from OpenRouter/Zen/Go (406 models, keyless API)
     dod-presets.yaml         # DoD quality presets
     mcp-registry.yaml        # Global MCP server catalog
     provider-tools.yaml      # Per-provider tool capability whitelists
@@ -349,6 +412,7 @@ agent-meta/
     provider-capabilities.yaml  # PAL: capability matrix per provider
     provider-bootstrap.yaml  # PAL: bootstrap mechanism definitions
   docs/                      # Documentation
+    admin-ui.html            # Web frontend for the Admin UI
     agent-graph.html         # Interactive agent visualization graph
     agent-mindmap.md         # Mermaid mindmap of all agents
     live-dashboard.html      # Live session monitoring dashboard
@@ -374,13 +438,16 @@ agent-meta/
     1-generic/               # Universal rules (auto-loaded into all agents)
     2-platform/              # Platform-specific rule overrides
   scripts/                   # Build and utility scripts
-    sync.py                  # Main generation script (CLI entrypoint)
+    sync.py                  # Main generation script (CLI entrypoint) + --update-models flag
+    admin-server.py          # Backend server for the Admin UI (v0.65.0: new Tier Presets + Models sections)
     viz-logger.py            # MCP server & CLI fallback for agent event logging
     viz-logger-mcp.mjs       # HTTP/SSE MCP transport for OpenCode (Windows)
     viz-server.py            # Live dashboard HTTP server
     viz-report.py            # Session report generator (terminal/HTML/JSON)
     consistency-check.py     # Deterministic template consistency validation
     lib/                     # Sync library modules (config, agents, rules, etc.)
+      model_discovery.py     # Keyless API fetching: OpenRouter, OpenCode Zen/Go (NEW v0.65.0)
+      curation.py            # Model visibility management: blacklist/disabled lists (NEW v0.65.0)
       delegation_syntax.py   # PAL: DelegationSyntaxEngine for placeholder substitution
       bootstrap.py           # PAL: BootstrapEngine for provider-specific registration
   speech/                    # Communication style mode files

@@ -1,0 +1,40 @@
+Cheap:
+  description: "Flacht die Kurve radikal ab."
+  tiers:
+    nano:     claude-haiku-4-5-20251001
+    fast:     claude-haiku-4-5-20251001
+    balanced: claude-haiku-4-5-20251001
+    powerful: claude-haiku-4-5-20251001
+    max:      claude-sonnet-4-6
+Normal:
+  description: "Das 1:1 Mapping (Status Quo)."
+  tiers:
+    nano:     claude-haiku-4-5-20251001
+    fast:     claude-haiku-4-5-20251001
+    balanced: claude-sonnet-4-6
+    powerful: claude-opus-4-7
+    max:      claude-fable-5
+Advanced:
+  description: "Shifft alles eine Stufe nach oben."
+  tiers:
+    nano:     claude-haiku-4-5-20251001
+    fast:     claude-sonnet-4-6
+    balanced: claude-opus-4-7
+    powerful: claude-fable-5
+    max:      claude-fable-5
+Expensive:
+  description: "Sehr starker Shift."
+  tiers:
+    nano:     claude-sonnet-4-6
+    fast:     claude-opus-4-7
+    balanced: claude-fable-5
+    powerful: claude-fable-5
+    max:      claude-fable-5
+Expensive as Hell:
+  description: "Fast alle Agenten laufen auf powerful oder max."
+  tiers:
+    nano:     claude-opus-4-7
+    fast:     claude-fable-5
+    balanced: claude-fable-5
+    powerful: claude-fable-5
+    max:      claude-fable-5
