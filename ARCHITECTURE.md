@@ -458,17 +458,15 @@ Mit der Implementierung von dynamischer Modellerfassung und Tier-Presets (REQ-MO
 - Echtzeit-Abfrage der Preise für Input/Output Tokens (`pricing.prompt`, `pricing.completion`).
 - Die Liste der verfügbaren Modelle sowie deren Kontextfenster und Pricing wird in `config/generated/model-registry.json` gecached.
 
-### Provider Mapping: Go vs. Zen
+### Provider Mapping: OpenCode Zen
 
-Es erfolgt eine explizite Provider-Klassifizierung für OpenCode-Modelle:
-- **`opencode-go`**: Für offene Modelle (z.B. Llama, Qwen, Mistral).
-- **`opencode-zen`**: Für Enterprise / Closed-Source Modelle.
+OpenCode-Modelle werden vom keyless Zen-Endpoint (`https://opencode.ai/zen/v1/models`) bezogen und im Registry als `opencode-zen` klassifiziert. IDs werden als `opencode/<raw_id>` namespaced, um Kollisionen mit OpenRouter-IDs zu vermeiden.
 
 ### Pricing Overlay
 
 Das `config/pricing-overlay.yaml` fungiert als manueller Überschreib-Mechanismus für die automatisierten API-Preise:
 - API-Preise werden standardmäßig bevorzugt.
-- Ist im Overlay ein eigener Preis definiert (z.B. `0.00$` für Go-Abonnenten), überschreibt dieser den API-Preis.
+- Ist im Overlay ein eigener Preis definiert (z.B. `0.00$` für Zen-Subscriptions), überschreibt dieser den API-Preis.
 - Die Admin-UI (Web-Dashboard) ermöglicht das direkte Editieren dieser Custom-Preise.
 
 ### UI Transparenz

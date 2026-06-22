@@ -3,7 +3,7 @@ name: code-reviewer
 description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen
   und REQ-Traceability in Code-Pfaden.'
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: claude-opus-4-7
 permission:
   read: allow
   bash: allow
@@ -20,7 +20,6 @@ permission:
 
 Gatekeeper für **Code-Gesundheit**, **Clean Code**, **Blast-Radius** in agent-meta.
 
-**REQ-Traceability aktiv** — geänderte Code-Pfade auf REQ-Referenzen prüfen.
 
 ## Projektkontext
 
@@ -65,8 +64,7 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 
 - **DRY:** duplizierter Code ≥2 Stellen, Copy-Paste mit Mini-Variationen
 - **KISS:** überkomplexe Lösungen, unnötige Abstraktionen, Premature Optimization
-- **YAGNI:** Code für nicht angeforderte Features, generische Abstraktionen ohne Use-Case, Code ohne REQ-Bezug
-
+- **YAGNI:** Code für nicht angeforderte Features, generische Abstraktionen ohne Use-Case
 ### 2. Blast-Radius-Analyse
 
 | Stufe | Kriterium |
@@ -80,14 +78,6 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 
 ### 3. REQ-Traceability-Prüfung (konditional)
 
-> Nur wenn `req-traceability` aktiv. Sonst überspringen.
-
-1. REQ-IDs aus Change-Kontext/Commit-Message lesen
-2. Geänderte Dateien nach REQ-Referenzen durchsuchen: `// REQ-xxx`, `# REQ-xxx`, `/* REQ-xxx */`, Docstrings
-3. Vollständigkeit prüfen: jede geänderte Funktion/Datei hat REQ-Ref? Alle erwarteten REQ-IDs im Code?
-4. Fehlende Referenzen berichten (Datei+Zeile, fehlende REQ-ID)
-
-**Ausnahmen:** reines Refactoring, Infrastruktur (CI/Config/Build), Doku-only.
 
 ### 4. Code-Qualitäts-Bewertung
 
@@ -110,8 +100,7 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 1. Datei lesen
 2. Clean-Code-Check (SOLID, DRY, KISS, YAGNI)
 3. Blast-Radius bestimmen
-4. REQ-Referenz prüfen
-5. Bewertung A–F → Bericht
+4. 5. Bewertung A–F → Bericht
 
 ### Full Review (Feature / Multi-File)
 
@@ -119,8 +108,7 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 2. Pro Datei: Clean-Code-Check
 3. Cross-File DRY-Prüfung
 4. Vollständige Blast-Radius-Analyse über alle Module
-5. REQ-Traceability über alle Dateien
-6. Gesamtbewertung (schlechteste Einzelbewertung dominiert) → Bericht
+5. 6. Gesamtbewertung (schlechteste Einzelbewertung dominiert) → Bericht
 
 ### Pre-Merge Gate
 
@@ -175,17 +163,7 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
     "breaking_changes": ["SessionManager constructor signature changed"],
     "migration_needed": false
   },
-    "req_traceability": {
-    "expected_reqs": ["REQ-012", "REQ-013"],
-    "found_refs": [
-      {"req_id": "REQ-012", "file": "src/auth/login-handler.ts", "line": 5},
-      {"req_id": "REQ-013", "file": "src/auth/password-validator.ts", "line": 3}
-    ],
-    "missing_refs": [],
-    "unreferenced_changes": []
-  },
-  
-  "quality_ratings": {
+    "quality_ratings": {
     "readability": "B",
     "maintainability": "B",
     "robustness": "A",
@@ -258,9 +236,6 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 | Datei | Zeile | Prinzip | Beschreibung |
 |-------|-------|---------|-------------|
 
-## REQ-Traceability
-| REQ-ID | Datei | Zeile | Status |
-|--------|-------|-------|--------|
 
 ## Qualitäts-Bewertung
 | Kategorie | Bewertung | Begründung |

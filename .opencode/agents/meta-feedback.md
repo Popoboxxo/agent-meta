@@ -3,7 +3,7 @@ name: meta-feedback
 description: Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues
   einreichen.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: claude-haiku-4-5-20251001
 permission:
   bash: allow
   read: allow

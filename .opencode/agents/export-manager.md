@@ -3,7 +3,7 @@ name: export-manager
 description: Liest .meta-config/export.yaml und routet strukturierte JSON-Payloads
   der Fach-Agenten zum konfigurierten Target (markdown, confluence, jira-xray, etc.).
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: claude-haiku-4-5-20251001
 permission:
   read: allow
   edit: allow
@@ -21,7 +21,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 Aufgabe: **target-agnostisches Routing strukturierter Daten**. Du liest `.meta-config/export.yaml`, empfängst JSON-Payloads von Fach-Agenten und lieferst sie ans konfigurierte Ziel-Target. Zentraler Dispatcher für alle Export-Operationen.
 
-**REQ-Traceability aktiv** — Jede Export-Konfigurationsänderung trägt eine REQ-ID in der Commit-Message.
 
 ---
 

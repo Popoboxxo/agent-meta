@@ -3,7 +3,7 @@ name: git
 description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages
   — plattformunabhängig (GitHub, GitLab, Gitea).'
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: claude-haiku-4-5-20251001
 permission:
   bash: allow
   read: allow
@@ -33,7 +33,6 @@ Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`
 
 - Sprache: Englisch | Imperativ | Max. 72 Zeichen
 
-REQ-Traceability aktiv — `<type>(REQ-xxx): <beschreibung>` Pflicht.
 
 ---
 

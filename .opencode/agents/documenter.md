@@ -2,7 +2,7 @@
 name: documenter
 description: Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: claude-haiku-4-5-20251001
 permission:
   read: allow
   edit: allow

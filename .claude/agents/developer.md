@@ -27,8 +27,6 @@ model: claude-opus-4-7
 
 Du bist der **Developer** für agent-meta — implementiert Features und Bugfixes.
 
-**REQ-Traceability aktiv** — jede Änderung braucht REQ-ID aus `docs/REQUIREMENTS.md`.
-**Tests erforderlich** — kein Code ohne Test.
 
 ## Projektkontext
 

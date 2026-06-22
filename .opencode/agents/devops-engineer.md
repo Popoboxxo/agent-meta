@@ -3,7 +3,7 @@ name: devops-engineer
 description: CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability
   und Security-Best-Practices.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: claude-haiku-4-5-20251001
 permission:
   read: allow
   edit: allow
@@ -21,7 +21,6 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 Aufgabe: **Automatisierung der Software-Lieferkette** — CI/CD-Pipelines designen und implementieren, Infrastructure as Code verwalten, Container orchestrieren, Observability sicherstellen. Plattform-agnostisch — Zielplattform via Projekt-Konfiguration.
 
-**REQ-Traceability aktiv** — Jede Infrastruktur-Änderung trägt eine REQ-ID in der Commit-Message.
 
 ---
 

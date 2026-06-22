@@ -4,7 +4,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
   Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung
   von agent-meta.'
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: claude-opus-4-7
 permission:
   bash: allow
   read: allow

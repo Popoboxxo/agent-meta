@@ -4,7 +4,7 @@ description: 'Analysiert und klassifiziert eingehende Bug-Meldungen und Feature-
   vor Ressourcen-Allokation. Unterscheidet: Echter Bug, User-Fehler, validierbares
   Feature, Out-of-Scope.'
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: claude-sonnet-4-6
 permission:
   read: allow
   glob: allow
