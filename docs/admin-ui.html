@@ -4067,21 +4067,22 @@ async function viewModels() {
   let modelsData = [];
 
   const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
-  
+
   const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
-  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
+  const editBtn = el("button", { class: "btn" }, ["Edit Prices"]);
+  const saveBtn = el("button", {
+    class: "btn btn-primary",
+    style: "background: var(--accent-green); border-color: var(--accent-green); color: white;",
+    disabled: true,
+  }, ["Save Prices"]);
+  const cancelBtn = el("button", { class: "btn", style: "display: none;" }, ["Cancel"]);
   const deleteBtn = el("button", { class: "btn btn-danger", style: "display: none;" }, ["Delete Selected"]);
-  
-  const editLabel = el("label", { style: "margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;" }, [
-    el("span", {}, ["Edit Mode"])
-  ]);
-  const editToggle = el("input", { type: "checkbox" });
-  editLabel.prepend(editToggle);
-  
+
   controls.appendChild(refreshBtn);
+  controls.appendChild(editBtn);
   controls.appendChild(saveBtn);
+  controls.appendChild(cancelBtn);
   controls.appendChild(deleteBtn);
-  controls.appendChild(editLabel);
   wrap.appendChild(controls);
 
   const filterState = { provider: "", model: "", category: "" };
@@ -4320,11 +4321,21 @@ async function viewModels() {
     }
   };
 
-  editToggle.addEventListener("change", (e) => {
-    editMode = e.target.checked;
-    saveBtn.style.display = editMode ? "inline-block" : "none";
+  editBtn.onclick = () => {
+    editMode = true;
+    editBtn.style.display = "none";
+    cancelBtn.style.display = "inline-block";
+    saveBtn.disabled = false;
     renderTable();
-  });
+  };
+
+  cancelBtn.onclick = async () => {
+    editMode = false;
+    editBtn.style.display = "inline-block";
+    cancelBtn.style.display = "none";
+    saveBtn.disabled = true;
+    await loadData();
+  };
 
   refreshBtn.onclick = async () => {
     refreshBtn.disabled = true; refreshBtn.textContent = "Running sync.py...";
@@ -4365,9 +4376,14 @@ async function viewModels() {
         }
       });
       await api.post("/api/pricing/update", { updates });
-      toast("Saved", "success"); await loadData();
+      toast("Saved", "success");
+      editMode = false;
+      editBtn.style.display = "inline-block";
+      cancelBtn.style.display = "none";
+      await loadData();
     } finally {
-      saveBtn.disabled = false; saveBtn.textContent = "Save Configs";
+      saveBtn.textContent = "Save Prices";
+      saveBtn.disabled = editMode ? false : true;
     }
   };
 
@@ -4397,60 +4413,88 @@ async function viewProviderTiers() {
   const providersWrap = el("div", { id: "providers-wrap" });
   wrap.appendChild(providersWrap);
 
+  // Infer which registry-provider labels belong to a given ai-providers entry,
+  // by looking at existing tier values and matching them to registry models.
+  // Returns an array of registry provider names (e.g. ["anthropic"], ["opencode-go"]).
+  const inferRegistryProviders = (pData, models) => {
+    const tierValues = Object.values((pData && pData["model-tiers"]) || {}).filter(Boolean);
+    const providers = new Set();
+
+    tierValues.forEach(modelId => {
+      if (modelId.includes("/")) {
+        // namespaced id like "opencode/deepseek-v4-flash" or "opencode-go/kimi-k2.6"
+        const prefix = modelId.split("/")[0];
+        models
+          .filter(m => m.id.startsWith(prefix + "/"))
+          .forEach(m => providers.add(m.provider));
+      } else {
+        // native id like "claude-sonnet-4-6" → look up by exact id in registry
+        const match = models.find(m => m.id === modelId);
+        if (match) providers.add(match.provider);
+      }
+    });
+
+    return [...providers];
+  };
+
   const renderProviders = () => {
     providersWrap.innerHTML = "";
 
-    // Create global datalist with all active models
-    let globalDl = document.getElementById("global-tier-model-list");
-    if (!globalDl) {
-      globalDl = el("datalist", { id: "global-tier-model-list" });
-      document.body.appendChild(globalDl);
-    } else {
-      globalDl.innerHTML = "";
-    }
+    // Remove obsolete global datalist if it exists (replaced by per-row datalists)
+    const obsoleteDl = document.getElementById("global-tier-model-list");
+    if (obsoleteDl) obsoleteDl.remove();
 
-    const addedIds = new Set();
-    modelsData.forEach(m => {
-      globalDl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
-      addedIds.add(m.id);
-    });
-
-    // Add legacy tier values from ai-providers config
     const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
-    uniqueProviders.forEach(p => {
-      const pConf = aiProvidersData.providers ? aiProvidersData.providers[p] : aiProvidersData[p];
-      if (pConf && pConf["model-tiers"]) {
-        Object.values(pConf["model-tiers"]).forEach(val => {
-          if (val && !addedIds.has(val)) {
-            globalDl.appendChild(el("option", { value: val, label: `${val} (Legacy)` }));
-            addedIds.add(val);
-          }
-        });
-      }
-    });
-    
+
     const table = el("table", { class: "data provider-tiers-table" });
     const thead = el("thead");
     thead.appendChild(el("tr", {}, ["Provider", "Tier: nano", "Tier: fast", "Tier: balanced", "Tier: powerful", "Tier: max"].map(h => el("th", {}, [h]))));
     table.appendChild(thead);
-    
+
     const tbody = el("tbody");
     const providersList = aiProvidersData.providers ? Object.keys(aiProvidersData.providers) : (Object.keys(aiProvidersData).length > 0 ? Object.keys(aiProvidersData) : uniqueProviders);
-    
+
     providersList.forEach(p => {
       const tr = el("tr");
       tr.dataset.provider = p;
       tr.appendChild(el("td", {}, [el("strong", {}, [p])]));
-      
+
       const tiers = ["nano", "fast", "balanced", "powerful", "max"];
       const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
       const tData = pData["model-tiers"] || {};
-      
+
+      // Build per-provider datalist filtered to relevant registry providers.
+      const registryProviders = inferRegistryProviders(pData, modelsData);
+      const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      let dl = document.getElementById(dlId);
+      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+      else { dl.innerHTML = ""; }
+
+      // If we identified registry providers from existing tier values, use them.
+      // Otherwise fall back to all active models so free-text input still gets suggestions.
+      const candidates = registryProviders.length > 0
+        ? modelsData.filter(m => registryProviders.includes(m.provider))
+        : modelsData;
+
+      const addedIds = new Set();
+      candidates.forEach(m => {
+        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+        addedIds.add(m.id);
+      });
+
+      // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
+      Object.values(tData).forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
+          addedIds.add(val);
+        }
+      });
+
       tiers.forEach(t => {
         const td = el("td", {});
         const val = tData[t] || "";
         if (editMode) {
-          const input = el("input", { type: "text", list: "global-tier-model-list", value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
+          const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
           td.appendChild(input);
         } else {
           td.appendChild(el("span", { class: "mono" }, [val || "-"]));
