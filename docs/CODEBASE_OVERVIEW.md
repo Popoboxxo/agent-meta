@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-12 (Orchestrator v3.22.0, 3-Tier-Developer, PAL-Engine-Fix, Delegation-Syntax-Laufzeit-Platzhalter)
+> Letzte Aktualisierung: 2026-06-22 (REQ-MOD-01: Dynamic Model Discovery, Tier Presets, Curation, Admin UI Overhaul)
 
 ---
 
@@ -13,9 +13,10 @@
 5. [Schemas](#5-schemas)
 6. [Templates](#6-templates)
 7. [Howto-Dokumentation](#7-howto-dokumentation)
-8. [Scripts](#8-scripts)
-9. [Provider Abstraction Layer (PAL)](#9-provider-abstraction-layer-pal)
-10. [A2A-Handoff-Protokoll](#10-a2a-handoff-protokoll)
+8. [Model Discovery & Curation (REQ-MOD-01)](#8-model-discovery--curation-req-mod-01)
+9. [Scripts](#9-scripts)
+10. [Provider Abstraction Layer (PAL)](#10-provider-abstraction-layer-pal)
+11. [A2A-Handoff-Protokoll](#11-a2a-handoff-protokoll)
 
 ---
 
@@ -483,15 +484,58 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `se-termination` | fast | — | optional | L3-Component-Leaf-Node Entscheidung |
 | `se-orchestrator` | balanced | — | optional | 6-stufiger rekursiver SE-Herunterbruch |
 
-### `config/ai-providers.yaml` & `config/generated/model-registry.json`
+### `config/ai-providers.yaml` & Provider Tier Mapping
 
-**Zweck:** Verwaltung von dynamischen Modellen und Tiers über eine Preset-Matrix und Keyless Discovery.
-- **Keyless Discovery Architecture:** `scripts/lib/model_discovery.py` nutzt die öffentliche OpenRouter API (`https://openrouter.ai/api/v1/models`) als globalen Proxy. Dies ermöglicht das Abrufen von Echtzeit-Modelldaten (Anthropic, Gemini, Open-Source) und -Preisen (`pricing.prompt`, `pricing.completion`) völlig **ohne** lokale API-Keys.
-- **Provider Mapping (OpenCode Zen):** OpenCode-Modelle werden vom keyless Zen-Endpoint (`https://opencode.ai/zen/v1/models`) bezogen und als `opencode-zen` klassifiziert. IDs werden als `opencode/<raw_id>` namespaced.
-- **Model Registry (`model-registry.json`):** Cacht die dynamisch von den Providern/OpenRouter abgerufenen Modelle.
-- **Pricing Overlay (`config/pricing-overlay.yaml`):** Manueller Überschreib-Mechanismus für Preise. API-Preise werden bevorzugt, außer das Overlay definiert einen eigenen Preis (z.B. 0.00$ für Zen-Subscriptions). Preise können direkt in der Admin-UI editiert werden.
-- **Tier-Presets Matrix (`project.yaml`):** Mappt dynamisch Agenten-Tiers (nano, fast, balanced, powerful, max) auf konkrete Modelle, basierend auf dem eingestellten Preset (z.B. cheap, normal, advanced, expensive). Systems-Engineering (SE) Rollen werden zusätzlich über ein SE-spezifisches Prefix künstlich aufgewertet.
-- **UI Transparenz:** Die Admin-UI visualisiert die Datenherkunft mit `[API]`, `[Overlay]` und `[Calc]` Badges und bietet direkte Reference-Links zu den Modell-Providern.
+**Zweck:** Provider-Konfiguration mit `display-name`, Tier-Definitionen und Model-IDs (früher feste Zuordnung, jetzt via Presets). YAML mit Frontmatter: `name`, `tier`, `models`.
+
+**Neue Felder (REQ-MOD-01):**
+- `display-name` — lesbar im Admin-UI (z.B. "Anthropic Claude", "OpenCode")
+- `tiers` (geplant) — direkte Modell-ID pro Tier, fallback zu globalen `role-defaults.yaml` Defaults
+
+### `config/tier-presets.yaml` (NEU, REQ-MOD-01)
+
+**Zweck:** Globale Tier-Presets mit direktem Modell-Assignment statt indirektem Mapping.
+
+**Format — altes Format (backward-compat):**
+```yaml
+cheap:
+  nano: cheap-nano
+  fast: cheap-fast
+  mapping:  # fallback layer
+    nano: nano-tier
+    fast: fast-tier
+```
+
+**Format — neues Format (direkt, REQ-MOD-01):**
+```yaml
+cheap:
+  tiers:
+    nano: openai/gpt-4-mini
+    fast: openrouter/mistral/mistral-7b
+    balanced: anthropic/claude-3-haiku
+    powerful: anthropic/claude-3.5-sonnet
+    max: anthropic/claude-opus
+```
+
+**5 vordefinierte Presets:**
+1. `cheap` — günstigste echte Modelle pro Tier
+2. `normal` — balanced Preis/Performance
+3. `advanced` — stärkere Modelle, höhere Kosten
+4. `expensive` — max Kosten, max Performance
+5. `expensive-as-hell` — Claude max + Opus wo verfügbar
+
+**Preset-Auflösung (resolve_model):**
+1. Schaue `project.yaml:tier-preset` (project-lokal, überschreibt global)
+2. Lade Preset aus `tier-presets.yaml:tiers` oder fallback `mapping`
+3. Wenn Preset hat `tiers.tier` → direkt Model-ID
+4. Sonst: versuche `mapping` oder fallback zu `role-defaults.yaml:tiers`
+5. SE-Rollen upgrade: +1 Tier via SE-Prefix (balanced → powerful, etc.)
+
+### `config/pricing-overlay.yaml` & `config/generated/model-registry.json`
+
+**Pricing Overlay:** Manueller Überschreib-Mechanismus für Preise. API-Preise werden bevorzugt, außer Overlay definiert einen eigenen Preis (z.B. 0.00$ für Zen-Subscriptions). Preise können direkt in der Admin-UI editiert werden.
+
+**Model Registry:** Cacht die dynamisch von OpenRouter/Zen/Go abgerufenen Modelle (406 Modelle). Produziert von `sync.py --update-models`.
 
 ---
 
@@ -679,7 +723,97 @@ se-cascade:
 
 ---
 
-## 8. Scripts
+## 8. Model Discovery & Curation (REQ-MOD-01)
+
+### 8.1 `scripts/lib/model_discovery.py`
+
+**Version:** 1.0.0 (neu in v0.65.0)
+**Beschreibung:** Keyless API-basierte Modell-Discovery von OpenRouter (338 Modelle), OpenCode Zen (48 Modelle) und OpenCode Go. Schreibt ein dedupliziertes Registry nach `config/generated/model-registry.json` mit Fallback bei Netzwerkausfällen.
+
+**Exportierte API:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `fetch_openrouter_models` | `(blacklist: List[str] \| None) → List[Dict]` | OpenRouter keyless Endpoint (`https://openrouter.ai/api/v1/models`), Provider-Attribution via ID-Präfix, Preise in `pricing.prompt`/`completion` |
+| `fetch_opencode_zen_models` | `(blacklist: List[str] \| None) → List[Dict]` | OpenCode Zen Endpoint (`https://opencode.ai/zen/v1/models`), IDs namespaced als `opencode/<raw_id>` |
+| `fetch_opencode_go_models` | `(blacklist: List[str] \| None) → List[Dict]` | OpenCode Go Endpoint (`https://opencode.ai/zen/go/v1/models`), IDs als `opencode-go/<raw_id>` |
+| `discover_models` | `(_project_root: str \| None) → Dict` | Orchestriert alle Fetcher, dedupliciert nach ID, appliziert Registry-Guard (min. 10 Modelle) |
+| `_load_blacklist` | `(project_root: str) → List[str]` | Lädt `config/model-curation.yaml` → `blacklist` Sektion |
+
+**Kritische Flows:**
+
+1. **Network-resilience:** Jeder Fetcher returniert `[]` bei HTTP/Parse-Fehler → `discover_models` merged mit leerer Liste
+2. **Registry Guard:** Falls Discovery < 10 Modelle zurückgibt, preserviert existentes Registry (Netzwerkausfall-Schutz)
+3. **Deduplication:** Sorted nach ID, erste Occurrence wins (kein Merge von Duplikaten)
+4. **Blacklist-Integration:** Modelle in `config/model-curation.yaml:blacklist` werden gefiltert WÄHREND Discovery (nicht nachträglich)
+
+**Provider Attribution (REQ-MOD-01):**
+- OpenRouter: Prefix vor erstem `/` ist Provider (`qwen/qwen3` → `qwen`)
+- OpenCode Zen: Alle als `opencode-zen` (später merged zu `opencode`)
+- OpenCode Go: Alle als `opencode-go` (später merged zu `opencode`)
+
+### 8.2 `scripts/lib/curation.py` (NEU)
+
+**Version:** 1.0.0
+**Beschreibung:** Typsichere Curation-File-Verwaltung mit Fallback auf Default-Dicts bei fehlender/malformed YAML.
+
+**Exportierte API:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `load_curation` | `(root: str) → Dict[str, List[str]]` | Lädt `config/model-curation.yaml`, returns `{"blacklist": [...], "disabled": [...]}` oder Default `{}` |
+| `save_curation` | `(root: str, data: Dict) → None` | Schreibt Curation-Datei atomar (temp → rename) mit PyYAML |
+| `_normalize` | `(data: Any) → Dict[str, List[str]]` | Coercion zu kanonischer Form (nur `blacklist` + `disabled`, beide Lists) |
+| `_default` | `() → Dict[str, List[str]]` | Fresh copy der Default-Struktur |
+
+**Curation-Semantik:**
+- `blacklist` — hard exclusion, gefiltert während Discovery, nie in Registry
+- `disabled` — soft exclusion, in Registry aber hidden in Admin-UI Dropdowns/Pickers
+- **Fallback:** Beide Listen default zu empty `[]`, so Callers brauchten nicht auf fehlende YAML zu prüfen
+
+### 8.3 `config/model-curation.yaml` (NEU)
+
+**Zweck:** Single source of truth für Modell-Sichtbarkeit (Blacklist + Disabled).
+
+**Format:**
+```yaml
+blacklist:
+  - google/gemini-3.1-flash-image  # entfernt während discovery
+  - google/gemini-3-pro-image
+disabled: []                         # hidden in UI, aber in registry
+```
+
+**Migrationspfad:** Legacy `pricing-overlay.yaml:excluded_models` wurde nach `blacklist` migriert (2026-06-21).
+
+### 8.4 `config/generated/model-registry.json` (NEU, generiert)
+
+**Zweck:** Cache der echten Modelle von OpenRouter + Zen + Go. Produziert von `sync.py --update-models` via `model_discovery.discover_models()`.
+
+**Schema:**
+```json
+{
+  "models": [
+    {
+      "id": "openrouter/anthropic/claude-3.5-sonnet",
+      "name": "Claude 3.5 Sonnet",
+      "provider": "anthropic",
+      "input_cost_api": 3.0,        // Million-Token-Äquiv., z.B. 0.003 = 3.0
+      "output_cost_api": 15.0,
+      "context_length": 200000,
+      "tier": "Standard"
+    }
+  ]
+}
+```
+
+**Fakten:**
+- 406 echte Modelle nach Dedup (38 OpenRouter-Provider, 48 Zen, max ~9 Go)
+- Preise von OpenRouter API oder `config/pricing-overlay.yaml` (Overlay wins)
+- Admin-UI lädt Registry und zeigt `[API]` / `[Overlay]` / `[Calc]` Badges pro Modell
+
+---
+
+## 8. Scripts (überarbeitet)
 
 ### `scripts/sync.py`
 
@@ -697,12 +831,26 @@ se-cascade:
 **Dynamisches Crawling (`--update-models`):**
 Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
 
-### `scripts/admin-server.py` & `docs/admin-ui.html`
+### `scripts/admin-server.py` & `docs/admin-ui.html` (REQ-MOD-01 Overhaul)
 
-**Zweck:** Bereitstellung einer interaktiven, webbasierten Admin UI.
-- **Dashboard:** Bietet ein "Model Discovery & Pricing" Dashboard mit sortierbaren Modell-Tabellen, Preis-Heatmaps und einem Button zum direkten Ausführen von `sync.py --update-models`.
-- **Config Management:** Visuelle Bearbeitung der Tier-Presets Matrix und Provider-Konfiguration inklusive Live-Vorschau.
-- **Architektur:** Single-File Web Frontend (`docs/admin-ui.html`) in Vanilla JS (Zero Dependencies) und ein Python-Backend (`scripts/admin-server.py`).
+**Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing.
+**Architektur:** Single-File Frontend (`docs/admin-ui.html`, Vanilla JS, Zero Dependencies) + Python-Backend (`scripts/admin-server.py`).
+
+**Neue Sektionen (REQ-MOD-01):**
+
+| Sektion | Features | Button-Flow |
+|---------|----------|------------|
+| **Models & Pricing** | Sortierbare Tabelle (400+ Modelle), Filter-Strip (Claude/OpenCode/GitHub/OpenAI/Google), Preis-Heatmap, `[API]`/`[Overlay]`/`[Calc]` Badges | Edit → Save/Cancel, Enable/Disable/Blacklist per Modell, Crawl Button |
+| **Provider Tier Mappings** | Per-Provider Datalist-Filtering, display-name Anzeige | Edit → Save/Cancel |
+| **Tier Presets** | 2 Tabs: **Resolved View** (aktuell aufgelöste Modelle) + **Edit Mappings** (direkte Modell-Inputs), Tier-Dropdown-Picker | Save/Cancel, Quick-Preset-Switcher |
+| **Project General** | tier-preset Dropdown (fixed), Global Framework Setup Link | Edit → Save/Cancel |
+| **AI Providers** | Project Tier Override Panel | Enable/Disable pro Provider |
+
+**New UI Patterns (REQ-MOD-01):**
+1. **Quick-Filter Strip** oben in Models-Tabelle → Click-to-filter nach Provider
+2. **Enable/Disable/Blacklist Row Buttons** statt Inline-Checkboxen → weniger Jitter, bessere UX
+3. **Datalist-Filtering** in Provider-Mappings → zeigt nur verfügbare Modelle per Provider
+4. **Resolved View Tab** → Users sehen aktuell aufgelöste Modelle VOR Bearbeitung
 
 ### `scripts/viz-logger.py` & `scripts/viz-logger-mcp.mjs` & `scripts/lib/viz.py`
 
@@ -747,11 +895,11 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 
 ---
 
-## 9. Provider Abstraction Layer (PAL)
+## 10. Provider Abstraction Layer (PAL)
 
 Der Provider Abstraction Layer (PAL) isoliert generische Agent-Templates von provider-spezifischer Delegationssyntax. Er verhindert "Syntax Leaks" und handhabt provider-spezifische Bootstrap-Mechanismen.
 
-### 9.1 `config/delegation-syntax.yaml` — Provider-Delegation Syntax Registry
+### 10.1 `config/delegation-syntax.yaml` — Provider-Delegation Syntax Registry
 
 **Zweck:** Registry die abstrakte `{{PAL_*}}` Platzhalter auf provider-native Delegationssyntax mappt. Neu: Laufzeit-Platzhalter verwenden `<angle-brackets>` statt `{{}}` um LLM-Verwirrung bei Template-Substitution zu vermeiden.
 
@@ -785,7 +933,7 @@ delegation_syntax:
 - Alte Syntax: `{{agent}}`, `{{task}}` → Verwirrung bei LLM
 - Neue Syntax: `<agent>`, `<task>` → LLM erkennt korrekt als Platzhalter für Laufzeit-Substitution
 
-### 9.2 `config/provider-capabilities.yaml`
+### 10.2 `config/provider-capabilities.yaml`
 
 **Zweck:** Capability Matrix — dokumentiert welche Features jeder Provider unterstützt.
 
@@ -801,7 +949,7 @@ delegation_syntax:
 | `native_agent_tools` | string[] | Namen der nativen Agent-Tools |
 | `bootstrap_required` | boolean | Session-Bootstrap erforderlich |
 
-### 9.3 `config/provider-bootstrap.yaml`
+### 10.3 `config/provider-bootstrap.yaml`
 
 **Zweck:** Definiert Registrierungsmechanismus pro Provider.
 
@@ -813,7 +961,7 @@ delegation_syntax:
 | `api-based` | Gemini | `inject-bootstrap-instructions` in GEMINI.md |
 | `config-based` | Continue | `update-config` in `.continue/config.yaml` |
 
-### 9.4 `scripts/lib/delegation_syntax.py`
+### 10.4 `scripts/lib/delegation_syntax.py`
 
 **Klasse:** `DelegationSyntaxEngine`
 
@@ -856,7 +1004,7 @@ PLACEHOLDERS = {
 8. Return: bereinigter Content mit nativer Provider-Syntax
 ```
 
-### 9.5 `scripts/lib/bootstrap.py`
+### 10.5 `scripts/lib/bootstrap.py`
 
 **Klasse:** `BootstrapEngine`
 
@@ -897,7 +1045,7 @@ PLACEHOLDERS = {
 6. Nur bei Änderungen → Datei wird aktualisiert
 ```
 
-### 9.6 `templates/bootstrap/gemini-session-bootstrap.md`
+### 10.6 `templates/bootstrap/gemini-session-bootstrap.md`
 
 **Zweck:** Bootstrap-Template für Gemini/Antigravity Session-Start.
 
@@ -906,7 +1054,7 @@ PLACEHOLDERS = {
 - 4-Schritte-Workflow: Dateien einlesen → define_subagent → Orchestrator zuerst → Anfragen bearbeiten
 - Hinweise: Ephemere Registrierung, Version-Abhängigkeit von sync.py, Konsequenzen ohne Bootstrap
 
-### 9.7 Integration in `scripts/lib/agents.py`
+### 10.7 Integration in `scripts/lib/agents.py`
 
 **Stelle:** `_compose_agent()` Funktion, Zeile ~1082
 
@@ -928,20 +1076,20 @@ BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 
 ---
 
-## 10. A2A-Handoff-Protokoll
+## 11. A2A-Handoff-Protokoll
 
 > **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
 > **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
 > **Dokument:** `docs/concepts/a2a-handoff-protocol.md`
 > **Analyse:** `docs/concepts/a2a-best-practice-analysis.md`
 
-### 10.1 Prinzip: A2A als EINZIGES Format
+### 11.1 Prinzip: A2A als EINZIGES Format
 
 **A2A-Envelopes sind das einzige Format für Agent-zu-Agent-Daten.** Natural-Language-Prompts zwischen Agenten werden vollständig durch strukturierte Envelopes ersetzt. Dies eliminiert Context Loss, ermöglicht deterministische Validierung und schafft lückenloses Supersession-Tracking.
 
 Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Text-Block statt JSON — identisches Konzept, anderes Transport-Format.
 
-### 10.2 Kernkonzepte
+### 11.2 Kernkonzepte
 
 | Konzept | Beschreibung |
 |---------|-------------|
@@ -952,7 +1100,7 @@ Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Tex
 | **Supersession** | Version-Tracking mit `history[]`-Array für vollständige Revisionsketten |
 | **Contract** | Jede Route deklariert Schema + Extension + compact_mode in der Routing-Tabelle |
 
-### 10.3 A2A vs. viz-Debug — Separate Konzepte
+### 11.3 A2A vs. viz-Debug — Separate Konzepte
 
 Das A2A-Protokoll und der viz-Handshake sind **separate Systeme** mit loser Kopplung:
 
@@ -964,7 +1112,7 @@ Das A2A-Protokoll und der viz-Handshake sind **separate Systeme** mit loser Kopp
 
 **Lose Kopplung via `trace_context.viz_task_id`** — das einzige Feld das beide Systeme verbindet. Der A2A-Envelope funktioniert vollständig ohne viz, und viz funktioniert ohne A2A.
 
-### 10.4 Schema-Strategie: 1 Core + 4 Extensions + 1 SE
+### 11.4 Schema-Strategie: 1 Core + 4 Extensions + 1 SE
 
 ```
 schemas/handoffs/
@@ -979,7 +1127,7 @@ schemas/handoffs/
 
 Reduziert die Schema-Anzahl von 19 auf 6 (84% Routen-Abdeckung mit Core + Extensions).
 
-### 10.5 Orchestrator als Envelope-Fabrik
+### 11.5 Orchestrator als Envelope-Fabrik
 
 Der Orchestrator ist der primäre Envelope-Produzent:
 
@@ -991,7 +1139,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | PIPELINE | Verkettet Envelopes via `trace_parent` |
 | REPEAT_UNTIL | Managed Supersession-Ketten via `supersession.history[]` |
 
-### 10.6 Provider-Matrix: Transport-Format
+### 11.6 Provider-Matrix: Transport-Format
 
 | Provider | structured_handoff | handoff_format | Envelope-Transport |
 |----------|-------------------|----------------|-------------------|
@@ -1001,7 +1149,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | Continue | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
 | Copilot | `false` | `yaml_text_block` | YAML-Block im Prompt-Text |
 
-### 10.7 Token-Budget & Optimierungen
+### 11.7 Token-Budget & Optimierungen
 
 | Optimierung | Ersparnis | Status |
 |-------------|-----------|--------|
@@ -1011,7 +1159,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `compact_mode`-Flag zur Steuerung | — (schaltet #1) | ✓ Im Envelope |
 | viz.debug: false (default) | 30 Tokens/Handoff | ✓ In Config |
 
-### 10.8 Betroffene Artefakte
+### 11.8 Betroffene Artefakte
 
 | Artefakt | Änderung | Status |
 |----------|----------|--------|
@@ -1035,7 +1183,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `config/mcp-registry.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
 | `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
 
-### 10.9 Roadmap
+### 11.9 Roadmap
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -1044,7 +1192,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | 3 — Agent-Updates | Orchestrator-Envelope-Fabrik + handoff-Contracts + ideation, feature, developer, SE-Agenten | ✓ Abgeschlossen |
 | 4 — MCP & Tooling | MCP-Tools (resolve-handoff-schema, validate-handoff, resolve-handoff) + viz-Integration | ✓ Abgeschlossen |
 
-### 10.10 Handoff-Contracts in `config/role-defaults.yaml`
+### 11.10 Handoff-Contracts in `config/role-defaults.yaml`
 
 16 Rollen deklarieren A2A-Handoff-Contracts in ihrer `handoff:`-Sektion:
 
