@@ -1000,6 +1000,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/tier-presets":
             return self._handle_get_tier_presets()
 
+        if path == "/api/tier-presets/merged":
+            return self._handle_get_tier_presets_merged()
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1508,6 +1511,54 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_tier_presets_merged(self) -> None:
+        """Return merged tier presets: global + project-local.
+
+        Each preset carries a ``source`` field (``"global"`` or ``"project"``).
+        Project-local presets (from ``.meta-config/project.yaml`` →
+        ``tier-presets``) override global ones with the same key. The Admin UI
+        uses this endpoint to surface both sets in tier-preset dropdowns and
+        the tier-presets matrix view.
+        """
+        try:
+            # 1. Load global tier presets (mirrors _handle_get_tier_presets).
+            global_path = self.__class__.root / "config" / "tier-presets.yaml"
+            if not (self.__class__.root / "config").exists():
+                global_path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            global_data: dict = {}
+            if global_path.exists():
+                global_data = yaml.safe_load(global_path.read_text(encoding="utf-8")) or {}
+
+            # 2. Load project-local tier-presets from .meta-config/project.yaml.
+            project_data: dict = {}
+            try:
+                project_cfg = self.__class__.config_manager.read("project") or {}
+                if isinstance(project_cfg, dict):
+                    raw = project_cfg.get("tier-presets") or {}
+                    if isinstance(raw, dict):
+                        project_data = raw
+            except Exception:
+                project_data = {}
+
+            # 3. Merge — global first, project overrides per-key with source tag.
+            merged: dict = {}
+            for key, val in (global_data or {}).items():
+                if not isinstance(val, dict):
+                    continue
+                entry = dict(val)
+                entry["source"] = "global"
+                merged[key] = entry
+            for key, val in (project_data or {}).items():
+                if not isinstance(val, dict):
+                    continue
+                entry = dict(val)
+                entry["source"] = "project"
+                merged[key] = entry
+
+            return self._send_json(merged)
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 

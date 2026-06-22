@@ -157,8 +157,17 @@ def resolve_model(
             log.debug(f"{provider}/{role}", f"SE Focus applied, tier upgraded to: {base_tier}")
 
     # C1 fix: presets are top-level keys in tier-presets.yaml, not nested under "presets:"
-    presets = load_tier_presets(agent_meta_root)
-    preset_matrix = presets.get(preset_name, {}).get("mapping", {})
+    # Merge: project-local presets (project_config["tier-presets"]) override global ones.
+    global_presets = load_tier_presets(agent_meta_root)
+    project_presets = project_config.get("tier-presets", {}) or {}
+    if isinstance(project_presets, dict) and preset_name in project_presets:
+        preset_matrix = project_presets[preset_name].get("mapping", {}) or {}
+        if log:
+            log.debug(f"{provider}/{role}", f"Preset '{preset_name}' resolved from project-local tier-presets")
+    elif preset_name in global_presets:
+        preset_matrix = global_presets.get(preset_name, {}).get("mapping", {}) or {}
+    else:
+        preset_matrix = {}
 
     mapped_tier = preset_matrix.get(base_tier, base_tier)
     if log and mapped_tier != base_tier:

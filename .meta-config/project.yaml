@@ -320,11 +320,21 @@ quality-pipelines:
 
 model-overrides:
   Opencode:
-    developer: "opencode-go/deepseek-v4-pro"
-    senior-developer: "opencode-go/kimi-k2.7-code"
+    developer: "opencode/deepseek-v4-pro"
+    senior-developer: "opencode/kimi-k2.6"
 
 reflection-pairs:
   overrides:
     dev-review-loop:
       max_iterations: 5
       enabled: true
+
+# tier-presets:  # Optional: project-local presets override global tier-presets.yaml
+#   MyCustom:
+#     description: "Project-specific preset"
+#     mapping:
+#       nano: nano
+#       fast: fast
+#       balanced: balanced
+#       powerful: powerful
+#       max: max
