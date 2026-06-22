@@ -4676,17 +4676,34 @@ async function viewTierPresets() {
     saveBtn.textContent = "Saving...";
     try {
       const newPresetsData = JSON.parse(JSON.stringify(tierPresetsData));
-      presetsWrap.querySelectorAll("tr[data-preset-id]").forEach(tr => {
+      // Collect global (all-providers) tier values
+      presetsWrap.querySelectorAll("tr[data-preset-id][data-row-kind='global']").forEach(tr => {
         const pid = tr.dataset.presetId;
         if (!newPresetsData[pid]) return;
-        const descInput = tr.querySelector(".preset-desc");
-        if (descInput) newPresetsData[pid].description = descInput.value;
         newPresetsData[pid].tiers = {};
         delete newPresetsData[pid].mapping;
+        delete newPresetsData[pid].source;
         TIERS.forEach(comp => {
           const inp = tr.querySelector(`.preset-tier-${comp}`);
-          if (inp && inp.value) newPresetsData[pid].tiers[comp] = inp.value;
+          if (inp && inp.value.trim()) newPresetsData[pid].tiers[comp] = inp.value.trim();
         });
+      });
+      // Collect per-provider override rows
+      presetsWrap.querySelectorAll("tr[data-preset-id][data-row-kind='provider']").forEach(tr => {
+        const pid = tr.dataset.presetId;
+        const pName = tr.dataset.providerName;
+        if (!newPresetsData[pid] || !pName) return;
+        const provTiers = {};
+        TIERS.forEach(comp => {
+          const inp = tr.querySelector(`.preset-tier-${comp}`);
+          if (inp && inp.value.trim()) provTiers[comp] = inp.value.trim();
+        });
+        if (Object.keys(provTiers).length > 0) {
+          if (!newPresetsData[pid].providers) newPresetsData[pid].providers = {};
+          newPresetsData[pid].providers[pName] = { tiers: provTiers };
+        } else if (newPresetsData[pid].providers) {
+          delete newPresetsData[pid].providers[pName];
+        }
       });
       await api.post("/api/tier-presets/update", newPresetsData);
       toast("Saved", "success");
@@ -4780,11 +4797,14 @@ async function viewTierPresets() {
   };
 
   const renderEdit = () => {
+    const providersMap = aiProvidersData.providers || aiProvidersData || {};
+    const providerNames = Object.keys(providersMap).filter(p => providersMap[p] && providersMap[p]["model-tiers"]);
+
     const table = el("table", { class: "data tier-presets-table" });
     const thead = el("thead");
     thead.appendChild(el("tr", {}, [
       el("th", {}, ["Preset"]),
-      el("th", {}, ["Description"]),
+      el("th", {}, ["Provider"]),
       ...TIERS.map(t => el("th", {}, [t]))
     ]));
     table.appendChild(thead);
@@ -4802,28 +4822,24 @@ async function viewTierPresets() {
     const tbody = el("tbody");
     Object.keys(tierPresetsData).forEach(presetId => {
       const preset = tierPresetsData[presetId] || {};
-      const currentTiers = preset.tiers || {};
+      const globalTiers = preset.tiers || {};
       const isDefault = presetId === "Normal";
+      const totalRows = 1 + providerNames.length;
 
-      const tr = el("tr");
-      tr.dataset.presetId = presetId;
-      if (isDefault) tr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
+      // --- Global row (all providers default) ---
+      const globalTr = el("tr");
+      globalTr.dataset.presetId = presetId;
+      globalTr.dataset.rowKind = "global";
+      if (isDefault) globalTr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
 
-      const presetTd = el("td", {});
+      const presetTd = el("td", { rowspan: String(totalRows) });
       presetTd.appendChild(el("strong", {}, [presetId]));
       if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
-      if (preset.source === "project") {
-        presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
-      }
-      tr.appendChild(presetTd);
+      if (preset.source === "project") presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+      if (preset.description) presetTd.appendChild(el("div", { class: "muted", style: "font-size:0.85em; margin-top:4px;" }, [preset.description]));
+      globalTr.appendChild(presetTd);
 
-      const descInput = el("input", {
-        type: "text",
-        class: "preset-desc",
-        value: preset.description || "",
-        style: "width: 100%; box-sizing: border-box;"
-      });
-      tr.appendChild(el("td", {}, [descInput]));
+      globalTr.appendChild(el("td", {}, [el("span", { class: "muted", style: "font-size:0.85em;" }, ["All Providers (default)"])]));
 
       TIERS.forEach(comp => {
         const td = el("td", {});
@@ -4831,15 +4847,48 @@ async function viewTierPresets() {
           type: "text",
           list: "tier-presets-model-list",
           class: `preset-tier-${comp}`,
-          value: currentTiers[comp] || "",
+          value: globalTiers[comp] || "",
           placeholder: "model id…",
           style: "width:100%; box-sizing:border-box;"
         });
         td.appendChild(input);
-        tr.appendChild(td);
+        globalTr.appendChild(td);
+      });
+      tbody.appendChild(globalTr);
+
+      // --- Per-provider override rows ---
+      providerNames.forEach(pName => {
+        const providerOverrideTiers = ((preset.providers || {})[pName] || {}).tiers || {};
+        const provTr = el("tr");
+        provTr.dataset.presetId = presetId;
+        provTr.dataset.rowKind = "provider";
+        provTr.dataset.providerName = pName;
+        if (isDefault) provTr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.04)";
+
+        provTr.appendChild(el("td", {}, [el("span", { class: "mono", style: "color: var(--muted);" }, [`↳ ${pName}`])]));
+
+        TIERS.forEach(comp => {
+          const td = el("td", {});
+          const fallback = globalTiers[comp] || "";
+          const short = fallback.includes("/") ? fallback.split("/").pop() : fallback;
+          const input = el("input", {
+            type: "text",
+            list: "tier-presets-model-list",
+            class: `preset-tier-${comp}`,
+            value: providerOverrideTiers[comp] || "",
+            placeholder: short ? `(${short})` : "override…",
+            style: "width:100%; box-sizing:border-box; opacity:0.85;"
+          });
+          td.appendChild(input);
+          provTr.appendChild(td);
+        });
+        tbody.appendChild(provTr);
       });
 
-      tbody.appendChild(tr);
+      // Visual separator row between presets.
+      const sep = el("tr");
+      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border); padding: 0;" }));
+      tbody.appendChild(sep);
     });
 
     table.appendChild(tbody);
@@ -4935,6 +4984,7 @@ async function init() {
   router.register("/config/dod-presets",       viewDodPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
+  router.register("/config-audit",             viewConfigAudit);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/agents",    viewAgentTemplates);

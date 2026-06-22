@@ -1,7 +1,7 @@
 """Roles config loading and model/memory/permissionMode resolution."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from .io import _load_yaml_or_json
 
@@ -95,7 +95,7 @@ def resolve_model(
     agent_meta_root: Path,
     provider: str = "Claude",
     provider_config: dict | None = None,
-    log: "SyncLog" | None = None,
+    log: Optional["SyncLog"] = None,
 ) -> str:
     """Resolve the model ID for a role and provider using tier presets and registry."""
     pc = provider_config or {}
