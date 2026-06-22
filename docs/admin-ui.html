@@ -3849,12 +3849,32 @@ async function viewProjectProviderTierOverrides() {
   const specificModels = modelsRes.models || [];
   const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
-  const datalist = el("datalist", { id: "global-model-list-tier" });
-  for (const m of specificModels) {
-    const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
-    datalist.appendChild(el("option", { value: m.id }, [label]));
-  }
-  wrap.appendChild(datalist);
+  // Per-provider datalists keyed by framework provider name (e.g. "Claude", "Gemini")
+  // Derive registry provider names from model_tiers values so the filter works
+  tierProviders.forEach(tp => {
+    const tierVals = Object.values(tp.model_tiers || {}).filter(Boolean);
+    const registryProvs = new Set();
+    tierVals.forEach(modelId => {
+      if (modelId.includes("/")) {
+        const prefix = modelId.split("/")[0];
+        specificModels.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
+      } else {
+        const match = specificModels.find(m => m.id === modelId);
+        if (match) registryProvs.add(match.provider);
+      }
+    });
+    const candidates = registryProvs.size > 0
+      ? specificModels.filter(m => registryProvs.has(m.provider))
+      : specificModels;
+    const dlId = `pto-dl-${tp.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    let dl = document.getElementById(dlId);
+    if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+    else { dl.innerHTML = ""; }
+    candidates.forEach(m => {
+      const label = m.name ? `${m.name} (${m.provider})` : m.id;
+      dl.appendChild(el("option", { value: m.id }, [label]));
+    });
+  });
 
   // Flatten existing
   const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
@@ -3911,7 +3931,8 @@ async function viewProjectProviderTierOverrides() {
       tr.appendChild(el("td", {}, [tierSel]));
 
       // Model input
-      const modelInp = el("input", { type: "text", list: "global-model-list-tier", placeholder: "Preset Standard (Kein Override)" });
+      const dlId = row.provider ? `pto-dl-${row.provider.replace(/[^a-zA-Z0-9]/g, "-")}` : "";
+      const modelInp = el("input", { type: "text", ...(dlId ? { list: dlId } : {}), placeholder: "Preset Standard (Kein Override)" });
       if (row.model) modelInp.value = row.model;
       modelInp.addEventListener("change", () => { row.model = modelInp.value; });
       tr.appendChild(el("td", {}, [modelInp]));
@@ -4809,15 +4830,33 @@ async function viewTierPresets() {
     ]));
     table.appendChild(thead);
 
-    // Build global datalist for model autocomplete
-    const existingDl = document.getElementById("tier-presets-model-list");
-    if (existingDl) existingDl.remove();
-    const datalist = el("datalist", { id: "tier-presets-model-list" });
-    modelsData.forEach(m => {
-      const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
-      datalist.appendChild(el("option", { value: m.id }, [label]));
+    // Per-provider datalists — map framework provider name → registry provider names
+    // via model-tier values (e.g. "claude-sonnet-4-6" → registry provider "anthropic")
+    providerNames.forEach(pName => {
+      const pData = providersMap[pName] || {};
+      const tierVals = Object.values(pData["model-tiers"] || {}).filter(Boolean);
+      const registryProvs = new Set();
+      tierVals.forEach(modelId => {
+        if (modelId.includes("/")) {
+          const prefix = modelId.split("/")[0];
+          modelsData.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
+        } else {
+          const match = modelsData.find(m => m.id === modelId);
+          if (match) registryProvs.add(match.provider);
+        }
+      });
+      const candidates = registryProvs.size > 0
+        ? modelsData.filter(m => registryProvs.has(m.provider))
+        : modelsData;
+      const dlId = `tp-dl-${pName.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      let dl = document.getElementById(dlId);
+      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+      else { dl.innerHTML = ""; }
+      candidates.forEach(m => {
+        const label = m.name ? `${m.name} (${m.provider})` : m.id;
+        dl.appendChild(el("option", { value: m.id }, [label]));
+      });
     });
-    presetsWrap.appendChild(datalist);
 
     const tbody = el("tbody");
     Object.keys(tierPresetsData).forEach(presetId => {
@@ -4845,7 +4884,6 @@ async function viewTierPresets() {
         const td = el("td", {});
         const input = el("input", {
           type: "text",
-          list: "tier-presets-model-list",
           class: `preset-tier-${comp}`,
           value: globalTiers[comp] || "",
           placeholder: "model id…",
@@ -4873,7 +4911,7 @@ async function viewTierPresets() {
           const short = fallback.includes("/") ? fallback.split("/").pop() : fallback;
           const input = el("input", {
             type: "text",
-            list: "tier-presets-model-list",
+            list: `tp-dl-${pName.replace(/[^a-zA-Z0-9]/g, "-")}`,
             class: `preset-tier-${comp}`,
             value: providerOverrideTiers[comp] || "",
             placeholder: short ? `(${short})` : "override…",

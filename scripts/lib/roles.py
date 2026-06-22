@@ -170,7 +170,9 @@ def resolve_model(
 
     # --- New format: tiers: {tier → model_id} direct ---
     if "tiers" in preset_data:
-        direct_model = preset_data["tiers"].get(base_tier, "")
+        # Provider-specific tier within preset takes priority over global tiers
+        provider_preset_tiers = (preset_data.get("providers") or {}).get(provider, {}).get("tiers") or {}
+        direct_model = provider_preset_tiers.get(base_tier) or preset_data["tiers"].get(base_tier, "")
         if direct_model:
             # provider-tier-overrides take priority over preset tiers
             pto = project_config.get("provider-tier-overrides", {})
@@ -179,8 +181,9 @@ def resolve_model(
                 if log:
                     log.debug(f"{provider}/{role}", f"Tier '{base_tier}' explicitly overriden for provider '{provider}': {resolved}")
                 return resolved
+            source = f"provider '{provider}'" if provider_preset_tiers.get(base_tier) else "global fallback"
             if log:
-                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved directly from preset '{preset_name}': {direct_model}")
+                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved from preset '{preset_name}' ({source}): {direct_model}")
             return direct_model
 
     # --- Old format: mapping: {tier → tier} + provider model-tiers ---

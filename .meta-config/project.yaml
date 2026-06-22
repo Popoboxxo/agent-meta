@@ -320,8 +320,8 @@ quality-pipelines:
 
 model-overrides:
   Opencode:
-    developer: "opencode/deepseek-v4-pro"
-    senior-developer: "opencode/kimi-k2.6"
+    developer: "opencode-go/qwen3.7-plus"
+    senior-developer: "opencode-go/kimi-k2.7-code"
 
 reflection-pairs:
   overrides:

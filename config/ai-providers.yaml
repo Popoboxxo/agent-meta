@@ -110,21 +110,20 @@ providers:
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
     orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode model IDs — merged from Zen (opencode/) and Go (opencode-go/) catalogs.
-    # Full lists: https://opencode.ai/zen and https://opencode.ai/zen/go
+    # opencode model IDs — sourced from the Go catalog (opencode-go/).
+    # Full list: https://opencode.ai/zen/go
     model-tiers:
-      nano:     opencode/deepseek-v4-flash-free   # Zen free tier
-      fast:     opencode/deepseek-v4-flash        # Zen
-      balanced: opencode/qwen3.6-plus             # Zen
-      powerful: opencode/kimi-k2.6                # Zen
-      max:      opencode-go/kimi-k2.7-code        # Go (k2.7 > k2.6 and deepseek-v4-pro)
+      nano:     opencode-go/deepseek-v4-flash     # Go (cheapest, high-throughput)
+      fast:     opencode-go/deepseek-v4-flash     # Go (quick ops)
+      balanced: opencode-go/qwen3.7-plus          # Go (default workhorse)
+      powerful: opencode-go/kimi-k2.6             # Go (complex reasoning)
+      max:      opencode-go/kimi-k2.7-code        # Go (top-tier code model)
     model-aliases:
-      flash-free: opencode/deepseek-v4-flash-free
-      flash:      opencode/deepseek-v4-flash
-      qwen:       opencode/qwen3.6-plus
-      kimi:       opencode/kimi-k2.6
-      kimi-max:   opencode-go/kimi-k2.7-code
-      deepseek:   opencode/deepseek-v4-pro
+      flash:      opencode-go/deepseek-v4-flash
+      qwen:       opencode-go/qwen3.7-plus
+      kimi:       opencode-go/kimi-k2.6
+      kimi-code:  opencode-go/kimi-k2.7-code
+      qwen-max:   opencode-go/qwen3.7-max
 
   Continue:
     agents_dir: .continue/agents
