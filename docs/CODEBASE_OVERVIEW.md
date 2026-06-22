@@ -487,9 +487,9 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 
 **Zweck:** Verwaltung von dynamischen Modellen und Tiers über eine Preset-Matrix und Keyless Discovery.
 - **Keyless Discovery Architecture:** `scripts/lib/model_discovery.py` nutzt die öffentliche OpenRouter API (`https://openrouter.ai/api/v1/models`) als globalen Proxy. Dies ermöglicht das Abrufen von Echtzeit-Modelldaten (Anthropic, Gemini, Open-Source) und -Preisen (`pricing.prompt`, `pricing.completion`) völlig **ohne** lokale API-Keys.
-- **Provider Mapping (Go vs. Zen):** Offene Modelle (z.B. Llama, Qwen, Mistral) werden explizit als `opencode-go` klassifiziert, während Enterprise/Closed-Source Modelle als `opencode-zen` abgebildet werden.
+- **Provider Mapping (OpenCode Zen):** OpenCode-Modelle werden vom keyless Zen-Endpoint (`https://opencode.ai/zen/v1/models`) bezogen und als `opencode-zen` klassifiziert. IDs werden als `opencode/<raw_id>` namespaced.
 - **Model Registry (`model-registry.json`):** Cacht die dynamisch von den Providern/OpenRouter abgerufenen Modelle.
-- **Pricing Overlay (`config/pricing-overlay.yaml`):** Manueller Überschreib-Mechanismus für Preise. API-Preise werden bevorzugt, außer das Overlay definiert einen eigenen Preis (z.B. 0.00$ für Go-Abonnenten). Preise können direkt in der Admin-UI editiert werden.
+- **Pricing Overlay (`config/pricing-overlay.yaml`):** Manueller Überschreib-Mechanismus für Preise. API-Preise werden bevorzugt, außer das Overlay definiert einen eigenen Preis (z.B. 0.00$ für Zen-Subscriptions). Preise können direkt in der Admin-UI editiert werden.
 - **Tier-Presets Matrix (`project.yaml`):** Mappt dynamisch Agenten-Tiers (nano, fast, balanced, powerful, max) auf konkrete Modelle, basierend auf dem eingestellten Preset (z.B. cheap, normal, advanced, expensive). Systems-Engineering (SE) Rollen werden zusätzlich über ein SE-spezifisches Prefix künstlich aufgewertet.
 - **UI Transparenz:** Die Admin-UI visualisiert die Datenherkunft mit `[API]`, `[Overlay]` und `[Calc]` Badges und bietet direkte Reference-Links zu den Modell-Providern.
 

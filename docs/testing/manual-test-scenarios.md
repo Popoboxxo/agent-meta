@@ -141,7 +141,7 @@ Jeder Provider bekommt eigene Agent-Dateien, Rules und Konfigurationen in separa
 2. Prüfe ob `.opencode/agents/` im Output erscheint
 3. Öffne eine generierte Datei z.B. `.opencode/agents/developer.md` (nach Sync)
 4. Prüfe das Frontmatter-Format: `name:`, `description:`, `mode: subagent`
-5. Prüfe: `model:` enthält Opencode-spezifische Modell-ID (z.B. `opencode-go/deepseek-v4-flash`)
+5. Prüfe: `model:` enthält Opencode-spezifische Modell-ID (z.B. `opencode/deepseek-v4-flash`)
 6. Prüfe: `permission:`-Block ist vorhanden mit Tool-Berechtigungen
 
 **Erwartetes Ergebnis:**
@@ -1928,11 +1928,11 @@ für jede Delegation. 5 Tiers: `nano` (ultra-schnell), `fast` (günstig), `balan
    ```yaml
    model-overrides:
      Opencode:
-       developer: opencode-go/kimi-k2.5
+       developer: opencode/kimi-k2.6
    ```
 2. Führe `python scripts/sync.py` aus
 3. Öffne `.opencode/agents/developer.md`
-4. Prüfe: `model: opencode-go/kimi-k2.5` (override)
+4. Prüfe: `model: opencode/kimi-k2.6` (override)
 5. Öffne `.opencode/agents/documenter.md`
 6. Prüfe: Default-Modell aus role-defaults (kein override)
 7. Entferne den model-override Eintrag und sync
