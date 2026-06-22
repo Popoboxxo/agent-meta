@@ -4490,12 +4490,6 @@ async function viewProviderTiers() {
     const obsoleteDl = document.getElementById("global-tier-model-list");
     if (obsoleteDl) obsoleteDl.remove();
 
-    // Provider grouping: maps individual providers to their group name.
-    const PROVIDER_GROUPS = {
-      "Opencode": "OpenCode Platform",
-      "OpencodeGo": "OpenCode Platform",
-    };
-
     const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
 
     const table = el("table", { class: "data provider-tiers-table" });
@@ -4506,104 +4500,62 @@ async function viewProviderTiers() {
     const tbody = el("tbody");
     const providersList = aiProvidersData.providers ? Object.keys(aiProvidersData.providers) : (Object.keys(aiProvidersData).length > 0 ? Object.keys(aiProvidersData) : uniqueProviders);
 
-    // Build group structure: group -> [providers]
-    const groupOrder = [];
-    const groupedRows = {};
+    // Render each provider as a single row (no grouping — providers are 1:1 now).
     providersList.forEach(p => {
-      const grp = PROVIDER_GROUPS[p] || p;
-      if (!groupedRows[grp]) {
-        groupedRows[grp] = [];
-        groupOrder.push(grp);
-      }
-      groupedRows[grp].push(p);
-    });
+      const tr = el("tr");
+      tr.dataset.provider = p;
 
-    // Render groups and their members
-    groupOrder.forEach(grp => {
-      const members = groupedRows[grp];
-      const isGroup = members.length > 1;
+      const provDisplayName = displayNameMap[p] || p;
+      const nameCell = el("td", {});
+      nameCell.appendChild(el("strong", {}, [provDisplayName]));
+      tr.appendChild(nameCell);
 
-      // Add group header row if this is a multi-member group
-      if (isGroup) {
-        const hdr = el("tr", { style: "background: var(--bg-secondary); font-weight: 600;" });
-        const hdrTd = el("td", { colspan: String(1 + 5), style: "padding: 6px 12px; font-size: 0.9em; color: var(--text-muted);" });
-        hdrTd.textContent = "▸ " + grp;
-        hdr.appendChild(hdrTd);
-        tbody.appendChild(hdr);
-      }
+      const tiers = ["nano", "fast", "balanced", "powerful", "max"];
+      const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
+      const tData = pData["model-tiers"] || {};
 
-      // Render individual provider rows within the group
-      members.forEach(p => {
-        const tr = el("tr");
-        tr.dataset.provider = p;
+      // Build per-provider datalist filtered to relevant registry providers.
+      // inferRegistryProviders handles mixed-prefix tier values automatically
+      // (e.g. Opencode with both opencode/ and opencode-go/ tiers).
+      const registryProviders = inferRegistryProviders(pData, modelsData);
 
-        // Provider name cell: indent if it's part of a group
-        const provDisplayName = displayNameMap[p] || p;
-        const nameCell = el("td", {});
-        if (isGroup) {
-          const nameSpan = el("span", { style: "padding-left: 16px;" });
-          nameSpan.textContent = provDisplayName;
-          nameCell.appendChild(nameSpan);
-        } else {
-          nameCell.appendChild(el("strong", {}, [provDisplayName]));
-        }
-        tr.appendChild(nameCell);
+      const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      let dl = document.getElementById(dlId);
+      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+      else { dl.innerHTML = ""; }
 
-        const tiers = ["nano", "fast", "balanced", "powerful", "max"];
-        const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
-        const tData = pData["model-tiers"] || {};
+      // If we identified registry providers from existing tier values, use them.
+      // Otherwise fall back to all active models so free-text input still gets suggestions.
+      const candidates = registryProviders.length > 0
+        ? modelsData.filter(m => registryProviders.includes(m.provider))
+        : modelsData;
 
-        // Build per-provider datalist filtered to relevant registry providers.
-        // For grouped providers, also include models from other group members.
-        let registryProviders = inferRegistryProviders(pData, modelsData);
-        if (isGroup && registryProviders.length === 0) {
-          // If this group member has no explicit registry providers yet,
-          // include all registry providers from all group members
-          members.forEach(member => {
-            const memberData = aiProvidersData.providers ? aiProvidersData.providers[member] : (aiProvidersData[member] || {});
-            const memberRegistryProviders = inferRegistryProviders(memberData, modelsData);
-            registryProviders = [...new Set([...registryProviders, ...memberRegistryProviders])];
-          });
-        }
-
-        const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
-        let dl = document.getElementById(dlId);
-        if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
-        else { dl.innerHTML = ""; }
-
-        // If we identified registry providers from existing tier values, use them.
-        // Otherwise fall back to all active models so free-text input still gets suggestions.
-        const candidates = registryProviders.length > 0
-          ? modelsData.filter(m => registryProviders.includes(m.provider))
-          : modelsData;
-
-        const addedIds = new Set();
-        candidates.forEach(m => {
-          dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
-          addedIds.add(m.id);
-        });
-
-        // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
-        Object.values(tData).forEach(val => {
-          if (val && !addedIds.has(val)) {
-            dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
-            addedIds.add(val);
-          }
-        });
-
-        tiers.forEach(t => {
-          const td = el("td", {});
-          const val = tData[t] || "";
-          if (editMode) {
-            const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
-            td.appendChild(input);
-          } else {
-            td.appendChild(el("span", { class: "mono" }, [val || "-"]));
-          }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
+      const addedIds = new Set();
+      candidates.forEach(m => {
+        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+        addedIds.add(m.id);
       });
+
+      // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
+      Object.values(tData).forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
+          addedIds.add(val);
+        }
+      });
+
+      tiers.forEach(t => {
+        const td = el("td", {});
+        const val = tData[t] || "";
+        if (editMode) {
+          const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
+          td.appendChild(input);
+        } else {
+          td.appendChild(el("span", { class: "mono" }, [val || "-"]));
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
     });
 
     table.appendChild(tbody);
