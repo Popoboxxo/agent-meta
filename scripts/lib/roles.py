@@ -137,7 +137,7 @@ def resolve_model(
 
     # If it's not a known tier (e.g. a hardcoded model id), fallback to old logic
     if tier_or_id and tier_or_id not in _KNOWN_TIERS:
-        resolved = _resolve_tier_to_model(tier_or_id, provider, pc)
+        resolved = _resolve_tier_to_model(tier_or_id, provider, provider_config)
         if log:
             log.debug(f"{provider}/{role}", f"Tier '{tier_or_id}' resolved directly to: {resolved}")
         return resolved
@@ -198,7 +198,7 @@ def resolve_model(
         return resolved
 
     # Resolve tier to provider-specific model ID
-    resolved = _resolve_tier_to_model(mapped_tier, provider, pc)
+    resolved = _resolve_tier_to_model(mapped_tier, provider, provider_config)
     if log:
         log.debug(f"{provider}/{role}", f"Tier '{mapped_tier}' resolved to: {resolved}")
     return resolved
