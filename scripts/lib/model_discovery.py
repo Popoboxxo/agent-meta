@@ -1,108 +1,223 @@
+"""Model discovery for the agent-meta registry.
+
+Fetches models from external endpoints (OpenRouter, OpenCode Zen) and writes a
+merged, deduplicated registry to ``config/generated/model-registry.json``.
+
+Design notes:
+    * Provider attribution uses the **exact prefix** of the model id
+      (``provider/<name>``). No bucket heuristics are applied — the prefix is
+      the provider.
+    * Hard exclusion (blacklist) is sourced from ``config/model-curation.yaml``
+      (see :mod:`scripts.lib.curation`), not from ``pricing-overlay.yaml``.
+    * Network failures are non-fatal: each fetcher returns ``[]`` on error so
+      sync runs degrade gracefully in offline environments.
+"""
+
 import json
-import os
 import logging
+import os
 import urllib.request
-import yaml
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-OPENCODE_GO_MODELS = [
-    {"id": "opencode-go/glm-5.2", "name": "glm-5.2", "provider": "opencode-go", "input_cost_api": 1.40, "output_cost_api": 4.40},
-    {"id": "opencode-go/glm-5.1", "name": "glm-5.1", "provider": "opencode-go", "input_cost_api": 1.40, "output_cost_api": 4.40},
-    {"id": "opencode-go/kimi-k2.7-code", "name": "kimi-k2.7-code", "provider": "opencode-go", "input_cost_api": 0.95, "output_cost_api": 4.00},
-    {"id": "opencode-go/kimi-k2.6", "name": "kimi-k2.6", "provider": "opencode-go", "input_cost_api": 0.95, "output_cost_api": 4.00},
-    {"id": "opencode-go/mimo-v2.5", "name": "mimo-v2.5", "provider": "opencode-go", "input_cost_api": 0.14, "output_cost_api": 0.28},
-    {"id": "opencode-go/mimo-v2.5-pro", "name": "mimo-v2.5-pro", "provider": "opencode-go", "input_cost_api": 1.74, "output_cost_api": 3.48},
-    {"id": "opencode-go/minimax-m3", "name": "minimax-m3", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
-    {"id": "opencode-go/minimax-m2.7", "name": "minimax-m2.7", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
-    {"id": "opencode-go/minimax-m2.5", "name": "minimax-m2.5", "provider": "opencode-go", "input_cost_api": 0.30, "output_cost_api": 1.20},
-    {"id": "opencode-go/qwen3.7-max", "name": "qwen3.7-max", "provider": "opencode-go", "input_cost_api": 2.50, "output_cost_api": 7.50},
-    {"id": "opencode-go/qwen3.7-plus", "name": "qwen3.7-plus", "provider": "opencode-go", "input_cost_api": 0.40, "output_cost_api": 1.60},
-    {"id": "opencode-go/qwen3.6-plus", "name": "qwen3.6-plus", "provider": "opencode-go", "input_cost_api": 0.50, "output_cost_api": 3.00},
-    {"id": "opencode-go/deepseek-v4-pro", "name": "deepseek-v4-pro", "provider": "opencode-go", "input_cost_api": 1.74, "output_cost_api": 3.48},
-    {"id": "opencode-go/deepseek-v4-flash", "name": "deepseek-v4-flash", "provider": "opencode-go", "input_cost_api": 0.14, "output_cost_api": 0.28},
-]
+OPENROUTER_URL = "https://openrouter.ai/api/v1/models"
+OPENCODE_ZEN_URL = "https://opencode.ai/zen/v1/models"
+HTTP_TIMEOUT = 20
 
-def fetch_openrouter_models(excluded_models=None) -> List[Dict[str, Any]]:
-    if excluded_models is None:
-        excluded_models = []
-    models = []
+# A browser-like User-Agent is required: opencode.ai returns HTTP 403 for the
+# default urllib agent. OpenRouter works without it but is sent the same header
+# for consistency and robustness.
+HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (agent-meta model-discovery)"}
+
+
+def fetch_openrouter_models(
+    blacklist: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch models from the keyless OpenRouter API.
+
+    The provider attribution is the exact prefix before the first ``/`` in the
+    model id (e.g. ``qwen/qwen3-coder`` → provider ``qwen``). No bucket
+    heuristics are applied; the prefix is authoritative.
+
+    Args:
+        blacklist: Optional list of model ids to exclude from the result.
+
+    Returns:
+        List of model dicts. Empty list on any network or parse error.
+    """
+    if blacklist is None:
+        blacklist = []
+    blacklist_set = set(blacklist)
+    models: List[Dict[str, Any]] = []
     try:
-        req = urllib.request.Request("https://openrouter.ai/api/v1/models")
-        with urllib.request.urlopen(req, timeout=20) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            
-            for m in data.get("data", []):
-                model_id = m.get("id", "")
-                if model_id in excluded_models:
-                    continue
-                model_name = m.get("name") or model_id
-                
-                if model_id.startswith("anthropic/"):
-                    provider = "anthropic"
-                elif model_id.startswith("google/"):
-                    provider = "gemini"
-                elif model_id.startswith("openai/"):
-                    provider = "openai"
-                else:
-                    provider = "opencode-go"
-                
-                pricing = m.get("pricing", {})
-                
-                try:
-                    input_cost = float(pricing.get("prompt", 0)) * 1000000
-                except (ValueError, TypeError):
-                    input_cost = 0.0
-                    
-                try:
-                    output_cost = float(pricing.get("completion", 0)) * 1000000
-                except (ValueError, TypeError):
-                    output_cost = 0.0
-                
-                models.append({
-                    "id": model_id,
-                    "name": model_name,
-                    "provider": provider,
-                    "input_cost_api": input_cost,
-                    "output_cost_api": output_cost,
-                    "tier": "Standard" # Fallback if needed by UI
-                })
+        req = urllib.request.Request(OPENROUTER_URL, headers=HTTP_HEADERS)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        for m in data.get("data", []):
+            model_id = m.get("id", "")
+            if not model_id or "/" not in model_id:
+                continue
+            if model_id in blacklist_set:
+                continue
+
+            provider = model_id.split("/", 1)[0]
+            model_name = m.get("name") or model_id
+
+            pricing = m.get("pricing", {}) or {}
+            try:
+                input_cost = float(pricing.get("prompt", 0)) * 1_000_000
+            except (ValueError, TypeError):
+                input_cost = 0.0
+            try:
+                output_cost = float(pricing.get("completion", 0)) * 1_000_000
+            except (ValueError, TypeError):
+                output_cost = 0.0
+
+            context_length = m.get("context_length")
+
+            models.append({
+                "id": model_id,
+                "name": model_name,
+                "provider": provider,
+                "input_cost_api": input_cost,
+                "output_cost_api": output_cost,
+                "context_length": context_length,
+                "tier": "Standard",  # Fallback if needed by UI
+            })
     except Exception as e:
-        logger.error(f"Failed to fetch OpenRouter models: {e}")
+        logger.error(f"fetch_openrouter_models failed: {e}")
+        return []
     return models
 
-def discover_models() -> Dict[str, Any]:
-    logger.info("Discovering models from OpenRouter...")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
-    pricing_path = os.path.join(project_root, 'config', 'pricing-overlay.yaml')
-    
-    excluded_models = []
+
+def fetch_opencode_zen_models(
+    blacklist: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch models from the OpenCode Zen endpoint.
+
+    The endpoint is keyless and returns a ``data[]`` array of model objects.
+    Registry ids are namespaced as ``opencode/<raw_id>`` to keep them
+    distinguishable from OpenRouter ids.
+
+    Args:
+        blacklist: Optional list of model ids (post-namespacing) to exclude.
+
+    Returns:
+        List of model dicts. Empty list on any network or parse error.
+    """
+    if blacklist is None:
+        blacklist = []
+    blacklist_set = set(blacklist)
+    models: List[Dict[str, Any]] = []
     try:
-        if os.path.exists(pricing_path):
-            with open(pricing_path, 'r', encoding='utf-8') as f:
-                pricing_data = yaml.safe_load(f) or {}
-                excluded_models = pricing_data.get('excluded_models', [])
+        req = urllib.request.Request(OPENCODE_ZEN_URL, headers=HTTP_HEADERS)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        for m in data.get("data", []):
+            raw_id = m.get("id", "")
+            if not raw_id:
+                continue
+            namespaced_id = f"opencode/{raw_id}"
+            if namespaced_id in blacklist_set or raw_id in blacklist_set:
+                continue
+
+            display_name = raw_id.replace("-", " ").title()
+            context_length = m.get("context_length")
+
+            models.append({
+                "id": namespaced_id,
+                "name": display_name,
+                "provider": "opencode-zen",
+                "input_cost_api": 0.0,
+                "output_cost_api": 0.0,
+                "context_length": context_length,
+                "tier": "Standard",
+            })
     except Exception as e:
-        logger.error(f"Failed to read pricing-overlay.yaml: {e}")
+        logger.error(f"fetch_opencode_zen_models failed: {e}")
+        return []
+    return models
 
-    models = fetch_openrouter_models(excluded_models)
-    
-    models.extend(OPENCODE_GO_MODELS)
-    
-    registry = {
-        "models": models
-    }
 
-    registry_path = os.path.join(project_root, 'config', 'generated', 'model-registry.json')
-    
+def _load_blacklist(project_root: str) -> List[str]:
+    """Load the model blacklist from ``config/model-curation.yaml``.
+
+    Falls back to an empty list if the file is missing or unreadable. The
+    curation file is the single source of truth for hard exclusions; the legacy
+    ``excluded_models`` key in ``pricing-overlay.yaml`` is no longer consulted.
+    """
+    try:
+        from scripts.lib.curation import load_curation  # local import to avoid cycles
+    except ImportError:
+        try:
+            from lib.curation import load_curation  # type: ignore[no-redef]
+        except ImportError:
+            logger.warning("curation module not importable — blacklist disabled")
+            return []
+    try:
+        data = load_curation(project_root)
+        blacklist = data.get("blacklist", []) or []
+        if not isinstance(blacklist, list):
+            logger.warning("model-curation.yaml: 'blacklist' is not a list — ignoring")
+            return []
+        return [str(x) for x in blacklist]
+    except Exception as e:
+        logger.error(f"Failed to load model-curation.yaml: {e}")
+        return []
+
+
+def discover_models() -> Dict[str, Any]:
+    """Fetch all upstream models, merge, deduplicate and persist the registry.
+
+    Returns:
+        The registry dict written to ``config/generated/model-registry.json``.
+    """
+    logger.info("Discovering models from OpenRouter and OpenCode Zen...")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+
+    blacklist = _load_blacklist(project_root)
+
+    or_models = fetch_openrouter_models(blacklist)
+    zen_models = fetch_opencode_zen_models(blacklist)
+
+    if not zen_models:
+        logger.warning(
+            "OpenCode Zen returned no models (network down or upstream error); "
+            "continuing with OpenRouter-only registry."
+        )
+
+    all_models = or_models + zen_models
+
+    # Deduplicate by id, keep first occurrence.
+    seen: set = set()
+    deduped: List[Dict[str, Any]] = []
+    for m in all_models:
+        mid = m.get("id")
+        if not mid or mid in seen:
+            continue
+        seen.add(mid)
+        deduped.append(m)
+
+    registry = {"models": deduped}
+
+    registry_path = os.path.join(
+        project_root, "config", "generated", "model-registry.json"
+    )
     os.makedirs(os.path.dirname(registry_path), exist_ok=True)
-    with open(registry_path, 'w', encoding='utf-8') as f:
+    with open(registry_path, "w", encoding="utf-8") as f:
         json.dump(registry, f, indent=2)
-        
-    logger.info(f"Model registry updated at {registry_path}")
+
+    logger.info(
+        f"Model registry updated at {registry_path} "
+        f"(openrouter={len(or_models)}, opencode-zen={len(zen_models)}, "
+        f"merged={len(deduped)})"
+    )
     return registry
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
