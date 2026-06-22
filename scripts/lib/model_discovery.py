@@ -220,15 +220,21 @@ def _load_blacklist(project_root: str) -> List[str]:
         return []
 
 
-def discover_models() -> Dict[str, Any]:
+def discover_models(_project_root: Optional[str] = None) -> Dict[str, Any]:
     """Fetch all upstream models, merge, deduplicate and persist the registry.
+
+    Args:
+        _project_root: Optional override for project root path (used in testing).
 
     Returns:
         The registry dict written to ``config/generated/model-registry.json``.
     """
     logger.info("Discovering models from OpenRouter, OpenCode Zen and OpenCode Go...")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+    if _project_root is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+    else:
+        project_root = _project_root
 
     blacklist = _load_blacklist(project_root)
 

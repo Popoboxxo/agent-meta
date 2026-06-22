@@ -267,7 +267,7 @@ def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
         "scripts.lib.model_discovery.fetch_opencode_go_models",
         return_value=list(go_fetched),
     ):
-        registry = discover_models()
+        registry = discover_models(_project_root=str(tmp_path))
 
     assert isinstance(registry, dict)
     assert "models" in registry
@@ -277,7 +277,7 @@ def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
         assert m["id"] in ids
 
 
-def test_discover_models_deduplicates_by_id():
+def test_discover_models_deduplicates_by_id(tmp_path):
     duplicated = [
         {
             "id": "anthropic/claude-test",
@@ -307,7 +307,7 @@ def test_discover_models_deduplicates_by_id():
         "scripts.lib.model_discovery.fetch_opencode_go_models",
         return_value=[],
     ):
-        registry = discover_models()
+        registry = discover_models(_project_root=str(tmp_path))
 
     matching = [m for m in registry["models"] if m["id"] == "anthropic/claude-test"]
     assert len(matching) == 1
