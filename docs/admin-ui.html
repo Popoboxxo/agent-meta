@@ -4383,29 +4383,32 @@ async function viewProviderTiers() {
   const providersWrap = el("div", { id: "providers-wrap" });
   wrap.appendChild(providersWrap);
 
-  const getDatalistId = (provider) => `model-list-${provider.replace(/[^a-zA-Z0-9]/g, '-')}`;
-
   const renderProviders = () => {
     providersWrap.innerHTML = "";
+
+    // Create global datalist with all active models
+    let globalDl = document.getElementById("global-tier-model-list");
+    if (!globalDl) {
+      globalDl = el("datalist", { id: "global-tier-model-list" });
+      document.body.appendChild(globalDl);
+    } else {
+      globalDl.innerHTML = "";
+    }
+
+    const addedIds = new Set();
+    modelsData.forEach(m => {
+      globalDl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+      addedIds.add(m.id);
+    });
+
+    // Add legacy tier values from ai-providers config
     const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
     uniqueProviders.forEach(p => {
-      let dl = document.getElementById(getDatalistId(p));
-      if (!dl) {
-        dl = el("datalist", { id: getDatalistId(p) });
-        document.body.appendChild(dl);
-      } else {
-        dl.innerHTML = "";
-      }
-      const addedIds = new Set();
-      modelsData.filter(m => m.provider === p).forEach(m => {
-        dl.appendChild(el("option", { value: m.id }, [m.name]));
-        addedIds.add(m.id);
-      });
       const pConf = aiProvidersData.providers ? aiProvidersData.providers[p] : aiProvidersData[p];
       if (pConf && pConf["model-tiers"]) {
         Object.values(pConf["model-tiers"]).forEach(val => {
           if (val && !addedIds.has(val)) {
-            dl.appendChild(el("option", { value: val }, [val + " (Legacy)"]));
+            globalDl.appendChild(el("option", { value: val, label: `${val} (Legacy)` }));
             addedIds.add(val);
           }
         });
@@ -4433,7 +4436,7 @@ async function viewProviderTiers() {
         const td = el("td", {});
         const val = tData[t] || "";
         if (editMode) {
-          const input = el("input", { type: "text", list: getDatalistId(p), value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
+          const input = el("input", { type: "text", list: "global-tier-model-list", value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
           td.appendChild(input);
         } else {
           td.appendChild(el("span", { class: "mono" }, [val || "-"]));
