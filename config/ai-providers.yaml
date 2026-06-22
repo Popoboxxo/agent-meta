@@ -82,7 +82,7 @@ providers:
     model-aliases: {}
 
   Opencode:
-    display-name: "OpenCode Zen"
+    display-name: "OpenCode"
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
@@ -110,63 +110,21 @@ providers:
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
     orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode-zen model IDs — format: opencode/<raw_id>
-    # Full list: https://opencode.ai/zen
+    # opencode model IDs — merged from Zen (opencode/) and Go (opencode-go/) catalogs.
+    # Full lists: https://opencode.ai/zen and https://opencode.ai/zen/go
     model-tiers:
-      nano:     opencode/deepseek-v4-flash-free   # free tier, lowest cost
-      fast:     opencode/deepseek-v4-flash        # quick ops: git, meta-feedback, formatting
-      balanced: opencode/qwen3.6-plus             # best cost/performance default workhorse
-      powerful: opencode/kimi-k2.6                # strong reasoning: architecture, security
-      max:      opencode/deepseek-v4-pro          # premium reasoning, complex coding
+      nano:     opencode/deepseek-v4-flash-free   # Zen free tier
+      fast:     opencode/deepseek-v4-flash        # Zen
+      balanced: opencode/qwen3.6-plus             # Zen
+      powerful: opencode/kimi-k2.6                # Zen
+      max:      opencode-go/kimi-k2.7-code        # Go (k2.7 > k2.6 and deepseek-v4-pro)
     model-aliases:
-      flash:      opencode/deepseek-v4-flash
       flash-free: opencode/deepseek-v4-flash-free
+      flash:      opencode/deepseek-v4-flash
       qwen:       opencode/qwen3.6-plus
       kimi:       opencode/kimi-k2.6
+      kimi-max:   opencode-go/kimi-k2.7-code
       deepseek:   opencode/deepseek-v4-pro
-
-  OpencodeGo:
-    display-name: "OpenCode Go"
-    agents_dir: .opencode/agents
-    agent_ext: .md
-    context_file: AGENTS.md
-    context_template: howto/configs/OPENCODE.project-template.md
-    has_rules: false
-    has_hooks: false
-    has_commands: true
-    commands_dir: .opencode/commands
-    has_settings: true
-    settings_file: opencode.json
-    settings_template: howto/configs/OPENCODE.settings-template.json
-    isolation-dirs:
-      - .opencode/
-      - opencode.json
-      - AGENTS.md
-    gitignore_entries:
-      - AGENTS.personal.md
-      - .opencode/settings.local.json
-    mcp-config:
-      committed-file: opencode.json
-      secrets-file: .opencode/mcp.local.json
-      format: opencode-json
-    skills_dir: .opencode/skills
-    snippets_dir: .opencode/snippets
-    pending_tasks_file: .opencode/pending-tasks.md
-    extension_dir: .opencode/3-project
-    orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode-go model IDs — format: opencode-go/<raw_id>
-    # Full list: https://opencode.ai/zen/go
-    model-tiers:
-      nano:     opencode-go/deepseek-v4-flash   # quick ops, low cost
-      fast:     opencode-go/deepseek-v4-flash   # quick ops: git, meta-feedback, formatting
-      balanced: opencode-go/qwen3.6-plus        # best cost/performance default workhorse
-      powerful: opencode-go/kimi-k2.6           # strong reasoning: architecture, security
-      max:      opencode-go/kimi-k2.7-code      # premium reasoning, complex coding
-    model-aliases:
-      flash:    opencode-go/deepseek-v4-flash
-      qwen:     opencode-go/qwen3.6-plus
-      kimi:     opencode-go/kimi-k2.6
-      kimi-max: opencode-go/kimi-k2.7-code
 
   Continue:
     agents_dir: .continue/agents
