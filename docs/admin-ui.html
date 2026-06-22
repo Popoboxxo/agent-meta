@@ -4619,6 +4619,7 @@ async function viewTierPresets() {
 
   let tierPresetsData = {};
   let aiProvidersData = {};
+  let modelsData = [];
   let currentTab = "resolved"; // "resolved" | "edit"
 
   const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
@@ -4636,7 +4637,7 @@ async function viewTierPresets() {
     tabEdit.className = currentTab === "edit" ? "btn btn-primary" : "btn";
     intro.textContent = currentTab === "resolved"
       ? "Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"
-      : "Edit raw tier→tier mappings per preset. Each cell selects which generic tier this preset maps the row tier to. (tier-presets.yaml)";
+      : "Edit direct model assignments per preset. Each cell sets the model ID for that tier. (tier-presets.yaml)";
   };
 
   // ---- Controls (Add / Save) -------------------------------------------
@@ -4652,12 +4653,12 @@ async function viewTierPresets() {
     }
     tierPresetsData[name] = {
       description: "",
-      mapping: {
-        nano: "nano",
-        fast: "nano",
-        balanced: "nano",
-        powerful: "nano",
-        max: "nano"
+      tiers: {
+        nano: "",
+        fast: "",
+        balanced: "",
+        powerful: "",
+        max: ""
       }
     };
     try {
@@ -4680,13 +4681,11 @@ async function viewTierPresets() {
         if (!newPresetsData[pid]) return;
         const descInput = tr.querySelector(".preset-desc");
         if (descInput) newPresetsData[pid].description = descInput.value;
-        if (!newPresetsData[pid].mapping) newPresetsData[pid].mapping = {};
+        newPresetsData[pid].tiers = {};
+        delete newPresetsData[pid].mapping;
         TIERS.forEach(comp => {
-          const select = tr.querySelector(`.preset-mapping-${comp}`);
-          if (select) {
-            if (select.value) newPresetsData[pid].mapping[comp] = select.value;
-            else delete newPresetsData[pid].mapping[comp];
-          }
+          const inp = tr.querySelector(`.preset-tier-${comp}`);
+          if (inp && inp.value) newPresetsData[pid].tiers[comp] = inp.value;
         });
       });
       await api.post("/api/tier-presets/update", newPresetsData);
@@ -4727,6 +4726,7 @@ async function viewTierPresets() {
 
     presetIds.forEach(presetId => {
       const preset = tierPresetsData[presetId] || {};
+      const presetTiers = preset.tiers || null;
       const mapping = preset.mapping || {};
       const isDefault = presetId === "Normal";
 
@@ -4751,8 +4751,15 @@ async function viewTierPresets() {
 
         const providerTiers = (providersMap[pName] || {})["model-tiers"] || {};
         TIERS.forEach(tier => {
-          const mappedTier = mapping[tier] || tier;
-          const fullId = providerTiers[mappedTier] || mappedTier;
+          let fullId;
+          if (presetTiers) {
+            // New format: value IS the resolved model id
+            fullId = presetTiers[tier] || tier;
+          } else {
+            // Old format: mapping + provider model-tiers lookup
+            const mappedTier = mapping[tier] || tier;
+            fullId = providerTiers[mappedTier] || mappedTier;
+          }
           const short = (typeof fullId === "string" && fullId.includes("/")) ? fullId.split("/").pop() : fullId;
           const td = el("td", {});
           td.appendChild(el("span", { class: "badge mono", title: String(fullId) }, [String(short || "-")]));
@@ -4782,10 +4789,20 @@ async function viewTierPresets() {
     ]));
     table.appendChild(thead);
 
+    // Build global datalist for model autocomplete
+    const existingDl = document.getElementById("tier-presets-model-list");
+    if (existingDl) existingDl.remove();
+    const datalist = el("datalist", { id: "tier-presets-model-list" });
+    modelsData.forEach(m => {
+      const label = m.name ? `${m.name} (${m.provider})` : `${m.id} (${m.provider})`;
+      datalist.appendChild(el("option", { value: m.id }, [label]));
+    });
+    presetsWrap.appendChild(datalist);
+
     const tbody = el("tbody");
     Object.keys(tierPresetsData).forEach(presetId => {
       const preset = tierPresetsData[presetId] || {};
-      const mapping = preset.mapping || {};
+      const currentTiers = preset.tiers || {};
       const isDefault = presetId === "Normal";
 
       const tr = el("tr");
@@ -4810,14 +4827,15 @@ async function viewTierPresets() {
 
       TIERS.forEach(comp => {
         const td = el("td", {});
-        const select = el("select", { class: `preset-mapping-${comp}`, "data-preset": presetId, "data-comp": comp, style: "width: 100%;" });
-        select.appendChild(el("option", { value: "" }, ["(none)"]));
-        TIERS.forEach(t => {
-          const opt = el("option", { value: t }, [t]);
-          if (t === (mapping[comp] || "")) opt.selected = true;
-          select.appendChild(opt);
+        const input = el("input", {
+          type: "text",
+          list: "tier-presets-model-list",
+          class: `preset-tier-${comp}`,
+          value: currentTiers[comp] || "",
+          placeholder: "model id…",
+          style: "width:100%; box-sizing:border-box;"
         });
-        td.appendChild(select);
+        td.appendChild(input);
         tr.appendChild(td);
       });
 
@@ -4853,12 +4871,14 @@ async function viewTierPresets() {
 
   const loadData = async () => {
     try {
-      const [tp, ap] = await Promise.all([
+      const [tp, ap, modelsRes] = await Promise.all([
         api.get("/api/tier-presets/merged"),
-        api.get("/api/ai-providers")
+        api.get("/api/ai-providers"),
+        api.get("/api/models/active").catch(() => ({ models: [] })),
       ]);
       tierPresetsData = tp;
       aiProvidersData = ap;
+      modelsData = modelsRes.models || [];
       renderPresets();
     } catch (err) { presetsWrap.replaceChildren(renderError(err)); }
   };
