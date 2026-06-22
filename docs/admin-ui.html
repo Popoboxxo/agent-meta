@@ -621,6 +621,39 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   border: 1px dashed var(--border-color);
   border-radius: var(--radius);
 }
+
+/* =====================================================================
+ * Quick-filter button strip (model discovery)
+ * ===================================================================== */
+.quick-filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.quick-filter-strip .badge {
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  user-select: none;
+}
+.quick-filter-strip .badge:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+.quick-filter-strip .badge.active {
+  background: var(--accent-blue-soft);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -4038,6 +4071,29 @@ async function viewModels() {
   wrap.appendChild(controls);
 
   const filterState = { provider: "", model: "", category: "" };
+
+  // Quick-filter button strip — appears above the table filter row
+  const QUICK_FILTERS = [
+    { label: "All",      value: "" },
+    { label: "Claude",   value: "claude" },
+    { label: "OpenCode", value: "opencode" },
+    { label: "GitHub",   value: "github" },
+    { label: "OpenAI",   value: "openai" },
+    { label: "Google",   value: "google" },
+  ];
+  const quickFilterStrip = el("div", { class: "quick-filter-strip" });
+  const quickBtns = QUICK_FILTERS.map(({ label, value }) => {
+    const btn = el("button", { class: "badge" + (value === "" ? " active" : "") }, [label]);
+    btn.addEventListener("click", () => {
+      filterState.provider = value;
+      quickBtns.forEach(b => b.classList.toggle("active", b === btn));
+      applyFilters();
+    });
+    return btn;
+  });
+  quickBtns.forEach(b => quickFilterStrip.appendChild(b));
+  wrap.appendChild(quickFilterStrip);
+
   const tableWrap = el("div", { id: "models-table-wrap" });
   wrap.appendChild(tableWrap);
 
@@ -4047,8 +4103,8 @@ async function viewModels() {
       const pText = tr.children[1]?.textContent.toLowerCase() || "";
       const mText = tr.children[2]?.textContent.toLowerCase() || "";
       const cText = tr.children[3]?.textContent.toLowerCase() || "";
-      
-      const pMatch = !filterState.provider || pText === filterState.provider.toLowerCase();
+
+      const pMatch = !filterState.provider || pText.includes(filterState.provider.toLowerCase());
       const mMatch = !filterState.model || mText.includes(filterState.model.toLowerCase());
       const cMatch = !filterState.category || cText === filterState.category.toLowerCase();
       
