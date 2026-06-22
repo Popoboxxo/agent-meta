@@ -1627,6 +1627,51 @@ async function viewAIProviders() {
     panel.appendChild(form.render());
     wrap.appendChild(panel);
   }
+
+  // — Project Tier Overrides section —
+  const overridePanel = el("div", { class: "panel", style: "margin-top: 24px;" });
+  overridePanel.appendChild(el("h2", {}, ["Project Tier Overrides"]));
+  const overrideDesc = el("p", { class: "muted" });
+  overrideDesc.textContent = "Per-provider, per-tier overrides stored in .meta-config/project.yaml. These take priority over the tier mappings above.";
+  const overrideLink = el("a", { href: "#/project/provider-tier-overrides", style: "margin-left: 8px;" });
+  overrideLink.textContent = "→ Open full editor";
+  overrideDesc.appendChild(overrideLink);
+  overridePanel.appendChild(overrideDesc);
+
+  (async () => {
+    try {
+      const proj = await api.get("/api/config/project");
+      const pto = proj["provider-tier-overrides"] || {};
+      if (Object.keys(pto).length === 0) {
+        overridePanel.appendChild(el("div", { class: "empty" }, ["No provider-tier-overrides configured in project.yaml."]));
+      } else {
+        const t = el("table", { class: "data" });
+        const thead = el("thead");
+        const hrow = el("tr");
+        ["Provider", "Tier", "Model Override"].forEach(h => {
+          const th = el("th"); th.textContent = h; hrow.appendChild(th);
+        });
+        thead.appendChild(hrow);
+        t.appendChild(thead);
+        const tb = el("tbody");
+        Object.entries(pto).forEach(([prov, tiers]) => {
+          Object.entries(tiers || {}).forEach(([tier, model]) => {
+            const row = el("tr");
+            const tdProv = el("td"); tdProv.appendChild(el("span", { class: "mono" }, [prov])); row.appendChild(tdProv);
+            const tdTier = el("td"); tdTier.appendChild(el("span", { class: "badge" }, [tier])); row.appendChild(tdTier);
+            const tdModel = el("td"); tdModel.appendChild(el("span", { class: "mono" }, [String(model)])); row.appendChild(tdModel);
+            tb.appendChild(row);
+          });
+        });
+        t.appendChild(tb);
+        overridePanel.appendChild(t);
+      }
+    } catch (e) {
+      overridePanel.appendChild(el("p", { class: "muted" }, ["Could not load project.yaml."]));
+    }
+  })();
+
+  wrap.appendChild(overridePanel);
   return wrap;
 }
 
@@ -4444,6 +4489,12 @@ async function viewProviderTiers() {
     const obsoleteDl = document.getElementById("global-tier-model-list");
     if (obsoleteDl) obsoleteDl.remove();
 
+    // Provider grouping: maps individual providers to their group name.
+    const PROVIDER_GROUPS = {
+      "Opencode": "OpenCode Platform",
+      "OpencodeGo": "OpenCode Platform",
+    };
+
     const uniqueProviders = [...new Set(modelsData.map(m => m.provider))];
 
     const table = el("table", { class: "data provider-tiers-table" });
@@ -4454,55 +4505,105 @@ async function viewProviderTiers() {
     const tbody = el("tbody");
     const providersList = aiProvidersData.providers ? Object.keys(aiProvidersData.providers) : (Object.keys(aiProvidersData).length > 0 ? Object.keys(aiProvidersData) : uniqueProviders);
 
+    // Build group structure: group -> [providers]
+    const groupOrder = [];
+    const groupedRows = {};
     providersList.forEach(p => {
-      const tr = el("tr");
-      tr.dataset.provider = p;
-      tr.appendChild(el("td", {}, [el("strong", {}, [p])]));
-
-      const tiers = ["nano", "fast", "balanced", "powerful", "max"];
-      const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
-      const tData = pData["model-tiers"] || {};
-
-      // Build per-provider datalist filtered to relevant registry providers.
-      const registryProviders = inferRegistryProviders(pData, modelsData);
-      const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
-      let dl = document.getElementById(dlId);
-      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
-      else { dl.innerHTML = ""; }
-
-      // If we identified registry providers from existing tier values, use them.
-      // Otherwise fall back to all active models so free-text input still gets suggestions.
-      const candidates = registryProviders.length > 0
-        ? modelsData.filter(m => registryProviders.includes(m.provider))
-        : modelsData;
-
-      const addedIds = new Set();
-      candidates.forEach(m => {
-        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
-        addedIds.add(m.id);
-      });
-
-      // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
-      Object.values(tData).forEach(val => {
-        if (val && !addedIds.has(val)) {
-          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
-          addedIds.add(val);
-        }
-      });
-
-      tiers.forEach(t => {
-        const td = el("td", {});
-        const val = tData[t] || "";
-        if (editMode) {
-          const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
-          td.appendChild(input);
-        } else {
-          td.appendChild(el("span", { class: "mono" }, [val || "-"]));
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
+      const grp = PROVIDER_GROUPS[p] || p;
+      if (!groupedRows[grp]) {
+        groupedRows[grp] = [];
+        groupOrder.push(grp);
+      }
+      groupedRows[grp].push(p);
     });
+
+    // Render groups and their members
+    groupOrder.forEach(grp => {
+      const members = groupedRows[grp];
+      const isGroup = members.length > 1;
+
+      // Add group header row if this is a multi-member group
+      if (isGroup) {
+        const hdr = el("tr", { style: "background: var(--bg-secondary); font-weight: 600;" });
+        const hdrTd = el("td", { colspan: String(1 + 5), style: "padding: 6px 12px; font-size: 0.9em; color: var(--text-muted);" });
+        hdrTd.textContent = "▸ " + grp;
+        hdr.appendChild(hdrTd);
+        tbody.appendChild(hdr);
+      }
+
+      // Render individual provider rows within the group
+      members.forEach(p => {
+        const tr = el("tr");
+        tr.dataset.provider = p;
+
+        // Provider name cell: indent if it's part of a group
+        const nameCell = el("td", {});
+        if (isGroup) {
+          const nameSpan = el("span", { style: "padding-left: 16px;" });
+          nameSpan.textContent = p;
+          nameCell.appendChild(nameSpan);
+        } else {
+          nameCell.appendChild(el("strong", {}, [p]));
+        }
+        tr.appendChild(nameCell);
+
+        const tiers = ["nano", "fast", "balanced", "powerful", "max"];
+        const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
+        const tData = pData["model-tiers"] || {};
+
+        // Build per-provider datalist filtered to relevant registry providers.
+        // For grouped providers, also include models from other group members.
+        let registryProviders = inferRegistryProviders(pData, modelsData);
+        if (isGroup && registryProviders.length === 0) {
+          // If this group member has no explicit registry providers yet,
+          // include all registry providers from all group members
+          members.forEach(member => {
+            const memberData = aiProvidersData.providers ? aiProvidersData.providers[member] : (aiProvidersData[member] || {});
+            const memberRegistryProviders = inferRegistryProviders(memberData, modelsData);
+            registryProviders = [...new Set([...registryProviders, ...memberRegistryProviders])];
+          });
+        }
+
+        const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
+        let dl = document.getElementById(dlId);
+        if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+        else { dl.innerHTML = ""; }
+
+        // If we identified registry providers from existing tier values, use them.
+        // Otherwise fall back to all active models so free-text input still gets suggestions.
+        const candidates = registryProviders.length > 0
+          ? modelsData.filter(m => registryProviders.includes(m.provider))
+          : modelsData;
+
+        const addedIds = new Set();
+        candidates.forEach(m => {
+          dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+          addedIds.add(m.id);
+        });
+
+        // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
+        Object.values(tData).forEach(val => {
+          if (val && !addedIds.has(val)) {
+            dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
+            addedIds.add(val);
+          }
+        });
+
+        tiers.forEach(t => {
+          const td = el("td", {});
+          const val = tData[t] || "";
+          if (editMode) {
+            const input = el("input", { type: "text", list: dlId, value: val, class: `tier-input-${t}`, style: "width: 100%; box-sizing: border-box;" });
+            td.appendChild(input);
+          } else {
+            td.appendChild(el("span", { class: "mono" }, [val || "-"]));
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    });
+
     table.appendChild(tbody);
     providersWrap.appendChild(table);
   };
@@ -4554,11 +4655,32 @@ async function viewProviderTiers() {
 async function viewTierPresets() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Tier Presets"]));
-  wrap.appendChild(el("p", { class: "muted" }, ["Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"]));
+  const intro = el("p", { class: "muted" }, ["Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"]);
+  wrap.appendChild(intro);
 
   let tierPresetsData = {};
   let aiProvidersData = {};
+  let currentTab = "resolved"; // "resolved" | "edit"
 
+  const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
+
+  // ---- Tab strip --------------------------------------------------------
+  const tabStrip = el("div", { class: "btn-row", style: "margin-bottom: 16px; display: flex; gap: 8px;" });
+  const tabResolved = el("button", { class: "btn btn-primary" }, ["Resolved View"]);
+  const tabEdit = el("button", { class: "btn" }, ["Edit Mappings"]);
+  tabStrip.appendChild(tabResolved);
+  tabStrip.appendChild(tabEdit);
+  wrap.appendChild(tabStrip);
+
+  const updateTabStyles = () => {
+    tabResolved.className = currentTab === "resolved" ? "btn btn-primary" : "btn";
+    tabEdit.className = currentTab === "edit" ? "btn btn-primary" : "btn";
+    intro.textContent = currentTab === "resolved"
+      ? "Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"
+      : "Edit raw tier→tier mappings per preset. Each cell selects which generic tier this preset maps the row tier to. (tier-presets.yaml)";
+  };
+
+  // ---- Controls (Add / Save) -------------------------------------------
   const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
 
   const addBtn = el("button", { class: "btn" }, ["Add Preset"]);
@@ -4588,17 +4710,46 @@ async function viewTierPresets() {
     }
   };
 
+  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    try {
+      const newPresetsData = JSON.parse(JSON.stringify(tierPresetsData));
+      presetsWrap.querySelectorAll("tr[data-preset-id]").forEach(tr => {
+        const pid = tr.dataset.presetId;
+        if (!newPresetsData[pid]) return;
+        const descInput = tr.querySelector(".preset-desc");
+        if (descInput) newPresetsData[pid].description = descInput.value;
+        if (!newPresetsData[pid].mapping) newPresetsData[pid].mapping = {};
+        TIERS.forEach(comp => {
+          const select = tr.querySelector(`.preset-mapping-${comp}`);
+          if (select) {
+            if (select.value) newPresetsData[pid].mapping[comp] = select.value;
+            else delete newPresetsData[pid].mapping[comp];
+          }
+        });
+      });
+      await api.post("/api/tier-presets/update", newPresetsData);
+      toast("Saved", "success");
+      await loadData();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Configs";
+    }
+  };
+
   controls.appendChild(addBtn);
+  controls.appendChild(saveBtn);
   wrap.appendChild(controls);
 
   const presetsWrap = el("div", { id: "presets-wrap" });
   wrap.appendChild(presetsWrap);
 
-  const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
-
-  const renderPresets = () => {
-    presetsWrap.innerHTML = "";
-
+  // ---- Renderers --------------------------------------------------------
+  const renderResolved = () => {
     // ai-providers.yaml may be returned wrapped in {providers: {...}} or flat.
     const providersMap = aiProvidersData.providers || aiProvidersData || {};
     const providerNames = Object.keys(providersMap).filter(p => providersMap[p] && providersMap[p]["model-tiers"]);
@@ -4660,6 +4811,85 @@ async function viewTierPresets() {
 
     table.appendChild(tbody);
     presetsWrap.appendChild(table);
+  };
+
+  const renderEdit = () => {
+    const table = el("table", { class: "data tier-presets-table" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, [
+      el("th", {}, ["Preset"]),
+      el("th", {}, ["Description"]),
+      ...TIERS.map(t => el("th", {}, [t]))
+    ]));
+    table.appendChild(thead);
+
+    const tbody = el("tbody");
+    Object.keys(tierPresetsData).forEach(presetId => {
+      const preset = tierPresetsData[presetId] || {};
+      const mapping = preset.mapping || {};
+      const isDefault = presetId === "Normal";
+
+      const tr = el("tr");
+      tr.dataset.presetId = presetId;
+      if (isDefault) tr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
+
+      const presetTd = el("td", {});
+      presetTd.appendChild(el("strong", {}, [presetId]));
+      if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+      if (preset.source === "project") {
+        presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+      }
+      tr.appendChild(presetTd);
+
+      const descInput = el("input", {
+        type: "text",
+        class: "preset-desc",
+        value: preset.description || "",
+        style: "width: 100%; box-sizing: border-box;"
+      });
+      tr.appendChild(el("td", {}, [descInput]));
+
+      TIERS.forEach(comp => {
+        const td = el("td", {});
+        const select = el("select", { class: `preset-mapping-${comp}`, "data-preset": presetId, "data-comp": comp, style: "width: 100%;" });
+        select.appendChild(el("option", { value: "" }, ["(none)"]));
+        TIERS.forEach(t => {
+          const opt = el("option", { value: t }, [t]);
+          if (t === (mapping[comp] || "")) opt.selected = true;
+          select.appendChild(opt);
+        });
+        td.appendChild(select);
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    presetsWrap.appendChild(table);
+  };
+
+  const renderPresets = () => {
+    presetsWrap.innerHTML = "";
+    updateTabStyles();
+    if (currentTab === "edit") {
+      saveBtn.style.display = "";
+      renderEdit();
+    } else {
+      saveBtn.style.display = "none";
+      renderResolved();
+    }
+  };
+
+  tabResolved.onclick = () => {
+    if (currentTab === "resolved") return;
+    currentTab = "resolved";
+    renderPresets();
+  };
+  tabEdit.onclick = () => {
+    if (currentTab === "edit") return;
+    currentTab = "edit";
+    renderPresets();
   };
 
   const loadData = async () => {
