@@ -1,17 +1,16 @@
-"""Tests for scripts.lib.model_discovery (keyless OpenRouter API).
+"""Tests for scripts.lib.model_discovery (keyless OpenRouter + OpenCode Zen).
 
 Network is mocked via unittest.mock — no real HTTP requests are made.
 """
 
 import json
-import numbers
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from scripts.lib.model_discovery import (
-    OPENCODE_GO_MODELS,
     discover_models,
+    fetch_opencode_zen_models,
     fetch_openrouter_models,
 )
 
@@ -61,46 +60,40 @@ def _sample_openrouter_payload():
     }
 
 
-# -- OPENCODE_GO_MODELS structure --------------------------------------------
+def _sample_opencode_zen_payload():
+    return {
+        "data": [
+            {"id": "deepseek-v4-flash-free", "context_length": 128000},
+            {"id": "qwen3.6-plus", "context_length": 128000},
+            {"id": "kimi-k2.6", "context_length": 200000},
+        ]
+    }
 
 
-def test_opencode_go_models_structure():
-    assert isinstance(OPENCODE_GO_MODELS, list)
-    assert len(OPENCODE_GO_MODELS) >= 1
-    for m in OPENCODE_GO_MODELS:
-        assert isinstance(m, dict)
-        assert isinstance(m["id"], str) and m["id"]
-        assert isinstance(m["name"], str) and m["name"]
-        assert m["provider"] == "opencode-go"
-        assert isinstance(m["input_cost_api"], numbers.Real)
-        assert isinstance(m["output_cost_api"], numbers.Real)
-        assert m["input_cost_api"] >= 0
-        assert m["output_cost_api"] >= 0
+# -- fetch_openrouter_models: provider mapping (literal prefix) ---------------
 
 
-# -- fetch_openrouter_models: provider mapping --------------------------------
-
-
-def test_fetch_openrouter_models_provider_mapping():
+def test_fetch_openrouter_models_provider_mapping_is_literal_prefix():
     payload = _sample_openrouter_payload()
     with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
         models = fetch_openrouter_models()
 
     by_id = {m["id"]: m for m in models}
+    # Provider is the literal prefix before the first slash — no bucket heuristic.
     assert by_id["anthropic/claude-3.5-sonnet"]["provider"] == "anthropic"
-    assert by_id["google/gemini-2.0-flash"]["provider"] == "gemini"
+    assert by_id["google/gemini-2.0-flash"]["provider"] == "google"
     assert by_id["openai/gpt-4o"]["provider"] == "openai"
-    assert by_id["mistralai/mistral-large"]["provider"] == "opencode-go"
+    assert by_id["mistralai/mistral-large"]["provider"] == "mistralai"
 
 
-# -- fetch_openrouter_models: excluded_models ---------------------------------
+# -- fetch_openrouter_models: blacklist ---------------------------------------
 
 
-def test_fetch_openrouter_models_excludes_models():
+def test_fetch_openrouter_models_respects_blacklist():
     payload = _sample_openrouter_payload()
-    excluded = ["deprecated/model-x", "openai/gpt-4o"]
+    blacklist = ["deprecated/model-x", "openai/gpt-4o"]
     with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
-        models = fetch_openrouter_models(excluded_models=excluded)
+        models = fetch_openrouter_models(blacklist=blacklist)
 
     ids = {m["id"] for m in models}
     assert "deprecated/model-x" not in ids
@@ -134,11 +127,48 @@ def test_fetch_openrouter_models_network_error_returns_empty():
     assert models == []
 
 
+# -- fetch_opencode_zen_models: namespacing and provider tag ------------------
+
+
+def test_fetch_opencode_zen_models_namespaces_ids():
+    payload = _sample_opencode_zen_payload()
+    with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
+        models = fetch_opencode_zen_models()
+
+    ids = {m["id"] for m in models}
+    assert "opencode/deepseek-v4-flash-free" in ids
+    assert "opencode/qwen3.6-plus" in ids
+    assert "opencode/kimi-k2.6" in ids
+
+    for m in models:
+        assert m["provider"] == "opencode-zen"
+        assert m["id"].startswith("opencode/")
+
+
+def test_fetch_opencode_zen_models_blacklist_matches_both_forms():
+    payload = _sample_opencode_zen_payload()
+    # Blacklist by both raw id and namespaced id forms.
+    blacklist = ["kimi-k2.6", "opencode/qwen3.6-plus"]
+    with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
+        models = fetch_opencode_zen_models(blacklist=blacklist)
+
+    ids = {m["id"] for m in models}
+    assert "opencode/kimi-k2.6" not in ids
+    assert "opencode/qwen3.6-plus" not in ids
+    assert "opencode/deepseek-v4-flash-free" in ids
+
+
+def test_fetch_opencode_zen_models_network_error_returns_empty():
+    with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+        models = fetch_opencode_zen_models()
+    assert models == []
+
+
 # -- discover_models ----------------------------------------------------------
 
 
-def test_discover_models_contains_all_opencode_and_fetched(tmp_path, monkeypatch):
-    fetched = [
+def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
+    or_fetched = [
         {
             "id": "anthropic/claude-test",
             "name": "Claude Test",
@@ -156,12 +186,23 @@ def test_discover_models_contains_all_opencode_and_fetched(tmp_path, monkeypatch
             "tier": "Standard",
         },
     ]
+    zen_fetched = [
+        {
+            "id": "opencode/qwen3.6-plus",
+            "name": "Qwen3.6 Plus",
+            "provider": "opencode-zen",
+            "input_cost_api": 0.0,
+            "output_cost_api": 0.0,
+            "tier": "Standard",
+        },
+    ]
 
-    # Patch the network-hitting function at the module level so discover_models
-    # uses the stub instead of doing a real fetch.
     with patch(
         "scripts.lib.model_discovery.fetch_openrouter_models",
-        return_value=list(fetched),
+        return_value=list(or_fetched),
+    ), patch(
+        "scripts.lib.model_discovery.fetch_opencode_zen_models",
+        return_value=list(zen_fetched),
     ):
         registry = discover_models()
 
@@ -169,9 +210,39 @@ def test_discover_models_contains_all_opencode_and_fetched(tmp_path, monkeypatch
     assert "models" in registry
 
     ids = [m["id"] for m in registry["models"]]
-    # Every OPENCODE_GO_MODELS entry must be present
-    for m in OPENCODE_GO_MODELS:
+    for m in or_fetched + zen_fetched:
         assert m["id"] in ids
-    # Fetched models must also be present
-    for m in fetched:
-        assert m["id"] in ids
+
+
+def test_discover_models_deduplicates_by_id():
+    duplicated = [
+        {
+            "id": "anthropic/claude-test",
+            "name": "Claude Test A",
+            "provider": "anthropic",
+            "input_cost_api": 1.0,
+            "output_cost_api": 2.0,
+            "tier": "Standard",
+        },
+        {
+            "id": "anthropic/claude-test",
+            "name": "Claude Test B",  # second occurrence should be dropped
+            "provider": "anthropic",
+            "input_cost_api": 9.0,
+            "output_cost_api": 9.0,
+            "tier": "Standard",
+        },
+    ]
+
+    with patch(
+        "scripts.lib.model_discovery.fetch_openrouter_models",
+        return_value=list(duplicated),
+    ), patch(
+        "scripts.lib.model_discovery.fetch_opencode_zen_models",
+        return_value=[],
+    ):
+        registry = discover_models()
+
+    matching = [m for m in registry["models"] if m["id"] == "anthropic/claude-test"]
+    assert len(matching) == 1
+    assert matching[0]["name"] == "Claude Test A"
