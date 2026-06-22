@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/models"
 OPENCODE_ZEN_URL = "https://opencode.ai/zen/v1/models"
+OPENCODE_GO_URL = "https://opencode.ai/zen/go/v1/models"
 HTTP_TIMEOUT = 20
 
 # A browser-like User-Agent is required: opencode.ai returns HTTP 403 for the
@@ -142,6 +143,56 @@ def fetch_opencode_zen_models(
     return models
 
 
+def fetch_opencode_go_models(
+    blacklist: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch models from the OpenCode Go endpoint.
+
+    The endpoint is keyless and returns a ``data[]`` array of model objects.
+    Registry ids are namespaced as ``opencode-go/<raw_id>`` to keep them
+    distinguishable from OpenRouter and OpenCode Zen ids.
+
+    Args:
+        blacklist: Optional list of model ids (post-namespacing) to exclude.
+
+    Returns:
+        List of model dicts. Empty list on any network or parse error.
+    """
+    if blacklist is None:
+        blacklist = []
+    blacklist_set = set(blacklist)
+    models: List[Dict[str, Any]] = []
+    try:
+        req = urllib.request.Request(OPENCODE_GO_URL, headers=HTTP_HEADERS)
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        for m in data.get("data", []):
+            raw_id = m.get("id", "")
+            if not raw_id:
+                continue
+            namespaced_id = f"opencode-go/{raw_id}"
+            if namespaced_id in blacklist_set or raw_id in blacklist_set:
+                continue
+
+            display_name = raw_id.replace("-", " ").title()
+            context_length = m.get("context_length")
+
+            models.append({
+                "id": namespaced_id,
+                "name": display_name,
+                "provider": "opencode-go",
+                "input_cost_api": 0.0,
+                "output_cost_api": 0.0,
+                "context_length": context_length,
+                "tier": "Standard",
+            })
+    except Exception as e:
+        logger.error(f"fetch_opencode_go_models failed: {e}")
+        return []
+    return models
+
+
 def _load_blacklist(project_root: str) -> List[str]:
     """Load the model blacklist from ``config/model-curation.yaml``.
 
@@ -175,7 +226,7 @@ def discover_models() -> Dict[str, Any]:
     Returns:
         The registry dict written to ``config/generated/model-registry.json``.
     """
-    logger.info("Discovering models from OpenRouter and OpenCode Zen...")
+    logger.info("Discovering models from OpenRouter, OpenCode Zen and OpenCode Go...")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
 
@@ -183,6 +234,7 @@ def discover_models() -> Dict[str, Any]:
 
     or_models = fetch_openrouter_models(blacklist)
     zen_models = fetch_opencode_zen_models(blacklist)
+    go_models = fetch_opencode_go_models(blacklist)
 
     if not zen_models:
         logger.warning(
@@ -190,7 +242,7 @@ def discover_models() -> Dict[str, Any]:
             "continuing with OpenRouter-only registry."
         )
 
-    all_models = or_models + zen_models
+    all_models = or_models + zen_models + go_models
 
     # Deduplicate by id, keep first occurrence.
     seen: set = set()
@@ -214,7 +266,7 @@ def discover_models() -> Dict[str, Any]:
     logger.info(
         f"Model registry updated at {registry_path} "
         f"(openrouter={len(or_models)}, opencode-zen={len(zen_models)}, "
-        f"merged={len(deduped)})"
+        f"opencode-go={len(go_models)}, merged={len(deduped)})"
     )
     return registry
 
