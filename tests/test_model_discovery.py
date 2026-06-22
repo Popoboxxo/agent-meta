@@ -312,3 +312,43 @@ def test_discover_models_deduplicates_by_id():
     matching = [m for m in registry["models"] if m["id"] == "anthropic/claude-test"]
     assert len(matching) == 1
     assert matching[0]["name"] == "Claude Test A"
+
+
+def test_discover_models_does_not_overwrite_on_empty_result(tmp_path, monkeypatch):
+    """If all fetchers return [] but a populated registry exists, it must be preserved."""
+    import os
+    from scripts.lib import model_discovery as md
+
+    # Create a pre-existing registry with enough models
+    registry_dir = tmp_path / "config" / "generated"
+    registry_dir.mkdir(parents=True)
+    existing_models = [{"id": f"x/model-{i}", "provider": "x", "name": f"Model {i}"} for i in range(20)]
+    existing = {"models": existing_models}
+    registry_file = registry_dir / "model-registry.json"
+    registry_file.write_text(json.dumps(existing))
+
+    # Patch fetchers to return empty
+    monkeypatch.setattr(md, "fetch_openrouter_models", lambda blacklist=None: [])
+    monkeypatch.setattr(md, "fetch_opencode_zen_models", lambda blacklist=None: [])
+    monkeypatch.setattr(md, "fetch_opencode_go_models", lambda blacklist=None: [])
+    monkeypatch.setattr(md, "_load_blacklist", lambda project_root: [])
+
+    # Capture the real os.path.join before patching
+    real_join = os.path.join
+
+    def mock_join(*args):
+        """Route registry path to temp location, pass through others."""
+        result = real_join(*args)
+        if "model-registry.json" in result:
+            return str(registry_file)
+        return result
+
+    monkeypatch.setattr(md.os.path, "join", mock_join)
+
+    result = discover_models()
+
+    # Should return existing registry unchanged
+    assert len(result.get("models", [])) == 20
+    # Registry file should still have 20 models
+    on_disk = json.loads(registry_file.read_text())
+    assert len(on_disk.get("models", [])) == 20

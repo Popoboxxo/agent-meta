@@ -254,11 +254,29 @@ def discover_models() -> Dict[str, Any]:
         seen.add(mid)
         deduped.append(m)
 
-    registry = {"models": deduped}
-
     registry_path = os.path.join(
         project_root, "config", "generated", "model-registry.json"
     )
+
+    # Safety guard: don't overwrite a populated registry with an empty/tiny result
+    # that is almost certainly caused by a network outage rather than real data.
+    MIN_MODELS_TO_WRITE = 10
+    if len(deduped) < MIN_MODELS_TO_WRITE:
+        # Try to preserve the existing registry
+        if os.path.exists(registry_path):
+            with open(registry_path, encoding="utf-8") as _f:
+                _existing = json.loads(_f.read())
+            existing_count = len(_existing.get("models", []))
+            if existing_count >= MIN_MODELS_TO_WRITE:
+                logger.warning(
+                    f"Discovery returned only {len(deduped)} models "
+                    f"(existing registry has {existing_count}). "
+                    "Possible network outage — registry NOT overwritten."
+                )
+                return _existing
+        logger.warning(f"Discovery returned only {len(deduped)} models — writing anyway (no existing registry).")
+
+    registry = {"models": deduped}
     os.makedirs(os.path.dirname(registry_path), exist_ok=True)
     with open(registry_path, "w", encoding="utf-8") as f:
         json.dump(registry, f, indent=2)
