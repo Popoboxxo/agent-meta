@@ -118,3 +118,82 @@ def test_backward_compat_se_suffix() -> None:
     assert dev_suffix == dev_flag, (
         f"Suffix compat must match flag for non-SE role: {dev_suffix!r} vs {dev_flag!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# New format: tiers: {tier → model_id} direct resolution
+# ---------------------------------------------------------------------------
+
+def _resolve_with_project_preset(
+    role: str,
+    preset_name: str,
+    preset_tiers: dict,
+    extra: dict | None = None,
+) -> str:
+    """Helper: resolve with an inline project-local preset using tiers: format."""
+    project_config: dict = {
+        "tier-preset": preset_name,
+        "tier-presets": {
+            preset_name: {"description": "test preset", "tiers": preset_tiers}
+        },
+    }
+    if extra:
+        project_config.update(extra)
+    return resolve_model(
+        role=role,
+        project_config=project_config,
+        agent_meta_root=REPO_ROOT,
+        provider="Claude",
+        provider_config=_PROVIDER_CONFIG,
+    )
+
+
+def test_new_format_direct_model_resolution() -> None:
+    """Preset with tiers: format resolves tier directly to model id — no provider lookup."""
+    # developer has model: powerful; preset tiers maps balanced only
+    model = _resolve_with_project_preset(
+        role="developer",
+        preset_name="DirectTest",
+        preset_tiers={"powerful": CLAUDE_MODEL_BALANCED},
+    )
+    assert model == CLAUDE_MODEL_BALANCED, (
+        f"New tiers: format should return model id directly, got {model!r}"
+    )
+
+
+def test_old_format_mapping_still_works() -> None:
+    """Preset with mapping: format (old) still resolves via provider model-tiers."""
+    project_config: dict = {
+        "tier-preset": "LegacyPreset",
+        "tier-presets": {
+            "LegacyPreset": {
+                "description": "legacy mapping preset",
+                "mapping": {"balanced": "fast", "powerful": "fast"},
+            }
+        },
+    }
+    model = resolve_model(
+        role="developer",
+        project_config=project_config,
+        agent_meta_root=REPO_ROOT,
+        provider="Claude",
+        provider_config=_PROVIDER_CONFIG,
+    )
+    # developer has tier=powerful; mapping maps powerful→fast; fast maps to haiku
+    assert model == CLAUDE_MODEL_FAST, (
+        f"Old mapping: format should still work via provider model-tiers, got {model!r}"
+    )
+
+
+def test_provider_tier_override_beats_preset_tiers() -> None:
+    """provider-tier-overrides must win over preset tiers: direct model assignment."""
+    override_model = CLAUDE_MODEL_FAST  # claude-haiku — deliberately "cheap"
+    model = _resolve_with_project_preset(
+        role="developer",
+        preset_name="OverrideTest",
+        preset_tiers={"powerful": CLAUDE_MODEL_MAX},  # would return max without override
+        extra={"provider-tier-overrides": {"Claude": {"powerful": override_model}}},
+    )
+    assert model == override_model, (
+        f"provider-tier-overrides must beat preset tiers: expected {override_model!r}, got {model!r}"
+    )
