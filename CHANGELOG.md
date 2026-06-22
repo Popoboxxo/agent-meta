@@ -4,6 +4,17 @@
 
 ---
 
+## [0.65.1] - 2026-06-22
+
+### Fixed
+- Per-provider tier presets: all 5 presets (Cheap/Normal/Advanced/Expensive/Expensive as Hell) now have `providers:` sections for Claude, Gemini and Opencode with correct model IDs
+- Opencode model IDs unified with `opencode-go/` prefix; `qwen3.7-plus` replaces `qwen3.6-plus`; `flash-free` removed; aliases cleaned up (`config/ai-providers.yaml`)
+- Core bug in `scripts/lib/roles.py` tier resolver: now uses `providers.<name>.tiers` before global fallback — previously all Opencode agents received Claude model IDs
+- Admin UI autocomplete performance: per-provider datalists replace a single global list with thousands of entries (Tier Presets + Provider Tier Overrides dialog) (`docs/admin-ui.html`)
+- Outdated project-level model overrides: Opencode prefix corrected from `opencode/` to `opencode-go/` (`.meta-config/project.yaml`)
+
+---
+
 ## [0.65.0] - 2026-06-22
 
 ### Added
