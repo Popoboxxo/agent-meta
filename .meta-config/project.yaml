@@ -54,7 +54,7 @@ roles:
   - opencode-expert
   - continue-expert
   - copilot-expert
-  - se-orchestrator
+  # - se-orchestrator  # AUTO-DISABLED 2026-06-22: deprecated
   - se-requirements
   - se-architect
   - se-interface-mgr
