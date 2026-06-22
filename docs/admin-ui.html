@@ -4496,17 +4496,13 @@ async function viewProviderTiers() {
 async function viewTierPresets() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Tier Presets"]));
-  wrap.appendChild(el("p", { class: "muted" }, ["Manage configuration templates that map generic tasks to required model tiers. (tier-presets.yaml)"]));
+  wrap.appendChild(el("p", { class: "muted" }, ["Resolved model matrix per preset and provider. Each cell shows the actual model ID that a tier maps to. (tier-presets.yaml + ai-providers.yaml)"]));
 
-  let editMode = false;
   let tierPresetsData = {};
+  let aiProvidersData = {};
 
   const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
-  const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
-  const editLabel = el("label", { style: "margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;" }, [el("span", {}, ["Edit Mode"])]);
-  const editToggle = el("input", { type: "checkbox" });
-  editLabel.prepend(editToggle);
-  
+
   const addBtn = el("button", { class: "btn" }, ["Add Preset"]);
   addBtn.onclick = async () => {
     const name = prompt("Enter new Preset ID:");
@@ -4533,96 +4529,88 @@ async function viewTierPresets() {
       toast(err.message, "error");
     }
   };
-  
-  controls.appendChild(saveBtn);
+
   controls.appendChild(addBtn);
-  controls.appendChild(editLabel);
   wrap.appendChild(controls);
 
   const presetsWrap = el("div", { id: "presets-wrap" });
   wrap.appendChild(presetsWrap);
 
+  const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
+
   const renderPresets = () => {
     presetsWrap.innerHTML = "";
+
+    // ai-providers.yaml may be returned wrapped in {providers: {...}} or flat.
+    const providersMap = aiProvidersData.providers || aiProvidersData || {};
+    const providerNames = Object.keys(providersMap).filter(p => providersMap[p] && providersMap[p]["model-tiers"]);
+
     const table = el("table", { class: "data tier-presets-table" });
     const thead = el("thead");
-    thead.appendChild(el("tr", {}, ["Preset ID", "Description", "nano", "fast", "balanced", "powerful", "max"].map(h => el("th", {}, [h]))));
+    thead.appendChild(el("tr", {}, [
+      el("th", {}, ["Preset"]),
+      el("th", {}, ["Provider"]),
+      ...TIERS.map(t => el("th", {}, [t]))
+    ]));
     table.appendChild(thead);
-    
+
     const tbody = el("tbody");
-    Object.keys(tierPresetsData).forEach(presetId => {
-      const tr = el("tr");
-      tr.dataset.presetId = presetId;
-      const data = tierPresetsData[presetId];
-      
-      tr.appendChild(el("td", {}, [el("strong", {}, [presetId])]));
-      if (editMode) {
-        tr.appendChild(el("td", {}, [el("input", { type: "text", class: "preset-desc", value: data.description || "", style: "width: 100%; box-sizing: border-box;" })]));
-      } else {
-        tr.appendChild(el("td", {}, [data.description || "-"]));
-      }
-      
-      const tiers = ["nano", "fast", "balanced", "powerful", "max"];
-      const mapping = data.mapping || {};
-      
-      ["nano", "fast", "balanced", "powerful", "max"].forEach(comp => {
-        const td = el("td", {});
-        const val = mapping[comp] || "";
-        if (editMode) {
-          const select = el("select", { class: `preset-mapping-${comp}`, style: "width: 100%;" });
-          select.appendChild(el("option", { value: "" }, ["(none)"]));
-          tiers.forEach(t => {
-            const opt = el("option", { value: t }, [t]);
-            if (t === val) opt.selected = true;
-            select.appendChild(opt);
-          });
-          td.appendChild(select);
-        } else {
-          td.appendChild(el("span", { class: "badge" }, [val || "-"]));
+    const presetIds = Object.keys(tierPresetsData);
+
+    presetIds.forEach(presetId => {
+      const preset = tierPresetsData[presetId] || {};
+      const mapping = preset.mapping || {};
+      const isDefault = presetId === "Normal";
+
+      providerNames.forEach((pName, pIdx) => {
+        const tr = el("tr");
+        if (isDefault) tr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.08)";
+
+        if (pIdx === 0) {
+          const presetTd = el("td", { rowspan: String(providerNames.length) });
+          presetTd.appendChild(el("strong", {}, [presetId]));
+          if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+          if (preset.description) {
+            presetTd.appendChild(el("div", { class: "muted", style: "font-size: 0.85em; margin-top: 4px;" }, [preset.description]));
+          }
+          tr.appendChild(presetTd);
         }
-        tr.appendChild(td);
+
+        tr.appendChild(el("td", {}, [el("span", { class: "mono" }, [pName])]));
+
+        const providerTiers = (providersMap[pName] || {})["model-tiers"] || {};
+        TIERS.forEach(tier => {
+          const mappedTier = mapping[tier] || tier;
+          const fullId = providerTiers[mappedTier] || mappedTier;
+          const short = (typeof fullId === "string" && fullId.includes("/")) ? fullId.split("/").pop() : fullId;
+          const td = el("td", {});
+          td.appendChild(el("span", { class: "badge mono", title: String(fullId) }, [String(short || "-")]));
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
       });
-      tbody.appendChild(tr);
+
+      // Visual separator row between presets.
+      const sep = el("tr");
+      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border); padding: 0;" }));
+      tbody.appendChild(sep);
     });
+
     table.appendChild(tbody);
     presetsWrap.appendChild(table);
   };
 
   const loadData = async () => {
     try {
-      tierPresetsData = await api.get("/api/tier-presets");
+      const [tp, ap] = await Promise.all([
+        api.get("/api/tier-presets"),
+        api.get("/api/ai-providers")
+      ]);
+      tierPresetsData = tp;
+      aiProvidersData = ap;
       renderPresets();
     } catch (err) { presetsWrap.replaceChildren(renderError(err)); }
-  };
-
-  editToggle.addEventListener("change", (e) => {
-    editMode = e.target.checked;
-    saveBtn.style.display = editMode ? "inline-block" : "none";
-    renderPresets();
-  });
-
-  saveBtn.onclick = async () => {
-    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
-    try {
-      const newPresetsData = JSON.parse(JSON.stringify(tierPresetsData));
-      presetsWrap.querySelectorAll("tr[data-preset-id]").forEach(tr => {
-        const pid = tr.dataset.presetId;
-        const descInput = tr.querySelector(".preset-desc");
-        if (descInput) newPresetsData[pid].description = descInput.value;
-        if (!newPresetsData[pid].mapping) newPresetsData[pid].mapping = {};
-        ["nano", "fast", "balanced", "powerful", "max"].forEach(comp => {
-          const select = tr.querySelector(`.preset-mapping-${comp}`);
-          if (select) {
-            if (select.value) newPresetsData[pid].mapping[comp] = select.value;
-            else delete newPresetsData[pid].mapping[comp];
-          }
-        });
-      });
-      await api.post("/api/tier-presets/update", newPresetsData);
-      toast("Saved", "success"); await loadData();
-    } finally {
-      saveBtn.disabled = false; saveBtn.textContent = "Save Configs";
-    }
   };
 
   loadData();
