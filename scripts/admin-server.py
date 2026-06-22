@@ -1566,15 +1566,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
-            # Validate: each top-level preset value must be a dict with a "mapping" key
             if not isinstance(data, dict):
                 return self._send_json({"error": "Payload must be a JSON object"}, status=400)
             for preset_id, preset_val in data.items():
-                if not isinstance(preset_val, dict) or "mapping" not in preset_val:
+                if not isinstance(preset_val, dict) or (
+                    "tiers" not in preset_val and "mapping" not in preset_val
+                ):
                     return self._send_json(
-                        {"error": f"Preset '{preset_id}' must be an object with a 'mapping' key"},
+                        {"error": f"Preset '{preset_id}' must be an object with a 'tiers' or 'mapping' key"},
                         status=400,
                     )
+                # Strip synthetic fields added by the merged endpoint before persisting.
+                preset_val.pop("source", None)
+                providers_block = preset_val.get("providers")
+                if isinstance(providers_block, dict):
+                    for prov_val in providers_block.values():
+                        if isinstance(prov_val, dict):
+                            prov_val.pop("source", None)
             path = self.__class__.root / "config" / "tier-presets.yaml"
             if not (self.__class__.root / "config").exists():
                 path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"

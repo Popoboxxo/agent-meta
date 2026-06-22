@@ -1,40 +1,150 @@
 Cheap:
-  description: "Flacht die Kurve radikal ab."
+  description: Flacht die Kurve radikal ab.
   tiers:
-    nano:     claude-haiku-4-5-20251001
-    fast:     claude-haiku-4-5-20251001
+    nano: claude-haiku-4-5-20251001
+    fast: claude-haiku-4-5-20251001
     balanced: claude-haiku-4-5-20251001
     powerful: claude-haiku-4-5-20251001
-    max:      claude-sonnet-4-6
+    max: claude-sonnet-4-6
+  providers:
+    Claude:
+      tiers:
+        nano: claude-haiku-4-5-20251001
+        fast: claude-haiku-4-5-20251001
+        balanced: claude-haiku-4-5-20251001
+        powerful: claude-haiku-4-5-20251001
+        max: claude-sonnet-4-6
+    Gemini:
+      tiers:
+        nano: gemini-3.5-flash-medium
+        fast: gemini-3.5-flash-medium
+        balanced: gemini-3.5-flash-medium
+        powerful: gemini-3.5-flash-medium
+        max: gemini-3.5-flash-high
+    Opencode:
+      tiers:
+        nano: opencode-go/deepseek-v4-flash
+        fast: opencode-go/deepseek-v4-flash
+        balanced: opencode-go/deepseek-v4-flash
+        powerful: opencode-go/deepseek-v4-flash
+        max: opencode-go/qwen3.7-plus
 Normal:
-  description: "Das 1:1 Mapping (Status Quo)."
+  description: Das 1:1 Mapping (Status Quo).
   tiers:
-    nano:     claude-haiku-4-5-20251001
-    fast:     claude-haiku-4-5-20251001
+    nano: claude-haiku-4-5-20251001
+    fast: claude-haiku-4-5-20251001
     balanced: claude-sonnet-4-6
     powerful: claude-opus-4-7
-    max:      claude-fable-5
+    max: claude-fable-5
+  providers:
+    Claude:
+      tiers:
+        nano: claude-haiku-4-5-20251001
+        fast: claude-haiku-4-5-20251001
+        balanced: claude-sonnet-4-6
+        powerful: claude-opus-4-7
+        max: claude-fable-5
+    Gemini:
+      tiers:
+        nano: gemini-3.5-flash-medium
+        fast: gemini-3.5-flash-high
+        balanced: gemini-3.1-pro-low
+        powerful: gemini-3.1-pro-high
+        max: gemini-3.1-pro-high
+    Opencode:
+      tiers:
+        nano: opencode-go/deepseek-v4-flash
+        fast: opencode-go/deepseek-v4-flash
+        balanced: opencode-go/qwen3.7-plus
+        powerful: opencode-go/kimi-k2.6
+        max: opencode-go/kimi-k2.7-code
 Advanced:
-  description: "Shifft alles eine Stufe nach oben."
+  description: Shifft alles eine Stufe nach oben.
   tiers:
-    nano:     claude-haiku-4-5-20251001
-    fast:     claude-sonnet-4-6
+    nano: claude-haiku-4-5-20251001
+    fast: claude-sonnet-4-6
     balanced: claude-opus-4-7
     powerful: claude-fable-5
-    max:      claude-fable-5
+    max: claude-fable-5
+  providers:
+    Claude:
+      tiers:
+        nano: claude-haiku-4-5-20251001
+        fast: claude-sonnet-4-6
+        balanced: claude-opus-4-7
+        powerful: claude-fable-5
+        max: claude-fable-5
+    Gemini:
+      tiers:
+        nano: gemini-3.5-flash-medium
+        fast: gemini-3.1-pro-low
+        balanced: gemini-3.1-pro-high
+        powerful: gemini-3.1-pro-high
+        max: gemini-3.1-pro-high
+    Opencode:
+      tiers:
+        nano: opencode-go/deepseek-v4-flash
+        fast: opencode-go/qwen3.7-plus
+        balanced: opencode-go/kimi-k2.6
+        powerful: opencode-go/kimi-k2.7-code
+        max: opencode-go/kimi-k2.7-code
 Expensive:
-  description: "Sehr starker Shift."
+  description: Sehr starker Shift.
   tiers:
-    nano:     claude-sonnet-4-6
-    fast:     claude-opus-4-7
+    nano: claude-sonnet-4-6
+    fast: claude-opus-4-7
     balanced: claude-fable-5
     powerful: claude-fable-5
-    max:      claude-fable-5
+    max: claude-fable-5
+  providers:
+    Claude:
+      tiers:
+        nano: claude-sonnet-4-6
+        fast: claude-opus-4-7
+        balanced: claude-fable-5
+        powerful: claude-fable-5
+        max: claude-fable-5
+    Gemini:
+      tiers:
+        nano: gemini-3.5-flash-high
+        fast: gemini-3.1-pro-low
+        balanced: gemini-3.1-pro-high
+        powerful: gemini-3.1-pro-high
+        max: gemini-3.1-pro-high
+    Opencode:
+      tiers:
+        nano: opencode-go/qwen3.7-plus
+        fast: opencode-go/kimi-k2.6
+        balanced: opencode-go/kimi-k2.7-code
+        powerful: opencode-go/kimi-k2.7-code
+        max: opencode-go/kimi-k2.7-code
 Expensive as Hell:
-  description: "Fast alle Agenten laufen auf powerful oder max."
+  description: Fast alle Agenten laufen auf powerful oder max.
   tiers:
-    nano:     claude-opus-4-7
-    fast:     claude-fable-5
+    nano: claude-opus-4-7
+    fast: claude-fable-5
     balanced: claude-fable-5
     powerful: claude-fable-5
-    max:      claude-fable-5
+    max: claude-fable-5
+  providers:
+    Claude:
+      tiers:
+        nano: claude-opus-4-7
+        fast: claude-fable-5
+        balanced: claude-fable-5
+        powerful: claude-fable-5
+        max: claude-fable-5
+    Gemini:
+      tiers:
+        nano: gemini-3.1-pro-low
+        fast: gemini-3.1-pro-high
+        balanced: gemini-3.1-pro-high
+        powerful: gemini-3.1-pro-high
+        max: gemini-3.1-pro-high
+    Opencode:
+      tiers:
+        nano: opencode-go/kimi-k2.6
+        fast: opencode-go/kimi-k2.7-code
+        balanced: opencode-go/kimi-k2.7-code
+        powerful: opencode-go/kimi-k2.7-code
+        max: opencode-go/kimi-k2.7-code
