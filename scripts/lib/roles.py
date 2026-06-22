@@ -160,14 +160,31 @@ def resolve_model(
     # Merge: project-local presets (project_config["tier-presets"]) override global ones.
     global_presets = load_tier_presets(agent_meta_root)
     project_presets = project_config.get("tier-presets", {}) or {}
+
     if isinstance(project_presets, dict) and preset_name in project_presets:
-        preset_matrix = project_presets[preset_name].get("mapping", {}) or {}
+        preset_data = project_presets[preset_name] or {}
         if log:
             log.debug(f"{provider}/{role}", f"Preset '{preset_name}' resolved from project-local tier-presets")
-    elif preset_name in global_presets:
-        preset_matrix = global_presets.get(preset_name, {}).get("mapping", {}) or {}
     else:
-        preset_matrix = {}
+        preset_data = global_presets.get(preset_name, {}) or {}
+
+    # --- New format: tiers: {tier → model_id} direct ---
+    if "tiers" in preset_data:
+        direct_model = preset_data["tiers"].get(base_tier, "")
+        if direct_model:
+            # provider-tier-overrides take priority over preset tiers
+            pto = project_config.get("provider-tier-overrides", {})
+            if provider in pto and base_tier in pto[provider]:
+                resolved = str(pto[provider][base_tier])
+                if log:
+                    log.debug(f"{provider}/{role}", f"Tier '{base_tier}' explicitly overriden for provider '{provider}': {resolved}")
+                return resolved
+            if log:
+                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved directly from preset '{preset_name}': {direct_model}")
+            return direct_model
+
+    # --- Old format: mapping: {tier → tier} + provider model-tiers ---
+    preset_matrix = preset_data.get("mapping", {}) or {}
 
     mapped_tier = preset_matrix.get(base_tier, base_tier)
     if log and mapped_tier != base_tier:
