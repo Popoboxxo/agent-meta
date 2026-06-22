@@ -329,6 +329,8 @@ reflection-pairs:
       max_iterations: 5
       enabled: true
 
+tier-preset: Normal
+
 # tier-presets:  # Optional: project-local presets override global tier-presets.yaml
 #   MyCustom:
 #     description: "Project-specific preset"
