@@ -1,4 +1,4 @@
-"""Tests for scripts.lib.model_discovery (keyless OpenRouter + OpenCode Zen).
+"""Tests for scripts.lib.model_discovery (keyless OpenRouter + OpenCode Zen/Go).
 
 Network is mocked via unittest.mock — no real HTTP requests are made.
 """
@@ -10,6 +10,7 @@ import pytest
 
 from scripts.lib.model_discovery import (
     discover_models,
+    fetch_opencode_go_models,
     fetch_opencode_zen_models,
     fetch_openrouter_models,
 )
@@ -66,6 +67,16 @@ def _sample_opencode_zen_payload():
             {"id": "deepseek-v4-flash-free", "context_length": 128000},
             {"id": "qwen3.6-plus", "context_length": 128000},
             {"id": "kimi-k2.6", "context_length": 200000},
+        ]
+    }
+
+
+def _sample_opencode_go_payload():
+    return {
+        "data": [
+            {"id": "deepseek-v4-flash", "context_length": 128000},
+            {"id": "kimi-k2.6", "context_length": 200000},
+            {"id": "qwen3.6-plus", "context_length": 128000},
         ]
     }
 
@@ -164,6 +175,45 @@ def test_fetch_opencode_zen_models_network_error_returns_empty():
     assert models == []
 
 
+# -- fetch_opencode_go_models: namespacing and provider tag -------------------
+
+
+def test_fetch_opencode_go_models_namespaces_ids():
+    payload = _sample_opencode_go_payload()
+    with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
+        models = fetch_opencode_go_models()
+
+    ids = {m["id"] for m in models}
+    assert "opencode-go/deepseek-v4-flash" in ids
+    assert "opencode-go/kimi-k2.6" in ids
+    assert "opencode-go/qwen3.6-plus" in ids
+
+    for m in models:
+        assert m["provider"] == "opencode-go"
+        assert m["id"].startswith("opencode-go/")
+        assert m["input_cost_api"] == 0.0
+        assert m["output_cost_api"] == 0.0
+
+
+def test_fetch_opencode_go_models_blacklist_matches_both_forms():
+    payload = _sample_opencode_go_payload()
+    # Blacklist by both raw id and namespaced id forms.
+    blacklist = ["kimi-k2.6", "opencode-go/qwen3.6-plus"]
+    with patch("urllib.request.urlopen", return_value=_make_urlopen_mock(payload)):
+        models = fetch_opencode_go_models(blacklist=blacklist)
+
+    ids = {m["id"] for m in models}
+    assert "opencode-go/kimi-k2.6" not in ids
+    assert "opencode-go/qwen3.6-plus" not in ids
+    assert "opencode-go/deepseek-v4-flash" in ids
+
+
+def test_fetch_opencode_go_models_network_error_returns_empty():
+    with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+        models = fetch_opencode_go_models()
+    assert models == []
+
+
 # -- discover_models ----------------------------------------------------------
 
 
@@ -196,6 +246,16 @@ def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
             "tier": "Standard",
         },
     ]
+    go_fetched = [
+        {
+            "id": "opencode-go/deepseek-v4-flash",
+            "name": "Deepseek V4 Flash",
+            "provider": "opencode-go",
+            "input_cost_api": 0.0,
+            "output_cost_api": 0.0,
+            "tier": "Standard",
+        },
+    ]
 
     with patch(
         "scripts.lib.model_discovery.fetch_openrouter_models",
@@ -203,6 +263,9 @@ def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
     ), patch(
         "scripts.lib.model_discovery.fetch_opencode_zen_models",
         return_value=list(zen_fetched),
+    ), patch(
+        "scripts.lib.model_discovery.fetch_opencode_go_models",
+        return_value=list(go_fetched),
     ):
         registry = discover_models()
 
@@ -210,7 +273,7 @@ def test_discover_models_merges_openrouter_and_zen(tmp_path, monkeypatch):
     assert "models" in registry
 
     ids = [m["id"] for m in registry["models"]]
-    for m in or_fetched + zen_fetched:
+    for m in or_fetched + zen_fetched + go_fetched:
         assert m["id"] in ids
 
 
@@ -239,6 +302,9 @@ def test_discover_models_deduplicates_by_id():
         return_value=list(duplicated),
     ), patch(
         "scripts.lib.model_discovery.fetch_opencode_zen_models",
+        return_value=[],
+    ), patch(
+        "scripts.lib.model_discovery.fetch_opencode_go_models",
         return_value=[],
     ):
         registry = discover_models()
