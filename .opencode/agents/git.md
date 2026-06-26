@@ -3,7 +3,7 @@ name: git
 description: 'Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages
   — plattformunabhängig (GitHub, GitLab, Gitea).'
 mode: subagent
-model: claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

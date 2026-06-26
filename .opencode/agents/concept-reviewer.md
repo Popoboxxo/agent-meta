@@ -3,7 +3,7 @@ name: concept-reviewer
 description: 'Generischer Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit,
   Logik-Lücken, Annahmen, Alternativen, Risiken, Machbarkeit und Konsistenz.'
 mode: subagent
-model: claude-opus-4-7
+model: opencode-go/kimi-k2.6
 permission:
   read: allow
   glob: allow

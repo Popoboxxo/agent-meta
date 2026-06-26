@@ -3,7 +3,7 @@ name: export-manager
 description: Liest .meta-config/export.yaml und routet strukturierte JSON-Payloads
   der Fach-Agenten zum konfigurierten Target (markdown, confluence, jira-xray, etc.).
 mode: subagent
-model: claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

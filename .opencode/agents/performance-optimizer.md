@@ -3,7 +3,7 @@ name: performance-optimizer
 description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
   Profiling-Daten, ohne funktionale Aenderungen.
 mode: subagent
-model: claude-opus-4-7
+model: opencode-go/kimi-k2.6
 permission:
   read: allow
   edit: allow

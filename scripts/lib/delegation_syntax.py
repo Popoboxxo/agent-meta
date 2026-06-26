@@ -36,6 +36,7 @@ _A2A_REQUIRED_FIELDS: tuple[str, ...] = (
     "source_agent",
     "target_agent",
     "payload",
+    "delegation_depth",
 )
 
 
@@ -153,6 +154,7 @@ class DelegationSyntaxEngine:
         envelope: dict[str, Any],
         schema_name: str = "a2a-handoff",
         agent_meta_root: Path | None = None,
+        max_depth: int = 10,
     ) -> list[str]:
         """Validate an A2A envelope dict and return a list of error strings.
 
@@ -170,6 +172,9 @@ class DelegationSyntaxEngine:
             schema_name:     Schema key (default ``"a2a-handoff"``).
             agent_meta_root: Repo root path used to locate the schema file.
                              Derived from ``config_dir`` when not provided.
+            max_depth:       Maximum allowed delegation_depth (default 10).
+                             Configurable via ``orchestrator.delegation.max_depth``
+                             in project.yaml.
 
         Returns:
             A list of human-readable error strings.  Empty list means valid.
@@ -180,6 +185,24 @@ class DelegationSyntaxEngine:
         missing = [f for f in _A2A_REQUIRED_FIELDS if f not in envelope]
         if missing:
             errors.append(f"Missing required fields: {', '.join(missing)}")
+
+        # Tier 1.5: topological hard rejects (Anti-Re-Delegation)
+        sa = envelope.get("source_agent")
+        ta = envelope.get("target_agent")
+        if sa is not None and ta is not None and sa == ta:
+            errors.append(
+                f"Self-handoff rejected: source_agent ('{sa}') == target_agent ('{ta}'). "
+                "Delegation to self is structurally forbidden."
+            )
+
+        dd = envelope.get("delegation_depth")
+        if dd is not None:
+            if not isinstance(dd, int) or isinstance(dd, bool):
+                errors.append(
+                    f"Invalid delegation_depth: must be integer 0..{max_depth}, got {type(dd).__name__}"
+                )
+            elif dd < 0 or dd > max_depth:
+                errors.append(f"Delegation depth {dd} out of range: must be 0..{max_depth}")
 
         # Tier 2: full JSON Schema validation (optional, graceful degradation)
         schema_rel = self.get_schema_ref(schema_name)

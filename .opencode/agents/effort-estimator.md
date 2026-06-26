@@ -3,7 +3,7 @@ name: effort-estimator
 description: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und
   LLM-Fähigkeiten
 mode: subagent
-model: claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

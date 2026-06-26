@@ -1099,6 +1099,7 @@ Ausnahme: Continue/Copilot (`structured_handoff: false`) erhalten einen YAML-Tex
 | **compact_mode** | Envelope-Flag: `true` = kurze Payload-Namen (Token-sparend), `false` = lesbare Namen |
 | **Supersession** | Version-Tracking mit `history[]`-Array für vollständige Revisionsketten |
 | **Contract** | Jede Route deklariert Schema + Extension + compact_mode in der Routing-Tabelle |
+| **Delegation Gates** | Anti-Re-Delegation: `delegation_depth` (konfigurierbar via `project.yaml`, Default 10), Self-Handoff-Verbot (`source_agent ≠ target_agent`), T-Size-Limit, Re-Delegation-Detection — 4 Hard-Reject-Gates in `rules/1-generic/a2a-delegation-gates.md` |
 
 ### 11.3 A2A vs. viz-Debug — Separate Konzepte
 
@@ -1163,7 +1164,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 
 | Artefakt | Änderung | Status |
 |----------|----------|--------|
-| `schemas/a2a-handoff.schema.json` | Envelope: `batch`, `retry_count`, `requires_human_approval`, `negotiated_format`, `supersession.history[]` | ✓ Phase 1 |
+| `schemas/a2a-handoff.schema.json` | Envelope: `batch`, `retry_count`, `requires_human_approval`, `negotiated_format`, `supersession.history[]`, `delegation_depth` (required, max 50) | ✓ Phase 1 (erweitert) |
 | `schemas/handoffs/task-spec.schema.json` | Universelles Kern-Payload (NEU) — kurze Feldnamen | ✓ Phase 1 |
 | `schemas/handoffs/ext/*.schema.json` | 4 Extensions (NEU): Ideation, Design, API, Review | ✓ Phase 1 |
 | `schemas/se-decomposition.schema.json` | **Unverändert** — in Envelope eingebettet | — |
@@ -1171,6 +1172,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `.meta-config/project.yaml` | `orchestrator.handoff`-Block + `viz.debug` + `viz.a2a_events` | ✓ Phase 1 |
 | `docs/concepts/a2a-handoff-protocol.md` | Implementation-nahes Konzept (v2.0, 872 Zeilen) | ✓ Phase 1 |
 | `docs/CODEBASE_OVERVIEW.md` | Abschnitte 5 + 10 aktualisiert | ✓ Phase 1 |
+| `rules/1-generic/a2a-delegation-gates.md` | Anti-Re-Delegation Gates: Self-Handoff-Verbot, Tiefenlimit, T-Size-Limit, Re-Delegation-Detection | ✓ Phase 4 (erweitert) |
 | `config/delegation-syntax.yaml` | `handoff:`-Block für alle 5 Provider (JSON + YAML-Fallback) | ✓ Phase 2 |
 | `config/provider-capabilities.yaml` | `structured_handoff` + `handoff_format` + `handoff_envelope_support` Flags | ✓ Phase 2 |
 | `scripts/lib/delegation_syntax.py` | `PLACEHOLDERS` um `PAL_HANDOFF` erweitert | ✓ Phase 2 |

@@ -3579,6 +3579,30 @@ async function viewProjectOrchestrator() {
 
   wrap.appendChild(hPanel);
 
+  // ── Delegation ────────────────────────────────────────────────────────────
+  const del = (orch.delegation && typeof orch.delegation === "object") ? clone(orch.delegation) : {};
+  const delPanel = el("div", { class: "panel" });
+  delPanel.appendChild(el("h2", {}, ["Delegation"]));
+  delPanel.appendChild(el("p", { class: "muted" }, [
+    "Hard limits for agent-to-agent handoffs. Self-handoff (source_agent == target_agent) is always forbidden and cannot be disabled."
+  ]));
+
+  // max_depth — number input
+  const mdRow = el("div", { class: "field-row" });
+  mdRow.appendChild(el("label", { class: "field-label" }, ["max_depth"]));
+  const mdInput = el("input", { type: "number", min: "1", max: "50", style: "width:80px;" });
+  mdInput.value = del.max_depth != null ? String(del.max_depth) : "10";
+  mdInput.addEventListener("change", () => {
+    const v = parseInt(mdInput.value, 10);
+    del.max_depth = isNaN(v) ? 10 : Math.max(1, Math.min(50, v));
+    orch.delegation = del;
+  });
+  mdRow.appendChild(mdInput);
+  mdRow.appendChild(el("span", { class: "muted", style: "margin-left:8px;" }, ["Default: 10, Range: 1–50"]));
+  delPanel.appendChild(mdRow);
+
+  wrap.appendChild(delPanel);
+
   // ── Token Budget ──────────────────────────────────────────────────────────
   const tb = (hf["token-budget"] && typeof hf["token-budget"] === "object") ? hf["token-budget"] : {};
   const tbPanel = el("div", { class: "panel" });
@@ -3639,6 +3663,9 @@ async function viewProjectOrchestrator() {
       if (Object.keys(hf).length > 0 || orch.handoff !== undefined) {
         hf["token-budget"] = tb;
         orch.handoff = hf;
+      }
+      if (Object.keys(del).length > 0 || orch.delegation !== undefined) {
+        orch.delegation = del;
       }
       try { await saveProjectSection("orchestrator", orch, status); } catch { /* toast shown */ }
     } }, ["Save"]),

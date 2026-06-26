@@ -3,7 +3,7 @@ name: api-specialist
 description: API-Design, OpenAPI-Spezifikationen, Contract-First Development. Erstellt
   und pflegt API-Vertraege.
 mode: subagent
-model: claude-sonnet-4-6
+model: opencode-go/qwen3.7-plus
 permission:
   read: allow
   edit: allow

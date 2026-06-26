@@ -121,6 +121,9 @@ test-repo:
 #     meta-feedback: true
 #     main-chat: true
 #     ask-user: false
+#   # delegation:
+#   #   max_depth: 10  # Maximale Delegations-Tiefe (Default: 10, Range: 1-50)
+#   #                   # Selbst-Delegation (source_agent == target_agent) ist immer verboten.
 #
 # max-parallel-agents: 4
 #

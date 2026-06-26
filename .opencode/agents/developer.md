@@ -4,7 +4,7 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
 mode: subagent
-model: opencode/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

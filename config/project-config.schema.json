@@ -930,6 +930,20 @@
             }
           },
           "additionalProperties": true
+        },
+        "delegation": {
+          "type": "object",
+          "description": "Delegation behavior configuration. Controls hard limits for agent-to-agent handoffs.",
+          "properties": {
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "Maximum delegation depth before HARD REJECT. Default 10. Self-handoff (source_agent == target_agent) is enforced separately and cannot be disabled."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": true

@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "3.3.1"
+version: "4.1.0"
 description: "Formaler Prozess-Wächter: DoD-Checkboxen, REQ-ID-Präsenz, Commit-Konventionen. Bewertet KEINE Code-Qualität — dafür code-reviewer."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
@@ -179,9 +179,15 @@ Prüfe Konsistenz: `docs/REQUIREMENTS.md` ↔ `docs/CODEBASE_OVERVIEW.md` ↔ `s
 
 Eingehenden A2A-Envelope VOR inhaltlicher Prüfung validieren:
 
-1. Pflichtfelder: `protocol_version` (= `1.0.0`), `handoff_id` (Regex `^HOFF-\d{8}-\d{3,6}$`), `source_agent`, `target_agent`, `payload`
+### Structural Validation
+1. Pflichtfelder vorhanden: `protocol_version` (= `1.0.0`), `handoff_id` (Regex `^HOFF-\d{8}-\d{3,6}$`), `source_agent`, `target_agent`, `payload`, `delegation_depth` (int, 0..{{A2A_MAX_DEPTH}})
 2. `schema_ref` (falls gesetzt): referenzierte Schema-Datei muss existieren
 3. `payload`: Object (oder Array wenn `batch: true`); `trace_parent` (falls gesetzt): Format wie handoff_id
+
+### Topological Hard Rejects (Anti-Re-Delegation)
+4. **`source_agent == target_agent`** → HARD REJECT. Fehler: `"Self-handoff rejected: source_agent ({source}) == target_agent ({target}). Delegation to self is structurally forbidden."`
+5. **`delegation_depth > {{A2A_MAX_DEPTH}}`** → HARD REJECT. Fehler: `"Delegation depth {N} exceeds limit of {{A2A_MAX_DEPTH}}. Structural error in caller."`
+6. **`delegation_depth < 0`** → HARD REJECT. Fehler: `"Invalid delegation_depth: must be 0..{{A2A_MAX_DEPTH}}."`
 
 Rückgabe: `{"valid": bool, "handoff_id": "...", "errors": [{"field","message"}], "warnings": [...]}`
 Kein Envelope (Natural-Language) → Aufgabe normal ausführen, Warning: "Kein A2A-Envelope — Natural-Language-Fallback".

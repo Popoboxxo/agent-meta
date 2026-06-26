@@ -4,7 +4,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionswe
   Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
 mode: subagent
-model: claude-opus-4-7
+model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow

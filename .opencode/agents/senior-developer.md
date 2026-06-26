@@ -3,7 +3,7 @@ name: senior-developer
 description: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs und Cross-Cutting-Refactorings.
   Analysiert vor der Implementierung und dokumentiert Entscheidungen.
 mode: subagent
-model: opencode/kimi-k2.6
+model: opencode-go/kimi-k2.7-code
 permission:
   bash: allow
   read: allow

@@ -1,14 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "A2A Handoff Envelope Schema",
-  "description": "Standardized envelope for structured Agent-to-Agent handoffs in agent-meta. Wraps any domain-specific payload with metadata for validation, supersession tracking, and traceability.",
+  "description": "Standardized envelope for structured Agent-to-Agent handoffs in agent-meta. Wraps any domain-specific payload with metadata for validation, supersession tracking, and traceability. Hard constraint: source_agent MUST NOT equal target_agent — self-handoffs are structurally forbidden and MUST be rejected by the consuming agent.",
   "type": "object",
   "required": [
     "protocol_version",
     "handoff_id",
     "source_agent",
     "target_agent",
-    "payload"
+    "payload",
+    "delegation_depth"
   ],
   "properties": {
     "protocol_version": {
@@ -95,6 +96,13 @@
       "items": {
         "type": "object"
       }
+    },
+    "delegation_depth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50,
+      "default": 0,
+      "description": "Depth of this handoff in the delegation chain. 0 = main chat, 1 = orchestrator, 2+ = worker/sub-worker. Envelopes with delegation_depth exceeding the configured max (project.yaml → orchestrator.delegation.max_depth, default 10) MUST be rejected. Self-handoff (source_agent == target_agent) is enforced separately and cannot be disabled."
     },
     "trace_parent": {
       "type": "string",

@@ -3,7 +3,7 @@ name: ui-ux-designer
 description: Erstellt UI-Spezifikationen, Mockups und Design-Systeme. Ordnet UI-Elemente
   REQ-IDs zu.
 mode: subagent
-model: claude-sonnet-4-6
+model: opencode-go/qwen3.7-plus
 permission:
   read: allow
   edit: allow

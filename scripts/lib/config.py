@@ -379,6 +379,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
     variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
     variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
+    # A2A_MAX_DEPTH: configurable maximum delegation depth before HARD REJECT.
+    # Read from orchestrator.delegation.max_depth (default: 10, range: 1-50).
+    _delegation_cfg = orch_config.get("delegation", {})
+    _max_depth = _delegation_cfg.get("max_depth", 10) if isinstance(_delegation_cfg, dict) else 10
+    if not isinstance(_max_depth, int) or isinstance(_max_depth, bool):
+        _max_depth = 10
+    _max_depth = max(1, min(50, _max_depth))  # clamp to valid range
+    variables["A2A_MAX_DEPTH"] = str(_max_depth)
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
     # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)

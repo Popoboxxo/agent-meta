@@ -3,7 +3,7 @@ name: requirements
 description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und
   Traceability prüfen.
 mode: subagent
-model: claude-sonnet-4-6
+model: opencode-go/qwen3.7-plus
 permission:
   read: allow
   edit: allow

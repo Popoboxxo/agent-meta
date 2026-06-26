@@ -3,7 +3,7 @@ name: devops-engineer
 description: CI/CD-Pipelines, Infrastructure as Code, Container-Orchestrierung, Observability
   und Security-Best-Practices.
 mode: subagent
-model: claude-haiku-4-5-20251001
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

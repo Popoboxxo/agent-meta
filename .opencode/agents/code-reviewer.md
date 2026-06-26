@@ -3,7 +3,7 @@ name: code-reviewer
 description: 'Gatekeeper für Code-Gesundheit: Clean Code, SOLID, Blast-Radius-Analysen
   und REQ-Traceability in Code-Pfaden.'
 mode: subagent
-model: claude-opus-4-7
+model: opencode-go/kimi-k2.6
 permission:
   read: allow
   bash: allow

@@ -3,7 +3,7 @@ name: explorer
 description: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
   und Symbol-Suche.
 mode: subagent
-model: claude-sonnet-4-6
+model: opencode-go/qwen3.7-plus
 permission:
   read: allow
   glob: allow
