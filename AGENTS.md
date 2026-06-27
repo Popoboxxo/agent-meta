@@ -39,6 +39,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `opencode-expert` | Opencode Experte: Funktionsweise, .opencode Konfiguration, Best Practices |
 | `orchestrator` | Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel |
 | `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
+| `prompt-engineer` | Prompts und Agenten entwerfen oder reviewen |
 | `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `senior-developer` | High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann |
@@ -410,24 +411,6 @@ ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
 
 Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
 
-3. **Orchestrator:** Alles andere → an `orchestrator` delegieren.
-
-> **Merksatz:** Mehr als ein Schritt ODER mehr als ein Agent ODER Dateien in kritischen Pfaden → immer Orchestrator. Auch wenn der User eine kurze Lösung erwartet.
-
-## Direkter Dispatch (nur nach Regel 2)
-
-| Operation | Direkt an | Bedingung |
-|-----------|-----------|-----------|
-| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
-| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
-| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
-| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
-
-> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
-
-## Auto-Handoff
-
-Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
 
 ## Git Delegation — Hard Rule
 
@@ -452,11 +435,6 @@ ALLE anderen git-Operationen → an `git`-Agenten delegieren.
 
 **Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
 **Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
-
-# Main-Chat-Modus
-
-Orchestrator ist deaktiviert. Alle Aufgaben werden direkt im Hauptchat ausgeführt.
-Delegation an Subagenten ist optional und erfolgt nach eigenem Ermessen.
 
 ---
 

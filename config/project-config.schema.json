@@ -86,6 +86,7 @@
           "openscad-developer",
           "orchestrator",
           "performance-optimizer",
+          "prompt-engineer",
           "release",
           "requirements",
           "se-architect",
@@ -449,7 +450,14 @@
       "description": "Override the resolved tier per role.",
       "additionalProperties": {
         "type": "string",
-        "enum": ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+        "enum": [
+          "nano",
+          "fast",
+          "balanced",
+          "powerful",
+          "max",
+          "ultra"
+        ]
       }
     },
     "provider-tier-overrides": {
@@ -460,7 +468,14 @@
         "description": "Role-to-tier overrides for this provider.",
         "additionalProperties": {
           "type": "string",
-          "enum": ["nano", "fast", "balanced", "powerful", "max", "ultra"]
+          "enum": [
+            "nano",
+            "fast",
+            "balanced",
+            "powerful",
+            "max",
+            "ultra"
+          ]
         }
       }
     },
