@@ -146,6 +146,12 @@ roles:
     workflow_tier: optional
     description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
 
+  prompt-engineer:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera)."
+
   agent-meta-manager:
     model: balanced
     memory: ""
