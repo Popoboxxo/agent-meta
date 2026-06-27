@@ -206,6 +206,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/feature.md` | `1-generic/feature.md` |
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
+| `.claude/agents/prompt-engineer.md` | `1-generic/prompt-engineer.md` |
 | `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
 | `.claude/agents/feedback.md` | `1-generic/feedback.md` |
 | `.claude/agents/se-requirements.md` | `1-generic/se-requirements.md` |
@@ -413,6 +414,7 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/feature.md` vorhanden
 - [ ] `.claude/agents/agent-meta-manager.md` vorhanden
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
+- [ ] `.claude/agents/prompt-engineer.md` vorhanden
 - [ ] `.claude/agents/log-analyzer.md` vorhanden
 - [ ] `.claude/agents/feedback.md` vorhanden
 - [ ] `.claude/agents/bug-feature-analyzer.md` vorhanden
