@@ -4,6 +4,14 @@
 
 ---
 
+## [0.65.2] - 2026-06-28
+
+### Fixed
+- Orchestrator Singleton Guard (verhindert Rekursion, max Depth 10)
+- Tests fuer Singleton-Verhalten ergaenzt
+
+---
+
 ## [0.65.1] - 2026-06-22
 
 ### Fixed
