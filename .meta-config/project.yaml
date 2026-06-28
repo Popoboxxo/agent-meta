@@ -266,6 +266,8 @@ model-overrides:
     orchestrator: opencode-go/minimax-m3
     se-junior-developer: opencode-go/minimax-m3
     developer: opencode-go/minimax-m3
+    prompt-engineer: opencode-go/minimax-m3
+    agent-meta-manager: opencode-go/minimax-m3
 reflection-pairs:
   overrides:
     dev-review-loop:

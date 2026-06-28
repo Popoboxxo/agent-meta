@@ -3,7 +3,7 @@ name: prompt-engineer
 description: Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert
   Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera).
 mode: subagent
-model: opencode-go/kimi-k2.6
+model: opencode-go/minimax-m3
 permission:
   bash: allow
   read: allow
