@@ -262,8 +262,10 @@ quality-pipelines:
   custom-pipelines: {}
 model-overrides:
   Opencode:
-    developer: opencode-go/qwen3.7-plus
     senior-developer: opencode-go/kimi-k2.7-code
+    orchestrator: opencode-go/minimax-m3
+    se-junior-developer: opencode-go/minimax-m3
+    developer: opencode-go/minimax-m3
 reflection-pairs:
   overrides:
     dev-review-loop:
