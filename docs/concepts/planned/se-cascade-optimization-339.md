@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-Das SE-Framework (14 Agenten, V-Modell, fraktale Decomposition) hat in der praktischen Nutzung sechs strukturelle Befunde gezeigt: fehlende ADR-Standards (B1), uneinheitliche REQ-Frontmatter (B2), ungetaxonomierte Strategie-Dokumente (B3), verletzte L2-Trennregel (B4), fehlender Review-Lifecycle (B5) und fehlende Bottom-Up-Rückkopplung (B6). Dieses Konzept standardisiert die SE-Dokumenten-Taxonomie, führt eine verbindliche YAML-Frontmatter-Sprache für REQ/ADR/Review ein, ergänzt einen neuen `se-housekeeper`-Agenten für kontinuierliche Compliance-Prüfung und schließt die Kaskade bidirektional. Zielgruppe: SE-Operatoren in Projekten mit `SE_ENABLED: true`. Auslieferung in 5 Phasen, Aufwand gesamt **L** (groß), Start **Phase 1** sofort nach Konzept-Approval.
+Das SE-Framework (14 Agenten, V-Modell, fraktale Decomposition) hat in der praktischen Nutzung sechs strukturelle Befunde gezeigt: fehlende ADR-Standards (B1), uneinheitliche REQ-Frontmatter (B2), ungetaxonomierte Strategie-Dokumente (B3), verletzte L2-Trennregel (B4), fehlender Review-Lifecycle (B5) und fehlende Bottom-Up-Rückkopplung (B6). Dieses Konzept standardisiert die SE-Dokumenten-Taxonomie, führt eine verbindliche YAML-Frontmatter-Sprache für REQ/ADR/Review ein, ergänzt einen neuen `se-housekeeper`-Agenten für kontinuierliche Compliance-Prüfung und schließt die Kaskade bidirektional. Zielgruppe: SE-Operatoren in Projekten mit `SE_ENABLED: true`. Auslieferung in 6 Phasen (Phase 1.5 neu für Verzeichnisstruktur + Adapter-Refactoring), Aufwand gesamt **L** (groß), Start **Phase 1** sofort nach Konzept-Approval.
 
 ---
 
@@ -73,11 +73,14 @@ review_iteration:     0                 # monoton steigend
 ### B3 — SE-Doku-Taxonomie (MITTEL)
 
 **Ist:** Versionen im Dateinamen (`_v6`), keine einheitliche Struktur.
-**Soll:** Verbindliche 7-Verzeichnis-Taxonomie + YAML-Frontmatter-Pflicht für alle SE-Dokumente.
+**Soll:** Verbindliche 8-Verzeichnis-Taxonomie + YAML-Frontmatter-Pflicht für alle SE-Dokumente + verschachtelte Hierarchie.
 
-**Taxonomie** (siehe Anhang B): `L0/`, `L1/`, `L2/`, `L3/`, `ADR/`, `VV/`, `reviews/`, `traceability/`
+**Taxonomie** (siehe Sektion 7 — Verzeichnisstruktur (verschachtelt)):
+- 8 flache/gemischte Verzeichnisse (`L0/`, `L1/`, `L2/`, `L3/`, `ADR/`, `VV/`, `reviews/`, `traceability/`)
+- **Verschachtelt** unter `L1/`, `L2/`, `Components/`: System-/Component-Ordner mit Postfix-Konvention (`AuthServiceSystem`, `TokenValidatorComponent`)
 - Frontmatter-Pflicht: `type: ADR|REQ|REVIEW|TRACE|STRATEGY|VV-DOC`, `scope: project|<subscope>`, `status`, `date`, `author_agent`
-- Versionskontrolle via Git, **nie** via Dateinamen-Suffix
+- Versionskontrolle via Git, **nie** via Dateinamen-Suffix — das **Verbot von `_v6`-Suffixen** im Dateinamen ist hart: `VV_Strategy_new_needs_v6.md` ist exakt die #339-Sünde (POC-Referenz in Sektion 15)
+- **Postfix-Konvention:** System-Ordner IMMER auf `System` endend (z.B. `AuthServiceSystem`), Component-Ordner IMMER auf `Component` (z.B. `TokenValidatorComponent`). Ermöglicht eindeutige Zell-Identifikation ohne explizite Tag-Ebene.
 - **Akzeptanzkriterium:** `se-housekeeper` Block 1 ("Dateinamen-Standard") prüft `^docs/se/(L0|L1|L2|L3|ADR|VV|reviews|traceability)/[A-Z]+-\d+_.+\.md$` — 0% Abweichung.
 
 ### B4 — L2-Trennregel (HOCH)
@@ -91,6 +94,18 @@ review_iteration:     0                 # monoton steigend
 - Architektur → `docs/se/L<n>/ARCH-L<n>_<subscope>.md` mit YAML-Frontmatter `type: ARCH`.
 - Review-Befunde → `docs/se/reviews/REVIEW_<YYYY-MM-DD>_<scope>.md`.
 - Traceability → `docs/se/traceability/TRACE_<scope>.md` mit `kind: derives|satisfies|verifies|implements`.
+
+**Verzeichnis-basierte Trennung (siehe Sektion 7 — Verzeichnisstruktur):**
+
+| Artefakt | Ablageort | Erlaubt in REQ-Datei? |
+|----------|-----------|----------------------|
+| Architecture | `L{N}_*_Architecture.md` innerhalb des Zellen-Ordners | ❌ — nie inline |
+| Implementation | `implementation/`-Subfolder innerhalb der Zelle | ❌ |
+| Review-Protokolle | `docs/se/reviews/` (flach) | ❌ |
+| Traceability-Matrizen | `docs/se/traceability/` (flach) | ❌ |
+| V&V-Dokumente | `docs/se/VV/` (flach) | ❌ |
+| ADRs | `docs/se/ADR/ADR-NNN_kurztitel.md` | ❌ — nur `open_adrs`-Referenz im Frontmatter |
+
 - **Akzeptanzkriterium:** `se-housekeeper` Block 2 ("L2-Trennregel") findet 0 REQ-Dateien mit Sections, die nicht "Beschreibung" oder "Akzeptanzkriterien" sind.
 
 ### B5 — Review-Lifecycle (MITTEL)
@@ -273,9 +288,175 @@ se-housekeeper:
 - **Neu:** `properties.se_output.properties.review_dir` (string)
 - **Neu:** `properties.systems-engineering.properties.housekeeper_enabled` (boolean, default `true` wenn `enabled=true`)
 
+## 7. Verzeichnisstruktur (verschachtelt) — Anforderung F
+
+**Ziel:** Ablösung des flachen `L0/`–`L2/`-Layouts (siehe Legacy-Anhang B.1) durch eine verschachtelte, Zellen-basierte Verzeichnisstruktur. Jede System-Zelle ist ein vollständiger SE-Stack mit eigener `.se-state.yaml`, eigenem `implementation/`-Subfolder und versionierten Iterations-Drafts.
+
+**Inspiration:** Codeberg-POC `feat/se-implementation` (siehe Sektion 16 — POC-Referenz). Die Struktur wurde für #339 um reviews/, traceability/ und reports/ erweitert.
+
+```
+docs/se/
+├── ADR/                                                      ← flach, ADR-NNN_Kurztitel.md
+├── L0/                                                       ← flach (SN sind nicht hierarchisch)
+│   ├── SN_Stakeholder_Needs.md
+│   └── SN_Stakeholder_Needs_Backlog.md
+├── L1/
+│   └── {SystemName}System/                                   ← Postfix "System" Pflicht
+│       ├── L1_{System}_Requirements.md
+│       ├── L1_{System}_Architecture.md
+│       ├── L1_clarifications_iter-N.md                       ← User-Klärungs-Iterationen
+│       ├── L2_architectural_decomposition_iter-N.md          ← Decomposition-Iterationen
+│       ├── L2_architectural_decomposition_critic-...md       ← Critic-Findings je Iteration
+│       ├── .se-state.yaml                                    ← cell-local, NICHT global
+│       └── L2/
+│           └── {SubSystemName}System/                        ← rekursiv verschachtelt
+│               ├── L2_{SubSystem}_Requirements.md
+│               ├── L2_{SubSystem}_Architecture.md
+│               ├── L3_clarifications_iter-N.md
+│               ├── implementation/                           ← NICHT inline in REQs
+│               │   ├── L2_{SubSystem}_Impl.md
+│               │   └── L2_{SubSystem}_Validation.md
+│               ├── .se-state.yaml
+│               └── Components/                               ← L3
+│                   └── {ComponentId}Component/               ← Postfix "Component"
+│                       ├── L3_{Component}_Requirements.md
+│                       ├── L3_{Component}_Architecture.md
+│                       ├── implementation/
+│                       └── .se-state.yaml
+├── VV/                                                       ← flach
+│   └── VV_Strategy.md                                        ← KEIN _v6 mehr
+├── reviews/                                                  ← flach, neu in #339
+│   └── REVIEW_YYYY-MM-DD_SCOPE.md
+├── traceability/                                             ← flach, neu in #339
+│   └── TRACEABILITY_SCOPE.md
+└── reports/                                                  ← flach (Status, Audit, Validierung)
+    ├── se-phase{N}-{stage}-{date}.md
+    └── *_audit_{date}.md
+```
+
+**Begründung für Verschachtelung:**
+
+| Argument | Detail |
+|----------|--------|
+| **Fraktale Decomposition** | Jede System-Zelle (L1-/L2-/Component-Ordner) ist ein vollständiger SE-Stack: Requirements, Architecture, Clarifications, Implementation, Cell-State. Kapselung ermöglicht parallele Bearbeitung ohne Konflikte. |
+| **Cell-local `.se-state.yaml`** | Resume bei Recursion-Abbruch ohne globale Locks. Jede Zelle speichert ihren eigenen `current_level`, `last_completed_step`, `next_expected_step`. Beim Wiederaufsetzen wird nur die aktuelle Zelle geladen, nicht der gesamte Graph. |
+| **Iteration-Pattern** | `*_iter-N.md` für Critic-Drafts, `*_critic-...md` für Critic-Reviews. Versionierte Kritik-Schleifen sind nachvollziehbar und auditierbar. |
+| **Postfix-Konvention** | `System`/`Component`-Postfix ermöglicht eindeutige Identifikation von Zellen ohne explizite Tag-Ebene. Verzeichnisname = Rollentyp. |
+| **Kein `_v6` mehr** | Dateinamen wie `VV_Strategy_new_needs_v6.md` (exakte #339-Sünde) sind durch versionslose, Git-versionierte Namen ersetzt. |
+
+**Akzeptanzkriterium:** Ein `se-housekeeper`-Lauf auf einem migrierten Projekt prüft:
+1. Alle L1/L2-Ordner enden auf `System`, alle Component-Ordner auf `Component`
+2. Jede Zelle enthält genau eine `.se-state.yaml`
+3. Keine Datei hat einen `_v\d+`-Suffix im Namen (ausgenommen `_iter-N`/`_critic-...`)
+4. `implementation/`-Subfolder existiert nur innerhalb von Zellen, nie auf Root-Ebene
+
+### 7.1 — Source of Truth: JSON-Graph (intern)
+
+**Hierarchie der Wahrheitsquellen:**
+
+```
+1. JSON-Graph (intern) ──── Single Source of Truth
+        │                        └── referenziert in .se-state.yaml
+        │
+        ├── 2. Markdown-Adapter ──── Fallback-Export (menschenlesbare Reviews)
+        ├── 3. GitHub-Issues / Jira / ReqIF ──── Phase-2/3-Exports
+        └── 4. Direct MD-Edit ──── Temporär, wird beim nächsten se-export überschrieben
+```
+
+**Konzept-Regel:** Konflikte zwischen JSON-Graph und MD-Dateien → JSON-Graph gewinnt. Der `se-housekeeper`-Agent MUSS bei Abweichungen einen Major-Befund melden.
+
+**Verweise auf existierende Infrastruktur:**
+
+| Komponente | Pfad | Rolle |
+|------------|------|-------|
+| CLI-Tool | `scripts/se-export.py` (170 Zeilen) | Liest JSON-Graph, ruft `adapter.export_graph()` auf |
+| Abstrakter Adapter | `scripts/lib/se_export/base.py` (171 Zeilen) | `SEAdapter`-Interface mit `export_graph()`-Orchestrierung |
+| Default-Adapter | `scripts/lib/se_export/markdown_adapter.py` (235 Zeilen) | Schreibt flache `docs/se/REQ-XXX.md` + `index.md` |
+| Adapter-Doku | `howto/se-mcp-adapters.md` (250 Zeilen) | Dokumentiert "JSON-Graph → Adapter → Zielsystem" |
+| Decomposition-Schema | `schemas/se-decomposition.schema.json` (339 Zeilen) | Hat `l1_system`, `l2_subsystems`, `l3_components`, `sub_components` |
+| State-Schema | `schemas/se-state.schema.json` (88 Zeilen) | Derzeit GLOBAL — muss für cell-local erweitert werden |
+
+**Frontmatter-Marker `source: graph-json`** (in JEDER exportierten Datei):
+
+```yaml
+---
+source: graph-json
+graph_export_timestamp: 2026-06-28T12:00:00Z
+graph_export_run_id: SE-EXPORT-2026-06-28-001
+req_id: REQ-L1-007
+title: "Authentifizierte Benutzer-Sessions"
+implementation_state: not_implemented
+test_status: missing
+review_state: open
+open_adrs: [ADR-001, ADR-003]
+review_iteration: 0
+arch_impact: false
+---
+```
+
+**Verhalten bei MD-Edit:** Der Adapter generiert eine `.md.unchanged-marker`-Datei mit Timestamp. Beim nächsten `se-export` werden veränderte MDs neu generiert (mit Warnung "Manual edits will be overwritten"). Ohne `--force`-Flag erstellt der Adapter ein Backup (`<file>.md.bak`).
+
+### 7.2 — Markdown-Adapter-Refactoring
+
+**IST-Zustand:** `markdown_adapter.py` (235 Zeilen) schreibt alle REQs flach nach `docs/se/REQ-XXX.md`. Die `export_graph()`-Methode iteriert `l1_system` → `l2_subsystems` → `l3_components` → `sub_components` ohne Hierarchie-Bewusstsein.
+
+**SOLL-Erweiterungen für verschachtelte Verzeichnisstruktur:**
+
+| Methode | Aktuell | Neu |
+|---------|---------|-----|
+| `create_requirement()` | Schreibt `docs/se/<req_id>.md` | Pfad-Aufbau aus `parent_id`-Hierarchie: rekursiv durch JSON-Graph |
+| `write_index()` | Ein `index.md` im Root | Rekursiv: pro Zelle optional eigener `index.md` mit Mini-Mermaid; Root-`index.md` linked auf alle Zell-Indizes |
+| `export_graph()` | Flache Iteration L1→L2→L3→Sub | Cell-Hierarchie verstehen: `sub_components` mit `parent_id` → Pfad-Aufbau |
+| `link_requirements()` | Append an REQ-Datei | Cross-Zellen-Links (relativ zu `docs/se/`) |
+| _Neu:_ `_get_cell_path()` | — | Rekursive Navigation durch JSON-Graph: aus `parent_id`-Kette den Ziel-Ordner ableiten |
+
+**Pfad-Aufbau-Logik (rekursiv):**
+
+```
+req_id="REQ-L1-AuthServiceSystem-001", parent_id="REQ-L1-007"
+  → erzeugt: docs/se/L1/AuthServiceSystem/L1_AuthService_Requirements.md
+  → schreibt parent_id als "**Parent:**"-Link
+
+L2-REQ mit parent_id=L1-System
+  → docs/se/L1/{System}/L2/{SubSystem}System/L2_{SubSystem}_Requirements.md
+
+parent_id: None (Top-Level)
+  → docs/se/L{level}/<req_id>.md
+```
+
+**Frontmatter-Marker `source: graph-json`:** JEDE exportierte Datei erhält diesen Marker im YAML-Frontmatter (siehe 7.1).
+
+**Backward-Compat:** Bei flachem Graph (alle `parent_id: null`) → flache Ablage wie bisher (`docs/se/REQ-XXX.md`). Automatische Erkennung durch Prüfung der `parent_id`-Hierarchie. Der flache Modus wird mit Phase 5 (Migration) abgeschaltet, danach Hard-Fail.
+
+**Verhalten bei manuellen Edits:**
+
+1. Adapter generiert `.md.unchanged-marker` mit Timestamp
+2. Beim nächsten Export: Prüft ob MD neuer als Marker → wenn ja: Warnung + Backup `.md.bak`
+3. Ohne `--force`: Export bricht ab, User muss Konflikt auflösen
+4. Mit `--force`: Überschreibt MD (Backup bleibt erhalten)
+
+**Schema-Erweiterung für `se-state.schema.json`:**
+
+```json
+{
+  "cell_path": {
+    "type": "string",
+    "description": "Relativer Pfad zur Zelle, z.B. L1/AuthServiceSystem"
+  },
+  "cell_id": {
+    "type": "string",
+    "description": "Eindeutige Zellen-ID, z.B. L1-AuthServiceSystem"
+  }
+}
+```
+
+Diese Felder werden in `.se-state.yaml` PRO ZELLE gespeichert (cell-local), nicht im globalen State. Das bestehende `se-state.schema.json` wird um `cell_path` und `cell_id` als optional properties erweitert.
+
+**Akzeptanzkriterium:** Ein `se-export --graph test-graph.json` auf einem verschachtelten Graphen erzeugt die korrekte Verzeichnisstruktur laut obenstehendem Baum. Ein flacher Graph (`parent_id: null` überall) erzeugt weiterhin die alte flache Struktur.
+
 ---
 
-## 7. viz-Logger-Integration (Anforderung D)
+## 8. viz-Logger-Integration (Anforderung D)
 
 **Aktueller Stand:** `viz-logger.py` unterstützt `trace_context.viz_task_id`, default off, aktivierbar via `viz.debug: true`. Siehe [`docs/viz-architecture.md`](../viz-architecture.md).
 
@@ -306,7 +487,7 @@ viz:
 
 ---
 
-## 8. Admin-UI-Integration (Anforderung E)
+## 9. Admin-UI-Integration (Anforderung E)
 
 **Bestand:** Keine Admin-UI im Repo. Konzept-Skizze in [`docs/concepts/planned/admin-ui-concept.md`](./planned/admin-ui-concept.md).
 
@@ -327,7 +508,7 @@ viz:
 
 ---
 
-## 9. Schema-Erweiterungen
+## 10. Schema-Erweiterungen
 
 **Neue Felder im REQ-Frontmatter** (siehe B2 für Details):
 
@@ -365,15 +546,15 @@ viz:
 **Backward-Compat-Strategie (Variante a — Strict-Modus ab Phase 5):**
 
 - `se-requirements.schema.json` setzt `additionalProperties: false` auf Root-Ebene. Keine Toleranz für unbekannte Felder.
-- Migrations-Script (Phase 5, siehe Sektion 10) entfernt **alle** Legacy-Felder (`Implementation State`, `Test Status`, `Review Findings`, `Remarks`) und setzt **alle 8 neuen Felder** mit Defaults (siehe Tabelle oben).
+- Migrations-Script (Phase 5, siehe Sektion 11) entfernt **alle** Legacy-Felder (`Implementation State`, `Test Status`, `Review Findings`, `Remarks`) und setzt **alle 8 neuen Felder** mit Defaults (siehe Tabelle oben).
 - `se-housekeeper` Block 5 ("Frontmatter-Schema") läuft im **`severity: major`**-Modus: jeder Schema-Verstoß blockiert die Validierung (Exit-Code 1).
 - **Begründung:** Zero-Overhead und saubere Validierung erfordern strikte Schemata. Toleranz würde zu dauerhaftem Legacy-Schutz-Wildwuchs führen.
 
-**Migrationspfad:** siehe Sektion 10.
+**Migrationspfad:** siehe Sektion 11.
 
 ---
 
-## 10. Migrations-Plan (Bestandsprojekte)
+## 11. Migrations-Plan (Bestandsprojekte)
 
 **Schritt-für-Schritt:**
 
@@ -438,27 +619,40 @@ def migrate_file(path: Path) -> bool:
     return changed
 ```
 
-**Risiko:** Pflichtfelder ohne Default → `additionalProperties: false` bricht alte REQs. Mitigation: Migrations-Script (Sektion 10) setzt strikt alle 8 Felder, Housekeeper-Block 5 läuft im `severity: major`-Modus (siehe Sektion 9).
+**Risiko:** Pflichtfelder ohne Default → `additionalProperties: false` bricht alte REQs. Mitigation: Migrations-Script (Sektion 11) setzt strikt alle 8 Felder, Housekeeper-Block 5 läuft im `severity: major`-Modus (siehe Sektion 10).
 
 ---
 
-## 11. Phasen-Plan
+## 12. Phasen-Plan
 
 | Phase | Ziel | Scope | Deliverables | Akzeptanzkriterium | Aufwand | Abhängigkeiten |
 |-------|------|-------|--------------|---------------------|---------|----------------|
 | **1. Schema-Definition** | Stabile Frontmatter-Schemata | `schemas/se-requirements.schema.json` (neu), `schemas/se-adr.schema.json` (neu), `schemas/se-review.schema.json` (neu) | 3 JSON-Schema-Dateien | `jsonschema`-Validierung gegen 10 Beispiel-REQs grün | **S** | — |
-| **2. `se-housekeeper` Agent** | Compliance-Prüfer verfügbar | `agents/1-generic/se-housekeeper.md`, `config/role-defaults.yaml`-Eintrag, `placeholders.py`-Erweiterung | Agent-Template + 5 Befund-Blöcke als Stubs | Audit auf Test-Repo mit 5 Verstößen → 5 Befunde | **M** | Phase 1 |
+| **1.5 (NEU) Verzeichnisstruktur + Adapter-Refactoring** | `docs/se/`-Hierarchie-Spec, `markdown_adapter.py` Umbau | `se-state.schema.json` Erweiterung (cell_path, cell_id), `markdown_adapter.py` Refactoring (Pfad-Aufbau, Frontmatter-Marker, Backward-Compat) | Hierarchie-Spec (verankert in Sektion 7), geänderter Adapter, erweitertes Schema | `se-export` auf verschachteltem Graph erzeugt korrekte Baum-Struktur laut Sektion 7 | **M** | Phase 1 |
+| **2. `se-housekeeper` Agent** | Compliance-Prüfer verfügbar | `agents/1-generic/se-housekeeper.md`, `config/role-defaults.yaml`-Eintrag, `placeholders.py`-Erweiterung | Agent-Template + 5 Befund-Blöcke als Stubs | Audit auf Test-Repo mit 5 Verstößen → 5 Befunde | **M** | Phase 1.5 |
 | **3. Sync-Integration** | Conditional-Injection + Housekeeper-CLI | `delegation_table.py`, `frontmatter_validator.py` (neu), `housekeeper_runner.py` (neu) | Sync-Option `--validate-se`, Housekeeper-CLI | Sync mit `SE_ENABLED=false` produziert identischen Output | **M** | Phase 2 |
-| **4. viz-Logger & Rückkopplung** | 4 Events + Suspect-Mark | `viz-logger.py` Erweiterung, `se-critic` Update für Suspect-Mark | Event-Code, Tests, 1 Beispielprojekt durchläuft Bottom-Up | Exakte Event-Anzahl pro Testkonfiguration (siehe Sektion 7) | **M** | Phase 2 |
-| **5. Migration & Rollout** | Bestandsprojekte migrierbar | `migrate-se-frontmatter.py` (neu), `howto/se-workflow.md` Update, `howto/migrate-se-339.md` (neu) | Migrations-Script, Howto, 1 Pilotprojekt durchgelaufen | Pilotprojekt: 0 Breaking Changes, 100% Frontmatter-Valid | **L** | Phase 3 |
+| **4. viz-Logger & Rückkopplung** | 4 Events + Suspect-Mark | `viz-logger.py` Erweiterung, `se-critic` Update für Suspect-Mark | Event-Code, Tests, 1 Beispielprojekt durchläuft Bottom-Up | Exakte Event-Anzahl pro Testkonfiguration (siehe Sektion 8) | **M** | Phase 2 |
+| **5. Migration & Rollout** | Bestandsprojekte migrierbar | `migrate-se-frontmatter.py` (neu), `howto/se-workflow.md` Update, `howto/migrate-se-339.md` (neu) | Migrations-Script, Howto, 1 Pilotprojekt durchgelaufen | Pilotprojekt: 0 Breaking Changes, 100% Frontmatter-Valid | **L** | Phase 3 + Phase 4 |
 
-**Gesamt-Aufwand:** **L** (groß, ~3–4 Wochen Vollzeit für 1 Entwickler + 1 Woche Review).
+**Gesamt-Aufwand:** **L** (groß, ~4–5 Wochen Vollzeit für 1 Entwickler + 1 Woche Review — Phase 1.5 ist +1 Woche).
 
-**Reihenfolge-Begründung:** Schema → Agent → Sync → Events → Migration. Schema ist Fundament, Migration kommt zuletzt (sonst Migrations-Script gegen instabile Schemas).
+**Reihenfolge-Begründung:** Schema → Hierarchie+Adapter → Agent → Sync/Events → Migration. Schema ist Fundament, Verzeichnisstruktur muss vor Agent kommen (Housekeeper prüft Zellen-Pfade), Migration kommt zuletzt (sonst Migrations-Script gegen instabile Schemas).
+
+**Phasen-Diagramm:**
+
+```mermaid
+flowchart LR
+    P1[1 Schema] --> P15[1.5 Hierarchie+Adapter]
+    P15 --> P2[2 Housekeeper]
+    P2 --> P3[3 Sync-Integration]
+    P2 --> P4[4 viz+Rückkopplung]
+    P3 --> P5[5 Migration]
+    P4 --> P5
+```
 
 ---
 
-## 12. Risiken & Mitigationen
+## 13. Risiken & Mitigationen
 
 | Risiko | W. | I. | Mitigation |
 |--------|----|----|------------|
@@ -472,7 +666,7 @@ def migrate_file(path: Path) -> bool:
 
 ---
 
-## 13. Offene Fragen an User
+## 14. Offene Fragen an User
 
 1. **`se-required: true` erzwingen?** Soll der neue Standard nur für `se-required: recommended`/`true` verfügbar sein, oder auch für `false` (mit Hinweis "SE deaktiviert")? → **default: recommended + true**
 2. **Default-Werte für `implementation_state`:** Soll `not_implemented` der sichere Default sein, oder lieber `partially_implemented` um Bestandsprojekte nicht "rot" zu markieren? → **Empfehlung: not_implemented** (ehrlich)
@@ -481,6 +675,39 @@ def migrate_file(path: Path) -> bool:
 5. **Pilotprojekt für Phase 5:** Welches Bestandsprojekt zuerst migrieren? agent-meta selbst (Meta-Hund) oder ein externes Test-Repo? → **default: agent-meta selbst**
 6. **`se-housekeeper` Tier:** `senior` (volle Befugnisse) oder `junior` (nur read-only)? → **default: senior mit read-only-Constraint im Frontmatter**
 7. **Migrations-Script: Auto-Commit?** Soll `migrate-se-frontmatter.py --apply` direkt committen oder nur Working-Tree ändern? → **default: nur Working-Tree**, User committed manuell
+
+8. **Postfix-Pflicht:** Soll die `System`/`Component`-Postfix-Konvention hart erzwungen werden (Housekeeper-Block 1: Verstoß = major finding) oder nur empfohlen? → **default: hart erzwungen**
+9. **Cell-local `.se-state.yaml`:** Pro Zelle eine eigene Datei, oder ein zentrales `docs/se/.se-state-index.yaml` mit Referenzen auf Zellen-States? → **default: cell-local** (Resume ohne Index-Lookup)
+10. **Frontmatter-Marker `source: graph-json`:** Soll der Adapter veränderte MD-Dateien ohne Marker warnungslos überschreiben, oder muss User `--force` setzen? → **default: warnen + Backup `.md.bak`**
+11. **Backward-Compat-Modus:** Wann wird der flache Modus abgeschaltet? Mit Phase 5 (Migration), oder erst nach 6 Monaten Adoption-Phase? → **default: mit Phase 5, danach Hard-Fail bei flachem Graph**
+12. **`sub_components` Recursion-Tiefe:** Aktuell in `se-decomposition.schema.json` ist nur eine Ebene `sub_components` modelliert. Soll das Schema erweitert werden auf beliebige Tiefe (`sub_components.sub_components...`), oder bleibt es bei expliziten Ebenen? → **default: Schema-Erweiterung auf rekursive `sub_components`**
+13. **POC-Referenz als externe Datei?** Soll die POC-Referenz in einer neuen Datei `docs/concepts/poc-references/se-implementation.md` ausgelagert werden, oder inline im Konzept bleiben? → **default: inline, aber separate H2-Sektion für bessere Verlinkung**
+
+## 15. POC-Referenz
+
+**Referenz-Branch:** `feat/se-implementation` auf Codeberg (POC — nicht in diesem Repo verfügbar). Die Dateien dienen als Inspiration, nicht als 1:1-Vorlage.
+
+### Inspizierte POC-Dateien
+
+| Datei | Größe | Relevanz für #339 |
+|-------|-------|-------------------|
+| `docs/se/L1/Gesamtsystem/L1_Gesamtsystem_Requirements.md` | 1476 Zeilen | Zeigt REQ-Format mit Implementation State, Review Findings, Test Status, Remarks — exakt die #339 Befund-2-Sünden (daher REQ-Frontmatter-Standard nötig) |
+| `docs/se/L1/Gesamtsystem/L2/ApplicationServiceSystem/L2_ApplicationServiceSystem_Requirements.md` | 1142 Zeilen | Zeigt L2-Struktur mit Postfix `System` |
+| `docs/se/L1/Gesamtsystem/.se-state.yaml` | — | Cell-local state (Vorlage für cell-local `.se-state.yaml`) |
+| `docs/se/ADR/ADR-001_Sandbox-Mechanismus.md` | 107 Zeilen | ADR-Format (MADR-konform, bestätigt B1-Ansatz) |
+| `docs/se/VV/VV_Strategy_new_needs_v6.md` | — | Die `_v6`-Sünde — exakt wie in #339 Befund 3 beschrieben |
+
+### Warum die POC-Struktur sinnvoll ist
+
+| Eigenschaft | Begründung |
+|-------------|------------|
+| **Fraktale Decomposition** | Jede Zelle (System/Component-Ordner) ist ein vollständiger SE-Stack: Requirements, Architecture, Clarifications, Implementation, Cell-State. Parallele Bearbeitung ohne Konflikte. |
+| **Cell-local `.se-state.yaml`** | Resume bei Recursion-Abbruch ohne globale Locks. Beim Wiederaufsetzen wird nur die aktuelle Zelle geladen, nicht der gesamte Graph. |
+| **Iteration-Pattern** | `*_iter-N.md` für Critic-Drafts, `*_critic-...md` für Critic-Reviews. Versionierte Kritik-Schleifen sind auditierbar. |
+| **Postfix-Konvention** | `System`/`Component`-Postfix ermöglicht eindeutige Identifikation ohne explizite Tag-Ebene. |
+| **Kein `_v6` mehr** | Die POC zeigt: Dateinamen-Versionierung führt zu Chaos. Git ist der Versionierer. |
+
+**POC-Pfad nicht in diesem Repo verfügbar — Referenz dient nur als Inspiration.** Die konkrete Umsetzung in agent-meta weicht ab: flache reviews/traceability/reports-Ordner, erweiterte `se-state.schema.json`, Frontmatter-Marker `source: graph-json`.
 
 ---
 
@@ -566,7 +793,17 @@ findings:
 
 ---
 
-## Anhang B: Verzeichnis-Layout (Soll)
+## Anhang B: Verzeichnis-Layout (Soll — verschachtelt)
+
+Die normative Beschreibung der Verzeichnisstruktur befindet sich in **Sektion 7 (Verzeichnisstruktur (verschachtelt))**. Anhang B dient nur als Kurzreferenz.
+
+**Kurzfassung:** 8 flache/gemischte Verzeichnisse (`L0/`, `L1/`, `L2/`, `L3/`, `ADR/`, `VV/`, `reviews/`, `traceability/`, `reports/`) mit verschachtelten System-/Component-Ordnern unter `L1/`, `L2/` und `Components/`. Postfix-Konvention: System-Ordner enden auf `System`, Component-Ordner auf `Component`. Cell-local `.se-state.yaml` pro Zelle.
+
+**Datei-Naming-Standard:** `<TYPE>-<ID>_<kurztitel>.md` (lowercase, snake_case, ASCII). Kein `_v\d+`-Suffix (außer `_iter-N`/`_critic-...` für Iterationen).
+
+### B.1 — Legacy: Flaches Layout (vor #339 v2)
+
+Das folgende flache Layout war der Stand vor der Einführung der verschachtelten Struktur in #339 v2. Es wird hier zu Dokumentationszwecken aufbewahrt:
 
 ```
 docs/se/
@@ -575,7 +812,7 @@ docs/se/
 ├── L1/                              # L1 System Requirements + Architektur
 │   ├── REQ-L1-007_user-auth.md
 │   ├── REQ-L1-012_session-mgmt.md
-│   └── ARCH-L1_topology.md          # ehemals inline in REQ-Datei
+│   └── ARCH-L1_topology.md
 ├── L2/                              # L2 Component Requirements + Architektur
 │   ├── REQ-L2-003_jwt-validator.md
 │   └── ARCH-L2_auth-service.md
@@ -596,7 +833,7 @@ docs/se/
     └── TRACE-REQ-to-ADR.md
 ```
 
-**Datei-Naming-Standard:** `<TYPE>-<ID>_<kurztitel>.md` (lowercase, snake_case, ASCII).
+Dieses Layout wird mit Phase 5 (Migration) abgelöst. Bestandsprojekte können parallel migrieren (siehe Sektion 11).
 
 ---
 
@@ -607,6 +844,7 @@ docs/se/
 | **ADR** | Architecture Decision Record. Dokumentiert eine architektonische Entscheidung mit Kontext, Alternativen, Konsequenzen. MADR-konform. |
 | **Bottom-Up-Rückkopplung** | Kaskaden-Pfad, der Implementierungs-/Test-Befunde zurück an übergeordnete REQs propagiert (Suspect-Mark). |
 | **`{{#if SE_ENABLED}}`** | Conditional-Block in Templates. Wird zur Build-Zeit entfernt, wenn `SE_ENABLED=false` in `project.yaml`. |
+| **Cell-Local State** | `.se-state.yaml` pro Zelle (statt global). Ermöglicht Resume bei Recursion-Abbruch ohne globale Locks. Jede Zelle speichert `current_level`, `last_completed_step`, `next_expected_step`. |
 | **Frontmatter** | YAML-Block am Dateianfang (zwischen `---`-Markern) mit Metadaten. |
 | **HK-N** | HausKeeper-Befund-Block (HK-1 bis HK-5). |
 | **L0/L1/L2/L3** | Hierarchie-Ebenen im V-Modell: Stakeholder → System → Component → Implementation. |
@@ -615,6 +853,7 @@ docs/se/
 | **RVW** | Review. Protokoll einer Critic-Iteration mit Findings. |
 | **SE-Enabled** | Boolean-Flag in `project.yaml → systems-engineering.enabled`. Steuert Conditional-Injection. |
 | **SE-Mode** | Betriebsmodus des Orchestrators für SE-Projekte. Wird via `{{#if SE_ENABLED}}` aktiviert. |
+| **Source of Truth Hierarchy** | JSON-Graph (intern) als primäre Wahrheitsquelle → Markdown-Adapter (Fallback-Export) → GitHub/Jira/ReqIF (Phase 2/3) → Direct MD-Edit (temporär, wird überschrieben). Konflikte werden zu Gunsten des JSON-Graphen aufgelöst. |
 | **Suspect-Mark** | Marker auf einer Parent-REQ, signalisiert "abhängige REQ hat Befund → Re-Derivation prüfen". |
 | **V&V** | Verification & Validation. V-Modell-Stufen: rechts (Tests, Abnahme). |
 | **Zero-Overhead** | Prinzip: bei `SE_ENABLED=false` darf kein SE-Byte im generierten Output landen. |

@@ -1,6 +1,6 @@
 # Konzept: Prompt-Modernisierung durch Two-Mode-Prompt-Architektur
 
-> Status: **Konzept-Entwurf v2.0** | 2026-06-28
+> Status: **Konzept-Entwurf v2.1 — überarbeitet nach Machbarkeits-Analyse** | 2026-06-29
 > Ziel: Einführung einer zweigleisigen Prompt-Architektur für agent-meta — Legacy-Mode (bestehender Markdown-Fluss) und Modern-Mode (XML-/Contract-basierte Struktur) mit sanftem Hybrid-Migrationspfad.
 > Bezugsdokumente: `admin-ui-concept.md`, `admin-ui-architecture.md`, `dynamic-model-presets.md`
 > Quellen: `reports/prompt-optimization/00_SUMMARY.md` und alle zugehörigen Rollen-Reports
@@ -33,8 +33,8 @@ Der Modus wird **pro Rolle** in `.meta-config/project.yaml` konfiguriert. Damit 
 
 ### 1.3 Erwarteter Impact
 
-| Metrik | Ziel | Begründung |
-|--------|------|------------|
+| Metrik | Hypothese | Begründung |
+|--------|-----------|------------|
 | Input-Token-Kostenreduktion | **15–20 %** für `developer.md` | XML-Tags ersetzen Markdown-Header-Padding; TypeScript-Interfaces ersetzen JSON-Beispiele |
 | Reduzierte "Lost-in-the-Middle"-Effekte | **Deutlich reduziert** | Constraints am Ende (Recency Bias) |
 | Halluzinations-Risiko | **Deutlich reduziert** | Keine ausufernden Mock-Daten; Constraints am Ende |
@@ -43,6 +43,8 @@ Der Modus wird **pro Rolle** in `.meta-config/project.yaml` konfiguriert. Damit 
 **Hinweis:** Time-to-First-Token (TTFT) ist keine sinnvolle Zielgröße für diese Prompt-Modernisierung, da TTFT primär von Netzwerk- und Modell-Initialisierungslatenz abhängt und nicht vom Prompt-Format. Die relevante Metrik ist die **Input-Token-Kostenreduktion**.
 
 Die Schätzung von 15–20 % für `developer.md` basiert auf einem Vorab-Vergleich: Legacy 197 LOC vs. Modern ~150 LOC plus einer Heuristik für den XML-Tag-Overhead (siehe Abschnitt 5.8 und 10.3).
+
+**Validierung:** Die 15–20 % sind eine **Hypothese** auf Basis von Zeilenvergleich plus Tag-Overhead-Heuristik. "Zeichenzahl / 4" ist für deutsche Templates unscharf. Die erste belastbare Messung erfolgt im PoC via `scripts/token-counter.py`. Erst danach wird die Zahl als verifiziertes Ziel verankert.
 
 ### 1.4 PoC-Empfehlung
 
@@ -141,8 +143,9 @@ Der Report empfiehlt einen Umbau in drei Phasen. Dieses Konzept übersetzt sie i
 ### 3.3 Hybrid Mode (Sanfter Migrationspfad)
 
 - Quelle: Weiterhin `agents/1-generic/<role>.md`
-- Zusätzlich: `wrap_sections_in_xml()` wird angewendet
-- Ergebnis: Der Markdown-Inhalt bleibt erhalten, wird aber in `<section name="...">`-Tags eingefasst
+- Mechanik: `wrap_sections_in_xml()` ist **bereits implementiert** in `scripts/lib/agents.py:355` und wird über das Flag `xml-section-wrapping: enabled: true` in `.meta-config/project.yaml` aktiviert (`agents.py:941–944`).
+- Ergebnis: Der Markdown-Inhalt bleibt erhalten, wird aber in `<section name="...">`-Tags eingefasst.
+- **Aufwand für Hybrid-Mode: 0** — nur Config-Flag setzen, kein neuer Code nötig.
 - Vorteil: Sofortige strukturelle Verbesserung ohne Rewrite
 - Nachteil: Keine TypeScript-Contracts, keine echte 6-Block-Struktur
 
@@ -475,6 +478,12 @@ Diese Variablen können in Modern-Templates direkt eingesetzt werden:
 </constraints>
 ```
 
+**Strikt getrennte Conditional-Systeme:**
+- **Legacy-Templates** verwenden `{{#if VAR}}...{{/if}}` (strip_inactive_conditional_blocks) — bleibt unverändert.
+- **Modern-Templates** verwenden AUSSCHLIESSLICH vorab aufgelöste Block-Variablen wie `{{DOD_REQ_BLOCK}}`, `{{DOD_TESTS_BLOCK}}`, `{{A2A_HANDOFF_BLOCK}}`, `{{ANTI_RECURSION_BLOCK}}`. `{{#if}}`-Conditionals werden in Modern-Templates **nicht unterstützt**.
+
+Damit bleibt `substitute()` simpel und Modern-Templates sind frei von Template-Engine-Logik.
+
 ### 6.4 Source-Layout-Vorschlag
 
 ```
@@ -520,6 +529,8 @@ def _resolve_agent_source(
     return legacy_path
 ```
 
+**Zusätzlich anzupassen:** `collect_sources()` in `scripts/lib/agents.py` iteriert heute nur über `1-generic/`, `2-platform/`, `3-project/` und `0-external/`. Das Verzeichnis `1-generic-modern/` muss zur Discovery hinzugefügt werden, sonst werden Modern-Templates nicht erkannt und nicht generiert. Dieser Eingriff ist **Pflichtbestandteil von Phase 1, Step 2**.
+
 ### 6.6 Frontmatter-Injection und A2A-Block-Zentralisierung
 
 Der Sync-Prozess injiziert den Prompt-Mode in das generierte Frontmatter:
@@ -556,6 +567,18 @@ if prompt_mode in ("hybrid", "modern"):
 ```
 
 Für den Modern-Mode wird **kein** automatisches Wrapping angewendet, weil das Template bereits die 6-Block-Struktur enthält. Stattdessen kann eine Validierungsfunktion prüfen, ob alle sechs Blöcke vorhanden sind.
+
+### 6.8 Composition-Patch-Constraint (Blocking)
+
+Modern-Mode-Templates dürfen in Phase 1 und Phase 2 **KEINE** `extends:`/`patches:`-Targets sein.
+
+**Begründung:** `compose_agent()` in `scripts/lib/agents.py` arbeitet auf Markdown-Anchors (`anchor: "## Heading"`). Modern-Mode-Templates ersetzen `## Heading` durch `<workflow>` etc. Bestehende 2-platform/3-project-Patches würden brechen.
+
+**Lösungspfad (Phase 2+):**
+- `compose_agent()` um XML-Anchor-Support erweitern: `anchor: "<workflow>"`
+- Danach können 2-platform/3-project-Overrides auf Modern-Templates zugreifen.
+
+**Betroffene Dateien heute:** `agents/2-platform/agent-meta-developer.md` nutzt `extends: "1-generic/developer.md"` mit `anchor: "## Deine Zuständigkeiten"`. Diese Datei kann erst migriert werden, wenn XML-Anchors in `compose_agent()` funktionieren.
 
 ---
 
@@ -777,6 +800,13 @@ Alle Modern-Mode-Prompts, Rules und Templates in `1-generic/` müssen provider-a
 ### 9.4 Verwendung
 
 Cascaden werden vom Orchestrator oder von spezialisierten Cascade-Runnern interpretiert. Sie sind **kein Syncer-Feature** — `sync.py` validiert sie nur gegen das Schema und stellt sie als Variablen bereit. Die Ausführung bleibt Sache des Agenten-Runtimes.
+
+### 9.5 Phasen-Zuordnung
+
+- **Phase 1:** JSON-Schema-Erweiterung `cascades` in `project-config.schema.json` (siehe 9.2/9.3, Anhang D).
+- **Phase 3+:** Cascade-Runtime — wie Orchestrator/Runner Cascaden interpretiert, Stages ausführt, Conditions auswertet, on_error behandelt. Dieses Konzept spezifiziert die Runtime explizit **nicht**. Sie ist Gegenstand eines Folge-Konzepts.
+
+Bis dahin sind `cascades`-Einträge in `project.yaml` Schema-validiert, aber inaktiv (keine Ausführung).
 
 ---
 
@@ -1246,6 +1276,12 @@ cascades:
 
 `sync.py` validiert `cascades` gegen `project-config.schema.json` und injiziert sie als kompakte Variablen in den Orchestrator. Die tatsächliche Ausführung obliegt dem Agenten-Runtime.
 
+### 16.6 Runtime-Scope
+
+Phase 1 liefert ausschließlich das Schema. Die Cascade-Runtime (Orchestrator-Interpretation, Stage-Ausführung, Condition-Evaluation, Error-Handling) ist explizit **Phase 3+** und wird in einem Folge-Konzept spezifiziert.
+
+Bis dahin sind `cascades`-Einträge in `project.yaml` Schema-validiert, aber inaktiv (keine Ausführung).
+
 ---
 
 ## 17. Erweiterungs-Matrix
@@ -1310,9 +1346,11 @@ mkdir -p agents/1-generic-modern
 
 **Schritt 5 — Sync-Logik erweitern**
 
-- `_resolve_agent_source()` implementieren
-- Bedingte XML-Wrapping-Logik anpassen
-- Frontmatter-Injection `prompt_mode` hinzufügen
+- `_resolve_agent_source()` in `scripts/lib/agents.py` implementieren
+- `collect_sources()` um `1-generic-modern/` als Discovery-Pfad erweitern (Pflicht — sonst keine Modern-Template-Generierung)
+- Frontmatter-Injection `prompt_mode: <mode>` in das generierte Frontmatter aufnehmen
+
+Kein zusätzliches XML-Wrapping nötig: Hybrid läuft bereits über das existierende Flag `xml-section-wrapping: enabled: true` (`agents.py:941–944`); Modern-Templates enthalten die XML-Struktur nativ.
 
 **Schritt 6 — PoC-Projekt konfigurieren, syncen und validieren**
 
@@ -1364,25 +1402,31 @@ Test-Tasks, Admin-UI-Integration und vollständige Dokumentation sind **nicht** 
 | `AGENT_PROMPTS_MODE_<ROLE>` in `build_variables()` | 0.5 Tage | senior-developer |
 | `_resolve_agent_source()` und bedingtes Wrapping | 1 Tag | senior-developer |
 | Modern-Template `developer.md` erstellen | 2 Tage | senior-developer |
-| Prüf-Skripte `token-counter.py`, `validate-modern-templates.py`, `check-provider-agnostic.py` | 1.5 Tage | developer |
+| Prüf-Skripte `token-counter.py` und `check-provider-agnostic.py` implementieren | 1 Tag | developer |
 | Sync und Validierung | 1 Tag | senior-developer |
 
-### 19.2 Phase 2 — Erste Rollout-Welle (2 Wochen)
+> **Nicht in Phase 1:** `validate-modern-templates.py` und `audit-prompt-mode.py` — verschoben in Phase 2. `rules/1-generic-modern/` — verschoben in Phase 3. Cascaden-Runtime — Phase 3+.
 
-Ziel: 5–8 weitere Agenten modernisieren, priorisiert nach:
+### 19.2 Phase 2 — Erste Rollout-Welle + Composition-Support (2.5 Wochen)
+
+Ziel: 5–8 weitere Agenten modernisieren + Composition-Patches kompatibel machen.
+
+Priorisierung:
 - Hoher Token-Einsparung (`concept-reviewer`, `agent-meta-manager`)
 - Klarem Scope (`junior-developer`, `git`, `feedback`)
 - Hoher Nutzungshäufigkeit (`developer`, `code-reviewer`)
 
 | Task | Aufwand | Owner |
 |------|---------|-------|
+| `compose_agent()` um XML-Anchor-Support erweitern (`anchor: "<workflow>"`) — Voraussetzung für 2-platform-Overrides auf Modern-Templates | 2 Tage | senior-developer |
 | `concept-reviewer` modernisieren | 2 Tage | senior-developer |
 | `agent-meta-manager` modernisieren | 2 Tage | senior-developer |
 | `git`, `feedback`, `documenter` modernisieren | 2 Tage | developer |
 | Integrationstests | 2 Tage | tester |
 | `audit-prompt-mode.py` und Reporting | 1 Tag | developer |
+| `validate-modern-templates.py` (XML-Wohlgeformtheit, 6-Block-Check) | 1 Tag | developer |
 
-### 19.3 Phase 3 — Admin-UI & Viz (1.5 Wochen)
+### 19.3 Phase 3 — Admin-UI, Viz, Rules-Mode-Switch & Cascade-Runtime-Konzept (2.5 Wochen)
 
 | Task | Aufwand | Owner |
 |------|---------|-------|
@@ -1390,6 +1434,8 @@ Ziel: 5–8 weitere Agenten modernisieren, priorisiert nach:
 | Viz-Badge und Farbcodierung | 1.5 Tage | developer |
 | Event-Typ `prompt-mode-changed` | 1 Tag | developer |
 | Template-Editor Toggle (Super-Admin) | 2 Tage | senior-developer |
+| Rules-Mode-Switch (`rules/1-generic-modern/`) implementieren | 2 Tage | senior-developer |
+| Cascade-Runtime-Konzept ausarbeiten (Folge-Konzept) | 3 Tage | architect / senior-developer |
 
 ### 19.4 Phase 4 — Orchestrator-Modernisierung (3 Wochen)
 
@@ -1404,8 +1450,10 @@ Der Orchestrator wird bewusst spät migriert, weil er das komplexeste Template i
 | Umfassende Integrationstests | 3 Tage | tester |
 | Review und Feinschliff | 2 Tage | concept-reviewer |
 
-### 19.5 Phase 5 — Vollständiger Rollout & Cleanup (2 Wochen)
+### 19.5 Phase 5 — Snippets/Templates-Mode-Switch, Rollout & Cleanup (2.5 Wochen)
 
+- Snippets-Mode-Switch (`snippets/<mode>/`) einführen
+- Templates-Mode-Switch (`templates/<mode>/`) einführen
 - Restliche Agenten modernisieren oder auf Hybrid setzen
 - Legacy-Templates als `deprecated` markieren, falls Modern-Variante existiert
 - Dokumentation aktualisieren (`CLAUDE.md`, `AGENTS.md`, `CODEBASE_OVERVIEW.md`)
@@ -1416,11 +1464,11 @@ Der Orchestrator wird bewusst spät migriert, weil er das komplexeste Template i
 | Phase | Dauer |
 |-------|-------|
 | Phase 1 (PoC) | 1 Woche |
-| Phase 2 (Rollout-Welle) | 2 Wochen |
-| Phase 3 (Admin-UI & Viz) | 1.5 Wochen |
+| Phase 2 (Rollout-Welle + Composition-Support) | 2.5 Wochen |
+| Phase 3 (Admin-UI, Viz, Rules, Cascade-Runtime-Konzept) | 2.5 Wochen |
 | Phase 4 (Orchestrator) | 3 Wochen |
-| Phase 5 (Rollout & Cleanup) | 2 Wochen |
-| **Gesamt** | **~9.5 Wochen** |
+| Phase 5 (Snippets/Templates/Rollout & Cleanup) | 2.5 Wochen |
+| **Gesamt** | **~11.5 Wochen** |
 
 ---
 
@@ -1436,14 +1484,15 @@ Der Orchestrator wird bewusst spät migriert, weil er das komplexeste Template i
 | Provider-spezifische XML-Strukturen | Mittel | Niedrig | 1-generic-modern bleibt provider-agnostisch; Provider-Spezifika in 2-platform |
 | TypeScript vs. TOON | Niedrig | Niedrig | Für A2A-Contracts bleibt TypeScript; TOON nur für große Input-Daten evaluieren |
 | Hybrid-Mode wird zur Falle | Mittel | Mittel | Klare Kommunikation: Hybrid ist Übergang, nicht Endzustand; Modern-Mode für wichtige Rollen forcieren |
+| `collect_sources()` kennt `1-generic-modern/` nicht — Discovery-Erweiterung in Phase 1 nötig, sonst keine Modern-Templates generiert | Hoch | Sicher (Tatsache, kein Risiko) | In Phase 1, Step 2 adressiert: `collect_sources()` um Modern-Pfad erweitern |
 
 ### 20.2 Offene Fragen
 
 1. **Soll `1-generic-modern/` ein eigenes Verzeichnis erhalten, oder reicht ein Frontmatter-Flag?**
-   - Vorschlag: Eigenes Verzeichnis für klare Trennung und einfacheres Rollback.
+   - **Entschieden:** Eigenes Verzeichnis für klare Trennung, deterministischer Sync-Pfad und einfaches Rollback.
 
 2. **Wie werden Composition-Patches (2-platform, 3-project) im Modern Mode behandelt?**
-   - Vorschlag: Patches müssen XML-Blöcke referenzieren (`anchor: "<workflow>"`).
+   - **Entschieden:** In Phase 1+2 sind Modern-Templates KEINE `extends:`/`patches:`-Targets (Constraint, siehe Abschnitt 6.8). In Phase 2 wird `compose_agent()` um XML-Anchor-Support (`anchor: "<workflow>"`) erweitert. Danach können 2-platform/3-project-Overrides auf Modern-Templates zugreifen.
 
 3. **Soll der Hybrid-Mode der neue Default werden?**
    - Vorschlag: Nein — erst nach erfolgreichem PoC und Rollout-Welle diskutieren.
@@ -1879,19 +1928,22 @@ alternatives:
   - PoC mit `orchestrator` → zu komplex, hoher Blast-Radius, schwer zu validieren
   - Mini-Template-Engine (`{{#if}}`) in `sync.py` → neues Subsystem, Parser-Risiko, unterschätzte Wartungslast
   - Cascaden als Ersatz für `quality_pipelines` → `pipelines.py` erfüllt bereits einen spezifischen Zweck; Cascaden sollen ergänzen, nicht ersetzen
+  - Sofortige Composition-Patch-Unterstützung für Modern-Templates → verschoben auf Phase 2, da `compose_agent()` heute Markdown-Anchor-basiert ist
 consequences:
   + Schrittweise Migration möglich
   + Bestehende `wrap_sections_in_xml()` und `_extract_and_append_critical_footer()` werden wiederverwendet
+  + Hybrid-Mode ist bereits funktional — nur Config-Flag `xml-section-wrapping: enabled: true`, kein Code-Aufwand
   + Admin-UI und Viz können Mode pro Rolle visualisieren
   + A2A-Handoff-Blocks lassen sich zentral in Snippets pflegen
   + Provider-Agnostik wird durch automatisierte Checks garantiert
   - Zusätzliche Verzeichnisstruktur `1-generic-modern/` nötig
-  - Composition-Patches müssen XML-Struktur respektieren
-  - Cascaden-Runtime muss in Phase 2+ definiert werden
-  - Token-Reduktionsziel wurde von 25 % auf 15–20 % für `developer.md` korrigiert, da die ursprüngliche Zahl unbelegt war
+  - `collect_sources()` muss in Phase 1 um `1-generic-modern/` erweitert werden, sonst keine Discovery
+  - Modern-Templates sind in Phase 1+2 keine Composition-Targets (Constraint 6.8); `compose_agent()`-XML-Anchor-Support ist Phase-2-Task
+  - Cascade-Runtime ist explizit Phase 3+, Phase 1 liefert nur das Schema
+  - 15–20 % Token-Reduktion ist Hypothese, nicht Ziel — erste Messung im PoC
 ```
 
 ---
 
-**Status:** Konzept-Entwurf v2.0 — revidiert
+**Status:** Konzept-Entwurf v2.1 — überarbeitet nach Machbarkeits-Analyse
 **Nächster Schritt:** Branch `feat/prompt-modernization-poc` ist angelegt; Phase 1 starten.
