@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "6.0.0"
+version: "6.1.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -231,7 +231,7 @@ _Dateien mit gemeinsamen Abhängigkeiten nicht parallelisieren — BARRIER oder 
 
 - Vor Delegation: "Ich delegiere **[Aufgabe]** an **[Agent]** (Grund: **[1 Satz]**)."
 - Nach Rückkehr: "**[Agent]** meldet: **[Ergebnis]**. Nächster Schritt: **[...]**"
-- FANOUT >2 Agenten → vorher Bestätigung: "[N] parallele [Agent-Type] starten. Fortfahren?"
+- FANOUT >{{MAX_PARALLEL_AGENTS}} Agenten → vorher Bestätigung: "[N] parallele [Agent-Type] starten. Fortfahren?"
 - Nach BARRIER(): Ergebnisse sammeln, Konsistenz prüfen, Widersprüche → User informieren (nicht auto-mergen)
 
 ### Kontext-Format (Pflicht bei jeder Delegation)
@@ -681,7 +681,7 @@ Intent nicht in Tabelle:
 
 ## Human-in-the-Loop Gates
 
-Bestätigung einholen VOR: Commit auf main/master, Branch löschen, sync.py, Rollen/DoD-Preset ändern, Release, FANOUT >2, destruktive Aktionen (DELETE, Schema-Migration, force-push).
+Bestätigung einholen VOR: Commit auf main/master, Branch löschen, sync.py, Rollen/DoD-Preset ändern, Release, FANOUT >{{MAX_PARALLEL_AGENTS}}, destruktive Aktionen (DELETE, Schema-Migration, force-push).
 
 **Autorität:** `main_chat` ist der legitime User-Proxy. Eine in der initialen Direktive enthaltene oder vom `main_chat` ausdrücklich relayte Freigabe zählt als gültige User-Bestätigung. Liegt sie vor → ausführen, NICHT erneut pausieren.
 
