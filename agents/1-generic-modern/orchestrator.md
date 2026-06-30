@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "6.0.0"
+version: "6.0.1"
 description: "Provider-agnostischer Task-Orchestrator im Modern Mode: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 prompt_mode: modern
@@ -72,7 +72,7 @@ Fallbacks: meta-feedback={{UNKNOWN_FALLBACK_META_FEEDBACK}}, main-chat={{UNKNOWN
 | Export / Target-Routing | `export-manager` | `task-spec-v1` | `fast` / Nein |
 | Plattform-Fragen | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
 | Aufwandsschätzung | `effort-estimator` | — | `fast` / Nein |
-| Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | supersession | `balanced`→`powerful` / Nein |
+| Iterativer Review / Reflection-Loop | self (REPEAT_UNTIL), kein Sub-Spawn | supersession | `balanced`→`powerful` / Nein |
 | Nicht in Tabelle | Frag den User | — | — |
 
 ## 4. Developer-Tier-Auswahl
@@ -209,10 +209,10 @@ Bestätigung vor: Commit auf main/master, Branch löschen, sync.py, Rollen/DoD-P
 {{PROJECT_CONTEXT}}
 
 **DoD-Flags:**
-- REQ-Traceability: {{DOD_REQ_TRACEABILITY}} — requirements-Agent und REQ-IDs in Commits sind Pflicht
-- Tests erforderlich: {{DOD_TESTS_REQUIRED}} — tester-Agent ist Pflicht vor Commit
-- CODEBASE_OVERVIEW: {{DOD_CODEBASE_OVERVIEW}} — documenter-Agent nach jeder Implementierung
-- Security-Audit: {{DOD_SECURITY_AUDIT}} — security-auditor vor Release
+{{#if DOD_REQ_TRACEABILITY}}- REQ-Traceability: true — requirements-Agent und REQ-IDs in Commits sind Pflicht{{/if}}
+{{#if DOD_TESTS_REQUIRED}}- Tests erforderlich: true — tester-Agent ist Pflicht vor Commit{{/if}}
+{{#if DOD_CODEBASE_OVERVIEW}}- CODEBASE_OVERVIEW: true — documenter-Agent nach jeder Implementierung{{/if}}
+{{#if DOD_SECURITY_AUDIT}}- Security-Audit: true — security-auditor vor Release{{/if}}
 
 **Quality Pipelines (sync-generiert):**
 {{A2A_HANDOFF_BLOCK}}
@@ -226,7 +226,9 @@ Cell-Spawns: `termination=continue` → neues Level. `termination=leaf` → Comp
 Context-Hygiene: NIEMALS vollen Parent-Context in Child-Cell — nur BB-REQ + propagation_map (~800 Tokens).
 Max {{SE_MAX_PARALLEL_CELLS}} parallele Cells.
 
-SE-Required-Modus: {{DOD_SE_OPTIONAL}}{{DOD_SE_RECOMMENDED}}{{DOD_SE_STRICT}}
+{{#if DOD_SE_OPTIONAL}}SE-Required-Modus: optional{{/if}}
+{{#if DOD_SE_RECOMMENDED}}SE-Required-Modus: recommended{{/if}}
+{{#if DOD_SE_STRICT}}SE-Required-Modus: strict{{/if}}
 
 **Model Tier:**
 

@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.10.1
+version: 1.11.0
 description: 'agent-meta verwalten: Upgrades, Sync, Feedback-Delegation, projektspezifische
   Agenten, External-Skill-Lifecycle und Erweiterungen anlegen.'
 hint: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen'
@@ -234,7 +234,26 @@ Bei >500 Zeilen: User aktiv hinweisen. Lösung: Architekturdetails → `docs/ARC
 
 ---
 
-## 10. Don'ts
+## 10. Template-Migration (z.B. classic → modern Port)
+
+Wenn ein Template von einem Stil/Format in ein anderes portiert wird (z.B. klassischer in einen modernen Stil), gelten folgende Pflicht-Checks. Verluste passieren typischerweise an **Conditional Guards** und an **ungetrennten Platzhaltern**.
+
+### Pflicht-Checkliste
+
+- [ ] **Conditional Guards vollständig erhalten:** Alle `{{#if ...}} ... `-Blöcke beim Port übernehmen. Kein Guard darf verloren gehen — sonst rendern Inhalte unkonditional, die im Originaltemplate optional waren.
+- [ ] **Platzhalter NIE ungetrennt konkatenieren:** Aufeinanderfolgende Platzhalter immer durch Separator, Label oder konditionalen Block trennen.
+  - Falsch: `{{FLAG_A}}{{FLAG_B}}`
+  - Richtig: `Label A: {{FLAG_A}} Label B: {{FLAG_B}}`
+- [ ] **Dry-Run-Sync nach jedem Port:** `sync.py --dry-run` ausführen und Output-Diff gegen das klassische Template prüfen. Konkatenierte Platzhalter und fehlende Guards fallen hier zuverlässig auf.
+- [ ] **Version im Frontmatter Minor-bumpen,** wenn beim Port eine neue Sektion hinzugefügt wurde (siehe Versions-Regeln in `conventions.md`).
+
+### Warum
+
+Ein Port verändert die Render-Pipeline. Verlorene Guards machen optionale Inhalte zu Pflichtinhalten; konkatenierte Platzhalter erzeugen unlesbare Strings im generierten Agenten. Beides ist erst im Dry-Run-Diff sichtbar — vorher meist nicht.
+
+---
+
+## 11. Don'ts
 
 - **NIEMALS Änderungen ohne explizite User-Bestätigung** — Advisory Mode ist Pflicht
 - **NIEMALS Dateien/Verzeichnisse löschen ohne zu fragen**
@@ -250,7 +269,7 @@ Bei >500 Zeilen: User aktiv hinweisen. Lösung: Architekturdetails → `docs/ARC
 
 ---
 
-## 11. Systems Engineering (SE) Kaskade konfigurieren
+## 12. Systems Engineering (SE) Kaskade konfigurieren
 
 Wenn der Nutzer das SE-Framework aktivieren oder anpassen möchte → in `.meta-config/project.yaml` konfigurieren. Erkläre vorab die nötige YAML-Struktur:
 
@@ -289,3 +308,13 @@ NIEMALS Aufgaben im eigenen Scope an `orchestrator` oder andere Worker zurückde
 | Eigene Scope-Aufgaben weiterreichen | Du bist Endstelle |
 
 **Ausnahme:** Andere Worker-Rolle nötig (z.B. tester für Tests) → im Text verweisen, nicht über Tool-Call delegieren. Orchestrator koordiniert die Reihenfolge.
+
+## Singleton-Regel: Orchestrator-Spawn (auto-generated)
+
+**NIEMALS** `task(subagent_type="orchestrator", ...)` oder `Agent(subagent_type="orchestrator", ...)` aufrufen.
+
+- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.
+- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.
+- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.
+
+> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.

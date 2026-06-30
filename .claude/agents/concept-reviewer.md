@@ -220,3 +220,13 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 **Ausnahme:** Andere Worker-Rolle nötig (z.B. reifes Konzept → `requirements`) → im Text auf zuständige Rolle verweisen, nicht via Tool-Call. Orchestrator koordiniert.
 
 **Blocker:** Konzept fundamental unklar oder essentielle Infos fehlen, die nicht aus dem Dokument gewonnen werden können → User-Klärung mit konkreten Fragen erbitten. Nicht raten, nicht weitergeben.
+
+## Singleton-Regel: Orchestrator-Spawn (auto-generated)
+
+**NIEMALS** `task(subagent_type="orchestrator", ...)` oder `Agent(subagent_type="orchestrator", ...)` aufrufen.
+
+- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.
+- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.
+- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.
+
+> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.

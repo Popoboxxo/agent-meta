@@ -126,7 +126,7 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 {{#if EFFORT_ESTIMATOR_ENABLED}}
 | Aufwandsschätzung                   | `effort-estimator` | —                | `fast` / Nein |
 {{/if}}
-| Iterativer Review / Reflection-Loop | `orchestrator` → REPEAT_UNTIL | supersession | `balanced`→`powerful` / Nein |
+| Iterativer Review / Reflection-Loop | self (REPEAT_UNTIL), kein Sub-Spawn | supersession | `balanced`→`powerful` / Nein |
 | Nicht in Tabelle | Frag den User | — | — / — |
 
 Intent nicht exakt in Tabelle → User fragen, nicht raten. `bug-feature-analyzer` nur durch Orchestrator, nie direkt.
