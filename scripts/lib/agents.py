@@ -772,7 +772,10 @@ def _resolve_agent_source(
     Returns None only when the modern override is requested but missing AND the
     caller should fall through to the legacy path.
     """
-    mode = prompt_modes.get(role) or prompt_modes.get("default", "legacy")
+    # prompt_modes shape: {"default": "legacy", "modes": {"developer": "modern", ...}}
+    modes_map = prompt_modes.get("modes", {}) or {}
+    default_mode = prompt_modes.get("default", "legacy")
+    mode = modes_map.get(role) or default_mode
     if mode == "modern":
         modern_path = agent_meta_root / AGENTS_DIR / MODERN_DIR / f"{role}.md"
         if modern_path.exists():
@@ -859,10 +862,10 @@ def sync_agents(
     role_map = build_role_map(agent_meta_root)
     platforms = config.get("platforms", [])
     _ap_cfg_sa = config.get("agent-prompts", {})
-    _prompt_modes_sa: dict[str, str] = {}
+    _prompt_modes_sa: dict = {'default': 'legacy', 'modes': {}}
     if isinstance(_ap_cfg_sa, dict):
         _prompt_modes_sa["default"] = _ap_cfg_sa.get("default", "legacy")
-        _prompt_modes_sa.update(_ap_cfg_sa.get("modes", {}) or {})
+        _prompt_modes_sa["modes"] = _ap_cfg_sa.get("modes", {}) or {}
     overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes_sa)
     target_dir = project_root / CLAUDE_AGENTS_DIR
 
@@ -980,6 +983,9 @@ def sync_agents(
             content = wrap_sections_in_xml(content)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        # Annotate log when a Modern Mode template is used (layer already set above)
+        if layer == MODERN_DIR:
+            rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
             if write_checked(target_path, content, log, rel_label, config=config):
@@ -1062,10 +1068,10 @@ def sync_agents_for_provider(
     role_map = build_role_map(agent_meta_root)
     platforms = config.get('platforms', [])
     _ap_cfg = config.get('agent-prompts', {})
-    _prompt_modes: dict[str, str] = {}
+    _prompt_modes: dict = {'default': 'legacy', 'modes': {}}
     if isinstance(_ap_cfg, dict):
         _prompt_modes['default'] = _ap_cfg.get('default', 'legacy')
-        _prompt_modes.update(_ap_cfg.get('modes', {}) or {})
+        _prompt_modes['modes'] = _ap_cfg.get('modes', {}) or {}
     overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes)
     target_dir = project_root / pc['agents_dir']
 
@@ -1370,6 +1376,9 @@ def sync_agents_for_provider(
             content = wrap_sections_in_xml(content)
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        # Annotate log when a Modern Mode template is used (layer already set above)
+        if layer == MODERN_DIR:
+            rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
             if write_checked(target_path, content, log, rel_label, config=config):

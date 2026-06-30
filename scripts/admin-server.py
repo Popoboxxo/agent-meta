@@ -985,6 +985,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/roles":
             return self._send_json(self._list_roles())
 
+        if path == "/api/prompt-modes":
+            return self._send_json(self._read_prompt_modes())
+
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
 
@@ -1622,7 +1625,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         Each role entry includes:
           * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
-            ``permission_mode``
+            ``permission_mode``, ``prompt_mode``
           * ``description`` — never empty (falls back to template frontmatter
             ``description`` field if the role-defaults entry is missing/empty)
           * ``targets`` — list of delegation target role names from
@@ -1630,6 +1633,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         role_defaults_path = self._role_defaults_path()
         roles: list[dict] = []
+
+        # Read agent-prompts config for prompt_mode annotation per role
+        prompt_modes = self._read_prompt_modes()
+        prompt_default = prompt_modes.get("default", "legacy")
+
         if role_defaults_path.exists():
             with role_defaults_path.open("r", encoding="utf-8") as fh:
                 data = yaml.safe_load(fh) or {}
@@ -1650,6 +1658,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if not description:
                         description = f"{name} agent (no description)"
 
+                    # Resolve effective prompt_mode: role override > default
+                    effective_mode = prompt_modes.get("modes", {}).get(name) or prompt_default
+
                     roles.append({
                         "name": name,
                         "tier": (attrs.get("workflow_tier")
@@ -1662,8 +1673,30 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
                         "description": description,
                         "targets": targets,
+                        "prompt_mode": effective_mode,
                     })
         return {"roles": roles, "count": len(roles)}
+
+    def _read_prompt_modes(self) -> dict:
+        """Return the agent-prompts block from project.yaml.
+
+        Shape: ``{"default": "legacy", "modes": {"developer": "modern", ...}}``
+        Falls back to ``{"default": "legacy", "modes": {}}`` when absent.
+        """
+        try:
+            project_config = self.__class__.root / ".meta-config" / "project.yaml"
+            if project_config.exists():
+                with project_config.open("r", encoding="utf-8") as fh:
+                    cfg = yaml.safe_load(fh) or {}
+                ap = cfg.get("agent-prompts") or {}
+                if isinstance(ap, dict):
+                    return {
+                        "default": ap.get("default", "legacy"),
+                        "modes": ap.get("modes") or {},
+                    }
+        except Exception:
+            pass
+        return {"default": "legacy", "modes": {}}
 
     def _role_defaults_path(self) -> Path:
         """Resolve the path to ``role-defaults.yaml`` for either layout."""

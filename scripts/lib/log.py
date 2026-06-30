@@ -87,10 +87,13 @@ class SyncLog:
         else:
             lines += ["", "WARNINGS", "--------", "(none)"]
 
+        modern_writes = sum(1 for a in self.actions if "[modern]" in a)
         summary = (
             f"{len(self.actions)} action(s)  |  {len(self.skipped)} skipped  |  "
             f"{len(self.warnings)} warning(s)"
         )
+        if modern_writes:
+            summary += f"  |  {modern_writes} modern-mode template(s)"
         if self.errors:
             summary += f"  |  {len(self.errors)} error(s)"
         lines += [
