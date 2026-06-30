@@ -284,6 +284,57 @@ patches:
 | **se-testreviewer** | powerful | Audits test strategies for edge cases, boundary values, flakiness |
 | **se-integration-and-test-manager** | balanced | V&V orchestrator: integration strategy, test level coordination |
 
+## Prompt Modes (Legacy / Hybrid / Modern)
+
+agent-meta supports three rendering modes for agent templates, selectable per role:
+
+| Mode | Template Source | Rendering | Use Case |
+|------|----------------|-----------|----------|
+| `legacy` | `agents/1-generic/` | unchanged Markdown | all existing roles, full compatibility |
+| `hybrid` | `agents/1-generic/` | auto-wrapped in `<section>` tags | incremental migration |
+| `modern` | `agents/1-generic-modern/` | native 6-block XML | optimized LLM parsing |
+
+### 6-Block XML Format (Modern Mode)
+
+Modern templates use exactly 6 XML blocks in fixed order:
+
+```xml
+<persona>     role identity, singleton rules</persona>
+<workflow>    numbered step-by-step process</workflow>
+<context>     project context, DoD flags, agent table</context>
+<tools>       allowed tools with short descriptions</tools>
+<output_contract>  return format, escalation</output_contract>
+<constraints> hard rules — last, for recency bias</constraints>
+```
+
+`<constraints>` is intentionally placed last — LLMs follow final instructions more reliably.
+
+### Configuration
+
+```yaml
+# .meta-config/project.yaml
+agent-prompts:
+  default: legacy          # fallback for all roles without explicit override
+  modes:
+    developer: modern      # uses agents/1-generic-modern/developer.md
+    orchestrator: modern   # uses agents/1-generic-modern/orchestrator.md
+```
+
+### Validation & Token Counting
+
+```bash
+# Validate all Modern Mode templates (6-block + frontmatter)
+python scripts/validate-modern-templates.py --all --strict
+
+# Compare token estimates: legacy vs modern
+python scripts/token-counter.py --role developer
+python scripts/token-counter.py --role orchestrator --threshold 4000
+```
+
+→ Architecture details: `docs/architecture/prompt-modernization.md`
+
+---
+
 ## Quick Start
 
 ```bash

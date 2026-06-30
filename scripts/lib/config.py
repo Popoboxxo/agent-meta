@@ -461,6 +461,36 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[enabled_key] = "false"
     except Exception:
         pass
+    # AGENT_PROMPTS: mode config for Modern/Hybrid/Legacy prompt rendering.
+    # Reads agent-prompts block: {default: legacy, modes: {developer: modern, ...}}
+    _ap = config.get("agent-prompts", {}) or {}
+    _ap_default = _ap.get("default", "legacy") if isinstance(_ap, dict) else "legacy"
+    _ap_modes = _ap.get("modes", {}) or {} if isinstance(_ap, dict) else {}
+    variables["AGENT_PROMPTS_DEFAULT"] = _ap_default
+    for _role, _mode in (_ap_modes.items() if isinstance(_ap_modes, dict) else {}.items()):
+        variables[f"AGENT_PROMPTS_MODE_{_role.upper().replace('-', '_')}"] = str(_mode)
+
+    # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
+    # Each block is either the real content or an empty string when the flag is off.
+    _dod_req = dod_resolved.get("req-traceability", True)
+    variables["DOD_REQ_BLOCK"] = (
+        "REQ-ID aus `REQUIREMENTS.md` prüfen — kein Commit ohne REQ-ID." if _dod_req else ""
+    )
+    _dod_tests = dod_resolved.get("tests-required", True)
+    variables["DOD_TESTS_BLOCK"] = (
+        "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
+    )
+    variables["A2A_HANDOFF_BLOCK"] = (
+        "A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), "
+        "IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). "
+        f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
+        if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""
+    )
+    variables["ANTI_RECURSION_BLOCK"] = (
+        "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
+        "Nur tester/documenter/requirements/validator aus Kontext verweisen."
+    )
+
     return variables, unmapped
 
 

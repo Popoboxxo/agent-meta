@@ -697,6 +697,34 @@
     "outcome-caching": {
       "$ref": "#/$defs/outcome-caching"
     },
+    "agent-prompts": {
+      "description": "Prompt-Mode-Konfiguration: legacy (Markdown), hybrid (auto-wrapped XML), modern (native 6-block XML).",
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "enum": ["legacy", "hybrid", "modern"],
+          "default": "legacy",
+          "description": "Standard-Modus für alle Agenten ohne expliziten Override."
+        },
+        "modes": {
+          "type": "object",
+          "description": "Rollen-spezifische Overrides. Key = Rollenname, Value = Modus.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["legacy", "hybrid", "modern"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "cascades": {
+      "description": "SE-Kaskaden-Definitionen (Phase 3+). First-Class neben quality-pipelines.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/cascadeDefinition"
+      }
+    },
     "external-skills": {
       "type": "object",
       "description": "Opt-in external skill activation. Two-Gate: approved in external-skills.config.json AND enabled here.",
@@ -1128,6 +1156,54 @@
             "manual"
           ],
           "default": "git-commit"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cascadeDefinition": {
+      "type": "object",
+      "description": "Definition einer SE-Kaskade mit Phasen und Agenten.",
+      "required": ["stages"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/cascadeStage"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "cascadeStage": {
+      "type": "object",
+      "description": "Eine Phase innerhalb einer SE-Kaskade.",
+      "required": ["name", "agent"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "parallel": {
+          "type": "boolean",
+          "default": false
+        },
+        "barrier": {
+          "type": "boolean",
+          "default": true
+        },
+        "condition": {
+          "type": "string",
+          "description": "Optionale Bedingung (Jinja2-ähnlich) für bedingte Ausführung."
         }
       },
       "additionalProperties": false

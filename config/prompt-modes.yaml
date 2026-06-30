@@ -1,0 +1,20 @@
+# agent-meta — Prompt-Mode-Defaults
+# Framework-weite Defaults für den Prompt-Rendering-Modus.
+# Projekt-Overrides via .meta-config/project.yaml → agent-prompts.
+#
+# Modi:
+#   legacy  — unverändertes Markdown (default, vollständig kompatibel)
+#   hybrid  — Markdown-Sektionen automatisch in <section>-Tags gewrapped (wrap_sections_in_xml)
+#   modern  — natives 6-block XML: <persona>, <workflow>, <context>, <tools>, <output_contract>, <constraints>
+#             Voraussetzung: Template in agents/1-generic-modern/ vorhanden
+
+agent-prompts:
+  default: legacy
+
+# Modern-Mode-Templates (agents/1-generic-modern/)
+modern-templates:
+  - developer
+  - orchestrator
+
+# Hybrid-Mode ist opt-in auf Rollen-Ebene.
+# Kein globaler hybrid-default — würde alle Legacy-Templates wrappen.

@@ -270,3 +270,11 @@ reflection-pairs:
       max_iterations: 5
       enabled: true
 tier-preset: Normal
+
+# Prompt-Mode-Konfiguration (feat/prompt-modernization-poc)
+# legacy = unverändertes Markdown | hybrid = auto-XML-Wrap | modern = natives 6-block XML
+agent-prompts:
+  default: legacy
+  modes:
+    developer: modern
+    orchestrator: modern

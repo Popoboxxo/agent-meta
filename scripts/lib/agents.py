@@ -15,6 +15,7 @@ except ImportError:
 
 AGENTS_DIR = "agents"
 GENERIC_DIR = "1-generic"
+MODERN_DIR = "1-generic-modern"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 EXTERNAL_DIR = "0-external"
@@ -756,8 +757,33 @@ def compose_agent(
     return result
 
 
+def _resolve_agent_source(
+    role: str,
+    agent_meta_root: Path,
+    prompt_modes: dict[str, str],
+) -> Path | None:
+    """Return the best source path for a role given agent-prompts config.
+
+    Resolution order:
+      1. If prompt_modes[role] == 'modern' → 1-generic-modern/<role>.md (if exists)
+      2. If prompt_modes['default'] == 'modern' → 1-generic-modern/<role>.md (if exists)
+      3. Fallback → 1-generic/<role>.md (caller is responsible for existence check)
+
+    Returns None only when the modern override is requested but missing AND the
+    caller should fall through to the legacy path.
+    """
+    mode = prompt_modes.get(role) or prompt_modes.get("default", "legacy")
+    if mode == "modern":
+        modern_path = agent_meta_root / AGENTS_DIR / MODERN_DIR / f"{role}.md"
+        if modern_path.exists():
+            return modern_path
+    return None  # caller falls through to generic
+
+
 def collect_sources(
-    agent_meta_root: Path, platforms: list[str]
+    agent_meta_root: Path,
+    platforms: list[str],
+    prompt_modes: dict[str, str] | None = None,
 ) -> tuple[dict[str, Path], set[str]]:
     """
     Returns (overrides, known_ext_roles).
@@ -769,6 +795,9 @@ def collect_sources(
       These are NOT used as templates — just signals that the role supports extensions.
       (Currently unused since 3-project/ in meta-repo has no templates by design.)
     """
+    if prompt_modes is None:
+        prompt_modes = {}
+
     overrides: dict[str, Path] = {}
     known_ext_roles: set[str] = set()
 
@@ -776,7 +805,9 @@ def collect_sources(
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
         if not f.name.startswith("_"):
-            overrides[f.stem] = f
+            role = f.stem
+            modern_override = _resolve_agent_source(role, agent_meta_root, prompt_modes)
+            overrides[role] = modern_override if modern_override else f
 
     # 2. Platform agents
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
@@ -827,7 +858,12 @@ def sync_agents(
     CLAUDE_AGENTS_DIR = ".claude/agents"
     role_map = build_role_map(agent_meta_root)
     platforms = config.get("platforms", [])
-    overrides, _ = collect_sources(agent_meta_root, platforms)
+    _ap_cfg_sa = config.get("agent-prompts", {})
+    _prompt_modes_sa: dict[str, str] = {}
+    if isinstance(_ap_cfg_sa, dict):
+        _prompt_modes_sa["default"] = _ap_cfg_sa.get("default", "legacy")
+        _prompt_modes_sa.update(_ap_cfg_sa.get("modes", {}) or {})
+    overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes_sa)
     target_dir = project_root / CLAUDE_AGENTS_DIR
 
     # Optional role whitelist — if "roles" key is absent, all roles are generated
@@ -1025,7 +1061,12 @@ def sync_agents_for_provider(
 
     role_map = build_role_map(agent_meta_root)
     platforms = config.get('platforms', [])
-    overrides, _ = collect_sources(agent_meta_root, platforms)
+    _ap_cfg = config.get('agent-prompts', {})
+    _prompt_modes: dict[str, str] = {}
+    if isinstance(_ap_cfg, dict):
+        _prompt_modes['default'] = _ap_cfg.get('default', 'legacy')
+        _prompt_modes.update(_ap_cfg.get('modes', {}) or {})
+    overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes)
     target_dir = project_root / pc['agents_dir']
 
     allowed_roles = set(config['roles']) if 'roles' in config else None
