@@ -201,6 +201,11 @@ Each agent role declares its handoff contracts in `config/role-defaults.yaml` �
 | **PIPELINE** | Sequential steps with dependencies | requirements → dev → test |
 | **LIFECYCLE** | Complete end-to-end feature workflow | Branch → REQ → TDD → Dev → Validate → PR |
 
+**Orchestrator Robustness:**
+- Recognizes `main_chat` as a valid HITL (Human-in-the-Loop) proxy for approval gates, preventing confirmation deadlocks in multi-agent workflows.
+- Actively collects parallel subagent results via BARRIER, ensuring deterministic result ordering and timeout resilience.
+- Propagates delegation trace context (`viz_task_id`) to enable cross-agent session tracking and visualization.
+
 ### Provider Generation Matrix
 
 | Provider | Agents | Rules | Commands | Config |
@@ -332,6 +337,10 @@ python scripts/token-counter.py --role orchestrator --threshold 4000
 ```
 
 → Architecture details: `docs/architecture/prompt-modernization.md`
+
+### Reference Agent & Modern Template Architecture
+
+Modern templates leverage a canonical reference agent (`agents/1-generic-modern/_reference-agent.md`) that demonstrates all framework features in native 6-block XML format. The underscore prefix ensures it is not instantiated as a role but serves as a didactic blueprint for role authors. All modern mode agents inherit from this reference's structure, ensuring consistency in <persona>, <workflow>, <context>, <tools>, <output_contract>, and <constraints> ordering.
 
 ### Singleton-Orchestrator Rule
 

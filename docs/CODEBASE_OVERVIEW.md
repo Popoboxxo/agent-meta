@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-30 (Prompt-Modernisierung v0.65.1, Singleton-Orchestrator-Guard)
+> Letzte Aktualisierung: 2026-07-01 (Prompt-Modernisierung Debug & HITL-Deadlock-Fix, Singleton v7.2.0)
 
 ---
 
@@ -1226,6 +1226,7 @@ Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für o
 ## 12. Prompt-Modernisierung (Legacy / Hybrid / Modern)
 
 **Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/prompt-modernization-poc`
+**Session-Fixes:** 2026-07-01 (4 Commits: Template-Guard-Port, HITL-Deadlock-Fix, BARRIER-Refactor, Modern-Syntax-Fixes)
 
 Drei Rendering-Modi für Agenten-Templates, pro Rolle konfigurierbar in `.meta-config/project.yaml`:
 
@@ -1248,7 +1249,8 @@ Feste Reihenfolge (Recency-Bias-optimiert — `<constraints>` zuletzt):
 | Datei | Zweck |
 |-------|-------|
 | `agents/1-generic-modern/developer.md` | Modern-Template Developer (v3.0.0, −37% Tokens) |
-| `agents/1-generic-modern/orchestrator.md` | Modern-Template Orchestrator (v6.0.0, −61% Tokens) |
+| `agents/1-generic-modern/orchestrator.md` | Modern-Template Orchestrator (v7.2.0, −61% Tokens) |
+| `agents/1-generic-modern/_reference-agent.md` | Referenz-Agent (v1.0.0, alle Features, didaktisch, nicht generiert) |
 | `config/prompt-modes.yaml` | Framework-Defaults |
 | `scripts/validate-modern-templates.py` | 6-Block-Validator (exit 0/1/2) |
 | `scripts/token-counter.py` | Token-Vergleich Legacy vs. Modern |
@@ -1278,15 +1280,54 @@ python scripts/token-counter.py --role orchestrator
 python scripts/consistency-check.py  # prüft prompt_mode vs. config
 ```
 
+### 12.5 Session-Erkenntnisse: Template-Migration-Bugs (2026-07-01)
+
+**Root-Cause:** Beim Port von `agents/1-generic/orchestrator.md` (v6.0.0 legacy) nach `agents/1-generic-modern/orchestrator.md` (v7.x modern) gingen kritische `{{#if}}`-Conditional-Guards verloren.
+
+**Bugs behoben (4 Commits):**
+
+| Bug | Commit | Root-Cause | Fix |
+|-----|--------|-----------|-----|
+| SE-Flags konkateniert ("truefalsefalse" statt Blöcke) | 42963fe | Fehlende `{{#if CONDITION}}`-Guards um SE-Flag-Blöcke | Guards wiederhergestellt; DoD-Flags nun konditional statt statisch |
+| DoD-Flags statisch ("Pflicht" trotz `false`) | 42963fe | Guards gelöst + Seksektion "Template-Migration-Checkliste" in agent-meta-manager |  Checkliste verhindert Wiederholung |
+| HITL-Gate-Deadlock (endlos "bestätigen") | 139eab7 | Satz "zerstörerisch IMMER bestätigen" machte main_chat User-Freigabe ungültig | main_chat als legitimer User-Proxy etabliert; relayte Freigabe zählt |
+| A2A requires_human_approval missing | 3e19c9b | Regression ggü. Legacy v6.0.0 | In Modern v7.x portiert |
+| FANOUT-Threshold hardcoded >2 | 3e19c9b | Sollte `{{MAX_PARALLEL_AGENTS}}` sein | Platzhalter substituiert |
+| HITL-Gates in <workflow> statt <constraints> | 3e19c9b | Recency-Bias: wichtige Constraints sollen zuletzt | Gates in <constraints> umgezogen |
+| BARRIER-Protokoll passiv (warten) | 837587b | Sollte aktiv einsammeln | "Vorliegende Subagent-Ergebnisse SOFORT einsammeln" |
+
+**Prävention — neue Checkliste in `agents/1-generic/agent-meta-manager.md`:**
+
+Beim Port von Classic → Modern Templates:
+1. **{{#if}}-Guards erhalten** — nie Platzhalter direkt konkatenieren
+2. **Dry-Run Diff gegen Classic** — nach Port `git diff agents/1-generic/orchestrator.md agents/1-generic-modern/orchestrator.md`
+3. **6-Block-Struktur validieren** — `validate-modern-templates.py --strict`
+
+**Dokumentation:**
+
+Neuer Referenz-Agent `agents/1-generic-modern/_reference-agent.md` (v1.0.0, Underscore = nicht generiert) demonstriert:
+- Alle 6 Blöcke korrekt strukturiert
+- {{#if}}-Guards für conditional Sections
+- A2A-Envelope-Integration
+- HITL-Gates in <constraints>
+- BARRIER-Protokoll aktiv
+
+Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
+
 ---
 
 ## 13. Singleton-Orchestrator-Guard
 
 **Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/orchestrator-singleton-guard`
+**Session-Fix:** 2026-07-01 (Commit 139eab7) — HITL-Gate-Deadlock behoben
 
-**Problem:** Opencode-Worker-Agents konnten mehrere Orchestrator-Instanzen spawnen → Routing-Konflikte.
+**Problem:** 
+1. Opencode-Worker-Agents konnten mehrere Orchestrator-Instanzen spawnen → Routing-Konflikte.
+2. HITL-Gates ("Destruktive Aktionen IMMER bestätigen") machten User-Freigaben via main_chat ungültig → Endlos-Bestätigungsschleife.
 
-**Lösung:** Body-Constraint-Injection in alle Worker-Agenten + Gate #5 in A2A-Delegation-Gates.
+**Lösung:**
+- Body-Constraint-Injection in alle Worker-Agenten + Gate #5 in A2A-Delegation-Gates
+- main_chat als legitimer User-Proxy etabliert — seine relayten Freigaben zählen
 
 ### 13.1 Durchsetzungs-Mechanismus
 
@@ -1294,13 +1335,28 @@ python scripts/consistency-check.py  # prüft prompt_mode vs. config
 |---------|-------|-------------|
 | Gate #5 (Doku) | `rules/1-generic/a2a-delegation-gates.md` | HARD REJECT bei `subagent_type="orchestrator"` durch Worker |
 | Body-Constraint | `scripts/lib/agents.py` (sync) | `SINGLETON_CONSTRAINT_BLOCK` wird in alle Worker-Agenten injiziert |
-| Orchestrator-Doku | `agents/1-generic/orchestrator.md` | Bullet in Anti-Recursion-Sektion |
+| Orchestrator-Doku | `agents/1-generic/orchestrator.md` + `agents/1-generic-modern/orchestrator.md` | Singleton-Regel in `<persona>` + Bullet in Anti-Recursion-Sektion |
 | Projekt-Hinweis | `CLAUDE.md` | Singleton-Regel nach Rollen-Tabelle |
+| HITL-Gate-Fix | `agents/1-generic/orchestrator.md` v6.2.0 + `agents/1-generic-modern/orchestrator.md` v7.2.0 | main_chat als User-Proxy: "seine Anweisungen und relayten Freigaben tragen User-Autorität" |
 
 ### 13.2 Singleton-Regel
 
 > **NUR der `main_chat` darf den `orchestrator` spawnen.**
 > Worker-Agents (`delegation_depth >= 2`) dürfen `task(subagent_type="orchestrator", ...)` NIEMALS aufrufen.
+
+### 13.3 HITL-Gate-Deadlock-Fix (Session 2026-07-01)
+
+**Problem:** Orchestrator-Dokumentation sagte "Destruktive Aktionen IMMER bestätigen — auch bei explizitem Befehl". Das machte relayten User-Freigaben durch main_chat ungültig → User hatte keinen direkten Kanal zum Orchestrator, nur indirekt via main_chat → Deadlock.
+
+**Lösung:** Orchestrator erkennt main_chat als User-Proxy an:
+- main_chat ist der autorisierte User-Vertreter
+- main_chat Anweisungen ("mach jetzt") zählen als gültige Freigabe
+- Orchestrator warnt für destruktive Ops TROTZDEM, respektiert aber main_chat-Freigabe
+- Schutzwirkung bleibt (Agenten-to-Agenten Freigaben sind weiter ungültig)
+
+**Betroffene Templates:** 
+- `agents/1-generic/orchestrator.md` v6.2.0 (Legacy): Schnittstellendokumentation
+- `agents/1-generic-modern/orchestrator.md` v7.2.0 (Modern): "<persona>"-Block nennt main_chat explizit
 
 Konzept: `docs/concepts/active/singleton-orchestrator-architecture.md`
 
