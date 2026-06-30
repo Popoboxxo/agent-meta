@@ -137,6 +137,15 @@ def _check_patch_anchors(patches: list, extends: str, rel: str,
                 f"patches[{i}] op='{op}' has no 'anchor:' field.",
             ))
             continue
+        # XML-anchor: check tag exists anywhere in base content
+        if anchor.startswith("<") and not anchor.startswith("</"):
+            if anchor not in base_content:
+                findings.append(Finding(
+                    Severity.ERROR, "frontmatter.patch-anchor-not-found", rel,
+                    f"patches[{i}] XML anchor not found in base file '{extends}': {anchor!r}",
+                    "The opening XML tag must appear in the base file.",
+                ))
+            continue  # skip the plain-text anchor check below
         if anchor not in base_content:
             findings.append(Finding(
                 Severity.ERROR, "frontmatter.patch-anchor-not-found", rel,

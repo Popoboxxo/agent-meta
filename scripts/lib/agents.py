@@ -599,13 +599,29 @@ def _parse_frontmatter_yaml(content: str) -> dict:
 
 
 def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | None:
-    """Find (start, end) line indices for a Markdown section.
+    """Find (start, end) line indices for a section.
 
-    anchor must match the heading line exactly (e.g. '## Don\\'ts').
-    start is inclusive (the heading line).
-    end is exclusive (first line of next section at same or higher level, or len(lines)).
+    Supports two anchor modes:
+    - XML-tag anchor (e.g. '<workflow>'): start = line with opening tag,
+      end = line after the matching closing '</tag>' (inclusive of close line).
+    - Markdown heading anchor (e.g. '## Don\\'ts'): start = heading line,
+      end = first line of next section at same or higher level (exclusive).
     """
     anchor_stripped = anchor.strip()
+
+    # XML-anchor mode: anchor starts with '<' (e.g. '<workflow>')
+    if anchor_stripped.startswith("<") and not anchor_stripped.startswith("</"):
+        tag = anchor_stripped.strip("<>").strip()
+        open_tag = f"<{tag}>"
+        close_tag = f"</{tag}>"
+        start_idx = None
+        for i, line in enumerate(lines):
+            if start_idx is None and open_tag in line:
+                start_idx = i
+            elif start_idx is not None and close_tag in line:
+                return (start_idx, i + 1)
+        return None  # tag not found or unclosed
+
     anchor_level = len(anchor_stripped) - len(anchor_stripped.lstrip("#"))
 
     start_idx = None
