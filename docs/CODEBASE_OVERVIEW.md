@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-22 (REQ-MOD-01: Dynamic Model Discovery, Tier Presets, Curation, Admin UI Overhaul)
+> Letzte Aktualisierung: 2026-06-30 (Prompt-Modernisierung v0.65.1, Singleton-Orchestrator-Guard)
 
 ---
 
@@ -17,6 +17,8 @@
 9. [Scripts](#9-scripts)
 10. [Provider Abstraction Layer (PAL)](#10-provider-abstraction-layer-pal)
 11. [A2A-Handoff-Protokoll](#11-a2a-handoff-protokoll)
+12. [Prompt-Modernisierung (Legacy / Hybrid / Modern)](#12-prompt-modernisierung-legacy--hybrid--modern)
+13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
 
 ---
 
@@ -1218,6 +1220,89 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | **se-orchestrator** | `task-spec-v1` | `task-spec-v1` | se-architect, se-requirements | — |
 
 Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für optionale Schema-Validierung vor/nach Delegation. `target_roles` deklariert die typischen Empfänger — der Orchestrator nutzt dies für dynamisches Routing.
+
+---
+
+## 12. Prompt-Modernisierung (Legacy / Hybrid / Modern)
+
+**Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/prompt-modernization-poc`
+
+Drei Rendering-Modi für Agenten-Templates, pro Rolle konfigurierbar in `.meta-config/project.yaml`:
+
+| Modus | Template-Quelle | Format | Aktive Rollen |
+|-------|----------------|--------|---------------|
+| `legacy` | `agents/1-generic/` | Markdown (unverändert) | alle (Default) |
+| `hybrid` | `agents/1-generic/` | Auto-XML-Wrap | geplant |
+| `modern` | `agents/1-generic-modern/` | natives 6-Block-XML | `developer`, `orchestrator` |
+
+### 12.1 6-Block-XML-Struktur
+
+Feste Reihenfolge (Recency-Bias-optimiert — `<constraints>` zuletzt):
+
+```
+<persona> → <workflow> → <context> → <tools> → <output_contract> → <constraints>
+```
+
+### 12.2 Implementierte Artefakte
+
+| Datei | Zweck |
+|-------|-------|
+| `agents/1-generic-modern/developer.md` | Modern-Template Developer (v3.0.0, −37% Tokens) |
+| `agents/1-generic-modern/orchestrator.md` | Modern-Template Orchestrator (v6.0.0, −61% Tokens) |
+| `config/prompt-modes.yaml` | Framework-Defaults |
+| `scripts/validate-modern-templates.py` | 6-Block-Validator (exit 0/1/2) |
+| `scripts/token-counter.py` | Token-Vergleich Legacy vs. Modern |
+| `scripts/lib/agents.py` | `_resolve_agent_source()`, `MODERN_DIR`, `[modern]`-Annotation |
+| `scripts/lib/log.py` | `N modern-mode template(s)` im SUMMARY |
+| `scripts/admin-server.py` | `/api/prompt-modes` Endpoint, `prompt_mode` in Hierarchy |
+| `docs/admin-ui.html` | Badges (modern/hybrid/legacy) + `/project/prompt-modes` Seite |
+| `scripts/lib/consistency/crossrefs.py` | `check_prompt_mode_consistency()` |
+| `docs/architecture/prompt-modernization.md` | Architektur-Dokumentation |
+
+### 12.3 Konfiguration
+
+```yaml
+# .meta-config/project.yaml
+agent-prompts:
+  default: legacy
+  modes:
+    developer: modern
+    orchestrator: modern
+```
+
+### 12.4 Tools
+
+```bash
+python scripts/validate-modern-templates.py --all --strict
+python scripts/token-counter.py --role orchestrator
+python scripts/consistency-check.py  # prüft prompt_mode vs. config
+```
+
+---
+
+## 13. Singleton-Orchestrator-Guard
+
+**Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/orchestrator-singleton-guard`
+
+**Problem:** Opencode-Worker-Agents konnten mehrere Orchestrator-Instanzen spawnen → Routing-Konflikte.
+
+**Lösung:** Body-Constraint-Injection in alle Worker-Agenten + Gate #5 in A2A-Delegation-Gates.
+
+### 13.1 Durchsetzungs-Mechanismus
+
+| Schicht | Datei | Mechanismus |
+|---------|-------|-------------|
+| Gate #5 (Doku) | `rules/1-generic/a2a-delegation-gates.md` | HARD REJECT bei `subagent_type="orchestrator"` durch Worker |
+| Body-Constraint | `scripts/lib/agents.py` (sync) | `SINGLETON_CONSTRAINT_BLOCK` wird in alle Worker-Agenten injiziert |
+| Orchestrator-Doku | `agents/1-generic/orchestrator.md` | Bullet in Anti-Recursion-Sektion |
+| Projekt-Hinweis | `CLAUDE.md` | Singleton-Regel nach Rollen-Tabelle |
+
+### 13.2 Singleton-Regel
+
+> **NUR der `main_chat` darf den `orchestrator` spawnen.**
+> Worker-Agents (`delegation_depth >= 2`) dürfen `task(subagent_type="orchestrator", ...)` NIEMALS aufrufen.
+
+Konzept: `docs/concepts/active/singleton-orchestrator-architecture.md`
 
 ---
 

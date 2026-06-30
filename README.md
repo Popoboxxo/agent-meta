@@ -333,6 +333,13 @@ python scripts/token-counter.py --role orchestrator --threshold 4000
 
 → Architecture details: `docs/architecture/prompt-modernization.md`
 
+### Singleton-Orchestrator Rule
+
+Only `main_chat` may spawn the `orchestrator`. Worker-agents must never call
+`task(subagent_type="orchestrator", ...)` — doing so causes routing conflicts and
+session-state corruption. Enforced via body-constraint injection in all worker agent files
+and Gate #5 in `rules/1-generic/a2a-delegation-gates.md`.
+
 ---
 
 ## Quick Start
