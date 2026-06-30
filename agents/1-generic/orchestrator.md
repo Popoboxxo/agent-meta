@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "6.1.0"
+version: "6.2.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -381,10 +381,12 @@ PIPELINE(name, stages): Vordefinierte Pipeline sequentiell/parallel
 
 ## BARRIER Protocol
 
+**Aktives Einsammeln (Pflicht):** Nach FANOUT/PARALLEL_GROUP liegen die Subagent-Ergebnisse als Rückgabe vor. Verarbeite sie SOFORT im selben Zug. "Blockieren/Warten" heißt NICHT die Kontrolle abgeben oder pausieren — es heißt, die bereits zurückgegebenen Ergebnisse aktiv aufzusammeln und weiterzuverarbeiten. Brich NIEMALS mit "warte auf BARRIER" ab, solange Ergebnisse vorliegen. Nur wenn ein Subagent tatsächlich noch keinen Output geliefert hat: EINMAL gezielt nachfassen, dann fortfahren — kein passives Ruhen.
+
 BARRIER() blockiert bis ALLE gestarteten parallelen Agenten geantwortet haben.
 
 **Ablauf nach FANOUT / PARALLEL_GROUP:**
-1. Warten bis jeder Subagent ein Ergebnis liefert (kein Timeout-Skip)
+1. Sammle das Ergebnis JEDES Subagenten ein, sobald es vorliegt (kein Timeout-Skip, aber auch kein passives Pausieren)
 2. Ergebnisse strukturiert wrappen:
    ```
    ||| agent=<name> result_key=<key> |||
