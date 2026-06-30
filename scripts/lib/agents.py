@@ -998,6 +998,19 @@ def sync_agents(
         if xml_cfg.get('enabled', False):
             content = wrap_sections_in_xml(content)
 
+        # Singleton-Constraint: inject guard block into all non-orchestrator agent files
+        SINGLETON_CONSTRAINT_BLOCK = (
+            "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+            "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+            "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+            "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+            "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+            "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+            "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+        )
+        if role != "orchestrator" and not role.endswith("-iteration"):
+            content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         # Annotate log when a Modern Mode template is used (layer already set above)
         if layer == MODERN_DIR:
@@ -1390,6 +1403,19 @@ def sync_agents_for_provider(
         xml_cfg = config.get('xml-section-wrapping', {})
         if xml_cfg.get('enabled', False):
             content = wrap_sections_in_xml(content)
+
+        # Singleton-Constraint: inject guard block into all non-orchestrator agent files
+        SINGLETON_CONSTRAINT_BLOCK = (
+            "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+            "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+            "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+            "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+            "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+            "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+            "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+        )
+        if role != "orchestrator" and not role.endswith("-iteration"):
+            content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
         # Annotate log when a Modern Mode template is used (layer already set above)

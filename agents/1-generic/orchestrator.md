@@ -701,6 +701,7 @@ Bestätigung vor: Commit auf main/master, Branch löschen, sync.py, Rollen/DoD-P
 - Delegations-Tracker: `(agent, task_summary)` merken; identische Kombination → keine erneute Delegation
 - Worker dürfen nicht an Orchestrator zurückdelegieren (Scopes: Agenten-Tabelle)
 - Ausnahme: Reflection-Loops (generator↔critic) zählen als eine Operation
+- **Singleton-Regel:** Kein Worker-Agent darf `task(subagent_type="orchestrator", ...)` aufrufen. Es existiert genau EIN Orchestrator pro Session — der vom `main_chat` gespawnte.
 
 **A2A Handoff Validierung (VOR jedem Dispatch):**
 
