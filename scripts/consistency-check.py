@@ -46,6 +46,7 @@ from lib.consistency.crossrefs import (
     check_orchestrator_table,
     check_changelog_mentions_new_files,
     check_schema_refs,
+    check_prompt_mode_consistency,
 )
 from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
@@ -174,6 +175,7 @@ def run_checks(
         findings += check_orchestrator_table(root)
         findings += check_duplicate_commands(root)
         findings += check_schema_refs(root)
+        findings += check_prompt_mode_consistency(root)
 
         # Changelog check: only meaningful when checking changed/new files
         new_files = get_new_files_vs_main(root)
