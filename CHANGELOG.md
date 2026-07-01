@@ -4,7 +4,7 @@
 
 ---
 
-## [0.66.0-beta.1] - 2026-07-01
+## [0.66.0-beta.2] - 2026-07-01
 
 ### Added
 - **Prompt-Modernization PoC**: Modern Mode with 6-block XML structure for agent prompts (`feat/prompt-modernization-poc`)
