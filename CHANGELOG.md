@@ -4,6 +4,34 @@
 
 ---
 
+## [0.66.0-beta.1] - 2026-07-01
+
+### Added
+- **Prompt-Modernization PoC**: Modern Mode with 6-block XML structure for agent prompts (`feat/prompt-modernization-poc`)
+- **Prompt-mode awareness**: `log`, `admin-server`, `admin-ui` now respect prompt-mode configuration (legacy/hybrid/modern)
+- **Admin UI prompt-modes page**: `/project/prompt-modes` page for viewing and managing prompt-mode settings per agent
+- **XML-anchor support**: Composition patches can now target XML anchors in Modern-mode templates
+- **prompt_mode consistency check**: `consistency-check.py` validates prompt_mode alignment across generated agents
+- **Singleton-Constraint injection**: `sync.py` injects Singleton-Constraint block into Worker agent files to prevent recursive spawning
+- **A2A anti-re-delegation gates**: Configurable depth-limit, self-handoff rejection, T-size-limit, re-delegation detection (`rules/a2a-delegation-gates.md`)
+- **Gate #5 — Singleton-Orchestrator Spawn Rule**: Prevents Workers from spawning additional Orchestrator instances
+- **prompt-engineer agent template**: New role for prompt design, review and optimization (#337)
+
+### Fixed
+- Prompt-engineer agent template corrections and refinements
+- Various minor fixes in prompt-modernization integration
+
+### Changed
+- Orchestrator-singleton-guard concept integrated into prompt-modernization-poc branch
+
+### Documentation
+- Active concept: prompt-modernization (Phase 1 complete)
+- Active concept: singleton-orchestrator moved to `active/`
+- Active concept: SE-und-Prompt-Modernisierung moved to `active/`
+- Updated CODEBASE_OVERVIEW.md and README.md for prompt-modernization and singleton-guard
+
+---
+
 ## [0.65.1] - 2026-06-22
 
 ### Fixed
