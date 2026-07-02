@@ -491,6 +491,19 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         "Nur tester/documenter/requirements/validator aus Kontext verweisen."
     )
 
+    # Orchestrator conditional blocks loaded from snippets (token optimization).
+    # Each block is either the real conditional section or an empty string.
+    _snippets_dir = agent_meta_root / "snippets" / "orchestrator"
+    for _snippet_name, _var_stem in (
+        ("se-mode", "SE_MODE"),
+        ("a2a-protocol", "A2A_PROTOCOL"),
+        ("checkpointing", "CHECKPOINTING"),
+        ("quality-pipelines", "QUALITY_PIPELINES"),
+    ):
+        _snippet_path = _snippets_dir / f"{_snippet_name}.md"
+        _var_name = f"{_var_stem}_BLOCK"
+        variables[_var_name] = _snippet_path.read_text(encoding="utf-8") if _snippet_path.exists() else ""
+
     return variables, unmapped
 
 
