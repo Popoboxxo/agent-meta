@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.65.1 — `2026-07-01`
+Generiert von agent-meta v0.66.0-beta.2 — `2026-07-02`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -47,611 +47,93 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 
 ## Regeln
 
-# A2A Anti-Re-Delegation Gates
-
+### A2A Anti-Re-Delegation Gates
 Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Delegations-Schleifen und unkontrollierten Spec-Dump in `payload.t`.
-
-## Hard Reject Gates (jeder Verstoß → Dispatch ablehnen, User informieren)
-
-1. **Self-Handoff verboten:** `source_agent == target_agent` ist ein harter Strukturfehler. Niemals akzeptieren.
-2. **Tiefenlimit:** `delegation_depth` darf maximal `10` sein (konfigurierbar via `orchestrator.delegation.max_depth` in project.yaml, Default 10). Tiefer = struktureller Fehler im Aufrufer.
-3. **T-Size-Limit:** `payload.t` darf maximal `300 Zeichen` umfassen. Bei Überschreitung → kein Dispatch, User informieren.
-4. **Re-Delegation-Detection:** Wenn `payload.t` mit "Du bist" / "Du bist ein" / "Du bist eine" beginnt → das ist ein Re-Delegations-Versuch. Ablehnen, User informieren.
-
-## Werte
-
-- `delegation_depth`:
-  - `0` = Hauptchat (User-Eingang)
-  - `1` = Orchestrator (Routing-Ebene)
-  - `2+` = Worker / Sub-Worker (Ausführungs-Ebene, bis 10)
-- Hochzählen: bei jeder Delegation inkrementiert der Absender das Feld um 1.
-
-## Verhalten bei Verstoß
-
-| Verstoß | Aktion |
-|---------|--------|
-| `source_agent == target_agent` | HARD REJECT, keine Ausführung, User informieren |
-| `delegation_depth > 10` | HARD REJECT, User informieren |
-| `payload.t > 300 Zeichen` | KEIN Dispatch, User informieren ("kürze auf einen Satz") |
-| `payload.t` startet mit "Du bist..." | HARD REJECT, User informieren ("Re-Delegation erkannt") |
-
-## Singleton-Regel: Orchestrator-Spawn
-
-**NUR der `main_chat` darf den `orchestrator` spawnen. Worker-Agents niemals.**
-
-- `delegation_depth >= 2` → kein `subagent_type="orchestrator"` Dispatch erlaubt
-- Verstoß → HARD REJECT, User informieren: "Singleton-Regel verletzt: Orchestrator darf nur vom main_chat gespawnt werden."
-
-| Verstoß | Aktion |
-|---------|--------|
-| Worker ruft `task(subagent_type="orchestrator", ...)` | HARD REJECT, User informieren |
-| Worker ruft `Agent(subagent_type="orchestrator", ...)` | HARD REJECT, User informieren |
-
-> **Warum:** Mehrere parallele Orchestrator-Instanzen verursachen Konflikte in Routing, Checkpointing und Session-State. Es existiert genau EIN Orchestrator pro Session — der vom main_chat gespawnte.
-
-## Propagation
-
-Diese Regel wird via `sync.py` automatisch in alle Provider-Rules-Verzeichnisse propagiert:
-- `.claude/rules/a2a-delegation-gates.md`
-- `.gemini/rules/a2a-delegation-gates.md`
-- `.continue/rules/a2a-delegation-gates.md`
+Details: `rules/.../a2a-delegation-gates.md`
 
 ---
 
-# Branch-Guard — Feature-Branch Pflicht
-
+### Branch-Guard — Feature-Branch Pflicht
 **Gilt für alle code-ändernden Aufgaben.**
-
-## Pflicht vor dem ersten Edit
-
-```bash
-git branch --show-current
-```
-
-Auf `main`/`master` → Branch anlegen: `feat/<thema>` | `fix/<thema>` | `refactor/<thema>`
-
-Auf anderem Branch → weiterarbeiten (Branch existiert bereits).
-
-Bei detached HEAD oder leerem Branch-Namen → **stoppe** und frage den User nach dem Ziel-Branch. Keinen Branch raten.
-
-## Branch PFLICHT wenn
-
-- Zwei oder mehr Dateien betroffen (tracked files im working tree, inkl. neuer Dateien)
-- Inhaltliche Änderung an Templates, Rules, Scripts
-- GitHub Issue bearbeitet
-
-**Faustregel: Änderung betrifft ≥2 Dateien ODER berührt agents/, rules/, hooks/, scripts/, config/ → Branch.**
-
-## Direkt auf main erlaubt (Ausnahmen)
-
-Nur: Version-Bump (`VERSION`, `CHANGELOG.md`, `README.md`) | einzelner Tippfehler (1 Datei, 1 Zeile, User-Bestätigung) | Post-Merge-Pflege nach Review.
-
-**NIE für:** Templates, Rules, Scripts — egal wie klein. Nie für Issue-Arbeit.
-
-## Warum
-
-Direkte Commits auf main können kaum rückgängig gemacht werden und blockieren andere Entwicklung.
+Details: `rules/.../branch-guard.md`
 
 ---
 
-# Commit-Konventionen (Conventional Commits)
-
+### Commit-Konventionen (Conventional Commits)
 Gilt für alle Agenten die Commits erstellen oder vorbereiten.
-
-## Format
-
-```
-<type>(REQ-xxx): <beschreibung>   ← mit req-traceability
-<type>: <beschreibung>            ← ohne req-traceability
-```
-
-| Type | Bedeutung | REQ-ID |
-|------|-----------|--------|
-| `feat` | Neues Feature | Wenn `req-traceability` aktiv |
-| `fix` | Bugfix | Wenn `req-traceability` aktiv |
-| `refactor` | Refactoring ohne Verhaltensänderung | Wenn `req-traceability` aktiv |
-| `test` | Tests hinzufügen/ändern | Wenn `req-traceability` aktiv |
-| `chore` | Wartung: Dependencies, Config, Versions-Bumps | **Nie** |
-| `docs` | Dokumentation | **Nie** |
-| `ci` | CI/CD-Änderungen | **Nie** |
-
-## Regeln
-
-- Beschreibung im **Imperativ**: `add feature`, nicht `added feature`
-- Maximal **72 Zeichen** in der ersten Zeile
-- Beschreibungssprache: `Englisch`
-- Body optional: Was **und warum** geändert wurde
-
-## Beispiele
-
-**Mit req-traceability:**
-```
-feat(REQ-042): add queue persistence across restarts
-fix(REQ-017): prevent duplicate video entries on reconnect
-test(REQ-042): add persistence tests
-chore: bump version to 1.2.0
-docs: update installation instructions
-```
-
-**Ohne req-traceability:**
-```
-feat: add queue persistence across restarts
-fix: prevent duplicate video entries on reconnect
-chore: bump version to 1.2.0
-```
+Details: `rules/.../commit-conventions.md`
 
 ---
 
-# Definition of Done (DoD)
-
+### Definition of Done (DoD)
 Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-
-## Immer Pflicht
-
-- [ ] Code implementiert die Aufgabe vollständig
-- [ ] Code-Konventionen eingehalten
-- [ ] Commit-Message im Conventional-Commits-Format
-- [ ] Keine Regressions
-
-
-
-
-
-**Keine finale Antwort und keine Commit-Empfehlung** ohne Prüfung aller aktiven Kriterien.
+Details: `rules/.../dod-criteria.md`
 
 ---
 
-# GitHub Issue Lifecycle
-
+### GitHub Issue Lifecycle
 Wenn deine Arbeit mit einem GitHub Issue verknüpft ist, schließe es nach Abschluss ab.
-
-Ist keine Issue-Nummer bekannt oder kein GitHub-Issue verknüpft → Issue-Phase überspringen. Dokumentiere: „Issue nicht verknüpft".
-
-## Pflicht nach erledigter Arbeit
-
-1. **Kommentiere das Issue** — kurze Zusammenfassung was implementiert wurde und in welchem Commit
-2. **Schließe das Issue** — `gh issue close <number>`
-
-```bash
-# Kommentar + schließen in einem Schritt
-gh issue close <number> --comment "Implemented in <commit>: <one-line summary>"
-
-# Oder separat (wenn ausführlicherer Kommentar gewünscht)
-gh issue comment <number> --body "..."
-gh issue close <number>
-```
-
-## Wann gilt das?
-
-- Nach jedem abgeschlossenen Feature, Bugfix oder Task der einem Issue zugeordnet ist
-- Auch wenn kein PR erstellt wird (direkte Commits auf main)
-- Der `git`-Agent kennt den vollständigen Workflow (inkl. Formulierungshilfe)
-
-## Commit-Message-Referenz
-
-Issue-Referenzen in Commit-Messages sind optional, aber empfohlen:
-```
-feat(REQ-042): add queue persistence  (closes #22)
-```
-
-## Fehlerbehandlung
-
-- `gh` CLI nicht verfügbar oder nicht authentifiziert → **Stoppe** die Issue-Phase und melde den Fehler. Kein Issue-Status raten.
-- `gh issue close` oder `gh issue comment` schlägt fehl → Fehler eindeutig melden, keine Annahmen über den Issue-Status treffen.
-
-## Delegation
-
-Für GitHub-Operationen → `git`-Agent
+Details: `rules/.../issue-lifecycle.md`
 
 ---
 
-# Sprachregeln
-
+### Sprachregeln
 Diese Regel gilt für alle Agenten und den Hauptchat.
-
-## Sprachzuordnung
-
-| Kontext | Sprache |
-|---------|---------|
-| Kommunikation mit dem Nutzer | **Deutsch** |
-| Nutzer-Eingaben verstehen | **Deutsch** |
-| Externe Dokumente (README, CHANGELOG, Release Notes, GitHub Issues) | **Englisch** |
-| Interne Dokumente (CODEBASE_OVERVIEW, ARCHITECTURE, REQUIREMENTS, Berichte) | **Deutsch** |
-| Code-nahe Artefakte (Kommentare, Commit-Messages, Test-Beschreibungen) | **Englisch** |
-
-## Rollenspezifische Präzisierungen
-
-Agenten-Templates können zusätzliche Präzisierungen für ihren spezifischen Output-Typ enthalten
-(z.B. welche Datei unter welche Kategorie fällt). Diese Regel definiert den Rahmen — die
-rollenspezifische Zuordnung konkretisiert ihn.
+Details: `rules/.../language.md`
 
 ---
 
-# Lifecycle-Tasks — Ausstehende Aufgaben prüfen
-
+### Lifecycle-Tasks — Ausstehende Aufgaben prüfen
 Beim Start einer neuen Konversation: prüfe ob `.opencode/pending-tasks.md` existiert.
-
-## Pflicht beim Konversations-Start
-
-```bash
-# Prüfen ob Lifecycle-Tasks ausstehen
-test -f .opencode/pending-tasks.md && cat .opencode/pending-tasks.md
-```
-
-Wenn die Datei existiert und offene Tasks enthält (`- [ ]`):
-
-1. Informiere den User:
-   > "Es gibt ausstehende Lifecycle-Tasks aus einem Git-Event. Soll ich diese jetzt bearbeiten?"
-
-2. Zeige die offenen Tasks kompakt (Agent + Aufgabe, eine Zeile je Task).
-
-3. Wenn User bestätigt → delegiere Tasks an die genannten Agenten.
-
-4. Nach Erledigung aller Tasks: lösche `.opencode/pending-tasks.md`.
-
-## Wann diese Rule greift
-
-Lifecycle-Tasks entstehen wenn der `lifecycle-check`-Hook aktiv ist und ein konfiguriertes
-Git-Event erkannt wird (z.B. Release-Tag, Version-Bump, Merge).
-
-Konfiguration in `.meta-config/project.yaml`:
-```yaml
-lifecycle-triggers:
-  on-release:
-    - agent: documenter
-      task: "Update CODEBASE_OVERVIEW.md and ARCHITECTURE.md for this release."
-  on-merge:
-    - agent: code-reviewer
-      task: "Post-Merge Blast-Radius-Analyse: Prüfe betroffene Code-Pfade auf Clean-Code-Verletzungen."
-```
-
-## Wenn keine Tasks offen sind
-
-Datei existiert nicht oder enthält keine `- [ ]` Zeilen → nichts tun.
-Datei nicht committen — sie ist gitignored (`.opencode/pending-tasks.md`).
+Details: `rules/.../lifecycle-tasks.md`
 
 ---
 
-# Provider-Agnostic Policy — Generic Templates
-
+### Provider-Agnostic Policy — Generic Templates
 **Generische Agenten-Templates (1-generic/) müssen universell und provider-agnostisch bleiben.**
-
-## Verboten in 1-generic/
-
-- Provider-Namen (Claude, Gemini, Opencode, Continue, VS Code, etc.)
-- Provider-spezifische Tool-Aufruf-Syntax (at-agent, claude -a, define_subagent, etc.)
-- Provider-spezifische Dateipfade (.claude/, .gemini/, etc.)
-- Provider-spezifische APIs oder Protokolle
-
-## Erlaubt in 1-generic/
-
-- Abstrakte Konzepte ("Agent", "Orchestrator", "Subagent", "Task", "Rule")
-- Platzhalter (geschrieben als GROSS_MIT_UNTERSTRICH in doppelten geschweiften Klammern) die vom Sync-Prozess substituiert werden
-- Generische Hinweise auf Umgebungsverhalten ("nativer Planungsmodus", "Fallback")
-
-## Wo Provider-Spezifika hingehören
-
-| Ebene | Ort | Beispiel |
-|-------|-----|----------|
-| **2-platform/** | Plattform-spezifische Overrides | 2-platform/gemini-orchestrator.md |
-| **Sync-Generierung** | scripts/lib/agents.py injiziert Provider-spezifische Felder | model, memory, permissionMode |
-| **3-project/** | Projekt-spezifische Erweiterungen | .gemini/3-project/am-orchestrator-ext.md |
-
-## Prüfung
-
-Bevor ein Commit in 1-generic/ gemerged wird:
-- Enthält der Text Provider-Namen? → Ablehnen oder in 2-platform/ verschieben
-- Enthält der Text Tool-Syntax eines Providers? → Ablehnen oder abstrahieren
-
-> **Warum:** 1-generic/ propagiert in ALLE Projekte. Ein Provider-Name hier würde in Claude-Projekten "Gemini" stehen und in Gemini-Projekten "Claude" — beides falsch und verwirrend.
+Details: `rules/.../provider-agnostic.md`
 
 ---
 
-# Python Conventions
-
+### Python Conventions
 **Gilt für alle Python-Dateien (`*.py`).**
-
-## Code Style
-
-- PEP 8 einhalten
-- Type Hints verwenden wo möglich
-- Docstrings für alle öffentlichen Funktionen/Klassen
-
-## Imports
-
-- Standard Library → Third Party → Local
-- Keine wildcard imports (`from x import *`)
+Details: `rules/.../python-conventions.md`
 
 ---
 
-# Session-Abschluss — Erkenntnisse sichern
-
+### Session-Abschluss — Erkenntnisse sichern
 Gilt für Hauptchat und Orchestrator.
-
-## Session-Ende erkennen
-
-Signale dass eine Session abgeschlossen ist:
-
-- User sagt "tschüss", "bye", "bis später", "fertig", "done", "das war's"
-- User fragt nach einem Commit oder Push (Task ist abgeschlossen)
-- User wechselt explizit das Thema zu etwas Unverbundenem
-- User fragt "was haben wir heute gemacht?"
-
-## Pflicht bei Session-Ende
-
-Wenn ein Signal erkannt wird und in der Session etwas Nennenswertes passiert ist
-(Code geändert, Architektur-Entscheid getroffen, Bug analysiert, Feature implementiert):
-
-> "Session abschließen? Ich kann die Erkenntnisse an den documenter-Agenten delegieren."
-
-Bei Bestätigung → `documenter` mit Session-Zusammenfassung delegieren:
-- Was wurde implementiert / gefixt / entschieden
-- Offene Punkte / Follow-ups
-- Wichtige Erkenntnisse (Probleme, Lösungsansätze, Architektur-Änderungen)
-
-## Wann NICHT fragen
-
-- Kurze Fragen ohne Code-Änderungen (nur Erklärungen, Reviews ohne Fixes)
-- User hat Erkenntnisse bereits explizit gespeichert
-- Session war trivial (1 Datei, 1 Zeile Fix)
+Details: `rules/.../session-conclusion.md`
 
 ---
 
-# CRITICAL GATE — VERIFY BEFORE EVERY ACTION
-
+### CRITICAL GATE — VERIFY BEFORE EVERY ACTION
 YOU ARE THE MAIN CHAT. You MUST NOT perform any code changes directly.
-- NO `edit` tool call
-- NO `write` tool call
-- NO `bash` with mutating commands, including:
-  - git mutations: `git commit`, `git push`, `git add`, `git rm`, `git branch` (create/delete), `git merge`, `git rebase`, `git reset`, `git tag`, `git stash pop/drop/clear`
-  - package managers: `pip install`, `npm install/run/build`, etc.
-  - file mutations: `mkdir`, `rm`, `mv`, `cp` on tracked files
-- NO `task` tool call — delegate ONLY via `task(subagent_type="orchestrator", ...)` to the Orchestrator
-
-READ-ONLY bash is allowed: `git status`, `git log`, `git diff`, `git branch --show-current`, `git branch -l`
-
-ALL git mutations MUST be delegated to the `git` agent.
-
-EVERY development-related task MUST be delegated to the `orchestrator` first.
-ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
-
-**Violation: The PreToolUse hook will block these changes.**
-
-# Orchestrator — Universal Router
-
-**STRICT MODE — KEINE Ausnahmen.** Jede Entwicklungsaufgabe geht zwingend über den `orchestrator`. Kein User-Override, kein direkter Dispatch, kein Fallback in den Hauptchat.
-
-## Auto-Handoff
-
-Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
-
-3. **Orchestrator:** Alles andere → an `orchestrator` delegieren.
-
-> **Merksatz:** Mehr als ein Schritt ODER mehr als ein Agent ODER Dateien in kritischen Pfaden → immer Orchestrator. Auch wenn der User eine kurze Lösung erwartet.
-
-## Direkter Dispatch (nur nach Regel 2)
-
-| Operation | Direkt an | Bedingung |
-|-----------|-----------|-----------|
-| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
-| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
-| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
-| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
-
-> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
-
-## Auto-Handoff
-
-Hauptchat delegiert automatisch an Orchestrator via nativen Tool-Call — KEIN `@orchestrator` Mention im Output. `@orchestrator` ist der EINZIGE Mention den User direkt verwenden dürfen.
-
-## Git Delegation — Hard Rule
-
-**Alle mutierenden git-Befehle MÜSSEN über den `git`-Agenten laufen.**
-
-VERBOTEN im Hauptchat (Bash-Tool):
-- `git commit`, `git push`, `git pull` (wenn push/merge erfolgt)
-- `git add`, `git rm`, `git mv`
-- `git branch <name>` (Branch anlegen), `git branch -d/-D` (Branch löschen)
-- `git merge`, `git rebase`
-- `git reset`, `git restore`, `git checkout` (Branch wechseln/Dateien zurücksetzen)
-- `git tag`, `git stash` (pop/drop/clear)
-
-ERLAUBT im Hauptchat (read-only Diagnose):
-- `git status`, `git log`, `git diff`
-- `git branch --show-current`, `git branch -l`
-- `git remote -v`, `git show` (ohne Schreiboperation)
-
-ALLE anderen git-Operationen → an `git`-Agenten delegieren.
-
-## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
-
-**Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
-**Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
-
-# Main-Chat-Modus
-
-Orchestrator ist deaktiviert. Alle Aufgaben werden direkt im Hauptchat ausgeführt.
-Delegation an Subagenten ist optional und erfolgt nach eigenem Ermessen.
+Details: `rules/.../use-orchestrator.md`
 
 ---
 
-# agent-meta — Schichten-Architektur
-
+### agent-meta — Schichten-Architektur
 Dieses Repo ist das Meta-Repository für Agenten-Standards. Jede Änderung an Templates
-wirkt sich auf alle Projekte aus die dieses Submodul einbinden.
-
-## Schichten-Modell
-
-```
-0-external/   Externe Skill-Agenten aus Drittrepos (via Git Submodule).
-              Höchste Priorität. Konfiguriert in config/skills-registry.yaml.
-              approved: true/false — Meta-Maintainer Quality Gate.
-
-1-generic/    Universell. Gilt für jedes Projekt. Wird immer generiert,
-              solange kein Override in 2-platform oder 3-project existiert.
-
-2-platform/   Plattformspezifisch. Überschreibt den Generic-Agent für alle
-              Projekte auf dieser Plattform.
-              Modi: Full-replacement (kein extends:) oder Composition (extends: + patches:)
-
-3-project/    Projektspezifisch.
-              - <rolle>.md      → Override: ersetzt generierten Agent komplett
-              - <rolle>-ext.md  → Extension: additiv geladen vom generierten Agent
-```
-
-**Override-Reihenfolge:**
-```
-1-generic  →  2-platform  →  3-project/<rolle>.md  →  0-external (eigenständige Rollen)
-```
-
-## Composition-Syntax (2-platform und 3-project)
-
-```yaml
-extends: "1-generic/<rolle>.md"
-patches:
-  - op: append-after        # nach Section einfügen
-    anchor: "## Section"
-    content: |
-      ## Neue Section ...
-  - op: replace             # Section vollständig ersetzen
-    anchor: "## Section"
-    content: |
-      ## Section ...
-  - op: delete              # Section entfernen
-    anchor: "## Section"
-  - op: append              # ans Dateiende anhängen
-    content: |
-      ## Anhang ...
-```
-
-Composition wird zur Build-Zeit aufgelöst — das generierte `.opencode/agents/<rolle>.md`
-enthält das vollständige Dokument. Kein `extends:` im Output.
-
-## Abhängigkeitsprinzip
-
-Jede Änderung an einer Quelldatei propagiert in alle instanziierten Projekte
-beim nächsten `sync.py`-Lauf. Daher:
-
-- **1-generic geändert** → alle Projekte neu syncen
-- **2-platform geändert** → alle Projekte auf dieser Plattform neu syncen
-- **config/role-defaults.yaml geändert** → alle Projekte neu syncen
-- **config/skills-registry.yaml geändert** → alle betroffenen Projekte neu syncen
-
-## Platzhalter-Escape
-
-`{{VAR}}` → rendert als `{{VAR}}` ohne Substitution (für Dokumentation in Templates)
+Details: `rules/.../architecture.md`
 
 ---
 
-# agent-meta — Entwicklungskonventionen
-
-## Harte Invarianten (niemals verletzen)
-
+### agent-meta — Entwicklungskonventionen
 **1. `.opencode/agents` ist generierter Output — nie manuell bearbeiten.**
-Alle Änderungen gehören in die Quell-Templates unter `agents/` oder in `.meta-config/project.yaml`.
-Manuelle Edits werden beim nächsten `sync.py`-Lauf überschrieben.
-
-**2. Agent-Versionen im Frontmatter erhöhen bei jeder inhaltlichen Änderung.**
-
-| Änderungstyp | Bump |
-|---|---|
-| Umbenannte Variable, geändertes Verhalten, neue Pflichtsektion | **Major** (`X.0.0`) |
-| Neue optionale Sektion, erweiterter Scope | **Minor** (`x.Y.0`) |
-| Textverbesserung, Klarstellung, Config-Pfad-Fix | **Patch** (`x.y.Z`) |
-
-Plattform-Agenten (`2-platform/`) führen zusätzlich `based-on: "1-generic/<rolle>.md@<version>"`.
-Dieses Feld aktuell halten wenn die Generic-Basis geändert wird.
-
-**3. Platzhalter immer `{{GROSS_MIT_UNTERSTRICH}}`.**
-Kleinbuchstaben oder gemischte Schreibweise funktioniert nicht — der Regex in `substitute()`
-erfasst nur `[A-Z0-9_]+`.
-
-## Wenn du eine neue Agenten-Rolle hinzufügst
-
-Pflichtschritte — manuell zu pflegen (die anderen Artefakte werden automatisch generiert):
-
-### Manuell (Pflicht)
-
-1. `agents/1-generic/<rolle>.md` anlegen (mit Frontmatter: `name`, `version`, `description`, `hint`, `tools`)
-2. Eintrag in `config/role-defaults.yaml` (model, memory, permissionMode, tier)
-3. `howto/setup/instantiate-project.md` ergänzen (Agent-Tabelle und Hints)
-
-### Automatisch via `sync.py` — NIE manuell editieren
-
-Folgende Artefakte werden beim nächsten `sync.py`-Lauf automatisch generiert/aktualisiert:
-
-| Artefakt | Quelle | Hinweis |
-|----------|--------|---------|
-| `CLAUDE.md` (managed block) | `agents/` + `config/role-defaults.yaml` | Agent-Tabelle, Hints, Rules-Referenzen |
-| `AGENTS.md` (managed block) | `agents/` + `config/role-defaults.yaml` | Gleiche Quelle wie CLAUDE.md |
-| `GEMINI.md` | `agents/` + `config/role-defaults.yaml` | Plattform-spezifische Generierung |
-| `.continue/config.yaml` | `agents/` + `config/role-defaults.yaml` | Continue-Plattform |
-| `.*/agents/*.md` | `agents/1-generic/`, `2-platform/`, `3-project/` | Generierte Agenten-Dateien |
-| `docs/agent-graph.html` | `agents/` + Delegation-Map | Visualisierung |
-| `docs/agent-mindmap.md` | `agents/` + Delegation-Map | Mindmap |
-| `.claude/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
-| `.gemini/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
-| `.continue/rules/conventions.md` | `rules/2-platform/agent-meta-conventions.md` | Rules-Propagation |
-| `config/project-config.schema.json` (roles enum) | `config/role-defaults.yaml` | `properties.roles.items.enum` wird bei jedem sync.py-Lauf neu generiert |
-
-**Merksatz:** Nur `1-generic/<rolle>.md`, `config/role-defaults.yaml` und `howto/setup/instantiate-project.md` sind manuell zu pflegen. Alles andere → `sync.py` ausführen.
-
-## Wenn du einen neuen Platzhalter einführst
-
-1. In `scripts/lib/config.py` → `build_variables()` oder `_inject_dod()` eintragen
-2. In `CLAUDE.md` Variablen-Tabelle dokumentieren
-3. In `howto/project.yaml.example` als Kommentar-Zeile ergänzen (optional aber empfohlen)
-
-## Änderungs-Checkliste (before commit)
-
-| Was geändert | Was prüfen |
-|---|---|
-| `1-generic/<rolle>.md` | version: erhöhen + betroffene Projekte syncen |
-| `2-platform/<platform>-<rolle>.md` | version: und based-on: aktuell? |
-| `agents/0-external/_skill-wrapper.md` | Alle aktivierten Skills neu syncen |
-| `config/skills-registry.yaml` | Projekte neu syncen |
-| `config/role-defaults.yaml` (neue Rolle) | Tabellen in CLAUDE.md + howto-Dateien |
-| `config/project-config.schema.json` | IDE-Autocomplete prüfen, jsonschema-Validation testen |
-| `hint:` Feld in Agent-Template | Projekte syncen (AGENT_HINTS wird neu generiert) |
-| Rules oder Hooks in `rules/` / `hooks/` | Projekte syncen (werden überschrieben) |
+Details: `rules/.../conventions.md`
 
 ---
 
-# agent-meta — sync.py Interface
-
+### agent-meta — sync.py Interface
 `sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.opencode/agents` schreiben.
-
-Vollständige Referenz (Flags, sync.log, Modulstruktur):
-→ `.agent-meta/agents/1-generic/_wf-sync-interface.md`
-
-## Branch-Guard-Erweiterung für agent-meta
-
-Zusätzlich zu den generischen Branch-Guard-Regeln gilt hier:
-
-- `sync.py` ausführen → immer Branch (Sync propagiert in alle Projekte)
-
-**Faustregel: sync.py ausführen oder >1 Datei anfassen → Branch.**
-
-**NIE direkt auf main:** sync.py-Läufe, Template-Änderungen, Rule-Änderungen — egal wie klein.
-
-## Warum
-
-Direkte Commits auf main propagieren Fehler sofort in alle Projekte beim nächsten Sync.
+Details: `rules/.../sync-interface.md`
 
 ---
 
-# Kommunikationsstil: Short
-
+### Kommunikationsstil: Short
 **Diese Regel gilt für alle Antworten und überschreibt alle anderen Stilanweisungen.**
-
-- Keine Begrüßung. Kein Abschluss. Keine Zusammenfassung.
-- Keine Floskeln: kein "Gerne", "Natürlich", "Ich werde jetzt...", "Zusammenfassend lässt sich sagen...".
-- Nur Fakten und Ergebnisse. Was ist passiert, was fehlt, was als nächstes.
-- Bullet Points statt Fließtext. Maximal 1 Satz pro Punkt.
-- Erklärungen nur auf explizite Nachfrage des Nutzers.
-- Code-Blöcke ohne Einleitung — einfach zeigen.
-- Fehler: direkt benennen, keine Entschuldigung.
-- Rückfragen: 1 Satz, kein Kontext drumherum.
+Details: `rules/.../short.md`
 
 <!-- agent-meta:managed-end -->
 

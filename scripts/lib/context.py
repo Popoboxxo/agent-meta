@@ -453,6 +453,40 @@ def _strip_rule_frontmatter(content: str) -> str:
     return content[end + 4:].lstrip('\n')
 
 
+def _extract_rule_compact_from_content(content: str, output_name: str, rel_source: str) -> str:
+    """Extract title + 1-sentence summary from already-substituted rule content.
+
+    Reduces a 50-100 line rule to a single 3-line block:
+      - Title
+      - First non-empty paragraph (≤200 chars)
+      - Pfad zur Voll-Datei
+    """
+    body = _strip_rule_frontmatter(content).strip()
+    if not body:
+        return f"- **{output_name}** — siehe `{rel_source}`"
+
+    lines = body.splitlines()
+    title = output_name.replace('-', ' ').replace('.md', '').title()
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('# '):
+            title = stripped[2:].strip()
+            break
+
+    summary = ""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#') or stripped.startswith('```'):
+            continue
+        summary = stripped
+        if len(summary) > 200:
+            summary = summary[:197] + "..."
+        break
+
+    rule_stem = Path(output_name).stem
+    return f"### {title}\n{summary}\nDetails: `rules/.../{rule_stem}.md`"
+
+
 def _collect_embedded_rules_md(
     agent_meta_root: Path,
     config: dict,
@@ -460,11 +494,16 @@ def _collect_embedded_rules_md(
     log: SyncLog,
     provider: str = "Claude",
     provider_config: dict | None = None,
+    compact: bool = False,
 ) -> str:
     """Collect all active rules and return them as concatenated markdown.
 
     Used to embed rules into AGENTS.md for providers without a native rules directory
     (e.g. opencode). Respects `opencode: skip` rule option and speech-mode config.
+
+    When compact=True (default for Opencode), each rule is reduced to a 3-line
+    summary block (title + 1-sentence summary + path) — full content stays in
+    rules/<layer>/*.md. This shrinks AGENTS.md managed-block from ~660 to ~80 lines.
     """
     from .config import substitute, strip_inactive_conditional_blocks
     from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
@@ -488,7 +527,7 @@ def _collect_embedded_rules_md(
 
     embedded_count = 0
     skipped_count = 0
-    
+
     for source_path, output_name in sources:
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
@@ -503,15 +542,18 @@ def _collect_embedded_rules_md(
         if opts.get('embed') == False and provider_has_native_rules:
             skipped_count += 1
             continue
-        content = source_path.read_text(encoding='utf-8')
         rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
+        content = source_path.read_text(encoding='utf-8')
         content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_conditional_blocks(content, merged_vars)
-        body = _strip_rule_frontmatter(content).strip()
+        if compact:
+            body = _extract_rule_compact_from_content(content, output_name, rel_source)
+        else:
+            body = _strip_rule_frontmatter(content).strip()
         if body:
             sections.append(body)
             embedded_count += 1
-    
+
     if skipped_count > 0:
         log.info(f"Selective Embedding: {skipped_count} rules with embed:false skipped, {embedded_count} rules embedded", "embed filter")
 
@@ -520,7 +562,13 @@ def _collect_embedded_rules_md(
     if mode != 'full':
         speech_path = agent_meta_root / SPEECH_DIR / f'{mode}.md'
         if speech_path.exists():
-            body = _strip_rule_frontmatter(speech_path.read_text(encoding='utf-8')).strip()
+            speech_content = speech_path.read_text(encoding='utf-8')
+            speech_content = substitute(speech_content, merged_vars, f"speech/{mode}.md", log)
+            speech_content = strip_inactive_conditional_blocks(speech_content, merged_vars)
+            if compact:
+                body = _extract_rule_compact_from_content(speech_content, f"{mode}.md", f"speech/{mode}.md")
+            else:
+                body = _strip_rule_frontmatter(speech_content).strip()
             if body:
                 sections.append(body)
 
@@ -552,8 +600,14 @@ def _build_opencode_managed_block(
     template = _load_claude_md_managed_template(agent_meta_root)
     managed = substitute(template, local_vars, 'AGENTS.md managed block', log)
 
+    # Opencode loads the full managed block — use compact rule summaries to
+    # keep AGENTS.md under ~100 lines. Full rules stay in rules/1-generic/*.md
+    # and rules/2-platform/*.md where they belong.
+    use_compact_rules = (provider == "Opencode")
+
     rules_md = _collect_embedded_rules_md(agent_meta_root, config, local_vars, log,
-                                            provider=provider, provider_config=provider_config)
+                                            provider=provider, provider_config=provider_config,
+                                            compact=use_compact_rules)
     if rules_md:
         managed = managed.replace(
             '<!-- agent-meta:managed-end -->',

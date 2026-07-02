@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.66.0-beta.3] - 2026-07-02
+
+### Changed — Token Optimization Phase 1 (Quick-Wins)
+- **Orchestrator externalized**: 4 conditional blocks (SE-Mode, A2A-Protocol, Quality-Pipelines, Checkpointing) moved to `snippets/orchestrator/*.md`, reducing orchestrator.md from 35836 → 22878 chars (-36%, 8959 → 5719 tokens).
+- **A2A handoff documentation consolidated**: Reduced duplication between orchestrator and reference-agent templates.
+- **AGENTS.md managed-block compactified**: Root managed-block trimmed from 669 → 151 lines (-77%) via compact rule summaries (title + 1-sentence summary + path).
+- **`_wf-*.md` workflow files deleted**: 9 unused reference files removed, knowledge preserved in agent templates and rules files. See `agents/1-generic/_README.md` for mapping.
+- **Compact-Mode default enabled**: `orchestrator.handoff.compact-mode: true` (was `false`) — A2A envelopes use short field names by default.
+- **Continue prompt-mode `slim`**: `provider-options.Continue.prompt-mode: slim` (was `full`) — reduces Continue generated prompts to ~80 lines.
+
+### Internal
+- New helper `_extract_rule_compact_from_content()` in `scripts/lib/context.py`.
+- `_collect_embedded_rules_md()` gained `compact: bool` parameter.
+- `_build_opencode_managed_block()` passes `compact=True` for Opencode provider.
+
 ---
 
 ## [0.66.0-beta.2] - 2026-07-01
