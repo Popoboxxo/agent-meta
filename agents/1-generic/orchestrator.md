@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "6.2.0"
+version: "6.2.1"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -116,13 +116,13 @@ Pipelines sind im Abschnitt »Quality Pipelines« definiert (sync.py injiziert a
 | Release / Version bump | `release` | — | `balanced` / Nein |
 {{#if SE_ENABLED}}
 | Systems Engineering / SE-Kaskade | Pipeline `se-cascade` (SE-Mode) | — | `balanced`→`powerful` / Nein |
+{{/if}}
 | Code-Qualitäts-Audit / Clean Code | `code-reviewer` | `task-spec-v1` | `powerful` / Nein |
 | UI-Design / Mockups | `ui-ux-designer` | `task-spec-v1` | `balanced` / Ja |
 | API-Design / OpenAPI | `api-specialist` | `task-spec-v1` | `balanced` / Nein |
 | CI/CD / Infrastruktur | `devops-engineer` | `task-spec-v1` | `fast` / Ja |
 | Performance / Bottlenecks | `performance-optimizer` | `task-spec-v1` | `powerful` / Nein |
 | Export / Target-Routing | `export-manager` | `task-spec-v1` | `fast` / Nein |
-{{/if}}
 | Plattform-Fragen / Provider-Integration | `claude-expert`, `opencode-expert`, `gemini-expert`, `continue-expert`, `copilot-expert` | — | `powerful` / Nein |
 | Batch-Operationen (mehrere gleiche Tasks) | — | `task-spec-v1` (batch: true) | — / Ja |
 {{#if EFFORT_ESTIMATOR_ENABLED}}
