@@ -259,98 +259,19 @@ Pflicht: `TASK` + `EXPECTED_OUTPUT`. `TOOLS/SOURCES` optional, verhindert Tool-D
 {{#if A2A_PROTOCOL_ENABLED}}
 ## A2A Handoff Protocol
 
-**Jede Delegation MUSS als strukturiertes A2A-Envelope erfolgen.** Der Orchestrator ist die Envelope-Fabrik.
+**Jede Delegation MUSS als strukturiertes A2A-Envelope erfolgen.**
 
-### Envelope-Erstellung (vor jeder Delegation)
+### Kern-Regeln
 
-1. **`handoff_id`:** `HOFF-YYYYMMDD-NNN` (Datum + fortlaufende Nummer)
-2. **`schema_ref`:** Aus Intent-Routing-Tabelle (Handoff-Contract-Spalte) oder implizit via Route
-3. **`payload` aus User-Request + Kontext:**
-   - `t`: Task-Beschreibung (Pflicht)
-   - `ctx`: Strukturierter Kontext (Format → »Kontext-Format«)
-   - `con`: Constraints (optional)
-   - `pri`: Priority (optional, default: medium)
-   - `refs`: Referenzen (optional)
+- `handoff_id`: `HOFF-YYYYMMDD-NNN` | `schema_ref`: aus Intent-Routing-Tabelle
+- `payload.t` (Pflicht): max. **{{A2A_T_SIZE_LIMIT}} Zeichen** — EIN Satz. Überschreitung → kein Dispatch
+- Compact Mode (`t`, `ctx`, `con`, `pri`, `refs`, `dep`) reduziert Token-Overhead bei FANOUT
 
-   **Compact Mode:** Bei `compact_mode: true` (konfigurierbar in `role-defaults.yaml`) kurze Feldnamen verwenden: `t`, `ctx`, `con`, `pri`, `refs`, `dep`. Reduziert Token-Overhead, vor allem bei FANOUT.
+### Reference
 
-   **T-Size-Gate (hart):** `payload.t` max. **{{A2A_T_SIZE_LIMIT}} Zeichen** (~{{A2A_T_SIZE_LIMIT_TOKENS}} Tokens). Bei Überschreitung → **kein Dispatch**. User informieren: "payload.t zu groß (X Zeichen > {{A2A_T_SIZE_LIMIT}} Limit). Kürze auf einen Satz.". Kein Context-Dump. Keine Aufzählungen. Kein Expected-Output. Nur die Essenz des Tasks — ein Satz. Wer mehr als einen Satz in `t` schreibt, hat den Task nicht verstanden.
-
-4. **Envelope:**
-   ```json
-   {
-     "protocol_version": "1.0.0",
-     "handoff_id": "HOFF-YYYYMMDD-NNN",
-     "source_agent": "orchestrator",
-     "target_agent": "<ziel>",
-     "schema_ref": "<schema-uri>",
-     "payload": { "t": "<ein Satz>", "pri": "..." },
-     "trace_parent": "<parent-HOFF>"
-   }
-   ```
-
-   Bei FANOUT: `payload` als Array mit `batch_task_id`, jedes `t` einzeln ≤{{A2A_T_SIZE_LIMIT}} Zeichen.
-
-### FANOUT — Batch-Mode
-
-Mehrere Tasks an GLEICHEN Agententyp:
-- `batch: true` setzen
-- `payload` als Array mit `batch_task_id` pro Eintrag
-
-```json
-{
-  "batch": true,
-  "payload": [
-    { "batch_task_id": "T1", "t": "Fix A", "pri": "high" },
-    { "batch_task_id": "T2", "t": "Fix B", "pri": "medium" }
-  ]
-}
-```
-
-Ersparnis vs. separate Envelopes: ~110 Tokens pro FANOUT(3).
-
-### HITL — Human-in-the-Loop
-
-`requires_human_approval: true` bei:
-- Kritischen Änderungen (DELETE, Schema-Migrationen)
-- Erkannter Ambiguität
-- Security-sensiblen Operationen
-
-Downstream-Agent pausiert vor Ausführung und wartet auf User-Bestätigung.
-
-### Retry-Logik
-
-- Jeder Envelope führt `retry_count` (Start: 0), `max_retries` (Default: 3)
-- Failure → `retry_count++`, erneut senden
-- `retry_count >= max_retries` → Abbruch, User benachrichtigen
-
-### PIPELINE — trace_parent-Verkettung
-
-Pipeline-Delegationen (z.B. requirements→tester→developer):
-- Jeder Schritt setzt `trace_parent` auf vorherige `handoff_id`
-- Ermöglicht vollständige Chain-of-custody bei Fehlschlägen
-
-### REPEAT_UNTIL — Supersession
-
-Reflection-Loops (z.B. developer↔code-reviewer):
-- Erste Delegation: `supersession` nicht gesetzt, `history: []`
-- Critic-Rejection: neue `handoff_id` mit `supersession.supersedes` auf vorherige ID
-- `supersession.history[]` enthält alle vorherigen handoff_ids (NUR IDs, keine Payloads)
-- `version = history.length + 1`
-
-### Transport
-
-Konkretes Handoff-Format definiert in »Parallel Execution Engine« (sync-generiert). Strukturierte Umgebungen: JSON-Envelope im Prompt; sonst YAML-Text-Block mit identischer Struktur.
-
-### Token-Budget-Tracking
-
-Konfiguriert in `project.yaml` → `orchestrator.handoff.token-budget`. Bei `enabled: true` führst du session-weit Buch über den A2A-Overhead.
-
-- **Budget:** `session_budget × max_overhead_pct%` (Default 200000 × 10% = 20000 Tokens für alle Envelopes zusammen).
-- **Pro-Handoff-Richtwert:** `Budget ÷ erwartete Handoff-Anzahl`. Bei ~20 Handoffs → ~1000 Tokens/Handoff (Envelope + Payload).
-- **Laufende Schätzung:** Summiere die geschätzte Envelope-Größe jeder Delegation (Felder + Payload).
-- **Bei Überschreitung** (`on_exceed`): `compact` → ab sofort Compact-Mode (kurze Feldnamen `t/ctx/con/pri/refs/dep`); `warn` → im Output vermerken, normal weiter.
-- **T-Size-Gate (hart):** `payload.t` > {{A2A_T_SIZE_LIMIT}} Zeichen → **kein Dispatch.** User informieren: "payload.t zu groß (X Zeichen > {{A2A_T_SIZE_LIMIT}} Limit). Kürze auf einen Satz." Keine Aufzählung. Kein Expected-Output.
+Full A2A envelope schema: `schemas/a2a-handoff.schema.json`
+Delegation syntax per provider: `config/delegation-syntax.yaml`
+Pipeline definitions: `config/delegation-syntax.yaml` (pipelines section)
 
 ---
 {{/if}}
@@ -709,14 +630,6 @@ Bestätigung einholen VOR: Commit auf main/master, Branch löschen, sync.py, Rol
 - Worker dürfen nicht an Orchestrator zurückdelegieren (Scopes: Agenten-Tabelle)
 - Ausnahme: Reflection-Loops (generator↔critic) zählen als eine Operation
 - **Singleton-Regel:** Kein Worker-Agent darf `task(subagent_type="orchestrator", ...)` aufrufen. Es existiert genau EIN Orchestrator pro Session — der vom `main_chat` gespawnte.
-
-**A2A Handoff Validierung (VOR jedem Dispatch):**
-
-Prüfe eingehende Envelope gegen:
-1. `source_agent != target_agent` (harter Constraint)
-2. `delegation_depth <= {{A2A_MAX_DEPTH}}` (Hochzählen bei jeder Delegation)
-3. `payload.t` max. {{A2A_T_SIZE_LIMIT}} Zeichen (T-Size-Gate)
-4. `payload.t` darf NICHT mit "Du bist" beginnen (Re-Delegation-Detection)
 
 ---
 

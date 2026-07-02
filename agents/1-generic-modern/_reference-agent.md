@@ -288,39 +288,14 @@ Extensions (`-ext.md`) sind ADDITIV und werden zur Laufzeit gelesen.
 
 {{DEV_COMMANDS}}
 
-## A2A-Handoff-Block (sync-generiert)
+## A2A-Handoff (sync-generiert)
 
 {{A2A_HANDOFF_BLOCK}}                     <!-- Pipelines, Routing-Map zur Sync-Zeit injiziert -->
 
-## A2A-Envelope-Schema (zur Referenz)
-
-Jede Delegation laeuft als strukturiertes Envelope. Compact-Mode-Feldnamen reduzieren Token-Overhead.
-
-```typescript
-interface IPayload {
-  t: string;         // Task-Beschreibung — max {{A2A_T_SIZE_LIMIT}} Zeichen, EIN Satz
-  ctx?: object;      // Strukturierter Kontext (Branch, REQ-ID, vorherige Ergebnisse)
-  con?: string[];    // Constraints (was nicht anfassen, was zwingend nutzen)
-  refs?: string[];   // Referenzen (Datei-Pfade, REQ-IDs, Issue-Nummern, handoff_ids)
-  pri?: "low" | "normal" | "high";
-  dep?: string[];    // Handoff-IDs von Vorgaengern (fuer PIPELINE-Verkettung)
-}
-
-interface IEnvelope {
-  protocol_version: "a2a-1.0";
-  handoff_id: string;                     // z.B. "h-YYYYMMDD-HHMMSS-<short>"
-  source_agent: string;
-  target_agent: string;                   // Muss != source_agent sein (Self-Handoff verboten)
-  schema_ref: string;                     // z.B. "task-spec-v1"
-  payload: IPayload | IPayload[];         // Array bei batch:true (FANOUT)
-  delegation_depth: number;               // 0=main_chat, 1=orchestrator, >=2=Worker
-  supersession?: { supersedes: string; history: string[] };
-  trace_parent?: string;                  // Vorgaenger-handoff_id (Pipeline-Chain)
-  requires_human_approval?: boolean;      // HITL-Flag
-  retry_count?: number;                   // Default 0
-  max_retries?: number;                   // Default 3
-}
-```
+Kurzreferenz: `IPayload { t, ctx, con, refs, pri, dep }` — `t` max. {{A2A_T_SIZE_LIMIT}} Zeichen.
+`IEnvelope { protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload, delegation_depth }`.
+Self-Handoff verboten. Singleton: nur `main_chat` spawnt `orchestrator`.
+Full schema: `schemas/a2a-handoff.schema.json` | Delegation syntax: `config/delegation-syntax.yaml`
 
 <!-- ============================================================================
      CONDITIONAL RENDERING — sync-zeitliche Bloecke
