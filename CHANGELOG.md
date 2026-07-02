@@ -8,6 +8,17 @@
 - New: `agents/1-generic-modern/orchestrator.md` (Phase 1 token-optimization PoC)
 - New: `agents/1-generic/_README.md` (Phase 1 wf-deleted mapping reference)
 
+### Fixed
+- **model IDs**: Fix incorrect Claude model IDs in provider library admin UI (`config/ai-providers.yaml`, `docs/admin-ui.html`) — 137 tests verified green (commit dc5205b)
+- **SE_ENABLED scoping**: Fix SE_ENABLED scoping bug in orchestrator template (`agents/1-generic/orchestrator.md`) — conditional block was incorrectly rendered when SE mode disabled; verified via dry-run (commit 0123655)
+
+### Known Issues
+- **sync.py not yet run**: Generated provider files (`.claude/agents/`, `.opencode/agents/`, `.gemini/agents/`) are stale relative to source templates. A full `python scripts/sync.py` run is required before merging to main. No runtime impact on modern-mode agents (which use `agents/1-generic-modern/`). Post-Beta.
+- **Issue #342 (open)**: Three Viz-feature bugs: event-type mismatch (`delegate_out` vs. `delegate`), dead import in `scripts/viz-server.py` (`admin_server`), escape bug in `scripts/lib/viz.py`. No runtime impact — Viz is disabled (`viz.enabled: false`). Fix before next stable release.
+- **Missing regression test**: `tests/test_sync_conditional.py` not yet created. Would catch SE_ENABLED scoping regressions automatically. Recommended before v0.67.0 stable.
+- **Concept: SE standardization** (`docs/concepts/active/se-und-prompt-modernisierung.md`, v1.0 draft, 2026-06-29): SE-housekeeper agent, `docs/se/**` taxonomy, ADR standard, REQ frontmatter schema — planned but not implemented. Roadmap item only.
+- **Cosmetic**: Deprecated `se-orchestrator.md` contains unclosed `{{#if SE_ENABLED}}` literals (lines 4, 7) — display-only, no functional impact. Minor keyword leak in pipeline signal table at `SE_ENABLED=false` (runtime-guarded, harmless).
+
 ## [0.66.0-beta.4] - 2026-07-02
 
 ### Changed — Token Optimization Phase 2 (Top-10 Compactification)
