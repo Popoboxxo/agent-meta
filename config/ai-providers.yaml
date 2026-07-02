@@ -32,17 +32,21 @@ providers:
     # Model tiers: abstract tier name → provider-specific model ID.
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
+    # Source: https://platform.claude.com/docs/en/about-claude/models/overview (verified 2026-06-24)
+    # ID convention: 4.6+ generation uses dateless IDs (claude-sonnet-4-6);
+    # pre-4.6 models use dated snapshot IDs (claude-haiku-4-5-20251001).
     model-tiers:
-      nano:     claude-haiku-4-5           # cheapest, high-throughput tasks
-      fast:     claude-haiku-4-5           # quick ops: git, meta-feedback, docker
-      balanced: claude-sonnet-4-6          # default workhorse: dev, docs, review
-      powerful: claude-opus-4-7            # complex reasoning: architecture, security
-      max:      claude-opus-4-7            # reserved for future ultra-capable models; fallback to powerful
+      nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
+      fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
+      balanced: claude-sonnet-4-6           # default workhorse: dev, docs, review
+      powerful: claude-opus-4-8             # complex reasoning: architecture, security
+      max:      claude-fable-5              # most capable widely released model
     # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
     model-aliases:
-      haiku:  claude-haiku-4-5
+      haiku:  claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
-      opus:   claude-opus-4-7
+      opus:   claude-opus-4-8
+      fable:  claude-fable-5
 
   Gemini:
     agents_dir: .gemini/agents

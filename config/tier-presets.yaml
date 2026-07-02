@@ -34,7 +34,7 @@ Normal:
     nano: claude-haiku-4-5-20251001
     fast: claude-haiku-4-5-20251001
     balanced: claude-sonnet-4-6
-    powerful: claude-opus-4-7
+    powerful: claude-opus-4-8
     max: claude-fable-5
   providers:
     Claude:
@@ -42,7 +42,7 @@ Normal:
         nano: claude-haiku-4-5-20251001
         fast: claude-haiku-4-5-20251001
         balanced: claude-sonnet-4-6
-        powerful: claude-opus-4-7
+        powerful: claude-opus-4-8
         max: claude-fable-5
     Gemini:
       tiers:
@@ -63,7 +63,7 @@ Advanced:
   tiers:
     nano: claude-haiku-4-5-20251001
     fast: claude-sonnet-4-6
-    balanced: claude-opus-4-7
+    balanced: claude-opus-4-8
     powerful: claude-fable-5
     max: claude-fable-5
   providers:
@@ -71,7 +71,7 @@ Advanced:
       tiers:
         nano: claude-haiku-4-5-20251001
         fast: claude-sonnet-4-6
-        balanced: claude-opus-4-7
+        balanced: claude-opus-4-8
         powerful: claude-fable-5
         max: claude-fable-5
     Gemini:
@@ -92,7 +92,7 @@ Expensive:
   description: Sehr starker Shift.
   tiers:
     nano: claude-sonnet-4-6
-    fast: claude-opus-4-7
+    fast: claude-opus-4-8
     balanced: claude-fable-5
     powerful: claude-fable-5
     max: claude-fable-5
@@ -100,7 +100,7 @@ Expensive:
     Claude:
       tiers:
         nano: claude-sonnet-4-6
-        fast: claude-opus-4-7
+        fast: claude-opus-4-8
         balanced: claude-fable-5
         powerful: claude-fable-5
         max: claude-fable-5
@@ -121,7 +121,7 @@ Expensive:
 Expensive as Hell:
   description: Fast alle Agenten laufen auf powerful oder max.
   tiers:
-    nano: claude-opus-4-7
+    nano: claude-opus-4-8
     fast: claude-fable-5
     balanced: claude-fable-5
     powerful: claude-fable-5
@@ -129,7 +129,7 @@ Expensive as Hell:
   providers:
     Claude:
       tiers:
-        nano: claude-opus-4-7
+        nano: claude-opus-4-8
         fast: claude-fable-5
         balanced: claude-fable-5
         powerful: claude-fable-5
