@@ -33,17 +33,16 @@ providers:
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
     model-tiers:
-      nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
-      fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
-      balanced: claude-sonnet-4-6           # default workhorse: dev, docs, review
-      powerful: claude-opus-4-7             # complex reasoning: architecture, security
-      max:      claude-fable-5             # reserved for future ultra-capable models
+      nano:     claude-haiku-4-5           # cheapest, high-throughput tasks
+      fast:     claude-haiku-4-5           # quick ops: git, meta-feedback, docker
+      balanced: claude-sonnet-4-6          # default workhorse: dev, docs, review
+      powerful: claude-opus-4-7            # complex reasoning: architecture, security
+      max:      claude-opus-4-7            # reserved for future ultra-capable models; fallback to powerful
     # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
     model-aliases:
-      haiku:  claude-haiku-4-5-20251001
+      haiku:  claude-haiku-4-5
       sonnet: claude-sonnet-4-6
       opus:   claude-opus-4-7
-      fable:  claude-fable-5
 
   Gemini:
     agents_dir: .gemini/agents

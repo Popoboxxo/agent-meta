@@ -15,8 +15,8 @@ REPO_ROOT = Path(__file__).parent.parent
 
 # Claude model-tier expectations from config/ai-providers.yaml
 CLAUDE_MODEL_POWERFUL = "claude-opus-4-7"
-CLAUDE_MODEL_FAST = "claude-haiku-4-5-20251001"
-CLAUDE_MODEL_MAX = "claude-fable-5"
+CLAUDE_MODEL_FAST = "claude-haiku-4-5"
+CLAUDE_MODEL_MAX = "claude-opus-4-7"
 CLAUDE_MODEL_BALANCED = "claude-sonnet-4-6"
 
 # Provider config is loaded by resolve_model from ai-providers.yaml.

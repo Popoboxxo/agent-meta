@@ -1,15 +1,6 @@
 {
   "models": [
     {
-      "id": "anthropic/claude-sonnet-5",
-      "name": "Anthropic: Claude Sonnet 5",
-      "provider": "anthropic",
-      "input_cost_api": 2.0,
-      "output_cost_api": 10.0,
-      "context_length": 1000000,
-      "tier": "Standard"
-    },
-    {
       "id": "google/gemini-3.1-flash-lite-image",
       "name": "Google: Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)",
       "provider": "google",
@@ -61,24 +52,6 @@
       "input_cost_api": 0.74,
       "output_cost_api": 3.5,
       "context_length": 262144,
-      "tier": "Standard"
-    },
-    {
-      "id": "~anthropic/claude-fable-latest",
-      "name": "Anthropic: Claude Fable Latest",
-      "provider": "~anthropic",
-      "input_cost_api": 10.0,
-      "output_cost_api": 50.0,
-      "context_length": 1000000,
-      "tier": "Standard"
-    },
-    {
-      "id": "anthropic/claude-fable-5",
-      "name": "Anthropic: Claude Fable 5",
-      "provider": "anthropic",
-      "input_cost_api": 10.0,
-      "output_cost_api": 50.0,
-      "context_length": 1000000,
       "tier": "Standard"
     },
     {
@@ -445,8 +418,8 @@
       "id": "deepseek/deepseek-v4-flash",
       "name": "DeepSeek: DeepSeek V4 Flash",
       "provider": "deepseek",
-      "input_cost_api": 0.098,
-      "output_cost_api": 0.196,
+      "input_cost_api": 0.08900000000000001,
+      "output_cost_api": 0.18,
       "context_length": 1048576,
       "tier": "Standard"
     },
@@ -1093,8 +1066,8 @@
       "id": "minimax/minimax-m2.1",
       "name": "MiniMax: MiniMax M2.1",
       "provider": "minimax",
-      "input_cost_api": 0.29,
-      "output_cost_api": 0.95,
+      "input_cost_api": 0.3,
+      "output_cost_api": 1.2,
       "context_length": 204800,
       "tier": "Standard"
     },
@@ -1400,7 +1373,7 @@
       "name": "MiniMax: MiniMax M2",
       "provider": "minimax",
       "input_cost_api": 0.255,
-      "output_cost_api": 1.0,
+      "output_cost_api": 1.02,
       "context_length": 204800,
       "tier": "Standard"
     },
@@ -1714,8 +1687,8 @@
       "id": "qwen/qwen3-30b-a3b-thinking-2507",
       "name": "Qwen: Qwen3 30B A3B Thinking 2507",
       "provider": "qwen",
-      "input_cost_api": 0.08,
-      "output_cost_api": 0.39999999999999997,
+      "input_cost_api": 0.13,
+      "output_cost_api": 1.56,
       "context_length": 131072,
       "tier": "Standard"
     },
@@ -2164,8 +2137,8 @@
       "id": "qwen/qwen3-8b",
       "name": "Qwen: Qwen3 8B",
       "provider": "qwen",
-      "input_cost_api": 0.049999999999999996,
-      "output_cost_api": 0.39999999999999997,
+      "input_cost_api": 0.117,
+      "output_cost_api": 0.45499999999999996,
       "context_length": 131072,
       "tier": "Standard"
     },
@@ -2272,8 +2245,8 @@
       "id": "deepseek/deepseek-chat-v3-0324",
       "name": "DeepSeek: DeepSeek V3 0324",
       "provider": "deepseek",
-      "input_cost_api": 0.19999999999999998,
-      "output_cost_api": 0.77,
+      "input_cost_api": 0.24,
+      "output_cost_api": 0.8999999999999999,
       "context_length": 163840,
       "tier": "Standard"
     },
@@ -3025,15 +2998,6 @@
       "tier": "Standard"
     },
     {
-      "id": "opencode/claude-fable-5",
-      "name": "Claude Fable 5",
-      "provider": "opencode-zen",
-      "input_cost_api": 0.0,
-      "output_cost_api": 0.0,
-      "context_length": null,
-      "tier": "Standard"
-    },
-    {
       "id": "opencode/claude-opus-4-8",
       "name": "Claude Opus 4 8",
       "provider": "opencode-zen",
@@ -3349,6 +3313,15 @@
       "tier": "Standard"
     },
     {
+      "id": "opencode/minimax-m3",
+      "name": "Minimax M3",
+      "provider": "opencode-zen",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
       "id": "opencode/minimax-m2.7",
       "name": "Minimax M2.7",
       "provider": "opencode-zen",
@@ -3360,6 +3333,15 @@
     {
       "id": "opencode/minimax-m2.5",
       "name": "Minimax M2.5",
+      "provider": "opencode-zen",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode/kimi-k2.7-code",
+      "name": "Kimi K2.7 Code",
       "provider": "opencode-zen",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
