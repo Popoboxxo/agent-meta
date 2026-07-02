@@ -62,53 +62,17 @@ Pro Screen/View spezifiziere:
 
 ### 2. Mockup-Erstellung
 
-Textbasierte Mockups (ASCII/Wireframe) und/oder Markdown-Tabellen:
+Textbasierte Mockups (ASCII/Wireframe) und/oder Markdown-Tabellen. Pro Mockup begleitend dokumentieren:
 
-**ASCII Wireframe Format:**
+| Aspekt | Pflichtfelder |
+|--------|---------------|
+| **Layout** | Header, Sidebar, Content, Footer, Navigation |
+| **Interaktionen** | Klick, Hover, Drag, Keyboard, Zustandsübergänge |
+| **Responsive** | Breakpoint, Layout-Variante pro Breakpoint |
+| **Barrierefreiheit** | ARIA-Labels, Tab-Order, Screen-Reader-Hinweise{{#if DOD_REQ_TRACEABILITY}} |
+| **REQ-Zuordnung** | REQ-IDs, die der Screen erfüllt{{/if}} |
 
-```
-┌─────────────────────────────────────────────────┐
-│  HEADER: Logo                    [User] [Logout] │
-├─────────────────────────────────────────────────┤
-│  SIDEBAR        MAIN CONTENT AREA                │
-│  ┌─────────┐    ┌─────────────────────────────┐  │
-│  │ Nav Item│    │ Card 1                      │  │
-│  │ Nav Item│    │ Title / Body / [Action]     │  │
-│  └─────────┘    └─────────────────────────────┘  │
-├─────────────────────────────────────────────────┤
-│  FOOTER: © 2025 | Privacy | Terms               │
-└─────────────────────────────────────────────────┘
-```
-
-**Mockup-Begleitdokument:**
-
-```markdown
-## Mockup: [Screen-Name] (SCR-xxx)
-
-### Layout-Beschreibung
-- **Header:** Sticky, Logo links, User-Menu rechts
-- **Sidebar:** Kollabierbar, 240px, Navigations-Hierarchie
-- **Content:** Grid, 2 Spalten Desktop, 1 Spalte Mobile
-- **Footer:** Minimal, Copyright + Links
-
-### Interaktionen
-- Klick auf Card → Detail-View (SCR-xxx)
-- Hover Card → Schatten, Cursor pointer
-- Sidebar collapse → Icon-only, 64px
-
-### Responsive Verhalten
-| Breakpoint | Layout |
-|------------|--------|
-| ≥1200px | 2-Spalten Grid + Sidebar |
-| 768-1199px | 1-Spalte + Sidebar |
-| <768px | 1-Spalte, Sidebar als Drawer |
-
-{{#if DOD_REQ_TRACEABILITY}}
-### REQ-Zuordnung
-- REQ-001: User-Liste anzeigen (Card 1, Card 2)
-- REQ-002: Navigation zwischen Views (Sidebar)
-{{/if}}
-```
+ASCII-Wireframe-Skelett: `{{SNIPPETS_DIR}}/wireframe-template.md` (sync-generiert).
 
 ### 3. Design-System-Definition
 
@@ -167,35 +131,7 @@ Pro Komponente: visuelle Eigenschaften (Farbe, Größe, Abstand, Radius), Intera
 
 ### 4. User Journey Mapping
 
-```
-Journey: [Name] | Persona: [Zielgruppe] | Ziel: [User-Outcome]
-
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ SCR-001  │────▶│ SCR-002  │────▶│ SCR-003  │────▶│ SCR-004  │
-│ Landing  │     │ Register │     │ Dashboard│     │ Settings │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-     │                                 ▲
-     ▼                                 │
-┌──────────┐                           │
-│ SCR-005  │───────────────────────────┘
-│ Login    │
-└──────────┘
-
-Schritte:
-1. Landing (SCR-001) → "Registrieren" → SCR-002
-2. Formular → Validierung → Dashboard (SCR-003)
-3. Alternativ: "Login" → SCR-005 → bei Erfolg → SCR-003
-4. Dashboard → "Einstellungen" → SCR-004
-
-{{#if DOD_REQ_TRACEABILITY}}
-REQ-Abdeckung:
-- REQ-001: Landing Page (SCR-001)
-- REQ-002: User-Registrierung (SCR-002)
-- REQ-003: Dashboard (SCR-003)
-- REQ-004: Einstellungen (SCR-004)
-- REQ-005: User-Login (SCR-005)
-{{/if}}
-```
+Journey-Format: `Name | Persona | Ziel → Schritte (SCR-IDs mit Übergängen)`. Pro Journey optionale REQ-Abdeckung{{#if DOD_REQ_TRACEABILITY}}: REQ-IDs zu den Screens{{/if}}.
 
 {{#if DOD_REQ_TRACEABILITY}}
 ### 5. REQ-Zuordnung bei aktiver Traceability
@@ -215,97 +151,14 @@ REQ-Abdeckung:
 
 ## JSON/Markdown Output Schema — UI-Spec
 
-Return your UI specification as a JSON object matching the following schema:
+Vollständiges Schema siehe `schemas/ui-spec.schema.json` (sync-generiert). Pflichtfelder:
 
-```json
-{
-  "ui_spec_id": "UI-001",
-  "project_context": "{{PROJECT_NAME}}",
-  "screens": [
-    {
-      "screen_id": "SCR-001",
-      "screen_name": "Login Screen",
-      "purpose": "Authenticate users and provide access to the system",
-      "target_user": "All registered users",
-      "states": ["default", "loading", "error", "success"],
-      "layout": {
-        "header": "Logo + System Title",
-        "content": "Centered login form card",
-        "footer": "Copyright + Privacy Link"
-      },
-      "components": [
-        {
-          "type": "Input",
-          "variant": "Email",
-          "label": "Email Address",
-          "placeholder": "user@example.com",
-          "validation": "Required, valid email format",
-          "error_message": "Please enter a valid email address"
-        },
-        {
-          "type": "Input",
-          "variant": "Password",
-          "label": "Password",
-          "placeholder": "••••••••",
-          "validation": "Required, min 8 characters",
-          "error_message": "Password must be at least 8 characters"
-        },
-        {
-          "type": "Button",
-          "variant": "Primary",
-          "label": "Sign In",
-          "action": "Submit login form",
-          "loading_state": "Shows spinner, disabled during request"
-        }
-      ],
-      "navigation": {
-        "entry_points": ["SCR-000 (Landing) → 'Login' button"],
-        "exit_points": ["SCR-003 (Dashboard) on success", "SCR-001 (self) on error"]
-      },
-      "accessibility": {
-        "aria_labels": ["Login form", "Email input", "Password input", "Sign in button"],
-        "keyboard_navigation": "Tab order: Email → Password → Button → Forgot Password link",
-        "color_contrast": "WCAG AA compliant (4.5:1 minimum)"
-      },
-      {{#if DOD_REQ_TRACEABILITY}}
-      "req_references": ["REQ-005"]
-      {{/if}}
-    }
-  ],
-  "design_system": {
-    "colors": {
-      "primary": { "main": "#3B82F6", "light": "#60A5FA", "dark": "#2563EB" },
-      "semantic": { "success": "#10B981", "warning": "#F59E0B", "error": "#EF4444", "info": "#3B82F6" },
-      "neutral": { "background": "#F9FAFB", "surface": "#FFFFFF", "text-primary": "#111827" }
-    },
-    "typography": {
-      "font-family": { "primary": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, monospace" },
-      "scale": {
-        "h1": { "size": "2rem", "weight": 700 },
-        "body": { "size": "1rem", "weight": 400 }
-      }
-    },
-    "spacing": { "unit": "4px", "scale": [4, 8, 12, 16, 24, 32, 48, 64] },
-    "border-radius": { "sm": "4px", "md": "8px", "lg": "12px", "full": "9999px" }
-  },
-  "user_journeys": [
-    {
-      "journey_name": "User Login Flow",
-      "persona": "Registered User",
-      "goal": "Access the system with credentials",
-      "screens": ["SCR-001", "SCR-003"],
-      "steps": [
-        "User opens login screen (SCR-001)",
-        "User enters email and password",
-        "User clicks 'Sign In'",
-        "System validates credentials",
-        "On success: redirect to Dashboard (SCR-003)",
-        "On error: show error message on SCR-001"
-      ]
-    }
-  ]
-}
-```
+| Feld | Typ | Zweck |
+|------|-----|-------|
+| `ui_spec_id` | string | Eindeutige Kennung (`UI-001`) |
+| `screens[]` | array | Pro Screen: id, name, purpose, target_user, states, layout, components[], navigation, accessibility{{#if DOD_REQ_TRACEABILITY}}, req_references[]{{/if}} |
+| `design_system` | object | colors, typography, spacing, border-radius |
+| `user_journeys[]` | array | journey_name, persona, goal, screens[], steps[] |
 
 ---
 

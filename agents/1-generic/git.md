@@ -60,7 +60,7 @@ git commit -m "<type>: <beschreibung>"
 git push origin <branch>
 ```
 
-Erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI) → `.agent-meta/agents/1-generic/_wf-git-ops.md`
+Erweiterte Workflows (Feature-Branch, Tags, Rebase, Stash, Plattform-CLI) → siehe Plattform-Doku (GitHub CLI / GitLab CLI / Gitea)
 
 ---
 

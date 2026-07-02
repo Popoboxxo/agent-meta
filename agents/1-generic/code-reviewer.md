@@ -139,90 +139,22 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 
 ## JSON Output Schema — Review-Bericht
 
-```json
-{
-  "review_id": "CR-001",
-  "review_scope": "Feature: User Authentication",
-  "changed_files": [
-    "src/auth/login-handler.ts",
-    "src/auth/session-manager.ts",
-    "src/auth/password-validator.ts"
-  ],
-  "clean_code_findings": [
-    {
-      "file": "src/auth/login-handler.ts",
-      "line": 42,
-      "principle": "Single Responsibility",
-      "severity": "major",
-      "description": "Function handleLogin() validates input, authenticates, creates session, and sends response — 4 responsibilities in one function.",
-      "recommendation": "Extract validation, authentication, and session creation into separate functions."
-    },
-    {
-      "file": "src/auth/session-manager.ts",
-      "line": 15,
-      "principle": "DRY",
-      "severity": "minor",
-      "description": "Session ID generation logic duplicated from src/utils/crypto.ts:88",
-      "recommendation": "Import generateId() from crypto module instead of duplicating."
-    }
-  ],
-  "blast_radius": {
-    "level": "SIGNIFICANT",
-    "affected_files": [
-      "src/auth/login-handler.ts",
-      "src/auth/session-manager.ts",
-      "src/api/middleware.ts",
-      "src/api/routes.ts",
-      "tests/auth/login.test.ts",
-      "tests/auth/session.test.ts"
-    ],
-    "affected_modules": ["auth", "api", "tests/auth"],
-    "breaking_changes": ["SessionManager constructor signature changed"],
-    "migration_needed": false
-  },
-  {{#if DOD_REQ_TRACEABILITY}}
-  "req_traceability": {
-    "expected_reqs": ["REQ-012", "REQ-013"],
-    "found_refs": [
-      {"req_id": "REQ-012", "file": "src/auth/login-handler.ts", "line": 5},
-      {"req_id": "REQ-013", "file": "src/auth/password-validator.ts", "line": 3}
-    ],
-    "missing_refs": [],
-    "unreferenced_changes": []
-  },
-  {{/if}}
-  "quality_ratings": {
-    "readability": "B",
-    "maintainability": "B",
-    "robustness": "A",
-    "efficiency": "A",
-    "security": "A",
-    "overall": "B"
-  },
-  "verdict": "APPROVED_WITH_RECOMMENDATIONS",
-  "blockers": [],
-  "recommendations": [
-    "Extract handleLogin() into smaller functions (SRP violation)",
-    "Remove duplicated session ID generation (DRY violation)"
-  ]
-}
-```
+Vollständiges Schema: `schemas/code-review.schema.json` (sync-generiert). Pflichtfelder:
 
-## JSON Output Schema — Reflection-Loop Modus
+| Feld | Typ | Zweck |
+|------|-----|-------|
+| `review_id` | string | Eindeutige Kennung (`CR-001`) |
+| `review_scope` | string | Was wurde geprüft (Feature/Bug/Refactoring) |
+| `changed_files[]` | array | Betroffene Dateien |
+| `clean_code_findings[]` | array | Pro Finding: file, line, principle, severity, description, recommendation |
+| `blast_radius` | object | level, affected_files, affected_modules, breaking_changes, migration_needed |
+| `req_traceability`{{#if DOD_REQ_TRACEABILITY}} (Pflicht){{else}} (optional){{/if}} | object | expected_reqs, found_refs, missing_refs, unreferenced_changes |
+| `quality_ratings` | object | readability, maintainability, robustness, efficiency, security, overall (A–F) |
+| `verdict` | enum | APPROVED, APPROVED_WITH_RECOMMENDATIONS, CHANGES_REQUESTED, BLOCKED, REVISE |
+| `blockers[]` | array | Merge-blockierende Findings |
+| `recommendations[]` | array | Nicht-blockierende Verbesserungen |
 
-```json
-{
-  "verdict": "REVISE",
-  "iteration": 2,
-  "max_iterations": 3,
-  "correction_hints": [
-    "Funktion X sollte Y statt Z verwenden",
-    "Zeile N: Boundary-Case nicht behandelt"
-  ],
-  "findings": [...],
-  "summary": "..."
-}
-```
+**Reflection-Loop Variante:** `verdict: REVISE` + `iteration`/`max_iterations` + `correction_hints[]` (spezifisch, referenzierbar, max. 5).
 
 ## Verdict Values
 
@@ -241,44 +173,14 @@ Du und `validator` ergänzen euch: Qualität vs. Korrektheit.
 ```markdown
 # Code-Review-Bericht — [Datum]
 
-## Scope
-[Was wurde geprüft, welche Dateien/Commits]
-
-## Blast-Radius
-**Stufe:** [TRIVIAL / MODERATE / SIGNIFICANT / CRITICAL]
-**Betroffene Dateien:** [Liste]
-**Betroffene Module:** [Liste]
-**Breaking Changes:** [Ja/Nein, welche]
-
-## Clean Code Findings
-
-### SOLID
-| Datei | Zeile | Prinzip | Severity | Beschreibung |
-|-------|-------|---------|----------|-------------|
-
-### DRY
-| Duplikat | Dateien | Severity | Empfehlung |
-|----------|---------|----------|-----------|
-
-### KISS / YAGNI
-| Datei | Zeile | Prinzip | Beschreibung |
-|-------|-------|---------|-------------|
-
-{{#if DOD_REQ_TRACEABILITY}}
-## REQ-Traceability
-| REQ-ID | Datei | Zeile | Status |
-|--------|-------|-------|--------|
-{{/if}}
-
-## Qualitäts-Bewertung
-| Kategorie | Bewertung | Begründung |
-|-----------|-----------|-----------|
-
-## Gesamturteil
-**Verdict:** [APPROVED / APPROVED_WITH_RECOMMENDATIONS / CHANGES_REQUESTED / BLOCKED]
-**Blocker:** [Liste oder "keine"]
-**Empfehlungen:** [Liste]
+## Scope | Blast-Radius (Stufe, Dateien, Module, Breaking Changes)
+## Clean Code Findings — SOLID | DRY | KISS/YAGNI
+{{#if DOD_REQ_TRACEABILITY}}## REQ-Traceability{{/if}}
+## Qualitäts-Bewertung (Kategorien + A–F)
+## Gesamturteil (Verdict, Blocker, Empfehlungen)
 ```
+
+Vollständige Tabellen-Vorlage: `{{SNIPPETS_DIR}}/code-review-report.md` (sync-generiert).
 
 ---
 

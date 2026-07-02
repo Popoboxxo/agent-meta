@@ -175,9 +175,7 @@ Extensions und Rules so kurz wie möglich halten.
 
 ## 7. External Skills
 
-→ Lies `.agent-meta/agents/1-generic/_wf-skill-lifecycle.md` für vollständigen Lifecycle.
-
-Kurzreferenz:
+Kurzreferenz (Vollständiger Lifecycle in `rules/2-platform/agent-meta-sync-interface.md`):
 ```bash
 # Aktivieren
 # .meta-config/project.yaml: "external-skills": { "skill-name": { "enabled": true } }
@@ -221,8 +219,6 @@ py .agent-meta/scripts/consistency-check.py --changed --json       # CI/Pipeline
 ---
 
 ## 9. CLAUDE.md verbessern
-
-→ Lies `.agent-meta/agents/1-generic/_wf-claude-review.md` für Review-Prozess.
 
 Sofort-Regel: Fehler beobachtet → Imperativ-Regel formulieren → außerhalb managed block einfügen.
 

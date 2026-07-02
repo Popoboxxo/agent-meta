@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Files
+- New: `agents/1-generic-modern/_reference-agent.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic-modern/developer.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic-modern/orchestrator.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic/_README.md` (Phase 1 wf-deleted mapping reference)
+
+## [0.66.0-beta.4] - 2026-07-02
+
+### Changed — Token Optimization Phase 2 (Top-10 Compactification)
+- **ui-ux-designer**: 12200 → 7907 chars (-35%, 3050 → 1976 tokens) — JSON schema examples replaced with field-table + schema-reference
+- **prompt-engineer**: 12658 → 6065 chars (-52%, 3164 → 1516 tokens) — Best-Practices sections consolidated into reference tables
+- **code-reviewer**: 11237 → 9351 chars (-17%, 2809 → 2337 tokens) — JSON output schema replaced with field-table
+- **export-manager**: 9239 → 5647 chars (-39%, 2309 → 1411 tokens) — Two JSON schemas replaced with field-tables + snippet references
+- **performance-optimizer**: 9040 → 6589 chars (-27%, 2260 → 1647 tokens) — JSON output schema + workflow phases consolidated
+- **devops-engineer**: 9033 → 6451 chars (-29%, 2258 → 1612 tokens) — Pipeline-YAML + K8s-Manifest + JSON schema replaced with snippet references
+- **api-specialist**: 8664 → 6542 chars (-24%, 2166 → 1635 tokens) — OpenAPI-YAML + JSON schema replaced with snippet reference
+- **feature**: 8456 → 5698 chars (-33%, 2114 → 1424 tokens) — 8 step-by-step blocks collapsed into single lifecycle table
+- **concept-reviewer**: 6978 → 5477 chars (-22%, 1744 → 1369 tokens) — 7 review dimensions + reflection-loop consolidated into tables
+
+### Fixed
+- **Dead link cleanup**: Removed references to deleted `_wf-skill-lifecycle.md`, `_wf-claude-review.md`, `_wf-git-ops.md`, `_wf-security-audit.md` in `agent-meta-manager.md`, `git.md`, `security-auditor.md`
+- **Provider-agnostic consistency**: All compactifications are pure Markdown reductions — no XML/Modern-format, no provider-specific syntax. All 4 top providers (Claude, Opencode, Gemini, Continue, Copilot) work identically.
+- **Placeholder validation**: Added `A2A_MAX_DEPTH`, `FILE_AFFINITY_HINT`, `ANALYSIS_ENABLED`, `SE_MODE_BLOCK`, `A2A_PROTOCOL_BLOCK`, `CHECKPOINTING_BLOCK`, `QUALITY_PIPELINES_BLOCK` to `_BUILTIN_VARS` in `scripts/lib/consistency/placeholders.py` — eliminates 7 false-positive consistency warnings
+
 ## [0.66.0-beta.3] - 2026-07-02
 
 ### Changed — Token Optimization Phase 1 (Quick-Wins)

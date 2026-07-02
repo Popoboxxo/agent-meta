@@ -15,7 +15,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "AGENT_META_VERSION", "AGENT_META_DATE", "AGENT_META_REPO",
     "AGENT_TABLE", "AGENT_HINTS",
     # Provider / AI
-    "AI_PROVIDER", "MAX_PARALLEL_AGENTS", "PARALLEL_PATTERN",
+    "AI_PROVIDER", "MAX_PARALLEL_AGENTS", "PARALLEL_PATTERN", "FILE_AFFINITY_HINT", "ANALYSIS_ENABLED",
     # DoD flags
     "DOD_REQ_TRACEABILITY", "DOD_TESTS_REQUIRED", "DOD_CODEBASE_OVERVIEW",
     "DOD_SECURITY_AUDIT", "DOD_PRESET",
@@ -60,7 +60,9 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Feature flags (injected by build_variables)
     "SE_ENABLED", "SE_BASE_DIR", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
     "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
-    "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS",
+    "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
+    # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
+    "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     # SE cascade variables (from role-defaults.yaml se_variables)
     "SE_MIN_DEPTH", "SE_MAX_DEPTH", "SE_MAX_CRITIC_ITERATIONS", "SE_MAX_PARALLEL_CELLS",
     "SE_MAX_CELLS", "cost_limit_eur",
