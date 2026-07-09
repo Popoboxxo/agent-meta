@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.2.0
+version: 7.3.0
 description: 'Provider-agnostischer Task-Orchestrator im Modern Mode: zerlegt, parallelisiert,
   delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
@@ -98,6 +98,19 @@ Zweifel → höhere Stufe. Eskalation (`ESCALATE`-Card) → sofort an `recommend
 → Alle drei "ja" → starten. ANY "nein" → erst beheben.
 
 ## 6. Task Decomposition & Delegation
+
+### Direkter Dispatch (wenn aktiviert)
+
+## Direkter Dispatch (nur nach Regel 2)
+
+| Operation | Direkt an | Bedingung |
+|-----------|-----------|-----------|
+| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
+| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
+| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
+| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
+
+> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
 
 **Dispatch-Entscheidung:**
 

@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-model: claude-fable-5
+model: claude-opus-4-8
 memory: project
 ---
 

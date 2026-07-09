@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.2.0"
+version: "7.3.0"
 description: "Provider-agnostischer Task-Orchestrator im Modern Mode: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 prompt_mode: modern
@@ -95,6 +95,12 @@ Zweifel → höhere Stufe. Eskalation (`ESCALATE`-Card) → sofort an `recommend
 → Alle drei "ja" → starten. ANY "nein" → erst beheben.
 
 ## 6. Task Decomposition & Delegation
+
+### Direkter Dispatch (wenn aktiviert)
+
+{{#if DIRECT_DISPATCH_ENABLED}}
+{{DIRECT_DISPATCH_SECTION}}
+{{/if}}
 
 **Dispatch-Entscheidung:**
 

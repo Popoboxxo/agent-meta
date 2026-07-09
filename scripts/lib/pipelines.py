@@ -173,7 +173,9 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
     variables = {}
     for name, pipeline in pipelines.items():
         var_name = name.upper().replace("-", "_")
-        variables[f"PIPELINE_{var_name}_ENABLED"] = "true"
+        variables[f"PIPELINE_{var_name}_ENABLED"] = (
+            "true" if pipeline.get("enabled", True) else "false"
+        )
         variables[f"PIPELINE_{var_name}_STAGES"] = json.dumps(
             pipeline.get("stages", []), ensure_ascii=False
         )

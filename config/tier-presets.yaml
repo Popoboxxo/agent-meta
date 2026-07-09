@@ -43,7 +43,7 @@ Normal:
         fast: claude-haiku-4-5-20251001
         balanced: claude-sonnet-4-6
         powerful: claude-opus-4-8
-        max: claude-fable-5
+        max: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium

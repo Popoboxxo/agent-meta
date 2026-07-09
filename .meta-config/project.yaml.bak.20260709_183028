@@ -271,5 +271,7 @@ reflection-pairs:
       enabled: true
 tier-preset: Normal
 agent-prompts:
-  default: modern
-  modes: {}
+  default: legacy
+  modes:
+    developer: modern
+    git: modern

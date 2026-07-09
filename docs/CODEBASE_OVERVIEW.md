@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-07-01 (Prompt-Modernisierung Debug & HITL-Deadlock-Fix, Singleton v7.2.0)
+> Letzte Aktualisierung: 2026-07-09 (Phase 5: Provider-agnostischer Syncer, Admin-CRUD, Model-Mapping)
 
 ---
 
@@ -488,11 +488,32 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 
 ### `config/ai-providers.yaml` & Provider Tier Mapping
 
-**Zweck:** Provider-Konfiguration mit `display-name`, Tier-Definitionen und Model-IDs (früher feste Zuordnung, jetzt via Presets). YAML mit Frontmatter: `name`, `tier`, `models`.
+**Zweck:** Provider-Konfiguration mit Capabilities-Matrix, Settings-Templates und Model-IDs (früher feste Zuordnung, jetzt via Presets).
 
-**Neue Felder (REQ-MOD-01):**
-- `display-name` — lesbar im Admin-UI (z.B. "Anthropic Claude", "OpenCode")
-- `tiers` (geplant) — direkte Modell-ID pro Tier, fallback zu globalen `role-defaults.yaml` Defaults
+**Felder pro Provider (Stand v0.66.0):**
+
+| Feld | Typ | Zweck |
+|------|-----|-------|
+| `agents_dir` | string | Output-Verzeichnis für generierte Agenten |
+| `agent_ext` | string | Dateiendung (`.md`) |
+| `context_file` | string | Context-Datei (z.B. `CLAUDE.md`) |
+| `context_template` | string | Template für Context-Datei |
+| `has_rules` / `has_hooks` / `has_commands` / `has_settings` | bool | Feature-Flags |
+| `capabilities` | string[] | Capability-Matrix: `agents`, `rules`, `hooks`, `commands`, `settings`, `snippets`, `skills`, `artifacts`, `checkpoints`, `mcp`, `context-managed-block`, `context-embedded-rules` |
+| `artifact_dir` | string | Artifact-Verzeichnis (z.B. `.claude/artifacts`) |
+| `checkpoint_dir` | string | Checkpoint-Verzeichnis |
+| `settings_file` | string | Provider-Settings-Datei (z.B. `.claude/settings.json`) |
+| `settings_template` | string | Template für Settings-Datei (z.B. `howto/configs/CLAUDE.settings-template.json`) |
+| `settings_local_file` | string | Lokale/persönliche Override-Datei (z.B. `.claude/settings.local.json`) |
+| `settings_local_template` | string | Template für lokale Settings |
+| `model-tiers` | dict | `nano/fast/balanced/powerful/max` → konkrete Modell-ID |
+| `model-aliases` | dict | Kurznamen → Modell-ID |
+| `gitignore_entries` | string[] | Einträge für agent-meta managed Block in `.gitignore` |
+| `isolation-dirs` | string[] | Verzeichnisse die isoliert werden (Cross-Provider-Contamination-Schutz) |
+
+**Neue Settings-Templates (v0.66.0):**
+- `howto/configs/CLAUDE.settings-template.json` — committed settings skeleton
+- `howto/configs/CLAUDE.settings-local-template.json` — local/personal overrides (gitignored)
 
 ### `config/tier-presets.yaml` (NEU, REQ-MOD-01)
 
@@ -833,12 +854,12 @@ disabled: []                         # hidden in UI, aber in registry
 **Dynamisches Crawling (`--update-models`):**
 Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
 
-### `scripts/admin-server.py` & `docs/admin-ui.html` (REQ-MOD-01 Overhaul)
+### `scripts/admin-server.py` & `docs/admin-ui.html` (Phase 5: CRUD + Reflection + Model Mapping)
 
-**Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing.
+**Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing, Quality Pipelines, Reflection Pairs, Prompt Modes und Agent→Model-Mapping.
 **Architektur:** Single-File Frontend (`docs/admin-ui.html`, Vanilla JS, Zero Dependencies) + Python-Backend (`scripts/admin-server.py`).
 
-**Neue Sektionen (REQ-MOD-01):**
+**Bestehende Sektionen (REQ-MOD-01):**
 
 | Sektion | Features | Button-Flow |
 |---------|----------|------------|
@@ -848,7 +869,45 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | **Project General** | tier-preset Dropdown (fixed), Global Framework Setup Link | Edit → Save/Cancel |
 | **AI Providers** | Project Tier Override Panel | Enable/Disable pro Provider |
 
-**New UI Patterns (REQ-MOD-01):**
+**Neue CRUD-Endpunkte (Phase 5 — v0.66.0):**
+
+| Endpunkt | Methoden | Zweck |
+|----------|----------|-------|
+| `/api/pipelines` | `GET` · `PUT` | Liste aller Quality Pipelines lesen / ersetzen |
+| `/api/pipelines/{name}` | `GET` · `PUT` · `DELETE` | Einzelne Pipeline lesen / anlegen/aktualisieren / löschen |
+| `/api/reflection-pairs` | `GET` · `POST` · `PUT` | Liste aller Reflection Pairs lesen / neu anlegen (mit auto-generierter ID) / ersetzen |
+| `/api/reflection-pairs/{id}` | `GET` · `PUT` · `DELETE` | Einzelnes Pair lesen / aktualisieren / löschen |
+| `/api/prompt-modes` | `GET` · `PUT` | Prompt-Mode-Config (`agent-prompts` Block) lesen / schreiben |
+| `/api/prompt-modes/roles/{role}` | `GET` · `PUT` · `POST` · `DELETE` | Prompt-Mode-Override für eine Rolle setzen / löschen |
+| `/api/model-mapping` | `GET` | Matrix: Rolle × Provider → resolved model ID + source |
+
+**Neue UI-Pages (Phase 5):**
+
+| Page | Route | Beschreibung |
+|------|-------|-------------|
+| **Reflection Pairs** | `/reflection-pairs` | CRUD-Oberfläche für Generator-Critic-Paare (z.B. developer↔code-reviewer) mit `max_iterations` und `enabled`-Flag |
+| **Model Mapping** | `/model-mapping` | Lese-Ansicht der aufgelösten Modelle pro Rolle und Provider — Zellen zeigen Modell-ID + Source (`role-default`, `explicit-override`). Write-Overrides via `/api/config/project/section` oder `/api/models/update` |
+
+**Hilfsmethode `_update_role_defaults_section()`:**
+
+Ersetzt einen einzelnen Top-Level-YAML-Schlüssel in `config/role-defaults.yaml` kind-spezifisch: unveränderte Pipelines oder Reflection-Pair-Einträge behalten ihre ursprüngliche Formatierung und Kommentare bei. Nur geänderte oder neue Kinder werden mit PyYAML neu serialisiert. Kommentare, Leerzeilen und andere Top-Level-Sektionen außerhalb der bearbeiteten Sektion bleiben ebenfalls erhalten.
+
+```python
+def _update_role_defaults_section(self, key: str, value: Any) -> dict:
+    # Regex extrahiert den Sektions-Body
+    # Kinder werden einzeln geparst und nur bei Änderung neu gedumpt
+    # Backup + atomares replace
+```
+
+**Agent→Model-Mapping-Endpunkt (`/api/model-mapping`):**
+
+Ruft `lib.roles.resolve_model()` für jede aktive Rolle × Provider-Kombination auf. Pro Zelle wird zurückgegeben:
+- `model_id` — die aufgelöste konkrete Modell-ID
+- `source` — `"role-default"`, `"explicit-override"` oder `"fallback"`
+
+Die Auflösungslogik ist identisch mit der in `scripts/lib/agents.py` (`_compose_agent()`).
+
+**UI Patterns (REQ-MOD-01):**
 1. **Quick-Filter Strip** oben in Models-Tabelle → Click-to-filter nach Provider
 2. **Enable/Disable/Blacklist Row Buttons** statt Inline-Checkboxen → weniger Jitter, bessere UX
 3. **Datalist-Filtering** in Provider-Mappings → zeigt nur verfügbare Modelle per Provider
@@ -1056,7 +1115,35 @@ PLACEHOLDERS = {
 - 4-Schritte-Workflow: Dateien einlesen → define_subagent → Orchestrator zuerst → Anfragen bearbeiten
 - Hinweise: Ephemere Registrierung, Version-Abhängigkeit von sync.py, Konsequenzen ohne Bootstrap
 
-### 10.7 Integration in `scripts/lib/agents.py`
+### 10.7 `scripts/lib/context.py` — Provider-Kontext-Management (Phase 5 Refactoring)
+
+**Zweck:** Erzeugen und Aktualisieren von provider-spezifischen Context-Dateien (CLAUDE.md, GEMINI.md, AGENTS.md, .continue/rules/project-context.md), Settings-Dateien und `.gitignore`-Managed-Blöcken.
+
+**Capability-Driven Dispatch (`sync_context_for_provider()`):**
+
+Die Dispatch-Logik verwendet die `capabilities`-Matrix aus `config/ai-providers.yaml` statt hartkodierter Provider-Namen:
+
+| Capability | Strategie | Betroffene Provider |
+|------------|-----------|-------------------|
+| `context-embedded-rules` | Opencode-Strategie: Regeln in AGENTS.md managed block | Opencode |
+| `provider == "Continue"` | Continue-Strategie: project-context.md + config.yaml comment block | Continue |
+| `context-managed-block` | Generische HTML-Managed-Block-Strategie | Claude, Gemini |
+
+**Neue Initialisierungs-Funktionen (v0.66.0, provider-config-getrieben):**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `init_settings_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt committed Settings-Dateien für alle aktiven Provider aus deren `settings_template` |
+| `init_settings_local_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt lokale/persönliche Settings-Dateien aus `settings_local_template` (gitignored) |
+| `only_variables()` | `(project_root, variables, log, dry_run, providers, provider_config)` | Substituiert `{{VARIABLE}}`-Platzhalter in bestehenden Context-Dateien |
+| `ensure_gitignore_entries()` | `(project_root, log, dry_run, gitignore_entries, exact_entries)` | Stellt agent-meta Managed-Block in `.gitignore` sicher (additiv oder exakt) |
+
+**Provider-Eigenschaften (`_init_provider_settings_json()`):**
+- Liest `settings_file` und `settings_template` aus `config/ai-providers.yaml`
+- Template-Substitution via `substitute()` — Variablen werden eingesetzt
+- Fallback auf minimales JSON/YAML-Skelett wenn Template fehlt
+
+### 10.8 Integration in `scripts/lib/agents.py`
 
 **Stelle:** `_compose_agent()` Funktion, Zeile ~1082
 

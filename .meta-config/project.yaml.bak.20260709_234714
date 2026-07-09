@@ -1,4 +1,4 @@
-agent-meta-version: 0.65.1
+agent-meta-version: 0.66.0
 provider-isolation: disabled
 ai-providers:
 - Claude
@@ -66,7 +66,7 @@ provider-options:
   Gemini: {}
   Continue:
     generate-prompts: true
-    prompt-mode: full
+    prompt-mode: slim
   Copilot: {}
 speech-mode: short
 variables:
@@ -222,7 +222,7 @@ orchestrator:
     validate-before-delegate: true
     supersession-tracking: true
     strict-validation: false
-    compact-mode: false
+    compact-mode: true
     max_retries: 3
     human_approval_required: false
     protocol_routing: static
@@ -262,17 +262,16 @@ quality-pipelines:
   custom-pipelines: {}
 model-overrides:
   Opencode:
+    developer: opencode-go/qwen3.7-plus
     senior-developer: opencode-go/kimi-k2.7-code
-    orchestrator: opencode-go/minimax-m3
-    se-junior-developer: opencode-go/minimax-m3
-    developer: opencode-go/minimax-m3
-    prompt-engineer: opencode-go/minimax-m3
-    agent-meta-manager: opencode-go/minimax-m3
-  Claude:
-    se-developer: claude-opus-4-7
 reflection-pairs:
   overrides:
     dev-review-loop:
       max_iterations: 5
       enabled: true
 tier-preset: Normal
+agent-prompts:
+  default: modern
+  modes: {}
+dod:
+  tests-required: true

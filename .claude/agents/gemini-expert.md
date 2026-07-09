@@ -15,7 +15,7 @@ tools:
 - WebFetch
 - TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
-model: claude-opus-4-7
+model: claude-opus-4-8
 memory: project
 ---
 

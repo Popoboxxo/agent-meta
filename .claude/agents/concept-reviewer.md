@@ -12,7 +12,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-model: claude-opus-4-7
+model: claude-opus-4-8
 permissionMode: plan
 ---
 

@@ -154,7 +154,7 @@ Auf Anfrage: `.meta-config/project.yaml` um SE-Block erweitern. Erklärung der V
 
 **Sync-Workflow:** Pflicht-Reihenfolge bei Änderungen → 1. sync.py lokal testen → 2. .claude/agents prüfen → 3. Commit → 4. (ggf.) PR.
 
-**Version-Info:** v0.66.0-beta.4 (2026-07-02)
+**Version-Info:** v0.66.0 (2026-07-09)
 </context>
 
 <tools>

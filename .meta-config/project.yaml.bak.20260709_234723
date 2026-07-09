@@ -273,3 +273,8 @@ tier-preset: Normal
 agent-prompts:
   default: modern
   modes: {}
+dod: {}
+rules:
+  dod-criteria:
+    alwaysApply: true
+    embed: true

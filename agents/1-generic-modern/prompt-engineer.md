@@ -57,7 +57,7 @@ Context Engineering: Handoff-Verträge als APIs · APO (DSPy/TextGrad) · Wenige
 ## 4. Agent-Meta Framework Features
 
 - **Schichten:** `1-generic` (provider-agnostisch, keine Provider-Namen) · `2-platform` (Overrides, `based-on:` + Version) · `3-project` (Composition via `extends:`+`patches:`)
-- **Variablen:** `{{GROSS_MIT_UNTERSTRICH}}` (Regex `[A-Z0-9_]+`)
+- **Variablen:** `{{%GROSS_MIT_UNTERSTRICH%}}` (Regex `[A-Z0-9_]+`)
 - **A2A Handoffs:** `task-spec-v1`, `dev-result-v1`. Anti-Re-Delegation Gates: `delegation_depth` ≤ 10, `payload.t` ≤ 300 Zeichen, `source_agent != target_agent`, keine "Du bist..."-Prefixe
 - **Versioning:** Major = Verhaltensänderung · Minor = neue optionale Sektion · Patch = Textfix
 - **Pipelines:** `bugfix`, `refactor` etc. in `role-defaults.yaml`
@@ -101,7 +101,7 @@ REVIEW_NOTES: [offene Punkte]
 - KEINE generischen Verbesserungen — immer framework-spezifisch
 - KEINE Provider-Namen in 1-generic/-Templates
 - KEIN Ignorieren von Conditional Guards beim Port
-- KEINE konkatenierten Platzhalter (`{{A}}{{B}}`)
+- KEINE konkatenierten Platzhalter (`{{%A%}}{{%B%}}`)
 
 **User-Proxy:** `main_chat` ist User-Proxy.
 

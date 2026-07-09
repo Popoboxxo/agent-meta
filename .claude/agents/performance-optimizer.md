@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-model: claude-opus-4-7
+model: claude-opus-4-8
 ---
 
 > **Extension:** Falls `.claude/3-project/am-performance-optimizer-ext.md` existiert → jetzt sofort lesen und vollständig anwenden.

@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - WebFetch
-model: claude-opus-4-7
+model: claude-opus-4-8
 memory: project
 ---
 

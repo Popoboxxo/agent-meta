@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.66.0-beta.4 — `2026-07-02`
+Generiert von agent-meta v0.66.0 — `2026-07-09`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -49,91 +49,91 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 
 ### A2A Anti-Re-Delegation Gates
 Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Delegations-Schleifen und unkontrollierten Spec-Dump in `payload.t`.
-Details: `rules/.../a2a-delegation-gates.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Branch-Guard — Feature-Branch Pflicht
 **Gilt für alle code-ändernden Aufgaben.**
-Details: `rules/.../branch-guard.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Commit-Konventionen (Conventional Commits)
 Gilt für alle Agenten die Commits erstellen oder vorbereiten.
-Details: `rules/.../commit-conventions.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Definition of Done (DoD)
 Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-Details: `rules/.../dod-criteria.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### GitHub Issue Lifecycle
 Wenn deine Arbeit mit einem GitHub Issue verknüpft ist, schließe es nach Abschluss ab.
-Details: `rules/.../issue-lifecycle.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Sprachregeln
 Diese Regel gilt für alle Agenten und den Hauptchat.
-Details: `rules/.../language.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Lifecycle-Tasks — Ausstehende Aufgaben prüfen
 Beim Start einer neuen Konversation: prüfe ob `.opencode/pending-tasks.md` existiert.
-Details: `rules/.../lifecycle-tasks.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Provider-Agnostic Policy — Generic Templates
 **Generische Agenten-Templates (1-generic/) müssen universell und provider-agnostisch bleiben.**
-Details: `rules/.../provider-agnostic.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Python Conventions
 **Gilt für alle Python-Dateien (`*.py`).**
-Details: `rules/.../python-conventions.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Session-Abschluss — Erkenntnisse sichern
 Gilt für Hauptchat und Orchestrator.
-Details: `rules/.../session-conclusion.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### CRITICAL GATE — VERIFY BEFORE EVERY ACTION
 YOU ARE THE MAIN CHAT. You MUST NOT perform any code changes directly.
-Details: `rules/.../use-orchestrator.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### agent-meta — Schichten-Architektur
 Dieses Repo ist das Meta-Repository für Agenten-Standards. Jede Änderung an Templates
-Details: `rules/.../architecture.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### agent-meta — Entwicklungskonventionen
 **1. `.opencode/agents` ist generierter Output — nie manuell bearbeiten.**
-Details: `rules/.../conventions.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### agent-meta — sync.py Interface
 `sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.opencode/agents` schreiben.
-Details: `rules/.../sync-interface.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 ---
 
 ### Kommunikationsstil: Short
 **Diese Regel gilt für alle Antworten und überschreibt alle anderen Stilanweisungen.**
-Details: `rules/.../short.md`
+Details: embedded in `Opencode` context (Regeln-Abschnitt)
 
 <!-- agent-meta:managed-end -->
 
@@ -149,3 +149,47 @@ Agent files are in `.opencode/agents/`. Invoke them by name in opencode.
 - **Test:** `python scripts/sync.py --validate`
 - **Platform:** Python CLI (sync.py)
 - **Runtime:** Python 3.x
+
+
+<!-- headroom:rtk-instructions -->
+# RTK (Rust Token Killer) - Token-Optimized Commands
+
+When running shell commands, **always prefix with `rtk`**. This reduces context
+usage by 60-90% with zero behavior change. If rtk has no filter for a command,
+it passes through unchanged — so it is always safe to use.
+
+## Key Commands
+```bash
+# Git (59-80% savings)
+rtk git status          rtk git diff            rtk git log
+
+# Files & Search (60-75% savings)
+rtk ls <path>           rtk read <file>         rtk grep <pattern>
+rtk find <pattern>      rtk diff <file>
+
+# Test (90-99% savings) — shows failures only
+rtk pytest tests/       rtk cargo test          rtk test <cmd>
+
+# Build & Lint (80-90% savings) — shows errors only
+rtk tsc                 rtk lint                rtk cargo build
+rtk prettier --check    rtk mypy                rtk ruff check
+
+# Analysis (70-90% savings)
+rtk err <cmd>           rtk log <file>          rtk json <file>
+rtk summary <cmd>       rtk deps                rtk env
+
+# GitHub (26-87% savings)
+rtk gh pr view <n>      rtk gh run list         rtk gh issue list
+
+# Infrastructure (85% savings)
+rtk docker ps           rtk kubectl get         rtk docker logs <c>
+
+# Package managers (70-90% savings)
+rtk pip list            rtk pnpm install        rtk npm run <script>
+```
+
+## Rules
+- In command chains, prefix each segment: `rtk git add . && rtk git commit -m "msg"`
+- For debugging, use raw command without rtk prefix
+- `rtk proxy <cmd>` runs command without filtering but tracks usage
+<!-- /headroom:rtk-instructions -->

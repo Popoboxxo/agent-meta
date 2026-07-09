@@ -202,6 +202,30 @@ pre {
 .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.data-table th,
+.data-table td {
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.data-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.data-table td .badge {
+  font-size: 10px;
+  margin-top: 4px;
+}
+
 /* =====================================================================
  * Forms
  * ===================================================================== */
@@ -1296,6 +1320,9 @@ function buildSidebar() {
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "□" },
         { route: "/project/model-overrides", label: "Model Overrides", icon: "□" },
         { route: "/project/provider-tier-overrides", label: "Provider Tier Overrides", icon: "❖" },
+        { route: "/project/model-mapping", label: "Model Mapping", icon: "⊞" },
+        { route: "/project/dod-overrides", label: "DoD Overrides", icon: "□" },
+        { route: "/project/rules-overrides", label: "Rules Overrides", icon: "□" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "□" },
       ],
     },
@@ -1310,6 +1337,7 @@ function buildSidebar() {
         { route: "/config/skills-registry", label: "skills", icon: "□", superOnly: true },
         { route: "/config/mcp-registry", label: "mcp registry", icon: "□", superOnly: true },
         { route: "/config/dod-presets", label: "dod presets", icon: "□", superOnly: true },
+        { route: "/config/rules-presets", label: "rules presets", icon: "□", superOnly: true },
         { route: "/config/delegation-syntax", label: "delegation", icon: "□", superOnly: true },
         { route: "/config/export", label: "export", icon: "□", superOnly: true },
       ],
@@ -1319,6 +1347,7 @@ function buildSidebar() {
       items: [
         { route: "/roles", label: "Roles & graph", icon: "▣" },
         { route: "/pipelines", label: "Pipelines", icon: "↦" },
+        { route: "/reflection-pairs", label: "Reflection pairs", icon: "↻" },
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
         { route: "/config-audit", label: "Config audit", icon: "✓" },
       ],
@@ -2213,6 +2242,437 @@ async function viewDelegationSyntax() {
 }
 
 /* =========================================================================
+ * Views — Rules presets (Phase 3g)
+ * ========================================================================= */
+async function viewRulesPresets() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["rules-presets.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/rules-presets"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.presets = data.presets || {};
+  const presets = data.presets;
+
+  // Collect every rule referenced across all presets
+  const knownRules = new Set();
+  for (const p of Object.values(presets)) {
+    if (p && typeof p === "object") {
+      for (const k of Object.keys(p)) knownRules.add(k);
+    }
+  }
+  const rules = [...knownRules].sort();
+
+  const GEMINI_OPTIONS = ["", "skip"];
+  const status = el("div", { class: "muted" }, [`${Object.keys(presets).length} presets · ${rules.length} rules`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/rules-presets", data);
+      toast("rules-presets saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  for (const [pName, preset] of Object.entries(presets)) {
+    if (!preset || typeof preset !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    const ruleCount = Object.keys(preset).length;
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [`${pName} (${ruleCount} rules)`]));
+
+    const rulesHere = new Set(Object.keys(preset));
+
+    // Add-rule row
+    const addRow = el("div", { class: "field-row", style: "margin-bottom:12px;" });
+    const addSel = el("select");
+    addSel.appendChild(el("option", { value: "" }, ["— add rule —"]));
+    for (const r of rules) {
+      if (!rulesHere.has(r)) addSel.appendChild(el("option", { value: r }, [r]));
+    }
+    addSel.appendChild(el("option", { value: "__new__" }, ["+ new rule…"]));
+    addSel.addEventListener("change", () => {
+      if (addSel.value === "__new__") {
+        const name = prompt("New rule name (e.g. my-rule):", "");
+        if (name && !preset[name]) { preset[name] = {}; rules.push(name); markDirty(); renderPreset(); }
+        addSel.value = "";
+        return;
+      }
+      if (addSel.value && !preset[addSel.value]) {
+        preset[addSel.value] = {};
+        markDirty();
+        renderPreset();
+      }
+      addSel.value = "";
+    });
+    addRow.appendChild(el("label", { class: "field-label" }, ["Add rule:"]));
+    addRow.appendChild(addSel);
+
+    const rulesWrap = el("div");
+    const renderPreset = () => {
+      rulesWrap.replaceChildren();
+      for (const [rule, opts] of Object.entries(preset)) {
+        if (!opts || typeof opts !== "object") continue;
+        const row = el("div", { class: "field-row", style: "align-items:center; gap:12px; margin-bottom:6px;" });
+        row.appendChild(el("span", { style: "min-width:160px; font-family:monospace;" }, [rule]));
+
+        const alwaysCb = el("input", { type: "checkbox" });
+        alwaysCb.checked = !!opts.alwaysApply;
+        alwaysCb.addEventListener("change", () => { opts.alwaysApply = alwaysCb.checked; markDirty(); });
+        const l1 = el("label", { class: "toggle", style: "margin-right:8px;" });
+        l1.appendChild(alwaysCb); l1.appendChild(el("span", { class: "slider" }));
+        const f1 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        f1.appendChild(l1);
+        f1.appendChild(el("span", { style: "font-size:0.85em;" }, ["alwaysApply"]));
+        row.appendChild(f1);
+
+        const embedCb = el("input", { type: "checkbox" });
+        embedCb.checked = !!opts.embed;
+        embedCb.addEventListener("change", () => { opts.embed = embedCb.checked; markDirty(); });
+        const l2 = el("label", { class: "toggle", style: "margin-right:8px;" });
+        l2.appendChild(embedCb); l2.appendChild(el("span", { class: "slider" }));
+        const f2 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        f2.appendChild(l2);
+        f2.appendChild(el("span", { style: "font-size:0.85em;" }, ["embed"]));
+        row.appendChild(f2);
+
+        // Gemini
+        const gemSel = el("select");
+        for (const g of GEMINI_OPTIONS) {
+          const o = el("option", { value: g }, [g || "(none)"]);
+          if ((opts.gemini || "") === g) o.selected = true;
+          gemSel.appendChild(o);
+        }
+        gemSel.addEventListener("change", () => {
+          if (gemSel.value) { opts.gemini = gemSel.value; } else { delete opts.gemini; }
+          markDirty();
+        });
+        const f3 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        f3.appendChild(gemSel);
+        f3.appendChild(el("span", { style: "font-size:0.85em;" }, ["gemini"]));
+        row.appendChild(f3);
+
+        const rm = el("button", { class: "btn btn-danger", title: "Remove rule from this preset" }, ["×"]);
+        rm.addEventListener("click", () => { delete preset[rule]; markDirty(); renderPreset(); });
+        row.appendChild(rm);
+        rulesWrap.appendChild(row);
+      }
+    };
+    renderPreset();
+    panel.appendChild(addRow);
+    panel.appendChild(rulesWrap);
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Project DoD Overrides
+ * ========================================================================= */
+async function viewProjectDodOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — DoD Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override individual DoD criteria on top of the selected dod-preset. Precedence: dod override > dod-preset > full.",
+  ]));
+
+  const [data, dodPresetsResp] = await Promise.all([
+    loadProject(),
+    api.get("/api/config/dod-presets").catch(() => null),
+  ]);
+
+  const presets = (dodPresetsResp && dodPresetsResp.presets) ? dodPresetsResp.presets : {};
+  const activePreset = data["dod-preset"] || "full";
+  const presetDefaults = presets[activePreset] || presets["full"] || {};
+
+  const knownCols = new Set(["req-traceability", "tests-required", "codebase-overview", "security-audit", "se-required"]);
+  for (const p of Object.values(presets)) {
+    if (p && typeof p === "object") for (const k of Object.keys(p)) knownCols.add(k);
+  }
+  const criteria = [...knownCols];
+
+  const overrides = (data.dod && typeof data.dod === "object") ? clone(data.dod) : {};
+
+  const status = el("div", { class: "muted" });
+  const contentWrap = el("div");
+
+  const render = () => {
+    const cleaned = Object.keys(overrides).filter(k => overrides[k] !== undefined && overrides[k] !== "" && overrides[k] !== null).length;
+    status.textContent = `Active preset: ${activePreset}. ${cleaned} overrides active.`;
+    contentWrap.replaceChildren();
+
+    const panel = el("div", { class: "panel" });
+    panel.appendChild(el("h2", {}, [`Overrides (on top of "${activePreset}" preset)`]));
+
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Criterion", "Preset Default", "Override", "Active Value"].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    for (const c of criteria) {
+      const tr = el("tr");
+      tr.appendChild(el("td", { class: "mono" }, [c]));
+      tr.appendChild(el("td", { class: "muted" }, [String(presetDefaults[c] ?? "false")]));
+
+      const overrideTd = el("td");
+      if (c === "se-required") {
+        const sel = el("select");
+        for (const v of ["", "false", "recommended", "true"]) {
+          const o = el("option", { value: v }, [v || "(no override)"]);
+          if ((overrides[c] || "") === v) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", () => {
+          if (sel.value) { overrides[c] = sel.value; } else { delete overrides[c]; }
+          render();
+        });
+        overrideTd.appendChild(sel);
+      } else {
+        const sel = el("select");
+        const curVal = c in overrides ? String(overrides[c]) : "";
+        const selOpts = [["", "(no override)"], ["true", "true"], ["false", "false"]];
+        for (const [v, label] of selOpts) {
+          const o = el("option", { value: v }, [label]);
+          if (curVal === v) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", () => {
+          if (sel.value === "") { delete overrides[c]; } else { overrides[c] = sel.value === "true"; }
+          render();
+        });
+        overrideTd.appendChild(sel);
+      }
+      tr.appendChild(overrideTd);
+
+      const activeVal = c in overrides ? String(overrides[c]) : String(presetDefaults[c] ?? "false");
+      const activeTd = el("td");
+      activeTd.appendChild(el("span", { class: `badge ${c in overrides ? "warn" : "ok"}` }, [activeVal]));
+      tr.appendChild(activeTd);
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    panel.appendChild(table);
+    contentWrap.appendChild(panel);
+  };
+  render();
+
+  wrap.appendChild(status);
+  wrap.appendChild(contentWrap);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        const clean = {};
+        for (const k of Object.keys(overrides)) {
+          if (overrides[k] !== undefined && overrides[k] !== "" && overrides[k] !== null) {
+            clean[k] = overrides[k];
+          }
+        }
+        await saveProjectSection("dod", clean, status);
+      } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Project Rules Overrides
+ * ========================================================================= */
+async function viewProjectRulesOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Rules Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override individual rule settings on top of the selected rules-preset. Precedence: rules override > rules-preset > default.",
+  ]));
+
+  const [data, rulesPresetsResp] = await Promise.all([
+    loadProject(),
+    api.get("/api/config/rules-presets").catch(() => null),
+  ]);
+
+  const presets = (rulesPresetsResp && rulesPresetsResp.presets) ? rulesPresetsResp.presets : {};
+  const activePreset = data["rules-preset"] || "default";
+  const presetRules = presets[activePreset] || presets["default"] || {};
+
+  // Collect all known rules across all presets
+  const allRules = new Set(Object.keys(presetRules));
+  for (const p of Object.values(presets)) {
+    if (p && typeof p === "object") {
+      for (const k of Object.keys(p)) allRules.add(k);
+    }
+  }
+  // Also include any rules currently in project overrides
+  const projectOverrides = (data.rules && typeof data.rules === "object") ? clone(data.rules) : {};
+  for (const k of Object.keys(projectOverrides)) allRules.add(k);
+
+  const rules = [...allRules].sort();
+  const GEMINI_OPTIONS = ["", "skip"];
+
+  // Merge: project override wins, preset provides defaults
+  const resolved = {};
+  for (const r of rules) {
+    if (r in projectOverrides) {
+      resolved[r] = Object.assign({}, presetRules[r] || {}, projectOverrides[r] || {});
+    } else if (r in presetRules) {
+      resolved[r] = Object.assign({}, presetRules[r]);
+    } else {
+      resolved[r] = {};
+    }
+  }
+
+  const status = el("div", { class: "muted" }, [`Active preset: ${activePreset}. ${Object.keys(projectOverrides).length} overrides active.`]);
+  wrap.appendChild(status);
+
+  // Show each rule
+  for (const rule of rules) {
+    const presetCfg = presetRules[rule] || {};
+    const overrideCfg = projectOverrides[rule] || {};
+
+    const panel = el("details", { class: "panel", open: !!(rule in projectOverrides) });
+    const overridden = rule in projectOverrides;
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
+      rule,
+      overridden ? el("span", { class: "badge warn", style: "margin-left:8px;" }, ["overridden"]) : "",
+    ]));
+
+    const row = el("div", { class: "field-row", style: "align-items:center; gap:16px; flex-wrap:wrap;" });
+
+    // alwaysApply
+    const presetAlways = presetCfg.alwaysApply !== undefined ? String(presetCfg.alwaysApply) : "true (default)";
+    const overrideAlways = overrideCfg.alwaysApply !== undefined ? String(overrideCfg.alwaysApply) : "";
+    const alwaysLabel = el("span", { style: "font-size:0.85em;" }, [`alwaysApply (preset: ${presetAlways})`]);
+    const alwaysSel = el("select");
+    for (const v of ["", "true", "false"]) {
+      const o = el("option", { value: v }, [v || "(preset default)"]);
+      if (overrideAlways === v) o.selected = true;
+      alwaysSel.appendChild(o);
+    }
+    alwaysSel.addEventListener("change", () => {
+      if (alwaysSel.value === "") {
+        delete overrideCfg.alwaysApply;
+      } else {
+        overrideCfg.alwaysApply = alwaysSel.value === "true";
+      }
+      if (Object.keys(overrideCfg).length === 0) {
+        delete projectOverrides[rule];
+      } else {
+        projectOverrides[rule] = overrideCfg;
+      }
+      updateStatus();
+    });
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [alwaysLabel, alwaysSel]));
+
+    // embed
+    const presetEmbed = presetCfg.embed !== undefined ? String(presetCfg.embed) : "true (default)";
+    const overrideEmbed = overrideCfg.embed !== undefined ? String(overrideCfg.embed) : "";
+    const embedLabel = el("span", { style: "font-size:0.85em;" }, [`embed (preset: ${presetEmbed})`]);
+    const embedSel = el("select");
+    for (const v of ["", "true", "false"]) {
+      const o = el("option", { value: v }, [v || "(preset default)"]);
+      if (overrideEmbed === v) o.selected = true;
+      embedSel.appendChild(o);
+    }
+    embedSel.addEventListener("change", () => {
+      if (embedSel.value === "") {
+        delete overrideCfg.embed;
+      } else {
+        overrideCfg.embed = embedSel.value === "true";
+      }
+      if (Object.keys(overrideCfg).length === 0) {
+        delete projectOverrides[rule];
+      } else {
+        projectOverrides[rule] = overrideCfg;
+      }
+      updateStatus();
+    });
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [embedLabel, embedSel]));
+
+    // gemini
+    const presetGemini = presetCfg.gemini || "";
+    const overrideGemini = overrideCfg.gemini || "";
+    const gemLabel = el("span", { style: "font-size:0.85em;" }, [`gemini (preset: ${presetGemini || "(none)"})`]);
+    const gemSel = el("select");
+    for (const v of GEMINI_OPTIONS) {
+      const o = el("option", { value: v }, [v || "(preset default)"]);
+      if (overrideGemini === v) o.selected = true;
+      gemSel.appendChild(o);
+    }
+    gemSel.addEventListener("change", () => {
+      if (gemSel.value === "") {
+        delete overrideCfg.gemini;
+      } else {
+        overrideCfg.gemini = gemSel.value;
+      }
+      if (Object.keys(overrideCfg).length === 0) {
+        delete projectOverrides[rule];
+      } else {
+        projectOverrides[rule] = overrideCfg;
+      }
+      updateStatus();
+    });
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [gemLabel, gemSel]));
+
+    panel.appendChild(row);
+    wrap.appendChild(panel);
+  }
+
+  const updateStatus = () => {
+    status.textContent = `Active preset: ${activePreset}. ${Object.keys(projectOverrides).length} overrides active.`;
+  };
+
+  // Add custom rule
+  const addPanel = el("details", { class: "panel" });
+  addPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["+ Add custom rule override"]));
+  const addRow = el("div", { class: "field-row", style: "gap:8px; align-items:center;" });
+  const nameInp = el("input", { type: "text", placeholder: "rule name (e.g. my-rule)" });
+  const addBtn = el("button", { class: "btn" }, ["Add"]);
+  addBtn.addEventListener("click", () => {
+    const name = nameInp.value.trim();
+    if (!name) { toast("Enter a rule name", "warning"); return; }
+    projectOverrides[name] = projectOverrides[name] || {};
+    nameInp.value = "";
+    viewProjectRulesOverrides().then(newView => {
+      wrap.replaceChildren(...(newView.children || []));
+    });
+  });
+  addRow.appendChild(nameInp);
+  addRow.appendChild(addBtn);
+  addPanel.appendChild(addRow);
+  wrap.appendChild(addPanel);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        // Remove empty override objects
+        for (const [k, v] of Object.entries(projectOverrides)) {
+          if (!v || (typeof v === "object" && Object.keys(v).length === 0)) {
+            delete projectOverrides[k];
+          }
+        }
+        await saveProjectSection("rules", projectOverrides, status);
+      } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Export config (Phase 3f)
  * ========================================================================= */
 async function viewExport() {
@@ -2384,6 +2844,7 @@ async function viewPipelines() {
     el("button", { class: "btn btn-primary", onclick: savePipelines }, ["Save pipelines"]),
     el("button", { class: "btn", onclick: addPipelinePrompt }, ["Add pipeline"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+    el("button", { class: "btn btn-ghost", title: "Pipelines help", onclick: () => showPipelineHelp() }, ["?"]),
   ]);
   wrap.appendChild(toolbar);
 
@@ -2408,7 +2869,22 @@ async function viewPipelines() {
     const pipeline = pipelines[name];
     if (!pipeline || typeof pipeline !== "object") return el("div");
     const block = el("div", { class: "pipeline-block panel" });
+    const enabled = pipeline.enabled !== false;  // default: true
+    const enabledLabel = el("span", { style: "font-size:10px; color: var(--text-muted); font-family: var(--font-mono);" }, [enabled ? "ENABLED" : "DISABLED"]);
+    const toggleWrap = el("label", { class: "toggle", style: "margin-right:8px;" });
+    const toggleCb = el("input", { type: "checkbox" });
+    toggleCb.checked = enabled;
+    toggleCb.addEventListener("change", () => {
+      pipeline.enabled = toggleCb.checked;
+      enabledLabel.textContent = toggleCb.checked ? "ENABLED" : "DISABLED";
+    });
+    toggleWrap.appendChild(toggleCb);
+    toggleWrap.appendChild(el("span", { class: "slider" }));
     const header = el("div", { class: "panel-title" }, [
+      el("div", { style: "display:flex; align-items:center; gap:8px;" }, [
+        toggleWrap,
+        enabledLabel,
+      ]),
       el("h2", { style: "margin:0;" }, [name]),
       el("button", {
         class: "btn btn-danger",
@@ -2819,6 +3295,253 @@ async function viewSync() {
 }
 
 /* =========================================================================
+ * Views — Reflection Pairs
+ * CRUD editor for the reflection_pairs list in role-defaults.yaml.
+ * ========================================================================= */
+async function viewReflectionPairs() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Reflection pairs"]));
+
+  let envelope;
+  let hierarchy;
+  try {
+    [envelope, hierarchy] = await Promise.all([
+      api.get("/api/reflection-pairs"),
+      api.get("/api/agents/hierarchy"),
+    ]);
+  } catch (err) {
+    toast(err.message, "error");
+    wrap.appendChild(el("div", { class: "empty" }, ["Could not load reflection pairs."]));
+    return wrap;
+  }
+
+  const pairs = Array.isArray(envelope.reflection_pairs) ? envelope.reflection_pairs : [];
+  const agentNames = (hierarchy.roles || []).map(r => r.name).sort();
+  const onBlockedOptions = ["escalate_to_orchestrator", "skip", "abort", "retry"];
+
+  const status = el("div", { class: "muted" }, [`${pairs.length} reflection pair(s).`]);
+  wrap.appendChild(status);
+
+  const savePairs = async () => {
+    try {
+      await api.put("/api/reflection-pairs", { reflection_pairs: pairs });
+      toast("Reflection pairs saved", "success");
+      status.textContent = `${pairs.length} reflection pair(s) (saved).`;
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  };
+
+  const addPair = () => {
+    pairs.push({
+      id: `pair-${pairs.length + 1}`,
+      generator: agentNames[0] || "developer",
+      critic: agentNames[1] || "code-reviewer",
+      max_iterations: 3,
+      on_blocked: "escalate_to_orchestrator",
+    });
+    render();
+  };
+
+  const toolbar = el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: savePairs }, ["Save pairs"]),
+    el("button", { class: "btn", onclick: addPair }, ["Add pair"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]);
+  wrap.appendChild(toolbar);
+
+  const container = el("div", { class: "pipelines-container" });
+  wrap.appendChild(container);
+
+  function render() {
+    container.replaceChildren();
+    if (!pairs.length) {
+      container.appendChild(el("div", { class: "empty" }, ['No reflection pairs defined — click "Add pair".']));
+      return;
+    }
+    pairs.forEach((pair, idx) => {
+      const block = el("div", { class: "pipeline-block panel" });
+      const header = el("div", { class: "panel-title" }, [
+        el("h2", { style: "margin:0;" }, [pair.id || `(pair ${idx + 1})`]),
+        el("button", {
+          class: "btn btn-danger",
+          onclick: () => {
+            if (!confirm(`Delete reflection pair "${pair.id || idx + 1}"?`)) return;
+            pairs.splice(idx, 1);
+  function showPipelineHelp() {
+    api.get("/api/pipelines?help").then(data => {
+      const h = data.help;
+      if (!h) { showModal("Help", "No help data available."); return; }
+      const body = el("div");
+      body.appendChild(el("p", {}, [h.description]));
+
+      const structSec = el("div");
+      structSec.appendChild(el("h3", {}, ["Pipeline Structure"]));
+      structSec.appendChild(el("pre", { style: "max-height:200px;" }, [JSON.stringify(h.pipeline_structure, null, 2)]));
+      body.appendChild(structSec);
+
+      const modesSec = el("div");
+      modesSec.appendChild(el("h3", {}, ["Stage Modes"]));
+      const modesList = el("ul");
+      for (const [mode, desc] of Object.entries(h.stage_modes_explained || {})) {
+        modesList.appendChild(el("li", {}, [el("code", {}, [mode]), ` — ${desc}`]));
+      }
+      modesSec.appendChild(modesList);
+      body.appendChild(modesSec);
+
+      const epSec = el("div");
+      epSec.appendChild(el("h3", {}, ["API Endpoints"]));
+      for (const [ep, info] of Object.entries(h.endpoints || {})) {
+        const epBlock = el("div", { class: "panel", style: "padding:10px 14px; margin-bottom:8px;" });
+        epBlock.appendChild(el("h4", { style: "margin:0 0 6px;" }, [ep]));
+        epBlock.appendChild(el("p", { style: "margin:0 0 4px;" }, [info.description]));
+        if (info.warning) {
+          epBlock.appendChild(el("div", { class: "error-box", style: "margin:4px 0;" }, [info.warning]));
+        }
+        if (info.body) epBlock.appendChild(el("pre", {}, [info.body]));
+        if (info.example) epBlock.appendChild(el("code", {}, [info.example]));
+        body.appendChild(epBlock);
+      }
+
+      if (h.available_pipelines && h.available_pipelines.length) {
+        body.appendChild(el("p", {}, [
+          "Available pipelines: ",
+          el("code", {}, [h.available_pipelines.join(", ")]),
+        ]));
+      }
+      showModal("Pipelines Help", body);
+    }).catch(err => {
+      showModal("Help Error", `Failed to load help: ${err.message}`);
+    });
+  }
+
+  render();
+          },
+        }, ["Delete pair"]),
+      ]);
+      block.appendChild(header);
+
+      const idField = el("div", { class: "field" });
+      idField.appendChild(el("label", { class: "field-label" }, ["ID"]));
+      const idInp = el("input", { type: "text", value: pair.id || "" });
+      idInp.addEventListener("input", () => { pair.id = idInp.value; });
+      idField.appendChild(idInp);
+      block.appendChild(idField);
+
+      const genField = el("div", { class: "field" });
+      genField.appendChild(el("label", { class: "field-label" }, ["Generator"]));
+      const genSel = el("select");
+      for (const name of agentNames) {
+        const o = el("option", { value: name }, [name]);
+        if (name === pair.generator) o.selected = true;
+        genSel.appendChild(o);
+      }
+      genSel.addEventListener("change", () => { pair.generator = genSel.value; });
+      genField.appendChild(genSel);
+      block.appendChild(genField);
+
+      const critField = el("div", { class: "field" });
+      critField.appendChild(el("label", { class: "field-label" }, ["Critic"]));
+      const critSel = el("select");
+      for (const name of agentNames) {
+        const o = el("option", { value: name }, [name]);
+        if (name === pair.critic) o.selected = true;
+        critSel.appendChild(o);
+      }
+      critSel.addEventListener("change", () => { pair.critic = critSel.value; });
+      critField.appendChild(critSel);
+      block.appendChild(critField);
+
+      const iterField = el("div", { class: "field" });
+      iterField.appendChild(el("label", { class: "field-label" }, ["Max iterations"]));
+      const iterInp = el("input", { type: "number", min: 1, value: pair.max_iterations || 3 });
+      iterInp.addEventListener("input", () => { pair.max_iterations = parseInt(iterInp.value, 10) || 1; });
+      iterField.appendChild(iterInp);
+      block.appendChild(iterField);
+
+      const blockField = el("div", { class: "field" });
+      blockField.appendChild(el("label", { class: "field-label" }, ["On blocked"]));
+      const blockSel = el("select");
+      for (const opt of onBlockedOptions) {
+        const o = el("option", { value: opt }, [opt]);
+        if ((pair.on_blocked || "escalate_to_orchestrator") === opt) o.selected = true;
+        blockSel.appendChild(o);
+      }
+      blockSel.addEventListener("change", () => { pair.on_blocked = blockSel.value; });
+      blockField.appendChild(blockSel);
+      block.appendChild(blockField);
+
+      container.appendChild(block);
+    });
+    status.textContent = `${pairs.length} reflection pair(s).`;
+    status.style.color = "";
+  }
+
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Model Mapping
+ * Matrix view: rows = roles, columns = providers, cells = resolved model ID.
+ * Reads /api/model-mapping which uses the same resolution logic as sync.py.
+ * ========================================================================= */
+async function viewModelMapping() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Agent → Model Mapping"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Resolved model ID for every active role across all configured providers. "
+  ]));
+
+  let data;
+  try {
+    data = await api.get("/api/model-mapping");
+  } catch (err) {
+    toast(err.message, "error");
+    wrap.appendChild(el("div", { class: "empty" }, ["Could not load model mapping."]));
+    return wrap;
+  }
+
+  const providers = data.providers || [];
+  const roles = data.roles || [];
+
+  const status = el("div", { class: "muted" }, [
+    `${roles.length} roles × ${providers.length} providers.`
+  ]);
+  wrap.appendChild(status);
+
+  const table = el("table", { class: "data-table" });
+  const thead = el("thead");
+  const headerRow = el("tr", {}, [el("th", {}, ["Role"])]);
+  for (const p of providers) {
+    headerRow.appendChild(el("th", {}, [p]));
+  }
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = el("tbody");
+  for (const row of roles) {
+    const tr = el("tr");
+    tr.appendChild(el("td", {}, [row.name]));
+    for (const p of providers) {
+      const cell = row.mappings && row.mappings[p] ? row.mappings[p] : {};
+      const modelId = cell.model_id || "—";
+      const source = cell.source || "";
+      const sourceClass = source === "explicit-override" ? "badge required" : "badge optional";
+      tr.appendChild(el("td", {}, [
+        el("div", {}, [modelId]),
+        el("span", { class: sourceClass }, [source])
+      ]));
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Config Audit
  * Detects deprecated roles, missing templates, missing role-defaults and
  * orphaned pipeline references in the active project.yaml. Mirrors the
@@ -2972,7 +3695,7 @@ async function loadProject() {
 /** Save one top-level section of project.yaml via the partial-update route. */
 async function saveProjectSection(key, value, statusEl) {
   try {
-    await api.put("/api/config/project/section", { key, value });
+    await api.put("/api/config/project/section", { section: key, data: value });
     toast(`Saved project.${key}`, "success");
     if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
   } catch (err) {
@@ -4987,13 +5710,14 @@ async function viewTierPresets() {
         tr.appendChild(el("td", {}, [el("span", { class: "mono" }, [pName])]));
 
         const providerTiers = (providersMap[pName] || {})["model-tiers"] || {};
+        const providerSpecificTiers = ((preset.providers || {})[pName] || {}).tiers || {};
         TIERS.forEach(tier => {
           let fullId;
-          if (presetTiers) {
-            // New format: value IS the resolved model id
+          if (providerSpecificTiers[tier]) {
+            fullId = providerSpecificTiers[tier];
+          } else if (presetTiers) {
             fullId = presetTiers[tier] || tier;
           } else {
-            // Old format: mapping + provider model-tiers lookup
             const mappedTier = mapping[tier] || tier;
             fullId = providerTiers[mappedTier] || mappedTier;
           }
@@ -5212,6 +5936,8 @@ async function init() {
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/model-overrides", viewProjectModelOverrides);
   router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
+  router.register("/project/dod-overrides", viewProjectDodOverrides);
+  router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/advanced",        viewProjectAdvanced);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
@@ -5220,11 +5946,14 @@ async function init() {
   router.register("/config/skills-registry",   viewSkillsRegistry);
   router.register("/config/mcp-registry",      viewMcpRegistry);
   router.register("/config/dod-presets",       viewDodPresets);
+  router.register("/config/rules-presets",     viewRulesPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
   router.register("/config-audit",             viewConfigAudit);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
+  router.register("/reflection-pairs", viewReflectionPairs);
+  router.register("/project/model-mapping", viewModelMapping);
   router.register("/agents",    viewAgentTemplates);
   router.register("/models", viewModels);
   router.register("/provider-tiers", viewProviderTiers);

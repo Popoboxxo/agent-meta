@@ -1,0 +1,944 @@
+# Zentrale Rollen-Konfiguration für agent-meta.
+# Definiert alle bekannten Rollen, empfohlene Modelle, Memory-Scopes und Kurzbeschreibungen.
+# Wird von sync.py beim Generieren gelesen.
+#
+# model: Modell-Tier für diese Rolle. Leer = erbt vom Parent-Kontext (kein model:-Feld).
+#   Tier-Namen (provider-agnostisch, empfohlen):
+#     nano     — ultra-schnell, minimale Kosten (z.B. einfache Formatierungen)
+#     fast     — schnell & günstig (z.B. git, meta-feedback, docker)
+#     balanced — guter Kompromiss Kosten/Qualität (Standard für dev, docs, review)
+#     powerful — starkes Reasoning (z.B. security-audit, komplexe Architektur)
+#     max      — maximale Kapazität, reserviert für zukünftige Ultra-Modelle
+#   Rückwärtskompatibel: 'haiku', 'sonnet', 'opus' funktionieren als Claude-Aliase.
+#   Volle Modell-IDs ('claude-sonnet-4-6') werden direkt übergeben (kein Tier-Lookup).
+#   Provider-Mapping: config/ai-providers.yaml → model-tiers pro Provider.
+#   Projekte überschreiben via 'model-overrides' in .meta-config/project.yaml.
+#
+# memory: persistentes Agenten-Gedächtnis über Sessions hinweg. Leer = kein Gedächtnis.
+#   Gültige Werte: 'project' (.claude/agent-memory/<name>/, in git),
+#                  'local' (.claude/agent-memory-local/<name>/, gitignored),
+#                  'user' (~/.claude/agent-memory/<name>/, maschinenlokal).
+#   Projekte überschreiben via 'memory-overrides' in .meta-config/project.yaml.
+#
+# permission_mode: Claude Code Berechtigungsmodus. Leer = Standard (kein Frontmatter-Feld).
+#   Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only).
+#   Projekte überschreiben via 'permission-mode-overrides' in .meta-config/project.yaml.
+#
+# steps: Maximale Iterationen für Opencode-Agenten. Leer = kein Limit (kein steps:-Feld).
+#   Gültige Werte: positive Ganzzahl (z.B. 10, 25).
+#   Projekte überschreiben via 'steps-overrides' in .meta-config/project.yaml.
+#
+# workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
+#   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
+#
+# temperature: Sampling-Temperatur. Optional. Float 0.0–1.0. Leer = Provider-Default.
+# max_tokens: Max Output-Tokens. Optional. Positive Ganzzahl. Leer = Provider-Default.
+
+roles:
+
+  orchestrator:
+    model: "balanced"     # Routing/Delegation braucht Reasoning; balanced ist der richtige Kompromiss
+    memory: ""
+    workflow_tier: required
+    description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
+    handoff:
+      output_contract: "task-spec-v1"
+      handoff_routing: "static"
+
+  developer:
+    model: powerful          # erbt — oft das stärkste verfügbare Modell gewünscht
+    memory: ""
+    workflow_tier: required
+    description: "Feature-Implementierung und Bugfixes"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 300
+
+  junior-developer:
+    model: fast              # günstige Stufe — triviale, klar umrissene Änderungen
+    memory: ""
+    workflow_tier: optional
+    description: "Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 120
+
+  senior-developer:
+    model: max               # höchste Stufe — Architektur, komplexe Bugs, Risiko-Pfade
+    memory: project          # Architektur-Entscheidungen über Sessions hinweg erinnern
+    workflow_tier: optional
+    description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 600
+
+  requirements:
+    model: balanced
+    memory: project
+    workflow_tier: recommended
+    description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
+    handoff:
+      input_contracts: ["ideation-output-v1", "task-spec-v1"]
+      output_contract: "req-output-v1"
+      target_roles: ["developer", "tester"]
+
+  ideation:
+    model: ""           # erbt
+    memory: ""
+    workflow_tier: optional
+    description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
+    handoff:
+      output_contract: "ideation-output-v1"
+      output_schema: "schemas/handoffs/ext/ideation-extension.schema.json"
+      target_roles: ["requirements"]
+
+  feature:
+    model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
+    memory: ""
+    workflow_tier: recommended
+    description: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "feature-result-v1"
+
+  tester:
+    model: balanced
+    memory: ""
+    workflow_tier: recommended
+    description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
+    handoff:
+      input_contracts: ["task-spec-v1", "req-output-v1"]
+      output_contract: "test-result-v1"
+
+  validator:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: recommended
+    description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
+    handoff:
+      input_contracts: ["task-spec-v1", "dev-result-v1"]
+      validate_handoff: true
+      output_schema: "schemas/a2a-handoff.schema.json"
+
+  documenter:
+    model: fast
+    memory: project
+    workflow_tier: recommended
+    description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
+
+  security-auditor:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
+
+  agent-meta-scout:
+    model: balanced
+    memory: local
+    workflow_tier: optional
+    description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
+
+  prompt-engineer:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera)."
+
+  agent-meta-manager:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
+
+  release:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
+
+  git:
+    model: fast
+    memory: ""
+    workflow_tier: required
+    description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
+
+  meta-feedback:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
+
+  docker:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
+
+  log-analyzer:
+    model: balanced
+    memory: ""
+    workflow_tier: required
+    description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
+
+  feedback:
+    model: fast
+    memory: ""
+    workflow_tier: required
+    description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
+
+  bug-feature-analyzer:
+    model: balanced
+    memory: ""
+    workflow_tier: recommended
+    description: "Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation"
+
+  openscad-developer:
+    model: balanced
+    memory: local
+    workflow_tier: optional
+    description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
+
+  se-requirements:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "se-req-output-v1"
+      target_roles: ["se-critic"]
+
+  se-architect:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität)."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "se-arch-output-v1"
+      output_schema: "schemas/se-decomposition.schema.json"
+      target_roles: ["se-critic"]
+
+  se-critic:
+    model: powerful
+    memory: ""
+    workflow_tier: optional
+    description: "Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit."
+    handoff:
+      input_contracts: ["se-arch-output-v1"]
+      output_contract: "critic-result-v1"
+      target_roles: ["se-architect", "se-interface-mgr"]
+
+  se-interface-mgr:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend."
+    handoff:
+      input_contracts: ["critic-result-v1"]
+      output_contract: "interface-result-v1"
+      target_roles: ["se-termination"]
+
+  se-termination:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde."
+    handoff:
+      input_contracts: ["interface-result-v1"]
+      output_contract: "termination-result-v1"
+
+  se-orchestrator:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    deprecated: true
+    deprecated_by: "orchestrator"
+    description: "DEPRECATED — SE-Funktionalität wird nun direkt vom orchestrator via SE-Mode übernommen. Wird nur aus Backward-Compatibility-Gründen behalten."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "task-spec-v1"
+      target_roles: ["se-architect", "se-requirements", "se-junior-developer", "se-developer", "se-senior-developer"]
+
+  se-junior-developer:
+    model: fast              # günstige Stufe — triviale SE-Leafs, 0-1 Interfaces
+    memory: ""
+    workflow_tier: optional
+    parallel: true
+    description: "Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 120
+
+  se-developer:
+    model: powerful          # Standard-SE-Leafs mit mehreren Interfaces
+    memory: ""
+    workflow_tier: optional
+    parallel: true
+    description: "Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 300
+
+  se-senior-developer:
+    model: max               # höchste Stufe — komplexe SE-Leafs, cross-cutting, boundary-level
+    memory: project          # Architektur-/Interface-Entscheidungen über Sessions hinweg erinnern
+    workflow_tier: optional
+    parallel: true
+    description: "Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse"
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "dev-result-v1"
+      input_schema: "schemas/handoffs/task-spec.schema.json"
+      timeout_sec: 600
+
+  se-test-engineer:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel."
+
+  se-testreviewer:
+    model: powerful
+    memory: ""
+    permission_mode: plan
+    workflow_tier: optional
+    description: "Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness."
+
+  se-verifier:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen."
+
+  se-validator:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse."
+
+  se-integration-and-test-manager:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen."
+
+  code-reviewer:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: recommended
+    description: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+    handoff:
+      input_contracts: ["dev-result-v1"]
+      output_contract: "review-output-v1"
+      output_schema: "schemas/handoffs/ext/review-extension.schema.json"
+      target_roles: ["developer"]
+
+  concept-reviewer:
+    model: powerful
+    memory: ""
+    permission_mode: plan
+    workflow_tier: optional
+    description: "Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops"
+    handoff:
+      input_contracts: ["ideation-output-v1"]
+      output_contract: "concept-review-v1"
+
+  ui-ux-designer:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "UI-Spezifikationen, Mockups und Design-Systeme erstellen."
+    handoff:
+      output_contract: "design-spec-v1"
+      output_schema: "schemas/handoffs/ext/design-extension.schema.json"
+      target_roles: ["developer"]
+
+  api-specialist:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: "OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen."
+    handoff:
+      output_contract: "api-spec-v1"
+      output_schema: "schemas/handoffs/ext/api-extension.schema.json"
+      target_roles: ["developer"]
+
+  devops-engineer:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "CI/CD, Infrastructure as Code, Kubernetes, Observability."
+
+  performance-optimizer:
+    model: powerful
+    memory: ""
+    workflow_tier: optional
+    description: "Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung."
+
+  export-manager:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."
+
+  effort-estimator:
+    model: fast
+    memory: ""
+    workflow_tier: optional
+    description: "Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung"
+
+  explorer:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche."
+    handoff:
+      input_contracts: ["task-spec-v1"]
+      output_contract: "explorer-output-v1"
+      target_roles: ["developer", "ideation", "code-reviewer"]
+
+  claude-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+
+  gemini-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+
+  opencode-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+
+  continue-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+
+  copilot-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+
+outcome-caching:
+  enabled: false
+  ttl_seconds: 3600
+  max_entries: 100
+  invalidation: git-commit
+
+reflection_pairs:
+  - id: dev-review-loop
+    generator: developer
+    critic: code-reviewer
+    max_iterations: 3
+    on_blocked: escalate_to_orchestrator
+
+  - id: se-requirements-loop
+    generator: se-requirements
+    critic: se-critic
+    max_iterations: 3
+
+  - id: se-architect-loop
+    generator: se-architect
+    critic: se-critic
+    max_iterations: 3
+
+  - id: se-test-loop
+    generator: se-test-engineer
+    critic: se-testreviewer
+    max_iterations: 3
+
+  - id: se-dev-review-loop
+    generator: se-developer
+    critic: code-reviewer
+    max_iterations: 3
+    on_blocked: escalate_to_orchestrator
+
+quality_pipelines:
+  standard-feature:
+    description: "Full feature lifecycle with TDD, review, and PR"
+    stages:
+      - id: branch
+        agent: git
+        task: "Feature-Branch anlegen"
+        mode: sequential
+      - id: implement
+        agent: developer
+        task: "Feature implementieren"
+        mode: sequential
+      - id: review
+        agent: developer
+        task: "Code schreiben und Review-Feedback einarbeiten"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 3
+      - id: commit
+        agent: git
+        task: "Commit + Push + PR"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  quick-fix:
+    description: "Schneller Bugfix ohne Overhead"
+    stages:
+      - id: fix
+        agent: developer
+        task: "Bugfix"
+        mode: sequential
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  bugfix:
+    description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
+    stages:
+      - id: triage
+        agent: bug-feature-analyzer
+        task: "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen."
+        mode: sequential
+      - id: fix
+        agent: developer
+        task: "Bugfix implementieren"
+        mode: sequential
+      - id: review
+        agent: code-reviewer
+        task: "Code-Qualität, Blast-Radius, SOLID/DRY prüfen"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 2
+      - id: document
+        agent: documenter
+        task: "CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  concept-development:
+    description: "Recherche → Konzept → Review-Loop für Vorfeld-/Designarbeit ohne Code"
+    stages:
+      - id: research
+        agent: ideation
+        task: "Recherche: Stand der Technik, Optionen, Quellen, Trade-offs"
+        mode: sequential
+      - id: concept
+        agent: ideation
+        task: "Konzept/Design-Doc erstellen und Review-Feedback einarbeiten"
+        mode: loop
+        loop:
+          generator: ideation
+          critic: concept-reviewer
+          max_iterations: 3
+      - id: handoff
+        agent: requirements
+        task: "Konzept in REQs überführen"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  refactor:
+    description: "Codebase refactoring: blast-radius analysis → implement → review → commit. Use for cross-cutting refactorings, not trivial renames."
+    stages:
+      - id: analyze
+        agent: senior-developer
+        task: "Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten"
+        mode: sequential
+      - id: implement
+        agent: developer
+        task: "Refactoring implementieren ohne funktionale Änderungen"
+        mode: sequential
+      - id: review
+        agent: developer
+        task: "Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten"
+        mode: loop
+        loop:
+          generator: developer
+          critic: code-reviewer
+          max_iterations: 2
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+    on_error: escalate_to_orchestrator
+
+  docs-update:
+    description: "Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW, ARCHITECTURE, and similar doc-only changes."
+    stages:
+      - id: update
+        agent: documenter
+        task: "Dokumentation aktualisieren"
+        mode: sequential
+      - id: commit
+        agent: git
+        task: "Commit + Push"
+        mode: sequential
+    on_error: skip
+
+  se-cascade:
+    description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)"
+    stages:
+      - id: l0-stakeholder
+        agent: se-requirements
+        task: "Stakeholder Needs → formal SN-xxx Requirements"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l1-requirements
+        agent: se-requirements
+        task: "L1 System Requirements (REQ-L1) from Stakeholder Needs"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l1-architecture
+        agent: se-architect
+        task: "L1 System White-Box Decomposition (ARCH-L1)"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
+      - id: l2-requirements
+        agent: se-requirements
+        task: "L2 System Requirements (REQ-L2) derived from L1 Architecture"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l2-architecture
+        agent: se-architect
+        task: "L2 System White-Box Decomposition (ARCH-L2)"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
+      - id: l2-interface
+        agent: se-interface-mgr
+        task: "Interface Registry + Propagation Map for L2"
+        mode: sequential
+      - id: l3-requirements
+        agent: se-requirements
+        task: "L3 System Requirements (REQ-L3) derived from L2 Architecture"
+        mode: loop
+        loop:
+          generator: se-requirements
+          critic: se-critic
+          max_iterations: 3
+      - id: l3-architecture
+        agent: se-architect
+        task: "L3 System White-Box Decomposition (ARCH-L3)"
+        mode: loop
+        loop:
+          generator: se-architect
+          critic: se-critic
+          max_iterations: 3
+      - id: termination
+        agent: se-termination
+        task: "Per-system leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)"
+        mode: conditional
+        condition:
+          type: agent_decision
+          agent: se-termination
+      - id: implementation
+        agent: orchestrator
+        allow_orchestrator: true
+        task: |
+          For each leaf node with domain: software from the termination phase:
+          - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
+          - Route to se-developer for standard leafs (2-4 interfaces)
+          - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting, boundary-level, security/performance-critical)
+          Implement each leaf against its Black-Box specification and interface contracts from the interface-registry.
+          Each implementation must reference its req_id and leaf_id in code artifacts.
+          hardware/mechanics leafs → document as COTS/spec (not implemented).
+        mode: loop
+        loop:
+          generator: se-developer
+          critic: code-reviewer
+          max_iterations: 2
+      - id: validation
+        agent: se-validator
+        task: "L1 System Validation + Multi-Level Verification"
+        mode: parallel_group
+        parallel_group:
+          - agent: se-validator
+            task: "L1 User-Journey validation"
+          - agent: se-verifier
+            task: "Multi-Level verification"
+          - agent: se-integration-and-test-manager
+            task: "V&V orchestration"
+
+# SE cascade variables (defaults, overridden by .meta-config/project.yaml)
+se_variables:
+  SE_BASE_DIR: "SE"
+  SE_MIN_DEPTH: 2
+  SE_MAX_DEPTH: 6
+  SE_MAX_CRITIC_ITERATIONS: 3
+  SE_MAX_PARALLEL_CELLS: 4
+  SE_MAX_CELLS: 20
+  cost_limit_eur: 5.00
+  output_persistence: true              # REQ-SE-01: Enable Teilresultat-Protokoll (write-through cache)
+  resume_pointer_path: ".se-state.yaml"  # REQ-SE-03: Path to resumable state pointer (relative to SE_BASE_DIR)
+  se_pipeline_classifier: "default"      # REQ-SE-20: Pipeline A/B classification mode (default|strict|off)
+  se_persistence_schema_dir: "schemas"   # Path to schema files for FRONTMATTER validation
+
+quality_pipelines:
+  standard-feature:
+    description: Full feature lifecycle with TDD, review, and PR
+    stages:
+    - id: branch
+      agent: git
+      task: Feature-Branch anlegen
+      mode: sequential
+    - id: implement
+      agent: developer
+      task: Feature implementieren
+      mode: sequential
+    - id: review
+      agent: developer
+      task: Code schreiben und Review-Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 3
+    - id: commit
+      agent: git
+      task: Commit + Push + PR
+      mode: sequential
+    on_error: escalate_to_orchestrator
+  quick-fix:
+    description: Schneller Bugfix ohne Overhead
+    stages:
+    - id: fix
+      agent: developer
+      task: Bugfix
+      mode: sequential
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
+    on_error: escalate_to_orchestrator
+  bugfix:
+    description: 'Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig
+      für unabhängige Bugs.'
+    stages:
+    - id: triage
+      agent: bug-feature-analyzer
+      task: Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope
+        → Pipeline stoppen.
+      mode: sequential
+    - id: fix
+      agent: developer
+      task: Bugfix implementieren
+      mode: sequential
+    - id: review
+      agent: code-reviewer
+      task: Code-Qualität, Blast-Radius, SOLID/DRY prüfen
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: document
+      agent: documenter
+      task: CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren
+      mode: sequential
+    on_error: escalate_to_orchestrator
+  concept-development:
+    description: Recherche → Konzept → Review-Loop für Vorfeld-/Designarbeit ohne
+      Code
+    stages:
+    - id: research
+      agent: ideation
+      task: 'Recherche: Stand der Technik, Optionen, Quellen, Trade-offs'
+      mode: sequential
+    - id: concept
+      agent: ideation
+      task: Konzept/Design-Doc erstellen und Review-Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: ideation
+        critic: concept-reviewer
+        max_iterations: 3
+    - id: handoff
+      agent: requirements
+      task: Konzept in REQs überführen
+      mode: sequential
+    on_error: escalate_to_orchestrator
+  refactor:
+    description: 'Codebase refactoring: blast-radius analysis → implement → review
+      → commit. Use for cross-cutting refactorings, not trivial renames.'
+    stages:
+    - id: analyze
+      agent: senior-developer
+      task: 'Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren,
+        Risiken bewerten'
+      mode: sequential
+    - id: implement
+      agent: developer
+      task: Refactoring implementieren ohne funktionale Änderungen
+      mode: sequential
+    - id: review
+      agent: developer
+      task: Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
+    on_error: escalate_to_orchestrator
+  docs-update:
+    description: 'Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW,
+      ARCHITECTURE, and similar doc-only changes.'
+    stages:
+    - id: update
+      agent: documenter
+      task: Dokumentation aktualisieren
+      mode: sequential
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
+    on_error: skip
+  se-cascade:
+    description: Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)
+    stages:
+    - id: l0-stakeholder
+      agent: se-requirements
+      task: Stakeholder Needs → formal SN-xxx Requirements
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l1-requirements
+      agent: se-requirements
+      task: L1 System Requirements (REQ-L1) from Stakeholder Needs
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l1-architecture
+      agent: se-architect
+      task: L1 System White-Box Decomposition (ARCH-L1)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-requirements
+      agent: se-requirements
+      task: L2 System Requirements (REQ-L2) derived from L1 Architecture
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-architecture
+      agent: se-architect
+      task: L2 System White-Box Decomposition (ARCH-L2)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-interface
+      agent: se-interface-mgr
+      task: Interface Registry + Propagation Map for L2
+      mode: sequential
+    - id: l3-requirements
+      agent: se-requirements
+      task: L3 System Requirements (REQ-L3) derived from L2 Architecture
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l3-architecture
+      agent: se-architect
+      task: L3 System White-Box Decomposition (ARCH-L3)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: termination
+      agent: se-termination
+      task: Per-system leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)
+      mode: conditional
+      condition:
+        type: agent_decision
+        agent: se-termination
+    - id: implementation
+      agent: orchestrator
+      allow_orchestrator: true
+      task: 'For each leaf node with domain: software from the termination phase:
+
+        - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
+
+        - Route to se-developer for standard leafs (2-4 interfaces)
+
+        - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting,
+        boundary-level, security/performance-critical)
+
+        Implement each leaf against its Black-Box specification and interface contracts
+        from the interface-registry.
+
+        Each implementation must reference its req_id and leaf_id in code artifacts.
+
+        hardware/mechanics leafs → document as COTS/spec (not implemented).
+
+        '
+      mode: loop
+      loop:
+        generator: se-developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: validation
+      agent: se-validator
+      task: L1 System Validation + Multi-Level Verification
+      mode: parallel_group
+      parallel_group:
+      - agent: se-validator
+        task: L1 User-Journey validation
+      - agent: se-verifier
+        task: Multi-Level verification
+      - agent: se-integration-and-test-manager
+        task: V&V orchestration
+  test-pipeline:
+    description: test
+    stages: []

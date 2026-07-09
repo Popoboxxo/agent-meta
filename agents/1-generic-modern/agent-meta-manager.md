@@ -140,7 +140,7 @@ Sofort-Regel: Fehler beobachtet → Imperativ-Regel formulieren → außerhalb m
 
 **Pflicht-Checks:**
 - [ ] Conditional Guards vollständig erhalten (`{{#if ...}}` Blöcke)
-- [ ] Platzhalter NIE ungetrennt konkatenieren (`{{#if FLAG_A}}Label A: {{FLAG_A}}{{/if}}`)
+- [ ] Platzhalter NIE ungetrennt konkatenieren (`{{#if FLAG_A}}Label A: {{%FLAG_A%}}{{/if}}`)
 - [ ] Dry-Run-Sync nach jedem Port
 - [ ] Frontmatter-Version Minor-bumpen
 

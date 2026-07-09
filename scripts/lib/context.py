@@ -80,7 +80,80 @@ def sync_claude_md_managed(
             target_path.write_text(new_content, encoding="utf-8")
 
 
-def sync_context_for_provider(
+def _has_capability(pc: dict, capability: str) -> bool:
+    """Return True if provider config lists the given capability."""
+    return capability in pc.get("capabilities", [])
+
+
+def _ensure_context_file(
+    project_root: Path,
+    agent_meta_root: Path,
+    target_path: Path,
+    template_path: Path | None,
+    variables: dict,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    fallback_agent_dir: str,
+) -> None:
+    """Create a provider context file from template or minimal fallback."""
+    from .config import substitute
+
+    if target_path.exists():
+        return
+
+    if template_path and template_path.exists():
+        content = template_path.read_text(encoding="utf-8")
+        source_label = str(template_path.relative_to(agent_meta_root))
+        content = substitute(content, variables, source_label, log)
+    else:
+        project_name = config["project"]["name"]
+        content = (
+            f"# {project_name}\n\n"
+            "<!-- agent-meta:managed-begin -->\n"
+            "<!-- agent-meta:managed-end -->\n\n"
+            f"## Agents\n\n"
+            f"Agent files are in {fallback_agent_dir} (invoke by name).\n"
+        )
+        source_label = f"minimal fallback ({template_path.name if template_path else 'no template'})"
+    log.action("INIT", str(target_path.relative_to(project_root)), source_label)
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+
+def _update_managed_html_block(
+    target_path: Path,
+    project_root: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    agent_meta_root: Path,
+) -> None:
+    """Update the HTML-style managed block in a context file."""
+    from .config import substitute
+
+    existing = target_path.read_text(encoding="utf-8")
+    managed_pattern = re.compile(
+        r"<!--\s*agent-meta:managed-begin\s*-->"
+        r".*?<!--\s*agent-meta:managed-end\s*-->",
+        re.DOTALL,
+    )
+    if not managed_pattern.search(existing):
+        return
+    template = _load_claude_md_managed_template(agent_meta_root)
+    rel = str(target_path.relative_to(project_root))
+    new_managed = substitute(template, variables, rel, log)
+    new_content = managed_pattern.sub(new_managed, existing, count=1)
+    if new_content != existing:
+        log.action("UPDATE", rel, "managed block")
+        if not dry_run:
+            target_path.write_text(new_content, encoding="utf-8")
+    else:
+        log.skip(rel, "managed block unchanged")
+
+
+def _sync_managed_block_context(
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
@@ -89,277 +162,150 @@ def sync_context_for_provider(
     dry_run: bool,
     provider: str,
     provider_config: dict,
-):
-    """Create or update the context file for a given provider.
+) -> None:
+    """Strategy for providers with a context file using HTML managed blocks."""
+    from .config import substitute
 
-    Claude:   CLAUDE.md - managed block updated on every sync
-    Gemini:   .gemini/GEMINI.md - created once from template; managed block updated
-    Continue: .continue/config.yaml - skeleton, created once (never overwritten)
-    """
+    pc = provider_config[provider]
+    context_file = pc.get("context_file")
+    if not context_file:
+        return
+    target_path = safe_path(project_root, context_file)
+    template_name = pc.get("context_template")
+    template_path = agent_meta_root / template_name if template_name else None
+
+    # Claude's CLAUDE.md is created by init_claude_md() in the main sync loop;
+    # this strategy only updates the managed block for Claude.
+    if provider != "Claude":
+        _ensure_context_file(
+            project_root, agent_meta_root, target_path, template_path, variables, config,
+            log, dry_run,
+            fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
+        )
+    if target_path.exists():
+        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root)
+
+    # Claude settings files are initialized by the dedicated helpers in sync.py.
+    if provider != "Claude":
+        _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+
+
+def _sync_opencode_context(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict,
+) -> None:
+    """Strategy for Opencode: rules embedded into AGENTS.md managed block."""
+    from .config import substitute
+
+    pc = provider_config[provider]
+    context_file = pc["context_file"]  # AGENTS.md
+    target_path = safe_path(project_root, context_file)
+    template_name = pc.get("context_template")
+    template_path = agent_meta_root / template_name if template_name else None
+
+    if not target_path.exists():
+        if template_path and template_path.exists():
+            ocontent = template_path.read_text(encoding="utf-8")
+            ocontent = substitute(ocontent, variables, template_name, log)
+        else:
+            project_name = config["project"]["name"]
+            ocontent = (
+                f"# {project_name}\n\n"
+                "<!-- agent-meta:managed-begin -->\n"
+                "<!-- agent-meta:managed-end -->\n"
+            )
+        log.action("INIT", context_file, template_name or "minimal fallback")
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(ocontent, encoding="utf-8")
+
+    managed_pattern = re.compile(
+        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+        re.DOTALL,
+    )
+    if dry_run and not target_path.exists():
+        log.action("UPDATE", context_file, "managed block (agent hints + rules)")
+    else:
+        existing = target_path.read_text(encoding="utf-8")
+        if managed_pattern.search(existing):
+            new_managed = _build_opencode_managed_block(
+                agent_meta_root, config, variables, log,
+                provider=provider, provider_config=provider_config
+            )
+            new_content = managed_pattern.sub(new_managed, existing, count=1)
+            if new_content != existing:
+                log.action("UPDATE", context_file, "managed block (agent hints + rules)")
+                if not dry_run:
+                    target_path.write_text(new_content, encoding="utf-8")
+            else:
+                log.skip(context_file, "managed block unchanged")
+
+    init_opencode_personal(agent_meta_root, project_root, log, dry_run)
+    _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+
+
+def _sync_continue_context(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict,
+) -> None:
+    """Strategy for Continue: project-context.md + config.yaml comment block."""
     from .config import substitute
     from .extensions import render_managed_block, update_managed_block
 
-    pc = provider_config.get(provider)
-    if not pc:
-        return
-
-    if provider == "Claude":
-        sync_claude_md_managed(project_root, variables, log, dry_run, agent_meta_root)
-
-    elif provider == "Gemini":
-        context_file = pc["context_file"]
-        if context_file is None:
-            return
-        target_path = safe_path(project_root, context_file)
-        template_name = pc["context_template"]
-        template_path = agent_meta_root / template_name if template_name else None
-
-        if not target_path.exists():
-            if template_path and template_path.exists():
-                gcontent = template_path.read_text(encoding="utf-8")
-                gcontent = substitute(gcontent, variables, template_name, log)
-                log.action("INIT", str(target_path.relative_to(project_root)), template_name)
+    pc = provider_config[provider]
+    context_file = pc.get("context_file")
+    if context_file:
+        ctx_path = project_root / context_file
+        template_path = agent_meta_root / pc["context_template"]
+        if not ctx_path.exists():
+            if template_path.exists():
+                ccontent = substitute(
+                    template_path.read_text(encoding="utf-8"),
+                    variables, pc["context_template"], log,
+                )
             else:
-                project_name = config["project"]["name"]
-                gcontent = (
-                    f"# {project_name}\n\n"
+                ccontent = (
+                    f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"
+                    f"{variables.get('PROJECT_CONTEXT', '')}\n\n"
                     "<!-- agent-meta:managed-begin -->\n"
                     "<!-- agent-meta:managed-end -->\n\n"
-                    "## Agents\n\n"
-                    f"Agent files are in .gemini/agents/ (use @agent-name).\n"
+                    "## Agent Rules\n\n"
+                    "Agent context files are in `.continue/rules/`.\n"
+                    "Continue loads all Markdown files in this directory automatically as context.\n"
                 )
-                log.action("INIT", str(target_path.relative_to(project_root)),
-                           "minimal fallback (GEMINI.project-template.md not found)")
-            if not dry_run:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(gcontent, encoding="utf-8")
-        else:
-            existing = target_path.read_text(encoding="utf-8")
-            managed_pattern = re.compile(
-                r"<!--\s*agent-meta:managed-begin\s*-->"
-                r".*?<!--\s*agent-meta:managed-end\s*-->",
-                re.DOTALL,
-            )
-            if managed_pattern.search(existing):
-                template = _load_claude_md_managed_template(agent_meta_root)
-                new_managed = substitute(template, variables,
-                                         str(target_path.relative_to(project_root)), log)
-                new_content = managed_pattern.sub(new_managed, existing, count=1)
-                if new_content != existing:
-                    log.action("UPDATE", str(target_path.relative_to(project_root)),
-                               "managed block")
-                    if not dry_run:
-                        target_path.write_text(new_content, encoding="utf-8")
-                else:
-                    log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
-
-        # .gemini/settings.json — skeleton created once, never overwritten
-        settings_file = pc.get("settings_file")
-        if settings_file:
-            settings_path = safe_path(project_root, settings_file)
-            if settings_path.exists():
-                log.skip(str(settings_path.relative_to(project_root)),
-                         "already exists — not overwritten")
-            else:
-                settings_template_rel = pc.get("settings_template")
-                settings_template_path = (
-                    agent_meta_root / settings_template_rel if settings_template_rel else None
-                )
-                if settings_template_path and settings_template_path.exists():
-                    json_content = settings_template_path.read_text(encoding="utf-8")
-                    source_label = settings_template_rel
-                else:
-                    json_content = (
-                        '{\n'
-                        '  "//": "Gemini settings — https://ai.google.dev/gemini-api/docs"\n'
-                        '}\n'
-                    )
-                    source_label = "minimal fallback"
-                    if settings_template_rel:
-                        log.warn(
-                            f"{settings_template_rel} not found "
-                            f"— using minimal fallback for {settings_file}"
-                        )
-                log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
-                if not dry_run:
-                    settings_path.parent.mkdir(parents=True, exist_ok=True)
-                    settings_path.write_text(json_content, encoding="utf-8")
-
-    elif provider == "Opencode":
-        context_file = pc["context_file"]  # "AGENTS.md"
-        target_path = safe_path(project_root, context_file)
-        template_name = pc.get("context_template")
-        template_path = agent_meta_root / template_name if template_name else None
-
-        # Create AGENTS.md skeleton if it doesn't exist yet
-        if not target_path.exists():
-            if template_path and template_path.exists():
-                ocontent = template_path.read_text(encoding="utf-8")
-                ocontent = substitute(ocontent, variables, template_name, log)
-            else:
-                project_name = config["project"]["name"]
-                ocontent = (
-                    f"# {project_name}\n\n"
-                    "<!-- agent-meta:managed-begin -->\n"
-                    "<!-- agent-meta:managed-end -->\n"
-                )
-            log.action("INIT", context_file, template_name or "minimal fallback")
-            if not dry_run:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(ocontent, encoding="utf-8")
-
-        # Always update the managed block (agent hints + embedded rules)
-        managed_pattern = re.compile(
-            r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-            re.DOTALL,
-        )
-        if dry_run and not target_path.exists():
-            log.action("UPDATE", context_file, "managed block (agent hints + rules)")
-        else:
-            existing = target_path.read_text(encoding="utf-8")
-            if managed_pattern.search(existing):
-                new_managed = _build_opencode_managed_block(
-                    agent_meta_root, config, variables, log,
-                    provider=provider, provider_config=provider_config
-                )
-                new_content = managed_pattern.sub(new_managed, existing, count=1)
-                if new_content != existing:
-                    log.action("UPDATE", context_file, "managed block (agent hints + rules)")
-                    if not dry_run:
-                        target_path.write_text(new_content, encoding="utf-8")
-                else:
-                    log.skip(context_file, "managed block unchanged")
-
-        # AGENTS.personal.md — personal local file, gitignored, created once
-        init_opencode_personal(agent_meta_root, project_root, log, dry_run)
-
-        # opencode.json — skeleton created once, never overwritten
-        settings_file = pc.get("settings_file")
-        if settings_file:
-            settings_path = project_root / settings_file
-            if settings_path.exists():
-                log.skip(str(settings_path.relative_to(project_root)),
-                         "already exists — not overwritten")
-            else:
-                settings_template_rel = pc.get("settings_template")
-                settings_template_path = (
-                    agent_meta_root / settings_template_rel if settings_template_rel else None
-                )
-                if settings_template_path and settings_template_path.exists():
-                    json_content = settings_template_path.read_text(encoding="utf-8")
-                    source_label = settings_template_rel
-                else:
-                    json_content = (
-                        '{\n'
-                        '  // opencode configuration — https://opencode.ai/docs/config\n'
-                        '  // Agents  : .opencode/agents/  (managed by agent-meta)\n'
-                        '  // Commands: .opencode/commands/ (managed by agent-meta)\n'
-                        '  // Rules   : embedded in AGENTS.md (managed by agent-meta)\n'
-                        '}\n'
-                    )
-                    source_label = "minimal fallback"
-                    if settings_template_rel:
-                        log.warn(
-                            f"{settings_template_rel} not found "
-                            f"— using minimal fallback for {settings_file}"
-                        )
-                log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
-                if not dry_run:
-                    settings_path.parent.mkdir(parents=True, exist_ok=True)
-                    settings_path.write_text(json_content, encoding="utf-8")
-
-    elif provider == "Copilot":
-        # 1. .github/copilot/COPILOT.md — created once from template; managed block updated
-        context_file = pc["context_file"]
-        if context_file is None:
-            return
-        target_path = safe_path(project_root, context_file)
-        template_name = pc["context_template"]
-        template_path = agent_meta_root / template_name if template_name else None
-
-        if not target_path.exists():
-            if template_path and template_path.exists():
-                cp_content = template_path.read_text(encoding="utf-8")
-                cp_content = substitute(cp_content, variables, template_name, log)
-                log.action("INIT", str(target_path.relative_to(project_root)), template_name)
-            else:
-                project_name = config["project"]["name"]
-                cp_content = (
-                    f"# {project_name}\n\n"
-                    "<!-- agent-meta:managed-begin -->\n"
-                    "<!-- agent-meta:managed-end -->\n\n"
-                    "## Agents\n\n"
-                    f"Agent files are in .github/copilot/agents/ (invoke by name in Copilot Chat).\n"
-                )
-                log.action("INIT", str(target_path.relative_to(project_root)),
-                           "minimal fallback (COPILOT.project-template.md not found)")
-            if not dry_run:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(cp_content, encoding="utf-8")
-        else:
-            existing = target_path.read_text(encoding="utf-8")
-            managed_pattern = re.compile(
-                r"<!--\s*agent-meta:managed-begin\s*-->"
-                r".*?<!--\s*agent-meta:managed-end\s*-->",
-                re.DOTALL,
-            )
-            if managed_pattern.search(existing):
-                template = _load_claude_md_managed_template(agent_meta_root)
-                new_managed = substitute(template, variables,
-                                         str(target_path.relative_to(project_root)), log)
-                new_content = managed_pattern.sub(new_managed, existing, count=1)
-                if new_content != existing:
-                    log.action("UPDATE", str(target_path.relative_to(project_root)),
-                               "managed block")
-                    if not dry_run:
-                        target_path.write_text(new_content, encoding="utf-8")
-                else:
-                    log.skip(str(target_path.relative_to(project_root)), "managed block unchanged")
-
-    elif provider == "Continue":
-        # 1. .continue/rules/project-context.md — created once from template; managed block updated
-        context_file = pc["context_file"]
-        if context_file:
-            ctx_path = project_root / context_file
-            template_path = agent_meta_root / pc["context_template"]
-            if not ctx_path.exists():
-                if template_path.exists():
-                    ccontent = substitute(
-                        template_path.read_text(encoding="utf-8"),
-                        variables, pc["context_template"], log,
-                    )
-                else:
-                    ccontent = (
-                        f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"
-                        f"{variables.get('PROJECT_CONTEXT', '')}\n\n"
-                        "<!-- agent-meta:managed-begin -->\n"
-                        "<!-- agent-meta:managed-end -->\n\n"
-                        "## Agent Rules\n\n"
-                        "Agent context files are in `.continue/rules/`.\n"
-                        "Continue loads all Markdown files in this directory automatically as context.\n"
-                    )
-                    log.action("INIT", str(ctx_path.relative_to(project_root)),
-                               "minimal fallback (CONTINUE.project-template.md not found)")
                 log.action("INIT", str(ctx_path.relative_to(project_root)),
-                           pc["context_template"])
+                           "minimal fallback (CONTINUE.project-template.md not found)")
+            log.action("INIT", str(ctx_path.relative_to(project_root)),
+                       pc["context_template"])
+            if not dry_run:
+                ctx_path.parent.mkdir(parents=True, exist_ok=True)
+                ctx_path.write_text(ccontent, encoding="utf-8")
+        else:
+            existing = ctx_path.read_text(encoding="utf-8")
+            new_managed = render_managed_block(variables, context_file, log, agent_meta_root)
+            updated = update_managed_block(existing, new_managed)
+            if updated != existing:
+                log.action("UPDATE", str(ctx_path.relative_to(project_root)),
+                           "managed block refreshed")
                 if not dry_run:
-                    ctx_path.parent.mkdir(parents=True, exist_ok=True)
-                    ctx_path.write_text(ccontent, encoding="utf-8")
+                    ctx_path.write_text(updated, encoding="utf-8")
             else:
-                # Update managed block on every sync
-                existing = ctx_path.read_text(encoding="utf-8")
-                new_managed = render_managed_block(variables, context_file, log, agent_meta_root)
-                updated = update_managed_block(existing, new_managed)
-                if updated != existing:
-                    log.action("UPDATE", str(ctx_path.relative_to(project_root)),
-                               "managed block refreshed")
-                    if not dry_run:
-                        ctx_path.write_text(updated, encoding="utf-8")
-                else:
-                    log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
+                log.skip(str(ctx_path.relative_to(project_root)), "managed block unchanged")
 
-        # 2. .continue/config.yaml — skeleton created once; managed comment block updated
-        settings_file = pc["settings_file"]
+    settings_file = pc.get("settings_file")
+    if settings_file:
         settings_path = project_root / settings_file
         if settings_path.exists():
             _update_continue_config_managed_block(
@@ -367,11 +313,9 @@ def sync_context_for_provider(
             )
         else:
             settings_template_rel = pc.get("settings_template")
-            if settings_template_rel:
-                settings_template_path = agent_meta_root / settings_template_rel
-            else:
-                settings_template_path = None
-
+            settings_template_path = (
+                agent_meta_root / settings_template_rel if settings_template_rel else None
+            )
             if settings_template_path and settings_template_path.exists():
                 yaml_content = settings_template_path.read_text(encoding="utf-8")
                 source_label = settings_template_rel
@@ -386,11 +330,90 @@ def sync_context_for_provider(
                 source_label = "minimal fallback"
                 if settings_template_rel:
                     log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
-            log.action("INIT", str(settings_path.relative_to(project_root)),
-                       source_label)
+            log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
             if not dry_run:
                 settings_path.parent.mkdir(parents=True, exist_ok=True)
                 settings_path.write_text(yaml_content, encoding="utf-8")
+
+
+def sync_context_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict,
+):
+    """Create or update the context file for a given provider.
+
+    Dispatch is capability-driven:
+      - context-embedded-rules → Opencode strategy
+      - provider == Continue   → Continue strategy (managed block + config.yaml comment)
+      - context-managed-block  → generic HTML managed-block strategy
+    """
+    pc = provider_config.get(provider)
+    if not pc:
+        return
+
+    if _has_capability(pc, "context-embedded-rules"):
+        _sync_opencode_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+        )
+    elif provider == "Continue":
+        _sync_continue_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+        )
+    elif _has_capability(pc, "context-managed-block"):
+        _sync_managed_block_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+        )
+
+
+def _init_provider_settings_json(
+    project_root: Path,
+    pc: dict,
+    agent_meta_root: Path,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Create provider settings skeleton once if it does not exist yet."""
+    from .config import substitute
+
+    settings_file = pc.get("settings_file")
+    if not settings_file:
+        return
+    settings_path = safe_path(project_root, settings_file)
+    if settings_path.exists():
+        log.skip(str(settings_path.relative_to(project_root)),
+                 "already exists — not overwritten")
+        return
+
+    settings_template_rel = pc.get("settings_template")
+    settings_template_path = (
+        agent_meta_root / settings_template_rel if settings_template_rel else None
+    )
+    if settings_template_path and settings_template_path.exists():
+        content = substitute(
+            settings_template_path.read_text(encoding="utf-8"),
+            variables, settings_template_rel, log,
+        )
+        source_label = settings_template_rel
+    else:
+        # Minimal provider-agnostic JSON skeleton
+        content = '{\n  "//": "Provider settings managed by agent-meta"\n}\n'
+        source_label = "minimal fallback"
+        if settings_template_rel:
+            log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+    log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
+    if not dry_run:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        settings_path.write_text(content, encoding="utf-8")
 
 
 _CONTINUE_MANAGED_BEGIN = "# agent-meta:managed-begin"
@@ -453,13 +476,14 @@ def _strip_rule_frontmatter(content: str) -> str:
     return content[end + 4:].lstrip('\n')
 
 
-def _extract_rule_compact_from_content(content: str, output_name: str, rel_source: str) -> str:
+def _extract_rule_compact_from_content(content: str, output_name: str, rel_source: str,
+                                        provider: str = "Claude", has_native_rules: bool = True) -> str:
     """Extract title + 1-sentence summary from already-substituted rule content.
 
     Reduces a 50-100 line rule to a single 3-line block:
       - Title
       - First non-empty paragraph (≤200 chars)
-      - Pfad zur Voll-Datei
+      - Pointer to full rule (provider-aware)
     """
     body = _strip_rule_frontmatter(content).strip()
     if not body:
@@ -484,7 +508,11 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
         break
 
     rule_stem = Path(output_name).stem
-    return f"### {title}\n{summary}\nDetails: `rules/.../{rule_stem}.md`"
+    if has_native_rules:
+        details = f"Details: `rules/.../{rule_stem}.md`"
+    else:
+        details = f"Details: embedded in `{provider}` context (Regeln-Abschnitt)"
+    return f"### {title}\n{summary}\n{details}"
 
 
 def _collect_embedded_rules_md(
@@ -528,17 +556,17 @@ def _collect_embedded_rules_md(
     embedded_count = 0
     skipped_count = 0
 
+    provider_has_native_rules = pc.get('has_rules', False)
     for source_path, output_name in sources:
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
         if opts.get('opencode') == 'skip':
             continue
-        # Phase 2: Selective Rule Embedding
+        # Selective Rule Embedding:
         # embed: false → Rule wird nicht in den Managed Block eingebettet
         # (nur als separate Datei verfügbar, z.B. .claude/rules/)
         # Fallback B: Provider ohne native rules dir (has_rules: false) müssen
         # die Rule trotzdem embedden, sonst geht sie verloren.
-        provider_has_native_rules = pc.get('has_rules', False)
         if opts.get('embed') == False and provider_has_native_rules:
             skipped_count += 1
             continue
@@ -547,7 +575,10 @@ def _collect_embedded_rules_md(
         content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_conditional_blocks(content, merged_vars)
         if compact:
-            body = _extract_rule_compact_from_content(content, output_name, rel_source)
+            body = _extract_rule_compact_from_content(
+                content, output_name, rel_source,
+                provider=provider, has_native_rules=provider_has_native_rules,
+            )
         else:
             body = _strip_rule_frontmatter(content).strip()
         if body:
@@ -566,7 +597,10 @@ def _collect_embedded_rules_md(
             speech_content = substitute(speech_content, merged_vars, f"speech/{mode}.md", log)
             speech_content = strip_inactive_conditional_blocks(speech_content, merged_vars)
             if compact:
-                body = _extract_rule_compact_from_content(speech_content, f"{mode}.md", f"speech/{mode}.md")
+                body = _extract_rule_compact_from_content(
+                    speech_content, f"{mode}.md", f"speech/{mode}.md",
+                    provider=provider, has_native_rules=provider_has_native_rules,
+                )
             else:
                 body = _strip_rule_frontmatter(speech_content).strip()
             if body:
@@ -676,55 +710,85 @@ def init_opencode_personal(
 
 
 def init_settings_json(
+    agent_meta_root: Path,
     project_root: Path,
     log: SyncLog,
     dry_run: bool,
+    providers: list[str] | None = None,
+    provider_config: dict | None = None,
+    variables: dict | None = None,
 ):
-    """Create .claude/settings.json if it does not exist yet.
+    """Create provider settings files if they do not exist yet.
 
-    The file is created once as a skeleton for team-shared settings.
-    The hooks section is managed separately by sync_hooks() on every sync.
+    Iterates over all active providers (or every configured provider if no
+    explicit list is given) and initializes the committed settings file once.
+    The hooks section for Claude is managed separately by sync_hooks().
     """
-    target_path = project_root / ".claude" / "settings.json"
-    if target_path.exists():
-        log.skip(".claude/settings.json", "already exists")
-        return
-
-    content = '{\n  "permissions": {\n    "allow": [],\n    "deny": []\n  }\n}\n'
-    log.action("INIT", ".claude/settings.json", "team permissions skeleton")
-    if not dry_run:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+    pc = provider_config or {}
+    active = providers if providers is not None else list(pc.keys())
+    for provider in active:
+        _init_provider_settings_json(
+            project_root,
+            pc[provider],
+            agent_meta_root,
+            variables or {},
+            log,
+            dry_run,
+        )
 
 
 def init_settings_local_json(
+    agent_meta_root: Path,
     project_root: Path,
     log: SyncLog,
     dry_run: bool,
+    providers: list[str] | None = None,
+    provider_config: dict | None = None,
+    variables: dict | None = None,
 ) -> None:
-    """Create .claude/settings.local.json skeleton if it does not exist yet.
+    """Create provider-local settings files if they do not exist yet.
 
-    This file is gitignored and intended for personal / machine-local overrides
-    (e.g. allow-listing commands during development, local hook overrides).
-    Created once on --init or first Claude sync — never overwritten afterwards.
+    These files are gitignored and intended for personal / machine-local
+    overrides. Created once on --init or first sync — never overwritten.
     """
-    target_path = project_root / ".claude" / "settings.local.json"
-    if target_path.exists():
-        log.skip(".claude/settings.local.json", "already exists")
-        return
+    from .config import substitute
 
-    content = (
-        '{\n'
-        '  "permissions": {\n'
-        '    "allow": [],\n'
-        '    "deny": []\n'
-        '  }\n'
-        '}\n'
-    )
-    log.action("INIT", ".claude/settings.local.json", "personal/local settings skeleton (gitignored)")
-    if not dry_run:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+    pc = provider_config or {}
+    active = providers if providers is not None else list(pc.keys())
+    for provider in active:
+        prov_cfg = pc[provider]
+        local_file = prov_cfg.get("settings_local_file")
+        if not local_file:
+            continue
+        target_path = safe_path(project_root, local_file)
+        if target_path.exists():
+            log.skip(str(target_path.relative_to(project_root)), "already exists")
+            continue
+
+        template_rel = prov_cfg.get("settings_local_template")
+        template_path = agent_meta_root / template_rel if template_rel else None
+        if template_path and template_path.exists():
+            content = substitute(
+                template_path.read_text(encoding="utf-8"),
+                variables or {}, template_rel, log,
+            )
+            source_label = template_rel
+        else:
+            content = _settings_local_fallback(local_file)
+            source_label = "personal/local skeleton (gitignored)"
+
+        log.action("INIT", str(target_path.relative_to(project_root)), source_label)
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(content, encoding="utf-8")
+
+
+def _settings_local_fallback(local_file: str) -> str:
+    """Return a minimal, extension-aware skeleton for a local settings file."""
+    lower = local_file.lower()
+    if lower.endswith((".yaml", ".yml")):
+        return "# Local overrides — managed by agent-meta, never committed\n"
+    return '{\n  "//": "Local overrides — managed by agent-meta, never committed"\n}\n'
 
 
 def ensure_gitignore_entries(
@@ -748,13 +812,7 @@ def ensure_gitignore_entries(
     elif gitignore_entries is not None:
         required = list(gitignore_entries)
     else:
-        # Default: Claude entries (backward compat)
-        required = [
-            ".claude/settings.local.json",
-            ".claude/agent-memory-local/",
-            "CLAUDE.personal.md",
-            "sync.log",
-        ]
+        required = []
 
     gitignore_path = project_root / ".gitignore"
     existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
@@ -849,25 +907,37 @@ def only_variables(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    providers: list[str] | None = None,
+    provider_config: dict | None = None,
 ):
-    """Substitute {{VARIABLE}} placeholders in existing CLAUDE.md."""
-    import sys
+    """Substitute {{VARIABLE}} placeholders in existing provider context files."""
     from .config import substitute
 
-    target_path = project_root / "CLAUDE.md"
-    if not target_path.exists():
-        print("  !  CLAUDE.md not found — use --init to create it")
+    pc = provider_config or {}
+    active = providers if providers is not None else list(pc.keys())
+    found_any = False
+    for provider in active:
+        context_file = pc[provider].get("context_file")
+        if not context_file:
+            continue
+        target_path = safe_path(project_root, context_file)
+        if not target_path.exists():
+            continue
+        found_any = True
+        content = target_path.read_text(encoding="utf-8")
+        new_content = substitute(content, variables, context_file, log)
+
+        if new_content == content:
+            log.skip(context_file, "no open placeholders")
+        else:
+            log.action("WRITE", context_file, "variables from config")
+            if not dry_run:
+                target_path.write_text(new_content, encoding="utf-8")
+
+    if not found_any:
+        print("  !  No provider context file found — use --init to create one")
+        import sys
         sys.exit(1)
-
-    content = target_path.read_text(encoding="utf-8")
-    new_content = substitute(content, variables, "CLAUDE.md", log)
-
-    if new_content == content:
-        log.action("SKIP", "CLAUDE.md", "no open placeholders")
-    else:
-        log.action("WRITE", "CLAUDE.md", "variables from config")
-        if not dry_run:
-            target_path.write_text(new_content, encoding="utf-8")
 
 
 def sync_prompts_for_continue(

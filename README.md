@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.66.0--beta.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.66.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -47,6 +47,8 @@
 - **Model Curation:** Hard-block (blacklist) and soft-hide (disabled) models via `config/model-curation.yaml` — single source of truth for model visibility.
 - **Tier-Presets Matrix:** Dynamically resolve model IDs based on provider, preset (cheap, normal, advanced, expensive), and tier — direct `tiers.tier: model_id` format with backward-compat `mapping:` fallback.
 - **Admin UI Overhaul:** Interactive dashboard for Models & Pricing, Provider Tier Mappings, Tier Presets (Resolved View + Edit tabs), Quick-Filter strips, Enable/Disable/Blacklist buttons, pricing source badges (`[API]`, `[Overlay]`, `[Calc]`).
+- **Admin UI CRUD Endpoints (v0.66.0):** Full CRUD for Quality Pipelines, Reflection Pairs (generator-critic), and Prompt Modes per role — all with idempotent atomic writes and automatic backups.
+- **Admin UI Model Mapping (v0.66.0):** Read-only matrix view showing resolved model IDs per role and provider with source annotation (`role-default` / `explicit-override`). Uses the same resolution logic as `sync.py`.
 - **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
 - **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
 - **Provider Tool Whitelists:** Per-provider tool capability declarations prevent agents from referencing tools unavailable in their target provider environment.
@@ -146,8 +148,11 @@ cheap:
 - Provider Tier Mappings: Datalist-filtered model picker per provider
 - Tier Presets: Resolved view (current state) + edit mappings (direct input)
 - Price badges: `[API]` (OpenRouter live), `[Overlay]` (manual), `[Calc]` (derived)
+- CRUD endpoints: Quality Pipelines, Reflection Pairs, Prompt Modes
+- Model Mapping: Read-only role×provider matrix with resolution sources
 
 → Full details: `scripts/lib/model_discovery.py`, `scripts/lib/curation.py`, `config/model-curation.yaml`, `config/tier-presets.yaml`
+→ Admin UI usage guide: `docs/admin-ui-guide.md`
 
 ### A2A Handoff Protocol
 
@@ -480,6 +485,7 @@ agent-meta/
     provider-bootstrap.yaml  # PAL: bootstrap mechanism definitions
   docs/                      # Documentation
     admin-ui.html            # Web frontend for the Admin UI
+    admin-ui-guide.md         # Admin UI usage guide (v0.66.0)
     agent-graph.html         # Interactive agent visualization graph
     agent-mindmap.md         # Mermaid mindmap of all agents
     live-dashboard.html      # Live session monitoring dashboard
