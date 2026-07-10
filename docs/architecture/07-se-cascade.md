@@ -11,7 +11,7 @@ Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System 
 - **Implementation Floor** — 3 SE-Developer-Tiers für Leaf-Node-Implementierung.
 - **Validation Floor (V&V)** — 5 Agenten (`se-validator`, `se-verifier`, `se-test-engineer`, `se-testreviewer`, `se-integration-and-test-manager`) für die rechte V-Modell-Seite, im `se-cascade`-`validation`-Stage als `parallel_group` verdrahtet.
 
-> **Hinweis (Deprecation):** Der frühere `se-orchestrator`-Agent ist deprecated. Die SE-Koordination läuft direkt über den Haupt-`orchestrator` im SE-Mode. Der Wrapper bleibt aus Backward-Compatibility-Gründen erhalten.
+> **Hinweis (Deprecation):** Der frühere `orchestrator (SE-Mode)`-Agent ist deprecated. Die SE-Koordination läuft direkt über den Haupt-`orchestrator` im SE-Mode. Der Wrapper bleibt aus Backward-Compatibility-Gründen erhalten.
 
 ---
 
@@ -19,7 +19,7 @@ Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System 
 
 ```mermaid
 graph TD
-    USER["Stakeholder / User"] -->|unstrukturierter Bedarf| ORCH["se-orchestrator"]
+    USER["Stakeholder / User"] -->|unstrukturierter Bedarf| ORCH["orchestrator (SE-Mode)"]
     ORCH -->|L1-SH REQ| REQ["se-requirements"]
     REQ -->|formale BB-REQs| ORCH
 
@@ -151,19 +151,19 @@ Wenn ein `se-developer` eine Komponente implementiert:
 
 | Von → Nach | Trigger | Daten |
 |------------|---------|-------|
-| `se-orchestrator` → `se-requirements` | Initialisierung | Stakeholder-Feature (unstrukturiert) |
-| `se-orchestrator` → `se-architect` | L1/L2/L3 Phase | Parent BB-REQ + External Interfaces + Neighbor Contracts |
+| `orchestrator (SE-Mode)` → `se-requirements` | Initialisierung | Stakeholder-Feature (unstrukturiert) |
+| `orchestrator (SE-Mode)` → `se-architect` | L1/L2/L3 Phase | Parent BB-REQ + External Interfaces + Neighbor Contracts |
 | `se-architect` → `se-critic` | Post-Decomposition | White-Box JSON (sub_components, internal_interfaces, rationale) |
 | `se-critic` → `se-architect` | rejected | correction_hints[] |
-| `se-critic` → `se-orchestrator` | blocked | Eskalation mit Fehlerbeschreibung |
+| `se-critic` → `orchestrator (SE-Mode)` | blocked | Eskalation mit Fehlerbeschreibung |
 | `se-critic` → `se-interface-mgr` | approved | White-Box JSON + Interface Registry |
 | `se-interface-mgr` → `se-termination` | Validiert | White-Box + Propagation Map |
 | `se-termination` → `se-junior-developer` | decision: leaf (0–1 IF) | Leaf-Node + interface_specs + propagation_map |
 | `se-termination` → `se-developer` | decision: leaf (2–4 IF) | Leaf-Node + interface_specs + propagation_map |
 | `se-termination` → `se-senior-developer` | decision: leaf (5+ IF) | Leaf-Node + interface_specs + propagation_map |
 | `se-junior/developer/senior-dev` → `se-interface-mgr` | Escalation | Interface change required / ambiguity |
-| `se-termination` → `se-orchestrator` | Alle Entscheidungen | termination_decisions[] + summary |
-| `se-orchestrator` → neue Zelle (n+1) | decision: continue | BB-REQ + Propagation-Map-Zeile (sanitized) |
+| `se-termination` → `orchestrator (SE-Mode)` | Alle Entscheidungen | termination_decisions[] + summary |
+| `orchestrator (SE-Mode)` → neue Zelle (n+1) | decision: continue | BB-REQ + Propagation-Map-Zeile (sanitized) |
 
 ### Kontext-Grenzen
 
@@ -196,7 +196,7 @@ Wenn ein `se-developer` eine Komponente implementiert:
 
 ```mermaid
 sequenceDiagram
-    participant ORCH as se-orchestrator
+    participant ORCH as orchestrator (SE-Mode)
     participant TERM as se-termination
     participant IFM as se-interface-mgr
     participant NEXT as Neue Zelle (n+1)
@@ -348,7 +348,7 @@ Alle Felder sind optional außer den Top-Level Required Fields:
 
 ```yaml
 roles:
-  - se-orchestrator
+  - orchestrator (SE-Mode)
   - se-requirements
   - se-architect
   - se-critic
@@ -375,7 +375,7 @@ variables:
 | `se-junior-developer` | balanced | — | optional | 0–1 Interface Leaf |
 | `se-developer` | balanced | project | optional | 2–4 Interface Leaf |
 | `se-senior-developer` | powerful | project | optional | 5+ Interface Leaf |
-| `se-orchestrator` | balanced | — | optional (deprecated) | Wrapper — Funktionalität jetzt im Haupt-`orchestrator` (SE-Mode) |
+| `orchestrator (SE-Mode)` | balanced | — | optional (deprecated) | Wrapper — Funktionalität jetzt im Haupt-`orchestrator` (SE-Mode) |
 
 ---
 
@@ -387,7 +387,7 @@ variables:
 
 ### A2A als EINZIGES Format
 
-Die SE-Kaskade nutzt **ausschließlich** A2A-Envelopes für Agent-zu-Agent-Übergaben. Die existierenden SE-Schemas (`se-decomposition.schema.json`, `se-orchestrator.schema.json`) bleiben **unverändert** und werden als `payload` in den Envelope eingebettet.
+Die SE-Kaskade nutzt **ausschließlich** A2A-Envelopes für Agent-zu-Agent-Übergaben. Die existierenden SE-Schemas (`se-decomposition.schema.json`, `orchestrator (SE-Mode).schema.json`) bleiben **unverändert** und werden als `payload` in den Envelope eingebettet.
 
 **SE-Schemas laufen mit `compact_mode: false`** — die langen, lesbaren Feldnamen bleiben erhalten, da die SE-Kaskade strukturreiche Payloads mit vielen semantischen Feldnamen hat und ein Breaking Change der SE-Schemas nicht gerechtfertigt ist.
 
@@ -437,13 +437,13 @@ Die lose Kopplung erfolgt ausschließlich über `trace_context.viz_task_id` im E
 
 | Route | Contract | Payload-Schema | compact_mode |
 |-------|----------|---------------|-------------|
-| `se-orchestrator → se-requirements` | `se-req-input-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `orchestrator (SE-Mode) → se-requirements` | `se-req-input-v1` | `schemas/se-decomposition.schema.json` | `false` |
 | `se-requirements → se-architect` | `se-req-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
 | `se-architect → se-critic` | `se-arch-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
 | `se-critic → se-architect` | `se-critic-reject-v1` | `schemas/se-decomposition.schema.json` | `false` |
 | `se-critic → se-interface-mgr` | `se-critic-approve-v1` | `schemas/se-decomposition.schema.json` | `false` |
 | `se-interface-mgr → se-termination` | `se-ifm-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
-| `se-termination → se-orchestrator` | `se-term-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
+| `se-termination → orchestrator (SE-Mode)` | `se-term-output-v1` | `schemas/se-decomposition.schema.json` | `false` |
 
 **Alle 7 SE-Routen nutzen dasselbe Payload-Schema** (`se-decomposition.schema.json`) — die SE-Agenten füllen jeweils die für sie relevanten optionalen Felder (architect: `sub_components[]`, critic: `critic_status`, ifm: `propagation_map`, termination: `termination_decisions[]`).
 
@@ -469,7 +469,7 @@ Der `se-interface-mgr` erhält die vollständige Revisionshistorie via `history[
 
 ### Abbruchbedingung (MAX_CRITIC_ITERATIONS)
 
-Wenn `MAX_CRITIC_ITERATIONS` (default: 3) erreicht ist → `critic_status.status: "blocked"` → Eskalation an `se-orchestrator` mit `supersession.history[]` + Begründung. Kein weiterer Handoff — der `se-orchestrator` entscheidet über Eskalation oder Abbruch.
+Wenn `MAX_CRITIC_ITERATIONS` (default: 3) erreicht ist → `critic_status.status: "blocked"` → Eskalation an `orchestrator (SE-Mode)` mit `supersession.history[]` + Begründung. Kein weiterer Handoff — der `orchestrator (SE-Mode)` entscheidet über Eskalation oder Abbruch.
 
 ### Validierungsgrenzen
 
@@ -496,10 +496,10 @@ graph LR
 ### A2A + viz-Handshake — parallele Tracking-Ebenen
 
 ```
-se-orchestrator → viz: delegate_out(target=se-architect, task_id=uuid-X)
+orchestrator (SE-Mode) → viz: delegate_out(target=se-architect, task_id=uuid-X)
                  → A2A: handoff_id=HOFF-X, viz_task_id=uuid-X (lose Kopplung)
 
-se-architect    → viz: agent_start(caller=se-orchestrator, task_id=uuid-X)
+se-architect    → viz: agent_start(caller=orchestrator (SE-Mode), task_id=uuid-X)
                  → A2A: parst Envelope, validiert Payload
                  → A2A: handoff_delivered(handoff_id=HOFF-X)
 

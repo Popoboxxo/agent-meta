@@ -20,7 +20,7 @@ graph TD
     ORC --> AMS[agent-meta-scout]
     ORC --> SEC[security-auditor]
     ORC --> EXT[0-external skills]
-    ORC --> SE_ORCH[se-orchestrator]
+    ORC --> SE_ORCH[orchestrator (SE-Mode)]
     SE_ORCH --> SE_REQ[se-requirements]
     SE_ORCH --> SE_ARCH[se-architect]
     SE_ARCH --> SE_CRIT[se-critic]
@@ -55,7 +55,7 @@ graph TD
 | `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns | Ökosystem-Erkundung | sonnet |
 | `security-auditor` | Sicherheitsanalyse: OWASP, Secrets, Dependency-Audit | Security-Reviews | sonnet |
 | `0-external skills` | Domänenspezifische Agenten aus Drittrepos | Spezialwissen | variiert |
-| `se-orchestrator` | Koordiniert 6-stufige rekursive SE-Kaskade | Systems-Engineering | balanced |
+| `orchestrator (SE-Mode)` | Koordiniert 6-stufige rekursive SE-Kaskade | Systems-Engineering | balanced |
 | `se-requirements` | Stakeholder-Bedürfnisse → formale L1-Blackbox-REQs | SE-Start | balanced |
 | `se-architect` | Black-Box → White-Box (funktionale Dekomposition) | SE-Zerlegung | powerful |
 | `se-critic` | Quality Gate: Vollständigkeit, Konsistenz, Testbarkeit | SE-Audit | powerful |

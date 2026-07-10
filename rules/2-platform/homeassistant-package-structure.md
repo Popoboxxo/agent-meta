@@ -1,61 +1,57 @@
-# Package-Struktur & Fachliches Clustering
+# Package Structure & Domain Clustering
 
-## Oberste Direktive: Modularisierung
+## Top Directive: Modularize
 
-Konfigurationen werden **NIEMALS** monolithisch in Root-Dateien geschrieben, sondern modular in thematische Packages aufgeteilt.
+Configurations are never written monolithically into root files. Split them into thematic packages under `/config/packages/`.
 
-## Package-Struktur (`/config/packages/`)
+## Package Layout
 
 ```
-abstraction/   # Abstraktionsschichten (energy_power.yaml)
-bsm/           # Batterie-/Speicher-Management
-car/           # Auto (Ladung, Fahrzeug-APIs)
-fitness/       # Fitness & Gesundheits-Tracking
-grid/          # Stromnetz, Spotpreise
-heating/       # Heizungs-Steuerung
-home/          # Kernfunktionen (climate, window_monitoring, air_quality)
-home_appliances/ # Haushaltsgeräte
-location/      # Präsenz, GPS, Zonen
-mining/        # Krypto-Mining
-report/        # Reporting & Statistiken
-solar/         # Solar (dtu, solarforecast, solarmanager)
-weather/       # Wetter
+abstraction/   # Abstraction layers (energy_power.yaml)
+bsm/           # Battery/storage management
+car/           # Vehicle charging / APIs
+fitness/       # Fitness & health tracking
+grid/          # Grid / spot prices
+heating/       # Heating control
+home/          # Core: climate, window_monitoring, air_quality
+home_appliances/ # Household appliances
+location/      # Presence, GPS, zones
+mining/        # Crypto mining
+report/        # Reporting & statistics
+solar/         # Solar: dtu, solarforecast, solarmanager
+weather/       # Weather
 ```
 
-## Grundprinzipien
+## Principles
 
-- **Ein Package = Eine Fachdomäne**, ein File = ein Sub-Thema
-- **Keine Root-Dateien** — bleiben leer oder `!include_dir_merge_list packages/`
-- **Self-Contained** — jedes Package isoliert verstehbar
+- One package = one domain; one file = one sub-topic
+- Root files stay empty or use `!include_dir_merge_list packages/`
+- Every package is self-contained
 
-## Datei-Struktur (Pflicht-Header)
+## Mandatory File Header
 
 ```yaml
 # ==============================================================================
-# PACKAGE: [Domain] - [Sub-Thema]
-# Beschreibung: [1-2 Sätze]
-# Dependencies: [Integrationen]
+# PACKAGE: [Domain] - [Sub-Topic]
+# Description: [1-2 sentences]
+# Dependencies: [integrations]
 # ==============================================================================
 # Input Helpers → Template Sensors → Automations → Scripts → Scenes
 ```
 
-## Wann neue Datei / neues Package?
+## When to Split?
 
-Neue **Datei**: Sub-Thema neu, bestehende Datei >500 Zeilen, Sub-Thema mit 5+ Entitäten.
-Neues **Package**: Neue Hauptdomäne, mind. 2–3 YAML-Dateien erwartet, unabhängig von anderen.
+- New file: new sub-topic, file >500 lines, or sub-topic has 5+ entities
+- New package: new top-level domain, expect 2–3 YAML files, independent from others
 
 ## Naming
 
-| Typ | Schema | Beispiel |
-|-----|--------|---------|
-| Hauptfunktion | `[domain].yaml` | `climate.yaml` |
-| Hardware | `[hardware].yaml` | `dtu.yaml` |
-| Funktion | `[fn]_[obj].yaml` | `window_monitoring.yaml` |
+- Domain: `[domain].yaml` (e.g. `climate.yaml`)
+- Hardware: `[hardware].yaml` (e.g. `dtu.yaml`)
+- Function: `[fn]_[obj].yaml` (e.g. `window_monitoring.yaml`)
 
 ## Troubleshooting
 
-| Problem | Lösung |
-|---------|--------|
-| Package nicht geladen | `Developer Tools → Check Configuration` |
-| Entitäten doppelt | Root-Datei leeren |
-| Reload reicht nicht | Full Restart (neue Domain hinzugefügt) |
+- Package not loaded → `Developer Tools → Check Configuration`
+- Duplicate entities → empty the root file
+- Reload not enough → full restart (new domain added)

@@ -7,9 +7,9 @@ sodass der Tester den Prompt in den Chat kopieren kann.
 Optional: Leert das Viz-Log und startet den Viz-Server.
 
 Usage:
-  python tests/manual/test-engine/prepare-test-session.py --scenario SE-01
+  python tests/manual/test-engine/prepare-test-session.py --scenario SE-02
   python tests/manual/test-engine/prepare-test-session.py --scenario FW-01 --clear-log
-  python tests/manual/test-engine/prepare-test-session.py --scenario SE-01 --start-server
+  python tests/manual/test-engine/prepare-test-session.py --scenario SE-02 --start-server
   python tests/manual/test-engine/prepare-test-session.py --list
 """
 
@@ -158,7 +158,7 @@ def display_scenario(scenario: dict, target_repo: str | None = None, dry_run: bo
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare a manual test session")
-    parser.add_argument("--scenario", default=None, help="Scenario ID (e.g. SE-01)")
+    parser.add_argument("--scenario", default=None, help="Scenario ID (e.g. SE-02)")
     parser.add_argument("--clear-log", action="store_true", help="Clear viz log before test")
     parser.add_argument("--start-server", action="store_true", help="Start viz server")
     parser.add_argument("--list", action="store_true", help="List all scenarios")

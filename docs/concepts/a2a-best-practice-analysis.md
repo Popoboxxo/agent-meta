@@ -161,13 +161,13 @@ pl: {}
 | `ui-ux-designer → developer` | ⚠ | Design-Spezifikationen |
 | `api-specialist → developer` | ⚠ | API-Contract-Daten |
 | `code-reviewer → developer` | ⚠ | Review-Feedback-Struktur |
-| `se-orchestrator → se-requirements` | ✗ | SE-Stakeholder-REQs |
+| `orchestrator (SE-Mode) → se-requirements` | ✗ | SE-Stakeholder-REQs |
 | `se-requirements → se-architect` | ✗ | SE-Decomposition-Daten |
 | `se-architect → se-critic` | ✗ | SE-Decomposition-Daten |
 | `se-critic → se-architect` | ✗ | Critic-Status + Hints |
 | `se-critic → se-interface-mgr` | ✗ | SE-Decomposition-Daten |
 | `se-interface-mgr → se-termination` | ✗ | SE-Decomposition-Daten |
-| `se-termination → se-orchestrator` | ✗ | Termination-Decisions |
+| `se-termination → orchestrator (SE-Mode)` | ✗ | Termination-Decisions |
 
 ### 2.2 Abdeckungsanalyse: 80/20-Regel
 
@@ -320,7 +320,7 @@ HOFF-013: se-critic → se-interface-mgr (supersession: [HOFF-010, HOFF-011, HOF
 
 Der `se-interface-mgr` erhält die vollständige Revisionshistorie im `supersession`-Feld und kann nachvollziehen, welche Änderungen in welcher Iteration vorgenommen wurden. Dies ist bereits im Envelope-Schema vorgesehen (`supersession.version`, `supersession.supersedes`).
 
-**Abbruchbedingung:** Wenn `MAX_CRITIC_ITERATIONS` erreicht ist → `critic_status.blocked` → Eskalation an `se-orchestrator` mit `supersession`-Historie + Begründung.
+**Abbruchbedingung:** Wenn `MAX_CRITIC_ITERATIONS` erreicht ist → `critic_status.blocked` → Eskalation an `orchestrator (SE-Mode)` mit `supersession`-Historie + Begründung.
 
 ### 3.5 Orchestrator als Envelope-Produzent
 
@@ -446,12 +446,12 @@ viz:
 ```bash
 # MCP (primär):
 log_viz_event --event a2a_handoff_start --task_id uuid-X \
-  --caller se-orchestrator --payload '{"handoff_id":"HOFF-001","contract":"se-arch-output-v1"}'
+  --caller orchestrator --payload '{"handoff_id":"HOFF-001","contract":"se-arch-output-v1"}'
 
 # CLI (Fallback):
 python scripts/viz-logger.py --event a2a_handoff_validated \
   --agent se-architect --provider Opencode --task_id uuid-X \
-  --caller se-orchestrator \
+  --caller orchestrator \
   --payload '{"handoff_id":"HOFF-001","valid":true}'
 ```
 

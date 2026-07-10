@@ -26,7 +26,7 @@
 
 Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit 6 spezialisierten Agenten, die zusammen eine 6-stufige Black-Box → White-Box-Zerlegung koordinieren.
 
-### 1.1 `agents/1-generic/se-orchestrator.md`
+### 1.1 `agents/1-generic/se-orchestrator.md` (deprecated)
 
 **Version:** 1.1.0
 **Beschreibung:** Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch als Fraktal-Zellmaschine.
@@ -484,7 +484,6 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `se-critic` | powerful | — | optional | Vollständigkeit, Konsistenz, Testbarkeit |
 | `se-interface-mgr` | balanced | project | optional | Schnittstellenverträge domänenübergreifend |
 | `se-termination` | fast | — | optional | L3-Component-Leaf-Node Entscheidung |
-| `se-orchestrator` | balanced | — | optional | 6-stufiger rekursiver SE-Herunterbruch |
 
 ### `config/ai-providers.yaml` & Provider Tier Mapping
 
@@ -647,9 +646,9 @@ Jede Extension erweitert TaskSpec um domain-spezifische Felder via JSON Schema `
 - `l3_components` (array) — `[{component_id, description, refines}]`
 - `cqrs_interfaces` (object) — `{commands[], events[], queries[]}`
 
-### 5.6 `schemas/se-orchestrator.schema.json` (Existierend)
+### 5.6 `schemas/se-orchestrator.schema.json` (Existierend, deprecated)
 
-**Zweck:** Orchestrierungs-Metadaten vom se-orchestrator. **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet.
+**Zweck:** Orchestrierungs-Metadaten (deprecated � Funktionalit�t jetzt im Haupt-orchestrator SE-Mode). **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet.
 
 ---
 
@@ -1304,7 +1303,6 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | **se-critic** | `se-arch-output-v1` | `critic-result-v1` | se-architect, se-interface-mgr | — |
 | **se-interface-mgr** | `critic-result-v1` | `interface-result-v1` | se-termination | — |
 | **se-termination** | `interface-result-v1` | `termination-result-v1` | — | — |
-| **se-orchestrator** | `task-spec-v1` | `task-spec-v1` | se-architect, se-requirements | — |
 
 Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für optionale Schema-Validierung vor/nach Delegation. `target_roles` deklariert die typischen Empfänger — der Orchestrator nutzt dies für dynamisches Routing.
 

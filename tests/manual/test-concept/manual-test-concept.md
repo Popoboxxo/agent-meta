@@ -18,7 +18,7 @@ tests/manual/
 ├── test-concept/
 │   └── manual-test-concept.md   ← Diese Datei
 ├── scenarios/
-│   ├── se/                      ← SE-Test-Szenarien (5 Stück)
+│   ├── se/                      ← SE-Test-Szenarien (2 Stück)
 │   └── meta-agent/              ← Meta-Agent-Funktions-Tests (5 Stück)
 └── results/                     ← Test-Ergebnisse, Reports
 
@@ -44,10 +44,10 @@ docs/bugs/                        ← Auto-generierte Bug-Reports (bei FAIL)
 
 ```bash
 # Einzelnes Szenario vorbereiten
-python tests/manual/run-manual-test.py prepare --scenario SE-01
+python tests/manual/run-manual-test.py prepare --scenario SE-02
 
 # Mit Viz-Log leeren (sauberer Start)
-python tests/manual/run-manual-test.py prepare --scenario SE-01 --clear-log
+python tests/manual/run-manual-test.py prepare --scenario SE-02 --clear-log
 
 # Dry-Run (keine echten Git-/Release-Operationen)
 python tests/manual/run-manual-test.py prepare --scenario FW-06 --dry-run --clear-log
@@ -65,7 +65,7 @@ python tests/manual/run-manual-test.py prepare --scenario FW-02 \
 
 ```bash
 # Einzelnes Szenario validieren
-python tests/manual/run-manual-test.py validate --scenario SE-01
+python tests/manual/run-manual-test.py validate --scenario SE-02
 
 # Alle Szenarien validieren (liest aktuelles Viz-Log)
 python tests/manual/run-manual-test.py validate --all
@@ -74,7 +74,7 @@ python tests/manual/run-manual-test.py validate --all
 python tests/manual/run-manual-test.py validate --all --report
 
 # Mit Auto-Bug-Report bei FAIL
-python tests/manual/run-manual-test.py validate --scenario SE-01 --auto-report-fail
+python tests/manual/run-manual-test.py validate --scenario SE-02 --auto-report-fail
 
 # Im Ziel-Repository
 python tests/manual/run-manual-test.py validate --scenario FW-02 \
@@ -91,7 +91,7 @@ python tests/manual/run-manual-test.py validate --scenario FW-02 \
 python tests/manual/run-manual-test.py list
 ```
 
-**Ausgabe:** Alle 15 Szenarien gruppiert nach SE und meta-agent.
+**Ausgabe:** Alle im Test-Engine hinterlegten Szenarien gruppiert nach SE und Meta-Agent.
 
 ---
 
@@ -111,18 +111,18 @@ python tests/manual/run-manual-test.py clean
 
 ```bash
 # 1. Vorbereiten
-python tests/manual/run-manual-test.py prepare --scenario SE-01 --clear-log
+python tests/manual/run-manual-test.py prepare --scenario SE-02 --clear-log
 
 # 2. Prompt in Chat eingeben (manuell!)
-#    "Starte den SE-Prozess für einen Smart-Light IoT Controller..."
+#    "Führe Verifikation und Validierung für das Smart-Light System durch"
 
 # 3. Auf Abschluss warten
 
 # 4. Validieren + Report
-python tests/manual/run-manual-test.py validate --scenario SE-01 --report
+python tests/manual/run-manual-test.py validate --scenario SE-02 --report
 
 # 5. Optional: Bei FAIL Bug-Report generieren
-python tests/manual/run-manual-test.py validate --scenario SE-01 --auto-report-fail
+python tests/manual/run-manual-test.py validate --scenario SE-02 --auto-report-fail
 ```
 
 ### In einem Ziel-Projekt (agent-meta als Submodul)
@@ -169,19 +169,16 @@ wer zuständig ist. Nachher wird nur geprüft: **Wurde der richtige Agent gewäh
 
 ## Test-Szenarien
 
-### Gruppe A: Systems Engineering (5 Szenarien)
+### Gruppe A: Systems Engineering (2 Szenarien)
 
 | ID | Name | Prompt | Erwartete erste Delegation |
 |----|------|--------|---------------------------|
-| **SE-01** | Vollständige SE-Kaskade | "Starte den SE-Prozess für einen Smart-Light IoT Controller..." | `orchestrator → se-orchestrator` |
 | **SE-02** | V&V Rechter Flügel | "Führe Verifikation und Validierung für das Smart-Light System durch" | `orchestrator → se-integration-and-test-manager` |
-| **SE-03** | Trade-Study mit ADR-Export | "Führe eine Trade-Study für die Kommunikationshardware durch..." | `orchestrator → se-orchestrator` |
-| **SE-04** | Rekursive Dekomposition L1→L3 | "Dekomponiere die Sensorik-Einheit des Smart-Light bis auf Komponentenebene (L3)" | `orchestrator → se-orchestrator` |
 | **SE-05** | Stakeholder-Validierung (L1) | "Validiere das fertige Smart-Light System gegen die ursprünglichen Stakeholder-Anforderungen" | `orchestrator → se-validator` |
 
 ### Gruppe B: Meta-Agent-Funktionen (10 Szenarien)
 
-> Insgesamt 15 Szenarien: 5 SE + 10 Meta-Agent
+> Insgesamt 12 Szenarien im Konzept: 2 SE + 10 Meta-Agent (im Test-Engine aktuell 7 hinterlegt)
 
 | ID | Name | Prompt | Erwartete erste Delegation |
 |----|------|--------|---------------------------|
@@ -269,11 +266,11 @@ python tests/manual/run-manual-test.py validate --scenario FW-06 --report
 ### Aktivierung
 
 ```bash
-python tests/manual/run-manual-test.py validate --scenario SE-01 --auto-report-fail
+python tests/manual/run-manual-test.py validate --scenario SE-02 --auto-report-fail
 ```
 
 Bei FAIL wird generiert:
-- `docs/bugs/bug-SE-01-Opencode-20260524-143052.md`
+- `docs/bugs/bug-SE-02-Opencode-20260524-143052.md`
 
 ### Bug-Report-Inhalt
 
@@ -292,7 +289,7 @@ Bei FAIL wird generiert:
 # Kopiere den Bug-Report in ein neues GitHub Issue
 
 # Option B: Via feedback Agent (wenn im Projekt verfügbar)
-python scripts/feedback.py --bug docs/bugs/bug-SE-01-*.md
+python scripts/feedback.py --bug docs/bugs/bug-SE-02-*.md
 ```
 
 ---

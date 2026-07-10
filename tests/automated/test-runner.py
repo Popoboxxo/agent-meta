@@ -260,7 +260,6 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
 # ============================================================================
 
 REQUIRED_AGENT_TEMPLATES = [
-    "se-orchestrator.md",
     "se-requirements.md",
     "se-architect.md",
     "se-critic.md",
@@ -466,47 +465,31 @@ def run_orchestrator_routing_tests(report: TestReport):
 
     content_lower = content.lower()
 
-    # Check Intent-Routing-Tabelle
-    all_agents_in_routing = True
-    missing_routing = []
-    for agent in REQUIRED_AGENT_TEMPLATES:
-        agent_name = agent.replace(".md", "")
-        if agent_name.lower() not in content_lower:
-            all_agents_in_routing = False
-            missing_routing.append(agent_name)
-
+    # Intent-Routing and Agent table are auto-generated from role-defaults.yaml.
+    # Verify the placeholders are present in the source template.
+    has_intent_routing_placeholder = "{{INTENT_ROUTING_TABLE}}" in content
     report.add(TestResult(
-        name="Orchestrator: Intent-Routing contains all agents",
-        passed=all_agents_in_routing,
-        details="All agents referenced in routing table" if all_agents_in_routing
-        else f"Missing in routing: {', '.join(missing_routing)}",
+        name="Orchestrator: Intent-Routing placeholder present",
+        passed=has_intent_routing_placeholder,
+        details="{{INTENT_ROUTING_TABLE}} placeholder found" if has_intent_routing_placeholder
+        else "Missing {{INTENT_ROUTING_TABLE}} placeholder",
     ))
 
-    # Check Agenten-Tabelle
-    # Look for markdown table rows containing agent names
-    table_agents_found = 0
-    for agent in REQUIRED_AGENT_TEMPLATES:
-        agent_name = agent.replace(".md", "")
-        if f"`{agent_name}`" in content or f"| {agent_name}" in content or f"| `{agent_name}`" in content:
-            table_agents_found += 1
-
-    table_ok = table_agents_found >= len(REQUIRED_AGENT_TEMPLATES) * 0.8  # At least 80%
+    has_agent_table_placeholder = "{{AGENT_DELEGATION_TABLE}}" in content
     report.add(TestResult(
-        name="Orchestrator: Agent table contains new agents",
-        passed=table_ok,
-        details=f"Found {table_agents_found}/{len(REQUIRED_AGENT_TEMPLATES)} agents in table",
+        name="Orchestrator: Agent table placeholder present",
+        passed=has_agent_table_placeholder,
+        details="{{AGENT_DELEGATION_TABLE}} placeholder found" if has_agent_table_placeholder
+        else "Missing {{AGENT_DELEGATION_TABLE}} placeholder",
     ))
 
-    # Check SE-Kaskade / V&V Workflow references
-    se_keywords = ["se-kaskade", "se cascade", "v&v", "verification", "validation",
-                   "se-orchestrator", "se-requirements", "se-architect"]
-    found_keywords = [kw for kw in se_keywords if kw.lower() in content_lower]
-    workflow_ok = len(found_keywords) >= 3
+    # Check SE-Kaskade / V&V Workflow references via pipeline match placeholder
+    has_pipeline_match_placeholder = "{{PIPELINE_MATCH_TABLE}}" in content
     report.add(TestResult(
-        name="Orchestrator: SE/V&V workflows referenced",
-        passed=workflow_ok,
-        details=f"Found {len(found_keywords)} SE/V&V keywords: {', '.join(found_keywords)}"
-        if workflow_ok else "Insufficient SE/V&V workflow references",
+        name="Orchestrator: Pipeline Match placeholder present",
+        passed=has_pipeline_match_placeholder,
+        details="{{PIPELINE_MATCH_TABLE}} placeholder found" if has_pipeline_match_placeholder
+        else "Missing {{PIPELINE_MATCH_TABLE}} placeholder",
     ))
 
 

@@ -5,8 +5,8 @@ run-manual-test.py — Zentraler Einstiegspunkt für manuelle Tests.
 Steuert die komplette Test-Pipeline: Vorbereitung → Validierung → Reporting.
 
 Usage:
-  python tests/manual/run-manual-test.py prepare --scenario SE-01
-  python tests/manual/run-manual-test.py validate --scenario SE-01
+  python tests/manual/run-manual-test.py prepare --scenario SE-02
+  python tests/manual/run-manual-test.py validate --scenario SE-02
   python tests/manual/run-manual-test.py validate --all --report
   python tests/manual/run-manual-test.py list
   python tests/manual/run-manual-test.py clean
@@ -123,7 +123,7 @@ def main():
 
     # prepare
     prepare_parser = subparsers.add_parser("prepare", help="Test-Session vorbereiten")
-    prepare_parser.add_argument("--scenario", required=True, help="Szenario-ID (z.B. SE-01)")
+    prepare_parser.add_argument("--scenario", required=True, help="Szenario-ID (z.B. SE-02)")
     prepare_parser.add_argument("--clear-log", action="store_true", help="Viz-Log leeren")
     prepare_parser.add_argument("--target-repo", default=None, help="Ziel-Repository")
     prepare_parser.add_argument("--dry-run", action="store_true",

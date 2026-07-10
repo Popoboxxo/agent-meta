@@ -7,10 +7,10 @@ und gleicht es gegen die in manual-scenarios.json definierten erwarteten
 Delegationsketten ab.
 
 Usage:
-  python tests/manual/test-engine/validate-delegation.py --scenario SE-01
+  python tests/manual/test-engine/validate-delegation.py --scenario SE-02
   python tests/manual/test-engine/validate-delegation.py --all
   python tests/manual/test-engine/validate-delegation.py --all --report
-  python tests/manual/test-engine/validate-delegation.py --log .meta-viz/events.jsonl --scenario SE-01
+  python tests/manual/test-engine/validate-delegation.py --log .meta-viz/events.jsonl --scenario SE-02
 """
 
 import argparse
@@ -451,7 +451,7 @@ def render_report(all_results: list[dict], provider: str = "Unknown", repo: str 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate delegation patterns in REAL viz event logs")
-    parser.add_argument("--scenario", default=None, help="Validate a single scenario (e.g. SE-01)")
+    parser.add_argument("--scenario", default=None, help="Validate a single scenario (e.g. SE-02)")
     parser.add_argument("--all", action="store_true", help="Validate all scenarios (reads current viz log)")
     parser.add_argument("--strict", action="store_true", help="Strict order checking")
     parser.add_argument("--report", action="store_true", help="Generate Markdown report")

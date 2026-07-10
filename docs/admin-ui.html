@@ -1588,9 +1588,9 @@ async function viewRoleDefaults() {
     const tr = el("tr");
     tr.appendChild(el("td", { class: "mono" }, [name]));
     tr.appendChild(el("td", {}, [selectField(modelOptions, attrs.model || "", v => updateRole(name, "model", v, status))]));
-    tr.appendChild(el("td", {}, [selectField(tierOptions, attrs.tier || attrs["workflow-tier"] || "", v => updateRole(name, "tier", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(tierOptions, attrs.workflow_tier || attrs.tier || attrs["workflow-tier"] || "", v => updateRole(name, "workflow_tier", v, status))]));
     tr.appendChild(el("td", {}, [toggleField(!!attrs.parallel, v => updateRole(name, "parallel", v, status))]));
-    tr.appendChild(el("td", {}, [selectField(permOptions, attrs.permissionMode || "", v => updateRole(name, "permissionMode", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(permOptions, attrs.permission_mode || attrs.permissionMode || "", v => updateRole(name, "permission_mode", v, status))]));
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);

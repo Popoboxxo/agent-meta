@@ -95,7 +95,6 @@
           "se-integration-and-test-manager",
           "se-interface-mgr",
           "se-junior-developer",
-          "se-orchestrator",
           "se-requirements",
           "se-senior-developer",
           "se-termination",
@@ -703,7 +702,11 @@
       "properties": {
         "default": {
           "type": "string",
-          "enum": ["legacy", "hybrid", "modern"],
+          "enum": [
+            "legacy",
+            "hybrid",
+            "modern"
+          ],
           "default": "legacy",
           "description": "Standard-Modus für alle Agenten ohne expliziten Override."
         },
@@ -712,7 +715,11 @@
           "description": "Rollen-spezifische Overrides. Key = Rollenname, Value = Modus.",
           "additionalProperties": {
             "type": "string",
-            "enum": ["legacy", "hybrid", "modern"]
+            "enum": [
+              "legacy",
+              "hybrid",
+              "modern"
+            ]
           }
         }
       },
@@ -1163,7 +1170,9 @@
     "cascadeDefinition": {
       "type": "object",
       "description": "Definition einer SE-Kaskade mit Phasen und Agenten.",
-      "required": ["stages"],
+      "required": [
+        "stages"
+      ],
       "properties": {
         "description": {
           "type": "string"
@@ -1185,7 +1194,10 @@
     "cascadeStage": {
       "type": "object",
       "description": "Eine Phase innerhalb einer SE-Kaskade.",
-      "required": ["name", "agent"],
+      "required": [
+        "name",
+        "agent"
+      ],
       "properties": {
         "name": {
           "type": "string"

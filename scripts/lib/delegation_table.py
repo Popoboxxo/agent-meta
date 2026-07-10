@@ -28,7 +28,6 @@ _PARALLEL_LABELS: dict[str, str] = {
     "feedback": "❌ (atomar)",
     "bug-feature-analyzer": "✅ (Multi-Issues)",
     "effort-estimator": "❌ (sequentiell)",
-    "se-orchestrator": "❌ (Meta-Orchestrator)",
     "se-requirements": "❌ (sequentiell)",
     "se-architect": "✅ (Multi-Systeme)",
     "se-critic": "✅ (Multi-Prüfungen)",
@@ -96,5 +95,60 @@ def generate_agent_delegation_table(agent_meta_root: Path, config: dict, variabl
         model_tier = role_info.get("model", "") or "—"
 
         lines.append(f"| `{role_name}` | {description} | {model_tier} | {parallel} |")
+
+    return "\n".join(lines)
+
+
+def generate_intent_routing_table(agent_meta_root: Path, config: dict, variables: dict) -> str:
+    """Generate Intent-Routing table from role configs.
+
+    Reads roles from config/role-defaults.yaml and generates a Markdown table.
+    Only roles with a `routing` block are included. Respects feature flags for
+    SE_ENABLED, VALIDATOR_ENABLED, DEVELOPER_TIERS_ENABLED, EFFORT_ESTIMATOR_ENABLED
+    and DOD_TESTS_REQUIRED.
+    """
+    roles_cfg = load_roles_config(agent_meta_root)
+    roles = roles_cfg.get("roles", {})
+
+    se_enabled = variables.get("SE_ENABLED", "false") == "true"
+    validator_enabled = variables.get("VALIDATOR_ENABLED", "false") == "true"
+    developer_tiers = variables.get("DEVELOPER_TIERS_ENABLED", "false") == "true"
+    effort_estimator = variables.get("EFFORT_ESTIMATOR_ENABLED", "false") == "true"
+    tests_required = variables.get("DOD_TESTS_REQUIRED", "false") == "true"
+
+    lines = ["| Intent | Ziel | Tier | Parallel |", "|--------|------|------|----------|"]
+
+    for role_name in sorted(roles.keys()):
+        if role_name.startswith("se-") and not se_enabled:
+            continue
+        if role_name == "validator" and not validator_enabled:
+            continue
+        if role_name in ("junior-developer", "senior-developer") and not developer_tiers:
+            continue
+        if role_name == "effort-estimator" and not effort_estimator:
+            continue
+        if role_name == "tester" and not tests_required:
+            continue
+
+        role = roles[role_name]
+        routing = role.get("routing")
+        if not routing:
+            continue  # skip roles without routing hints
+
+        keywords = routing.get("intent_keywords", [role.get("description", role_name)])
+        intent = " / ".join(keywords[:4])
+        target = f"`{role_name}`"
+        tier = role.get("model", "balanced") or "balanced"
+        parallel = "Ja" if routing.get("parallel", True) else "Nein"
+
+        lines.append(f"| {intent} | {target} | {tier} | {parallel} |")
+
+    # Special non-role routing rows
+    if se_enabled:
+        lines.append("| SE-Kaskade | Pipeline `se-cascade` | balanced→powerful | Nein |")
+    lines.append("| Reflection-Loop | self (REPEAT_UNTIL) | balanced→powerful | Nein |")
+
+    # Fallback for unknown intents
+    lines.append("| Nicht in Tabelle | User fragen | — | — |")
 
     return "\n".join(lines)

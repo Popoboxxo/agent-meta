@@ -71,6 +71,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "se_persistence_schema_dir",
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
+    "PIPELINE_MATCH_TABLE", "INTENT_ROUTING_TABLE",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging

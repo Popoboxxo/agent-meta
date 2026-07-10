@@ -282,7 +282,7 @@ patches:
 
 | Agent | Tier | Description |
 |-------|------|-------------|
-| **se-orchestrator** | balanced | Coordinates the 6-level recursive SE breakdown |
+| **se-orchestrator (deprecated)** | balanced | SE-Funktionalit�t jetzt im Haupt-orchestrator (SE-Mode) |
 | **se-requirements** | balanced | Elicits stakeholder needs and formalizes L1 black-box requirements |
 | **se-architect** | powerful | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
 | **se-critic** | powerful | Audits architectures for completeness, consistency, traceability, verifiability |
@@ -605,7 +605,7 @@ viz:
 | **M** | Scout Ecosystem | Search for new skills/roles/rules/patterns | `agent-meta-scout` |
 | **O** | Log Analysis | Analyze logs → cluster errors → delegate findings | `log-analyzer` |
 | **P** | Project Issue | Create standardized bug/feature GitHub issue | `feedback` |
-| **U** | SE Cascade | 6-level recursive systems engineering breakdown | `se-orchestrator` |
+| **U** | SE Cascade | 6-level recursive systems engineering breakdown | `orchestrator (SE-Mode)` |
 
 ## Contributing
 

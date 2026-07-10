@@ -447,7 +447,7 @@ se-termination → (se-validator | se-verifier)). Maximal 5 Stufen Tiefe. Nur in
 **Schritte:**
 1. Starte Claude Code
 2. Gib ein: "Starte den SE-Prozess für ein Benachrichtigungssystem"
-3. Der se-orchestrator startet die Kaskade
+3. Der orchestrator (SE-Mode) startet die Kaskade
 4. Prüfe: se-requirements erstellt ein L1-Blackbox-Requirement
 5. Prüfe: se-architect zerlegt in Whitebox-Komponenten
 6. Prüfe: se-critic prüft Architekturentscheidungen
@@ -479,7 +479,7 @@ se-termination → (se-validator | se-verifier)). Maximal 5 Stufen Tiefe. Nur in
 - Gemini Code Assist installiert
 
 **Schritte:**
-1. Starte Gemini und rufe den se-orchestrator auf
+1. Starte Gemini und rufe den orchestrator (SE-Mode) auf
 2. Gib eine komplexe Anforderung ein (z.B. "IoT Sensorplattform")
 3. Beobachte den rekursiven Herunterbruch
 4. Prüfe: Eine neue Zelle wird gestartet wenn se-termination `continue` meldet
@@ -509,7 +509,7 @@ se-termination → (se-validator | se-verifier)). Maximal 5 Stufen Tiefe. Nur in
 - Opencode installiert
 
 **Schritte:**
-1. Starte den se-orchestrator via `@orchestrator`
+1. Starte den orchestrator (SE-Mode) via `@orchestrator`
 2. Gib: "Starte SE-Kaskade für eine einfache CRUD-API"
 3. Beobachte den rekursiven Herunterbruch bis L3
 4. Prüfe: se-termination erkennt dass die Komponente ein Leaf-Node ist
@@ -519,7 +519,7 @@ se-termination → (se-validator | se-verifier)). Maximal 5 Stufen Tiefe. Nur in
 - Kaskade erreicht L3 (Component Level)
 - se-termination markiert Leaf-Nodes korrekt
 - Deterministische Terminierung — keine Endlos-Rekursion
-- Ergebnisse werden an se-orchestrator zurückgemeldet
+- Ergebnisse werden an orchestrator (SE-Mode) zurückgemeldet
 
 **Tatsächliches Ergebnis:**
 - _(Platzhalter für Tester)_

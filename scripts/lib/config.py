@@ -15,6 +15,7 @@ from .pipelines import (
     apply_overrides,
     validate_pipelines,
     build_pipeline_variables,
+    generate_pipeline_match_table,
 )
 
 try:
@@ -268,7 +269,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
-    from .delegation_table import generate_agent_delegation_table
+    from .delegation_table import (
+        generate_agent_delegation_table,
+        generate_intent_routing_table,
+    )
     from .dod import resolve_dod
     from .providers import load_providers_config, resolve_providers
 
@@ -417,6 +421,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_OPTIONAL"]    = "true" if se_required == "false" else "false"
     variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
+    # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
+    variables["INTENT_ROUTING_TABLE"] = generate_intent_routing_table(agent_meta_root, config, variables)
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
@@ -451,6 +457,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         # base pipelines so substitute() never warns about missing placeholders.
         active_vars = build_pipeline_variables(effective, dod_resolved)
         variables.update(active_vars)
+        variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:
             var_name = name.upper().replace("-", "_")
             block_key = f"PIPELINE_{var_name}_BLOCK"

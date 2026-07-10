@@ -1,38 +1,6 @@
-# Zentrale Rollen-Konfiguration für agent-meta.
-# Definiert alle bekannten Rollen, empfohlene Modelle, Memory-Scopes und Kurzbeschreibungen.
-# Wird von sync.py beim Generieren gelesen.
-#
-# model: Modell-Tier für diese Rolle. Leer = erbt vom Parent-Kontext (kein model:-Feld).
-#   Tier-Namen (provider-agnostisch, empfohlen):
-#     nano     — ultra-schnell, minimale Kosten (z.B. einfache Formatierungen)
-#     fast     — schnell & günstig (z.B. git, meta-feedback, docker)
-#     balanced — guter Kompromiss Kosten/Qualität (Standard für dev, docs, review)
-#     powerful — starkes Reasoning (z.B. security-audit, komplexe Architektur)
-#     max      — maximale Kapazität, reserviert für zukünftige Ultra-Modelle
-#   Rückwärtskompatibel: 'haiku', 'sonnet', 'opus' funktionieren als Claude-Aliase.
-#   Volle Modell-IDs ('claude-sonnet-4-6') werden direkt übergeben (kein Tier-Lookup).
-#   Provider-Mapping: config/ai-providers.yaml → model-tiers pro Provider.
-#   Projekte überschreiben via 'model-overrides' in .meta-config/project.yaml.
-#
-# memory: persistentes Agenten-Gedächtnis über Sessions hinweg. Leer = kein Gedächtnis.
-#   Gültige Werte: 'project' (.claude/agent-memory/<name>/, in git),
-#                  'local' (.claude/agent-memory-local/<name>/, gitignored),
-#                  'user' (~/.claude/agent-memory/<name>/, maschinenlokal).
-#   Projekte überschreiben via 'memory-overrides' in .meta-config/project.yaml.
-#
-# permission_mode: Claude Code Berechtigungsmodus. Leer = Standard (kein Frontmatter-Feld).
-#   Gültige Werte: 'default', 'acceptEdits', 'bypassPermissions', 'plan' (read-only).
-#   Projekte überschreiben via 'permission-mode-overrides' in .meta-config/project.yaml.
-#
-# steps: Maximale Iterationen für Opencode-Agenten. Leer = kein Limit (kein steps:-Feld).
-#   Gültige Werte: positive Ganzzahl (z.B. 10, 25).
-#   Projekte überschreiben via 'steps-overrides' in .meta-config/project.yaml.
-#
-# workflow_tier: Empfehlungsstufe. 'required' = Kern-Workflow; 'recommended' = Standard-Qualität;
-#   'optional' = bei Bedarf. User steuert via 'roles' in .meta-config/project.yaml.
-#
-# temperature: Sampling-Temperatur. Optional. Float 0.0–1.0. Leer = Provider-Default.
-# max_tokens: Max Output-Tokens. Optional. Positive Ganzzahl. Leer = Provider-Default.
+# Central role defaults for agent-meta. Read by sync.py.
+# Fields: model, memory, permission_mode, steps, workflow_tier, temperature, max_tokens.
+# Project overrides live in .meta-config/project.yaml.
 
 roles:
 
@@ -50,7 +18,11 @@ roles:
     memory: ""
     workflow_tier: required
     description: "Feature-Implementierung und Bugfixes"
-    handoff:
+    routing:
+      intent_keywords: ["Feature", "Bugfix", "Refactoring", "Implementierung", "Code schreiben"]
+      parallel: true
+      orchestrator_only: false
+    handoff: &dev_handoff
       input_contracts: ["task-spec-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
@@ -61,10 +33,12 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert"
+    routing:
+      intent_keywords: ["Trivialer Fix", "kleiner Fix", "≤2 Dateien"]
+      parallel: true
+      orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
+      <<: *dev_handoff
       timeout_sec: 120
 
   senior-developer:
@@ -72,10 +46,12 @@ roles:
     memory: project          # Architektur-Entscheidungen über Sessions hinweg erinnern
     workflow_tier: optional
     description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings"
+    routing:
+      intent_keywords: ["Komplex", "Architektur", "schwieriger Bug", "Cross-Cutting"]
+      parallel: false
+      orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
+      <<: *dev_handoff
       timeout_sec: 600
 
   requirements:
@@ -83,6 +59,10 @@ roles:
     memory: project
     workflow_tier: recommended
     description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
+    routing:
+      intent_keywords: ["Anforderungen", "REQ-ID", "Requirements"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       input_contracts: ["ideation-output-v1", "task-spec-v1"]
       output_contract: "req-output-v1"
@@ -93,6 +73,10 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
+    routing:
+      intent_keywords: ["Design", "Konzept", "Architektur", "Idee"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       output_contract: "ideation-output-v1"
       output_schema: "schemas/handoffs/ext/ideation-extension.schema.json"
@@ -103,6 +87,10 @@ roles:
     memory: ""
     workflow_tier: recommended
     description: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
+    routing:
+      intent_keywords: ["Feature Lifecycle", "komplexes Feature", "Feature Pipeline"]
+      parallel: true
+      orchestrator_only: true
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "feature-result-v1"
@@ -112,6 +100,10 @@ roles:
     memory: ""
     workflow_tier: recommended
     description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
+    routing:
+      intent_keywords: ["Tests", "TDD", "Testabdeckung"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["task-spec-v1", "req-output-v1"]
       output_contract: "test-result-v1"
@@ -122,6 +114,10 @@ roles:
     permission_mode: plan
     workflow_tier: recommended
     description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
+    routing:
+      intent_keywords: ["Validierung", "DoD", "Traceability"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       input_contracts: ["task-spec-v1", "dev-result-v1"]
       validate_handoff: true
@@ -132,6 +128,10 @@ roles:
     memory: project
     workflow_tier: recommended
     description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
+    routing:
+      intent_keywords: ["Dokumentation", "README", "Docs", "Doku"]
+      parallel: true
+      orchestrator_only: false
 
   security-auditor:
     model: powerful
@@ -139,66 +139,111 @@ roles:
     permission_mode: plan
     workflow_tier: optional
     description: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
+    routing:
+      intent_keywords: ["Security", "Audit", "OWASP"]
+      parallel: false
+      orchestrator_only: false
 
   agent-meta-scout:
     model: balanced
     memory: local
     workflow_tier: optional
     description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
+    routing:
+      intent_keywords: ["Scout", "neue Skills", "Ökosystem"]
+      parallel: true
+      orchestrator_only: false
 
   prompt-engineer:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera)."
+    routing:
+      intent_keywords: ["Prompt", "Prompt Engineering", "Agenten-Definition"]
+      parallel: false
+      orchestrator_only: false
 
   agent-meta-manager:
     model: balanced
     memory: ""
     workflow_tier: optional
     description: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
+    routing:
+      intent_keywords: ["Meta-Fragen", "agent-meta", "Agenten verwalten"]
+      parallel: false
+      orchestrator_only: false
+
 
   release:
     model: balanced
     memory: ""
     workflow_tier: optional
     description: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
+    routing:
+      intent_keywords: ["Release", "Version", "Changelog"]
+      parallel: false
+      orchestrator_only: false
 
   git:
     model: fast
     memory: ""
     workflow_tier: required
     description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
+    routing:
+      intent_keywords: ["Git", "Commit", "Branch", "Push", "Pull"]
+      parallel: false
+      orchestrator_only: false
 
   meta-feedback:
     model: fast
     memory: ""
     workflow_tier: optional
     description: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
+    routing:
+      intent_keywords: ["Meta-Feedback", "Verbesserung"]
+      parallel: false
+      orchestrator_only: false
 
   docker:
     model: fast
     memory: ""
     workflow_tier: optional
     description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
+    routing:
+      intent_keywords: ["Docker", "Dev-Stack", "Container"]
+      parallel: false
+      orchestrator_only: false
 
   log-analyzer:
     model: balanced
     memory: ""
     workflow_tier: required
     description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
+    routing:
+      intent_keywords: ["Log", "Logs", "Fehleranalyse"]
+      parallel: true
+      orchestrator_only: false
 
   feedback:
     model: fast
     memory: ""
     workflow_tier: required
     description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
+    routing:
+      intent_keywords: ["Feedback", "Issue", "Bug melden"]
+      parallel: false
+      orchestrator_only: false
 
   bug-feature-analyzer:
     model: balanced
     memory: ""
     workflow_tier: recommended
     description: "Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation"
+    routing:
+      intent_keywords: ["Triage", "Bug/Feature", "klassifizieren"]
+      parallel: true
+      orchestrator_only: true
 
   openscad-developer:
     model: balanced
@@ -211,6 +256,10 @@ roles:
     memory: project
     workflow_tier: optional
     description: "Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement."
+    routing:
+      intent_keywords: ["SE Requirements", "Stakeholder Needs"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "se-req-output-v1"
@@ -221,6 +270,10 @@ roles:
     memory: project
     workflow_tier: optional
     description: "Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität)."
+    routing:
+      intent_keywords: ["SE Architektur", "Decomposition"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "se-arch-output-v1"
@@ -232,6 +285,10 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit."
+    routing:
+      intent_keywords: ["SE Critic", "Architektur Review"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["se-arch-output-v1"]
       output_contract: "critic-result-v1"
@@ -242,6 +299,10 @@ roles:
     memory: project
     workflow_tier: optional
     description: "Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend."
+    routing:
+      intent_keywords: ["SE Interface", "Schnittstellen"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       input_contracts: ["critic-result-v1"]
       output_contract: "interface-result-v1"
@@ -252,21 +313,13 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde."
+    routing:
+      intent_keywords: ["SE Termination"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       input_contracts: ["interface-result-v1"]
       output_contract: "termination-result-v1"
-
-  se-orchestrator:
-    model: balanced
-    memory: ""
-    workflow_tier: optional
-    deprecated: true
-    deprecated_by: "orchestrator"
-    description: "DEPRECATED — SE-Funktionalität wird nun direkt vom orchestrator via SE-Mode übernommen. Wird nur aus Backward-Compatibility-Gründen behalten."
-    handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "task-spec-v1"
-      target_roles: ["se-architect", "se-requirements", "se-junior-developer", "se-developer", "se-senior-developer"]
 
   se-junior-developer:
     model: fast              # günstige Stufe — triviale SE-Leafs, 0-1 Interfaces
@@ -274,10 +327,12 @@ roles:
     workflow_tier: optional
     parallel: true
     description: "Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert"
+    routing:
+      intent_keywords: ["SE trivial", "SE Leaf"]
+      parallel: true
+      orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
+      <<: *dev_handoff
       timeout_sec: 120
 
   se-developer:
@@ -286,10 +341,12 @@ roles:
     workflow_tier: optional
     parallel: true
     description: "Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin"
+    routing:
+      intent_keywords: ["SE Implementierung", "SE Leaf"]
+      parallel: true
+      orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
+      <<: *dev_handoff
       timeout_sec: 300
 
   se-senior-developer:
@@ -298,10 +355,12 @@ roles:
     workflow_tier: optional
     parallel: true
     description: "Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse"
+    routing:
+      intent_keywords: ["SE komplex", "SE Boundary"]
+      parallel: true
+      orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
+      <<: *dev_handoff
       timeout_sec: 600
 
   se-test-engineer:
@@ -309,6 +368,10 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel."
+    routing:
+      intent_keywords: ["SE Test", "MBSE Tests"]
+      parallel: true
+      orchestrator_only: false
 
   se-testreviewer:
     model: powerful
@@ -316,24 +379,40 @@ roles:
     permission_mode: plan
     workflow_tier: optional
     description: "Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness."
+    routing:
+      intent_keywords: ["SE Test Review"]
+      parallel: true
+      orchestrator_only: false
 
   se-verifier:
     model: balanced
     memory: project
     workflow_tier: optional
     description: "Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen."
+    routing:
+      intent_keywords: ["SE Verification"]
+      parallel: true
+      orchestrator_only: false
 
   se-validator:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse."
+    routing:
+      intent_keywords: ["SE Validation"]
+      parallel: false
+      orchestrator_only: false
 
   se-integration-and-test-manager:
     model: balanced
     memory: ""
     workflow_tier: optional
     description: "V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen."
+    routing:
+      intent_keywords: ["SE Integration", "V&V"]
+      parallel: false
+      orchestrator_only: false
 
   code-reviewer:
     model: powerful
@@ -341,6 +420,10 @@ roles:
     permission_mode: plan
     workflow_tier: recommended
     description: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+    routing:
+      intent_keywords: ["Code Review", "Code-Qualität", "Audit"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["dev-result-v1"]
       output_contract: "review-output-v1"
@@ -353,6 +436,10 @@ roles:
     permission_mode: plan
     workflow_tier: optional
     description: "Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops"
+    routing:
+      intent_keywords: ["Konzept Review", "Design Review"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["ideation-output-v1"]
       output_contract: "concept-review-v1"
@@ -362,6 +449,10 @@ roles:
     memory: project
     workflow_tier: optional
     description: "UI-Spezifikationen, Mockups und Design-Systeme erstellen."
+    routing:
+      intent_keywords: ["UI", "UX", "Mockup", "Design"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       output_contract: "design-spec-v1"
       output_schema: "schemas/handoffs/ext/design-extension.schema.json"
@@ -372,6 +463,10 @@ roles:
     memory: project
     workflow_tier: optional
     description: "OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen."
+    routing:
+      intent_keywords: ["API", "OpenAPI", "Contract-First"]
+      parallel: false
+      orchestrator_only: false
     handoff:
       output_contract: "api-spec-v1"
       output_schema: "schemas/handoffs/ext/api-extension.schema.json"
@@ -382,30 +477,50 @@ roles:
     memory: ""
     workflow_tier: optional
     description: "CI/CD, Infrastructure as Code, Kubernetes, Observability."
+    routing:
+      intent_keywords: ["CI/CD", "Kubernetes", "Infrastruktur"]
+      parallel: true
+      orchestrator_only: false
 
   performance-optimizer:
     model: powerful
     memory: ""
     workflow_tier: optional
     description: "Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung."
+    routing:
+      intent_keywords: ["Performance", "Bottleneck", "Optimierung"]
+      parallel: false
+      orchestrator_only: false
 
   export-manager:
     model: fast
     memory: ""
     workflow_tier: optional
     description: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."
+    routing:
+      intent_keywords: ["Export", "Routing", "Target"]
+      parallel: false
+      orchestrator_only: false
 
   effort-estimator:
     model: fast
     memory: ""
     workflow_tier: optional
     description: "Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung"
+    routing:
+      intent_keywords: ["Aufwand", "Schätzung", "Kosten"]
+      parallel: false
+      orchestrator_only: false
 
   explorer:
     model: balanced
     memory: ""
     workflow_tier: optional
     description: "Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche."
+    routing:
+      intent_keywords: ["Codebase", "Dependencies", "Impact", "Recherche"]
+      parallel: true
+      orchestrator_only: false
     handoff:
       input_contracts: ["task-spec-v1"]
       output_contract: "explorer-output-v1"
@@ -416,30 +531,50 @@ roles:
     memory: project
     workflow_tier: optional
     description: "Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Claude", "Claude Code"]
+      parallel: false
+      orchestrator_only: false
 
   gemini-expert:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Gemini", "Antigravity"]
+      parallel: false
+      orchestrator_only: false
 
   opencode-expert:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Opencode"]
+      parallel: false
+      orchestrator_only: false
 
   continue-expert:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Continue"]
+      parallel: false
+      orchestrator_only: false
 
   copilot-expert:
     model: powerful
     memory: project
     workflow_tier: optional
     description: "Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Copilot", "GitHub Copilot"]
+      parallel: false
+      orchestrator_only: false
 
 outcome-caching:
   enabled: false
@@ -478,6 +613,7 @@ reflection_pairs:
 quality_pipelines:
   standard-feature:
     description: "Full feature lifecycle with TDD, review, and PR"
+    signal_keywords: ["Feature implementieren", "Feature bauen", "neues Feature", "Funktion bauen"]
     stages:
       - id: branch
         agent: git
@@ -503,6 +639,7 @@ quality_pipelines:
 
   quick-fix:
     description: "Schneller Bugfix ohne Overhead"
+    signal_keywords: ["Bug fixen", "Bug beheben", "Triage", "schneller Fix", "Hotfix"]
     stages:
       - id: fix
         agent: developer
@@ -516,6 +653,7 @@ quality_pipelines:
 
   bugfix:
     description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
+    signal_keywords: ["Bug fixen", "Bug beheben", "Fehler beheben"]
     stages:
       - id: triage
         agent: bug-feature-analyzer
@@ -541,6 +679,7 @@ quality_pipelines:
 
   concept-development:
     description: "Recherche → Konzept → Review-Loop für Vorfeld-/Designarbeit ohne Code"
+    signal_keywords: ["Konzept", "Design-Doc", "Recherche", "Trade-offs"]
     stages:
       - id: research
         agent: ideation
@@ -562,6 +701,7 @@ quality_pipelines:
 
   refactor:
     description: "Codebase refactoring: blast-radius analysis → implement → review → commit. Use for cross-cutting refactorings, not trivial renames."
+    signal_keywords: ["Refactoring", "aufräumen", "Cleanup", "Code verbessern"]
     stages:
       - id: analyze
         agent: senior-developer
@@ -587,6 +727,7 @@ quality_pipelines:
 
   docs-update:
     description: "Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW, ARCHITECTURE, and similar doc-only changes."
+    signal_keywords: ["Dokumentation", "README", "Docs", "Doku"]
     stages:
       - id: update
         agent: documenter
@@ -600,6 +741,7 @@ quality_pipelines:
 
   se-cascade:
     description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)"
+    signal_keywords: ["SE-Kaskade", "Zerlegung", "Systems Engineering", "SE-Breakdown"]
     stages:
       - id: l0-stakeholder
         agent: se-requirements

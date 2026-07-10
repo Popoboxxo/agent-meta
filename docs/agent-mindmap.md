@@ -224,9 +224,9 @@ mindmap
 - **Beschreibung:** Manages generic signal flow and deterministic synchronization across systems.
 - **Model:** Claude: claude-sonnet-4-6, Opencode: opencode-go/qwen3.6-plus
 
-### se-orchestrator
-- **Tier:** optional
-- **Beschreibung:** Coordinates the 6-level recursive breakdown with zig-zag traceability and V&V.
+### se-orchestrator (deprecated)
+- **Tier:** optional (deprecated)
+- **Beschreibung:** SE-Funktionalität jetzt im Haupt-orchestrator (SE-Mode). Wrapper für Backward-Compatibility.
 - **Model:** Claude: claude-sonnet-4-6, Opencode: opencode-go/qwen3.6-plus
 
 ### se-requirements

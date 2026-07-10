@@ -1,9 +1,8 @@
 {
   "description": "Manuelle Test-Szenarien fuer Delegations-Verifikation via echte Viz-Logs",
   "version": "2.0.0",
-  "total_scenarios": 10,
+  "total_scenarios": 7,
   "orchestrator_routing_table": {
-    "SE-Kaskade": { "target": "se-orchestrator", "tier": "balanced" },
     "Neues Feature": { "target": "feature", "tier": "balanced" },
     "Bugfix": { "target": "developer", "tier": "balanced" },
     "Code-Qualitaets-Audit": { "target": "code-reviewer", "tier": "powerful" },
@@ -27,23 +26,6 @@
   "scenarios": {
     "SE": [
       {
-        "id": "SE-01",
-        "name": "Vollstaendige SE-Kaskade (Linker Fluegel)",
-        "user_input": "Starte den SE-Prozess fuer einen Smart-Light IoT Controller mit Temperatursensor, Bewegungserkennung und WiFi-Anbindung",
-        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
-        "delegation_chain": [
-          { "from": "se-orchestrator", "to": "se-requirements" },
-          { "from": "se-orchestrator", "to": "se-architect" },
-          { "from": "se-orchestrator", "to": "se-critic", "note": "1. Durchlauf" },
-          { "from": "se-orchestrator", "to": "se-architect", "note": "Iteration nach Critic-Feedback" },
-          { "from": "se-orchestrator", "to": "se-critic", "note": "2. Durchlauf" },
-          { "from": "se-orchestrator", "to": "se-termination" },
-          { "from": "se-orchestrator", "to": "se-interface-mgr" }
-        ],
-        "required_agents": ["orchestrator", "se-orchestrator", "se-requirements", "se-architect", "se-critic", "se-termination", "se-interface-mgr"],
-        "critical_checks": ["se-architect muss zweimal delegiert werden (Iteration nach Critic)", "se-termination muss leaf/continue Entscheidungen treffen"]
-      },
-      {
         "id": "SE-02",
         "name": "V&V Rechter Fluegel",
         "user_input": "Fuehre Verifikation und Validierung fuer das Smart-Light System durch",
@@ -56,39 +38,6 @@
         ],
         "required_agents": ["orchestrator", "se-integration-and-test-manager", "se-test-engineer", "se-testreviewer", "se-verifier", "se-validator"],
         "critical_checks": ["se-test-engineer vor se-testreviewer", "se-verifier vor se-validator", "se-validator nur auf L1"]
-      },
-      {
-        "id": "SE-03",
-        "name": "Trade-Study mit ADR-Export",
-        "user_input": "Fuehre eine Trade-Study fuer die Kommunikationshardware durch: WiFi vs. Zigbee vs. Thread",
-        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
-        "delegation_chain": [
-          { "from": "se-orchestrator", "to": "se-architect", "note": "Trade-Study + ADR" },
-          { "from": "se-architect", "to": "export-manager", "note": "ADR-Payload zu Target routen" }
-        ],
-        "required_agents": ["orchestrator", "se-orchestrator", "se-architect", "export-manager"],
-        "critical_checks": ["se-architect muss ADR als JSON-Payload an export-manager uebergeben", "export-manager muss Target aus export.yaml lesen"]
-      },
-      {
-        "id": "SE-04",
-        "name": "Rekursive Dekomposition L1->L2->L3",
-        "user_input": "Dekomponiere die Sensorik-Einheit des Smart-Light bis auf Komponentenebene (L3)",
-        "expected_routing": { "from": "orchestrator", "to": "se-orchestrator", "intent": "SE-Kaskade" },
-        "delegation_chain": [
-          { "from": "se-orchestrator", "to": "se-requirements", "note": "L1" },
-          { "from": "se-orchestrator", "to": "se-architect", "note": "L1" },
-          { "from": "se-orchestrator", "to": "se-critic", "note": "L1" },
-          { "from": "se-orchestrator", "to": "se-termination", "note": "L1" },
-          { "from": "se-orchestrator", "to": "se-requirements", "note": "L2" },
-          { "from": "se-orchestrator", "to": "se-architect", "note": "L2" },
-          { "from": "se-orchestrator", "to": "se-critic", "note": "L2" },
-          { "from": "se-orchestrator", "to": "se-termination", "note": "L2" },
-          { "from": "se-orchestrator", "to": "se-requirements", "note": "L3" },
-          { "from": "se-orchestrator", "to": "se-architect", "note": "L3" },
-          { "from": "se-orchestrator", "to": "se-termination", "note": "L3 -- leaf" }
-        ],
-        "required_agents": ["orchestrator", "se-orchestrator", "se-requirements", "se-architect", "se-critic", "se-termination"],
-        "critical_checks": ["3x se-requirements (L1, L2, L3)", "3x se-termination -- letztes muss auf leaf entscheiden", "Keine se-critic auf L3"]
       },
       {
         "id": "SE-05",

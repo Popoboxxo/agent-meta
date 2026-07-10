@@ -89,7 +89,7 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     - no circular orchestration (orchestrator agents inside pipelines)
     """
     errors = []
-    orchestrator_roles = {"orchestrator", "se-orchestrator", "feature"}
+    orchestrator_roles = {"orchestrator", "feature"}
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])
@@ -157,6 +157,18 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
         )
 
     return errors
+
+
+def generate_pipeline_match_table(pipelines: dict) -> str:
+    """Generate Pipeline Match Check table from quality_pipelines config."""
+    lines = ["| Signal | Pipeline |", "|--------|----------|"]
+    for name, pipeline in pipelines.items():
+        if not pipeline.get("enabled", True):
+            continue
+        keywords = pipeline.get("signal_keywords", [pipeline.get("description", name)])
+        signal = " / ".join(keywords[:3])  # max 3 keywords
+        lines.append(f"| {signal} | `{name}` |")
+    return "\n".join(lines)
 
 
 def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:

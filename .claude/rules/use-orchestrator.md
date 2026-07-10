@@ -1,52 +1,30 @@
 # CRITICAL GATE — VERIFY BEFORE EVERY ACTION
 
-YOU ARE THE MAIN CHAT. You MUST NOT perform any code changes directly.
-- NO `edit` tool call
-- NO `write` tool call
-- NO `bash` with mutating commands, including:
-  - git mutations: `git commit`, `git push`, `git add`, `git rm`, `git branch` (create/delete), `git merge`, `git rebase`, `git reset`, `git tag`, `git stash pop/drop/clear`
-  - package managers: `pip install`, `npm install/run/build`, etc.
-  - file mutations: `mkdir`, `rm`, `mv`, `cp` on tracked files
-- NO `task` tool call — delegate ONLY via `task(subagent_type="orchestrator", ...)` to the Orchestrator
+YOU ARE THE MAIN CHAT. Do not perform code changes directly.
+- No `edit`, `write`, or mutating `bash` calls
+- No `task` calls — delegate only to `orchestrator`
+- Read-only bash allowed: `git status`, `git log`, `git diff`, `git branch --show-current`, `git branch -l`
+- All git mutations → `git` agent
+- Every dev task → `orchestrator` first
 
-READ-ONLY bash is allowed: `git status`, `git log`, `git diff`, `git branch --show-current`, `git branch -l`
-
-ALL git mutations MUST be delegated to the `git` agent.
-
-EVERY development-related task MUST be delegated to the `orchestrator` first.
-ONLY allowed: `read`, `glob`, `grep` for research/diagnosis.
-
-**Violation: The PreToolUse hook will block these changes.**
+Violation: PreToolUse hook blocks these changes.
 
 # Orchestrator — Universal Router
 
-**STRICT MODE — KEINE Ausnahmen.** Jede Entwicklungsaufgabe geht zwingend über den `orchestrator`. Kein User-Override, kein direkter Dispatch, kein Fallback in den Hauptchat.
+**STRICT MODE — no exceptions.** Every dev task goes through `orchestrator`. No user override, no direct dispatch.
 
-## Auto-Handoff
-
-Hauptchat delegiert IMMER automatisch an den Orchestrator via nativen Tool-Call — KEIN User-Override, KEIN `@orchestrator` Mention im Output.
-
+Auto-handoff: the main chat always delegates to `orchestrator` via a native tool call — no `@orchestrator` mention in output.
 
 ## Git Delegation — Hard Rule
 
-**Alle mutierenden git-Befehle MÜSSEN über den `git`-Agenten laufen.**
+All mutating git commands must run through the `git` agent.
 
-VERBOTEN im Hauptchat (Bash-Tool):
-- `git commit`, `git push`, `git pull` (wenn push/merge erfolgt)
-- `git add`, `git rm`, `git mv`
-- `git branch <name>` (Branch anlegen), `git branch -d/-D` (Branch löschen)
-- `git merge`, `git rebase`
-- `git reset`, `git restore`, `git checkout` (Branch wechseln/Dateien zurücksetzen)
-- `git tag`, `git stash` (pop/drop/clear)
+Forbidden in main chat: `git commit`, `git push`, `git pull`, `git add`, `git rm`, `git mv`, `git branch`, `git merge`, `git rebase`, `git reset`, `git restore`, `git checkout`, `git tag`, `git stash`.
 
-ERLAUBT im Hauptchat (read-only Diagnose):
-- `git status`, `git log`, `git diff`
-- `git branch --show-current`, `git branch -l`
-- `git remote -v`, `git show` (ohne Schreiboperation)
+Allowed read-only: `git status`, `git log`, `git diff`, `git branch --show-current`, `git branch -l`, `git remote -v`, `git show`.
 
-ALLE anderen git-Operationen → an `git`-Agenten delegieren.
+All other git operations → `git` agent.
 
-## Anti-Recursion Guard — Worker dürfen nicht zurückdelegieren
+## Anti-Recursion Guard
 
-**Verboten:** `@orchestrator` im Output | Tool-Calls zum Orchestrator | Aufgaben zurückgeben.
-**Erlaubt:** Auf andere Worker verweisen | User bei Blockern um Klärung bitten.
+Workers must not re-delegate to `orchestrator`. No `@orchestrator` in output, no orchestrator tool calls, no handing tasks back. Referring to other workers or asking the user about blockers is allowed.

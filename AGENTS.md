@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.66.0 — `2026-07-09`
+Generiert von agent-meta v0.66.0 — `2026-07-10`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -47,93 +47,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 
 ## Regeln
 
-### A2A Anti-Re-Delegation Gates
-Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Delegations-Schleifen und unkontrollierten Spec-Dump in `payload.t`.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Branch-Guard — Feature-Branch Pflicht
-**Gilt für alle code-ändernden Aufgaben.**
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Commit-Konventionen (Conventional Commits)
-Gilt für alle Agenten die Commits erstellen oder vorbereiten.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Definition of Done (DoD)
-Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### GitHub Issue Lifecycle
-Wenn deine Arbeit mit einem GitHub Issue verknüpft ist, schließe es nach Abschluss ab.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Sprachregeln
-Diese Regel gilt für alle Agenten und den Hauptchat.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Lifecycle-Tasks — Ausstehende Aufgaben prüfen
-Beim Start einer neuen Konversation: prüfe ob `.opencode/pending-tasks.md` existiert.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Provider-Agnostic Policy — Generic Templates
-**Generische Agenten-Templates (1-generic/) müssen universell und provider-agnostisch bleiben.**
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Python Conventions
-**Gilt für alle Python-Dateien (`*.py`).**
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Session-Abschluss — Erkenntnisse sichern
-Gilt für Hauptchat und Orchestrator.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### CRITICAL GATE — VERIFY BEFORE EVERY ACTION
-YOU ARE THE MAIN CHAT. You MUST NOT perform any code changes directly.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### agent-meta — Schichten-Architektur
-Dieses Repo ist das Meta-Repository für Agenten-Standards. Jede Änderung an Templates
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### agent-meta — Entwicklungskonventionen
-**1. `.opencode/agents` ist generierter Output — nie manuell bearbeiten.**
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### agent-meta — sync.py Interface
-`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.opencode/agents` schreiben.
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
-
----
-
-### Kommunikationsstil: Short
-**Diese Regel gilt für alle Antworten und überschreibt alle anderen Stilanweisungen.**
-Details: embedded in `Opencode` context (Regeln-Abschnitt)
+> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen. Siehe `.opencode/rules/`.
 
 <!-- agent-meta:managed-end -->
 

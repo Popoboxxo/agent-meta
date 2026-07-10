@@ -10,7 +10,6 @@
 
 | Agent | Existiert | Frontmatter valide | Nicht leer | Routing in Orchestrator | Status |
 |-------|-----------|-------------------|------------|------------------------|--------|
-| se-orchestrator | [ ] | [ ] | [ ] | [ ] | [ ] |
 | se-requirements | [ ] | [ ] | [ ] | [ ] | [ ] |
 | se-architect | [ ] | [ ] | [ ] | [ ] | [ ] |
 | se-critic | [ ] | [ ] | [ ] | [ ] | [ ] |

@@ -634,25 +634,13 @@ def _build_opencode_managed_block(
     template = _load_claude_md_managed_template(agent_meta_root)
     managed = substitute(template, local_vars, 'AGENTS.md managed block', log)
 
-    # Opencode loads the full managed block — use compact rule summaries to
-    # keep AGENTS.md under ~100 lines. Full rules stay in rules/1-generic/*.md
-    # and rules/2-platform/*.md where they belong.
-    use_compact_rules = (provider == "Opencode")
-
-    rules_md = _collect_embedded_rules_md(agent_meta_root, config, local_vars, log,
-                                            provider=provider, provider_config=provider_config,
-                                            compact=use_compact_rules)
-    if rules_md:
-        managed = managed.replace(
-            '<!-- agent-meta:managed-end -->',
-            f'\n## Regeln\n\n{rules_md}\n\n<!-- agent-meta:managed-end -->',
-        )
-    else:
-        # Phase 2: All rules are embed:false → thinner managed block
-        managed = managed.replace(
-            '<!-- agent-meta:managed-end -->',
-            '\n<!-- agent-meta:managed-end -->',
-        )
+    # Phase 2: Opencode loads rules natively via the provider rules mechanism.
+    # The managed block only keeps a compact pointer; full rules live in
+    # rules/<layer>/*.md and are surfaced to the runtime via .opencode/rules/.
+    managed = managed.replace(
+        '<!-- agent-meta:managed-end -->',
+        '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen. Siehe `.opencode/rules/`.\n\n<!-- agent-meta:managed-end -->',
+    )
 
     return managed
 
