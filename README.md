@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.65.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.66.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -47,6 +47,8 @@
 - **Model Curation:** Hard-block (blacklist) and soft-hide (disabled) models via `config/model-curation.yaml` — single source of truth for model visibility.
 - **Tier-Presets Matrix:** Dynamically resolve model IDs based on provider, preset (cheap, normal, advanced, expensive), and tier — direct `tiers.tier: model_id` format with backward-compat `mapping:` fallback.
 - **Admin UI Overhaul:** Interactive dashboard for Models & Pricing, Provider Tier Mappings, Tier Presets (Resolved View + Edit tabs), Quick-Filter strips, Enable/Disable/Blacklist buttons, pricing source badges (`[API]`, `[Overlay]`, `[Calc]`).
+- **Admin UI CRUD Endpoints (v0.66.0):** Full CRUD for Quality Pipelines, Reflection Pairs (generator-critic), and Prompt Modes per role — all with idempotent atomic writes and automatic backups.
+- **Admin UI Model Mapping (v0.66.0):** Read-only matrix view showing resolved model IDs per role and provider with source annotation (`role-default` / `explicit-override`). Uses the same resolution logic as `sync.py`.
 - **Agent Composition:** Platform and project agents can extend generic templates via `extends:` + `patches:` (append, replace, delete, append-after) — no full copies needed.
 - **Consistency Checking:** Built-in `consistency-check.py` for deterministic validation of frontmatter versions, semver format, cross-references, and placeholder integrity.
 - **Provider Tool Whitelists:** Per-provider tool capability declarations prevent agents from referencing tools unavailable in their target provider environment.
@@ -146,8 +148,11 @@ cheap:
 - Provider Tier Mappings: Datalist-filtered model picker per provider
 - Tier Presets: Resolved view (current state) + edit mappings (direct input)
 - Price badges: `[API]` (OpenRouter live), `[Overlay]` (manual), `[Calc]` (derived)
+- CRUD endpoints: Quality Pipelines, Reflection Pairs, Prompt Modes
+- Model Mapping: Read-only role×provider matrix with resolution sources
 
 → Full details: `scripts/lib/model_discovery.py`, `scripts/lib/curation.py`, `config/model-curation.yaml`, `config/tier-presets.yaml`
+→ Admin UI usage guide: `docs/admin-ui-guide.md`
 
 ### A2A Handoff Protocol
 
@@ -200,6 +205,11 @@ Each agent role declares its handoff contracts in `config/role-defaults.yaml` �
 | **BARRIER** | Wait for all parallel tasks before proceeding | Collect results from FANOUT |
 | **PIPELINE** | Sequential steps with dependencies | requirements → dev → test |
 | **LIFECYCLE** | Complete end-to-end feature workflow | Branch → REQ → TDD → Dev → Validate → PR |
+
+**Orchestrator Robustness:**
+- Recognizes `main_chat` as a valid HITL (Human-in-the-Loop) proxy for approval gates, preventing confirmation deadlocks in multi-agent workflows.
+- Actively collects parallel subagent results via BARRIER, ensuring deterministic result ordering and timeout resilience.
+- Propagates delegation trace context (`viz_task_id`) to enable cross-agent session tracking and visualization.
 
 ### Provider Generation Matrix
 
@@ -272,7 +282,7 @@ patches:
 
 | Agent | Tier | Description |
 |-------|------|-------------|
-| **se-orchestrator** | balanced | Coordinates the 6-level recursive SE breakdown |
+| **se-orchestrator (deprecated)** | balanced | SE-Funktionalit�t jetzt im Haupt-orchestrator (SE-Mode) |
 | **se-requirements** | balanced | Elicits stakeholder needs and formalizes L1 black-box requirements |
 | **se-architect** | powerful | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
 | **se-critic** | powerful | Audits architectures for completeness, consistency, traceability, verifiability |
@@ -283,6 +293,68 @@ patches:
 | **se-test-engineer** | balanced | MBSE test models and integration test strategies |
 | **se-testreviewer** | powerful | Audits test strategies for edge cases, boundary values, flakiness |
 | **se-integration-and-test-manager** | balanced | V&V orchestrator: integration strategy, test level coordination |
+
+## Prompt Modes (Legacy / Hybrid / Modern)
+
+agent-meta supports three rendering modes for agent templates, selectable per role:
+
+| Mode | Template Source | Rendering | Use Case |
+|------|----------------|-----------|----------|
+| `legacy` | `agents/1-generic/` | unchanged Markdown | all existing roles, full compatibility |
+| `hybrid` | `agents/1-generic/` | auto-wrapped in `<section>` tags | incremental migration |
+| `modern` | `agents/1-generic-modern/` | native 6-block XML | optimized LLM parsing |
+
+### 6-Block XML Format (Modern Mode)
+
+Modern templates use exactly 6 XML blocks in fixed order:
+
+```xml
+<persona>     role identity, singleton rules</persona>
+<workflow>    numbered step-by-step process</workflow>
+<context>     project context, DoD flags, agent table</context>
+<tools>       allowed tools with short descriptions</tools>
+<output_contract>  return format, escalation</output_contract>
+<constraints> hard rules — last, for recency bias</constraints>
+```
+
+`<constraints>` is intentionally placed last — LLMs follow final instructions more reliably.
+
+### Configuration
+
+```yaml
+# .meta-config/project.yaml
+agent-prompts:
+  default: legacy          # fallback for all roles without explicit override
+  modes:
+    developer: modern      # uses agents/1-generic-modern/developer.md
+    orchestrator: modern   # uses agents/1-generic-modern/orchestrator.md
+```
+
+### Validation & Token Counting
+
+```bash
+# Validate all Modern Mode templates (6-block + frontmatter)
+python scripts/validate-modern-templates.py --all --strict
+
+# Compare token estimates: legacy vs modern
+python scripts/token-counter.py --role developer
+python scripts/token-counter.py --role orchestrator --threshold 4000
+```
+
+→ Architecture details: `docs/architecture/prompt-modernization.md`
+
+### Reference Agent & Modern Template Architecture
+
+Modern templates leverage a canonical reference agent (`agents/1-generic-modern/_reference-agent.md`) that demonstrates all framework features in native 6-block XML format. The underscore prefix ensures it is not instantiated as a role but serves as a didactic blueprint for role authors. All modern mode agents inherit from this reference's structure, ensuring consistency in <persona>, <workflow>, <context>, <tools>, <output_contract>, and <constraints> ordering.
+
+### Singleton-Orchestrator Rule
+
+Only `main_chat` may spawn the `orchestrator`. Worker-agents must never call
+`task(subagent_type="orchestrator", ...)` — doing so causes routing conflicts and
+session-state corruption. Enforced via body-constraint injection in all worker agent files
+and Gate #5 in `rules/1-generic/a2a-delegation-gates.md`.
+
+---
 
 ## Quick Start
 
@@ -413,6 +485,7 @@ agent-meta/
     provider-bootstrap.yaml  # PAL: bootstrap mechanism definitions
   docs/                      # Documentation
     admin-ui.html            # Web frontend for the Admin UI
+    admin-ui-guide.md         # Admin UI usage guide (v0.66.0)
     agent-graph.html         # Interactive agent visualization graph
     agent-mindmap.md         # Mermaid mindmap of all agents
     live-dashboard.html      # Live session monitoring dashboard
@@ -532,7 +605,7 @@ viz:
 | **M** | Scout Ecosystem | Search for new skills/roles/rules/patterns | `agent-meta-scout` |
 | **O** | Log Analysis | Analyze logs → cluster errors → delegate findings | `log-analyzer` |
 | **P** | Project Issue | Create standardized bug/feature GitHub issue | `feedback` |
-| **U** | SE Cascade | 6-level recursive systems engineering breakdown | `se-orchestrator` |
+| **U** | SE Cascade | 6-level recursive systems engineering breakdown | `orchestrator (SE-Mode)` |
 
 ## Contributing
 

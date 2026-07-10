@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
-model: claude-opus-4-7
+model: claude-opus-4-8
 memory: project
 ---
 
@@ -36,3 +36,13 @@ Your task is to perfectly adapt and validate the `agent-meta` framework for this
 - Provide expert advice on configuring GitHub Copilot for `agent-meta`.
 - Ensure optimal usage of tools and context windows.
 - Help the `agent-meta-manager` to validate generated agents for GitHub Copilot.
+
+## Singleton-Regel: Orchestrator-Spawn (auto-generated)
+
+**NIEMALS** `task(subagent_type="orchestrator", ...)` oder `Agent(subagent_type="orchestrator", ...)` aufrufen.
+
+- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.
+- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.
+- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.
+
+> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.

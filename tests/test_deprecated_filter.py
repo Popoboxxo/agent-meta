@@ -61,26 +61,12 @@ def check_no_frontmatter() -> list[str]:
 # collect_sources — integration check
 # ---------------------------------------------------------------------------
 
-def check_se_orchestrator_excluded() -> list[str]:
-    """se-orchestrator template has deprecated: true and must be filtered out."""
+def check_se_orchestrator_deleted() -> list[str]:
+    """se-orchestrator template has been deleted and must no longer exist."""
     errors: list[str] = []
-    overrides, _ = collect_sources(_REPO_ROOT, platforms=[])
-    if "se-orchestrator" in overrides:
-        errors.append(
-            "se-orchestrator (deprecated: true) was NOT filtered out of collect_sources"
-        )
-    # Sanity: a known active generic role must still be present.
-    if "orchestrator" not in overrides:
-        errors.append("orchestrator (active) is unexpectedly missing from collect_sources")
-    return errors
-
-
-def check_template_file_still_present() -> list[str]:
-    """The deprecated template file itself must remain on disk (not deleted)."""
-    errors: list[str] = []
-    template = _REPO_ROOT / "agents" / "1-generic" / "se-orchestrator.md"
-    if not template.exists():
-        errors.append(f"deprecated template file missing: {template}")
+    template_path = _REPO_ROOT / "agents" / "1-generic" / "se-orchestrator.md"
+    if template_path.exists():
+        errors.append(f"se-orchestrator.md should be deleted but still exists: {template_path}")
     return errors
 
 
@@ -89,8 +75,7 @@ CHECKS = [
     ("deprecated: false active", check_deprecated_false),
     ("absent field active", check_deprecated_absent),
     ("no frontmatter active", check_no_frontmatter),
-    ("se-orchestrator excluded", check_se_orchestrator_excluded),
-    ("template file preserved", check_template_file_still_present),
+    ("se-orchestrator deleted", check_se_orchestrator_deleted),
 ]
 
 
@@ -111,12 +96,8 @@ def test_no_frontmatter():
     assert check_no_frontmatter() == []
 
 
-def test_se_orchestrator_excluded():
-    assert check_se_orchestrator_excluded() == []
-
-
-def test_template_file_preserved():
-    assert check_template_file_still_present() == []
+def test_se_orchestrator_deleted():
+    assert check_se_orchestrator_deleted() == []
 
 
 def main() -> int:

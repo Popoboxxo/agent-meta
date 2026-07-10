@@ -8,7 +8,24 @@ providers:
     has_hooks: true
     has_commands: true
     has_settings: true
+    capabilities:
+      - agents
+      - rules
+      - hooks
+      - commands
+      - settings
+      - snippets
+      - skills
+      - context-managed-block
+      - artifacts
+      - checkpoints
+      - mcp
+    artifact_dir: .claude/artifacts
+    checkpoint_dir: .meta-viz
     settings_file: .claude/settings.json
+    settings_template: howto/configs/CLAUDE.settings-template.json
+    settings_local_file: .claude/settings.local.json
+    settings_local_template: howto/configs/CLAUDE.settings-local-template.json
     isolation-dirs:
       - .claude/
       - CLAUDE.md
@@ -32,17 +49,20 @@ providers:
     # Model tiers: abstract tier name → provider-specific model ID.
     # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
     # sync.py maps each tier to the model ID written into agent frontmatter.
+    # Source: https://platform.claude.com/docs/en/about-claude/models/overview (verified 2026-06-24)
+    # ID convention: 4.6+ generation uses dateless IDs (claude-sonnet-4-6);
+    # pre-4.6 models use dated snapshot IDs (claude-haiku-4-5-20251001).
     model-tiers:
       nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
       fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
       balanced: claude-sonnet-4-6           # default workhorse: dev, docs, review
-      powerful: claude-opus-4-7             # complex reasoning: architecture, security
-      max:      claude-fable-5             # reserved for future ultra-capable models
+      powerful: claude-opus-4-8             # complex reasoning: architecture, security
+      max:      claude-fable-5              # most capable widely released model
     # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
     model-aliases:
       haiku:  claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
-      opus:   claude-opus-4-7
+      opus:   claude-opus-4-8
       fable:  claude-fable-5
 
   Gemini:
@@ -57,8 +77,20 @@ providers:
     commands_dir: .gemini/commands
     commands_ext: .toml
     has_settings: true
+    capabilities:
+      - agents
+      - rules
+      - commands
+      - settings
+      - snippets
+      - skills
+      - context-managed-block
+      - mcp
+    artifact_dir: .gemini/artifacts
+    checkpoint_dir: .meta-viz
     settings_file: .gemini/settings.json
     settings_template: howto/configs/GEMINI.settings-template.json
+    settings_local_file: .gemini/settings.local.json
     isolation-dirs:
       - .gemini/
     gitignore_entries:
@@ -92,8 +124,21 @@ providers:
     has_commands: true
     commands_dir: .opencode/commands
     has_settings: true
+    capabilities:
+      - agents
+      - commands
+      - settings
+      - snippets
+      - skills
+      - context-embedded-rules
+      - artifacts
+      - checkpoints
+      - mcp
+    artifact_dir: .opencode/artifacts
+    checkpoint_dir: .meta-viz
     settings_file: opencode.json
     settings_template: howto/configs/OPENCODE.settings-template.json
+    settings_local_file: .opencode/settings.local.json
     isolation-dirs:
       - .opencode/
       - opencode.json
@@ -135,8 +180,20 @@ providers:
     has_hooks: false
     has_commands: true
     has_settings: true
+    capabilities:
+      - agents
+      - rules
+      - commands
+      - settings
+      - snippets
+      - skills
+      - context-managed-block
+      - mcp
+    artifact_dir: .continue/artifacts
+    checkpoint_dir: .meta-viz
     settings_file: .continue/config.yaml
     settings_template: howto/configs/CONTINUE.config-template.yaml
+    settings_local_file: .continue/config.local.yaml
     isolation-dirs:
       - .continue/
     gitignore_entries:
@@ -164,6 +221,14 @@ providers:
     has_hooks: false
     has_commands: false
     has_settings: false
+    capabilities:
+      - agents
+      - rules
+      - snippets
+      - skills
+      - context-managed-block
+    artifact_dir: .github/copilot/artifacts
+    checkpoint_dir: .meta-viz
     isolation-dirs:
       - .github/copilot/
     gitignore_entries: []

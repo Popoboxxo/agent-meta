@@ -25,8 +25,6 @@ Ziel: **konkrete, umsetzbare Findings** mit Datei + Zeile + Risiko + Empfehlung.
 
 ## Audit-Workflow
 
-→ Vollständige Kategorien und Report-Format: `.agent-meta/agents/1-generic/_wf-security-audit.md`.
-
 Kurzreferenz:
 ```
 1. Scope:        Glob auf /, src/, lib/, config/, scripts/ + Stack identifizieren

@@ -57,7 +57,7 @@ Die folgende Tabelle beschreibt den vollstandigen Durchlauf der Systems-Engineer
 
 | Schritt | Agent | Input | Output | Level |
 |---|---|---|---|---|
-| 1 | `se-orchestrator` | Dieses Dokument + `stakeholder-needs.md` | Koordinierter Task-Plan | — |
+| 1 | `orchestrator (SE-Mode)` | Dieses Dokument + `stakeholder-needs.md` | Koordinierter Task-Plan | — |
 | 2 | `se-requirements` | `stakeholder-needs.md` | L1 Blackbox Requirements | L1 |
 | 3 | `se-architect` | L1 Requirements | L2 System-Architektur mit Komponenten & Schnittstellen | L2 |
 | 4 | `se-critic` | L2 Architektur | Audit-Report (Orthogonalitat, Testbarkeit, Traceability) | L2 |
@@ -69,7 +69,7 @@ Die folgende Tabelle beschreibt den vollstandigen Durchlauf der Systems-Engineer
 
 ### 3.2 Detaillierte Schritt-Beschreibung
 
-#### Schritt 1: se-orchestrator — Koordination
+#### Schritt 1: orchestrator (SE-Mode) — Koordination
 
 - **Aufgabe:** Zerlegt das Gesamtziel in Sub-Tasks, dispatcht parallel wo moglich, sequenziell wo Abhangigkeiten bestehen.
 - **Input:** `stakeholder-needs.md`, dieses Test-Szenario
@@ -137,7 +137,7 @@ Die folgende Tabelle beschreibt den vollstandigen Durchlauf der Systems-Engineer
 
 | Schritt | Agent | Pass-Kriterium |
 |---|---|---|
-| 1 | se-orchestrator | Task-Plan vollstandig, alle Agenten dispatcht, keine zirkularen Abhangigkeiten |
+| 1 | orchestrator (SE-Mode) | Task-Plan vollstandig, alle Agenten dispatcht, keine zirkularen Abhangigkeiten |
 | 2 | se-requirements | Alle Stakeholder-Needs abgedeckt, jedes Requirement hat ID + Acceptance Criteria, Traceability-Matrix vollstandig |
 | 3 | se-architect | Mindestens 4 Subsysteme definiert, alle Schnittstellen spezifiziert, Signal-Flow konsistent |
 | 4 | se-critic | Alle 3 Audit-Kategorien (Orthogonalitat, Testbarkeit, Traceability) = "pass" |

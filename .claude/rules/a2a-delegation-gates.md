@@ -26,6 +26,20 @@ Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Deleg
 | `payload.t > 300 Zeichen` | KEIN Dispatch, User informieren ("kürze auf einen Satz") |
 | `payload.t` startet mit "Du bist..." | HARD REJECT, User informieren ("Re-Delegation erkannt") |
 
+## Singleton-Regel: Orchestrator-Spawn
+
+**NUR der `main_chat` darf den `orchestrator` spawnen. Worker-Agents niemals.**
+
+- `delegation_depth >= 2` → kein `subagent_type="orchestrator"` Dispatch erlaubt
+- Verstoß → HARD REJECT, User informieren: "Singleton-Regel verletzt: Orchestrator darf nur vom main_chat gespawnt werden."
+
+| Verstoß | Aktion |
+|---------|--------|
+| Worker ruft `task(subagent_type="orchestrator", ...)` | HARD REJECT, User informieren |
+| Worker ruft `Agent(subagent_type="orchestrator", ...)` | HARD REJECT, User informieren |
+
+> **Warum:** Mehrere parallele Orchestrator-Instanzen verursachen Konflikte in Routing, Checkpointing und Session-State. Es existiert genau EIN Orchestrator pro Session — der vom main_chat gespawnte.
+
 ## Propagation
 
 Diese Regel wird via `sync.py` automatisch in alle Provider-Rules-Verzeichnisse propagiert:

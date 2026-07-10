@@ -15,6 +15,7 @@ except ImportError:
 
 AGENTS_DIR = "agents"
 GENERIC_DIR = "1-generic"
+MODERN_DIR = "1-generic-modern"
 PLATFORM_DIR = "2-platform"
 PROJECT_DIR = "3-project"
 EXTERNAL_DIR = "0-external"
@@ -598,13 +599,29 @@ def _parse_frontmatter_yaml(content: str) -> dict:
 
 
 def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | None:
-    """Find (start, end) line indices for a Markdown section.
+    """Find (start, end) line indices for a section.
 
-    anchor must match the heading line exactly (e.g. '## Don\\'ts').
-    start is inclusive (the heading line).
-    end is exclusive (first line of next section at same or higher level, or len(lines)).
+    Supports two anchor modes:
+    - XML-tag anchor (e.g. '<workflow>'): start = line with opening tag,
+      end = line after the matching closing '</tag>' (inclusive of close line).
+    - Markdown heading anchor (e.g. '## Don\\'ts'): start = heading line,
+      end = first line of next section at same or higher level (exclusive).
     """
     anchor_stripped = anchor.strip()
+
+    # XML-anchor mode: anchor starts with '<' (e.g. '<workflow>')
+    if anchor_stripped.startswith("<") and not anchor_stripped.startswith("</"):
+        tag = anchor_stripped.strip("<>").strip()
+        open_tag = f"<{tag}>"
+        close_tag = f"</{tag}>"
+        start_idx = None
+        for i, line in enumerate(lines):
+            if start_idx is None and open_tag in line:
+                start_idx = i
+            elif start_idx is not None and close_tag in line:
+                return (start_idx, i + 1)
+        return None  # tag not found or unclosed
+
     anchor_level = len(anchor_stripped) - len(anchor_stripped.lstrip("#"))
 
     start_idx = None
@@ -756,8 +773,36 @@ def compose_agent(
     return result
 
 
+def _resolve_agent_source(
+    role: str,
+    agent_meta_root: Path,
+    prompt_modes: dict[str, str],
+) -> Path | None:
+    """Return the best source path for a role given agent-prompts config.
+
+    Resolution order:
+      1. If prompt_modes[role] == 'modern' → 1-generic-modern/<role>.md (if exists)
+      2. If prompt_modes['default'] == 'modern' → 1-generic-modern/<role>.md (if exists)
+      3. Fallback → 1-generic/<role>.md (caller is responsible for existence check)
+
+    Returns None only when the modern override is requested but missing AND the
+    caller should fall through to the legacy path.
+    """
+    # prompt_modes shape: {"default": "legacy", "modes": {"developer": "modern", ...}}
+    modes_map = prompt_modes.get("modes", {}) or {}
+    default_mode = prompt_modes.get("default", "legacy")
+    mode = modes_map.get(role) or default_mode
+    if mode == "modern":
+        modern_path = agent_meta_root / AGENTS_DIR / MODERN_DIR / f"{role}.md"
+        if modern_path.exists():
+            return modern_path
+    return None  # caller falls through to generic
+
+
 def collect_sources(
-    agent_meta_root: Path, platforms: list[str]
+    agent_meta_root: Path,
+    platforms: list[str],
+    prompt_modes: dict[str, str] | None = None,
 ) -> tuple[dict[str, Path], set[str]]:
     """
     Returns (overrides, known_ext_roles).
@@ -769,6 +814,9 @@ def collect_sources(
       These are NOT used as templates — just signals that the role supports extensions.
       (Currently unused since 3-project/ in meta-repo has no templates by design.)
     """
+    if prompt_modes is None:
+        prompt_modes = {}
+
     overrides: dict[str, Path] = {}
     known_ext_roles: set[str] = set()
 
@@ -776,7 +824,9 @@ def collect_sources(
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
         if not f.name.startswith("_"):
-            overrides[f.stem] = f
+            role = f.stem
+            modern_override = _resolve_agent_source(role, agent_meta_root, prompt_modes)
+            overrides[role] = modern_override if modern_override else f
 
     # 2. Platform agents
     platform_dir = agent_meta_root / AGENTS_DIR / PLATFORM_DIR
@@ -827,7 +877,12 @@ def sync_agents(
     CLAUDE_AGENTS_DIR = ".claude/agents"
     role_map = build_role_map(agent_meta_root)
     platforms = config.get("platforms", [])
-    overrides, _ = collect_sources(agent_meta_root, platforms)
+    _ap_cfg_sa = config.get("agent-prompts", {})
+    _prompt_modes_sa: dict = {'default': 'legacy', 'modes': {}}
+    if isinstance(_ap_cfg_sa, dict):
+        _prompt_modes_sa["default"] = _ap_cfg_sa.get("default", "legacy")
+        _prompt_modes_sa["modes"] = _ap_cfg_sa.get("modes", {}) or {}
+    overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes_sa)
     target_dir = project_root / CLAUDE_AGENTS_DIR
 
     # Optional role whitelist — if "roles" key is absent, all roles are generated
@@ -943,7 +998,23 @@ def sync_agents(
         if xml_cfg.get('enabled', False):
             content = wrap_sections_in_xml(content)
 
+        # Singleton-Constraint: inject guard block into all non-orchestrator agent files
+        SINGLETON_CONSTRAINT_BLOCK = (
+            "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+            "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+            "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+            "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+            "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+            "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+            "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+        )
+        if role != "orchestrator" and not role.endswith("-iteration"):
+            content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        # Annotate log when a Modern Mode template is used (layer already set above)
+        if layer == MODERN_DIR:
+            rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
             if write_checked(target_path, content, log, rel_label, config=config):
@@ -1025,7 +1096,12 @@ def sync_agents_for_provider(
 
     role_map = build_role_map(agent_meta_root)
     platforms = config.get('platforms', [])
-    overrides, _ = collect_sources(agent_meta_root, platforms)
+    _ap_cfg = config.get('agent-prompts', {})
+    _prompt_modes: dict = {'default': 'legacy', 'modes': {}}
+    if isinstance(_ap_cfg, dict):
+        _prompt_modes['default'] = _ap_cfg.get('default', 'legacy')
+        _prompt_modes['modes'] = _ap_cfg.get('modes', {}) or {}
+    overrides, _ = collect_sources(agent_meta_root, platforms, _prompt_modes)
     target_dir = project_root / pc['agents_dir']
 
     allowed_roles = set(config['roles']) if 'roles' in config else None
@@ -1328,7 +1404,23 @@ def sync_agents_for_provider(
         if xml_cfg.get('enabled', False):
             content = wrap_sections_in_xml(content)
 
+        # Singleton-Constraint: inject guard block into all non-orchestrator agent files
+        SINGLETON_CONSTRAINT_BLOCK = (
+            "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+            "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+            "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+            "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+            "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+            "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+            "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+        )
+        if role != "orchestrator" and not role.endswith("-iteration"):
+            content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+        # Annotate log when a Modern Mode template is used (layer already set above)
+        if layer == MODERN_DIR:
+            rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
             if write_checked(target_path, content, log, rel_label, config=config):

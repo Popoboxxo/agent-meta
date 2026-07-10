@@ -1,74 +1,41 @@
-# DoD-Presets — vordefinierte Qualitäts-Profile.
-# Projekte wählen via 'dod-preset' in agent-meta.config.yaml.
-# Einzelne Werte können via 'dod' Block überschrieben werden.
-# Precedence: dod (Projekt-Override) > dod-preset > full (impliziter Default).
-#
-# Neue Spalten hinzufügen:
-#   1. Feld hier in jedem Preset definieren.
-#   2. Default in 'full' setzen.
-#   3. In sync.py als DOD_<NAME> auto-injizieren.
-#   4. In Agent-Templates via {{DOD_<NAME>}} referenzieren.
-#   5. Schema in agent-meta.schema.json erweitern.
+# DoD presets. Override via 'dod-preset' or per-field 'dod' in project.yaml.
+# Precedence: dod > dod-preset > full.
 
 presets:
-
-  # Volle Qualität — Enterprise, regulierte Projekte.
-  # Impliziter Default wenn kein Preset gewählt.
-  full:
+  full:                 # enterprise / regulated
     req-traceability: true
     tests-required: true
     codebase-overview: true
     security-audit: false
     se-required: "false"
 
-  # Goldener Mittelweg — Tests ja, aber keine REQ-IDs und kein CODEBASE_OVERVIEW.
-  # Guter Start für die meisten Projekte.
-  standard:
+  standard:             # tests, no REQs / overview
     req-traceability: false
     tests-required: true
     codebase-overview: false
     security-audit: false
 
-  # Maximale Geschwindigkeit — kein formaler Overhead.
-  # Doku und Tests entstehen erst auf Anforderung.
-  # Ideal für Maker-Projekte, Experimente, Hackathons.
-  rapid-prototyping:
+  rapid-prototyping:    # minimal overhead
     req-traceability: false
     tests-required: false
     codebase-overview: false
     security-audit: false
 
-  # --- SE-Spec Presets (Beta) ---
-  # Koppeln SE-Kaskaden-Output an Code-DoD.
-  # Das Feld 'se-required' steuert den Verbindlichkeitsgrad
-  # der Systems-Engineering-Spezifikation für die Implementierung.
-
-  # SE-Kaskade verfügbar, aber nicht verpflichtend.
-  # COMP-REQs sind informativ — Developer kann auch ohne starten.
-  # Ideal für Teams die SE erkunden wollen.
-  spec-optional:
+  spec-optional:        # SE available, not mandatory
     req-traceability: false
     tests-required: true
     codebase-overview: false
     security-audit: false
     se-required: "false"
 
-  # SE-Kaskade empfohlen für komplexe Features (>1 Datei).
-  # COMP-REQs werden zu Akzeptanzkriterien — REQ-Traceability on.
-  # Wenn kein SE-Output vorhanden: Standard-DoD ohne Traceability.
-  # Ideal für SE-geführte Teams.
-  spec-driven:
+  spec-driven:          # SE recommended for complex features
     req-traceability: true
     tests-required: true
     codebase-overview: false
     security-audit: false
     se-required: "recommended"
 
-  # SE-Kaskade PFLICHT vor jedem Commit.
-  # Vollständige Traceability SN→SYS→SUB→COMP→Code→Tests.
-  # Approval-Gates, Audit-Trail, Coverage-Nachweis.
-  # Für regulierte Umgebungen (Automotive, Medical, Aerospace).
-  spec-certified:
+  spec-certified:       # regulated environments
     req-traceability: true
     tests-required: true
     codebase-overview: true

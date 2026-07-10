@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-06-22 (REQ-MOD-01: Dynamic Model Discovery, Tier Presets, Curation, Admin UI Overhaul)
+> Letzte Aktualisierung: 2026-07-09 (Phase 5: Provider-agnostischer Syncer, Admin-CRUD, Model-Mapping)
 
 ---
 
@@ -17,6 +17,8 @@
 9. [Scripts](#9-scripts)
 10. [Provider Abstraction Layer (PAL)](#10-provider-abstraction-layer-pal)
 11. [A2A-Handoff-Protokoll](#11-a2a-handoff-protokoll)
+12. [Prompt-Modernisierung (Legacy / Hybrid / Modern)](#12-prompt-modernisierung-legacy--hybrid--modern)
+13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
 
 ---
 
@@ -24,7 +26,7 @@
 
 Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit 6 spezialisierten Agenten, die zusammen eine 6-stufige Black-Box → White-Box-Zerlegung koordinieren.
 
-### 1.1 `agents/1-generic/se-orchestrator.md`
+### 1.1 `agents/1-generic/se-orchestrator.md` (deprecated)
 
 **Version:** 1.1.0
 **Beschreibung:** Koordiniert den gesamten 6-stufigen rekursiven Systems-Engineering-Herunterbruch als Fraktal-Zellmaschine.
@@ -482,15 +484,35 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `se-critic` | powerful | — | optional | Vollständigkeit, Konsistenz, Testbarkeit |
 | `se-interface-mgr` | balanced | project | optional | Schnittstellenverträge domänenübergreifend |
 | `se-termination` | fast | — | optional | L3-Component-Leaf-Node Entscheidung |
-| `se-orchestrator` | balanced | — | optional | 6-stufiger rekursiver SE-Herunterbruch |
 
 ### `config/ai-providers.yaml` & Provider Tier Mapping
 
-**Zweck:** Provider-Konfiguration mit `display-name`, Tier-Definitionen und Model-IDs (früher feste Zuordnung, jetzt via Presets). YAML mit Frontmatter: `name`, `tier`, `models`.
+**Zweck:** Provider-Konfiguration mit Capabilities-Matrix, Settings-Templates und Model-IDs (früher feste Zuordnung, jetzt via Presets).
 
-**Neue Felder (REQ-MOD-01):**
-- `display-name` — lesbar im Admin-UI (z.B. "Anthropic Claude", "OpenCode")
-- `tiers` (geplant) — direkte Modell-ID pro Tier, fallback zu globalen `role-defaults.yaml` Defaults
+**Felder pro Provider (Stand v0.66.0):**
+
+| Feld | Typ | Zweck |
+|------|-----|-------|
+| `agents_dir` | string | Output-Verzeichnis für generierte Agenten |
+| `agent_ext` | string | Dateiendung (`.md`) |
+| `context_file` | string | Context-Datei (z.B. `CLAUDE.md`) |
+| `context_template` | string | Template für Context-Datei |
+| `has_rules` / `has_hooks` / `has_commands` / `has_settings` | bool | Feature-Flags |
+| `capabilities` | string[] | Capability-Matrix: `agents`, `rules`, `hooks`, `commands`, `settings`, `snippets`, `skills`, `artifacts`, `checkpoints`, `mcp`, `context-managed-block`, `context-embedded-rules` |
+| `artifact_dir` | string | Artifact-Verzeichnis (z.B. `.claude/artifacts`) |
+| `checkpoint_dir` | string | Checkpoint-Verzeichnis |
+| `settings_file` | string | Provider-Settings-Datei (z.B. `.claude/settings.json`) |
+| `settings_template` | string | Template für Settings-Datei (z.B. `howto/configs/CLAUDE.settings-template.json`) |
+| `settings_local_file` | string | Lokale/persönliche Override-Datei (z.B. `.claude/settings.local.json`) |
+| `settings_local_template` | string | Template für lokale Settings |
+| `model-tiers` | dict | `nano/fast/balanced/powerful/max` → konkrete Modell-ID |
+| `model-aliases` | dict | Kurznamen → Modell-ID |
+| `gitignore_entries` | string[] | Einträge für agent-meta managed Block in `.gitignore` |
+| `isolation-dirs` | string[] | Verzeichnisse die isoliert werden (Cross-Provider-Contamination-Schutz) |
+
+**Neue Settings-Templates (v0.66.0):**
+- `howto/configs/CLAUDE.settings-template.json` — committed settings skeleton
+- `howto/configs/CLAUDE.settings-local-template.json` — local/personal overrides (gitignored)
 
 ### `config/tier-presets.yaml` (NEU, REQ-MOD-01)
 
@@ -624,9 +646,9 @@ Jede Extension erweitert TaskSpec um domain-spezifische Felder via JSON Schema `
 - `l3_components` (array) — `[{component_id, description, refines}]`
 - `cqrs_interfaces` (object) — `{commands[], events[], queries[]}`
 
-### 5.6 `schemas/se-orchestrator.schema.json` (Existierend)
+### 5.6 `schemas/se-orchestrator.schema.json` (Existierend, deprecated)
 
-**Zweck:** Orchestrierungs-Metadaten vom se-orchestrator. **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet.
+**Zweck:** Orchestrierungs-Metadaten (deprecated � Funktionalit�t jetzt im Haupt-orchestrator SE-Mode). **Bleibt unverändert** — wird als `payload` in A2A-Envelope eingebettet.
 
 ---
 
@@ -831,12 +853,12 @@ disabled: []                         # hidden in UI, aber in registry
 **Dynamisches Crawling (`--update-models`):**
 Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
 
-### `scripts/admin-server.py` & `docs/admin-ui.html` (REQ-MOD-01 Overhaul)
+### `scripts/admin-server.py` & `docs/admin-ui.html` (Phase 5: CRUD + Reflection + Model Mapping)
 
-**Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing.
+**Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing, Quality Pipelines, Reflection Pairs, Prompt Modes und Agent→Model-Mapping.
 **Architektur:** Single-File Frontend (`docs/admin-ui.html`, Vanilla JS, Zero Dependencies) + Python-Backend (`scripts/admin-server.py`).
 
-**Neue Sektionen (REQ-MOD-01):**
+**Bestehende Sektionen (REQ-MOD-01):**
 
 | Sektion | Features | Button-Flow |
 |---------|----------|------------|
@@ -846,7 +868,45 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | **Project General** | tier-preset Dropdown (fixed), Global Framework Setup Link | Edit → Save/Cancel |
 | **AI Providers** | Project Tier Override Panel | Enable/Disable pro Provider |
 
-**New UI Patterns (REQ-MOD-01):**
+**Neue CRUD-Endpunkte (Phase 5 — v0.66.0):**
+
+| Endpunkt | Methoden | Zweck |
+|----------|----------|-------|
+| `/api/pipelines` | `GET` · `PUT` | Liste aller Quality Pipelines lesen / ersetzen |
+| `/api/pipelines/{name}` | `GET` · `PUT` · `DELETE` | Einzelne Pipeline lesen / anlegen/aktualisieren / löschen |
+| `/api/reflection-pairs` | `GET` · `POST` · `PUT` | Liste aller Reflection Pairs lesen / neu anlegen (mit auto-generierter ID) / ersetzen |
+| `/api/reflection-pairs/{id}` | `GET` · `PUT` · `DELETE` | Einzelnes Pair lesen / aktualisieren / löschen |
+| `/api/prompt-modes` | `GET` · `PUT` | Prompt-Mode-Config (`agent-prompts` Block) lesen / schreiben |
+| `/api/prompt-modes/roles/{role}` | `GET` · `PUT` · `POST` · `DELETE` | Prompt-Mode-Override für eine Rolle setzen / löschen |
+| `/api/model-mapping` | `GET` | Matrix: Rolle × Provider → resolved model ID + source |
+
+**Neue UI-Pages (Phase 5):**
+
+| Page | Route | Beschreibung |
+|------|-------|-------------|
+| **Reflection Pairs** | `/reflection-pairs` | CRUD-Oberfläche für Generator-Critic-Paare (z.B. developer↔code-reviewer) mit `max_iterations` und `enabled`-Flag |
+| **Model Mapping** | `/model-mapping` | Lese-Ansicht der aufgelösten Modelle pro Rolle und Provider — Zellen zeigen Modell-ID + Source (`role-default`, `explicit-override`). Write-Overrides via `/api/config/project/section` oder `/api/models/update` |
+
+**Hilfsmethode `_update_role_defaults_section()`:**
+
+Ersetzt einen einzelnen Top-Level-YAML-Schlüssel in `config/role-defaults.yaml` kind-spezifisch: unveränderte Pipelines oder Reflection-Pair-Einträge behalten ihre ursprüngliche Formatierung und Kommentare bei. Nur geänderte oder neue Kinder werden mit PyYAML neu serialisiert. Kommentare, Leerzeilen und andere Top-Level-Sektionen außerhalb der bearbeiteten Sektion bleiben ebenfalls erhalten.
+
+```python
+def _update_role_defaults_section(self, key: str, value: Any) -> dict:
+    # Regex extrahiert den Sektions-Body
+    # Kinder werden einzeln geparst und nur bei Änderung neu gedumpt
+    # Backup + atomares replace
+```
+
+**Agent→Model-Mapping-Endpunkt (`/api/model-mapping`):**
+
+Ruft `lib.roles.resolve_model()` für jede aktive Rolle × Provider-Kombination auf. Pro Zelle wird zurückgegeben:
+- `model_id` — die aufgelöste konkrete Modell-ID
+- `source` — `"role-default"`, `"explicit-override"` oder `"fallback"`
+
+Die Auflösungslogik ist identisch mit der in `scripts/lib/agents.py` (`_compose_agent()`).
+
+**UI Patterns (REQ-MOD-01):**
 1. **Quick-Filter Strip** oben in Models-Tabelle → Click-to-filter nach Provider
 2. **Enable/Disable/Blacklist Row Buttons** statt Inline-Checkboxen → weniger Jitter, bessere UX
 3. **Datalist-Filtering** in Provider-Mappings → zeigt nur verfügbare Modelle per Provider
@@ -1054,7 +1114,35 @@ PLACEHOLDERS = {
 - 4-Schritte-Workflow: Dateien einlesen → define_subagent → Orchestrator zuerst → Anfragen bearbeiten
 - Hinweise: Ephemere Registrierung, Version-Abhängigkeit von sync.py, Konsequenzen ohne Bootstrap
 
-### 10.7 Integration in `scripts/lib/agents.py`
+### 10.7 `scripts/lib/context.py` — Provider-Kontext-Management (Phase 5 Refactoring)
+
+**Zweck:** Erzeugen und Aktualisieren von provider-spezifischen Context-Dateien (CLAUDE.md, GEMINI.md, AGENTS.md, .continue/rules/project-context.md), Settings-Dateien und `.gitignore`-Managed-Blöcken.
+
+**Capability-Driven Dispatch (`sync_context_for_provider()`):**
+
+Die Dispatch-Logik verwendet die `capabilities`-Matrix aus `config/ai-providers.yaml` statt hartkodierter Provider-Namen:
+
+| Capability | Strategie | Betroffene Provider |
+|------------|-----------|-------------------|
+| `context-embedded-rules` | Opencode-Strategie: Regeln in AGENTS.md managed block | Opencode |
+| `provider == "Continue"` | Continue-Strategie: project-context.md + config.yaml comment block | Continue |
+| `context-managed-block` | Generische HTML-Managed-Block-Strategie | Claude, Gemini |
+
+**Neue Initialisierungs-Funktionen (v0.66.0, provider-config-getrieben):**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `init_settings_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt committed Settings-Dateien für alle aktiven Provider aus deren `settings_template` |
+| `init_settings_local_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt lokale/persönliche Settings-Dateien aus `settings_local_template` (gitignored) |
+| `only_variables()` | `(project_root, variables, log, dry_run, providers, provider_config)` | Substituiert `{{VARIABLE}}`-Platzhalter in bestehenden Context-Dateien |
+| `ensure_gitignore_entries()` | `(project_root, log, dry_run, gitignore_entries, exact_entries)` | Stellt agent-meta Managed-Block in `.gitignore` sicher (additiv oder exakt) |
+
+**Provider-Eigenschaften (`_init_provider_settings_json()`):**
+- Liest `settings_file` und `settings_template` aus `config/ai-providers.yaml`
+- Template-Substitution via `substitute()` — Variablen werden eingesetzt
+- Fallback auf minimales JSON/YAML-Skelett wenn Template fehlt
+
+### 10.8 Integration in `scripts/lib/agents.py`
 
 **Stelle:** `_compose_agent()` Funktion, Zeile ~1082
 
@@ -1215,9 +1303,147 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | **se-critic** | `se-arch-output-v1` | `critic-result-v1` | se-architect, se-interface-mgr | — |
 | **se-interface-mgr** | `critic-result-v1` | `interface-result-v1` | se-termination | — |
 | **se-termination** | `interface-result-v1` | `termination-result-v1` | — | — |
-| **se-orchestrator** | `task-spec-v1` | `task-spec-v1` | se-architect, se-requirements | — |
 
 Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für optionale Schema-Validierung vor/nach Delegation. `target_roles` deklariert die typischen Empfänger — der Orchestrator nutzt dies für dynamisches Routing.
+
+---
+
+## 12. Prompt-Modernisierung (Legacy / Hybrid / Modern)
+
+**Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/prompt-modernization-poc`
+**Session-Fixes:** 2026-07-01 (4 Commits: Template-Guard-Port, HITL-Deadlock-Fix, BARRIER-Refactor, Modern-Syntax-Fixes)
+
+Drei Rendering-Modi für Agenten-Templates, pro Rolle konfigurierbar in `.meta-config/project.yaml`:
+
+| Modus | Template-Quelle | Format | Aktive Rollen |
+|-------|----------------|--------|---------------|
+| `legacy` | `agents/1-generic/` | Markdown (unverändert) | alle (Default) |
+| `hybrid` | `agents/1-generic/` | Auto-XML-Wrap | geplant |
+| `modern` | `agents/1-generic-modern/` | natives 6-Block-XML | `developer`, `orchestrator` |
+
+### 12.1 6-Block-XML-Struktur
+
+Feste Reihenfolge (Recency-Bias-optimiert — `<constraints>` zuletzt):
+
+```
+<persona> → <workflow> → <context> → <tools> → <output_contract> → <constraints>
+```
+
+### 12.2 Implementierte Artefakte
+
+| Datei | Zweck |
+|-------|-------|
+| `agents/1-generic-modern/developer.md` | Modern-Template Developer (v3.0.0, −37% Tokens) |
+| `agents/1-generic-modern/orchestrator.md` | Modern-Template Orchestrator (v7.2.0, −61% Tokens) |
+| `agents/1-generic-modern/_reference-agent.md` | Referenz-Agent (v1.0.0, alle Features, didaktisch, nicht generiert) |
+| `config/prompt-modes.yaml` | Framework-Defaults |
+| `scripts/validate-modern-templates.py` | 6-Block-Validator (exit 0/1/2) |
+| `scripts/token-counter.py` | Token-Vergleich Legacy vs. Modern |
+| `scripts/lib/agents.py` | `_resolve_agent_source()`, `MODERN_DIR`, `[modern]`-Annotation |
+| `scripts/lib/log.py` | `N modern-mode template(s)` im SUMMARY |
+| `scripts/admin-server.py` | `/api/prompt-modes` Endpoint, `prompt_mode` in Hierarchy |
+| `docs/admin-ui.html` | Badges (modern/hybrid/legacy) + `/project/prompt-modes` Seite |
+| `scripts/lib/consistency/crossrefs.py` | `check_prompt_mode_consistency()` |
+| `docs/architecture/prompt-modernization.md` | Architektur-Dokumentation |
+
+### 12.3 Konfiguration
+
+```yaml
+# .meta-config/project.yaml
+agent-prompts:
+  default: legacy
+  modes:
+    developer: modern
+    orchestrator: modern
+```
+
+### 12.4 Tools
+
+```bash
+python scripts/validate-modern-templates.py --all --strict
+python scripts/token-counter.py --role orchestrator
+python scripts/consistency-check.py  # prüft prompt_mode vs. config
+```
+
+### 12.5 Session-Erkenntnisse: Template-Migration-Bugs (2026-07-01)
+
+**Root-Cause:** Beim Port von `agents/1-generic/orchestrator.md` (v6.0.0 legacy) nach `agents/1-generic-modern/orchestrator.md` (v7.x modern) gingen kritische `{{#if}}`-Conditional-Guards verloren.
+
+**Bugs behoben (4 Commits):**
+
+| Bug | Commit | Root-Cause | Fix |
+|-----|--------|-----------|-----|
+| SE-Flags konkateniert ("truefalsefalse" statt Blöcke) | 42963fe | Fehlende `{{#if CONDITION}}`-Guards um SE-Flag-Blöcke | Guards wiederhergestellt; DoD-Flags nun konditional statt statisch |
+| DoD-Flags statisch ("Pflicht" trotz `false`) | 42963fe | Guards gelöst + Seksektion "Template-Migration-Checkliste" in agent-meta-manager |  Checkliste verhindert Wiederholung |
+| HITL-Gate-Deadlock (endlos "bestätigen") | 139eab7 | Satz "zerstörerisch IMMER bestätigen" machte main_chat User-Freigabe ungültig | main_chat als legitimer User-Proxy etabliert; relayte Freigabe zählt |
+| A2A requires_human_approval missing | 3e19c9b | Regression ggü. Legacy v6.0.0 | In Modern v7.x portiert |
+| FANOUT-Threshold hardcoded >2 | 3e19c9b | Sollte `{{MAX_PARALLEL_AGENTS}}` sein | Platzhalter substituiert |
+| HITL-Gates in <workflow> statt <constraints> | 3e19c9b | Recency-Bias: wichtige Constraints sollen zuletzt | Gates in <constraints> umgezogen |
+| BARRIER-Protokoll passiv (warten) | 837587b | Sollte aktiv einsammeln | "Vorliegende Subagent-Ergebnisse SOFORT einsammeln" |
+
+**Prävention — neue Checkliste in `agents/1-generic/agent-meta-manager.md`:**
+
+Beim Port von Classic → Modern Templates:
+1. **{{#if}}-Guards erhalten** — nie Platzhalter direkt konkatenieren
+2. **Dry-Run Diff gegen Classic** — nach Port `git diff agents/1-generic/orchestrator.md agents/1-generic-modern/orchestrator.md`
+3. **6-Block-Struktur validieren** — `validate-modern-templates.py --strict`
+
+**Dokumentation:**
+
+Neuer Referenz-Agent `agents/1-generic-modern/_reference-agent.md` (v1.0.0, Underscore = nicht generiert) demonstriert:
+- Alle 6 Blöcke korrekt strukturiert
+- {{#if}}-Guards für conditional Sections
+- A2A-Envelope-Integration
+- HITL-Gates in <constraints>
+- BARRIER-Protokoll aktiv
+
+Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
+
+---
+
+## 13. Singleton-Orchestrator-Guard
+
+**Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/orchestrator-singleton-guard`
+**Session-Fix:** 2026-07-01 (Commit 139eab7) — HITL-Gate-Deadlock behoben
+
+**Problem:** 
+1. Opencode-Worker-Agents konnten mehrere Orchestrator-Instanzen spawnen → Routing-Konflikte.
+2. HITL-Gates ("Destruktive Aktionen IMMER bestätigen") machten User-Freigaben via main_chat ungültig → Endlos-Bestätigungsschleife.
+
+**Lösung:**
+- Body-Constraint-Injection in alle Worker-Agenten + Gate #5 in A2A-Delegation-Gates
+- main_chat als legitimer User-Proxy etabliert — seine relayten Freigaben zählen
+
+### 13.1 Durchsetzungs-Mechanismus
+
+| Schicht | Datei | Mechanismus |
+|---------|-------|-------------|
+| Gate #5 (Doku) | `rules/1-generic/a2a-delegation-gates.md` | HARD REJECT bei `subagent_type="orchestrator"` durch Worker |
+| Body-Constraint | `scripts/lib/agents.py` (sync) | `SINGLETON_CONSTRAINT_BLOCK` wird in alle Worker-Agenten injiziert |
+| Orchestrator-Doku | `agents/1-generic/orchestrator.md` + `agents/1-generic-modern/orchestrator.md` | Singleton-Regel in `<persona>` + Bullet in Anti-Recursion-Sektion |
+| Projekt-Hinweis | `CLAUDE.md` | Singleton-Regel nach Rollen-Tabelle |
+| HITL-Gate-Fix | `agents/1-generic/orchestrator.md` v6.2.0 + `agents/1-generic-modern/orchestrator.md` v7.2.0 | main_chat als User-Proxy: "seine Anweisungen und relayten Freigaben tragen User-Autorität" |
+
+### 13.2 Singleton-Regel
+
+> **NUR der `main_chat` darf den `orchestrator` spawnen.**
+> Worker-Agents (`delegation_depth >= 2`) dürfen `task(subagent_type="orchestrator", ...)` NIEMALS aufrufen.
+
+### 13.3 HITL-Gate-Deadlock-Fix (Session 2026-07-01)
+
+**Problem:** Orchestrator-Dokumentation sagte "Destruktive Aktionen IMMER bestätigen — auch bei explizitem Befehl". Das machte relayten User-Freigaben durch main_chat ungültig → User hatte keinen direkten Kanal zum Orchestrator, nur indirekt via main_chat → Deadlock.
+
+**Lösung:** Orchestrator erkennt main_chat als User-Proxy an:
+- main_chat ist der autorisierte User-Vertreter
+- main_chat Anweisungen ("mach jetzt") zählen als gültige Freigabe
+- Orchestrator warnt für destruktive Ops TROTZDEM, respektiert aber main_chat-Freigabe
+- Schutzwirkung bleibt (Agenten-to-Agenten Freigaben sind weiter ungültig)
+
+**Betroffene Templates:** 
+- `agents/1-generic/orchestrator.md` v6.2.0 (Legacy): Schnittstellendokumentation
+- `agents/1-generic-modern/orchestrator.md` v7.2.0 (Modern): "<persona>"-Block nennt main_chat explizit
+
+Konzept: `docs/concepts/active/singleton-orchestrator-architecture.md`
 
 ---
 

@@ -32,7 +32,7 @@ Ein Preset definiert, wie die Rollen-Tiers auf die verfügbaren Modell-Klassen g
 
 SE Focus ist ein **Boolean-Modifier** (`se-focus: true/false` in `project.yaml`), kein separates Preset.
 
-**Verhalten bei `se-focus: true`:** Alle Systems-Engineering-Rollen (`se-architect`, `se-critic`, `se-developer`, `se-integration-and-test-manager`, `se-interface-mgr`, `se-junior-developer`, `se-orchestrator`, `se-requirements`, `se-senior-developer`, `se-termination`, `se-test-engineer`, `se-testreviewer`, `se-validator`, `se-verifier`) werden um **eine Tier-Stufe** hochgestuft, **bevor** das Preset-Mapping angewendet wird.
+**Verhalten bei `se-focus: true`:** Alle Systems-Engineering-Rollen (`se-architect`, `se-critic`, `se-developer`, `se-integration-and-test-manager`, `se-interface-mgr`, `se-junior-developer`, `se-requirements`, `se-senior-developer`, `se-termination`, `se-test-engineer`, `se-testreviewer`, `se-validator`, `se-verifier`) werden um **eine Tier-Stufe** hochgestuft, **bevor** das Preset-Mapping angewendet wird.
 
 **Beispiel:** Rolle `se-critic` hat Basis-Tier `balanced`. Mit `se-focus: true` → Upgrade auf `powerful`. Danach greift das Preset: Bei `Normal` bleibt `powerful` auf `powerful`. Bei `Cheap` wird `powerful` auf `fast` gemappt.
 

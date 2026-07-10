@@ -15,6 +15,7 @@ from .pipelines import (
     apply_overrides,
     validate_pipelines,
     build_pipeline_variables,
+    generate_pipeline_match_table,
 )
 
 try:
@@ -268,7 +269,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
-    from .delegation_table import generate_agent_delegation_table
+    from .delegation_table import (
+        generate_agent_delegation_table,
+        generate_intent_routing_table,
+    )
     from .dod import resolve_dod
     from .providers import load_providers_config, resolve_providers
 
@@ -417,6 +421,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_OPTIONAL"]    = "true" if se_required == "false" else "false"
     variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
+    # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
+    variables["INTENT_ROUTING_TABLE"] = generate_intent_routing_table(agent_meta_root, config, variables)
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
@@ -451,6 +457,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         # base pipelines so substitute() never warns about missing placeholders.
         active_vars = build_pipeline_variables(effective, dod_resolved)
         variables.update(active_vars)
+        variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:
             var_name = name.upper().replace("-", "_")
             block_key = f"PIPELINE_{var_name}_BLOCK"
@@ -461,6 +468,49 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[enabled_key] = "false"
     except Exception:
         pass
+    # AGENT_PROMPTS: mode config for Modern/Hybrid/Legacy prompt rendering.
+    # Reads agent-prompts block: {default: legacy, modes: {developer: modern, ...}}
+    _ap = config.get("agent-prompts", {}) or {}
+    _ap_default = _ap.get("default", "legacy") if isinstance(_ap, dict) else "legacy"
+    _ap_modes = _ap.get("modes", {}) or {} if isinstance(_ap, dict) else {}
+    variables["AGENT_PROMPTS_DEFAULT"] = _ap_default
+    for _role, _mode in (_ap_modes.items() if isinstance(_ap_modes, dict) else {}.items()):
+        variables[f"AGENT_PROMPTS_MODE_{_role.upper().replace('-', '_')}"] = str(_mode)
+
+    # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
+    # Each block is either the real content or an empty string when the flag is off.
+    _dod_req = dod_resolved.get("req-traceability", True)
+    variables["DOD_REQ_BLOCK"] = (
+        "REQ-ID aus `REQUIREMENTS.md` prüfen — kein Commit ohne REQ-ID." if _dod_req else ""
+    )
+    _dod_tests = dod_resolved.get("tests-required", True)
+    variables["DOD_TESTS_BLOCK"] = (
+        "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
+    )
+    variables["A2A_HANDOFF_BLOCK"] = (
+        "A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), "
+        "IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). "
+        f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
+        if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""
+    )
+    variables["ANTI_RECURSION_BLOCK"] = (
+        "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
+        "Nur tester/documenter/requirements/validator aus Kontext verweisen."
+    )
+
+    # Orchestrator conditional blocks loaded from snippets (token optimization).
+    # Each block is either the real conditional section or an empty string.
+    _snippets_dir = agent_meta_root / "snippets" / "orchestrator"
+    for _snippet_name, _var_stem in (
+        ("se-mode", "SE_MODE"),
+        ("a2a-protocol", "A2A_PROTOCOL"),
+        ("checkpointing", "CHECKPOINTING"),
+        ("quality-pipelines", "QUALITY_PIPELINES"),
+    ):
+        _snippet_path = _snippets_dir / f"{_snippet_name}.md"
+        _var_name = f"{_var_stem}_BLOCK"
+        variables[_var_name] = _snippet_path.read_text(encoding="utf-8") if _snippet_path.exists() else ""
+
     return variables, unmapped
 
 

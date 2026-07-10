@@ -492,7 +492,8 @@ def main():
 
     elif args.only_variables:
         mode = "only-variables"
-        only_variables(project_root, variables, log, args.dry_run)
+        only_variables(project_root, variables, log, args.dry_run,
+                       providers=providers, provider_config=provider_config)
 
     elif args.create_ext:
         mode = f"create-ext:{args.create_ext}"
@@ -610,8 +611,12 @@ def main():
         if is_claude:
             init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
-            init_settings_json(project_root, log, args.dry_run)
-            init_settings_local_json(project_root, log, args.dry_run)
+        init_settings_json(agent_meta_root, project_root, log, args.dry_run,
+                           providers=providers, provider_config=provider_config,
+                           variables=variables)
+        init_settings_local_json(agent_meta_root, project_root, log, args.dry_run,
+                                 providers=providers, provider_config=provider_config,
+                                 variables=variables)
         if args.init:
             init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync

@@ -135,12 +135,17 @@ def _dir_to_glob(directory: str) -> str:
 
     Examples:
       '.claude/'    → '.claude/**'
-      'opencode.json' → 'opencode.json'   (exact file, no ** needed)
-      'AGENTS.md'   → 'AGENTS.md'
+      'opencode.json' → '**/opencode.json'   (file, must look like a glob)
+      'AGENTS.md'   → '**/AGENTS.md'
+
+    File paths are prefixed with ``**/`` so Claude Code treats them as glob
+    patterns in ``permissions.deny``. Without a glob special character,
+    bare file names such as ``opencode.json`` are misinterpreted as tool
+    names and rejected because they do not start with an uppercase letter.
     """
     if directory.endswith("/"):
         return directory + "**"
-    return directory
+    return f"**/{directory}"
 
 
 # ---------------------------------------------------------------------------

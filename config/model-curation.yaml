@@ -9,4 +9,10 @@
 blacklist:
   - google/gemini-3.1-flash-image
   - google/gemini-3-pro-image
+  # Fictitious / unconfirmed Claude model IDs surfaced by discovery
+  - anthropic/claude-fable-5
+  - ~anthropic/claude-fable-latest
+  - anthropic/claude-sonnet-5
+  - opencode/claude-fable-5
+  - opencode/claude-sonnet-5
 disabled: []

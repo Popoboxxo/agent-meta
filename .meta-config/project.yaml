@@ -1,4 +1,4 @@
-agent-meta-version: 0.65.1
+agent-meta-version: 0.66.0
 provider-isolation: disabled
 ai-providers:
 - Claude
@@ -40,19 +40,6 @@ roles:
 - opencode-expert
 - continue-expert
 - copilot-expert
-- se-requirements
-- se-architect
-- se-interface-mgr
-- se-junior-developer
-- se-developer
-- se-senior-developer
-- se-test-engineer
-- se-integration-and-test-manager
-- se-validator
-- se-verifier
-- se-critic
-- se-testreviewer
-- se-termination
 - prompt-engineer
 project:
   name: agent-meta
@@ -66,7 +53,7 @@ provider-options:
   Gemini: {}
   Continue:
     generate-prompts: true
-    prompt-mode: full
+    prompt-mode: slim
   Copilot: {}
 speech-mode: short
 variables:
@@ -222,7 +209,7 @@ orchestrator:
     validate-before-delegate: true
     supersession-tracking: true
     strict-validation: false
-    compact-mode: false
+    compact-mode: true
     max_retries: 3
     human_approval_required: false
     protocol_routing: static
@@ -274,3 +261,6 @@ reflection-pairs:
       max_iterations: 5
       enabled: true
 tier-preset: Normal
+agent-prompts:
+  default: modern
+  modes: {}

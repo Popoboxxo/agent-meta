@@ -1,8 +1,8 @@
 # SE Framework Test Report
 
-**Timestamp:** 2026-05-24T16:35:34.504215
-**Total Tests:** 121
-**Passed:** 121
+**Timestamp:** 2026-07-10T17:19:43.594046
+**Total Tests:** 117
+**Passed:** 117
 **Failed:** 0
 **Success Rate:** 100.0%
 
@@ -12,32 +12,12 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-orchestrator | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-orchestrator.md |
-## Template-Size
-
-| Test | Status | Details |
-|------|--------|---------|
-| se-orchestrator | PASS | Size: 5416 chars |
-## Template-Frontmatter-Exists
-
-| Test | Status | Details |
-|------|--------|---------|
-| se-orchestrator | PASS | Has YAML frontmatter |
-## Template-Frontmatter-Fields
-
-| Test | Status | Details |
-|------|--------|---------|
-| se-orchestrator | PASS | All required fields present |
-## Template-Existenz
-
-| Test | Status | Details |
-|------|--------|---------|
 | se-requirements | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-requirements.md |
 ## Template-Size
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-requirements | PASS | Size: 5982 chars |
+| se-requirements | PASS | Size: 4492 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -57,7 +37,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-architect | PASS | Size: 7353 chars |
+| se-architect | PASS | Size: 4234 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -77,7 +57,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-critic | PASS | Size: 6359 chars |
+| se-critic | PASS | Size: 4246 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -97,7 +77,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-interface-mgr | PASS | Size: 3771 chars |
+| se-interface-mgr | PASS | Size: 6984 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -117,7 +97,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-termination | PASS | Size: 3953 chars |
+| se-termination | PASS | Size: 6833 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -137,7 +117,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-test-engineer | PASS | Size: 8107 chars |
+| se-test-engineer | PASS | Size: 7201 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -157,7 +137,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-testreviewer | PASS | Size: 7367 chars |
+| se-testreviewer | PASS | Size: 7416 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -177,7 +157,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-verifier | PASS | Size: 9379 chars |
+| se-verifier | PASS | Size: 8682 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -197,7 +177,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-validator | PASS | Size: 8127 chars |
+| se-validator | PASS | Size: 7704 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -217,7 +197,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-integration-and-test-manager | PASS | Size: 9942 chars |
+| se-integration-and-test-manager | PASS | Size: 9725 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -237,7 +217,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| code-reviewer | PASS | Size: 12202 chars |
+| code-reviewer | PASS | Size: 4909 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -257,7 +237,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| ui-ux-designer | PASS | Size: 13768 chars |
+| ui-ux-designer | PASS | Size: 7907 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -277,7 +257,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| api-specialist | PASS | Size: 9105 chars |
+| api-specialist | PASS | Size: 3102 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -297,7 +277,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| devops-engineer | PASS | Size: 9958 chars |
+| devops-engineer | PASS | Size: 6451 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -317,7 +297,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| performance-optimizer | PASS | Size: 9639 chars |
+| performance-optimizer | PASS | Size: 6589 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -337,7 +317,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| export-manager | PASS | Size: 10120 chars |
+| export-manager | PASS | Size: 5647 chars |
 ## Template-Frontmatter-Exists
 
 | Test | Status | Details |
@@ -382,9 +362,9 @@
 |------|--------|---------|
 | File exists | PASS |  |
 | Readable | PASS |  |
-| Intent-Routing contains all agents | PASS | All agents referenced in routing table |
-| Agent table contains new agents | PASS | Found 17/17 agents in table |
-| SE/V&V workflows referenced | PASS | Found 6 SE/V&V keywords: se-kaskade, v&v, verification, se-orchestrator, se-requirements, se-architect |
+| Intent-Routing placeholder present | PASS | {{INTENT_ROUTING_TABLE}} placeholder found |
+| Agent table placeholder present | PASS | {{AGENT_DELEGATION_TABLE}} placeholder found |
+| Pipeline Match placeholder present | PASS | {{PIPELINE_MATCH_TABLE}} placeholder found |
 ## JSON-L1-Requirements
 
 | Test | Status | Details |

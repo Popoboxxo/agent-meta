@@ -2,6 +2,84 @@
 
 ## [Unreleased]
 
+### Files
+- New: `agents/1-generic-modern/_reference-agent.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic-modern/developer.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic-modern/orchestrator.md` (Phase 1 token-optimization PoC)
+- New: `agents/1-generic/_README.md` (Phase 1 wf-deleted mapping reference)
+
+### Fixed
+- **model IDs**: Fix incorrect Claude model IDs in provider library admin UI (`config/ai-providers.yaml`, `docs/admin-ui.html`) — 137 tests verified green (commit dc5205b)
+- **SE_ENABLED scoping**: Fix SE_ENABLED scoping bug in orchestrator template (`agents/1-generic/orchestrator.md`) — conditional block was incorrectly rendered when SE mode disabled; verified via dry-run (commit 0123655)
+
+### Known Issues
+- **sync.py not yet run**: Generated provider files (`.claude/agents/`, `.opencode/agents/`, `.gemini/agents/`) are stale relative to source templates. A full `python scripts/sync.py` run is required before merging to main. No runtime impact on modern-mode agents (which use `agents/1-generic-modern/`). Post-Beta.
+- **Issue #342 (open)**: Three Viz-feature bugs: event-type mismatch (`delegate_out` vs. `delegate`), dead import in `scripts/viz-server.py` (`admin_server`), escape bug in `scripts/lib/viz.py`. No runtime impact — Viz is disabled (`viz.enabled: false`). Fix before next stable release.
+- **Missing regression test**: `tests/test_sync_conditional.py` not yet created. Would catch SE_ENABLED scoping regressions automatically. Recommended before v0.67.0 stable.
+- **Concept: SE standardization** (`docs/concepts/active/se-und-prompt-modernisierung.md`, v1.0 draft, 2026-06-29): SE-housekeeper agent, `docs/se/**` taxonomy, ADR standard, REQ frontmatter schema — planned but not implemented. Roadmap item only.
+- **Cosmetic**: Deprecated `se-orchestrator.md` contains unclosed `{{#if SE_ENABLED}}` literals (lines 4, 7) — display-only, no functional impact. Minor keyword leak in pipeline signal table at `SE_ENABLED=false` (runtime-guarded, harmless).
+
+## [0.66.0-beta.4] - 2026-07-02
+
+### Changed — Token Optimization Phase 2 (Top-10 Compactification)
+- **ui-ux-designer**: 12200 → 7907 chars (-35%, 3050 → 1976 tokens) — JSON schema examples replaced with field-table + schema-reference
+- **prompt-engineer**: 12658 → 6065 chars (-52%, 3164 → 1516 tokens) — Best-Practices sections consolidated into reference tables
+- **code-reviewer**: 11237 → 9351 chars (-17%, 2809 → 2337 tokens) — JSON output schema replaced with field-table
+- **export-manager**: 9239 → 5647 chars (-39%, 2309 → 1411 tokens) — Two JSON schemas replaced with field-tables + snippet references
+- **performance-optimizer**: 9040 → 6589 chars (-27%, 2260 → 1647 tokens) — JSON output schema + workflow phases consolidated
+- **devops-engineer**: 9033 → 6451 chars (-29%, 2258 → 1612 tokens) — Pipeline-YAML + K8s-Manifest + JSON schema replaced with snippet references
+- **api-specialist**: 8664 → 6542 chars (-24%, 2166 → 1635 tokens) — OpenAPI-YAML + JSON schema replaced with snippet reference
+- **feature**: 8456 → 5698 chars (-33%, 2114 → 1424 tokens) — 8 step-by-step blocks collapsed into single lifecycle table
+- **concept-reviewer**: 6978 → 5477 chars (-22%, 1744 → 1369 tokens) — 7 review dimensions + reflection-loop consolidated into tables
+
+### Fixed
+- **Dead link cleanup**: Removed references to deleted `_wf-skill-lifecycle.md`, `_wf-claude-review.md`, `_wf-git-ops.md`, `_wf-security-audit.md` in `agent-meta-manager.md`, `git.md`, `security-auditor.md`
+- **Provider-agnostic consistency**: All compactifications are pure Markdown reductions — no XML/Modern-format, no provider-specific syntax. All 4 top providers (Claude, Opencode, Gemini, Continue, Copilot) work identically.
+- **Placeholder validation**: Added `A2A_MAX_DEPTH`, `FILE_AFFINITY_HINT`, `ANALYSIS_ENABLED`, `SE_MODE_BLOCK`, `A2A_PROTOCOL_BLOCK`, `CHECKPOINTING_BLOCK`, `QUALITY_PIPELINES_BLOCK` to `_BUILTIN_VARS` in `scripts/lib/consistency/placeholders.py` — eliminates 7 false-positive consistency warnings
+
+## [0.66.0-beta.3] - 2026-07-02
+
+### Changed — Token Optimization Phase 1 (Quick-Wins)
+- **Orchestrator externalized**: 4 conditional blocks (SE-Mode, A2A-Protocol, Quality-Pipelines, Checkpointing) moved to `snippets/orchestrator/*.md`, reducing orchestrator.md from 35836 → 22878 chars (-36%, 8959 → 5719 tokens).
+- **A2A handoff documentation consolidated**: Reduced duplication between orchestrator and reference-agent templates.
+- **AGENTS.md managed-block compactified**: Root managed-block trimmed from 669 → 151 lines (-77%) via compact rule summaries (title + 1-sentence summary + path).
+- **`_wf-*.md` workflow files deleted**: 9 unused reference files removed, knowledge preserved in agent templates and rules files. See `agents/1-generic/_README.md` for mapping.
+- **Compact-Mode default enabled**: `orchestrator.handoff.compact-mode: true` (was `false`) — A2A envelopes use short field names by default.
+- **Continue prompt-mode `slim`**: `provider-options.Continue.prompt-mode: slim` (was `full`) — reduces Continue generated prompts to ~80 lines.
+
+### Internal
+- New helper `_extract_rule_compact_from_content()` in `scripts/lib/context.py`.
+- `_collect_embedded_rules_md()` gained `compact: bool` parameter.
+- `_build_opencode_managed_block()` passes `compact=True` for Opencode provider.
+
+---
+
+## [0.66.0-beta.2] - 2026-07-01
+
+### Added
+- **Prompt-Modernization PoC**: Modern Mode with 6-block XML structure for agent prompts (`feat/prompt-modernization-poc`)
+- **Prompt-mode awareness**: `log`, `admin-server`, `admin-ui` now respect prompt-mode configuration (legacy/hybrid/modern)
+- **Admin UI prompt-modes page**: `/project/prompt-modes` page for viewing and managing prompt-mode settings per agent
+- **XML-anchor support**: Composition patches can now target XML anchors in Modern-mode templates
+- **prompt_mode consistency check**: `consistency-check.py` validates prompt_mode alignment across generated agents
+- **Singleton-Constraint injection**: `sync.py` injects Singleton-Constraint block into Worker agent files to prevent recursive spawning
+- **A2A anti-re-delegation gates**: Configurable depth-limit, self-handoff rejection, T-size-limit, re-delegation detection (`rules/a2a-delegation-gates.md`)
+- **Gate #5 — Singleton-Orchestrator Spawn Rule**: Prevents Workers from spawning additional Orchestrator instances
+- **prompt-engineer agent template**: New role for prompt design, review and optimization (#337)
+
+### Fixed
+- Prompt-engineer agent template corrections and refinements
+- Various minor fixes in prompt-modernization integration
+
+### Changed
+- Orchestrator-singleton-guard concept integrated into prompt-modernization-poc branch
+
+### Documentation
+- Active concept: prompt-modernization (Phase 1 complete)
+- Active concept: singleton-orchestrator moved to `active/`
+- Active concept: SE-und-Prompt-Modernisierung moved to `active/`
+- Updated CODEBASE_OVERVIEW.md and README.md for prompt-modernization and singleton-guard
+
 ---
 
 ## [0.65.2] - 2026-06-28

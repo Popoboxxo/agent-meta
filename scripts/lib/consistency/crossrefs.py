@@ -257,6 +257,76 @@ def check_schema_refs(agent_meta_root: Path) -> list[Finding]:
     return findings
 
 
+def check_prompt_mode_consistency(agent_meta_root: Path) -> list[Finding]:
+    """Cross-check: modern templates in 1-generic-modern/ vs agent-prompts config.
+
+    1. Template exists + prompt_mode=modern in frontmatter, but config doesn't activate it → WARNING
+    2. Config activates modern for a role, but no 1-generic-modern/<role>.md exists → WARNING
+    """
+    findings: list[Finding] = []
+
+    # Load agent-prompts from project.yaml (prefer .meta-config/project.yaml)
+    ap_cfg = _load_agent_prompts(agent_meta_root)
+    default_mode = ap_cfg.get("default", "legacy")
+    modes_map = ap_cfg.get("modes", {}) or {}
+
+    modern_dir = agent_meta_root / "agents" / "1-generic-modern"
+
+    # Check 1: templates that exist but aren't activated
+    if modern_dir.exists():
+        for md in sorted(modern_dir.glob("*.md")):
+            if md.name.startswith("_"):
+                continue
+            role = md.stem
+            fm = _parse_frontmatter_yaml(md)
+            if fm.get("prompt_mode") != "modern":
+                continue  # not a modern template
+            effective_mode = modes_map.get(role) or default_mode
+            if effective_mode != "modern":
+                findings.append(Finding(
+                    Severity.WARNING,
+                    "crossrefs.prompt-mode-template-not-activated",
+                    f"agents/1-generic-modern/{md.name}",
+                    f"Template has prompt_mode=modern but agent-prompts config activates '{effective_mode}' for role '{role}'.",
+                    f"Set agent-prompts.modes.{role}: modern in project.yaml, or set agent-prompts.default: modern.",
+                ))
+
+    # Check 2: config activates modern but template missing
+    for role, mode in modes_map.items():
+        if mode != "modern":
+            continue
+        template_path = modern_dir / f"{role}.md"
+        if not template_path.exists():
+            findings.append(Finding(
+                Severity.WARNING,
+                "crossrefs.prompt-mode-template-missing",
+                ".meta-config/project.yaml",
+                f"agent-prompts.modes.{role}=modern but agents/1-generic-modern/{role}.md does not exist.",
+                f"Create agents/1-generic-modern/{role}.md or remove the mode override.",
+            ))
+
+    return findings
+
+
+def _load_agent_prompts(agent_meta_root: Path) -> dict:
+    """Load the agent-prompts block from .meta-config/project.yaml."""
+    for candidate in [
+        agent_meta_root / ".meta-config" / "project.yaml",
+        agent_meta_root / "config" / "prompt-modes.yaml",
+    ]:
+        if not candidate.exists():
+            continue
+        try:
+            import yaml
+            data = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
+            ap = data.get("agent-prompts")
+            if ap and isinstance(ap, dict):
+                return ap
+        except Exception:
+            pass
+    return {"default": "legacy", "modes": {}}
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _load_role_names(roles_path: Path) -> set[str]:

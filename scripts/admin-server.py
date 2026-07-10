@@ -866,7 +866,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         # no CORS headers so the browser will not consider this an allowed
         # cross-site preflight.
         self.send_response(204)
-        self.send_header("Allow", "GET, PUT, POST, OPTIONS")
+        self.send_header("Allow", "GET, PUT, POST, DELETE, OPTIONS")
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
@@ -909,6 +909,19 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
+            return
+        except Exception as exc:  # pragma: no cover
+            self._send_json({"error": "internal", "detail": str(exc)}, status=500)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        try:
+            self._check_origin()
+            self._dispatch_delete()
+        except SecurityError as exc:
+            self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except FileNotFoundError as exc:
+            self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
+        except ConnectionError:
             return
         except Exception as exc:  # pragma: no cover
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
@@ -961,7 +974,20 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return self._send_json(self._build_agent_hierarchy())
 
         if path == "/api/pipelines":
+            if "help" in (parsed.query or "").lower():
+                return self._send_json(self._pipeline_help())
             return self._send_json(self._read_pipelines())
+
+        if path.startswith("/api/pipelines/"):
+            name = path[len("/api/pipelines/"):]
+            return self._send_json(self._read_single_pipeline(name))
+
+        if path == "/api/reflection-pairs":
+            return self._send_json(self._read_reflection_pairs())
+
+        if path.startswith("/api/reflection-pairs/"):
+            pair_id = path[len("/api/reflection-pairs/"):]
+            return self._send_json(self._read_reflection_pair(pair_id))
 
         if path == "/api/agents/templates":
             return self._send_json(self._list_agent_templates())
@@ -985,6 +1011,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/roles":
             return self._send_json(self._list_roles())
 
+        if path == "/api/prompt-modes":
+            return self._send_json(self._read_prompt_modes())
+
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
 
@@ -1002,6 +1031,31 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/tier-presets/merged":
             return self._handle_get_tier_presets_merged()
+
+        if path == "/api/model-mapping":
+            return self._handle_get_model_mapping()
+
+        raise FileNotFoundError(path)
+
+    # ------------------------------------------------------------------ #
+    # DELETE routes                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _dispatch_delete(self) -> None:
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+
+        if path.startswith("/api/pipelines/"):
+            name = path[len("/api/pipelines/"):]
+            return self._send_json(self._delete_pipeline(name))
+
+        if path.startswith("/api/reflection-pairs/"):
+            pair_id = path[len("/api/reflection-pairs/"):]
+            return self._send_json(self._delete_reflection_pair(pair_id))
+
+        if path.startswith("/api/prompt-modes/roles/"):
+            role = path[len("/api/prompt-modes/roles/"):]
+            return self._send_json(self._delete_role_prompt_mode(role))
 
         raise FileNotFoundError(path)
 
@@ -1039,6 +1093,47 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(pipelines, dict):
                 raise ValueError("'pipelines' must be an object")
             result = self._write_pipelines(pipelines)
+            return self._send_json(result)
+
+        if path.startswith("/api/pipelines/"):
+            name = path[len("/api/pipelines/"):]
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body with pipeline object")
+            result = self._write_single_pipeline(name, body)
+            return self._send_json(result)
+
+        if path == "/api/reflection-pairs":
+            body = self._read_body()
+            if not isinstance(body, dict) or "reflection_pairs" not in body:
+                raise ValueError("expected JSON body with 'reflection_pairs' field")
+            pairs = body["reflection_pairs"]
+            if not isinstance(pairs, list):
+                raise ValueError("'reflection_pairs' must be a list")
+            result = self._write_reflection_pairs(pairs)
+            return self._send_json(result)
+
+        if path.startswith("/api/reflection-pairs/"):
+            pair_id = path[len("/api/reflection-pairs/"):]
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body with reflection pair object")
+            result = self._write_reflection_pair(pair_id, body)
+            return self._send_json(result)
+
+        if path == "/api/prompt-modes":
+            body = self._read_body()
+            if not isinstance(body, dict) or "default" not in body:
+                raise ValueError("expected JSON body with 'default' field")
+            result = self._write_agent_prompts(body)
+            return self._send_json(result)
+
+        if path.startswith("/api/prompt-modes/roles/"):
+            role = path[len("/api/prompt-modes/roles/"):]
+            body = self._read_body()
+            if not isinstance(body, dict) or "mode" not in body:
+                raise ValueError("expected JSON body with 'mode' field")
+            result = self._set_role_prompt_mode(role, body["mode"])
             return self._send_json(result)
 
         raise FileNotFoundError(path)
@@ -1083,6 +1178,22 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/tier-presets/update":
             return self._handle_post_tier_presets_update()
+
+        if path == "/api/reflection-pairs":
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body with reflection pair object")
+            pair_id = self._ensure_pair_id(body)
+            result = self._write_reflection_pair(pair_id, body)
+            return self._send_json(result)
+
+        if path.startswith("/api/prompt-modes/roles/"):
+            role = path[len("/api/prompt-modes/roles/"):]
+            body = self._read_body()
+            if not isinstance(body, dict) or "mode" not in body:
+                raise ValueError("expected JSON body with 'mode' field")
+            result = self._set_role_prompt_mode(role, body["mode"])
+            return self._send_json(result)
 
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
@@ -1466,9 +1577,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     model_id = data.get("id")
                     if provider in pricing["prices"] and model_id in pricing["prices"][provider]:
                         del pricing["prices"][provider][model_id]
-                        if not pricing["prices"][provider] and "_url" not in pricing["prices"][provider]:
-                             # Maybe don't delete empty providers to be safe, but they have _url usually
-                             pass
+                        # Remove provider block if empty or only metadata (_url) remains.
+                        remaining = set(pricing["prices"][provider].keys())
+                        if not remaining or remaining == {"_url"}:
+                            del pricing["prices"][provider]
                         with pricing_path.open("w", encoding="utf-8") as fh:
                             yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
                             
@@ -1593,6 +1705,130 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 
+    def _agent_meta_root(self) -> Path:
+        """Resolve the agent-meta framework root for lib helpers.
+
+        In super_admin mode the server root is the framework checkout. In
+        project_admin mode the framework sources live under ``.agent-meta/``.
+        """
+        root = self.__class__.root
+        if (root / "agents" / "1-generic").is_dir():
+            return root
+        submodule = root / ".agent-meta"
+        if (submodule / "agents" / "1-generic").is_dir():
+            return submodule
+        return root
+
+    def _handle_get_model_mapping(self) -> None:
+        """Return a matrix of role → resolved model ID for every provider.
+
+        Loads role-defaults.yaml and tier-presets.yaml once, then resolves
+        each role × provider combination in memory — no repeated disk I/O.
+        """
+        try:
+            self._ensure_lib_on_path()
+            from lib.io import _load_yaml_or_json
+            from lib.providers import resolve_providers
+            from lib.roles import _KNOWN_TIERS, _resolve_tier_to_model, _upgrade_tier
+
+            project_config = self.__class__.config_manager.read("project") or {}
+            agent_meta_root = self._agent_meta_root()
+            raw_providers_cfg, _ = _load_yaml_or_json(agent_meta_root / "config" / "ai-providers.yaml")
+            if not isinstance(raw_providers_cfg, dict):
+                raw_providers_cfg = {}
+            providers_cfg = raw_providers_cfg.get("providers") or {}
+            providers = resolve_providers(project_config, providers_cfg)
+
+            hierarchy = self._build_agent_hierarchy()
+            role_names = [r["name"] for r in hierarchy.get("roles", [])]
+            project_roles = project_config.get("roles") or []
+            if isinstance(project_roles, list):
+                for role in project_roles:
+                    if role not in role_names:
+                        role_names.append(role)
+
+            # --- Pre-load configs once ---
+            role_defaults, _ = _load_yaml_or_json(agent_meta_root / "config" / "role-defaults.yaml")
+            if not isinstance(role_defaults, dict):
+                role_defaults = {}
+            roles_cfg = role_defaults.get("roles") or {}
+            global_presets, _ = _load_yaml_or_json(agent_meta_root / "config" / "tier-presets.yaml")
+            if not isinstance(global_presets, dict):
+                global_presets = {}
+            project_presets = project_config.get("tier-presets") or {}
+
+            provider_names = sorted(providers, key=str.lower)
+            rows: list[dict] = []
+            for role in role_names:
+                row: dict = {"name": role, "mappings": {}}
+                meta_model = (roles_cfg.get(role) or {}).get("model", "")
+                for provider in provider_names:
+                    pc = providers_cfg.get(provider) or {}
+
+                    # --- Inline resolve_model (single call per cell, no I/O) ---
+                    model_id = ""
+                    tier_or_id = ""
+                    explicit = False
+
+                    overrides = project_config.get("model-overrides") or {}
+                    prov_override = overrides.get(provider, {}) if isinstance(overrides, dict) else {}
+                    if isinstance(prov_override, dict) and role in prov_override:
+                        tier_or_id = str(prov_override[role])
+                        explicit = True
+                    elif isinstance(overrides, dict) and role in overrides and not isinstance(overrides[role], dict):
+                        if provider == "Claude":
+                            tier_or_id = str(overrides[role])
+                            explicit = True
+
+                    if not tier_or_id:
+                        tier_or_id = meta_model
+
+                    if not explicit:
+                        tier_overrides = project_config.get("tier-overrides") or {}
+                        if role in tier_overrides:
+                            tier_or_id = str(tier_overrides[role])
+
+                    if tier_or_id and tier_or_id not in _KNOWN_TIERS:
+                        model_id = _resolve_tier_to_model(tier_or_id, provider, pc)
+                    else:
+                        base_tier = tier_or_id
+                        preset_name = project_config.get("tier-preset", "Normal")
+                        se_focus = bool(project_config.get("se-focus", False))
+                        if preset_name.endswith(" (SE)"):
+                            se_focus = True
+                            preset_name = preset_name.replace(" (SE)", "")
+                        if se_focus and role.startswith("se-"):
+                            base_tier = _upgrade_tier(base_tier, 1)
+
+                        presets = project_presets.get(preset_name) if isinstance(project_presets, dict) and preset_name in project_presets else global_presets.get(preset_name) or {}
+                        if isinstance(presets, dict) and "tiers" in presets:
+                            prov_tiers = (presets.get("providers") or {}).get(provider, {}).get("tiers") or {}
+                            direct = prov_tiers.get(base_tier) or presets["tiers"].get(base_tier, "")
+                            if direct:
+                                pto = project_config.get("provider-tier-overrides") or {}
+                                if provider in pto and base_tier in pto[provider]:
+                                    model_id = str(pto[provider][base_tier])
+                                else:
+                                    model_id = direct
+                            else:
+                                model_id = _resolve_tier_to_model(base_tier, provider, pc)
+                        else:
+                            preset_matrix = presets.get("mapping") or {}
+                            mapped = preset_matrix.get(base_tier, base_tier)
+                            pto = project_config.get("provider-tier-overrides") or {}
+                            if provider in pto and mapped in pto[provider]:
+                                model_id = str(pto[provider][mapped])
+                            else:
+                                model_id = _resolve_tier_to_model(mapped, provider, pc)
+
+                    source = "explicit-override" if explicit else "role-default"
+                    row["mappings"][provider] = {"model_id": model_id or "", "source": source}
+                rows.append(row)
+
+            return self._send_json({"providers": provider_names, "roles": rows})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
     # ------------------------------------------------------------------ #
@@ -1622,7 +1858,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         Each role entry includes:
           * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
-            ``permission_mode``
+            ``permission_mode``, ``prompt_mode``
           * ``description`` — never empty (falls back to template frontmatter
             ``description`` field if the role-defaults entry is missing/empty)
           * ``targets`` — list of delegation target role names from
@@ -1630,6 +1866,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         role_defaults_path = self._role_defaults_path()
         roles: list[dict] = []
+
+        # Read agent-prompts config for prompt_mode annotation per role
+        prompt_modes = self._read_prompt_modes()
+        prompt_default = prompt_modes.get("default", "legacy")
+
         if role_defaults_path.exists():
             with role_defaults_path.open("r", encoding="utf-8") as fh:
                 data = yaml.safe_load(fh) or {}
@@ -1650,6 +1891,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if not description:
                         description = f"{name} agent (no description)"
 
+                    # Resolve effective prompt_mode: role override > default
+                    effective_mode = prompt_modes.get("modes", {}).get(name) or prompt_default
+
                     roles.append({
                         "name": name,
                         "tier": (attrs.get("workflow_tier")
@@ -1662,8 +1906,30 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
                         "description": description,
                         "targets": targets,
+                        "prompt_mode": effective_mode,
                     })
         return {"roles": roles, "count": len(roles)}
+
+    def _read_prompt_modes(self) -> dict:
+        """Return the agent-prompts block from project.yaml.
+
+        Shape: ``{"default": "legacy", "modes": {"developer": "modern", ...}}``
+        Falls back to ``{"default": "legacy", "modes": {}}`` when absent.
+        """
+        try:
+            project_config = self.__class__.root / ".meta-config" / "project.yaml"
+            if project_config.exists():
+                with project_config.open("r", encoding="utf-8") as fh:
+                    cfg = yaml.safe_load(fh) or {}
+                ap = cfg.get("agent-prompts") or {}
+                if isinstance(ap, dict):
+                    return {
+                        "default": ap.get("default", "legacy"),
+                        "modes": ap.get("modes") or {},
+                    }
+        except Exception:
+            pass
+        return {"default": "legacy", "modes": {}}
 
     def _role_defaults_path(self) -> Path:
         """Resolve the path to ``role-defaults.yaml`` for either layout."""
@@ -1686,98 +1952,633 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             pipelines = {}
         return {"pipelines": pipelines}
 
-    def _write_pipelines(self, pipelines: dict) -> dict:
-        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``.
-
-        All other top-level keys (``roles``, ``outcome-caching``,
-        ``reflection_pairs`` …) are preserved untouched. Goes through the
-        ConfigManager so the regular backup + atomic-replace contract applies.
-        """
-        cm = self.__class__.config_manager
-        # ``role-defaults`` is the whitelisted key — never accept a raw path.
-        existing = cm.read("role-defaults")
-        if not isinstance(existing, dict):
-            existing = {}
-        existing["quality_pipelines"] = pipelines
-        return cm.write("role-defaults", existing)
+    def _read_single_pipeline(self, name: str) -> dict:
+        """Return a single pipeline by name or raise."""
+        pipelines = self._read_pipelines().get("pipelines", {})
+        if name not in pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        return {"pipeline": pipelines[name]}
 
     @staticmethod
-    def _deep_merge(base: dict, overlay: dict) -> dict:
-        """Recursively merge ``overlay`` into ``base`` and return ``base``.
-
-        Nested dicts are merged key-by-key; every other value type (scalars,
-        lists) is replaced wholesale. Mutates and returns ``base``.
-        """
-        for key, value in overlay.items():
-            if (
-                key in base
-                and isinstance(base[key], dict)
-                and isinstance(value, dict)
-            ):
-                AdminRequestHandler._deep_merge(base[key], value)
+    def _indent_yaml_dump(value: Any, indent: int) -> list[str]:
+        """Dump ``value`` to YAML and prefix every line with ``indent`` spaces."""
+        raw = yaml.dump(
+            value,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        if not raw.endswith("\n"):
+            raw += "\n"
+        out: list[str] = []
+        for line in raw.splitlines(keepends=True):
+            if line == "\n":
+                out.append("\n")
             else:
-                base[key] = value
-        return base
+                out.append(" " * indent + line)
+        return out
 
-    def _write_project_section(self) -> None:
-        """Apply a partial update to a single top-level section of
-        ``project.yaml`` using a read-modify-write deep merge.
+    @staticmethod
+    def _format_yaml_list_item(item: Any, indent: int, value_indent: int) -> list[str]:
+        """Format a list item (``- key: value``) preserving nested indentation.
 
-        Body shape: ``{"key": "<top-level-yaml-key>", "value": <section-data>}``.
-        The remaining top-level keys are preserved untouched. Goes through the
-        whitelisted ``project`` config key so backup + atomic-replace apply.
+        ``indent`` is the column of the ``-`` marker; ``value_indent`` is the
+        column used for the item's body lines.
         """
-        body = self._read_body()
-        if not isinstance(body, dict) or "key" not in body or "value" not in body:
-            raise ValueError("expected JSON body with 'key' and 'value' fields")
-        key = body["key"]
-        value = body["value"]
-        if not isinstance(key, str) or not key:
-            raise ValueError("'key' must be a non-empty string")
+        lines = AdminRequestHandler._indent_yaml_dump(item, value_indent)
+        if not lines:
+            return [(" " * indent) + "- \n"]
+        # The first dumped line already has ``value_indent`` spaces; replace
+        # them with the list marker at ``indent``.
+        first_content = lines[0][value_indent:]
+        lines[0] = (" " * indent) + "- " + first_content
+        return lines
 
+    @staticmethod
+    def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
+        """Return the indentation used for a child mapping/list body.
+
+        Falls back to ``base_indent + 2`` when the body is empty.
+        """
+        for line in body_lines:
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                continue
+            indent = len(line) - len(stripped)
+            if indent > base_indent:
+                return indent
+        return base_indent + 2
+
+    @staticmethod
+    def _trailing_blank_lines(lines: list[str]) -> list[str]:
+        """Return only the trailing blank/whitespace lines of a block."""
+        last = -1
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip() not in ("", "\n"):
+                last = i
+                break
+        if last == -1:
+            return lines[:]
+        return lines[last + 1 :]
+
+    @staticmethod
+    def _extract_list_item_id(lines: list[str]) -> Optional[str]:
+        """Parse a single YAML list item and return its ``id`` field, if any."""
+        try:
+            data = yaml.safe_load("".join(lines))
+            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+                return data[0].get("id")
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _split_dict_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level mapping keys inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and not stripped.startswith("-") and ":" in stripped:
+                key_name = stripped.split(":", 1)[0]
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind < base_indent:
+                        break
+                    if ind == base_indent and not l.lstrip().startswith("-"):
+                        break
+                    i += 1
+                children.append({"type": "dict", "key": key_name, "start": start, "end": i})
+            else:
+                i += 1
+        return children
+
+    @staticmethod
+    def _split_list_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level list items inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and stripped.startswith("- "):
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind <= base_indent:
+                        break
+                    i += 1
+                children.append({"start": start, "end": i})
+            else:
+                i += 1
+        return children
+
+    def _build_role_defaults_section_body(
+        self, key: str, value: Any, body_lines: list[str]
+    ) -> str:
+        """Rebuild the body of a top-level ``role-defaults.yaml`` section.
+
+        Dict sections (e.g. ``quality_pipelines``) are edited child-by-child.
+        Children whose parsed value equals the new value keep their original
+        formatting; only changed or new children are re-serialised. List
+        sections with an ``id`` field (e.g. ``reflection_pairs``) are matched
+        by id using the same rule. Comments and blank lines that are not part
+        of a child block are preserved unchanged.
+        """
+        base_indent = 2
+        value_indent = self._infer_child_value_indent(body_lines, base_indent)
+
+        def _scalar_dump(v: Any) -> str:
+            return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
+
+        def _build_dict_child(k: str, v: Any, child: Optional[dict]) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if isinstance(v, (dict, list)):
+                    header = body_lines[child["start"]]
+                    child_value_indent = self._infer_child_value_indent(
+                        body_lines[child["start"] + 1 : child["end"]], base_indent
+                    )
+                    value_lines = self._indent_yaml_dump(v, child_value_indent)
+                    return [header] + value_lines + trailing
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n"
+                    ] + trailing
+            else:
+                if isinstance(v, (dict, list)):
+                    header = " " * base_indent + k + ":\n"
+                    value_lines = self._indent_yaml_dump(v, value_indent)
+                    return [header] + value_lines + ["\n"]
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n",
+                        "\n",
+                    ]
+
+        def _build_list_child(item: dict, child: Optional[dict]) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + trailing
+            else:
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + ["\n"]
+
+        def _assigned_indices(children: list[dict]) -> set[int]:
+            indices: set[int] = set()
+            for child in children:
+                indices.update(range(child["start"], child["end"]))
+            return indices
+
+        if isinstance(value, dict):
+            children = self._split_dict_children(body_lines, base_indent)
+            old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for k, v in value.items():
+                child = old_by_key.get(k)
+                if child:
+                    new_lines.extend(body_lines[pos : child["start"]])
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed.get(k) if isinstance(parsed, dict) else None
+                    except Exception:
+                        old_value = None
+                    if old_value == v:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_dict_child(k, v, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_dict_child(k, v, None))
+            new_lines.extend(body_lines[pos:])
+            new_lines.extend(appended_new)
+            return "".join(new_lines)
+
+        if isinstance(value, list) and key == "reflection_pairs":
+            children = self._split_list_children(body_lines, base_indent)
+            old_by_id: dict[str, dict] = {}
+            for child in children:
+                item_id = self._extract_list_item_id(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if item_id:
+                    old_by_id[item_id] = child
+
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                item_id = item.get("id")
+                child = old_by_id.get(item_id) if item_id else None
+                if child:
+                    new_lines.extend(body_lines[pos : child["start"]])
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed[0] if isinstance(parsed, list) and parsed else None
+                    except Exception:
+                        old_value = None
+                    if old_value == item:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_list_child(item, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_list_child(item, None))
+            new_lines.extend(body_lines[pos:])
+            new_lines.extend(appended_new)
+            return "".join(new_lines)
+
+        # Fallback for any other shape: replace the whole body with a fresh dump.
+        snippet = yaml.dump(
+            {key: value},
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        lines = snippet.splitlines(keepends=True)
+        if lines and lines[0].startswith(key + ":"):
+            return "".join(lines[1:])
+        return snippet
+
+    def _update_role_defaults_section(self, key: str, value: Any) -> dict:
+        """Replace one top-level section of ``role-defaults.yaml`` in-place.
+
+        Uses a fine-grained, child-aware edit so that untouched inner keys,
+        list items, and comments keep their original formatting. Only new or
+        changed children are re-serialised with PyYAML. Falls back to a full
+        block dump when the section is missing or its structure is unexpected.
+        Backup + atomic-replace rules mirror :class:`ConfigManager`.
+        """
+        import re
+
+        path = self._role_defaults_path()
+        original_text = path.read_text(encoding="utf-8") if path.exists() else ""
+        text = original_text.replace("\r\n", "\n")
+
+        # Skip the actual write if the parsed content is unchanged.
+        try:
+            parsed_original = yaml.safe_load(original_text) or {}
+        except Exception:
+            parsed_original = {}
+        if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
+            return {
+                "status": "unchanged",
+                "key": key,
+                "path": str(path.relative_to(self.root)),
+                "backup": None,
+            }
+
+        block_re = re.compile(
+            rf"^{re.escape(key)}:\s*(?:\n|$)"
+            rf"(?P<body>.*?)"
+            rf"(?=\n^[A-Za-z0-9_\-]+:\s*(?:\n|$)|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        match = block_re.search(text)
+        if not match:
+            snippet = yaml.dump(
+                {key: value},
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            new_text = text.rstrip("\n") + "\n\n" + snippet
+        else:
+            section_start = match.start()
+            section_end = match.end()
+            header = text[section_start : match.start("body")]
+            body_lines = match.group("body").splitlines(keepends=True)
+            new_body = self._build_role_defaults_section_body(key, value, body_lines)
+            new_text = text[:section_start] + header + new_body + text[section_end:]
+
+        cm = self.__class__.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, path)
+        return {
+            "status": "saved",
+            "key": key,
+            "path": str(path.relative_to(self.root)),
+            "backup": backup,
+        }
+
+    def _write_pipelines(self, pipelines: dict) -> dict:
+        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``."""
+        return self._update_role_defaults_section("quality_pipelines", pipelines)
+
+    def _write_single_pipeline(self, name: str, pipeline: dict) -> dict:
+        """Create or update a single pipeline by name."""
+        all_pipelines = self._read_pipelines().get("pipelines", {})
+        all_pipelines[name] = pipeline
+        result = self._write_pipelines(all_pipelines)
+        result["pipeline"] = pipeline
+        result["name"] = name
+        return result
+
+    def _delete_pipeline(self, name: str) -> dict:
+        """Delete a single pipeline by name."""
+        all_pipelines = self._read_pipelines().get("pipelines", {})
+        if name not in all_pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        del all_pipelines[name]
+        result = self._write_pipelines(all_pipelines)
+        result["deleted"] = name
+        return result
+
+    def _write_reflection_pairs(self, pairs: list) -> dict:
+        """Replace ONLY the ``reflection_pairs`` key in ``role-defaults.yaml``."""
+        result = self._update_role_defaults_section("reflection_pairs", pairs)
+        result["reflection_pairs"] = pairs
+        result["count"] = len(pairs)
+        return result
+
+    def _pipeline_help(self) -> dict:
+        """Return comprehensive help documentation for the pipelines API."""
+        pipeline_names = list(self._read_pipelines().get("pipelines", {}).keys())
+        return {
+            "help": {
+                "title": "Quality Pipelines API",
+                "version": self.__class__.version,
+                "description": (
+                    "Quality Pipelines define multi-stage workflows for agent orchestration. "
+                    "Each pipeline consists of sequential, parallel, loop, or conditional stages "
+                    "that delegate work to specific agents."
+                ),
+                "endpoints": {
+                    "GET /api/pipelines": {
+                        "description": "List all pipelines with their full stage definitions.",
+                        "response": '{"pipelines": {"<name>": {...}}}',
+                    },
+                    "GET /api/pipelines?help": {
+                        "description": "Show this help documentation.",
+                        "response": '{"help": {...}}',
+                    },
+                    "GET /api/pipelines/<name>": {
+                        "description": "Get a single pipeline by name.",
+                        "response": '{"pipeline": {...}}',
+                        "example": f"/api/pipelines/{pipeline_names[0]}" if pipeline_names else "/api/pipelines/standard-feature",
+                    },
+                    "PUT /api/pipelines": {
+                        "description": "Replace ALL pipelines (whole-file replace with backup).",
+                        "body": '{"pipelines": {"<name>": {...}}}',
+                        "warning": "This replaces the entire quality_pipelines block. Use with care.",
+                    },
+                    "PUT /api/pipelines/<name>": {
+                        "description": "Create or update a single pipeline by name.",
+                        "body": '{"description": "...", "stages": [...], "on_error": "..."}',
+                    },
+                    "DELETE /api/pipelines/<name>": {
+                        "description": "Delete a single pipeline by name.",
+                        "response": '{"deleted": "<name>"}',
+                    },
+                },
+                "pipeline_structure": {
+                    "description": "string — human-readable description of the pipeline",
+                    "on_error": "enum: escalate_to_orchestrator | skip | abort | retry",
+                    "stages": [
+                        {
+                            "id": "string — unique stage identifier within the pipeline",
+                            "agent": "string — role name of the agent to delegate to",
+                            "task": "string — task description for the agent",
+                            "mode": "enum: sequential | parallel_group | fanout | loop | conditional | agent_decision",
+                            "loop": {
+                                "description": "Only required when mode=loop",
+                                "generator": "string — agent that produces output",
+                                "critic": "string — agent that reviews output",
+                                "max_iterations": "integer — loop limit (default 3)",
+                            },
+                            "condition": {
+                                "description": "Only required when mode=conditional",
+                                "type": "agent_decision",
+                                "agent": "string — agent making the decision",
+                            },
+                            "parallel_group": {
+                                "description": "Only required when mode=parallel_group",
+                                "items": [{"agent": "string", "task": "string"}],
+                            },
+                        }
+                    ],
+                },
+                "stage_modes_explained": {
+                    "sequential": "Run one agent after another in sequence.",
+                    "parallel_group": "Run multiple agents in parallel (fixed list).",
+                    "fanout": "Split work across N independent instances of the same agent.",
+                    "loop": "Generator→Critic loop for iterative refinement (e.g. implement→review).",
+                    "conditional": "Agent decides which path to take next.",
+                    "agent_decision": "Similar to conditional — agent makes a programmatic decision.",
+                },
+                "available_pipelines": pipeline_names,
+            },
+        }
+        """Return the ``reflection_pairs`` block from ``role-defaults.yaml``.
+
+        Envelope shape: ``{"reflection_pairs": [...]}``. The list is always
+        returned (empty if absent).
+        """
+        path = self._role_defaults_path()
+        if not path.exists():
+            return {"reflection_pairs": []}
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        pairs = data.get("reflection_pairs") or []
+        if not isinstance(pairs, list):
+            pairs = []
+        return {"reflection_pairs": pairs}
+
+    def _read_reflection_pair(self, pair_id: str) -> dict:
+        """Return a single reflection pair by ``id`` or raise."""
+        for pair in self._read_reflection_pairs().get("reflection_pairs", []):
+            if isinstance(pair, dict) and pair.get("id") == pair_id:
+                return {"reflection_pair": pair}
+        raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+
+    def _ensure_pair_id(self, pair: dict, pair_id: Optional[str] = None) -> str:
+        """Return a valid id for a reflection pair, generating one if missing."""
+        if pair_id:
+            pair["id"] = pair_id
+            return pair_id
+        if not pair.get("id"):
+            existing = self._read_reflection_pairs().get("reflection_pairs", [])
+            base = pair.get("generator", "pair") + "-" + pair.get("critic", "critic")
+            idx = 1
+            candidate = f"{base}-{idx}"
+            old_ids = {p.get("id") for p in existing if isinstance(p, dict)}
+            while candidate in old_ids:
+                idx += 1
+                candidate = f"{base}-{idx}"
+            pair["id"] = candidate
+        return pair["id"]
+
+    def _write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
+        """Create or update a single reflection pair by id."""
+        self._ensure_pair_id(pair, pair_id)
+        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
+        found = False
+        for i, existing in enumerate(pairs):
+            if isinstance(existing, dict) and existing.get("id") == pair_id:
+                pairs[i] = pair
+                found = True
+                break
+        if not found:
+            pairs.append(pair)
+        result = self._write_reflection_pairs(pairs)
+        result["reflection_pair"] = pair
+        return result
+
+    def _delete_reflection_pair(self, pair_id: str) -> dict:
+        """Delete a single reflection pair by id."""
+        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
+        new_pairs = [p for p in pairs if not (isinstance(p, dict) and p.get("id") == pair_id)]
+        if len(new_pairs) == len(pairs):
+            raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+        result = self._write_reflection_pairs(new_pairs)
+        result["deleted"] = pair_id
+        return result
+
+    def _read_agent_prompts(self) -> dict:
+        """Return the ``agent-prompts`` block from ``project.yaml``.
+
+        Shape: ``{"default": "legacy", "modes": {...}}``.
+        """
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
-        if isinstance(existing.get(key), dict) and isinstance(value, dict):
-            self._deep_merge(existing[key], value)
+        ap = existing.get("agent-prompts") or {}
+        if not isinstance(ap, dict):
+            ap = {}
+        return {
+            "default": ap.get("default", "legacy"),
+            "modes": ap.get("modes") or {},
+        }
+
+    def _write_agent_prompts(self, ap: dict) -> dict:
+        """Replace ONLY the ``agent-prompts`` top-level section."""
+        existing = self.__class__.config_manager.read("project")
+        if not isinstance(existing, dict):
+            existing = {}
+        existing["agent-prompts"] = ap
+        return self.__class__.config_manager.write("project", existing)
+
+    def _set_role_prompt_mode(self, role: str, mode: str) -> dict:
+        """Set the prompt mode for a single role."""
+        ap = self._read_agent_prompts()
+        modes = ap.get("modes") or {}
+        modes[role] = mode
+        ap["modes"] = modes
+        return self._write_agent_prompts(ap)
+
+    def _delete_role_prompt_mode(self, role: str) -> dict:
+        """Remove a role-level prompt mode override."""
+        ap = self._read_agent_prompts()
+        modes = ap.get("modes") or {}
+        if role not in modes:
+            raise FileNotFoundError(f"role prompt mode not found: {role}")
+        del modes[role]
+        ap["modes"] = modes
+        return self._write_agent_prompts(ap)
+
+    def _deep_merge(self, base: Any, override: Any) -> Any:
+        """Recursively merge ``override`` into ``base``."""
+        if isinstance(base, dict) and isinstance(override, dict):
+            result = dict(base)
+            for k, v in override.items():
+                result[k] = self._deep_merge(result.get(k), v)
+            return result
+        return override
+
+    def _write_project_section(self) -> None:
+        """Partial update of one top-level section of ``project.yaml``."""
+        body = self._read_body()
+        if isinstance(body, dict) and "section" in body and "data" in body:
+            section = body["section"]
+            data = body["data"]
+        elif isinstance(body, dict) and "key" in body and "value" in body:
+            section = body["key"]
+            data = body["value"]
         else:
-            existing[key] = value
-        result = self.__class__.config_manager.write("project", existing)
-        return self._send_json(result)
+            raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
+        allowed = {
+            "agent-prompts", "model-overrides", "memory-overrides", "permission-mode-overrides",
+            "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
+            "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
+            "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
+            "provider-isolation",
+        }
+        if section not in allowed:
+            raise ValueError(f"section not allowed: {section}")
+        existing = self.__class__.config_manager.read("project")
+        if not isinstance(existing, dict):
+            existing = {}
+        existing[section] = data
+        return self._send_json(self.__class__.config_manager.write("project", existing))
 
     def _read_template_description(self, role: str) -> str:
-        """Read the ``description:`` field from a generic agent template's
-        YAML frontmatter (if available). Used as a fallback when the role in
-        ``role-defaults.yaml`` does not carry a description of its own.
-        """
+        """Read the description from a generated agent template's frontmatter."""
         try:
             path = self._template_path(role)
         except SecurityError:
             return ""
-        if not path.exists():
+        if not path or not path.exists():
             return ""
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            return ""
+        with path.open("r", encoding="utf-8") as fh:
+            text = fh.read()
         if not text.startswith("---"):
             return ""
-        # Parse only the YAML frontmatter block (between leading ``---`` and
-        # the next ``---``). Avoids pulling in the entire template body.
-        end = text.find("\n---", 3)
-        if end == -1:
-            return ""
         try:
-            front = yaml.safe_load(text[3:end]) or {}
-        except yaml.YAMLError:
-            return ""
-        if isinstance(front, dict):
-            desc = front.get("description")
+            _, front, _ = text.split("---", 2)
+            front_data = yaml.safe_load(front) or {}
+            desc = front_data.get("description")
             if isinstance(desc, str):
                 return desc.strip()
+        except Exception:
+            pass
         return ""
 
     def _list_agent_templates(self) -> dict:
+        """Return the list of agent templates available for generation."""
         templates_dir = self.__class__.root / "agents" / "1-generic"
         if not templates_dir.is_dir():
             return {"templates": [], "available": False}
@@ -1785,26 +2586,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return {"templates": names, "available": True}
 
     def _ai_providers_path(self) -> Path:
-        """Resolve the path to ``ai-providers.yaml`` for either layout."""
+        """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
         primary = self.__class__.root / "config" / "ai-providers.yaml"
         if primary.exists():
             return primary
         return self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
 
     def _list_providers(self) -> list[dict]:
-        """Return the configured AI providers with their model tiers/aliases.
-
-        Each entry exposes:
-          * ``name`` — provider key (e.g. ``Claude``)
-          * ``has_model_tiers`` — ``True`` if the provider declares any model
-            tiers (providers like Continue/Copilot manage models centrally and
-            report ``False``)
-          * ``model_tiers`` — mapping of tier name → concrete model ID
-          * ``model_aliases`` — mapping of alias name → concrete model ID
-
-        Sorted alphabetically by provider name. Returns ``[]`` if the file is
-        absent (project-admin mode without super-admin configs).
-        """
+        """Return the configured AI providers with their model tiers/aliases."""
         path = self._ai_providers_path()
         if not path.exists():
             return []
@@ -1834,17 +2623,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return out
 
     def _list_platforms(self) -> list[dict]:
-        """Return distinct platform prefixes derived from ``agents/2-platform/``.
-
-        Filenames follow the ``<prefix>-<role>.md`` convention. Roles can
-        themselves contain hyphens (e.g. ``claude-expert``), so the prefix is
-        resolved by stripping the longest known role name from the end of the
-        filename stem. If no known role matches, fall back to everything before
-        the last ``-``. ``agent-meta`` and ``generic`` are always included.
-        Sorted alphabetically.
-        """
+        """Return distinct platform prefixes derived from ``agents/2-platform/``."""
         names: set[str] = {"agent-meta", "generic"}
-        # Known role names (longest first) so multi-segment roles strip cleanly.
         known_roles = sorted(
             (r["name"] for r in self._list_roles()),
             key=len,
@@ -1871,174 +2651,109 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return [{"name": n} for n in sorted(names, key=str.lower)]
 
     def _list_roles(self) -> list[dict]:
-        """Return the role names declared in ``role-defaults.yaml``.
-
-        Reuses :meth:`_build_agent_hierarchy` so the role list stays consistent
-        with the delegation graph. Sorted alphabetically.
-        """
+        """Return the role names declared in ``role-defaults.yaml``."""
         hierarchy = self._build_agent_hierarchy()
-        roles = hierarchy.get("roles") or []
-        names = sorted((r.get("name") for r in roles if r.get("name")), key=str.lower)
-        return [{"name": n} for n in names]
+        rolenames = sorted(
+            (r.get("name") for r in hierarchy.get("roles") or [] if r.get("name")),
+            key=str.lower,
+        )
+        return [{"name": n} for n in rolenames]
 
-    # ------------------------------------------------------------------ #
-    # Config audit                                                       #
-    # ------------------------------------------------------------------ #
-
-    def _audit_paths(self) -> tuple[Path, Path]:
-        """Return ``(agent_meta_root, project_config_path)`` for the audit.
-
-        In project-admin mode the agent-meta sources live under
-        ``<root>/.agent-meta/`` — fall back to that layout when the top-level
-        ``agents/`` directory is missing. The project config is always
-        ``<root>/.meta-config/project.yaml``.
-        """
+    def _audit_paths(self) -> list[Path]:
+        """Return the set of config/agent files to audit."""
+        paths = []
         root = self.__class__.root
-        agents_top = root / "agents" / "1-generic"
-        if agents_top.exists():
-            meta_root = root
-        else:
-            submodule_root = root / ".agent-meta"
-            if (submodule_root / "agents" / "1-generic").exists():
-                meta_root = submodule_root
-            else:
-                meta_root = root
-        project_config = root / ".meta-config" / "project.yaml"
-        return meta_root, project_config
+        for rel in list(SUPER_ADMIN_FILES.values()) + list(PROJECT_FILES.values()):
+            p = root / rel
+            if p.exists():
+                paths.append(p)
+        return paths
 
     def _ensure_lib_on_path(self) -> None:
-        """Make sure ``lib.config_audit`` is importable in both layouts."""
-        root = self.__class__.root
-        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
-            if candidate.exists() and str(candidate) not in sys.path:
-                sys.path.insert(0, str(candidate))
+        """Ensure ``scripts/lib`` is on ``sys.path`` for imports."""
+        lib = self.__class__.root / "scripts" / "lib"
+        if str(lib) not in sys.path:
+            sys.path.insert(0, str(lib))
 
     def _run_config_audit(self) -> dict:
-        """Execute a read-only config audit and return a JSON-friendly dict."""
+        """Run the consistency audit over the current configuration."""
         self._ensure_lib_on_path()
-        try:
-            from lib.config_audit import audit_config, report_to_dict
-        except ImportError as exc:
-            raise FileNotFoundError(f"config_audit module unavailable: {exc}")
-        meta_root, project_config = self._audit_paths()
-        if not project_config.exists():
-            raise FileNotFoundError(f"project config not found: {project_config}")
-        report = audit_config(meta_root, project_config)
-        return report_to_dict(report)
+        from consistency.audit import run_audit
+        return run_audit(self.__class__.root)
 
     def _apply_config_audit(self) -> dict:
-        """Apply the auto-fix step: comment out deprecated roles in project.yaml.
-
-        Creates a timestamped backup beforehand to allow recovery and returns
-        the number of modified lines plus the resulting issue list.
-        """
+        """Apply safe fixes reported by the consistency audit."""
         self._ensure_lib_on_path()
-        try:
-            from lib.config_audit import audit_config, apply_audit, report_to_dict
-        except ImportError as exc:
-            raise FileNotFoundError(f"config_audit module unavailable: {exc}")
-        meta_root, project_config = self._audit_paths()
-        if not project_config.exists():
-            raise FileNotFoundError(f"project config not found: {project_config}")
-        # Backup via the existing ConfigManager so the file rotation policy
-        # (timestamped ``.bak.<stamp>``, ``MAX_BACKUPS`` retention) stays
-        # consistent with regular PUT writes.
-        cm = self.__class__.config_manager
-        try:
-            cm._backup(project_config)  # type: ignore[attr-defined]
-            cm._prune_backups(project_config)  # type: ignore[attr-defined]
-        except Exception:
-            # The backup is best-effort — never block the apply step.
-            pass
-        report = audit_config(meta_root, project_config)
-        changed = apply_audit(report, project_config)
-        # Re-audit after apply so the UI immediately reflects the new state.
-        report_after = audit_config(meta_root, project_config)
-        result = report_to_dict(report_after)
-        result["changed"] = changed
-        return result
+        from consistency.audit import apply_fixes
+        return apply_fixes(self.__class__.root)
 
     def _send_template(self, role: str) -> None:
+        """Send a generated agent template as plain text."""
         path = self._template_path(role)
         if not path.exists():
             raise FileNotFoundError(f"agent template not found: {role}")
-        self._send_text(path.read_text(encoding="utf-8"), content_type="text/markdown; charset=utf-8")
+        return self._send_bytes(path.read_bytes(), "text/markdown; charset=utf-8")
 
     def _write_template(self, role: str) -> None:
-        if self.__class__.mode != "super_admin":
-            raise SecurityError("agent templates are read-only in project_admin mode")
+        """Write an agent template back to disk."""
         body = self._read_body()
-        if not isinstance(body, dict) or "content" not in body:
-            raise ValueError("expected JSON body with 'content' field")
-        content = body["content"]
-        if not isinstance(content, str):
-            raise ValueError("'content' must be a string")
+        if body is None:
+            raise ValueError("empty body")
+        if not isinstance(body, str):
+            raise ValueError("expected plain text body")
         path = self._template_path(role)
+        if not path:
+            raise FileNotFoundError(f"template not found: {role}")
+        cm = self.__class__.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(content, encoding="utf-8")
+        tmp.write_text(body, encoding="utf-8")
         os.replace(tmp, path)
-        self._send_json({"status": "saved", "role": role, "bytes": len(content)})
+        return self._send_json({"status": "saved", "role": role, "backup": backup})
 
-    def _template_path(self, role: str) -> Path:
+    def _template_path(self, role: str) -> Optional[Path]:
+        """Resolve the platform-specific template path for a role."""
         if not role or any(c in role for c in ("/", "\\", "..")):
             raise SecurityError(f"invalid role name: {role!r}")
         safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
         if safe != role:
             raise SecurityError(f"invalid role name: {role!r}")
-        return self.__class__.root / "agents" / "1-generic" / f"{role}.md"
-
-    # ------------------------------------------------------------------ #
-    # Server-Sent Events                                                 #
-    # ------------------------------------------------------------------ #
+        prompt_modes = self._read_prompt_modes()
+        modern_override = self._agent_meta_root() / "agents" / "1-generic-modern" / f"{role}.md"
+        if prompt_modes.get("modes", {}).get(role) == "modern" or prompt_modes.get("default") == "modern":
+            if modern_override.exists():
+                return modern_override
+        candidate = self._agent_meta_root() / "agents" / "1-generic" / f"{role}.md"
+        # Also check 2-platform for platform-specific overrides.
+        for entry in (self._agent_meta_root() / "agents" / "2-platform").glob("*.md"):
+            if entry.stem.endswith(f"-{role}"):
+                return entry
+        return candidate
 
     def _stream_events(self) -> None:
-        events_path = self.__class__.root / ".meta-viz" / "events.jsonl"
+        """SSE endpoint that streams configuration change events."""
         self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-
-        try:
-            self.wfile.write(b": stream-open\n\n")
-            self.wfile.flush()
-        except ConnectionError:
-            # ConnectionError is the base class covering BrokenPipeError,
-            # ConnectionResetError, ConnectionAbortedError (Windows WinError
-            # 10053) and platform-specific variants. Client disconnected
-            # before the stream even opened — nothing to do.
-            return
-
-        offset = events_path.stat().st_size if events_path.exists() else 0
-        last_heartbeat = time.time()
-
+        queue = self.__class__.config_watcher.subscribe()
         try:
             while True:
-                if events_path.exists() and events_path.stat().st_size > offset:
-                    with events_path.open("r", encoding="utf-8") as fh:
-                        fh.seek(offset)
-                        for line in fh:
-                            line = line.strip()
-                            if line:
-                                self.wfile.write(f"data: {line}\n\n".encode("utf-8"))
-                        offset = fh.tell()
-                    self.wfile.flush()
-                if time.time() - last_heartbeat > SSE_HEARTBEAT_SECONDS:
-                    self.wfile.write(b": heartbeat\n\n")
-                    self.wfile.flush()
-                    last_heartbeat = time.time()
-                time.sleep(1.0)
-        except ConnectionError:
-            # ConnectionError is the base class covering BrokenPipeError,
-            # ConnectionResetError, ConnectionAbortedError (Windows WinError
-            # 10053) and platform-specific variants. Normal client disconnect.
-            return
-
-
-# --------------------------------------------------------------------------- #
-# Server bootstrap                                                            #
-# --------------------------------------------------------------------------- #
+                event = queue.get(timeout=SSE_HEARTBEAT_SECONDS)
+                if event is None:
+                    self.wfile.write(b"data: heartbeat\n\n")
+                else:
+                    self.wfile.write(f"data: {json.dumps(event)}\n\n".encode("utf-8"))
+                self.wfile.flush()
+        except queue.Empty:
+            self.wfile.write(b"data: heartbeat\n\n")
+            self.wfile.flush()
 
 
 class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
