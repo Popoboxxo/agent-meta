@@ -2,22 +2,32 @@
 
 ## [Unreleased]
 
-### Files
-- New: `agents/1-generic-modern/_reference-agent.md` (Phase 1 token-optimization PoC)
-- New: `agents/1-generic-modern/developer.md` (Phase 1 token-optimization PoC)
-- New: `agents/1-generic-modern/orchestrator.md` (Phase 1 token-optimization PoC)
-- New: `agents/1-generic/_README.md` (Phase 1 wf-deleted mapping reference)
+## [0.67.0] - 2026-07-10
+
+### Added
+- **Pipeline Match Check auto-generated**: `{{PIPELINE_MATCH_TABLE}}` is now dynamically assembled from `quality_pipelines` signal_keywords in `role-defaults.yaml` — eliminates hardcoded pipeline tables in orchestrator
+- **Intent-Routing auto-generated**: `{{INTENT_ROUTING_TABLE}}` is now dynamically assembled from `routing` hints in `role-defaults.yaml` — eliminates hardcoded intent routing in orchestrator
+- **`agents/1-generic-modern/` directory**: Phase 1 token-optimization PoC with reference-agent, developer, and orchestrator templates using 6-block XML structure
+
+### Changed
+- **Token-Optimierungs-Offensive**: ~200 KB token savings through compression of all agents, rules, and commands across the framework
+- **se-orchestrator fully removed**: Agent file, schema, tests, and all documentation references deleted — replaced by `orchestrator (SE-Mode)` nomenclature
+- **AGENTS.md streamlined**: Rules-Summary block (89 lines of token overhead) removed from managed block
+- **ARCHITECTURE.md reduced to 53 lines**: Detailed architecture moved to `ARCHITECTURE.full.md`
+- **49 active roles** (down from 50 after se-orchestrator removal)
+- **Documentation references normalized**: 15-file audit updating `se-orchestrator` → `orchestrator (SE-Mode)` or `[deprecated]` across CODEBASE_OVERVIEW, ARCHITECTURE, README, and cascade docs
 
 ### Fixed
-- **model IDs**: Fix incorrect Claude model IDs in provider library admin UI (`config/ai-providers.yaml`, `docs/admin-ui.html`) — 137 tests verified green (commit dc5205b)
-- **SE_ENABLED scoping**: Fix SE_ENABLED scoping bug in orchestrator template (`agents/1-generic/orchestrator.md`) — conditional block was incorrectly rendered when SE mode disabled; verified via dry-run (commit 0123655)
+- **Admin UI section-whitelist expanded**: `_write_project_section` whitelist in `admin-server.py` expanded from 7 to 23 keys — enables saving of `roles`, `orchestrator`, `viz`, `admin-ui`, and provider settings
+- **Admin UI key-name corrections**: `workflow_tier` / `permission_mode` key mismatches fixed in `admin-ui.html`
+- **Admin UI cleanup**: Removed CSS artifacts and stale se-orchestrator agent cards from `agent-graph.html`
+- **Placeholder validation**: `sync.py --validate` reports 0 warnings after full reference normalization
 
-### Known Issues
-- **sync.py not yet run**: Generated provider files (`.claude/agents/`, `.opencode/agents/`, `.gemini/agents/`) are stale relative to source templates. A full `python scripts/sync.py` run is required before merging to main. No runtime impact on modern-mode agents (which use `agents/1-generic-modern/`). Post-Beta.
-- **Issue #342 (open)**: Three Viz-feature bugs: event-type mismatch (`delegate_out` vs. `delegate`), dead import in `scripts/viz-server.py` (`admin_server`), escape bug in `scripts/lib/viz.py`. No runtime impact — Viz is disabled (`viz.enabled: false`). Fix before next stable release.
-- **Missing regression test**: `tests/test_sync_conditional.py` not yet created. Would catch SE_ENABLED scoping regressions automatically. Recommended before v0.67.0 stable.
-- **Concept: SE standardization** (`docs/concepts/active/se-und-prompt-modernisierung.md`, v1.0 draft, 2026-06-29): SE-housekeeper agent, `docs/se/**` taxonomy, ADR standard, REQ frontmatter schema — planned but not implemented. Roadmap item only.
-- **Cosmetic**: Deprecated `se-orchestrator.md` contains unclosed `{{#if SE_ENABLED}}` literals (lines 4, 7) — display-only, no functional impact. Minor keyword leak in pipeline signal table at `SE_ENABLED=false` (runtime-guarded, harmless).
+### Removed
+- **`se-orchestrator.md`** agent file deleted
+- **`se-orchestrator.schema.json`** deleted
+- **Legacy SE test scenarios** (SE-01, SE-03, SE-04) removed — replaced by updated manual tests
+- **Hardcoded pipeline/intent tables** from orchestrator — now auto-generated from role-defaults.yaml
 
 ## [0.66.0-beta.4] - 2026-07-02
 
