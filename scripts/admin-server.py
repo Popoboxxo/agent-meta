@@ -2540,7 +2540,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             data = body["value"]
         else:
             raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
-        allowed = {"agent-prompts", "model-overrides", "memory-overrides", "permission-mode-overrides", "steps-overrides", "dod", "rules"}
+        allowed = {
+            "agent-prompts", "model-overrides", "memory-overrides", "permission-mode-overrides",
+            "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
+            "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
+            "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
+            "provider-isolation",
+        }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
         existing = self.__class__.config_manager.read("project")

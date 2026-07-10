@@ -40,19 +40,6 @@ roles:
 - opencode-expert
 - continue-expert
 - copilot-expert
-- se-requirements
-- se-architect
-- se-interface-mgr
-- se-junior-developer
-- se-developer
-- se-senior-developer
-- se-test-engineer
-- se-integration-and-test-manager
-- se-validator
-- se-verifier
-- se-critic
-- se-testreviewer
-- se-termination
 - prompt-engineer
 project:
   name: agent-meta
