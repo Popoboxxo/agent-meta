@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-07-12
+
+### Added
+- **Backup API Endpoints**: Added `GET /api/backups`, `POST /api/backups/create`, `POST /api/backups/restore`, and `DELETE /api/backups/<archive>` endpoints to `admin-server.py`.
+- **Backup Configuration**: Added `backup` config block with `retention` settings (`max_backups`, `max_age_days`) to `project.yaml`.
 ## [0.67.0] - 2026-07-10
 
 ### Added
