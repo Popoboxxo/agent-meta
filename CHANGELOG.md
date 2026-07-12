@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.70.0] — 2026-07-12
+
 ### Changed — Token Efficiency (Phase 6)
 - **Flat Orchestrator Mode Flags** (`ORCH_MODE_*`): Replaced nested `{{#if}}/{{else}}` blocks with three flat boolean flags (`ORCH_MODE_DISABLED`, `ORCH_MODE_STRICT`, `ORCH_MODE_ADVISORY`) — eliminates nesting-risk in conditional stripping
 - **AGENT_HINTS_CLAUDE** (new parameter): `include_table=False` option for providers (like Claude) that inject agent descriptions natively — removes ~1.5 KB duplication
