@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.71.0] — 2026-07-12
+
+### Added
+- feat: add tool risk classification section to orchestrator agent
+
+### Fixed
+- fix: add provider limits and execution trace isolation to A2A delegation rules
+
+### Documentation
+- docs: document instruction bleed risk in platform composition rules
+- docs: add best-practice audit report (2026-07) and circuit-breaker/DoD-gate/judge concept patterns
 
 ## [0.70.0] — 2026-07-12
 
