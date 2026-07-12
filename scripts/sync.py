@@ -76,6 +76,14 @@ from lib.skills import (
 from lib.extensions import create_extension, update_extensions
 from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
 from lib.isolation import sync_provider_isolation
+from lib.deactivation import (
+    deactivate_providers, activate_providers, get_deactivation_status,
+    is_provider_active,
+)
+from lib.backup import (
+    create_backup, restore_backup, list_backups,
+    delete_backup, prune_backups,
+)
 from lib.io import SyncError
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
@@ -317,6 +325,42 @@ def main():
     parser.add_argument("--clear-cache", action="store_true",
                         help="Clear the outcome cache")
 
+    # Provider deactivation
+    parser.add_argument("--deactivate-providers", nargs="*", metavar="PROVIDER",
+                        default=None,
+                        help="Deactivate providers: zip and remove their directories. "
+                             "Pass provider names or omit for all. "
+                             "Use --activate-providers to restore.")
+    parser.add_argument("--activate-providers", nargs="*", metavar="PROVIDER",
+                        default=None,
+                        help="Activate (restore) providers from backup zips. "
+                             "Pass provider names or omit for all backed-up providers.")
+    parser.add_argument("--deactivation-status", action="store_true",
+                        help="Show provider deactivation status")
+
+    # Backup & Restore
+    parser.add_argument("--backup", nargs="*", metavar="PROVIDER",
+                         default=None,
+                         help="Create a timestamped backup of provider directories "
+                              "and project config. Pass provider names or omit for all. "
+                              "Use --label to add a description.")
+    parser.add_argument("--label", metavar="TEXT", default=None,
+                        help="Optional label/description for --backup")
+    parser.add_argument("--restore", metavar="ARCHIVE",
+                        help="Restore provider directories from a backup archive. "
+                             "Use --restore-providers to select specific providers.")
+    parser.add_argument("--restore-providers", nargs="*", metavar="PROVIDER",
+                        default=None,
+                        help="Which providers to restore from --restore (default: all)")
+    parser.add_argument("--force", action="store_true",
+                        help="Force overwrite when restoring (--restore)")
+    parser.add_argument("--list-backups", action="store_true",
+                        help="List all available backup archives with metadata")
+    parser.add_argument("--delete-backup", metavar="ARCHIVE",
+                        help="Delete a specific backup archive")
+    parser.add_argument("--prune-backups", action="store_true",
+                        help="Delete old backups according to retention policy")
+
     # Config audit
     parser.add_argument("--audit-config", action="store_true",
                         help="Audit project config against templates + role-defaults. "
@@ -535,6 +579,77 @@ def main():
         cleanup_old_sessions(project_root, retention_days=retention,
                              log=log, dry_run=args.dry_run)
 
+    elif args.deactivation_status:
+        mode = "deactivation-status"
+        provider_config = load_providers_config(agent_meta_root)
+        status = get_deactivation_status(project_root, config, provider_config)
+        import json as _json
+        print(_json.dumps(status, indent=2, ensure_ascii=False))
+
+    elif args.deactivate_providers is not None:
+        mode = "deactivate-providers"
+        provider_config = load_providers_config(agent_meta_root)
+        targets = args.deactivate_providers if args.deactivate_providers else ["all"]
+        results = deactivate_providers(
+            project_root, targets, provider_config, config, log, args.dry_run
+        )
+        import json as _json
+        print(_json.dumps(results, indent=2, ensure_ascii=False))
+
+    elif args.activate_providers is not None:
+        mode = "activate-providers"
+        provider_config = load_providers_config(agent_meta_root)
+        targets = args.activate_providers if args.activate_providers else []
+        results = activate_providers(
+            project_root, targets, provider_config, config, log, args.dry_run
+        )
+        import json as _json
+        print(_json.dumps(results, indent=2, ensure_ascii=False))
+
+    elif args.backup is not None:
+        mode = "backup"
+        provider_config = load_providers_config(agent_meta_root)
+        targets = args.backup if args.backup else None
+        result = create_backup(
+            project_root, targets, provider_config, config, log,
+            label=args.label,
+            dry_run=args.dry_run,
+            source_version=source_version,
+        )
+        import json as _json
+        print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    elif args.restore:
+        mode = "restore"
+        provider_config = load_providers_config(agent_meta_root)
+        result = restore_backup(
+            project_root, args.restore, provider_config, config, log,
+            providers=args.restore_providers,
+            force=args.force,
+            dry_run=args.dry_run,
+        )
+        import json as _json
+        print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    elif args.list_backups:
+        mode = "list-backups"
+        provider_config = load_providers_config(agent_meta_root)
+        result = list_backups(project_root, config, provider_config)
+        import json as _json
+        print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    elif args.delete_backup:
+        mode = "delete-backup"
+        result = delete_backup(project_root, args.delete_backup, config, log, args.dry_run)
+        import json as _json
+        print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    elif args.prune_backups:
+        mode = "prune-backups"
+        result = prune_backups(project_root, config, log, args.dry_run)
+        import json as _json
+        print(_json.dumps(result, indent=2, ensure_ascii=False))
+
     elif args.validate:
         mode = "validate"
         if args.dry_run:
@@ -628,6 +743,9 @@ def main():
         for provider in providers:
             pc = provider_config[provider]
             log.provider_header(provider)
+            if not is_provider_active(config, provider):
+                log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")
+                continue
             sync_context_for_provider(agent_meta_root, project_root, config, variables,
                                       log, args.dry_run, provider, provider_config)
             sync_agents_for_provider(agent_meta_root, project_root, config, variables,

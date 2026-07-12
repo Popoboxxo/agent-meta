@@ -1314,6 +1314,7 @@ function buildSidebar() {
       items: [
         { route: "/project/general",   label: "General", icon: "□" },
         { route: "/project/providers", label: "Providers & Platforms", icon: "□" },
+        { route: "/project/provider-deactivation", label: "Provider Deactivation", icon: "⊘" },
         { route: "/project/roles",     label: "Roles", icon: "□" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "□" },
         { route: "/project/prompt-modes", label: "Prompt Modes", icon: "□" },
@@ -4887,6 +4888,146 @@ async function viewProjectProviderTierOverrides() {
   return wrap;
 }
 
+/* ----------------------- Provider Deactivation ------------------------ */
+async function viewProviderDeactivation() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Provider Deactivation"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Backup generated provider directories (.claude/, .opencode/, .gemini/, etc.) as zip files and remove them. ",
+    "Deactivated providers will no longer read agent sub-definitions. Root context files (CLAUDE.md, AGENTS.md) are NOT affected.",
+  ]));
+
+  const status = el("div", { class: "muted" }, ["Loading deactivation status..."]);
+  wrap.appendChild(status);
+
+  let deactStatus = null;
+  try { deactStatus = await api.get("/api/provider-deactivation/status"); }
+  catch (e) { status.textContent = "Failed to load: " + e; return wrap; }
+
+  const actions = el("div");
+
+  // Enable/disable toggle
+  const enabled = deactStatus.enabled === true;
+  const toggleRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  toggleRow.appendChild(el("span", {}, ["Global: "]));
+  const modeSel = el("select");
+  modeSel.appendChild(el("option", { value: "all" }, ["All Providers"]));
+  modeSel.appendChild(el("option", { value: "selective" }, ["Selective"]));
+  if (deactStatus.mode === "selective") modeSel.value = "selective";
+  else modeSel.value = "all";
+  toggleRow.appendChild(modeSel);
+  toggleRow.appendChild(el("label", { style: "display:flex; align-items:center; gap:4px;" }, [
+    el("input", { type: "checkbox", checked: enabled, onchange: () => { modeSel.disabled = !event.target.checked; } }),
+    el("span", {}, ["Enable deactivation"]),
+  ]));
+  actions.appendChild(toggleRow);
+  actions.appendChild(el("br"));
+
+  // Per-provider cards
+  const providers = deactStatus.providers || {};
+  const providerNames = Object.keys(providers).sort();
+  const grid = el("div", { style: "display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px;" });
+
+  for (const name of providerNames) {
+    const p = providers[name];
+    const card = el("div", { class: "panel", style: "padding:12px;" });
+    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+    header.appendChild(el("strong", {}, [name]));
+    const badge = el("span", {
+      style: `font-size:11px; padding:2px 8px; border-radius:4px; background:${p.deactivated ? '#553333' : '#335533'}; color:${p.deactivated ? '#ff9999' : '#99ff99'};`
+    }, [p.deactivated ? "DEACTIVATED" : "ACTIVE"]);
+    header.appendChild(badge);
+    card.appendChild(header);
+
+    const info = el("div", { style: "font-size:12px; color:var(--text-secondary); margin-top:6px;" });
+    if (p.directory_exists) {
+      info.appendChild(el("div", {}, [`Dir: ${p.directory}`]));
+    } else {
+      info.appendChild(el("div", { style: "color:#aa8866;" }, [`(no directory)`]));
+    }
+    if (p.backups.length > 0) {
+      info.appendChild(el("div", {}, [`Backups: ${p.backups.length} (latest: ${p.backups[p.backups.length - 1]})`]));
+    } else {
+      info.appendChild(el("div", { style: "color:#aa8866;" }, ["No backups"]));
+    }
+    card.appendChild(info);
+
+    const btnRow = el("div", { class: "btn-row", style: "margin-top:8px;" });
+    const deactBtn = el("button", { class: "btn btn-danger", style: "font-size:11px;", disabled: !p.directory_exists }, ["Deactivate"]);
+    deactBtn.addEventListener("click", async () => {
+      deactBtn.disabled = true;
+      deactBtn.textContent = "Working...";
+      try {
+        await api.post("/api/provider-deactivation/deactivate", { providers: [name] });
+        router.resolve(); // refresh
+      } catch (e) { deactBtn.textContent = "Error!"; }
+    });
+    btnRow.appendChild(deactBtn);
+
+    const actBtn = el("button", { class: "btn", style: "font-size:11px;", disabled: p.backups.length === 0 || p.directory_exists }, ["Activate"]);
+    actBtn.addEventListener("click", async () => {
+      actBtn.disabled = true;
+      actBtn.textContent = "Working...";
+      try {
+        await api.post("/api/provider-deactivation/activate", { providers: [name] });
+        router.resolve(); // refresh
+      } catch (e) { actBtn.textContent = "Error!"; }
+    });
+    btnRow.appendChild(actBtn);
+    card.appendChild(btnRow);
+
+    grid.appendChild(card);
+  }
+
+  actions.appendChild(grid);
+  actions.appendChild(el("br"));
+
+  // Bulk actions
+  const bulkRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  const deactAllBtn = el("button", { class: "btn btn-danger" }, ["Deactivate ALL"]);
+  deactAllBtn.addEventListener("click", async () => {
+    if (!confirm("Deactivate ALL providers? This will zip and remove all provider directories.")) return;
+    deactAllBtn.disabled = true;
+    try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
+    router.resolve(); } catch { /* ignore */ }
+  });
+  bulkRow.appendChild(deactAllBtn);
+
+  const actAllBtn = el("button", { class: "btn" }, ["Activate ALL (from backups)"]);
+  actAllBtn.addEventListener("click", async () => {
+    if (!confirm("Activate ALL providers from backups?")) return;
+    actAllBtn.disabled = true;
+    try { await api.post("/api/provider-deactivation/activate", { providers: [] });
+    router.resolve(); } catch { /* ignore */ }
+  });
+  bulkRow.appendChild(actAllBtn);
+  actions.appendChild(bulkRow);
+
+  // Save config
+  actions.appendChild(el("br"));
+  const saveRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  saveRow.appendChild(el("button", { class: "btn btn-primary", onclick: async () => {
+    const data = await loadProject();
+    if (!data["provider-deactivation"]) data["provider-deactivation"] = {};
+    data["provider-deactivation"].enabled = enabled;
+    data["provider-deactivation"].mode = modeSel.value;
+    if (modeSel.value === "selective") {
+      // Keep existing selective list from status
+      data["provider-deactivation"].providers = deactStatus.deactivated_providers || [];
+    } else {
+      delete data["provider-deactivation"].providers;
+    }
+    data["provider-deactivation"]["backup-dir"] = deactStatus.backup_dir || ".backup/provider-deactivation";
+    try { await saveConfig("project", data, status); } catch { /* ignore */ }
+  } }, ["Save Config"]));
+  saveRow.appendChild(el("button", { class: "btn", onclick: () => router.resolve() }, ["Refresh"]));
+  actions.appendChild(saveRow);
+
+  wrap.appendChild(actions);
+  status.textContent = "";
+  return wrap;
+}
+
 /* ------------------------------- Advanced -------------------------------- */
 async function viewProjectAdvanced() {
   const wrap = el("div");
@@ -5930,6 +6071,7 @@ async function init() {
   // Project instance — thematic sub-pages (split from the old single config page)
   router.register("/project/general",         viewProjectGeneral);
   router.register("/project/providers",       viewProjectProviders);
+  router.register("/project/provider-deactivation", viewProviderDeactivation);
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
   router.register("/project/prompt-modes",    viewProjectPromptModes);

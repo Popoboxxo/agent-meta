@@ -40,7 +40,7 @@ def load_providers_config(agent_meta_root: Path) -> dict:
     return data.get("providers", data)
 
 
-def resolve_providers(config: dict, provider_config: dict) -> list:
+def resolve_providers(config: dict, provider_config: dict, filter_deactivated: bool = True) -> list:
     """Resolve active AI providers from config.
 
     Supports:
@@ -48,18 +48,36 @@ def resolve_providers(config: dict, provider_config: dict) -> list:
     - "ai-provider":  "Claude"               (legacy, backward-compat)
 
     Falls back to ["Claude"] if neither key is set.
+
+    When filter_deactivated is True (default), providers marked as deactivated in
+    provider-deactivation config are excluded.
     """
+    providers: list[str] = []
     if "ai-providers" in config:
-        providers = config["ai-providers"]
-        if isinstance(providers, list):
-            return [p for p in providers if p in provider_config]
-        if isinstance(providers, str) and providers in provider_config:
-            return [providers]
-    if "ai-provider" in config:
+        raw = config["ai-providers"]
+        if isinstance(raw, list):
+            providers = [p for p in raw if p in provider_config]
+        elif isinstance(raw, str) and raw in provider_config:
+            providers = [raw]
+
+    if not providers and "ai-provider" in config:
         p = config["ai-provider"]
         if isinstance(p, str) and p in provider_config:
-            return [p]
-    return ["Claude"]
+            providers = [p]
+
+    if not providers:
+        providers = ["Claude"]
+
+    if filter_deactivated:
+        dc = config.get("provider-deactivation", {})
+        if dc.get("enabled", False):
+            mode = dc.get("mode", "all")
+            if mode == "all":
+                return []
+            deactivated = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
+            providers = [p for p in providers if p not in deactivated]
+
+    return providers
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:
