@@ -164,6 +164,29 @@ def extract_frontmatter_field(content: str, field: str) -> str | None:
     return single.group(1).strip() if single else None
 
 
+def _tools_can_spawn(tools) -> bool:
+    """Return True if a frontmatter `tools` value grants sub-agent spawning.
+
+    Spawning requires the `Agent` or `Task` tool (or a `*` wildcard granting all
+    tools). Accepts the value in its raw frontmatter forms: a YAML list, a
+    comma/space-separated string, or `*`. Anything else → cannot spawn.
+    """
+    if tools is None:
+        return False
+    if isinstance(tools, str):
+        if tools.strip() == "*":
+            return True
+        items = re.split(r"[,\s]+", tools)
+    elif isinstance(tools, (list, tuple)):
+        if "*" in tools:
+            return True
+        items = tools
+    else:
+        return False
+    names = {str(i).strip() for i in items if str(i).strip()}
+    return "Agent" in names or "Task" in names
+
+
 def is_deprecated_template(content: str) -> bool:
     """Return True if the template frontmatter declares `deprecated: true`.
 
@@ -927,6 +950,10 @@ def sync_agents(
                 f"composed from {extends_base} + {source_path.name}",
             )
 
+        # Capture spawn capability from the (composed) source frontmatter before
+        # any provider-specific tool transformation mangles the tools field.
+        _can_spawn = _tools_can_spawn(_parse_frontmatter_yaml(content).get("tools"))
+
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, "version")
         template_description = extract_frontmatter_field(content, "description")
@@ -1008,7 +1035,9 @@ def sync_agents(
             "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
             "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
         )
-        if role != "orchestrator" and not role.endswith("-iteration"):
+        # Only agents that can actually spawn sub-agents (Agent/Task tool) need
+        # the singleton guard — injecting it into non-spawning agents is wasted context.
+        if role != "orchestrator" and not role.endswith("-iteration") and _can_spawn:
             content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
@@ -1149,6 +1178,10 @@ def sync_agents_for_provider(
                     str(target_path.relative_to(project_root)),
                     f'composed from {extends_base} + {source_path.name}',
                 )
+
+        # Capture spawn capability from the (composed) source frontmatter before
+        # any provider-specific tool transformation mangles the tools field.
+        _can_spawn = _tools_can_spawn(_parse_frontmatter_yaml(content).get('tools'))
 
         rel_source = str(source_path.relative_to(agent_meta_root))
         source_version = extract_frontmatter_field(content, 'version')
@@ -1414,7 +1447,9 @@ def sync_agents_for_provider(
             "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
             "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
         )
-        if role != "orchestrator" and not role.endswith("-iteration"):
+        # Only agents that can actually spawn sub-agents (Agent/Task tool) need
+        # the singleton guard — injecting it into non-spawning agents is wasted context.
+        if role != "orchestrator" and not role.endswith("-iteration") and _can_spawn:
             content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
 
         rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
@@ -1792,11 +1827,16 @@ def _make_slim_body(content: str) -> str:
     return "\n".join(out)
 
 
-def build_agent_hints(config: dict, agent_meta_root: Path) -> str:
+def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool = True) -> str:
     """Generate agent usage hints for {{AGENT_HINTS}}.
 
     Reads hint (preferred) or description from each active agent's template frontmatter.
     If orchestrator is active, adds a prominent start hint.
+
+    include_table:
+      True  → full output: entry-point hint + per-agent role/description table.
+      False → entry-point hint only. Used for providers (e.g. Claude) that inject
+              agent descriptions natively — the table would be a ~1.5 KB duplication.
     """
     from .roles import build_role_map
 
@@ -1816,8 +1856,12 @@ def build_agent_hints(config: dict, agent_meta_root: Path) -> str:
         lines.append(
             "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
         )
-        lines.append("")
 
+    if not include_table:
+        return "\n".join(lines)
+
+    if has_orchestrator:
+        lines.append("")
     lines.append("| Agent | Zuständigkeit |")
     lines.append("|-------|--------------|")
     for role, source_path in sorted(overrides.items()):

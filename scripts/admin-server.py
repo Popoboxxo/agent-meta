@@ -2606,7 +2606,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         templates_dir = self.__class__.root / "agents" / "1-generic"
         if not templates_dir.is_dir():
             return {"templates": [], "available": False}
-        names = sorted(p.stem for p in templates_dir.glob("*.md") if p.is_file())
+        names = sorted(
+            p.stem for p in templates_dir.glob("*.md")
+            if p.is_file() and not p.name.startswith("_")
+        )
         return {"templates": names, "available": True}
 
     def _ai_providers_path(self) -> Path:

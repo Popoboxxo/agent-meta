@@ -69,7 +69,11 @@ def sync_claude_md_managed(
         return
 
     template = _load_claude_md_managed_template(agent_meta_root)
-    new_managed = substitute(template, variables, "CLAUDE.md managed block", log)
+    # CLAUDE.md is Claude-specific: drop the per-agent table (native injection).
+    render_vars = variables
+    if "AGENT_HINTS_CLAUDE" in variables:
+        render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
+    new_managed = substitute(template, render_vars, "CLAUDE.md managed block", log)
     new_content = pattern.sub(new_managed, existing, count=1)
 
     if new_content == existing:
@@ -129,8 +133,14 @@ def _update_managed_html_block(
     log: SyncLog,
     dry_run: bool,
     agent_meta_root: Path,
+    provider: str = "Claude",
 ) -> None:
-    """Update the HTML-style managed block in a context file."""
+    """Update the HTML-style managed block in a context file.
+
+    For Claude, the per-agent table is dropped from the managed block:
+    Claude Code injects agent descriptions natively, so the table would be a
+    duplication. Other providers keep the full table via {{AGENT_HINTS}}.
+    """
     from .config import substitute
 
     existing = target_path.read_text(encoding="utf-8")
@@ -143,7 +153,10 @@ def _update_managed_html_block(
         return
     template = _load_claude_md_managed_template(agent_meta_root)
     rel = str(target_path.relative_to(project_root))
-    new_managed = substitute(template, variables, rel, log)
+    render_vars = variables
+    if provider == "Claude" and "AGENT_HINTS_CLAUDE" in variables:
+        render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
+    new_managed = substitute(template, render_vars, rel, log)
     new_content = managed_pattern.sub(new_managed, existing, count=1)
     if new_content != existing:
         log.action("UPDATE", rel, "managed block")
@@ -183,7 +196,7 @@ def _sync_managed_block_context(
             fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
         )
     if target_path.exists():
-        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root)
+        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider)
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if provider != "Claude":

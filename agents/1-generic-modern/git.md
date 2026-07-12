@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.2.0"
+version: "1.3.0"
 description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 prompt_mode: modern
@@ -70,10 +70,7 @@ Je nach Anweisung:
 - `docs/<thema>` — Doku-only
 - `chore/<thema>` — Maintenance
 
-**Commit-Format (Conventional Commits):**
-- `<type>(REQ-xxx): <description>`
-- Types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`
-- Erste Zeile ≤ 72 Zeichen
+**Commit-Format:** `<type>(REQ-xxx): <description>`, erste Zeile ≤ 72 Zeichen — Typen/REQ-ID-Regeln: Rule `commit-conventions.md` (auto-geladen).
 </context>
 
 <tools>

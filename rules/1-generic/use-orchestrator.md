@@ -1,5 +1,4 @@
-{{#if ORCHESTRATOR_ENABLED}}
-{{#if ORCHESTRATOR_STRICT}}
+{{#if ORCH_MODE_STRICT}}
 # CRITICAL GATE — VERIFY BEFORE EVERY ACTION
 
 YOU ARE THE MAIN CHAT. Do not perform code changes directly.
@@ -10,15 +9,16 @@ YOU ARE THE MAIN CHAT. Do not perform code changes directly.
 - Every dev task → `orchestrator` first
 
 Violation: PreToolUse hook blocks these changes.
-{{/if}}
 
 # Orchestrator — Universal Router
 
-{{#if ORCHESTRATOR_STRICT}}
 **STRICT MODE — no exceptions.** Every dev task goes through `orchestrator`. No user override, no direct dispatch.
 
 Auto-handoff: the main chat always delegates to `orchestrator` via a native tool call — no `@orchestrator` mention in output.
-{{else}}
+{{/if}}
+{{#if ORCH_MODE_ADVISORY}}
+# Orchestrator — Universal Router
+
 Every dev task goes through `orchestrator`.
 
 Decision order:
@@ -35,7 +35,7 @@ Rule of thumb: more than one step, more than one agent, or files in critical pat
 
 Auto-handoff: delegate to `orchestrator` via native tool call. `@orchestrator` is the only mention the user may use directly.
 {{/if}}
-
+{{#unless ORCH_MODE_DISABLED}}
 ## Git Delegation — Hard Rule
 
 All mutating git commands must run through the `git` agent.
@@ -49,7 +49,8 @@ All other git operations → `git` agent.
 ## Anti-Recursion Guard
 
 Workers must not re-delegate to `orchestrator`. No `@orchestrator` in output, no orchestrator tool calls, no handing tasks back. Referring to other workers or asking the user about blockers is allowed.
-{{else}}
+{{/unless}}
+{{#if ORCH_MODE_DISABLED}}
 # Main-Chat Mode
 
 Orchestrator is disabled. All tasks run in the main chat. Subagent delegation is optional.

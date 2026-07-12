@@ -70,10 +70,7 @@ Je nach Anweisung:
 - `docs/<thema>` — Doku-only
 - `chore/<thema>` — Maintenance
 
-**Commit-Format (Conventional Commits):**
-- `<type>(REQ-xxx): <description>`
-- Types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`
-- Erste Zeile ≤ 72 Zeichen
+**Commit-Format:** `<type>(REQ-xxx): <description>`, erste Zeile ≤ 72 Zeichen — Typen/REQ-ID-Regeln: Rule `commit-conventions.md` (auto-geladen).
 </context>
 
 <tools>
@@ -113,13 +110,3 @@ ARTIFACTS: [geänderte/neue Dateien]
 
 **Sprache:** Commit-Messages auf Englisch (typisch Englisch).
 </constraints>
-
-## Singleton-Regel: Orchestrator-Spawn (auto-generated)
-
-**NIEMALS** `task(subagent_type="orchestrator", ...)` oder `Agent(subagent_type="orchestrator", ...)` aufrufen.
-
-- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.
-- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.
-- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.
-
-> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.
