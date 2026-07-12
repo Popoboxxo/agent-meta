@@ -10,6 +10,19 @@
    - Platform agents (`2-platform/`) also keep `based-on` up to date.
 3. Placeholders are always `{{%GROSS_MIT_UNTERSTRICH%}}`. Lowercase or mixed case will not match.
 
+## Composition-Risiko: Instruction Bleed
+
+Bei `extends + patches` in `2-platform/` und `3-project/` gilt:
+
+**Instruction Bleed:** Text-Level-Composition kann Behavioral-Logic ungewollt zwischen Schichten übertragen — ein `append-after` an einer Section, die in einer anderen Schicht semantisch umdefiniert wurde, produziert widersprüchliche Instruktionen im generierten Agent.
+
+**Prüfpunkte vor einem Patch-Commit:**
+- Überschreibt der Patch eine Section, die in der übergeordneten Schicht eine andere Semantik trägt?
+- Erzeugt `append-after` doppelte oder widersprüchliche Regelaussagen?
+- Ist der Override vollständig (replace) oder additiv (append-after)? Additiv = höheres Bleed-Risiko.
+
+> Empirische Grundlage: Instruction Bleed Paper (arXiv:2606.26356) belegt Cross-Module-Interference bei Text-Level-Composition als häufige Fehlerquelle.
+
 ## Adding a New Agent Role
 
 Manual (required):
