@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.5.0
+version: 7.6.0
 description: 'Provider-agnostischer Task-Orchestrator im Modern Mode: zerlegt, parallelisiert,
   delegiert.'
 hint: Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched
@@ -9,6 +9,7 @@ prompt_mode: modern
 tools:
 - TodoWrite
 - Agent
+- Read
 - Write
 model: claude-sonnet-4-6
 ---
@@ -142,7 +143,7 @@ BARRIER() sammelt ALLE Ergebnisse aktiv ein. "Warten" heißt nicht pausieren, so
 3. Widersprüche → `main_chat`, nicht auto-mergen
 4. "[N] Agenten abgeschlossen"
 
-Artifact Pattern bei Output >200 Zeilen: Subagent schreibt `.claude/artifacts/<handoff_id>-<type>.md`, gibt nur Referenz.
+Artifact Pattern bei Output >200 Zeilen: Subagent schreibt in ein Artefakt-Verzeichnis (`<handoff_id>-<type>.md`), gibt nur Referenz.
 
 ## 8. Reflection-Loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` nur IDs.

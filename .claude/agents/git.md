@@ -2,7 +2,6 @@
 name: git
 version: 1.3.0
 description: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
-hint: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
 prompt_mode: modern
 tools:
 - Bash

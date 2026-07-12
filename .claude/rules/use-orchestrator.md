@@ -14,6 +14,22 @@ Violation: PreToolUse hook blocks these changes.
 **STRICT MODE — no exceptions.** Every dev task goes through `orchestrator`. No user override, no direct dispatch.
 
 Auto-handoff: the main chat always delegates to `orchestrator` via a native tool call — no `@orchestrator` mention in output.
+3. **Orchestrator** — everything else.
+
+Rule of thumb: more than one step, more than one agent, or files in critical paths → orchestrator.
+## Direkter Dispatch (nur nach Regel 2)
+
+| Operation | Direkt an | Bedingung |
+|-----------|-----------|-----------|
+| Commit, Push, Branch, Tag, PR | `git` | Einzelner Git-Befehl |
+| Sync, Upgrade, Meta-Konfiguration | `agent-meta-manager` | Reine agent-meta-Operation |
+| Bug/Feature/Verbesserung melden | `feedback` | Issue-Erstellung |
+| Session-Erkenntnisse speichern | `documenter` | Nur bei Session-Ende |
+
+> **Faustregel:** >1 Tool-Call → Orchestrator. Unsicher → Orchestrator.
+
+Auto-handoff: delegate to `orchestrator` via native tool call. `@orchestrator` is the only mention the user may use directly.
+
 ## Git Delegation — Hard Rule
 
 All mutating git commands must run through the `git` agent.

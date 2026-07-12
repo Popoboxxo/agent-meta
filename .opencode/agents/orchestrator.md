@@ -8,6 +8,7 @@ model: opencode-go/minimax-m3
 permission:
   todowrite: allow
   task: allow
+  read: allow
   edit: allow
   bash: deny
 ---
@@ -140,7 +141,7 @@ BARRIER() sammelt ALLE Ergebnisse aktiv ein. "Warten" heißt nicht pausieren, so
 3. Widersprüche → `main_chat`, nicht auto-mergen
 4. "[N] Agenten abgeschlossen"
 
-Artifact Pattern bei Output >200 Zeilen: Subagent schreibt `.claude/artifacts/<handoff_id>-<type>.md`, gibt nur Referenz.
+Artifact Pattern bei Output >200 Zeilen: Subagent schreibt in ein Artefakt-Verzeichnis (`<handoff_id>-<type>.md`), gibt nur Referenz.
 
 ## 8. Reflection-Loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` nur IDs.
