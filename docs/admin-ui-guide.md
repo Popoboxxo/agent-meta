@@ -1,6 +1,6 @@
 # Admin-UI Guide — agent-meta
 
-> **Stand:** v0.66.0 — Phase 5 (CRUD-Endpunkte für Pipelines, Reflection Pairs, Prompt Modes + Model Mapping)
+> **Stand:** v0.68.0 — Phase 6 (Backup-API + Token-Efficiency)
 > **Frontend:** `docs/admin-ui.html` (Single-File, Vanilla JS, Zero Dependencies)
 > **Backend:** `scripts/admin-server.py` (Python stdlib + PyYAML)
 
@@ -190,6 +190,10 @@ So bleibt das restliche `config/role-defaults.yaml` stabil, während nur das tat
 | `/api/pricing/reset` | POST | Pricing zurücksetzen |
 | `/api/ai-providers/update` | POST | AI-Provider aktualisieren |
 | `/api/tier-presets/update` | POST | Tier-Presets aktualisieren |
+| `/api/backups` | GET | Liste aller Backups |
+| `/api/backups/create` | POST | Neues Backup erstellen |
+| `/api/backups/restore` | POST | Aus Backup wiederherstellen |
+| `/api/backups/<archive>` | DELETE | Backup löschen |
 | `/api/sync/dry-run` | POST | `sync.py --dry-run` ausführen |
 | `/api/sync/run` | POST | `sync.py` ausführen |
 | `/api/subserver/{name}/{action}` | POST | Viz/MCP-Server start/stop/restart |

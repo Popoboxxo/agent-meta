@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Changed — Token Efficiency (Phase 6)
+- **Flat Orchestrator Mode Flags** (`ORCH_MODE_*`): Replaced nested `{{#if}}/{{else}}` blocks with three flat boolean flags (`ORCH_MODE_DISABLED`, `ORCH_MODE_STRICT`, `ORCH_MODE_ADVISORY`) — eliminates nesting-risk in conditional stripping
+- **AGENT_HINTS_CLAUDE** (new parameter): `include_table=False` option for providers (like Claude) that inject agent descriptions natively — removes ~1.5 KB duplication
+- **hint/description-Deduplication**: Automatic deletion of redundant `hint` field when identical to `description` in agent frontmatter (v220+ in agents.py)
+- **Lazy-Loaded Orchestrator Blocks**: SE-Mode, A2A-Protocol, Checkpointing, Quality-Pipelines now loaded from `snippets/orchestrator/` at build-time instead of hardcoded — enables selective disabling via empty variables
+- **Backup API Endpoints** (v0.68.0+): Added `/api/backups`, `/api/backups/create`, `/api/backups/restore`, `/api/backups/<archive>` DELETE for config versioning
+
+### Fixed
+- **Singleton-Block Injection** for spawn-capable agents only: Singleton constraint now limited to worker agents that can actually spawn (avoiding spurious warnings in non-spawning agents)
+- **Submodule Path Fallback**: `.agent-meta/` fallback added to `_list_agent_templates()` for projects using agent-meta as submodule
+
 ## [0.68.0] - 2026-07-12
 
 ### Added
