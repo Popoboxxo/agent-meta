@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "6.5.0"
+version: "6.6.0"
 description: "Provider-agnostischer Task-Orchestrator: zerlegt, parallelisiert, delegiert."
 hint: "Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel"
 tools:
@@ -235,6 +235,19 @@ Muster-Katalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design, 
 1. Max. 1 präzisierende Frage → dann routen
 2. Fallback: {{#if UNKNOWN_FALLBACK_ASK_USER}}ask-user via `main_chat`{{else}}{{#if ORCH_MODE_STRICT}}{{#if UNKNOWN_FALLBACK_META_FEEDBACK}}meta-feedback + Neuformulierung{{else}}Main-Chat selbst{{/if}}{{else}}{{#if UNKNOWN_FALLBACK_MAIN_CHAT}}Main-Chat selbst{{/if}}{{#if UNKNOWN_FALLBACK_META_FEEDBACK}} + meta-feedback{{/if}}{{/if}}{{/if}}
 3. Nie selbst ausführen, nie raten, nie abbrechen.
+
+## Tool Risk Classification
+Operation types by reversibility and impact:
+
+| Tier | Examples | Characteristics |
+|------|----------|------------------|
+| **Low** | read, search, fetch, analyze, list | No side effects. Fully parallelizable. |
+| **Med** | write, edit, create, modify | Reversible via version control. Normal queuing. |
+| **High** | delete, force-push, schema migration, external API mutation | Irreversible or wide blast-radius. |
+
+**Rules:**
+- High-risk operations require explicit user approval before dispatch (see HITL Gates below).
+- When risk is unclear, assume the higher tier.
 
 ## HITL Gates
 Bestätigung VOR: main/master-Commit, Branch-Delete, sync.py, Rollen/DoD-Preset, Release, FANOUT>{{MAX_PARALLEL_AGENTS}}, DELETE, Schema-Migration, force-push.

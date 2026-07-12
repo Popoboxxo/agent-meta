@@ -5,7 +5,7 @@ Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Deleg
 ## Hard Reject Gates (jeder Verstoß → Dispatch ablehnen, User informieren)
 
 1. **Self-Handoff verboten:** `source_agent == target_agent` ist ein harter Strukturfehler. Niemals akzeptieren.
-2. **Tiefenlimit:** `delegation_depth` darf maximal `10` sein (konfigurierbar via `orchestrator.delegation.max_depth` in project.yaml, Default 10). Tiefer = struktureller Fehler im Aufrufer.
+2. **Tiefenlimit:** `delegation_depth` darf maximal `10` sein (konfigurierbar via `orchestrator.delegation.max_depth` in project.yaml, Default 10). Tiefer = struktureller Fehler im Aufrufer. Gilt nur für Provider ohne Plattform-Limit. **Claude Code: hardes Plattform-Limit von 5 Delegations-Ebenen** — nicht konfigurierbar (Subagents-Doc v2.1.198). Für Claude-Code-Projekte: A2A_MAX_DEPTH ≤ 5 in `.meta-config/project.yaml` setzen.
 3. **T-Size-Limit:** `payload.t` darf maximal `300 Zeichen` umfassen. Bei Überschreitung → kein Dispatch, User informieren.
 4. **Re-Delegation-Detection:** Wenn `payload.t` mit "Du bist" / "Du bist ein" / "Du bist eine" beginnt → das ist ein Re-Delegations-Versuch. Ablehnen, User informieren.
 
@@ -39,6 +39,31 @@ Provider-agnostische Regeln für A2A-Handoffs zwischen Agenten. Verhindert Deleg
 | Worker ruft `Agent(subagent_type="orchestrator", ...)` | HARD REJECT, User informieren |
 
 > **Warum:** Mehrere parallele Orchestrator-Instanzen verursachen Konflikte in Routing, Checkpointing und Session-State. Es existiert genau EIN Orchestrator pro Session — der vom main_chat gespawnte.
+
+## Execution-Trace-Isolation
+
+Worker-Output an den Orchestrator muss eine **strukturierte Zusammenfassung** sein — keine rohen Execution-Traces propagieren.
+
+**Pflicht:**
+- Ergebnis in Kategorien: STATUS, RESULT, ARTIFACTS, ERRORS
+- Interne Zwischenschritte (Tool-Calls, Reasoning) nicht an übergeordnete Agenten weitergeben
+- Orchestrator fasst BARRIER-Ergebnisse weiter zusammen (Context Pollution verhindern)
+
+**Verboten:**
+- Rohe Bash-Outputs (Hunderte Zeilen) als Ergebnis zurückgeben
+- Vollständige Datei-Inhalte in Ergebnis einbetten (→ Artifact Pattern verwenden)
+- Sub-Agent-Kontexte mit Orchestrator-Kontext mischen
+
+> Hintergrund: Context-Pollution durch Worker-State-Propagation ist einer der häufigsten Failure-Modi in Multi-Agent-Systemen (MAST-Paper, arXiv:2503.13657: 38% der Failures).
+
+## Provider-Limits
+
+| Provider | Max. Tiefe | Konfigurierbar? | Empfehlung |
+|----------|-----------|-----------------|-----------|
+| Claude Code | 5 | Nein (Plattform-Limit) | `A2A_MAX_DEPTH: 5` in project.yaml |
+| Gemini / OpenCode / Continue | kein Limit bekannt | via `A2A_MAX_DEPTH` | Default 10 ausreichend |
+
+Auf Claude Code erhält kein Subagent bei `delegation_depth >= 5` mehr das Agent-Tool (gilt ab Subagents-Doc v2.1.198).
 
 ## Propagation
 
