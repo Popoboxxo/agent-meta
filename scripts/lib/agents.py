@@ -216,10 +216,19 @@ def build_frontmatter(content: str, name: str, description: str,
     emitted as a frontmatter field because opencode rejects it.
     """
     if _YAML_AVAILABLE:
+        removes = ["generated-from", "generated_from"]
+        # D15: drop a redundant `hint` when it is identical to the description.
+        # `hint` and `description` come from different template fields but often
+        # carry the same text, wasting tokens in every generated agent file. The
+        # AGENT_HINTS table is built from the source templates (build_agent_hints),
+        # not from generated files, so dropping the duplicate here loses nothing.
+        existing_hint = _parse_frontmatter_yaml(content).get("hint")
+        if isinstance(existing_hint, str) and existing_hint.strip() == (description or "").strip():
+            removes.append("hint")
         return _update_frontmatter_dict(
             content,
             updates={"name": name, "description": description},
-            removes=["generated-from", "generated_from"]
+            removes=removes,
         )
 
     content = re.sub(
@@ -1198,6 +1207,7 @@ def sync_agents_for_provider(
             'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
             'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
             'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+            'CONTEXT_FILE': pc.get('context_file', 'CLAUDE.md'),
             'FILE_BASED_AGENTS': 'true' if file_based else 'false',
         }
         merged_vars = {**variables, **provider_vars}

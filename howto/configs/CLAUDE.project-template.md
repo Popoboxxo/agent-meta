@@ -96,10 +96,6 @@ Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
 ## Sprachregeln
 
-<!-- Die globale Rule .claude/rules/language.md (generiert von sync.py) deckt den Kern ab. -->
-<!-- Hier nur projektspezifische Abweichungen eintragen — sonst leer lassen. -->
+Siehe `.claude/rules/language.md` für die Sprachkonventionen (von sync.py generiert, automatisch geladen).
 
-- `README.md` → **Englisch**
-- Alle anderen Dokumente → **Deutsch**
-- Code-Kommentare, Commit-Messages → **Englisch**
-- Kommunikation mit dem Nutzer → **Deutsch**
+<!-- Nur projektspezifische Abweichungen hier eintragen — sonst leer lassen. -->
