@@ -100,6 +100,37 @@ PROJECT_FILES: dict[str, str] = {
 
 
 # --------------------------------------------------------------------------- #
+# Asset resolution                                                            #
+# --------------------------------------------------------------------------- #
+
+
+def resolve_asset(root: Path, *parts: str) -> Path:
+    """Resolve a framework asset path, honouring the submodule layout.
+
+    agent-meta can be checked out at the project root (super-admin) or embedded
+    as a submodule under ``.agent-meta/`` (project-admin). Every framework asset
+    (``config/``, ``docs/``, ``agents/``, ``scripts/``, ``VERSION`` …) therefore
+    lives under one of two prefixes. Resolution order:
+
+      1. ``<root>/<*parts>``               -- top-level checkout
+      2. ``<root>/.agent-meta/<*parts>``   -- submodule layout
+
+    Returns the primary path even when neither exists, so callers can surface
+    the expected top-level location in ``not_found`` errors and route new writes
+    there. To pick the correct layout for a file that may not exist yet (e.g. an
+    optional overlay), resolve its parent directory instead, then join the file
+    name: ``resolve_asset(root, "config") / "pricing-overlay.yaml"``.
+    """
+    primary = root.joinpath(*parts)
+    if primary.exists():
+        return primary
+    fallback = root.joinpath(".agent-meta", *parts)
+    if fallback.exists():
+        return fallback
+    return primary
+
+
+# --------------------------------------------------------------------------- #
 # Viz / MCP sub-server manager                                               #
 # --------------------------------------------------------------------------- #
 
@@ -208,9 +239,7 @@ class VizManager:
     # ---------------------------------------------------------------------- #
 
     def _resolve_script(self, name: str) -> Path:
-        primary  = self.root / "scripts" / name
-        fallback = self.root / ".agent-meta" / "scripts" / name
-        return primary if primary.exists() else fallback
+        return resolve_asset(self.root, "scripts", name)
 
     def _start(
         self,
@@ -630,11 +659,9 @@ class SyncExecutor:
 
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
-        candidate = self.root / "scripts" / "sync.py"
-        if not candidate.exists():
-            # Fallback for target repos that embed agent-meta as a submodule.
-            candidate = self.root / ".agent-meta" / "scripts" / "sync.py"
-        self.sync_script = candidate
+        # Fallback to the submodule layout for target repos that embed
+        # agent-meta under ``.agent-meta/``.
+        self.sync_script = resolve_asset(self.root, "scripts", "sync.py")
 
     def _run(self, extra_args: list[str]) -> dict:
         if not self.sync_script.exists():
@@ -1300,12 +1327,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         submodule layout (``<root>/.agent-meta/config/``) when the framework
         is embedded in a target repo.
         """
-        root = self.__class__.root
-        if (root / "config").exists():
-            return root
-        if (root / ".agent-meta" / "config").exists():
-            return root / ".agent-meta"
-        return root
+        # ``resolve_asset(root, "config")`` selects the layout by the presence of
+        # the ``config/`` directory; its parent is the framework root that
+        # ``load_curation``/``save_curation`` expect.
+        return resolve_asset(self.__class__.root, "config").parent
 
     def _load_curation(self) -> dict:
         """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
@@ -1349,17 +1374,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
           out during registry generation, so a blacklisted model never reaches
           this code path; the field is included for response-shape stability.
         """
-        registry_path = self.__class__.root / "config" / "generated" / "model-registry.json"
-        pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
-        if not registry_path.exists():
-            fallback_registry = (
-                self.__class__.root / ".agent-meta" / "config" / "generated" / "model-registry.json"
-            )
-            if fallback_registry.exists():
-                registry_path = fallback_registry
-                pricing_path = (
-                    self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
-                )
+        # Resolve the config dir once (submodule-aware) so registry + overlay
+        # always share the same layout, even when either file is absent.
+        config_dir = resolve_asset(self.__class__.root, "config")
+        registry_path = config_dir / "generated" / "model-registry.json"
+        pricing_path = config_dir / "pricing-overlay.yaml"
 
         models: list[dict] = []
         if registry_path.exists():
@@ -1580,11 +1599,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "Empty body"}, status=400)
             body = self.rfile.read(length).decode("utf-8")
             data = json.loads(body)
-            
-            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
-            if not (self.__class__.root / "config").exists():
-                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
-                
+
+            pricing_path = resolve_asset(self.__class__.root, "config") / "pricing-overlay.yaml"
+
             pricing = {}
             if pricing_path.exists():
                 pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
@@ -1624,11 +1641,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if length <= 0:
                 return self._send_json({"error": "Empty body"}, status=400)
             data = json.loads(self.rfile.read(length).decode("utf-8"))
-            
-            pricing_path = self.__class__.root / "config" / "pricing-overlay.yaml"
-            if not (self.__class__.root / "config").exists():
-                pricing_path = self.__class__.root / ".agent-meta" / "config" / "pricing-overlay.yaml"
-                
+
+            pricing_path = resolve_asset(self.__class__.root, "config") / "pricing-overlay.yaml"
+
             if pricing_path.exists():
                 pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
                 if "prices" in pricing:
@@ -1649,9 +1664,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_get_ai_providers(self) -> None:
         try:
-            path = self.__class__.root / "config" / "ai-providers.yaml"
-            if not (self.__class__.root / "config").exists():
-                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            path = resolve_asset(self.__class__.root, "config") / "ai-providers.yaml"
             data = {}
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -1663,9 +1676,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
-            path = self.__class__.root / "config" / "ai-providers.yaml"
-            if not (self.__class__.root / "config").exists():
-                path = self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+            path = resolve_asset(self.__class__.root, "config") / "ai-providers.yaml"
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as fh:
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
@@ -1675,9 +1686,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_get_tier_presets(self) -> None:
         try:
-            path = self.__class__.root / "config" / "tier-presets.yaml"
-            if not (self.__class__.root / "config").exists():
-                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            path = resolve_asset(self.__class__.root, "config") / "tier-presets.yaml"
             data = {}
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -1696,9 +1705,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         try:
             # 1. Load global tier presets (mirrors _handle_get_tier_presets).
-            global_path = self.__class__.root / "config" / "tier-presets.yaml"
-            if not (self.__class__.root / "config").exists():
-                global_path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            global_path = resolve_asset(self.__class__.root, "config") / "tier-presets.yaml"
             global_data: dict = {}
             if global_path.exists():
                 global_data = yaml.safe_load(global_path.read_text(encoding="utf-8")) or {}
@@ -1754,9 +1761,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     for prov_val in providers_block.values():
                         if isinstance(prov_val, dict):
                             prov_val.pop("source", None)
-            path = self.__class__.root / "config" / "tier-presets.yaml"
-            if not (self.__class__.root / "config").exists():
-                path = self.__class__.root / ".agent-meta" / "config" / "tier-presets.yaml"
+            path = resolve_asset(self.__class__.root, "config") / "tier-presets.yaml"
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as fh:
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
@@ -1893,22 +1898,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _serve_ui(self) -> None:
-        primary  = self.root / "docs" / "admin-ui.html"
-        fallback = self.root / ".agent-meta" / "docs" / "admin-ui.html"
-        ui_path = primary if primary.exists() else fallback
+        ui_path = resolve_asset(self.root, "docs", "admin-ui.html")
         if not ui_path.exists():
             raise FileNotFoundError("docs/admin-ui.html (UI bundle missing)")
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
 
     def _find_schema_path(self) -> Path:
-        candidates = [
-            self.__class__.root / "config" / "project-config.schema.json",
-            self.__class__.root / ".agent-meta" / "config" / "project-config.schema.json",
-        ]
-        for c in candidates:
-            if c.exists():
-                return c
-        return candidates[0]
+        return resolve_asset(self.__class__.root, "config", "project-config.schema.json")
 
     def _build_agent_hierarchy(self) -> dict:
         """Derive a lightweight role hierarchy directly from
@@ -1992,10 +1988,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _role_defaults_path(self) -> Path:
         """Resolve the path to ``role-defaults.yaml`` for either layout."""
-        primary = self.__class__.root / "config" / "role-defaults.yaml"
-        if primary.exists():
-            return primary
-        return self.__class__.root / ".agent-meta" / "config" / "role-defaults.yaml"
+        return resolve_asset(self.__class__.root, "config", "role-defaults.yaml")
 
     def _read_pipelines(self) -> dict:
         """Return the ``quality_pipelines`` block from ``role-defaults.yaml``
@@ -2645,12 +2638,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         submodule layout ``.agent-meta/agents/1-generic`` when agent-meta is
         embedded in a target project.
         """
-        candidates = [
-            self.__class__.root / "agents" / "1-generic",
-            self.__class__.root / ".agent-meta" / "agents" / "1-generic",
-        ]
-        templates_dir = next((d for d in candidates if d.is_dir()), None)
-        if templates_dir is None:
+        templates_dir = resolve_asset(self.__class__.root, "agents", "1-generic")
+        if not templates_dir.is_dir():
             return {"templates": [], "available": False}
         names = sorted(
             p.stem for p in templates_dir.glob("*.md")
@@ -2660,10 +2649,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _ai_providers_path(self) -> Path:
         """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
-        primary = self.__class__.root / "config" / "ai-providers.yaml"
-        if primary.exists():
-            return primary
-        return self.__class__.root / ".agent-meta" / "config" / "ai-providers.yaml"
+        return resolve_asset(self.__class__.root, "config", "ai-providers.yaml")
 
     def _list_providers(self) -> list[dict]:
         """Return the configured AI providers with their model tiers/aliases."""
@@ -2703,9 +2689,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             key=len,
             reverse=True,
         )
-        platform_dir = self.__class__.root / "agents" / "2-platform"
-        if not platform_dir.is_dir():
-            platform_dir = self.__class__.root / ".agent-meta" / "agents" / "2-platform"
+        platform_dir = resolve_asset(self.__class__.root, "agents", "2-platform")
         if platform_dir.is_dir():
             for entry in platform_dir.glob("*.md"):
                 stem = entry.stem
@@ -3104,13 +3088,10 @@ class AdminServer:
         self.httpd = _DaemonThreadingHTTPServer((self.host, self.port), AdminRequestHandler)
 
     def _read_version(self) -> str:
-        version_file = self.root / "VERSION"
+        # resolve_asset falls back to the ``.agent-meta/`` submodule layout.
+        version_file = resolve_asset(self.root, "VERSION")
         if version_file.exists():
             return version_file.read_text(encoding="utf-8").strip()
-        # Fallback for submodule layout
-        submodule_version = self.root / ".agent-meta" / "VERSION"
-        if submodule_version.exists():
-            return submodule_version.read_text(encoding="utf-8").strip()
         return "unknown"
 
     def start(self) -> None:
