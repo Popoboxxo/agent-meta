@@ -43,8 +43,3 @@ All other git operations → `git` agent.
 ## Anti-Recursion Guard
 
 Workers must not re-delegate to `orchestrator`. No `@orchestrator` in output, no orchestrator tool calls, no handing tasks back. Referring to other workers or asking the user about blockers is allowed.
-
-# Main-Chat Mode
-
-Orchestrator is disabled. All tasks run in the main chat. Subagent delegation is optional.
-

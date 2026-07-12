@@ -286,6 +286,12 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
+    # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
+    # Claude Code injects agent descriptions natively into the system prompt,
+    # so the table in CLAUDE.md would be a duplication — dropped for Claude only.
+    variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(
+        config, agent_meta_root, include_table=False
+    )
     # User variables may be YAML scalars (true, 20) — coerce to the string form
     # templates expect ("true"/"false" for {{#if}} blocks, str() otherwise).
     for key, value in (config.get("variables") or {}).items():
@@ -295,6 +301,20 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             variables[key] = str(value)
         else:
             variables[key] = value
+    # REQ category placeholders: guarantee substitution so generated context
+    # files never keep a literal {{REQ_CATEGORIES_LIST}} / {{REQ_CATEGORIES}}.
+    # User-set values (loaded above) take precedence; otherwise derive the long
+    # form from the short form (and vice versa), falling back to generic defaults.
+    if not variables.get("REQ_CATEGORIES_LIST"):
+        variables["REQ_CATEGORIES_LIST"] = variables.get("REQ_CATEGORIES") or (
+            "- **Kernfunktionalität** — Kernfeatures des Projekts\n"
+            "- **Lifecycle** — Startup, Shutdown, Fehlerbehandlung\n"
+            "- **Nichtfunktionale Anforderungen** — Performance, Sicherheit, Wartbarkeit"
+        )
+    if not variables.get("REQ_CATEGORIES"):
+        variables["REQ_CATEGORIES"] = variables.get("REQ_CATEGORIES_LIST") or (
+            "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen"
+        )
     # AGENTS_DIR: provider-agnostic generated agents directory (default: .claude/agents)
     if "AGENTS_DIR" not in variables:
         variables["AGENTS_DIR"] = ".claude/agents"
@@ -314,6 +334,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
     variables["DIRECT_DISPATCH_ENABLED"] = "true" if orch_config.get("direct-dispatch-enabled", True) else "false"
+    # ORCH_MODE_*: mutually-exclusive, flat mode flags for the use-orchestrator rule.
+    # Exactly one is "true". These replace nested {{#if}}/{{else}} in the rule
+    # template so the conditional stripper can never render two modes at once.
+    _orch_enabled = orch_config.get("enabled", True)
+    _orch_strict = orch_config.get("strict", True)
+    variables["ORCH_MODE_DISABLED"] = "true" if not _orch_enabled else "false"
+    variables["ORCH_MODE_STRICT"]   = "true" if (_orch_enabled and _orch_strict) else "false"
+    variables["ORCH_MODE_ADVISORY"] = "true" if (_orch_enabled and not _orch_strict) else "false"
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.
@@ -531,6 +559,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
+    conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
 
     if not conditional_vars:
         return text

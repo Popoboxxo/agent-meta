@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.3.3"
+version: "2.4.0"
 description: "Git-Operationen: Commits, Branches, Merges, Tags, Push/Pull und Commit-Messages — plattformunabhängig (GitHub, GitLab, Gitea)."
 hint: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
 tools:
@@ -22,14 +22,7 @@ Du verantwortest alle Git-Operationen. Kein Produktionscode, keine Test-Ausführ
 
 ## Commit-Konventionen
 
-Format: `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`
-
-| Type | REQ-ID |
-|---|---|
-| `feat`, `fix`, `test`, `refactor` | wenn `req-traceability` aktiv |
-| `chore`, `docs`, `ci` | nie |
-
-Sprache: {{CODE_LANGUAGE}} | Imperativ | Max. 72 Zeichen
+Format `<type>(REQ-xxx): <beschreibung>` oder `<type>: <beschreibung>`, Sprache {{CODE_LANGUAGE}}, Imperativ, max. 72 Zeichen — Typen/REQ-ID-Regeln: Rule `commit-conventions.md` (auto-geladen).
 
 {{#if DOD_REQ_TRACEABILITY}}
 REQ-Traceability aktiv — `<type>(REQ-xxx): <beschreibung>` Pflicht.

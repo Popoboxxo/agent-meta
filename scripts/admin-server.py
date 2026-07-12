@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
 import sys
 import subprocess
 import threading
@@ -697,9 +698,32 @@ class ConfigWatcher(threading.Thread):
         self._stop_event = threading.Event()
         self._mtimes: dict[Path, float] = {}
         self._events_path = self.root / ".meta-viz" / "events.jsonl"
+        self._subscribers: list["queue.Queue"] = []
+        self._subscribers_lock = threading.Lock()
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def subscribe(self) -> "queue.Queue":
+        """Register a listener for config change events.
+
+        Returns a fresh :class:`queue.Queue`. Emitted event dicts are pushed to
+        every registered queue; consumers call ``get(timeout=...)`` and catch
+        :class:`queue.Empty` for heartbeats. The SSE handler owns one queue per
+        open connection.
+        """
+        q: "queue.Queue" = queue.Queue()
+        with self._subscribers_lock:
+            self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q: "queue.Queue") -> None:
+        """Remove a previously registered listener queue."""
+        with self._subscribers_lock:
+            try:
+                self._subscribers.remove(q)
+            except ValueError:
+                pass
 
     def _tracked_files(self) -> Iterable[Path]:
         for rel in {**PROJECT_FILES, **SUPER_ADMIN_FILES}.values():
@@ -732,16 +756,28 @@ class ConfigWatcher(threading.Thread):
 
     def _emit(self, event_type: str, path: Path) -> None:
         try:
+            rel_path = str(path.relative_to(self.root))
+        except ValueError:
+            rel_path = str(path)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "type": event_type,
+            "path": rel_path,
+        }
+        try:
             self._events_path.parent.mkdir(parents=True, exist_ok=True)
-            entry = {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "type": event_type,
-                "path": str(path.relative_to(self.root)),
-            }
             with self._events_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except OSError:  # pragma: no cover - best effort
             pass
+        # Fan out to live SSE subscribers regardless of file-write success.
+        with self._subscribers_lock:
+            subscribers = list(self._subscribers)
+        for q in subscribers:
+            try:
+                q.put_nowait(entry)
+            except queue.Full:  # pragma: no cover - best effort
+                pass
 
 
 # --------------------------------------------------------------------------- #
@@ -760,6 +796,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     config_manager: ConfigManager
     sync_executor: SyncExecutor
     viz_manager: "VizManager"
+    config_watcher: "ConfigWatcher"
     mode: str
     root: Path
     version: str
@@ -2602,11 +2639,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return ""
 
     def _list_agent_templates(self) -> dict:
-        """Return the list of agent templates available for generation."""
-        templates_dir = self.__class__.root / "agents" / "1-generic"
-        if not templates_dir.is_dir():
+        """Return the list of agent templates available for generation.
+
+        Searches the top-level ``agents/1-generic`` first and falls back to the
+        submodule layout ``.agent-meta/agents/1-generic`` when agent-meta is
+        embedded in a target project.
+        """
+        candidates = [
+            self.__class__.root / "agents" / "1-generic",
+            self.__class__.root / ".agent-meta" / "agents" / "1-generic",
+        ]
+        templates_dir = next((d for d in candidates if d.is_dir()), None)
+        if templates_dir is None:
             return {"templates": [], "available": False}
-        names = sorted(p.stem for p in templates_dir.glob("*.md") if p.is_file())
+        names = sorted(
+            p.stem for p in templates_dir.glob("*.md")
+            if p.is_file() and not p.name.startswith("_")
+        )
         return {"templates": names, "available": True}
 
     def _ai_providers_path(self) -> Path:
@@ -2734,8 +2783,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if body is None:
             raise ValueError("empty body")
-        if not isinstance(body, str):
-            raise ValueError("expected plain text body")
+        # Frontend sends JSON: {"content": "..."}. Accept the parsed dict and
+        # extract the content field. A bare string body is tolerated for
+        # backward compatibility with plain-text clients.
+        if isinstance(body, dict):
+            content = body.get("content")
+        elif isinstance(body, str):
+            content = body
+        else:
+            content = None
+        if not isinstance(content, str):
+            raise ValueError("expected 'content' field with template text")
         path = self._template_path(role)
         if not path:
             raise FileNotFoundError(f"template not found: {role}")
@@ -2747,9 +2805,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             backup = None
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(body, encoding="utf-8")
+        tmp.write_text(content, encoding="utf-8")
         os.replace(tmp, path)
-        return self._send_json({"status": "saved", "role": role, "backup": backup})
+        return self._send_json({
+            "status": "saved",
+            "role": role,
+            "backup": backup,
+            "bytes": len(content.encode("utf-8")),
+        })
 
     def _template_path(self, role: str) -> Optional[Path]:
         """Resolve the platform-specific template path for a role."""
@@ -2777,18 +2840,26 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        queue = self.__class__.config_watcher.subscribe()
+        watcher = self.__class__.config_watcher
+        event_queue = watcher.subscribe()
         try:
             while True:
-                event = queue.get(timeout=SSE_HEARTBEAT_SECONDS)
+                try:
+                    event = event_queue.get(timeout=SSE_HEARTBEAT_SECONDS)
+                except queue.Empty:
+                    self.wfile.write(b"data: heartbeat\n\n")
+                    self.wfile.flush()
+                    continue
                 if event is None:
                     self.wfile.write(b"data: heartbeat\n\n")
                 else:
                     self.wfile.write(f"data: {json.dumps(event)}\n\n".encode("utf-8"))
                 self.wfile.flush()
-        except queue.Empty:
-            self.wfile.write(b"data: heartbeat\n\n")
-            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected — end the stream quietly.
+            pass
+        finally:
+            watcher.unsubscribe(event_queue)
 
     # ------------------------------------------------------------------ #
     # Provider deactivation handlers                                      #
@@ -3013,7 +3084,9 @@ class AdminServer:
         self.host = host
         self.port = port
         self.mode = detect_mode(self.root)
-        self.watcher: Optional[ConfigWatcher] = None
+        # Always create the watcher instance so the SSE endpoint can subscribe;
+        # the background polling thread is only started when enabled (see start()).
+        self.watcher: ConfigWatcher = ConfigWatcher(self.root)
         self.enable_watcher = enable_watcher
         self.enable_viz = enable_viz
         self.viz_manager = VizManager(self.root)
@@ -3021,6 +3094,7 @@ class AdminServer:
         AdminRequestHandler.config_manager = ConfigManager(self.root, self.mode)
         AdminRequestHandler.sync_executor = SyncExecutor(self.root)
         AdminRequestHandler.viz_manager = self.viz_manager
+        AdminRequestHandler.config_watcher = self.watcher
         AdminRequestHandler.mode = self.mode
         AdminRequestHandler.root = self.root
         AdminRequestHandler.version = self._read_version()
@@ -3042,7 +3116,6 @@ class AdminServer:
     def start(self) -> None:
         """Run the server (blocking). Honours ``Ctrl+C``."""
         if self.enable_watcher:
-            self.watcher = ConfigWatcher(self.root)
             self.watcher.start()
 
         # Start Viz dashboard + MCP server as supervised subprocesses.

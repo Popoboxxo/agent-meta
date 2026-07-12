@@ -95,7 +95,9 @@ python scripts/sync.py --validate
 
 Kategorien für `docs/REQUIREMENTS.md`:
 
-{{REQ_CATEGORIES_LIST}}
+- Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
+- Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
+- Entwickler-Experience (Howto, Beispiele, Doku)
 
 ---
 
@@ -109,40 +111,6 @@ Generiert von agent-meta v0.69.0 — `2026-07-12`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
-
-| Agent | Zuständigkeit |
-|-------|--------------|
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen |
-| `agent-meta-scout` | KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken |
-| `api-specialist` | Verwende diesen Agenten fuer API-Design, OpenAPI-Spezifikationen und Contract-First Development. |
-| `bug-feature-analyzer` | Issue-Triage: Bug vs. User-Error vs. Feature vs. Out-of-Scope klassifizieren — vor developer/feature-Delegation |
-| `claude-expert` | Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices |
-| `code-reviewer` | Prüft Code-Qualität, Blast-Radius und Clean Code — nicht funktionale Korrektheit (das macht validator). |
-| `concept-reviewer` | Konzept/Design-Doc reviewen: Vollständigkeit, Logik, Risiken, Approve/Iterate |
-| `continue-expert` | Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices |
-| `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
-| `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
-| `devops-engineer` | Verwende diesen Agenten fuer CI/CD, IaC, Kubernetes, Monitoring und Infrastructure-Aufgaben. |
-| `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse |
-| `effort-estimator` | Aufwandsschätzung für Tasks — delegiere hierher wenn User nach Zeit/Kosten fragt |
-| `explorer` | Codebase analysieren / Dependencies / Impact — read-only, delegiert Findings |
-| `export-manager` | Verwende diesen Agenten fuer Export-Routing von strukturierten Daten zu konfigurierten Targets. |
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. |
-| `feedback` | Projekt-Feedback: Bugs, Features, Verbesserungen als GitHub Issues standardisiert einreichen — immer vor git |
-| `gemini-expert` | Gemini Experte: Funktionsweise, .gemini Konfiguration, Best Practices |
-| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
-| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
-| `junior-developer` | Low-Tier-Developer: triviale Fixes, Typos, kleine klar umrissene Änderungen — eskaliert bei Scope-Überschreitung |
-| `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
-| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
-| `opencode-expert` | Opencode Experte: Funktionsweise, .opencode Konfiguration, Best Practices |
-| `orchestrator` | Einstiegspunkt für ALLE Entwicklungsaufgaben — zerlegt komplexe Tasks und dispatched parallel |
-| `performance-optimizer` | Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung. |
-| `prompt-engineer` | Prompts und Agenten entwerfen oder reviewen |
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
-| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-| `senior-developer` | High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann |
-| `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 <!-- agent-meta:managed-end -->
 
 **Singleton-Regel:** Es existiert genau EIN `orchestrator` pro Session — der vom `main_chat` gespawnte. Worker-Agents dürfen niemals `task(subagent_type="orchestrator", ...)` aufrufen. Verstoß = Deadlock / Routing-Konflikt.

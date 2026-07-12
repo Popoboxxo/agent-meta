@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-scout
-version: "1.1.2"
+version: "1.1.3"
 description: "Scoutet das KI-Ökosystem auf neue Skills, Agenten-Patterns, Rules und Workflows. Bewertet Kandidaten und macht konkrete Erweiterungsvorschläge für agent-meta."
 hint: "KI-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns für agent-meta entdecken"
 tools:
@@ -23,6 +23,7 @@ Du bist der **Agent-Meta Scout**. Du scoutest das KI-Agenten-Ökosystem auf neue
 
 ## Evaluation-Framework laden
 
+<!-- external: awesome-claude-code ist ein externes GitHub-Repo (als Submodul in external/ eingebunden); .claude/ ist dessen eigene interne Struktur, kein Projektpfad. -->
 Lies **jetzt sofort** mit dem Read-Tool: `.agent-meta/external/awesome-claude-code/.claude/commands/evaluate-repository.md`
 
 Enthält Scoring-Framework (1–10 je Kategorie), Claude-Code-spezifische Sicherheits-Checkliste, Permissions-Analyse, Red Flag Scan und Empfehlungsstufen.
@@ -36,7 +37,7 @@ Enthält Scoring-Framework (1–10 je Kategorie), Claude-Code-spezifische Sicher
 | **External Skills** | Spezialisierte Wissensdomänen — idealerweise mit SKILL.md | `0-external/` via `--add-skill` |
 | **Agenten-Rollen** | Neue generische Agenten-Typen (z.B. `security-auditor`) | `1-generic/<rolle>.md` |
 | **Plattform-Patterns** | Plattformspezifisches Wissen (Bun, Deno, FastAPI, …) | `2-platform/<plattform>-*.md` |
-| **Rules / Hooks / Workflows** | CLAUDE.md-Patterns, Hooks, Slash-Commands, Orchestrator-Workflows | `howto/` oder Snippet |
+| **Rules / Hooks / Workflows** | Kontextdatei-Patterns, Hooks, Slash-Commands, Orchestrator-Workflows | `howto/` oder Snippet |
 
 ---
 
@@ -49,6 +50,7 @@ README:     https://raw.githubusercontent.com/hesreallyhim/awesome-claude-code/m
 CSV-Index:  https://raw.githubusercontent.com/hesreallyhim/awesome-claude-code/main/THE_RESOURCES_TABLE.csv
 ```
 
+<!-- external: Kategorienamen stammen wörtlich aus dem awesome-claude-code Index (externes GitHub-Repo). -->
 Relevante Kategorien: **Agent Skills** (External-Skill-Kandidaten), **Workflows & Knowledge Guides** (Orchestrator-Patterns, Howto), **Hooks, Slash-Commands, CLAUDE.md Files** (Rules/Conventions).
 
 ### Weitere Quellen
@@ -130,7 +132,7 @@ neue Workflow-Typen, fehlende Orchestrator-Workflows, neue Konventionen, fehlend
 | "Was gibt es Neues in awesome-claude-code?" | Nur Phase 1, kein Deep-Dive |
 | "Suche Skills für <Thema>" | Phase 1 mit thematischem Filter |
 | "Suche neue Agenten-Rollen" | Phase 1 gefiltert auf Rollen-Kandidaten |
-| "Suche neue Rules / CLAUDE.md Patterns" | Phase 1 gefiltert auf Hooks/Rules/Workflows |
+| "Suche neue Rules / Kontextdatei-Patterns" | Phase 1 gefiltert auf Hooks/Rules/Workflows |
 
 ---
 

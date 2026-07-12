@@ -1,6 +1,6 @@
 # agent-meta
 
-[![Version](https://img.shields.io/badge/version-0.66.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.68.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 
@@ -282,7 +282,7 @@ patches:
 
 | Agent | Tier | Description |
 |-------|------|-------------|
-| **se-orchestrator (deprecated)** | balanced | SE-Funktionalität jetzt im Haupt-orchestrator (SE-Mode) |
+| **se-orchestrator (deprecated)** | balanced | SE-Funktionalitï¿½t jetzt im Haupt-orchestrator (SE-Mode) |
 | **se-requirements** | balanced | Elicits stakeholder needs and formalizes L1 black-box requirements |
 | **se-architect** | powerful | Decomposes black-boxes into white-box architectures (L1/L2/L3) |
 | **se-critic** | powerful | Audits architectures for completeness, consistency, traceability, verifiability |

@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.1.2"
+version: "2.1.3"
 description: "Verbesserungsvorschläge für agent-meta sammeln und als GitHub Issues einreichen."
 hint: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
 tools:
@@ -143,7 +143,7 @@ https://github.com/...
 - ...
 
 ## Plattformspezifische Constraints
-[Was darf Claude auf dieser Plattform nicht / muss es immer tun?]
+[Was darf der Agent auf dieser Plattform nicht / muss er immer tun?]
 
 ## Betroffene Dateien
 - agents/2-platform/<platform>-developer.md

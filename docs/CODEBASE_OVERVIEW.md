@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-07-09 (Phase 5: Provider-agnostischer Syncer, Admin-CRUD, Model-Mapping)
+> Letzte Aktualisierung: 2026-07-12 (Phase 6: Token-Efficiency, Lazy-Loading, Flat Orchestrator Modes)
 
 ---
 
@@ -559,6 +559,29 @@ cheap:
 
 **Model Registry:** Cacht die dynamisch von OpenRouter/Zen/Go abgerufenen Modelle (406 Modelle). Produziert von `sync.py --update-models`.
 
+### Backup-Konfiguration (Phase 6 — v0.68.0)
+
+**Zweck:** Automatische Versionierung von Konfigurationsdateien vor Änderungen über die Admin-UI.
+
+**Konfiguration in `.meta-config/project.yaml`:**
+```yaml
+backup:
+  retention:
+    max_backups: 10          # maximale Anzahl Backups speichern
+    max_age_days: 30         # alte Backups nach N Tagen löschen
+  enabled: true              # default: true
+```
+
+**Backup-Verzeichnis:** `.meta-config/backups/` 
+- Archivformat: `config-YYYYMMDD-HHMMSS.tar.gz`
+- Enthält: `.meta-config/project.yaml` + `config/role-defaults.yaml` (vom Sync)
+
+**Endpunkte für Admin-UI:**
+- `GET /api/backups` — Liste aller verfügbaren Backups
+- `POST /api/backups/create` — Neues Backup erstellen
+- `POST /api/backups/restore` — Aus Backup wiederherstellen
+- `DELETE /api/backups/<archive>` — Backup löschen
+
 ---
 
 ## 5. Schemas
@@ -853,6 +876,35 @@ disabled: []                         # hidden in UI, aber in registry
 **Dynamisches Crawling (`--update-models`):**
 Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
 
+### `scripts/lib/config.py` — `build_variables()`
+
+**Zweck:** Zentrale Template-Variablen-Auflösung für alle Placeholder-Substitutionen in Agent-Templates.
+
+**Neue Platzhalter (Phase 6 — Token Efficiency):**
+
+| Platzhalter | Typ | Beschreibung |
+|-------------|-----|-------------|
+| `ORCH_MODE_DISABLED` | bool | Orchestrator komplett deaktiviert (statt {{#if}} Nesting) |
+| `ORCH_MODE_STRICT` | bool | Orchestrator aktiv + strict mode (immer delegieren) |
+| `ORCH_MODE_ADVISORY` | bool | Orchestrator aktiv + advisory mode (Main-Chat kann fallback nutzen) |
+| `AGENT_HINTS_CLAUDE` | string | Agent-Hints ohne Tabelle (für Claude native agent injection) |
+| `A2A_HANDOFF_BLOCK` | string | A2A-Envelope-Dokumentation (leer wenn deaktiviert) |
+| `SE_MODE_BLOCK` | string | SE-Mode-Sektion aus `snippets/orchestrator/se-mode.md` |
+| `A2A_PROTOCOL_BLOCK` | string | A2A-Protokoll-Sektion aus `snippets/orchestrator/a2a-protocol.md` |
+| `CHECKPOINTING_BLOCK` | string | Checkpointing-Sektion aus `snippets/orchestrator/checkpointing.md` |
+| `QUALITY_PIPELINES_BLOCK` | string | Quality-Pipelines-Sektion aus `snippets/orchestrator/quality-pipelines.md` |
+
+**Flat-Mode-Flags (statt nested {{#if}}/{{else}}):**
+- Genau ein ORCH_MODE_*-Flag ist `true`, alle anderen `false`
+- Ermöglicht deterministische Conditional Stripping ohne Nesting-Risiken
+- Auflösung aus orchestrator-Block in project.yaml
+
+**Lazy-Loaded Snippets:**
+Template-Inhalte für SE-Mode, A2A-Protokoll, Checkpointing und Quality-Pipelines werden zur Build-Zeit aus `snippets/orchestrator/<name>.md` geladen, statt hardcodiert in Agents zu stehen. Bei Deaktivierung werden die Variablen leer (""), so Conditional Stripper können sie zuverlässig entfernen.
+
+**hint/description-Deduplication:**
+Redundante `hint`-Felder werden automatisch aus Agent-Frontmattern gelöscht wenn identisch mit `description` (Zeile 220-227 in agents.py). AGENT_HINTS wird immer aus Quell-Templates gebaut (nicht aus generierten Dateien), daher keine Token-Verschwendung.
+
 ### `scripts/admin-server.py` & `docs/admin-ui.html` (Phase 5: CRUD + Reflection + Model Mapping)
 
 **Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing, Quality Pipelines, Reflection Pairs, Prompt Modes und Agent→Model-Mapping.
@@ -868,7 +920,7 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | **Project General** | tier-preset Dropdown (fixed), Global Framework Setup Link | Edit → Save/Cancel |
 | **AI Providers** | Project Tier Override Panel | Enable/Disable pro Provider |
 
-**Neue CRUD-Endpunkte (Phase 5 — v0.66.0):**
+**Neue CRUD-Endpunkte (Phase 5 — v0.66.0 + Phase 6 — v0.68.0 Backups):**
 
 | Endpunkt | Methoden | Zweck |
 |----------|----------|-------|
@@ -879,6 +931,9 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | `/api/prompt-modes` | `GET` · `PUT` | Prompt-Mode-Config (`agent-prompts` Block) lesen / schreiben |
 | `/api/prompt-modes/roles/{role}` | `GET` · `PUT` · `POST` · `DELETE` | Prompt-Mode-Override für eine Rolle setzen / löschen |
 | `/api/model-mapping` | `GET` | Matrix: Rolle × Provider → resolved model ID + source |
+| `/api/backups` | `GET` · `POST` | Liste aller Config-Backups lesen / neue Backup erstellen |
+| `/api/backups/<archive>` | `DELETE` | Backup löschen |
+| `/api/backups/restore` | `POST` | Konfiguration aus Backup wiederherstellen |
 
 **Neue UI-Pages (Phase 5):**
 
