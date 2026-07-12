@@ -808,6 +808,11 @@ class API {
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.json();
   }
+  async delete(path) {
+    const res = await fetch(this.base + path, { method: "DELETE" });
+    if (!res.ok) throw new APIError(res.status, await safeJson(res));
+    return res.json();
+  }
   streamEvents(path, onEvent) {
     const source = new EventSource(this.base + path);
     // Surface persistent reconnect failures as a toast so the user knows the
