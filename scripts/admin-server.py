@@ -2435,6 +2435,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "available_pipelines": pipeline_names,
             },
         }
+
+    def _read_reflection_pairs(self) -> dict:
         """Return the ``reflection_pairs`` block from ``role-defaults.yaml``.
 
         Envelope shape: ``{"reflection_pairs": [...]}``. The list is always
@@ -2700,14 +2702,25 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _run_config_audit(self) -> dict:
         """Run the consistency audit over the current configuration."""
         self._ensure_lib_on_path()
-        from consistency.audit import run_audit
-        return run_audit(self.__class__.root)
+        from lib.config_audit import audit_config
+        import dataclasses
+        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
+        report = audit_config(self.__class__.root, project_config_path)
+        return {
+            "has_issues": report.has_issues,
+            "errors": [dataclasses.asdict(i) for i in report.errors],
+            "warnings": [dataclasses.asdict(i) for i in report.warnings],
+            "issues": [dataclasses.asdict(i) for i in report.issues],
+        }
 
     def _apply_config_audit(self) -> dict:
         """Apply safe fixes reported by the consistency audit."""
         self._ensure_lib_on_path()
-        from consistency.audit import apply_fixes
-        return apply_fixes(self.__class__.root)
+        from lib.config_audit import audit_config, apply_audit
+        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
+        report = audit_config(self.__class__.root, project_config_path)
+        count = apply_audit(report, project_config_path)
+        return {"fixed": count}
 
     def _send_template(self, role: str) -> None:
         """Send a generated agent template as plain text."""

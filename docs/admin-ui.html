@@ -1315,6 +1315,7 @@ function buildSidebar() {
         { route: "/project/general",   label: "General", icon: "□" },
         { route: "/project/providers", label: "Providers & Platforms", icon: "□" },
         { route: "/project/provider-deactivation", label: "Provider Deactivation", icon: "⊘" },
+        { route: "/project/backups", label: "Backups", icon: "💾" },
         { route: "/project/roles",     label: "Roles", icon: "□" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "□" },
         { route: "/project/prompt-modes", label: "Prompt Modes", icon: "□" },
@@ -4885,6 +4886,91 @@ async function viewProjectProviderTierOverrides() {
     } }, ["Save"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
   ]));
+  return wrap;
+}
+
+/* ----------------------- Backups ------------------------ */
+async function viewBackups() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["System Backups"]));
+  wrap.appendChild(el("p", { class: "muted" }, ["Manage full system backups (agent-meta config + provider folders)."]));
+
+  const status = el("div", { class: "muted" }, ["Loading..."]);
+  wrap.appendChild(status);
+
+  let data = null;
+  const load = async () => {
+    try {
+      status.textContent = "Loading backups...";
+      data = await api.get("/api/backups");
+      status.textContent = "";
+      render();
+    } catch(e) {
+      status.textContent = "Error: " + e;
+    }
+  };
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  const render = () => {
+    tableWrap.innerHTML = "";
+    if (!data || !data.archives || data.archives.length === 0) {
+      tableWrap.appendChild(el("p", {}, ["No backups found."]));
+      return;
+    }
+    const t = el("table", { class: "roles-table" }, [
+      el("thead", {}, [
+        el("tr", {}, [
+          el("th", {}, ["Date"]),
+          el("th", {}, ["Label"]),
+          el("th", {}, ["Size"]),
+          el("th", {}, ["Actions"]),
+        ])
+      ]),
+      el("tbody", {}, data.archives.map(a => 
+        el("tr", {}, [
+          el("td", {}, [a.created.substring(0,19).replace("T"," ")]),
+          el("td", {}, [a.label || "-"]),
+          el("td", {}, [a.size_mb + " MB"]),
+          el("td", {}, [
+            el("button", { class: "btn small", onclick: async () => {
+              if(!confirm("Restore this backup?")) return;
+              try {
+                await api.post("/api/backups/restore", {archive_name: a.name, force: true});
+                alert("Restored successfully.");
+                load();
+              } catch(e) { alert("Error: " + e); }
+            }}, ["Restore"]),
+            " ",
+            el("button", { class: "btn small", onclick: async () => {
+              if(!confirm("Delete this backup?")) return;
+              try {
+                await api.delete("/api/backups/" + a.name);
+                load();
+              } catch(e) { alert("Error: " + e); }
+            }}, ["Delete"])
+          ])
+        ])
+      ))
+    ]);
+    tableWrap.appendChild(t);
+  };
+
+  const controls = el("div", { style: "margin-top: 1em;" }, [
+    el("button", { class: "btn", onclick: async () => {
+      const label = prompt("Optional label for backup:");
+      if (label === null) return;
+      try {
+        status.textContent = "Creating backup...";
+        await api.post("/api/backups/create", { label });
+        load();
+      } catch(e) { alert("Error: " + e); load(); }
+    }}, ["Create Backup"])
+  ]);
+  wrap.appendChild(controls);
+
+  load();
   return wrap;
 }
 
