@@ -1035,6 +1035,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/model-mapping":
             return self._handle_get_model_mapping()
 
+        if path == "/api/provider-deactivation/status":
+            return self._send_json(self._get_deactivation_status())
+
+        if path == "/api/backups":
+            return self._handle_get_backups()
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1056,6 +1062,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/prompt-modes/roles/"):
             role = path[len("/api/prompt-modes/roles/"):]
             return self._send_json(self._delete_role_prompt_mode(role))
+
+        if path.startswith("/api/backups/"):
+            archive_name = path[len("/api/backups/"):]
+            return self._handle_delete_backup(archive_name)
 
         raise FileNotFoundError(path)
 
@@ -1201,6 +1211,18 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if subserver is not None:
             name, action = subserver
             return self._handle_subserver_action(name, action)
+
+        if path == "/api/provider-deactivation/deactivate":
+            return self._handle_deactivate_providers()
+
+        if path == "/api/provider-deactivation/activate":
+            return self._handle_activate_providers()
+
+        if path == "/api/backups/create":
+            return self._handle_create_backup()
+
+        if path == "/api/backups/restore":
+            return self._handle_restore_backup()
 
         raise FileNotFoundError(path)
 
@@ -2754,6 +2776,198 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except queue.Empty:
             self.wfile.write(b"data: heartbeat\n\n")
             self.wfile.flush()
+
+    # ------------------------------------------------------------------ #
+    # Provider deactivation handlers                                      #
+    # ------------------------------------------------------------------ #
+
+    def _get_deactivation_status(self) -> dict:
+        """Return current provider deactivation status."""
+        root = self.__class__.root
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.deactivation import get_deactivation_status  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+            return get_deactivation_status(root, project_config, provider_config)
+        except Exception as exc:
+            return {"error": str(exc)}
+
+    def _handle_deactivate_providers(self) -> None:
+        """Deactivate providers: zip and remove their directories."""
+        root = self.__class__.root
+        body = self._read_body() or {}
+        providers = body.get("providers", [])
+        if not isinstance(providers, list):
+            providers = []
+
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.deactivation import deactivate_providers  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+
+            class _Log:
+                def info(self, *a): pass
+                def warn(self, *a): pass
+                def error(self, *a): pass
+
+            log = _Log()
+            results = deactivate_providers(
+                root, providers if providers else ["all"],
+                provider_config, project_config, log, dry_run=False,
+            )
+            return self._send_json({
+                "success": True,
+                "results": results,
+                "status": get_deactivation_status(root, project_config, provider_config),
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_activate_providers(self) -> None:
+        """Activate providers: restore from backup zips."""
+        root = self.__class__.root
+        body = self._read_body() or {}
+        providers = body.get("providers", [])
+        if not isinstance(providers, list):
+            providers = []
+
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.deactivation import activate_providers  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+
+            class _Log:
+                def info(self, *a): pass
+                def warn(self, *a): pass
+                def error(self, *a): pass
+
+            log = _Log()
+            results = activate_providers(
+                root, providers,
+                provider_config, project_config, log, dry_run=False,
+            )
+            return self._send_json({
+                "success": True,
+                "results": results,
+                "status": get_deactivation_status(root, project_config, provider_config),
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    # ------------------------------------------------------------------ #
+    # Backup handlers                                                    #
+    # ------------------------------------------------------------------ #
+
+    def _handle_get_backups(self) -> None:
+        root = self.__class__.root
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.backup import list_backups  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+            return self._send_json(list_backups(root, project_config, provider_config))
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_create_backup(self) -> None:
+        root = self.__class__.root
+        body = self._read_body() or {}
+        providers = body.get("providers", None)
+        label = body.get("label", None)
+        
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.backup import create_backup  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+
+            class _Log:
+                def info(self, *a): pass
+                def warn(self, *a): pass
+                def error(self, *a): pass
+
+            log = _Log()
+            result = create_backup(
+                root, providers, provider_config, project_config, log,
+                label=label, source_version=self.__class__.version
+            )
+            return self._send_json(result)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_restore_backup(self) -> None:
+        root = self.__class__.root
+        body = self._read_body() or {}
+        archive_name = body.get("archive_name")
+        if not archive_name:
+            return self._send_json({"error": "archive_name is required"}, status=400)
+            
+        providers = body.get("providers", None)
+        force = body.get("force", False)
+
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.backup import restore_backup  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+
+            class _Log:
+                def info(self, *a): pass
+                def warn(self, *a): pass
+                def error(self, *a): pass
+
+            log = _Log()
+            result = restore_backup(
+                root, archive_name, provider_config, project_config, log,
+                providers=providers, force=force
+            )
+            return self._send_json(result)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_delete_backup(self, archive_name: str) -> None:
+        root = self.__class__.root
+        if not archive_name:
+            return self._send_json({"error": "archive_name is required"}, status=400)
+
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.backup import delete_backup  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+
+            class _Log:
+                def info(self, *a): pass
+                def warn(self, *a): pass
+                def error(self, *a): pass
+
+            log = _Log()
+            result = delete_backup(root, archive_name, project_config, log)
+            return self._send_json(result)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
 
 
 class _DaemonThreadingHTTPServer(ThreadingHTTPServer):

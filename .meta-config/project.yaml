@@ -264,3 +264,14 @@ tier-preset: Normal
 agent-prompts:
   default: modern
   modes: {}
+provider-deactivation:
+  enabled: false
+  mode: all
+  backup-dir: .backup/provider-deactivation
+backup:
+  enabled: true
+  dir: .backup/agent-meta
+  retention:
+    max_backups: 10
+    max_age_days: 30
+  auto-backup-before-sync: false
