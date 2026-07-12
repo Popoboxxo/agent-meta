@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.1.2"
+version: "1.1.3"
 description: "Spezialisierter Developer für parametrische 3D-Modelle in OpenSCAD. Render-Inspect-Refine Loop via MCP, Druckbarkeits-Wissen, Toleranz-Management."
 hint: "OpenSCAD-Code generieren: parametrische 3D-Modelle, Render-Feedback, STL-Export, Druck-Optimierung"
 tools:
@@ -204,10 +204,10 @@ cuboid([20, 20, 10]) attach(TOP) cyl(r=5, h=15);           // modulares Assembly
 
 ## Skill-Integration
 
-Beim Start prüfen: `Falls .claude/skills/<name>/ existiert → lies das SKILL.md`
+Beim Start prüfen: `Falls {{SKILLS_DIR}}/<name>/ existiert → lies das SKILL.md`
 
-- **`.claude/skills/opengrid-openscad/`** → OpenGrid 28mm (Gridfinity-kompatibel)
-- **`.claude/skills/home-organization/`** → Systemauswahl für Aufbewahrung
+- **`{{SKILLS_DIR}}/opengrid-openscad/`** → OpenGrid 28mm (Gridfinity-kompatibel)
+- **`{{SKILLS_DIR}}/home-organization/`** → Systemauswahl für Aufbewahrung
 
 ---
 

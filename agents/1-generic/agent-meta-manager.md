@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.11.0"
+version: "1.11.1"
 description: "agent-meta verwalten: Upgrades, Sync, Feedback, projektspezifische Agenten, External Skills."
 hint: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
 tools:
@@ -128,9 +128,9 @@ py .agent-meta/scripts/consistency-check.py --changed --json # CI
 Prüft: Frontmatter, Cross-References, Platzhalter, Commands.
 `ERROR` → beheben; `WARNING` → empfohlen.
 
-## 9. CLAUDE.md verbessern
+## 9. Kontextdatei verbessern
 Fehler beobachtet → Imperativ-Regel außerhalb managed block einfügen.
-Längen-Check: `wc -l CLAUDE.md` — ≤300 optimal, 301–500 ok, >500 warnen → Details nach `docs/ARCHITECTURE.md` oder Extensions auslagern.
+Längen-Check: `wc -l {{CONTEXT_FILE}}` — ≤300 optimal, 301–500 ok, >500 warnen → Details nach `docs/ARCHITECTURE.md` oder Extensions auslagern.
 
 ## 10. Template-Migration (classic → modern)
 ### Pflicht-Checks
@@ -152,9 +152,9 @@ Verluste treten typischerweise bei Guards und konkatenierten Platzhaltern auf.
 - KEIN Override wenn Extension reicht
 - KEINE projektspezifische Lösung für generisches Problem
 - NICHT sync ohne `sync.log` zu prüfen
-- KEINE manuellen Änderungen in `.claude/agents/`
-- NIE in managed block von CLAUDE.md schreiben
-- Multi-Tool-Teams: `AGENTS.md` ↔ `CLAUDE.md` Symlink empfehlen
+- KEINE manuellen Änderungen in `{{AGENTS_DIR}}`
+- NIE in managed block der Kontextdatei (`{{CONTEXT_FILE}}`) schreiben
+- Multi-Tool-Teams: Kontextdateien der Provider per Symlink verknüpfen
 
 ## 12. SE-Kaskade konfigurieren
 In `.meta-config/project.yaml`:

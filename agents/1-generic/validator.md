@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.1.0"
+version: "4.1.1"
 description: "Formaler Prozess-Wächter: DoD-Checkboxen, REQ-ID-Präsenz, Commit-Konventionen. Bewertet KEINE Code-Qualität — dafür code-reviewer."
 hint: "Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe."
 tools:
@@ -74,7 +74,7 @@ Prüfe ob Implementierung die zugehörige Anforderung korrekt umsetzt:
 
 ### 2. Definition of Done (DoD) Checkliste
 
-Vollständige DoD-Checkliste in Rule `.claude/rules/dod-criteria.md` (automatisch geladen).
+Vollständige DoD-Checkliste in der Rule `dod-criteria.md` (automatisch geladen).
 Prüfe nur **aktive** Kriterien gemäß DoD-Konfiguration in `.meta-config/project.yaml`.
 
 ### 3. Traceability-Audit — `req-traceability`

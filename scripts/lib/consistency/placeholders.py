@@ -28,6 +28,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "TEST_COMMAND", "TEST_COMMANDS", "DEV_STACK_START", "DEV_STACK_RELOAD",
     # Extensions
     "EXTENSION_DIR",
+    # Provider-specific paths/files (injected per provider in sync_agents_for_provider)
+    "CONTEXT_FILE", "SKILLS_DIR", "PENDING_TASKS_FILE", "FILE_BASED_AGENTS",
     # Git / platform
     "GIT_PLATFORM", "GIT_REMOTE_URL", "GIT_MAIN_BRANCH",
     # Requirements
