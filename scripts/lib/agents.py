@@ -1,7 +1,6 @@
 """Agent file generation: frontmatter, composition, sync logic."""
 
 import re
-import fnmatch
 from pathlib import Path
 
 from .log import SyncLog
@@ -744,7 +743,7 @@ def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     Fields 'extends' and 'patches' are stripped (composition metadata).
     All other override fields (name, version, description, hint, tools, based-on) win.
     """
-    fm_block, body = _split_frontmatter(base_content)
+    _, body = _split_frontmatter(base_content)
     if not _YAML_AVAILABLE:
         return base_content  # Cannot merge without yaml — return base unchanged
 
@@ -1808,14 +1807,6 @@ def _make_slim_body(content: str) -> str:
         "## Beispiele",
         "## Beispiel",
         "## Anhang",
-    }
-    keep_sections = {
-        "## Don'ts",
-        "## Donts",
-        "## Don",
-        "## Kernregeln",
-        "## Aktive DoD",
-        "## DoD",
     }
 
     for line in lines:
