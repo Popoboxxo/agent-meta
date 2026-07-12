@@ -11,7 +11,13 @@ from .io import write_checked
 from .agents import collect_sources, extract_frontmatter_field
 from .roles import resolve_model
 from .providers import load_providers_config
-# Wird aus Beschreibungen und bekannten Workflows abgeleitet
+# Delegation graph: role -> roles it may hand off to.
+# TODO: Derive dynamically from agent templates (agents/1-generic/*.md).
+# NOTE: The edges below are NOT in the frontmatter — 'name' + 'hint' only give a
+# node's identity/description, not its delegation targets. Those live in prose
+# '## Delegation' sections of each template body, so dynamic derivation requires
+# parsing markdown bodies (complex, drift-prone). Currently hardcoded — risk of
+# drift when templates change. See scripts/lib/config.py for template loading.
 _DELEGATION_MAP: dict[str, list[str]] = {
     "orchestrator": [
         "developer", "feature", "git", "documenter", "ideation",
