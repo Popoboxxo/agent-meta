@@ -786,7 +786,7 @@ Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen prot
 - Eingehende und ausgehende Delegationen müssen exakt über die `task_id` und `caller/target` verknüpft sein.
 """
 
-    result = agent_content.rstrip() + "\\n\\n" + block.strip() + "\\n"
+    result = agent_content.rstrip() + "\n\n" + block.strip() + "\n"
 
     # A2A Debug Events — nur bei viz.debug:true injizieren (Null-Token-Kosten sonst)
     if viz_debug:
@@ -822,6 +822,6 @@ Der A2A-Debug-Modus ist aktiv. Protokolliere zusätzlich zu den viz-Handshake-Ev
 - A2A-Events werden NUR im Debug-Modus protokolliert (viz.debug: true in project.yaml).
 - Nutze dasselbe Tool wie für viz-Handshake-Events (MCP log_viz_event oder CLI-Fallback).
 """
-        result += "\\n\\n" + a2a_block.strip() + "\\n"
+        result += "\n\n" + a2a_block.strip() + "\n"
 
     return result

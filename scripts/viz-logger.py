@@ -23,11 +23,45 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Try to find the project root (where .meta-viz lives)
-# Assuming scripts/viz-logger.py, project root is parent
+# Try to find the project root (where .meta-viz lives).
+#
+# Default assumption: ``scripts/viz-logger.py`` → project root is the parent of
+# ``scripts/``. This is WRONG when the script runs from a submodule checkout
+# (``.agent-meta/scripts/viz-logger.py``), where ``parent.parent`` resolves to
+# the submodule directory instead of the host project root. In that case the
+# caller (e.g. admin-server.py's VizManager) must pass ``--root <project_root>``
+# so events land in the host project's ``.meta-viz/events.jsonl``.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VIZ_DIR = PROJECT_ROOT / ".meta-viz"
 EVENT_LOG = VIZ_DIR / "events.jsonl"
+
+
+def _apply_project_root(root: str | Path) -> None:
+    """Override the project root used for event logging.
+
+    Recomputes the module-level ``PROJECT_ROOT``, ``VIZ_DIR`` and ``EVENT_LOG``
+    so that all logging modes (CLI, stdio MCP, HTTP MCP) write to the correct
+    ``.meta-viz`` directory regardless of where this script physically lives.
+    """
+    global PROJECT_ROOT, VIZ_DIR, EVENT_LOG
+    PROJECT_ROOT = Path(root).resolve()
+    VIZ_DIR = PROJECT_ROOT / ".meta-viz"
+    EVENT_LOG = VIZ_DIR / "events.jsonl"
+
+
+def _root_from_argv(argv: list[str]) -> str | None:
+    """Extract a ``--root``/``--project-root`` value from raw argv, if present.
+
+    Needed because ``--mcp`` and ``--http`` modes are dispatched before argparse
+    runs, yet both must honour an explicit project root.
+    """
+    for flag in ("--root", "--project-root"):
+        for i, arg in enumerate(argv):
+            if arg == flag and i + 1 < len(argv):
+                return argv[i + 1]
+            if arg.startswith(flag + "="):
+                return arg.split("=", 1)[1]
+    return None
 
 
 def write_event_safe(event: dict):
@@ -535,6 +569,12 @@ def run_http_server(port: int = 9090):
 
 
 def main():
+    # Apply an explicit project root before any mode dispatch so that CLI,
+    # stdio MCP and HTTP MCP modes all log to the correct .meta-viz directory.
+    root_override = _root_from_argv(sys.argv)
+    if root_override:
+        _apply_project_root(root_override)
+
     # Detect --mcp or --http before argparse so required fields are not enforced in server mode.
     if any(a == "--mcp" for a in sys.argv):
         run_mcp_server()
@@ -552,6 +592,8 @@ def main():
         return
 
     parser = argparse.ArgumentParser(description="Log viz events")
+    parser.add_argument("--root", "--project-root", dest="root", default=None,
+                        help="Project root where .meta-viz lives (override for submodule layout)")
     parser.add_argument("--event", required=True, help="Event type: agent_start, delegate_out, agent_end, etc.")
     parser.add_argument("--agent", required=True, help="The current agent role")
     parser.add_argument("--provider", default="unknown", help="The AI provider")

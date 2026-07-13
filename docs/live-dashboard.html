@@ -715,7 +715,7 @@ const replay = {
     _apply(ev, state) {
         const type   = ev.event;
         const agent  = ev.agent || '';
-        const icons  = { session_start:'▶', session_end:'■', agent_start:'▶', agent_end:'✓', delegate:'→', tool_call:'🔧', log:'ℹ' };
+        const icons  = { session_start:'▶', session_end:'■', agent_start:'▶', agent_end:'✓', delegate:'→', delegate_out:'→', tool_call:'🔧', log:'ℹ' };
 
         const ensureAgent = name => {
             if (name && name !== 'user' && !state.agents[name])
@@ -745,8 +745,9 @@ const replay = {
         } else if (type === 'tool_call') {
             ensureAgent(agent);
             if (state.agents[agent]) state.agents[agent].tool_calls = (state.agents[agent].tool_calls || 0) + 1;
-        } else if (type === 'delegate') {
-            const { from = '', to = '' } = ev;
+        } else if (type === 'delegate' || type === 'delegate_out') {
+            const from = ev.from || ev.agent || '';
+            const to = ev.to || ev.target || '';
             ensureAgent(from); ensureAgent(to);
             const existing = state.edges.find(e => e.from === from && e.to === to);
             if (existing) { existing.count = (existing.count || 1) + 1; }
@@ -754,7 +755,7 @@ const replay = {
         }
 
         let msg = '';
-        if (type === 'delegate')      msg = `${ev.from || ''} → ${ev.to || ''}`;
+        if (type === 'delegate' || type === 'delegate_out') msg = `${ev.from || ev.agent || ''} → ${ev.to || ev.target || ''}`;
         else if (type === 'agent_start') msg = `${agent} gestartet`;
         else if (type === 'agent_end')   msg = `${agent} beendet (${ev.status || '?'})`;
         else if (type === 'tool_call')   msg = `${agent}: ${ev.tool || ''}`;
@@ -780,7 +781,10 @@ const replay = {
 
         // Trigger particle for delegate events
         const ev = this.events[idx];
-        if (ev && ev.event === 'delegate' && ev.from && ev.to) spawnParticle(ev.from, ev.to);
+        if (ev && (ev.event === 'delegate' || ev.event === 'delegate_out')) {
+            const pFrom = ev.from || ev.agent, pTo = ev.to || ev.target;
+            if (pFrom && pTo) spawnParticle(pFrom, pTo);
+        }
     },
 
     play() {
