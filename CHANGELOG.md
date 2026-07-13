@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.71.1] — 2026-07-13
+
+### Fixed
+- viz-server.py: fix missing importlib import (caused startup crash)
+- viz-logger.py + admin-server.py: add --root PROJECT_ROOT override so .agent-meta/ submodule paths resolve correctly in target projects
+- viz-report.py + live-dashboard.html: fix delegate_out event rendering (events were silently dropped)
+- lib/viz.py: fix newline injection (malformed output)
+
 ## [0.71.0] — 2026-07-12
 
 ### Added
