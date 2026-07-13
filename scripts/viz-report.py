@@ -166,9 +166,11 @@ def build_session_state(events: list[dict], user_window: bool = False) -> dict:
                 agents[agent]["last_error"] = ev.get("payload", {}).get("error", "Unknown error")
             timeline.append({"ts": ts, "icon": "✓" if ev.get("status") == "success" else "✗",
                            "msg": f"{agent} beendet ({ev.get('status', '?')})"})
-        elif event_type == "delegate":
-            from_agent = ev.get("from", "")
-            to_agent   = ev.get("to", "")
+        elif event_type in ("delegate", "delegate_out"):
+            # delegate_out events carry the delegating agent in `agent` (no
+            # explicit `from`), the target in `to`/`target`.
+            from_agent = ev.get("from") or ev.get("agent", "")
+            to_agent   = ev.get("to") or ev.get("target", "")
             task       = ev.get("task", "")
             key = (from_agent, to_agent)
             if key not in edge_map:

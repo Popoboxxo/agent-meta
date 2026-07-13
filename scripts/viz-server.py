@@ -46,18 +46,28 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 # duplicating them — single source of truth for PID-file paths and process
 # management logic.
 
-sys.path.insert(0, str(SCRIPT_DIR))
+# The module file is ``admin-server.py`` (hyphenated), which is not a valid
+# Python identifier and therefore cannot be imported with a plain ``import``
+# statement. Load it dynamically via importlib instead.
+import importlib.util
+
+_ADMIN_SERVER_PATH = SCRIPT_DIR / "admin-server.py"
 try:
-    from admin_server import (  # type: ignore[import]
-        VizManager,
-        _load_viz_config,
-        _read_pid,
-        _is_pid_running,
-        VIZ_PID_FILE,
-        MCP_PID_FILE,
-    )
+    _spec = importlib.util.spec_from_file_location("admin_server", _ADMIN_SERVER_PATH)
+    if _spec is None or _spec.loader is None:
+        raise ImportError(f"Cannot create module spec for {_ADMIN_SERVER_PATH}")
+    _admin_module = importlib.util.module_from_spec(_spec)
+    sys.modules["admin_server"] = _admin_module
+    _spec.loader.exec_module(_admin_module)
+
+    VizManager = _admin_module.VizManager
+    _load_viz_config = _admin_module._load_viz_config
+    _read_pid = _admin_module._read_pid
+    _is_pid_running = _admin_module._is_pid_running
+    VIZ_PID_FILE = _admin_module.VIZ_PID_FILE
+    MCP_PID_FILE = _admin_module.MCP_PID_FILE
     _IMPORT_OK = True
-except ImportError:
+except Exception:
     _IMPORT_OK = False
 
 

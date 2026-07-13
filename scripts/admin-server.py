@@ -346,6 +346,7 @@ class VizManager:
                     [
                         sys.executable, "-u",
                         str(self._viz_logger),
+                        "--root", str(self.root),
                         "--http", str(cfg["mcp_port"]),
                     ],
                     mcp_pid, mcp_log,
@@ -417,6 +418,7 @@ class VizManager:
             [
                 sys.executable, "-u",
                 str(self._viz_logger),
+                "--root", str(self.root),
                 "--http", str(cfg["mcp_port"]),
             ],
             mcp_pid, mcp_log,
