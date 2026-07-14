@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.71.2] — 2026-07-14
+
+### Documentation
+- docs: reconcile viz-event-schema with emitted events (#345)
+
 ## [0.71.1] — 2026-07-13
 
 ### Fixed
