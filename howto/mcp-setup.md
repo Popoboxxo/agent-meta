@@ -151,3 +151,4 @@ Token rotieren wenn unsicher ob er in Git-History gelandet ist!
 - `rules/2-platform/homeassistant-mcp.yaml` — HA-Platform-Bundle
 - `rules/2-platform/_wf-ha-mcp-local.md` — Konfig-Beispiele für alle Provider
 - `howto/configs/mcp-secrets.local-template.yaml` — Secrets-Template
+- `howto/mcp/honcho-setup.md` — Honcho Memory-Server aktivieren

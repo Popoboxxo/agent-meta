@@ -1,4 +1,4 @@
-version: "1.0.1"
+version: "1.0.2"
 
 # agent-meta MCP Registry
 # ========================
@@ -123,3 +123,33 @@ mcp-servers:
         - "--mode"
         - "a2a"
     secrets: []
+
+  honcho:
+    description: "Honcho local memory and context server"
+    category: memory
+    enabled-by-default: false
+    tools:
+      allowed:
+        - chat
+        - get_context
+        - get_representation
+        - search
+        - list_conclusions
+        - create_conclusion
+      blocked:
+        - delete_conclusion
+        - set_config
+    agent-hint: |
+      Honcho bietet persistentes Cross-Session-Memory.
+      get_context: aktuellen Sitzungskontext abrufen.
+      search: Wissensdatenbank und frühere Sessions durchsuchen.
+      create_conclusion: Erkenntnisse dauerhaft speichern.
+      list_conclusions: gespeicherte Erkenntnisse auflisten.
+      chat: direkte Interaktion mit dem Honcho-Speicher.
+      get_representation: personalisierte Nutzer-Darstellung abrufen.
+      Destruktive Tools (delete_conclusion, set_config) sind gesperrt.
+    connection:
+      type: sse
+      url: "{{MCP_HONCHO_URL}}"
+    secrets:
+      - MCP_HONCHO_URL

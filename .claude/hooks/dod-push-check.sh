@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 1.2.0
+# version: 1.3.0
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
@@ -30,23 +30,82 @@ COMMAND=$(printf '%s' "$_parsed" | tail -n +2)
 # Only intercept commands that contain git push
 echo "$COMMAND" | grep -qE '(^|[;&|[:space:]])git push' || exit 0
 
+# --- Resolve project config file ---
+# Config layout since agent-meta v0.26+: .meta-config/project.yaml (YAML).
+# Legacy fallback: agent-meta.config.json at the project root (pre-0.26).
+# Walk up the directory tree until a config is found.
+CONFIG_FILE=""
+DIR="$PWD"
+for _ in 1 2 3 4 5 6; do
+  if [ -f "$DIR/.meta-config/project.yaml" ]; then
+    CONFIG_FILE="$DIR/.meta-config/project.yaml"
+    break
+  fi
+  if [ -f "$DIR/agent-meta.config.json" ]; then
+    CONFIG_FILE="$DIR/agent-meta.config.json"
+    break
+  fi
+  [ "$DIR" = "/" ] && break
+  DIR="$(dirname "$DIR")"
+done
+
+# read_config_var <config_file> <variable_name>
+# Reads variables.<name> from a project config. Supports YAML (project.yaml)
+# and legacy JSON (agent-meta.config.json). Prefers PyYAML, falls back to a
+# stdlib-only scan of the top-level `variables:` block so the hook never needs
+# a third-party dependency in the target project.
+read_config_var() {
+  python3 - "$1" "$2" <<'PYEOF' 2>/dev/null
+import sys
+path, key = sys.argv[1], sys.argv[2]
+val = ""
+try:
+    if path.endswith(".json"):
+        import json
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f) or {}
+        val = str(data.get("variables", {}).get(key, ""))
+    else:
+        try:
+            import yaml
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            val = str(data.get("variables", {}).get(key, ""))
+        except Exception:
+            # stdlib-only fallback: scan the top-level `variables:` block
+            in_vars = False
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if line.startswith("variables:"):
+                        in_vars = True
+                        continue
+                    if in_vars:
+                        if line and not line[0].isspace():
+                            break
+                        s = line.strip()
+                        if s.startswith(key + ":"):
+                            v = s[len(key) + 1:].strip()
+                            if len(v) >= 2 and v[0] in "\"'" and v[-1] == v[0]:
+                                v = v[1:-1]
+                            val = v
+                            break
+except Exception:
+    val = ""
+print(val)
+PYEOF
+}
+
 # --- Branch-Guard: block push on main/master ---
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
-# Resolve GIT_MAIN_BRANCH: env var > agent-meta.config.json > default "main"
+# Resolve GIT_MAIN_BRANCH: env var > project config > default "main"
 MAIN_BRANCH="${AGENT_META_MAIN_BRANCH:-}"
 
-if [ -z "$MAIN_BRANCH" ]; then
-  DIR="$PWD"
-  for _ in 1 2 3 4; do
-    if [ -f "$DIR/agent-meta.config.json" ]; then
-      MAIN_BRANCH=$(python3 -c "import json,sys; c=json.load(open(sys.argv[1])); print(c.get('variables',{}).get('GIT_MAIN_BRANCH','main'))" "$DIR/agent-meta.config.json" 2>/dev/null)
-      break
-    fi
-    DIR="$(dirname "$DIR")"
-  done
-  MAIN_BRANCH="${MAIN_BRANCH:-main}"
+if [ -z "$MAIN_BRANCH" ] && [ -n "$CONFIG_FILE" ]; then
+  MAIN_BRANCH=$(read_config_var "$CONFIG_FILE" "GIT_MAIN_BRANCH")
 fi
+MAIN_BRANCH="${MAIN_BRANCH:-main}"
 
 if [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "master" ]; then
   echo "Branch-Guard: Push blocked — you are on '$CURRENT_BRANCH'."
@@ -54,28 +113,30 @@ if [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "master" ]; t
   echo "Direct pushes to $MAIN_BRANCH are not allowed by DoD policy."
   echo ""
   echo "If this is intentional (release, hotfix), disable the hook temporarily:"
-  echo "  Remove dod-push-check from hooks in agent-meta.config.json, re-sync, push, re-enable."
+  echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable."
   exit 2
 fi
 
 # --- Test-Gate: block push if tests fail ---
-# Resolve TEST_COMMAND: env var > agent-meta.config.json
+# Resolve TEST_COMMAND: env var > project config
 TEST_CMD="${AGENT_META_TEST_COMMAND:-}"
 
-if [ -z "$TEST_CMD" ]; then
-  DIR="$PWD"
-  for _ in 1 2 3 4; do
-    if [ -f "$DIR/agent-meta.config.json" ]; then
-      TEST_CMD=$(python3 -c "import json,sys; c=json.load(open(sys.argv[1])); print(c.get('variables',{}).get('TEST_COMMAND',''))" "$DIR/agent-meta.config.json" 2>/dev/null)
-      break
-    fi
-    DIR="$(dirname "$DIR")"
-  done
+if [ -z "$TEST_CMD" ] && [ -n "$CONFIG_FILE" ]; then
+  TEST_CMD=$(read_config_var "$CONFIG_FILE" "TEST_COMMAND")
+fi
+
+if [ -z "$TEST_CMD" ] && [ -z "$CONFIG_FILE" ]; then
+  # No config file located at all — surface this instead of silently skipping.
+  echo "DoD-Check: no project config found (.meta-config/project.yaml)."
+  echo "The test gate could not be evaluated. Either run from within the project,"
+  echo "or export AGENT_META_TEST_COMMAND='<your-test-command>' to enable it."
+  echo "Push allowed (Branch-Guard passed, but test gate was NOT enforced)."
+  exit 0
 fi
 
 if [ -z "$TEST_CMD" ]; then
   echo "DoD-Check: TEST_COMMAND not configured — skipping test gate."
-  echo "Set variables.TEST_COMMAND in agent-meta.config.json or"
+  echo "Set variables.TEST_COMMAND in .meta-config/project.yaml or"
   echo "export AGENT_META_TEST_COMMAND='<your-test-command>' to enable."
   echo "Push allowed (Branch-Guard passed, no test gate configured)."
   exit 0

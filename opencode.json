@@ -15,6 +15,11 @@
     }
   },
   "mcp": {
+    "honcho": {
+      "type": "remote",
+      "enabled": true,
+      "url": "{env:MCP_HONCHO_URL}"
+    },
     "viz-logger": {
       "type": "local",
       "enabled": true,

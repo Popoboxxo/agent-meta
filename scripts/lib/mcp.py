@@ -19,6 +19,9 @@ from .log import SyncLog
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
 MCP_RULE_PREFIX = "mcp-"
 SECRETS_LOCAL_FILE = ".meta-config/secrets.local.yaml"
+# Fallback rules directory for providers without an explicit rules_dir (Claude).
+# Mirrors rules.CLAUDE_RULES_DIR to keep MCP rule output aligned with sync_rules().
+DEFAULT_RULES_DIR = ".claude/rules"
 
 
 # ---------------------------------------------------------------------------
@@ -555,8 +558,11 @@ def generate_mcp_artifacts(
     pc = provider_config.get(provider, {})
 
     # --- Rule file generation ---
-    if pc.get("has_rules") and rules_dir:
-        target_dir = project_root / rules_dir
+    # Providers without an explicit rules_dir (e.g. Claude) fall back to the
+    # default .claude/rules directory — mirrors sync_rules() in rules.py.
+    effective_rules_dir = rules_dir or DEFAULT_RULES_DIR
+    if pc.get("has_rules"):
+        target_dir = project_root / effective_rules_dir
         if not dry_run:
             target_dir.mkdir(parents=True, exist_ok=True)
 
