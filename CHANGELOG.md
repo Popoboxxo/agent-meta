@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.72.0] — 2026-07-15
+
+### Added
+- Honcho MCP server integration: persistent cross-session memory for agents (`config/mcp-registry.yaml`, `enabled-by-default: false`)
+- Honcho setup guide (`howto/mcp/honcho-setup.md`) with tool reference and activation instructions
+- `MCP_HONCHO_URL` secrets template entry (`howto/configs/mcp-secrets.local-template.yaml`)
+- Generated MCP rule files: `.claude/rules/mcp-honcho.md`, `.claude/rules/mcp-viz-logger.md`
+
+### Fixed
+- MCP rule-file generation for providers without explicit `rules_dir` — Claude provider was silently skipping rule generation (`scripts/lib/mcp.py`)
+
+### Changed
+- `dod-push-check.sh`: Config discovery migrated from `agent-meta.config.json` to `.meta-config/project.yaml`; PyYAML dependency replaced with stdlib fallback
+
 ## [0.71.2] — 2026-07-14
 
 ### Documentation
