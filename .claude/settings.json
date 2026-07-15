@@ -4,6 +4,10 @@
     "deny": []
   },
   "mcpServers": {
+    "honcho": {
+      "type": "sse",
+      "url": "${MCP_HONCHO_URL}"
+    },
     "viz-logger": {
       "type": "stdio",
       "command": "python",

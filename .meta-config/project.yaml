@@ -9,6 +9,8 @@ systems-engineering:
   enabled: false
 platforms:
 - agent-meta
+mcp-servers:
+- honcho
 roles:
 - orchestrator
 - developer
