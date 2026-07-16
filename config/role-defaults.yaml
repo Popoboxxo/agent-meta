@@ -23,7 +23,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff: &dev_handoff
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300
@@ -275,7 +275,7 @@ roles:
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "critic-result-v1"]
       output_contract: "se-req-output-v1"
       target_roles: ["se-critic"]
 
@@ -289,7 +289,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "critic-result-v1"]
       output_contract: "se-arch-output-v1"
       output_schema: "schemas/se-decomposition.schema.json"
       target_roles: ["se-critic"]
@@ -304,9 +304,9 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["se-arch-output-v1"]
+      input_contracts: ["se-arch-output-v1", "se-req-output-v1"]
       output_contract: "critic-result-v1"
-      target_roles: ["se-architect", "se-interface-mgr"]
+      target_roles: ["se-architect", "se-requirements", "se-interface-mgr"]
 
   se-interface-mgr:
     model: balanced
@@ -623,6 +623,7 @@ reflection_pairs:
     critic: code-reviewer
     max_iterations: 3
     on_blocked: escalate_to_orchestrator
+
 
 quality_pipelines:
   standard-feature:
