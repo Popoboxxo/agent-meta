@@ -42,13 +42,14 @@ Die Git-Delegation-Hard-Rule steht im Template unter `{{#unless ORCH_MODE_DISABL
 {{/unless}}
 ```
 
-**Konsequenz:** Im `main-chat`-Modus wird die Git-Delegation komplett übersprungen — es gibt keinerlei Aussage, ob der `main_chat` git direkt ausführen darf oder weiterhin über den `git`-Agenten gehen soll. Diese Lücke ist der zentrale offene Punkt.
+**Konsequenz:** Im `main-chat`-Modus wird die Git-Delegation komplett übersprungen — es gibt keinerlei Aussage, ob der `main_chat` git direkt ausführen darf oder weiterhin über den `git`-Agenten gehen soll.
 
-**Offene Frage:** Soll der `main_chat` im `main-chat`-Modus git direkt ausführen dürfen, oder weiterhin über den `git`-Agenten?
+**Entschiedene Frage:** Soll der `main_chat` im `main-chat`-Modus git direkt ausführen dürfen, oder weiterhin über den `git`-Agenten?
 
 - **Option A (git direkt):** Konsistent mit „alles läuft im main_chat" — weniger Delegations-Overhead. Risiko: keine atomare, isolierte Git-Operation; Fehler direkt auf main.
 - **Option B (weiterhin git-Agent):** Git bleibt kontrolliert und atomar, auch ohne Orchestrator. Der `git`-Agent ist ein Terminal-Worker und modusunabhängig sinnvoll.
-- **Empfehlung:** Option B — die Git-Delegation-Hard-Rule sollte modusunabhängig gelten (siehe Abschnitt 3). Git-Disziplin ist orthogonal zur Routing-Frage.
+
+**Entscheidung (User):** Option B als Standard — Delegation über den `git`-Agenten bleibt der DEFAULT-Pfad, auch im `main-chat`-Modus. Ausnahme: Bei expliziter User-Anweisung (z.B. „mach es direkt", „ohne Agent") darf `main_chat` Git-Mutationen für diese eine Aktion selbst ausführen. Git-Disziplin ist orthogonal zur Routing-Frage.
 
 ---
 
@@ -87,7 +88,7 @@ Folgende Rules sind **orthogonal zum Orchestrator-Modus** und bleiben unverände
 | `dod-criteria.md` | Definition of Done gilt für jede Aufgabe |
 | `issue-lifecycle.md` | GitHub-Issue-Abschluss ist modusunabhängig |
 
-**Empfehlung für die Git-Lücke (siehe 1.2):** Die Git-Delegation-Hard-Rule aus `use-orchestrator.md` sollte ebenfalls modusunabhängig werden — d.h. aus dem `{{#unless ORCH_MODE_DISABLED}}`-Block herausgelöst und immer generiert. Damit schließt sich die Lücke aus Abschnitt 1.2 automatisch.
+**Entscheidung zur Git-Lücke (siehe 1.2):** Die Git-Delegation-Hard-Rule aus `use-orchestrator.md` wird ebenfalls modusunabhängig — d.h. aus dem `{{#unless ORCH_MODE_DISABLED}}`-Block herausgelöst und immer generiert. Damit schließt sich die Lücke aus Abschnitt 1.2 automatisch. Die Ausnahme (explizite User-Anweisung erlaubt direktes Git im `main-chat`-Modus) wird in der Rule explizit dokumentiert.
 
 ---
 
@@ -170,12 +171,10 @@ Bei Umsetzung des Enum-Vorschlags (Abschnitt 5) müsste die `strict`-Checkbox du
 | Problem-Diagnose (Stub + Git-Lücke) | ✓ entschieden |
 | Ziel-Architektur (main_chat = Router + Worker) | ✓ entschieden |
 | Modusunabhängige Rules identifiziert | ✓ entschieden |
-| Git-Delegation modusunabhängig machen | ⏳ offen (Empfehlung: Option B) |
-| Git direkt vs. git-Agent im main-chat-Modus | ⏳ offen (Entscheidung ausstehend) |
+| Git direkt vs. git-Agent im main-chat-Modus | ✓ entschieden (Option B als Default, Ausnahme bei expliziter User-Anweisung) |
+| Git-Delegation modusunabhängig machen | ✓ entschieden (aus `{{#unless ORCH_MODE_DISABLED}}`-Block herauslösen) |
 | Config-Enum `orchestrator.mode` | ⏳ Vorschlag, nicht entschieden |
 | Migrationspfad enabled/strict → mode | ⏳ Vorschlag |
 | sync.py: orchestrator.md nicht generieren | ⏳ offen (Design-Detail: Provider-Verzeichnisse, Hook-Deaktivierung) |
 | Ausformulierte Main-Chat-Routing-Logik in use-orchestrator.md | ⏳ offen |
 | Admin-UI: Checkbox → Select | ⏳ nur dokumentiert, nicht Teil dieses Konzepts |
-
-**Nächster Schritt:** Entscheidung über die Git-Frage (Abschnitt 1.2 / 3) — sie blockiert die konkrete Ausformulierung der Main-Chat-Rule.
