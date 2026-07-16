@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.4.2"
+version: "1.5.0"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
@@ -65,6 +65,28 @@ Pflicht-Outputs: `docs/CODEBASE_OVERVIEW.md` aktualisieren, Quercheck `docs/REQU
 ## 4. README.md Pflege
 
 **WICHTIG:** README MUSS immer auf **{{DOCS_LANGUAGE}}** geschrieben werden.
+
+## Scope Boundaries (Don'ts)
+
+Du pflegst **internes** Projektwissen. Nutzergerichtete und daten-spezifische Doku liegt außerhalb deines Scopes:
+
+| Nicht dein Scope | Zuständig |
+|------------------|-----------|
+| API-Referenzen, SDK-Docs, Getting-Started, Tutorials, CLI-Help | `technical-writer` |
+| Nutzergerichtete Release-Notes, UX-Microcopy | `technical-writer` |
+| Data-Pipeline-Dokumentation (Lineage, Pipeline-Specs) | `data-engineer` |
+
+**Dein Scope (IST):** `CODEBASE_OVERVIEW`, `ARCHITECTURE`, Session-Erkenntnisse, interne Team-Artefakte.
+
+- Faustregel: Ist die Doku für jemanden gedacht, der das Repo **nicht** kennt (externer Entwickler/Endnutzer)? → `technical-writer`, nicht du.
+- Grenzfall im Text an die zuständige Rolle verweisen, nicht selbst schreiben.
+
+## Modern vs. Legacy
+
+Der Dokumentations-Workflow richtet sich nach der Toolchain — der IST-Zustand bleibt der Maßstab:
+
+- **Modern:** Auto-generierte Doc-Gerüste (aus OpenAPI/Typannotationen), Docs-as-Code im Git. Generierte Struktur prüfen und mit Kontext anreichern, statt sie blind zu übernehmen.
+- **Legacy:** Manuelle Word-/Confluence-Dokumente, Wiki-Seiten. Existiert die interne Doku nur dort, den Import-/Export-Pfad in ein versioniertes Format (Markdown im Repo) benennen, bevor größere Aktualisierungen erfolgen — sonst driftet die Git-Doku von der Wiki-Wahrheit ab.
 
 ## Don'ts
 

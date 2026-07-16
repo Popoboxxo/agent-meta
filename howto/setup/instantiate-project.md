@@ -227,6 +227,12 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/database-engineer.md` | `1-generic/database-engineer.md` (optional, Schema-Design, Migrationen, Query-Optimierung) |
 | `.claude/agents/incident-responder.md` | `1-generic/incident-responder.md` (optional, Live-Incident-Koordination, RCA, Hotfix-Priorisierung) |
 | `.claude/agents/dependency-auditor.md` | `1-generic/dependency-auditor.md` (optional, Supply-Chain-Hygiene, SBOM, Lizenz-Compliance) |
+| `.claude/agents/sre-engineer.md` | `1-generic/sre-engineer.md` (optional, SLI/SLO, Error-Budgets, Capacity-Planning, Runbooks, Reliability-Reviews) |
+| `.claude/agents/technical-writer.md` | `1-generic/technical-writer.md` (optional, externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials) |
+| `.claude/agents/data-engineer.md` | `1-generic/data-engineer.md` (optional, ETL/ELT-Pipelines, Data-Quality, Lineage-Analyse) |
+| `.claude/agents/accessibility-specialist.md` | `1-generic/accessibility-specialist.md` (optional, WCAG 2.1/2.2, ARIA-Checks, Keyboard-Navigation, Screenreader) |
+| `.claude/agents/refactoring-specialist.md` | `1-generic/refactoring-specialist.md` (optional, systematische Transformation, Strangler-Fig, Legacy-Modernisierung) |
+| `.claude/agents/product-manager.md` | `1-generic/product-manager.md` (optional, Backlog, User-Stories, Priorisierung RICE/MoSCoW, Roadmap) |
 
 ---
 

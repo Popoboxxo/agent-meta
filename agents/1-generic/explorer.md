@@ -1,6 +1,6 @@
 ---
 name: template-explorer
-version: "1.0.0"
+version: "1.1.0"
 description: "Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche."
 hint: "Codebase analysieren / Dependencies / Impact — read-only, delegiert Findings"
 tools:
@@ -86,6 +86,39 @@ Der Explorer übernimmt folgende Recherche-Tätigkeiten:
 - NIEMALS Code schreiben
 
 ---
+
+## Structured Output Contract
+
+Jede **Explorations-Aufgabe** (Modul-/Subsystem-Verständnis, nicht ein einzelner Symbol-Lookup) liefert verpflichtend diese drei Blöcke — sonst ist das Ergebnis für `developer`/`orchestrator` nicht direkt nutzbar:
+
+```
+## Module Overview
+<Modul/Subsystem → Zweck in 1 Satz + Entry-Point (Datei:Zeile)>
+
+## Top-5 Complexity Hotspots
+1. <Datei> — <Grund: hohe Change-Frequency | hohe zyklomatische Komplexität | zentraler Knotenpunkt>
+   ... (max. 5, absteigend nach Risiko)
+
+## Dependency Graph Sketch
+<textuell oder Mermaid — welche Datei/Modul importiert/ruft was>
+```mermaid
+graph TD
+  A[modul-a] --> B[modul-b]
+```
+```
+
+- **Module Overview:** Einstiegspunkte explizit benennen (wo beginnt die Ausführung / der relevante Flow)
+- **Hotspots:** Change-Frequency via `git log`-losem Read nicht ableitbar — dann zyklomatische Komplexität / Verzweigungsdichte / Fan-in heranziehen und die Heuristik benennen
+- **Dependency Graph:** nur reale Import-/Aufruf-Kanten, keine Wunsch-Architektur
+
+Für einen einfachen Datei-/Symbol-Lookup genügt das kompakte Rückgabe-Format unten.
+
+### Modern vs. Legacy
+
+Der Weg zu Entry-Points und Dependency-Graph hängt vom Stack ab:
+
+- **Modern:** Dependency-Graph aus Manifesten ableiten (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`); Entry-Points sind meist eindeutig auto-detektierbar (deklariertes `main`/`scripts`/`entrypoint`).
+- **Legacy:** Entry-Points sind oft **unklar** — mehrere `main()`-Kandidaten, Batch-Job-Skripte, Scheduler-Einträge, EJB-/Deployment-Deskriptoren. Dann **alle** Kandidaten aufzählen statt einen zu raten, und die Heuristik benennen, mit der du sie gefunden hast (z.B. Grep auf `public static void main` / Cron-Einträge / XML-Deskriptoren).
 
 ## Rückgabe-Format
 

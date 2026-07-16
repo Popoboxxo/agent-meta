@@ -23,7 +23,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff: &dev_handoff
-      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1"]
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1", "slo-report-v1", "data-pipeline-v1", "a11y-audit-v1", "refactoring-plan-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300
@@ -89,7 +89,7 @@ roles:
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["ideation-output-v1", "task-spec-v1"]
+      input_contracts: ["ideation-output-v1", "task-spec-v1", "backlog-v1"]
       output_contract: "req-output-v1"
       target_roles: ["developer", "tester"]
 
@@ -171,6 +171,8 @@ roles:
       intent_keywords: ["Dokumentation", "README", "Docs", "Doku"]
       parallel: true
       orchestrator_only: false
+    handoff:
+      input_contracts: ["slo-report-v1", "refactoring-plan-v1"]
 
   security-auditor:
     model: powerful
@@ -566,6 +568,84 @@ roles:
       intent_keywords: ["CI/CD", "Kubernetes", "Infrastruktur"]
       parallel: true
       orchestrator_only: false
+
+  sre-engineer:
+    model: balanced          # proactive reliability discipline needs solid reasoning, not max cost
+    memory: project          # remember SLOs, error budgets and reliability decisions across sessions
+    workflow_tier: optional
+    description: "Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets, Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment."
+    routing:
+      intent_keywords: ["SLO", "SLI", "error budget", "reliability", "runbook", "capacity planning", "toil", "post-mortem"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: "slo-report-v1"
+      target_roles: ["developer", "documenter"]
+
+  technical-writer:
+    model: fast              # documentation writing, no deep code reasoning required
+    memory: project          # remember doc structure and terminology across sessions
+    workflow_tier: optional
+    description: "Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy."
+    routing:
+      intent_keywords: ["API reference", "getting started", "tutorial", "SDK docs", "release notes", "quickstart", "user guide", "microcopy"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: "external-doc-v1"
+
+  data-engineer:
+    model: balanced          # pipeline design and data quality reasoning without max cost
+    memory: project          # remember pipeline topology and data contracts across sessions
+    workflow_tier: optional
+    description: "ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer."
+    routing:
+      intent_keywords: ["ETL", "ELT", "data pipeline", "data quality", "lineage", "streaming", "batch", "schema registry"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: "data-pipeline-v1"
+      target_roles: ["developer"]
+
+  accessibility-specialist:
+    model: balanced          # WCAG mapping and ARIA reasoning without max cost
+    memory: ""
+    workflow_tier: optional
+    description: "WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse."
+    routing:
+      intent_keywords: ["accessibility", "a11y", "WCAG", "ARIA", "screen reader", "keyboard navigation", "color contrast", "focus management"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: "a11y-audit-v1"
+      target_roles: ["developer"]
+
+  refactoring-specialist:
+    model: balanced          # systematic transformation reasoning; exclusive module access
+    memory: project          # remember transformation sequence and compatibility state across sessions
+    workflow_tier: optional
+    description: "Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene Rewrites."
+    routing:
+      intent_keywords: ["refactoring", "strangler fig", "legacy modernization", "code smell", "systematic transformation", "framework upgrade"]
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts: ["task-spec-v1", "explorer-output-v1"]
+      output_contract: "refactoring-plan-v1"
+      target_roles: ["developer", "documenter"]
+
+  product-manager:
+    model: balanced          # prioritization and stakeholder reasoning without max cost
+    memory: project          # remember backlog, roadmap and priorities across sessions
+    workflow_tier: optional
+    description: "Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation."
+    routing:
+      intent_keywords: ["backlog", "user story", "sprint planning", "prioritization", "RICE", "MoSCoW", "roadmap", "KPI"]
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      output_contract: "backlog-v1"
+      target_roles: ["requirements"]
 
   performance-optimizer:
     model: powerful
