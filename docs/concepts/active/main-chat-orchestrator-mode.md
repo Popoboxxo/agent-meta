@@ -1,6 +1,6 @@
 # Konzept: Main-Chat-Orchestrator-Modus
 
-> Status: **Geplant — noch nicht implementiert**
+> Status: **Umgesetzt — aktiv**
 > Verwandt: `docs/concepts/active/singleton-orchestrator-architecture.md`
 > Betroffen: `rules/1-generic/use-orchestrator.md`, `scripts/lib/config.py`, `agents/1-generic/orchestrator.md`, `docs/admin-ui.html`
 > Kern-These: **Der `main-chat`-Modus soll ein vollwertiger, schlanker Betriebsmodus sein — nicht nur ein leerer Stub.** Der `main_chat` übernimmt Router- UND Worker-Rolle ohne separaten Orchestrator-Subagenten.
@@ -173,8 +173,8 @@ Bei Umsetzung des Enum-Vorschlags (Abschnitt 5) müsste die `strict`-Checkbox du
 | Modusunabhängige Rules identifiziert | ✓ entschieden |
 | Git direkt vs. git-Agent im main-chat-Modus | ✓ entschieden (Option B als Default, Ausnahme bei expliziter User-Anweisung) |
 | Git-Delegation modusunabhängig machen | ✓ entschieden (aus `{{#unless ORCH_MODE_DISABLED}}`-Block herauslösen) |
-| Config-Enum `orchestrator.mode` | ⏳ Vorschlag, nicht entschieden |
-| Migrationspfad enabled/strict → mode | ⏳ Vorschlag |
-| sync.py: orchestrator.md nicht generieren | ⏳ offen (Design-Detail: Provider-Verzeichnisse, Hook-Deaktivierung) |
-| Ausformulierte Main-Chat-Routing-Logik in use-orchestrator.md | ⏳ offen |
-| Admin-UI: Checkbox → Select | ⏳ nur dokumentiert, nicht Teil dieses Konzepts |
+| Config-Enum `orchestrator.mode` | ✓ umgesetzt |
+| Migrationspfad enabled/strict → mode | ✓ umgesetzt |
+| sync.py: orchestrator.md nicht generieren | ✓ umgesetzt (Hook-Deaktivierung bleibt offenes Follow-up) |
+| Ausformulierte Main-Chat-Routing-Logik in use-orchestrator.md | ✓ umgesetzt |
+| Admin-UI: Checkbox → Select | ✓ umgesetzt |
