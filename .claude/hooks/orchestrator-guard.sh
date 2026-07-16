@@ -65,9 +65,14 @@ try:
     with open('$CONFIG_FILE') as f:
         c = yaml.safe_load(f) or {}
     orch = c.get('orchestrator', {})
-    strict = orch.get('strict', False)
-    enabled = orch.get('enabled', True)
-    print('true' if strict and enabled else 'false')
+    mode = orch.get('mode')
+    if mode is not None:
+        mode = str(mode).strip().lower()
+        print('true' if mode == 'strict' else 'false')
+    else:
+        strict = orch.get('strict', False)
+        enabled = orch.get('enabled', True)
+        print('true' if strict and enabled else 'false')
 except Exception:
     print('false')
 " 2>/dev/null)
