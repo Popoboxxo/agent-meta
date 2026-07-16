@@ -2247,13 +2247,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if isinstance(value, dict):
             children = self._split_dict_children(body_lines, base_indent)
             old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
+            # Line indices that belong to deleted children must be skipped so
+            # that deleting a pipeline actually removes it from the written YAML.
+            deleted_indices: set[int] = set()
+            for old_key, old_child in old_by_key.items():
+                if old_key not in value:
+                    deleted_indices.update(range(old_child["start"], old_child["end"]))
             new_lines: list[str] = []
             pos = 0
             appended_new: list[str] = []
             for k, v in value.items():
                 child = old_by_key.get(k)
                 if child:
-                    new_lines.extend(body_lines[pos : child["start"]])
+                    new_lines.extend(
+                        body_lines[i]
+                        for i in range(pos, child["start"])
+                        if i not in deleted_indices
+                    )
                     old_block = body_lines[child["start"] : child["end"]]
                     try:
                         parsed = yaml.safe_load("".join(old_block))
@@ -2267,7 +2277,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_dict_child(k, v, None))
-            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
+            tail = [
+                body_lines[i]
+                for i in range(pos, len(body_lines))
+                if i not in deleted_indices
+            ]
+            self._splice_appended_children(new_lines, tail, appended_new)
             return "".join(new_lines)
 
         if isinstance(value, list) and key == "reflection_pairs":
