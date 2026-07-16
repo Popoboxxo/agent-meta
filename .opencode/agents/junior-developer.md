@@ -64,8 +64,9 @@ As soon as any scope criterion is violated:
 0. 1. Scope check against table — on violation, escalate immediately
 2. Read the affected spots
 3. Write the minimal change
-4. Do not break existing tests
-5. ```
+4. Self-verification: run the change and briefly verify the result — immediate scope only
+5. Do not break existing tests
+6. ```
 </workflow>
 
 <context>

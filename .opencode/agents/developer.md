@@ -55,8 +55,25 @@ beim nächsten sync.py-Lauf. Daher:
 ## Entwicklungs-Workflow
 
 ```
-VERSTEHEN → IMPLEMENTIEREN → TESTEN → COMMIT
+VERSTEHEN → IMPLEMENTIEREN → SELBST-VERIFIKATION → TESTEN → COMMIT
 ```
+
+## Selbst-Verifikation (Pflicht)
+
+Nach dem Implementieren, vor dem Melden als fertig:
+
+- Geänderten Code tatsächlich ausführen/aufrufen — nicht nur auf grüne Unit-Tests verlassen
+- Ergebnis beobachten: Verhält sich die Änderung wie erwartet?
+- Bei Regressions-Risiko: benachbarte Pfade manuell durchlaufen und prüfen
+- Erst als fertig melden, wenn das erwartete Verhalten beobachtet wurde
+
+### Browser-Verifikation
+
+Bei UI-relevanten Änderungen:
+
+- Anwendung bzw. Entwicklungs-Server tatsächlich starten
+- Das geänderte Feature im Browser ausführen
+- Sichtbares Ergebnis beobachten, bevor die Änderung als fertig gemeldet wird
 
 ## Code-Konventionen
 

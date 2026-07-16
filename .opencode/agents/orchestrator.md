@@ -58,6 +58,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | CI/CD / Kubernetes / Infrastruktur | `devops-engineer` | fast | Ja |
 | Docker / Dev-Stack / Container | `docker` | fast | Nein |
 | Dokumentation / README / Docs / Doku | `documenter` | fast | Ja |
+| E2E / End-to-End / Browser-Test / visuelle Regression | `e2e-tester` | balanced | Ja |
 | Aufwand / Schätzung / Kosten | `effort-estimator` | fast | Nein |
 | Codebase / Dependencies / Impact / Recherche | `explorer` | balanced | Ja |
 | Export / Routing / Target | `export-manager` | fast | Nein |
@@ -193,6 +194,7 @@ SE mode: optional
 | `developer` | Feature-Implementierung und Bugfixes | powerful | ✅ (Multi-Dateien) |
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. | fast | ✅ (Multi-Targets) |
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | fast | ✅ (Multi-Sections) |
+| `e2e-tester` | E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units | balanced | ✅ (Multi-Flows) |
 | `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung | fast | ❌ (sequentiell) |
 | `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche. | balanced | ✅ (Multi-Tasks) |
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. | fast | ❌ (sequentiell) |

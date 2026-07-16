@@ -20,6 +20,14 @@
       "enabled": true,
       "url": "{env:MCP_HONCHO_URL}"
     },
+    "playwright": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ]
+    },
     "viz-logger": {
       "type": "local",
       "enabled": true,
