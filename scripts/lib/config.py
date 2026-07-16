@@ -340,7 +340,20 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # orchestrator.mode (enum: strict|advisory|main-chat) takes precedence over
     # the legacy enabled/strict booleans. Missing mode → derive from legacy fields.
     _orch_mode = orch_config.get("mode")
-    if _orch_mode is None:
+    if _orch_mode is not None:
+        _valid_orch_modes = {"strict", "advisory", "main-chat"}
+        _normalized_mode = str(_orch_mode).strip().lower()
+        if _normalized_mode not in _valid_orch_modes:
+            import sys
+            print(
+                f"ERROR: Invalid orchestrator.mode value: {_orch_mode!r}. "
+                f"Valid values are: {sorted(_valid_orch_modes)}. "
+                "Hint: use 'main-chat' instead of 'disabled'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        _orch_mode = _normalized_mode
+    else:
         _orch_enabled = orch_config.get("enabled", True)
         _orch_strict = orch_config.get("strict", True)
         if not _orch_enabled:
