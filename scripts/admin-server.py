@@ -2153,6 +2153,35 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 i += 1
         return children
 
+    @staticmethod
+    def _splice_appended_children(
+        new_lines: list[str], tail: list[str], appended_new: list[str]
+    ) -> None:
+        """Attach freshly appended children to ``new_lines`` in-place.
+
+        New children are spliced in *after* the existing content but *before*
+        ``tail`` — the trailing blank/comment lines that were captured with the
+        section body but usually head the *following* top-level section (e.g.
+        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
+        Placing new keys after that tail would glue them onto the comment line
+        (the section-body regex drops the final newline before the next key),
+        silently commenting the new key out. Newline boundaries are enforced so
+        a new key can never land on the same physical line as a trailing comment.
+
+        When there are no new children the tail is appended verbatim, preserving
+        the exact byte layout of update-only and delete writes.
+        """
+        if not appended_new:
+            new_lines.extend(tail)
+            return
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines[-1] = new_lines[-1] + "\n"
+        new_lines.extend(appended_new)
+        if tail:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines[-1] = new_lines[-1] + "\n"
+            new_lines.extend(tail)
+
     def _build_role_defaults_section_body(
         self, key: str, value: Any, body_lines: list[str]
     ) -> str:
@@ -2238,8 +2267,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_dict_child(k, v, None))
-            new_lines.extend(body_lines[pos:])
-            new_lines.extend(appended_new)
+            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
             return "".join(new_lines)
 
         if isinstance(value, list) and key == "reflection_pairs":
@@ -2275,8 +2303,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_list_child(item, None))
-            new_lines.extend(body_lines[pos:])
-            new_lines.extend(appended_new)
+            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
             return "".join(new_lines)
 
         # Fallback for any other shape: replace the whole body with a fresh dump.
