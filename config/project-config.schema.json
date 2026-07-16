@@ -771,6 +771,38 @@
         }
       }
     },
+    "reflection-pairs": {
+      "type": "object",
+      "description": "Project-level overrides for reflection pairs (generator/critic loops) defined in config/role-defaults.yaml. Each key under 'overrides' is a reflection pair id (e.g. 'dev-review-loop'); its value is merged into the base pair definition.",
+      "properties": {
+        "overrides": {
+          "type": "object",
+          "description": "Map of reflection pair id to override fields. Merged on top of the base pair from role-defaults.yaml.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable or disable this reflection pair for the project."
+              },
+              "max_iterations": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum number of generator/critic iterations before the loop stops."
+              },
+              "generator": {
+                "type": "string",
+                "description": "Role that produces output in the loop."
+              },
+              "critic": {
+                "type": "string",
+                "description": "Role that reviews the generator's output."
+              }
+            }
+          }
+        }
+      }
+    },
     "admin-ui": {
       "type": "object",
       "description": "Admin UI server configuration. Controls the optional zero-dependency HTTP server that serves docs/admin-ui.html and exposes REST endpoints for the YAML configuration files.",
