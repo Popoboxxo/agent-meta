@@ -127,6 +127,14 @@ def check_orchestrator_table(agent_meta_root: Path) -> list[Finding]:
     roles_data = _load_roles_with_tiers(roles_path)
     orch_content = orch_path.read_text(encoding="utf-8")
 
+    # The agent table is generated at sync time from the {{AGENT_DELEGATION_TABLE}}
+    # placeholder (see scripts/lib/delegation_table.py), which lists every role from
+    # role-defaults.yaml. When the placeholder is still present in the source template
+    # the table is not hand-maintained, so per-role literal checks would only produce
+    # false positives — skip them.
+    if "{{AGENT_DELEGATION_TABLE}}" in orch_content:
+        return findings
+
     for role, tier in roles_data.items():
         if role == "orchestrator":
             continue  # orchestrator doesn't list itself

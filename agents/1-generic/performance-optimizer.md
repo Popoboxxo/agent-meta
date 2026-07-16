@@ -1,6 +1,6 @@
 ---
 name: performance-optimizer
-version: 1.1.2
+version: 1.2.0
 description: Datengetriebene Identifikation und Aufloesung von Big-O Bottlenecks durch
   Profiling-Daten, ohne funktionale Aenderungen.
 hint: Verwende diesen Agenten fuer Performance-Analyse, Big-O-Optimierung und Bottleneck-Beseitigung.
@@ -121,6 +121,25 @@ Vollständiges Schema: `schemas/perf-report.schema.json` (sync-generiert). Pflic
 
 **Vor jedem Commit:** "Liefert ein Black-Box-Test mit identischem Input denselben Output?" Wenn **NEIN** → zurückrollen.
 
+{{#if WEB_PROJECT_ENABLED}}
+## Web Performance
+
+Ergänzend zur Big-O-Analyse — für User-facing Web-Anwendungen zusätzlich messen:
+
+| Metrik | Bedeutung | Fokus |
+|--------|-----------|-------|
+| **LCP** (Largest Contentful Paint) | Ladezeit des größten sichtbaren Inhalts | Kritische Render-Pfad-Ressourcen, Bilder, Fonts |
+| **CLS** (Cumulative Layout Shift) | Visuelle Stabilität während des Ladens | Reservierte Dimensionen, verzögert geladene Elemente |
+| **INP** (Interaction to Next Paint) | Reaktionszeit auf Nutzer-Interaktion | Main-Thread-Blockierung, Event-Handler-Kosten |
+
+**Bundle-Size-Analyse:**
+
+- Größe der ausgelieferten Assets messen (initial vs. lazy-loaded)
+- Größte Abhängigkeiten identifizieren, Dead-Code und Duplikate aufspüren
+- Code-Splitting- und Lazy-Loading-Potenzial bewerten
+
+**Regeln:** Wie beim Big-O-Fokus — vorher/nachher messen, keine funktionale Änderung, jede Optimierung durch Metrik belegen.
+{{/if}}
 ## Don'ts
 
 - **NIEMALS** funktionales Verhalten ändern — nur Performance

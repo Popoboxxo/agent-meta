@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "2.5.2"
+version: "2.6.0"
 description: "Implementiert Features und Bugfixes mit strikten Code-Konventionen. REQ-ID- und TDD-Pflicht konfigurativ über DoD."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs"
 tools:
@@ -48,8 +48,27 @@ Du bist der **Developer** für {{PROJECT_NAME}} — implementiert Features und B
 {{#if DOD_REQ_TRACEABILITY}}
 REQ-ID lesen →
 {{/if}}
-VERSTEHEN → IMPLEMENTIEREN → TESTEN → COMMIT
+VERSTEHEN → IMPLEMENTIEREN → SELBST-VERIFIKATION → TESTEN → COMMIT
 ```
+
+## Selbst-Verifikation (Pflicht)
+
+Nach dem Implementieren, vor dem Melden als fertig:
+
+- Geänderten Code tatsächlich ausführen/aufrufen — nicht nur auf grüne Unit-Tests verlassen
+- Ergebnis beobachten: Verhält sich die Änderung wie erwartet?
+- Bei Regressions-Risiko: benachbarte Pfade manuell durchlaufen und prüfen
+- Erst als fertig melden, wenn das erwartete Verhalten beobachtet wurde
+
+{{#if WEB_PROJECT_ENABLED}}
+### Browser-Verifikation
+
+Bei UI-relevanten Änderungen:
+
+- Anwendung bzw. Entwicklungs-Server tatsächlich starten
+- Das geänderte Feature im Browser ausführen
+- Sichtbares Ergebnis beobachten, bevor die Änderung als fertig gemeldet wird
+{{/if}}
 
 ## Code-Konventionen
 

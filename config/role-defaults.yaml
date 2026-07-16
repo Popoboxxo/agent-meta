@@ -23,7 +23,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff: &dev_handoff
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300
@@ -107,6 +107,20 @@ roles:
     handoff:
       input_contracts: ["task-spec-v1", "req-output-v1"]
       output_contract: "test-result-v1"
+
+  e2e-tester:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units"
+    routing:
+      intent_keywords: ["E2E", "End-to-End", "Browser-Test", "visuelle Regression", "Accessibility", "a11y"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts: ["task-spec-v1", "dev-result-v1"]
+      output_contract: "e2e-result-v1"
+      target_roles: ["developer"]
 
   validator:
     model: balanced
@@ -261,7 +275,7 @@ roles:
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "critic-result-v1"]
       output_contract: "se-req-output-v1"
       target_roles: ["se-critic"]
 
@@ -275,7 +289,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
+      input_contracts: ["task-spec-v1", "critic-result-v1"]
       output_contract: "se-arch-output-v1"
       output_schema: "schemas/se-decomposition.schema.json"
       target_roles: ["se-critic"]
@@ -290,9 +304,9 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["se-arch-output-v1"]
+      input_contracts: ["se-arch-output-v1", "se-req-output-v1"]
       output_contract: "critic-result-v1"
-      target_roles: ["se-architect", "se-interface-mgr"]
+      target_roles: ["se-architect", "se-requirements", "se-interface-mgr"]
 
   se-interface-mgr:
     model: balanced
@@ -609,6 +623,7 @@ reflection_pairs:
     critic: code-reviewer
     max_iterations: 3
     on_blocked: escalate_to_orchestrator
+
 
 quality_pipelines:
   standard-feature:

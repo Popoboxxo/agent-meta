@@ -22,6 +22,7 @@ _PARALLEL_LABELS: dict[str, str] = {
     "agent-meta-manager": "❌ (atomar)",
     "agent-meta-scout": "✅ (Multi-Quellen)",
     "tester": "✅ (Multi-Suites)",
+    "e2e-tester": "✅ (Multi-Flows)",
     "code-reviewer": "✅ (Multi-Prüfungen)",
     "docker": "❌ (sequentiell)",
     "log-analyzer": "✅ (Multi-Quellen)",
@@ -115,6 +116,7 @@ def generate_intent_routing_table(agent_meta_root: Path, config: dict, variables
     developer_tiers = variables.get("DEVELOPER_TIERS_ENABLED", "false") == "true"
     effort_estimator = variables.get("EFFORT_ESTIMATOR_ENABLED", "false") == "true"
     tests_required = variables.get("DOD_TESTS_REQUIRED", "false") == "true"
+    web_project = variables.get("WEB_PROJECT_ENABLED", "false") == "true"
 
     lines = ["| Intent | Ziel | Tier | Parallel |", "|--------|------|------|----------|"]
 
@@ -126,6 +128,8 @@ def generate_intent_routing_table(agent_meta_root: Path, config: dict, variables
         if role_name in ("junior-developer", "senior-developer") and not developer_tiers:
             continue
         if role_name == "effort-estimator" and not effort_estimator:
+            continue
+        if role_name == "e2e-tester" and not web_project:
             continue
         if role_name == "tester" and not tests_required:
             continue

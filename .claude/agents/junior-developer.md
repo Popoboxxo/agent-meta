@@ -1,6 +1,6 @@
 ---
 name: junior-developer
-version: 1.1.2
+version: 1.2.0
 description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates
   in a structured way as soon as scope grows.'
 hint: 'Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates
@@ -68,8 +68,9 @@ As soon as any scope criterion is violated:
 0. 1. Scope check against table — on violation, escalate immediately
 2. Read the affected spots
 3. Write the minimal change
-4. Do not break existing tests
-5. ```
+4. Self-verification: run the change and briefly verify the result — immediate scope only
+5. Do not break existing tests
+6. ```
 </workflow>
 
 <context>

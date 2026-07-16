@@ -2763,7 +2763,7 @@ async function viewExport() {
       tr.appendChild(el("td", {}, [dirInp]));
 
       // delete row
-      const delBtn = el("button", { class: "btn btn-danger" }, ["×"]);
+      const delBtn = el("button", { class: "btn btn-danger", title: "Remove mapping" }, ["×"]);
       delBtn.addEventListener("click", () => {
         if (!confirm(`Remove export mapping "${name}"?`)) return;
         delete data[name];
@@ -3174,12 +3174,15 @@ async function viewAgentTemplates() {
 
   saveBtn.addEventListener("click", async () => {
     if (!activeRole) return;
+    saveBtn.disabled = true;
     try {
       const r = await api.put(`/api/agent-template/${activeRole}`, { content: textarea.value });
       toast(`Saved ${activeRole}.md (${r.bytes} bytes)`, "success");
       status.textContent = `Saved ${activeRole}.md`;
     } catch (err) {
       toast(`Save failed: ${err.message}`, "error");
+    } finally {
+      saveBtn.disabled = false;
     }
   });
 
@@ -3269,7 +3272,7 @@ async function viewSync() {
 
       if (debugLines.length > 0) {
         const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px;" });
-        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug-Output (Model-Ersetzungen)"]);
+        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug Output (Model Substitutions)"]);
         const pre = el("pre", { style: "margin-top: 10px; background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
         details.appendChild(summary);
         details.appendChild(pre);
@@ -3563,8 +3566,8 @@ async function viewConfigAudit() {
     "timestamped backup of project.yaml is kept).",
   ]));
 
-  const runBtn   = el("button", { class: "btn btn-primary" }, ["Audit ausführen"]);
-  const applyBtn = el("button", { class: "btn", disabled: true }, ["Deprecated auskommentieren"]);
+  const runBtn   = el("button", { class: "btn btn-primary" }, ["Run audit"]);
+  const applyBtn = el("button", { class: "btn", disabled: true }, ["Disable deprecated"]);
   wrap.appendChild(el("div", { class: "btn-row" }, [runBtn, applyBtn]));
 
   const summary = el("div", { class: "muted", style: "margin-top:1rem;" }, ["(no audit run yet)"]);
@@ -3589,26 +3592,42 @@ async function viewConfigAudit() {
     info:  "var(--text-muted)",
   }[sev] || "var(--text-muted)");
 
+  // Normalize the flat API response { has_issues, errors, warnings, issues }
+  // into the categories-based shape the render function works with.
+  function normalizeAuditReport(r) {
+    if (!r) return r;
+    if (r.categories) return r;  // already in expected format (future-proof)
+    const all = [...(r.issues || []), ...(r.errors || []), ...(r.warnings || [])];
+    const categories = {};
+    for (const issue of all) {
+      const cat = issue.category || "other";
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(issue);
+    }
+    return { ...r, categories, total: all.length };
+  }
+
   function render(report) {
     resultsEl.replaceChildren();
-    if (!report || !report.categories) {
+    const norm = normalizeAuditReport(report);
+    if (!norm || !norm.categories) {
       resultsEl.appendChild(el("p", { class: "muted" }, ["(no data)"]));
       return;
     }
 
-    const deprecated = report.categories.deprecated_roles || [];
+    const deprecated = norm.categories.deprecated_roles || [];
     applyBtn.disabled = deprecated.length === 0;
 
-    if (!report.has_issues) {
+    if (!norm.has_issues) {
       summary.textContent = "Config audit: no issues found.";
       summary.style.color = "var(--accent-green)";
       return;
     }
-    summary.textContent = `${report.total} issue(s) found.`;
-    summary.style.color = "var(--text-default)";
+    summary.textContent = `${norm.total} issue(s) found.`;
+    summary.style.color = "var(--text-secondary)";
 
     for (const sec of SECTIONS) {
-      const items = report.categories[sec.key] || [];
+      const items = norm.categories[sec.key] || [];
       if (!items.length) continue;
       const panel = el("div", { class: "panel" });
       panel.appendChild(el("div", { class: "panel-title" }, [
@@ -3617,7 +3636,7 @@ async function viewConfigAudit() {
       ]));
       const list = el("div");
       for (const issue of items) {
-        const row = el("div", { style: "padding:0.4rem 0; border-bottom:1px solid var(--border);" });
+        const row = el("div", { style: "padding:0.4rem 0; border-bottom:1px solid var(--border-color);" });
         row.appendChild(el("div", { style: "font-weight:600;" }, [issue.role || "(no role)"]));
         row.appendChild(el("div", { class: "muted", style: "font-size:0.9em;" }, [issue.message || ""]));
         if (issue.detail && issue.detail !== issue.message) {
@@ -3651,9 +3670,10 @@ async function viewConfigAudit() {
     runBtn.disabled = true; applyBtn.disabled = true;
     try {
       const r = await api.post("/api/config-audit/apply");
-      const changed = r && typeof r.changed === "number" ? r.changed : 0;
-      toast(`Disabled ${changed} deprecated role line(s)`, "success");
-      render(r);
+      const fixed = r && typeof r.fixed === "number" ? r.fixed : 0;
+      toast(`Disabled ${fixed} deprecated role line(s)`, "success");
+      // Re-run the audit so the results reflect the post-apply state.
+      await runAudit();
     } catch (err) {
       toast(`Apply failed: ${err.message}`, "error");
     } finally {
@@ -4246,7 +4266,16 @@ async function viewProjectOrchestrator() {
   const genPanel = el("div", { class: "panel" });
   genPanel.appendChild(el("h2", {}, ["General"]));
   genPanel.appendChild(checkboxField("enabled", orch.enabled, v => { orch.enabled = v; }));
-  genPanel.appendChild(checkboxField("strict", orch.strict, v => { orch.strict = v; }));
+  // Orchestrator mode enum — replaces the deprecated `strict` checkbox.
+  // Takes precedence over legacy enabled/strict booleans in sync.py.
+  const orchModeValue = orch.mode
+    || (orch.enabled === false ? "main-chat" : (orch.strict !== false ? "strict" : "advisory"));
+  const modeField = el("div", { class: "field" });
+  modeField.appendChild(el("label", { class: "field-label" }, ["mode"]));
+  modeField.appendChild(selectField(["strict", "advisory", "main-chat"], orchModeValue, v => { orch.mode = v; }));
+  modeField.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:2px;" },
+    ["Orchestrator mode. Replaces the deprecated strict/enabled checkboxes. main-chat = no orchestrator subagent, main chat routes."]));
+  genPanel.appendChild(modeField);
   genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
   genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
   wrap.appendChild(genPanel);
@@ -4546,7 +4575,7 @@ async function viewProjectPromptModes() {
 
       // Clear button
       const clearTd = el("td");
-      const clearBtn = el("button", { class: "btn btn-ghost", style: "padding:2px 8px;font-size:11px;" }, ["✕"]);
+      const clearBtn = el("button", { class: "btn btn-ghost", style: "padding:2px 8px;font-size:11px;", title: "Clear override" }, ["✕"]);
       clearBtn.addEventListener("click", () => {
         delete ap.modes[role];
         sel.value = "";
@@ -4731,7 +4760,7 @@ async function viewProjectModelOverrides() {
       modelInp.addEventListener("change", () => { row.model = modelInp.value; });
       tr.appendChild(el("td", {}, [modelInp]));
 
-      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      const rm = el("button", { class: "btn btn-danger", title: "Remove override" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
       tr.appendChild(el("td", {}, [rm]));
 
@@ -4866,7 +4895,7 @@ async function viewProjectProviderTierOverrides() {
       modelInp.addEventListener("change", () => { row.model = modelInp.value; });
       tr.appendChild(el("td", {}, [modelInp]));
 
-      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      const rm = el("button", { class: "btn btn-danger", title: "Remove override" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
       tr.appendChild(el("td", {}, [rm]));
 
@@ -5964,7 +5993,7 @@ async function viewTierPresets() {
 
       // Visual separator row between presets.
       const sep = el("tr");
-      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border); padding: 0;" }));
+      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border-color); padding: 0;" }));
       tbody.appendChild(sep);
     });
 
@@ -6058,7 +6087,7 @@ async function viewTierPresets() {
         provTr.dataset.providerName = pName;
         if (isDefault) provTr.style.background = "rgba(var(--accent-green-rgb, 100,180,100), 0.04)";
 
-        provTr.appendChild(el("td", {}, [el("span", { class: "mono", style: "color: var(--muted);" }, [`↳ ${pName}`])]));
+        provTr.appendChild(el("td", {}, [el("span", { class: "mono", style: "color: var(--text-muted);" }, [`↳ ${pName}`])]));
 
         TIERS.forEach(comp => {
           const td = el("td", {});
@@ -6080,7 +6109,7 @@ async function viewTierPresets() {
 
       // Visual separator row between presets.
       const sep = el("tr");
-      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border); padding: 0;" }));
+      sep.appendChild(el("td", { colspan: String(2 + TIERS.length), style: "height:4px; background: var(--border-color); padding: 0;" }));
       tbody.appendChild(sep);
     });
 

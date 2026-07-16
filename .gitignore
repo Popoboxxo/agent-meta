@@ -39,3 +39,4 @@ docs/concepts/.local-Inputs/featuretemplate.md
 docs/concepts/.local-Inputs/reqmanager-se.md
 .backup/agent-meta/
 .backup/provider-deactivation/
+*.bak.*

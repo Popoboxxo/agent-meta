@@ -1,5 +1,5 @@
 Cheap:
-  description: Flacht die Kurve radikal ab.
+  description: Flattens all tiers to nano/fast range.
   tiers:
     nano: claude-haiku-4-5-20251001
     fast: claude-haiku-4-5-20251001
@@ -29,7 +29,7 @@ Cheap:
         powerful: opencode-go/deepseek-v4-flash
         max: opencode-go/qwen3.7-plus
 Normal:
-  description: Das 1:1 Mapping (Status Quo).
+  description: 1:1 tier mapping (status quo).
   tiers:
     nano: claude-haiku-4-5-20251001
     fast: claude-haiku-4-5-20251001
@@ -59,7 +59,7 @@ Normal:
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
 Advanced:
-  description: Shifft alles eine Stufe nach oben.
+  description: Shifts all tiers one level up.
   tiers:
     nano: claude-haiku-4-5-20251001
     fast: claude-sonnet-4-6
@@ -89,7 +89,7 @@ Advanced:
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
 Expensive:
-  description: Sehr starker Shift.
+  description: Strong upward tier shift.
   tiers:
     nano: claude-sonnet-4-6
     fast: claude-opus-4-8
@@ -119,7 +119,7 @@ Expensive:
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
 Expensive as Hell:
-  description: Fast alle Agenten laufen auf powerful oder max.
+  description: Most agents run at powerful or max tier.
   tiers:
     nano: claude-opus-4-8
     fast: claude-fable-5

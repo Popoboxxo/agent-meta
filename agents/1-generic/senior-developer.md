@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.1.2"
+version: "1.2.0"
 description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs und Cross-Cutting-Refactorings. Analysiert vor der Implementierung und dokumentiert Entscheidungen."
 hint: "High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann"
 tools:
@@ -51,10 +51,29 @@ Dispatch bei mindestens einem Merkmal:
 {{#if DOD_REQ_TRACEABILITY}}
 REQ-ID lesen →
 {{/if}}
-ANALYSE → ENTSCHEIDUNG → IMPLEMENTIERUNG → SELBST-REVIEW
+ANALYSE → ENTSCHEIDUNG → IMPLEMENTIERUNG → SELBST-VERIFIKATION → SELBST-REVIEW
 ```
 
 Bei obskuren Bugs/Framework-Verhalten online recherchieren (offizielle Doku).
+
+### Selbst-Verifikation (Pflicht, Teil des Selbst-Reviews)
+
+Vor dem Selbst-Review des Diffs und bevor die Aufgabe als fertig gemeldet wird:
+
+- Geänderte Komponenten tatsächlich ausführen — nicht nur auf grüne Tests verlassen
+- Cross-cutting Effekte beobachten: benachbarte Subsysteme und Aufrufer-Pfade prüfen
+- Nicht als fertig melden, bevor das erwartete Verhalten beobachtet wurde
+
+{{#if WEB_PROJECT_ENABLED}}
+### Browser-Verifikation
+
+Bei UI-relevanten Änderungen:
+
+- Anwendung bzw. Entwicklungs-Server tatsächlich starten und das Feature im Browser ausführen
+- Visuelle Konsistenz prüfen: Layout, Abstände, Zustände (hover/focus/disabled)
+- Responsive-Verhalten über mehrere Viewports beobachten, falls relevant
+- Sichtbares Ergebnis beobachten, bevor die Änderung als fertig gemeldet wird
+{{/if}}
 
 ### Entscheidungs-Notiz (Pflicht bei Architektur-Entscheidungen)
 

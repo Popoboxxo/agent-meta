@@ -593,6 +593,11 @@ class ConfigManager:
 
         Returns a status dict describing where the backup was stored.
         """
+        # Guard against corrupting a YAML config file with a scalar payload
+        # (e.g. PUT /api/config/role-defaults with body "just a string").
+        # A valid config document is always a mapping or a sequence.
+        if not isinstance(data, (dict, list)):
+            raise ValueError("Invalid payload type: expected object")
         path = self.resolve_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -973,6 +978,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._dispatch_post()
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ValueError as exc:
+            self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return
@@ -1259,6 +1266,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             body = self._read_body()
             if not isinstance(body, dict):
                 raise ValueError("expected JSON body with reflection pair object")
+            for field in ("id", "generator", "critic"):
+                value = body.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("id, generator and critic are required")
             pair_id = self._ensure_pair_id(body)
             result = self._write_reflection_pair(pair_id, body)
             return self._send_json(result)
@@ -2153,6 +2164,35 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 i += 1
         return children
 
+    @staticmethod
+    def _splice_appended_children(
+        new_lines: list[str], tail: list[str], appended_new: list[str]
+    ) -> None:
+        """Attach freshly appended children to ``new_lines`` in-place.
+
+        New children are spliced in *after* the existing content but *before*
+        ``tail`` — the trailing blank/comment lines that were captured with the
+        section body but usually head the *following* top-level section (e.g.
+        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
+        Placing new keys after that tail would glue them onto the comment line
+        (the section-body regex drops the final newline before the next key),
+        silently commenting the new key out. Newline boundaries are enforced so
+        a new key can never land on the same physical line as a trailing comment.
+
+        When there are no new children the tail is appended verbatim, preserving
+        the exact byte layout of update-only and delete writes.
+        """
+        if not appended_new:
+            new_lines.extend(tail)
+            return
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines[-1] = new_lines[-1] + "\n"
+        new_lines.extend(appended_new)
+        if tail:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines[-1] = new_lines[-1] + "\n"
+            new_lines.extend(tail)
+
     def _build_role_defaults_section_body(
         self, key: str, value: Any, body_lines: list[str]
     ) -> str:
@@ -2218,13 +2258,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if isinstance(value, dict):
             children = self._split_dict_children(body_lines, base_indent)
             old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
+            # Line indices that belong to deleted children must be skipped so
+            # that deleting a pipeline actually removes it from the written YAML.
+            deleted_indices: set[int] = set()
+            for old_key, old_child in old_by_key.items():
+                if old_key not in value:
+                    deleted_indices.update(range(old_child["start"], old_child["end"]))
             new_lines: list[str] = []
             pos = 0
             appended_new: list[str] = []
             for k, v in value.items():
                 child = old_by_key.get(k)
                 if child:
-                    new_lines.extend(body_lines[pos : child["start"]])
+                    new_lines.extend(
+                        body_lines[i]
+                        for i in range(pos, child["start"])
+                        if i not in deleted_indices
+                    )
                     old_block = body_lines[child["start"] : child["end"]]
                     try:
                         parsed = yaml.safe_load("".join(old_block))
@@ -2238,8 +2288,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_dict_child(k, v, None))
-            new_lines.extend(body_lines[pos:])
-            new_lines.extend(appended_new)
+            tail = [
+                body_lines[i]
+                for i in range(pos, len(body_lines))
+                if i not in deleted_indices
+            ]
+            self._splice_appended_children(new_lines, tail, appended_new)
             return "".join(new_lines)
 
         if isinstance(value, list) and key == "reflection_pairs":
@@ -2275,8 +2329,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_list_child(item, None))
-            new_lines.extend(body_lines[pos:])
-            new_lines.extend(appended_new)
+            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
             return "".join(new_lines)
 
         # Fallback for any other shape: replace the whole body with a fresh dump.

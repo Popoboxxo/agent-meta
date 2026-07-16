@@ -337,11 +337,40 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # ORCH_MODE_*: mutually-exclusive, flat mode flags for the use-orchestrator rule.
     # Exactly one is "true". These replace nested {{#if}}/{{else}} in the rule
     # template so the conditional stripper can never render two modes at once.
-    _orch_enabled = orch_config.get("enabled", True)
-    _orch_strict = orch_config.get("strict", True)
-    variables["ORCH_MODE_DISABLED"] = "true" if not _orch_enabled else "false"
-    variables["ORCH_MODE_STRICT"]   = "true" if (_orch_enabled and _orch_strict) else "false"
-    variables["ORCH_MODE_ADVISORY"] = "true" if (_orch_enabled and not _orch_strict) else "false"
+    # orchestrator.mode (enum: strict|advisory|main-chat) takes precedence over
+    # the legacy enabled/strict booleans. Missing mode → derive from legacy fields.
+    _orch_mode = orch_config.get("mode")
+    if _orch_mode is not None:
+        _valid_orch_modes = {"strict", "advisory", "main-chat"}
+        _normalized_mode = str(_orch_mode).strip().lower()
+        if _normalized_mode not in _valid_orch_modes:
+            import sys
+            print(
+                f"ERROR: Invalid orchestrator.mode value: {_orch_mode!r}. "
+                f"Valid values are: {sorted(_valid_orch_modes)}. "
+                "Hint: use 'main-chat' instead of 'disabled'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        _orch_mode = _normalized_mode
+    else:
+        _orch_enabled = orch_config.get("enabled", True)
+        _orch_strict = orch_config.get("strict", True)
+        if not _orch_enabled:
+            _orch_mode = "main-chat"
+        elif _orch_strict:
+            _orch_mode = "strict"
+        else:
+            _orch_mode = "advisory"
+    _orch_mode = str(_orch_mode).strip().lower()
+    _is_main_chat = _orch_mode == "main-chat"
+    # ORCH_MODE_DISABLED is a deprecated alias kept for backward compat — it mirrors
+    # ORCH_MODE_MAIN_CHAT so legacy templates keep rendering. New templates use
+    # ORCH_MODE_MAIN_CHAT.
+    variables["ORCH_MODE_MAIN_CHAT"] = "true" if _is_main_chat else "false"
+    variables["ORCH_MODE_DISABLED"]  = "true" if _is_main_chat else "false"
+    variables["ORCH_MODE_STRICT"]    = "true" if _orch_mode == "strict" else "false"
+    variables["ORCH_MODE_ADVISORY"]  = "true" if _orch_mode == "advisory" else "false"
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.
@@ -430,6 +459,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # EFFORT_ESTIMATOR_ENABLED: auto-detect from project roles list
     # — orchestrator gates effort-estimator routes behind this flag to avoid dead routes
     variables["EFFORT_ESTIMATOR_ENABLED"] = "true" if "effort-estimator" in _roles else "false"
+    # WEB_PROJECT_ENABLED: auto-detect web-oriented projects from the roles list.
+    # — derived purely from role activation (e2e-tester present), no separate
+    #   config flag. Gates browser-verification and web-vitals blocks in the
+    #   developer/senior-developer/performance-optimizer templates.
+    variables["WEB_PROJECT_ENABLED"] = "true" if "e2e-tester" in _roles else "false"
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
     variables["AGENT_DELEGATION_TABLE"] = generate_agent_delegation_table(agent_meta_root, config, variables)
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
@@ -451,18 +485,38 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
     # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
     variables["INTENT_ROUTING_TABLE"] = generate_intent_routing_table(agent_meta_root, config, variables)
-    # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
+    # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
     try:
-        roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
-        if roles_defaults_path.exists() and _YAML_AVAILABLE:
-            with roles_defaults_path.open(encoding="utf-8") as f:
-                roles_defaults = _yaml.safe_load(f) or {}
-            if roles_defaults.get("reflection_pairs"):
-                variables["REFLECTION_PAIRS_ENABLED"] = "true"
+        from .reflection import (
+            load_reflection_pairs,
+            load_project_overrides,
+            apply_project_overrides,
+        )
+        _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
+        _refl_overrides = load_project_overrides(
+            str(agent_meta_root / ".meta-config" / "project.yaml")
+        )
+        _effective_pairs = apply_project_overrides(_refl_pairs, _refl_overrides)
+        if _effective_pairs:
+            variables["REFLECTION_PAIRS_ENABLED"] = "true"
+            _main_pair = next(
+                (p for p in _effective_pairs if p.get("id") == "dev-review-loop"),
+                _effective_pairs[0],
+            )
+            variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:
-        pass
+        # Fallback: keep existing behavior (check role-defaults.yaml directly)
+        try:
+            roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
+            if roles_defaults_path.exists() and _YAML_AVAILABLE:
+                with roles_defaults_path.open(encoding="utf-8") as f:
+                    roles_defaults = _yaml.safe_load(f) or {}
+                if roles_defaults.get("reflection_pairs"):
+                    variables["REFLECTION_PAIRS_ENABLED"] = "true"
+        except Exception:
+            pass
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["QUALITY_PIPELINES_ENABLED"] = "false"
     try:
@@ -556,7 +610,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     (e.g. DOD_REQ_TRACEABILITY accidentally matching the ORCHESTRATOR_ENABLED
     block's {{else}} token).
     """
-    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED")) and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED", "WEB_PROJECT_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
@@ -586,8 +640,12 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                 return stripped
 
             # Guard: prevent simple-if from matching if-else blocks
-            # by not crossing {{/if}} or {{else}} boundaries.
-            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
+            # by not crossing {{/if}} or {{else}} boundaries. Also refuse to
+            # cross a nested opening marker ({{#if}}/{{#unless}}), so only true
+            # innermost blocks match. This makes stripping resolve nested blocks
+            # inner-to-outer regardless of the (set-derived) variable iteration
+            # order — otherwise output is non-deterministic across processes.
+            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
             pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?({_simple_body})\{{{{/if\}}}}\n?"
             old_text = text
             text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
@@ -605,7 +663,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                     return stripped + "\n"
                 return stripped
 
-            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}).)*?"
+            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
             pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?({_unless_body})\{{{{/unless\}}}}\n?"
             old_text = text
             text = re.sub(pattern_unless, replace_unless, text, flags=re.DOTALL)
@@ -626,8 +684,10 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
 
             # Guard: prevent if-else from matching past {{/if}} into
             # other blocks (e.g. DOD simple-if capturing orchestrator's {{else}}).
-            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
-            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            # Both branches refuse to cross nested opening markers so if-else
+            # blocks also resolve inner-to-outer (order-independent, see above).
+            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
+            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?({_ife_body})\{{{{/if\}}}}\n?"
             old_text = text
             text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
             if text != old_text:

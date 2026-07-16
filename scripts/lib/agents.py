@@ -944,6 +944,14 @@ def sync_agents(
                      "systems-engineering is disabled")
             continue
 
+        # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
+        # is spawned; the main chat acts as router + worker. Not added to
+        # expected_filenames so any stale orchestrator.md gets pruned.
+        if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+            log.skip(str(target_dir / filename).replace(str(project_root) + "/", "").replace(str(project_root) + "\\", ""),
+                     "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
+            continue
+
         expected_filenames.add(filename)
         target_path = safe_path(target_dir, filename)
         content = source_path.read_text(encoding="utf-8")
@@ -1170,6 +1178,17 @@ def sync_agents_for_provider(
                        .replace(str(project_root) + '/', '')
                        .replace(str(project_root) + chr(92), ""))
                 log.skip(rel, "systems-engineering is disabled")
+            continue
+
+        # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
+        # is spawned; the main chat acts as router + worker. Not added to
+        # expected_filenames so any stale orchestrator.md gets pruned.
+        if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+            if provider == 'Claude':
+                rel = (str(target_dir / filename)
+                       .replace(str(project_root) + '/', '')
+                       .replace(str(project_root) + chr(92), ""))
+                log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
             continue
 
         expected_filenames.add(filename)
@@ -1849,9 +1868,19 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
         allowed_roles = set(config["roles"])
 
     lines = []
+    # Determine if main-chat mode is active (no orchestrator subagent in this mode)
+    _orch_cfg = config.get("orchestrator", {})
+    _orch_mode_explicit = _orch_cfg.get("mode")
+    if _orch_mode_explicit is not None:
+        _is_main_chat_mode = str(_orch_mode_explicit).strip().lower() == "main-chat"
+    else:
+        # Legacy fallback: enabled=false was the old way to disable orchestrator
+        _is_main_chat_mode = not _orch_cfg.get("enabled", True)
+
     has_orchestrator = (
         "orchestrator" in overrides
         and (allowed_roles is None or "orchestrator" in allowed_roles)
+        and not _is_main_chat_mode
     )
     if has_orchestrator:
         lines.append(

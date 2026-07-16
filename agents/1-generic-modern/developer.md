@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "3.0.1"
+version: "3.1.0"
 description: "Implements features and bugfixes in Modern Mode with XML structure and TypeScript contracts."
 hint: "Feature implementation and bugfixes by REQ-ID"
 prompt_mode: modern
@@ -31,9 +31,10 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 3. **Scope:** identify the minimal change — only what the task requires.
 4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present. `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
-6. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
-7. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
-8. **Return:** result in `IResult` format (see `<output_contract>`).
+6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
+7. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
+8. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
+9. **Return:** result in `IResult` format (see `<output_contract>`).
 </workflow>
 
 <context>

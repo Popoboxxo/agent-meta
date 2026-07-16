@@ -96,6 +96,8 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
         for stage in stages:
             agent = stage.get("agent")
             if agent and agent not in available_roles:
+                if stage.get("optional"):
+                    continue  # Optional stages are skipped when role is not available
                 errors.append(
                     f"Pipeline '{name}': stage '{stage.get('id')}' agent '{agent}' "
                     f"not found in available roles. "

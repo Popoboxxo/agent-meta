@@ -14,6 +14,7 @@ Violation: PreToolUse hook blocks these changes.
 **STRICT MODE — no exceptions.** Every dev task goes through `orchestrator`. No user override, no direct dispatch.
 
 Auto-handoff: the main chat always delegates to `orchestrator` via a native tool call — no `@orchestrator` mention in output.
+
 ## Git Delegation — Hard Rule
 
 All mutating git commands must run through the `git` agent.

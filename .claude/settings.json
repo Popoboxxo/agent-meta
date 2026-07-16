@@ -8,6 +8,13 @@
       "type": "sse",
       "url": "${MCP_HONCHO_URL}"
     },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
     "viz-logger": {
       "type": "stdio",
       "command": "python",

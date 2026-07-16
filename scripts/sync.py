@@ -188,6 +188,33 @@ def resolve_test_repo_path(config: dict, project_root: Path, log: SyncLog) -> Pa
     return resolved
 
 
+def _run_consistency_checks(agent_meta_root: Path) -> int:
+    """Run the full agent-meta consistency-check suite over the sources.
+
+    Reuses the runner in scripts/consistency-check.py (loaded via importlib
+    because the filename contains a hyphen). Prints the human-readable report
+    and returns the number of ERROR-severity findings (0 = no errors).
+    """
+    import importlib.util
+
+    runner_path = agent_meta_root / "scripts" / "consistency-check.py"
+    if not runner_path.exists():
+        return 0
+    spec = importlib.util.spec_from_file_location("_consistency_check_runner",
+                                                  runner_path)
+    if spec is None or spec.loader is None:
+        return 0
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    from lib.consistency.report import Severity, print_report
+
+    findings = module.run_checks(agent_meta_root, changed_only=False,
+                                 specific_file=None)
+    print_report(findings, agent_meta_root, changed_only=False)
+    return sum(1 for f in findings if f.severity == Severity.ERROR)
+
+
 def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict,
                        log: SyncLog, dry_run: bool) -> bool:
     """Validate by performing a sync into the test repository and checking results.
@@ -654,18 +681,24 @@ def main():
         mode = "validate"
         if args.dry_run:
             print("DRY-RUN — validation will not write files\n")
+
+        # Consistency checks always run (no test repo required). These validate
+        # agent templates, cross-references, dual-tree parity and handoff
+        # contracts against the agent-meta sources themselves.
+        consistency_errors = _run_consistency_checks(agent_meta_root)
+
         test_repo_path = resolve_test_repo_path(config, project_root, log)
-        if test_repo_path is None:
-            log.error("test-repo",
-                      "No test repository configured.\n"
-                      "  Add to .meta-config/project.yaml:\n"
-                      "  test-repo:\n"
-                      "    enabled: true\n"
-                      "    path: \"../agent-meta-test\"\n"
-                      "  Or set AGENT_META_TEST_REPO environment variable.")
-            sys.exit(1)
+        if test_repo_path is None or not test_repo_path.exists():
+            reason = (f"configured path {test_repo_path} does not exist"
+                      if test_repo_path else
+                      "not configured (set test-repo.path in .meta-config/project.yaml "
+                      "or AGENT_META_TEST_REPO)")
+            log.info("test-repo",
+                     f"Skipping test-repo sync validation — {reason}. "
+                     "Consistency checks still ran.")
+            sys.exit(1 if consistency_errors else 0)
         success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
-        if not success:
+        if not success or consistency_errors:
             sys.exit(1)
 
     else:
