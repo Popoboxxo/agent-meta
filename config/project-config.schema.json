@@ -891,6 +891,11 @@
       "type": "object",
       "description": "Orchestrator behavior configuration.",
       "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Orchestrator operating mode. Takes precedence over legacy enabled/strict booleans. 'strict' = orchestrator mandatory, no user override. 'advisory' = orchestrator recommended, user-override allowed. 'main-chat' = no orchestrator subagent, main chat acts as router + worker.",
+          "enum": ["strict", "advisory", "main-chat"]
+        },
         "enabled": {
           "type": "boolean",
           "default": true,

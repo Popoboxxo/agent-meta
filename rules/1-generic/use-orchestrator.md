@@ -35,7 +35,30 @@ Rule of thumb: more than one step, more than one agent, or files in critical pat
 
 Auto-handoff: delegate to `orchestrator` via native tool call. `@orchestrator` is the only mention the user may use directly.
 {{/if}}
-{{#unless ORCH_MODE_DISABLED}}
+{{#if ORCH_MODE_MAIN_CHAT}}
+# Main-Chat Mode — Router + Worker
+
+The main chat acts as both router and worker. No separate orchestrator subagent is spawned.
+
+**Responsibilities:**
+- Classify the task (Feature, Bugfix, Refactoring, Docs, ...)
+- Select execution tier (junior / developer / senior) or execute directly
+- Apply HITL gates before risky operations (branch delete, force-push, schema migration, DELETE, release)
+- Delegate to specialist agents for isolated work — one level deep, sequential
+
+**Reduced overhead (no multi-agent protocol):**
+- No BARRIER / FANOUT
+- No A2A envelope protocol
+- No orchestrator checkpointing or session-state management
+- Delegation depth: main_chat (0) → worker (1)
+
+**Still active (modusunabhängige Rules):**
+- `branch-guard` — feature-branch rule always applies
+- `commit-conventions` — Conventional Commits format always applies
+- `dod-criteria` — Definition of Done always applies
+- `issue-lifecycle` — GitHub Issue close always applies
+{{/if}}
+
 ## Git Delegation — Hard Rule
 
 All mutating git commands must run through the `git` agent.
@@ -46,12 +69,11 @@ Allowed read-only: `git status`, `git log`, `git diff`, `git branch --show-curre
 
 All other git operations → `git` agent.
 
+{{#if ORCH_MODE_MAIN_CHAT}}
+Exception: if the user explicitly requests direct git execution in this session, the main chat may run git commands directly.
+{{/if}}
+{{#unless ORCH_MODE_MAIN_CHAT}}
 ## Anti-Recursion Guard
 
 Workers must not re-delegate to `orchestrator`. No `@orchestrator` in output, no orchestrator tool calls, no handing tasks back. Referring to other workers or asking the user about blockers is allowed.
 {{/unless}}
-{{#if ORCH_MODE_DISABLED}}
-# Main-Chat Mode
-
-Orchestrator is disabled. All tasks run in the main chat. Subagent delegation is optional.
-{{/if}}

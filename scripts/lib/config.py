@@ -337,11 +337,27 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # ORCH_MODE_*: mutually-exclusive, flat mode flags for the use-orchestrator rule.
     # Exactly one is "true". These replace nested {{#if}}/{{else}} in the rule
     # template so the conditional stripper can never render two modes at once.
-    _orch_enabled = orch_config.get("enabled", True)
-    _orch_strict = orch_config.get("strict", True)
-    variables["ORCH_MODE_DISABLED"] = "true" if not _orch_enabled else "false"
-    variables["ORCH_MODE_STRICT"]   = "true" if (_orch_enabled and _orch_strict) else "false"
-    variables["ORCH_MODE_ADVISORY"] = "true" if (_orch_enabled and not _orch_strict) else "false"
+    # orchestrator.mode (enum: strict|advisory|main-chat) takes precedence over
+    # the legacy enabled/strict booleans. Missing mode → derive from legacy fields.
+    _orch_mode = orch_config.get("mode")
+    if _orch_mode is None:
+        _orch_enabled = orch_config.get("enabled", True)
+        _orch_strict = orch_config.get("strict", True)
+        if not _orch_enabled:
+            _orch_mode = "main-chat"
+        elif _orch_strict:
+            _orch_mode = "strict"
+        else:
+            _orch_mode = "advisory"
+    _orch_mode = str(_orch_mode).strip().lower()
+    _is_main_chat = _orch_mode == "main-chat"
+    # ORCH_MODE_DISABLED is a deprecated alias kept for backward compat — it mirrors
+    # ORCH_MODE_MAIN_CHAT so legacy templates keep rendering. New templates use
+    # ORCH_MODE_MAIN_CHAT.
+    variables["ORCH_MODE_MAIN_CHAT"] = "true" if _is_main_chat else "false"
+    variables["ORCH_MODE_DISABLED"]  = "true" if _is_main_chat else "false"
+    variables["ORCH_MODE_STRICT"]    = "true" if _orch_mode == "strict" else "false"
+    variables["ORCH_MODE_ADVISORY"]  = "true" if _orch_mode == "advisory" else "false"
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.

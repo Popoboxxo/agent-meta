@@ -944,6 +944,14 @@ def sync_agents(
                      "systems-engineering is disabled")
             continue
 
+        # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
+        # is spawned; the main chat acts as router + worker. Not added to
+        # expected_filenames so any stale orchestrator.md gets pruned.
+        if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+            log.skip(str(target_dir / filename).replace(str(project_root) + "/", "").replace(str(project_root) + "\\", ""),
+                     "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
+            continue
+
         expected_filenames.add(filename)
         target_path = safe_path(target_dir, filename)
         content = source_path.read_text(encoding="utf-8")
@@ -1170,6 +1178,17 @@ def sync_agents_for_provider(
                        .replace(str(project_root) + '/', '')
                        .replace(str(project_root) + chr(92), ""))
                 log.skip(rel, "systems-engineering is disabled")
+            continue
+
+        # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
+        # is spawned; the main chat acts as router + worker. Not added to
+        # expected_filenames so any stale orchestrator.md gets pruned.
+        if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+            if provider == 'Claude':
+                rel = (str(target_dir / filename)
+                       .replace(str(project_root) + '/', '')
+                       .replace(str(project_root) + chr(92), ""))
+                log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
             continue
 
         expected_filenames.add(filename)
