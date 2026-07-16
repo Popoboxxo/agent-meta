@@ -3889,6 +3889,12 @@ async function viewProjectProviders() {
   const providerOptions = (data["provider-options"] && typeof data["provider-options"] === "object")
     ? clone(data["provider-options"]) : {};
   let isolation = data["provider-isolation"];
+  // Track whether the user (or the loaded project.yaml) ever gave this field a
+  // real value. If it stays untouched (no key on load, dropdown never used),
+  // `isolation` is `undefined` — JSON.stringify() then drops the whole "data"
+  // field of the save payload, which the backend rejects. Only send the
+  // section when there is something meaningful to write.
+  let isolationTouched = typeof isolation === "string";
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
@@ -3945,7 +3951,7 @@ async function viewProjectProviders() {
     "provider-isolation",
     isolationOptions,
     typeof isolation === "string" ? isolation : "",
-    v => { isolation = v; },
+    v => { isolation = v; isolationTouched = true; },
     isolationLabels,
   ));
 
@@ -4078,12 +4084,13 @@ async function viewProjectProviders() {
       // We rely on the sync() callbacks having kept provOpts up-to-date.
       // Empty-key rows are ignored by sync(), so provOpts stays clean.
       try {
-        await saveProjectSections([
+        const entries = [
           ["ai-providers", Array.from(selProviders)],
           ["platforms", Array.from(selPlatforms)],
           ["provider-options", providerOptions],
-          ["provider-isolation", isolation],
-        ], status);
+        ];
+        if (isolationTouched) entries.push(["provider-isolation", isolation]);
+        await saveProjectSections(entries, status);
       } catch { /* toast shown */ }
     } }, ["Save"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),

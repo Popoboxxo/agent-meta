@@ -182,7 +182,8 @@
           "enum": [
             "GitHub",
             "GitLab",
-            "Gitea"
+            "Gitea",
+            "Codeberg"
           ]
         },
         "GIT_REMOTE_URL": {
