@@ -1,6 +1,6 @@
 ---
 name: template-performance-optimizer
-version: "1.1.3"
+version: "1.2.0"
 description: "Data-driven identification and resolution of Big-O bottlenecks using profiling data, without functional changes."
 hint: "Use this agent for performance analysis, Big-O optimization, and bottleneck elimination."
 prompt_mode: modern
@@ -98,6 +98,22 @@ Full: `schemas/perf-report.schema.json`. Required fields: `report_id`, `baseline
 | I/O optimization (same data) | Remove error handling |
 
 **Before every commit:** "Does a black-box test with identical input produce the same output?" If NO → roll back.
+
+{{#if WEB_PROJECT_ENABLED}}
+## 10. Web performance
+
+Complements the Big-O focus — for user-facing web apps also measure:
+
+| Metric | Meaning | Focus |
+|--------|---------|-------|
+| **LCP** (Largest Contentful Paint) | Load time of the largest visible content | Critical render-path resources, images, fonts |
+| **CLS** (Cumulative Layout Shift) | Visual stability during load | Reserved dimensions, deferred elements |
+| **INP** (Interaction to Next Paint) | Response time to user interaction | Main-thread blocking, event-handler cost |
+
+**Bundle-size analysis:** measure shipped asset size (initial vs. lazy-loaded), identify largest dependencies, spot dead code and duplicates, assess code-splitting/lazy-loading potential.
+
+**Rules:** same as the Big-O focus — measure before/after, no functional change, back every optimization with a metric.
+{{/if}}
 </workflow>
 
 <context>
