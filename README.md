@@ -37,9 +37,9 @@ python .agent-meta/scripts/sync.py --setup
 python .agent-meta/scripts/sync.py
 ```
 
-## Agent Roster — 37 Generic Agents
+## Agent Roster — 39 Generic Agents
 
-### Core Development (10 agents)
+### Core Development (12 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -47,6 +47,8 @@ python .agent-meta/scripts/sync.py
 | **developer** | powerful | 2.5.2 | Feature implementation and bugfixes |
 | **junior-developer** | fast | 1.1.1 | Trivial changes (1-2 files, no architecture impact) |
 | **senior-developer** | powerful | 1.1.2 | Complex features, architecture decisions, difficult bugs |
+| **principal-developer** | ultra | 1.0.0 | Last-resort escalation above senior-developer — root-cause diagnosis, systemic reasoning, no symptom fixes (most expensive call) |
+| **intern-developer** | nano | 1.0.0 | Easter-egg/gag agent: over-eager clueless intern, read-only and harmless — not for production |
 | **requirements** | balanced | 1.4.2 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | **tester** | balanced | 2.1.2 | Isolated unit tests with mocks/stubs (TDD workflow) |
 | **validator** | balanced | 4.1.1 | Formal DoD gatekeeper: checkbox audit, REQ-ID presence, commit conventions |
@@ -68,17 +70,20 @@ python .agent-meta/scripts/sync.py
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.1 | Reviews design docs for completeness, logic, risks, feasibility |
 
-### Specialist Roles (13 agents)
+### Specialist Roles (16 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
 | **bug-feature-analyzer** | balanced | 1.1.2 | Triage and classify incoming bug reports and feature requests |
+| **database-engineer** | powerful | 1.0.0 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
+| **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
 | **devops-engineer** | fast | 1.1.2 | CI/CD pipelines, IaC, container orchestration |
 | **docker** | fast | 1.4.2 | Docker operations: Compose stacks, binary management, test environments |
 | **effort-estimator** | fast | 1.0.1 | Estimates effort for development tasks with complexity scoring |
 | **explorer** | nano | 1.0.0 | Read-only codebase research, dependency and impact mapping |
 | **export-manager** | fast | 1.1.2 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
+| **incident-responder** | powerful | 1.0.0 | Live incident coordination: RCA (5-Whys/Fishbone), severity classification, prioritized hotfixes |
 | **log-analyzer** | balanced | 1.1.2 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
 | **performance-optimizer** | powerful | 1.1.2 | Data-driven Big-O bottleneck identification |

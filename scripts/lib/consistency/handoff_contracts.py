@@ -20,7 +20,10 @@ _ROLE_DEFAULTS = "config/role-defaults.yaml"
 
 # Contracts that are produced outside of role-defaults.yaml (e.g. emitted by
 # the orchestrator at runtime) and must not trigger a "no producer" warning.
-_RUNTIME_CONTRACTS = {"task-spec-v1"}
+# blocked-review-v1 is emitted by the reflection-loop machinery when a loop hits
+# its on_blocked threshold and escalates to principal-developer — there is no
+# single role that declares it as output_contract.
+_RUNTIME_CONTRACTS = {"task-spec-v1", "blocked-review-v1"}
 
 
 def _load_roles(agent_meta_root: Path) -> dict | None:

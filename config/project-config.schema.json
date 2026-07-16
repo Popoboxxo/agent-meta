@@ -67,6 +67,8 @@
           "concept-reviewer",
           "continue-expert",
           "copilot-expert",
+          "database-engineer",
+          "dependency-auditor",
           "developer",
           "devops-engineer",
           "docker",
@@ -80,6 +82,8 @@
           "gemini-expert",
           "git",
           "ideation",
+          "incident-responder",
+          "intern-developer",
           "junior-developer",
           "log-analyzer",
           "meta-feedback",
@@ -87,6 +91,7 @@
           "openscad-developer",
           "orchestrator",
           "performance-optimizer",
+          "principal-developer",
           "prompt-engineer",
           "release",
           "requirements",
@@ -926,7 +931,11 @@
         "mode": {
           "type": "string",
           "description": "Orchestrator operating mode. Takes precedence over legacy enabled/strict booleans. 'strict' = orchestrator mandatory, no user override. 'advisory' = orchestrator recommended, user-override allowed. 'main-chat' = no orchestrator subagent, main chat acts as router + worker.",
-          "enum": ["strict", "advisory", "main-chat"]
+          "enum": [
+            "strict",
+            "advisory",
+            "main-chat"
+          ]
         },
         "enabled": {
           "type": "boolean",

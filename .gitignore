@@ -40,3 +40,7 @@ docs/concepts/.local-Inputs/reqmanager-se.md
 .backup/agent-meta/
 .backup/provider-deactivation/
 *.bak.*
+
+# tokensave runtime cache files (never commit)
+.tokensave/*.db-shm
+.tokensave/*.db-wal

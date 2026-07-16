@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- `principal-developer` agent role: ultra-tier last-resort escalation, invoked only after `senior-developer` fails repeatedly — mandates root-cause diagnosis before implementation, no further delegation down (`agents/1-generic/principal-developer.md`, `agents/1-generic-modern/principal-developer.md`, `config/role-defaults.yaml`)
+- `intern-developer` agent role: Easter-egg/gag agent — an over-eager, clueless intern with read-only tools, technically harmless, never routed real work (`agents/1-generic/intern-developer.md`, `agents/1-generic-modern/intern-developer.md`, `config/role-defaults.yaml`)
+- `ultra` tier added to all tier presets, above `max` — reserved for last-resort escalation, always assigned the strongest real (non-fictitious) model per provider (`config/tier-presets.yaml`)
+- `database-engineer`, `incident-responder`, `dependency-auditor` agent roles: schema design/migrations (powerful), live incident coordination with RCA (powerful), and supply-chain/SBOM auditing (balanced) — with handoff wiring `db-schema-v1`, `rca-report-v1`, `dependency-audit-v1` (`agents/1-generic/`, `agents/1-generic-modern/`, `config/role-defaults.yaml`)
+
+### Changed
+- `dev-review-loop` reflection pair now escalates to `principal-developer` on block instead of the orchestrator (`config/role-defaults.yaml`)
+- `blocked-review-v1` added to runtime-contract exemptions so principal-developer's escalation input contract does not trigger a false "no producer" handoff warning (`scripts/lib/consistency/handoff_contracts.py`)
+
 ## [0.73.0] — 2026-07-16
 
 ### Added

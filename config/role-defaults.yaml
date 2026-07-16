@@ -23,7 +23,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff: &dev_handoff
-      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1"]
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300
@@ -41,6 +41,16 @@ roles:
       <<: *dev_handoff
       timeout_sec: 120
 
+  intern-developer:
+    model: nano              # cheapest tier — it's a gag agent, spend nothing on it
+    memory: ""
+    workflow_tier: optional
+    description: "[EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen."
+    routing:
+      # NO intent_keywords — never auto-routed; invoke manually as a joke only
+      parallel: true
+      orchestrator_only: false
+
   senior-developer:
     model: max               # höchste Stufe — Architektur, komplexe Bugs, Risiko-Pfade
     memory: project          # Architektur-Entscheidungen über Sessions hinweg erinnern
@@ -53,6 +63,21 @@ roles:
     handoff:
       <<: *dev_handoff
       timeout_sec: 600
+
+  principal-developer:
+    model: ultra             # ultra tier — LAST-RESORT escalation only, most expensive call in the system
+    memory: project          # Root-Cause- und Architektur-Entscheidungen über Sessions hinweg erinnern
+    workflow_tier: optional
+    description: "Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten."
+    routing:
+      # NO intent_keywords — never auto-routed by keyword; only reached via escalation from a blocked reflection loop
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      <<: *dev_handoff
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "blocked-review-v1"]
+      target_roles: []       # the buck stops here — no further delegation down
+      timeout_sec: 900
 
   requirements:
     model: balanced
@@ -158,6 +183,19 @@ roles:
       parallel: false
       orchestrator_only: false
 
+  dependency-auditor:
+    model: balanced          # manifest scanning and categorization, no deep code reasoning
+    memory: ""
+    workflow_tier: optional
+    description: "Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und veraltete/verwundbare Pakete — reicht Findings über feedback ein."
+    routing:
+      intent_keywords: ["dependency", "license", "SBOM", "package audit", "vulnerability", "outdated", "supply chain"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: "dependency-audit-v1"
+      target_roles: ["feedback"]
+
   agent-meta-scout:
     model: balanced
     memory: local
@@ -238,6 +276,23 @@ roles:
       intent_keywords: ["Log", "Logs", "Fehleranalyse"]
       parallel: true
       orchestrator_only: false
+    handoff:
+      output_contract: "log-analysis-v1"
+      target_roles: ["incident-responder"]
+
+  incident-responder:
+    model: powerful          # incident coordination under pressure — deep reasoning required
+    memory: project          # remember prior incidents and their root causes across sessions
+    workflow_tier: optional
+    description: "Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schritte aus, liefert RCA-Report und priorisierte Hotfix-Liste unter Zeitdruck."
+    routing:
+      intent_keywords: ["incident", "outage", "RCA", "root cause", "post-mortem", "hotfix", "P0", "P1"]
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts: ["log-analysis-v1"]
+      output_contract: "rca-report-v1"
+      target_roles: ["developer", "documenter"]
 
   feedback:
     model: fast
@@ -248,6 +303,8 @@ roles:
       intent_keywords: ["Feedback", "Issue", "Bug melden"]
       parallel: false
       orchestrator_only: false
+    handoff:
+      input_contracts: ["dependency-audit-v1"]
 
   bug-feature-analyzer:
     model: balanced
@@ -486,6 +543,20 @@ roles:
       output_schema: "schemas/handoffs/ext/api-extension.schema.json"
       target_roles: ["developer"]
 
+  database-engineer:
+    model: powerful          # schema design and migration safety warrant deep reasoning
+    memory: project          # remember schema decisions and migration history across sessions
+    workflow_tier: optional
+    description: "Relationales Schema-Design, Datenbank-Migrationen, Query-Optimierung und Index-Strategie — übergibt einen rückwärtskompatiblen Schema-Vertrag an developer."
+    routing:
+      intent_keywords: ["database", "schema", "migration", "query optimization", "index", "SQL", "db-design"]
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts: ["req-output-v1", "api-spec-v1"]
+      output_contract: "db-schema-v1"
+      target_roles: ["developer"]
+
   devops-engineer:
     model: fast
     memory: ""
@@ -601,7 +672,9 @@ reflection_pairs:
     generator: developer
     critic: code-reviewer
     max_iterations: 3
-    on_blocked: escalate_to_orchestrator
+    # After max_iterations without a passing review, escalate to the last-resort
+    # tier (principal-developer) instead of bouncing back to the orchestrator.
+    on_blocked: escalate_to_principal-developer
 
   - id: se-requirements-loop
     generator: se-requirements
