@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.74.1] — 2026-07-16
+
+### Fixed
+- Add Codeberg as valid GIT_PLATFORM option in the platform enum
+- Fix provider-isolation save crash
+- Expose intent-routing table to main-chat orchestrator mode
+
+### Docs
+- Correct main-chat-orchestrator-mode.md to reference INTENT_ROUTING_TABLE
+
 ## [0.74.0] — 2026-07-16
 
 ### Added

@@ -13,7 +13,7 @@
 >
 > In short: this is a practical lab setup to evaluate VibeCoding methods, compare approaches, and develop agent frameworks while keeping limitations visible.
 
-[![Version](https://img.shields.io/badge/version-0.74.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.74.1-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 | **Date:** 2026-07-16
@@ -28,7 +28,7 @@
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.74.0 && cd ..
+cd .agent-meta && git checkout v0.74.1 && cd ..
 
 # Run interactive setup
 python .agent-meta/scripts/sync.py --setup
@@ -512,7 +512,7 @@ docs/
   admin-ui.html              # Web frontend for Admin UI
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
-VERSION                      # Current version (v0.74.0)
+VERSION                      # Current version (v0.74.1)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```
