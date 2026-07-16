@@ -2,15 +2,19 @@
 
 ## [Unreleased]
 
+## [0.74.0] — 2026-07-16
+
 ### Added
-- `principal-developer` agent role: ultra-tier last-resort escalation, invoked only after `senior-developer` fails repeatedly — mandates root-cause diagnosis before implementation, no further delegation down (`agents/1-generic/principal-developer.md`, `agents/1-generic-modern/principal-developer.md`, `config/role-defaults.yaml`)
-- `intern-developer` agent role: Easter-egg/gag agent — an over-eager, clueless intern with read-only tools, technically harmless, never routed real work (`agents/1-generic/intern-developer.md`, `agents/1-generic-modern/intern-developer.md`, `config/role-defaults.yaml`)
-- `ultra` tier added to all tier presets, above `max` — reserved for last-resort escalation, always assigned the strongest real (non-fictitious) model per provider (`config/tier-presets.yaml`)
-- `database-engineer`, `incident-responder`, `dependency-auditor` agent roles: schema design/migrations (powerful), live incident coordination with RCA (powerful), and supply-chain/SBOM auditing (balanced) — with handoff wiring `db-schema-v1`, `rca-report-v1`, `dependency-audit-v1` (`agents/1-generic/`, `agents/1-generic-modern/`, `config/role-defaults.yaml`)
+- `principal-developer` agent role: senior escalation target for complex architecture decisions, `orchestrator_only: true` (`agents/1-generic/principal-developer.md`, `agents/1-generic-modern/principal-developer.md`, `config/role-defaults.yaml`)
+- `intern-developer` agent role: learning-focused agent for simple tasks scoped to ≤1 file (`agents/1-generic/intern-developer.md`, `agents/1-generic-modern/intern-developer.md`, `config/role-defaults.yaml`)
+- `database-engineer` agent role: DB schema design, migrations, query optimization (`agents/1-generic/database-engineer.md`, `agents/1-generic-modern/database-engineer.md`, `config/role-defaults.yaml`)
+- `incident-responder` agent role: production incident coordination, RCA, post-mortem documentation (`agents/1-generic/incident-responder.md`, `agents/1-generic-modern/incident-responder.md`, `config/role-defaults.yaml`)
+- `dependency-auditor` agent role: dependency audits, CVE checks, license compliance (`agents/1-generic/dependency-auditor.md`, `agents/1-generic-modern/dependency-auditor.md`, `config/role-defaults.yaml`)
+- `ultra` tier added to all tier presets, above `max` — reserved for last-resort escalation (`config/tier-presets.yaml`)
 
 ### Changed
 - `dev-review-loop` reflection pair now escalates to `principal-developer` on block instead of the orchestrator (`config/role-defaults.yaml`)
-- `blocked-review-v1` added to runtime-contract exemptions so principal-developer's escalation input contract does not trigger a false "no producer" handoff warning (`scripts/lib/consistency/handoff_contracts.py`)
+- `blocked-review-v1` handoff contract updated with runtime exemptions for principal-developer escalation (`scripts/lib/consistency/handoff_contracts.py`)
 
 ## [0.73.0] — 2026-07-16
 
