@@ -84,7 +84,7 @@ python .agent-meta/scripts/sync.py
 | **performance-optimizer** | powerful | 1.1.2 | Data-driven Big-O bottleneck identification |
 | **security-auditor** | powerful | 1.2.2 | Static security analysis: OWASP Top 10, secrets, supply-chain |
 | **ui-ux-designer** | balanced | 1.1.2 | UI specs, mockups, design systems |
-| **security-auditor** | powerful | 1.2.2 | Security audit: OWASP Top 10, secrets, supply-chain |
+| **e2e-tester** | balanced | 1.0.0 | End-to-end browser testing via Playwright: user flows, visual regression, accessibility audits |
 
 ### Provider Expert Agents (5 agents)
 
@@ -350,6 +350,19 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **viz-logger** | stdio | Agent event logging (log_viz_event) |
 | **a2a-handoff** | stdio | A2A schema validation (validate_handoff, resolve_handoff) |
 
+## Admin UI Features
+
+Web-based control panel for project configuration (default: `http://localhost:7420`).
+
+**Key Controls:**
+
+- **Orchestrator Mode Selector** — Dropdown to switch between `strict`, `advisory`, and `main-chat` modes. Writes directly to `.meta-config/project.yaml` → `orchestrator.mode`. No restart required.
+- **DoD Preset Selector** — Change quality pipeline preset (full, standard, rapid-prototyping, etc.)
+- **MCP Server Dashboard** — View active MCP server status and configurations
+- **Agent Visualization** — Interactive agent dependency graph and mindmap
+
+Start with: `python scripts/sync.py --admin` or `/admin` slash command.
+
 ## A2A Handoff Protocol
 
 Structured JSON envelopes for Agent-to-Agent communication:
@@ -553,7 +566,7 @@ roles:
 
 orchestrator:
   enabled: true
-  strict: true
+  mode: strict    # strict | advisory | main-chat
 
 dod-preset: rapid-prototyping
 speech-mode: short
@@ -566,6 +579,38 @@ speech-mode: short
 | `.agent-meta/config/` | agent-meta framework | Role defaults, providers, DoD presets — read-only |
 | `.meta-config/project.yaml` | Your project | Project identity, active roles, providers, orchestrator config |
 | `.claude/platform-config.yaml` | Your project | Platform-specific variable overrides |
+
+### Orchestrator Modes
+
+Three operational modes for task routing and delegation:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **strict** | Orchestrator required, no direct dispatch, enforces all routing rules | Production codebases, strict quality gates, large teams |
+| **advisory** | Orchestrator recommended but user can override, direct dispatch allowed | Flexible workflows, balanced control |
+| **main-chat** | No orchestrator spawned; main_chat acts as router + worker in one | Rapid prototyping, single-developer projects, low overhead |
+
+Set in `.meta-config/project.yaml`:
+```yaml
+orchestrator:
+  mode: strict              # default for production
+  mode: advisory            # flexible routing
+  mode: main-chat           # direct execution, no subagent overhead
+```
+
+### Synchronization Variables
+
+Custom project variables for conditional feature activation:
+
+| Variable | Type | Purpose |
+|----------|------|---------|
+| `WEB_PROJECT_ENABLED` | boolean | When true, activates web-specific verification steps in developer, senior-developer, performance-optimizer agents (Playwright MCP, visual regression, accessibility checks) |
+
+Set in `.meta-config/project.yaml` under `variables:`
+```yaml
+variables:
+  WEB_PROJECT_ENABLED: true
+```
 
 ## Workflows
 
