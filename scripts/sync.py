@@ -688,12 +688,14 @@ def main():
         consistency_errors = _run_consistency_checks(agent_meta_root)
 
         test_repo_path = resolve_test_repo_path(config, project_root, log)
-        if test_repo_path is None:
+        if test_repo_path is None or not test_repo_path.exists():
+            reason = (f"configured path {test_repo_path} does not exist"
+                      if test_repo_path else
+                      "not configured (set test-repo.path in .meta-config/project.yaml "
+                      "or AGENT_META_TEST_REPO)")
             log.info("test-repo",
-                     "No test repository configured — skipping test-repo sync "
-                     "validation (consistency checks still ran). Configure "
-                     "test-repo.path in .meta-config/project.yaml or set "
-                     "AGENT_META_TEST_REPO to enable it.")
+                     f"Skipping test-repo sync validation — {reason}. "
+                     "Consistency checks still ran.")
             sys.exit(1 if consistency_errors else 0)
         success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
         if not success or consistency_errors:
