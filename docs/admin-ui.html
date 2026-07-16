@@ -4246,7 +4246,16 @@ async function viewProjectOrchestrator() {
   const genPanel = el("div", { class: "panel" });
   genPanel.appendChild(el("h2", {}, ["General"]));
   genPanel.appendChild(checkboxField("enabled", orch.enabled, v => { orch.enabled = v; }));
-  genPanel.appendChild(checkboxField("strict", orch.strict, v => { orch.strict = v; }));
+  // Orchestrator mode enum — replaces the deprecated `strict` checkbox.
+  // Takes precedence over legacy enabled/strict booleans in sync.py.
+  const orchModeValue = orch.mode
+    || (orch.enabled === false ? "main-chat" : (orch.strict !== false ? "strict" : "advisory"));
+  const modeField = el("div", { class: "field" });
+  modeField.appendChild(el("label", { class: "field-label" }, ["mode"]));
+  modeField.appendChild(selectField(["strict", "advisory", "main-chat"], orchModeValue, v => { orch.mode = v; }));
+  modeField.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:2px;" },
+    ["Orchestrator mode. Replaces the deprecated strict/enabled checkboxes. main-chat = no orchestrator subagent, main chat routes."]));
+  genPanel.appendChild(modeField);
   genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
   genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
   wrap.appendChild(genPanel);
