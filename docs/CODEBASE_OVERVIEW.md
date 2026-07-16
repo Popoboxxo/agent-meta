@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-07-12 (Phase 6: Token-Efficiency, Lazy-Loading, Flat Orchestrator Modes)
+> Letzte Aktualisierung: 2026-07-16 (v0.74.0: 5 neue Agenten-Rollen, ultra-Tier, principal-developer-Eskalation)
 
 ---
 
@@ -395,9 +395,9 @@ Die Provider-Expert-Agenten wurden in v0.55.0 eingeführt und bieten Provider-sp
 
 ---
 
-## 2.5 3-Tier-Developer-System (v2026-06-12)
+## 2.5 4-Tier-Developer-System (v0.74.0 — erweitert um ultra-Tier)
 
-Das System wurde vollständig in Orchestrator und Templates integriert. Drei spezialisierte Developer-Agenten mit Eskalations- und De-Eskalations-Protokoll:
+Das System wurde vollständig in Orchestrator und Templates integriert. Vier spezialisierte Developer-Agenten mit Eskalations- und De-Eskalations-Protokoll:
 
 ### Tier-Übersicht
 
@@ -405,7 +405,8 @@ Das System wurde vollständig in Orchestrator und Templates integriert. Drei spe
 |------|-------|--------|--------|---------|--------------|
 | `fast` | `junior-developer` | Günstiger/Fast | Trivialer Fix ≤2 Dateien, offensichtliche Lösung | Typo, Off-by-one, Config-Wert, Logging, Boilerplate-nach-Vorlage | `developer` ODER `senior-developer` |
 | `balanced` | `developer` | Balanced | Standard-Implementierung, klarer Scope | Feature mit Pattern, normaler Bugfix, ≤3 Dateien | `senior-developer` (bei Scope-Überschreitung) |
-| `max` | `senior-developer` | Powerful/Max | Architektur-Impact, Risiko, unklare Ursache | API/Schema-Änderung, Cross-Cutting-Refactoring, Race Condition, Security, Performance | Keine (end-of-line) |
+| `max` | `senior-developer` | Powerful/Max | Architektur-Impact, Risiko, unklare Ursache | API/Schema-Änderung, Cross-Cutting-Refactoring, Race Condition, Security, Performance | `principal-developer` (via dev-review-loop `on_blocked`) |
+| `ultra` | `principal-developer` | Ultra (stärkstes Realmodell) | Last-Resort nach wiederholtem senior-developer-Versagen. Root-Cause-Diagnose vor Implementierung mandatiert. `orchestrator_only: true` | Nur über `on_blocked: escalate_to_principal-developer` im dev-review-loop | — (end-of-line) |
 
 ### Eskalations-Protokoll
 
@@ -443,6 +444,8 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `developer.md` | 2.0.1 | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
 | `junior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Fast-Tier: triviale Fixes ≤2 Dateien, kein Design nötig |
 | `senior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Max-Tier: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs |
+| `principal-developer.md` | 1.0.0 | read, write, edit, glob, grep | Ultra-Tier: Last-Resort-Eskalation nach wiederholtem senior-developer-Versagen; Root-Cause-Diagnose mandatiert; `orchestrator_only: true` |
+| `intern-developer.md` | 1.0.0 | read, glob, grep | Nano-Tier: Easter-Egg/Gag-Agent, read-only, nie für Produktionsarbeit geroutet |
 | `tester.md` | — | read, write, run_command | TDD, Test-Suite, Testabdeckung |
 | `validator.md` | 2.0.1 | read, run_command | Code gegen REQs prüfen, DoD-Check |
 | `documenter.md` | — | read, write, edit, glob, grep | CODEBASE_OVERVIEW, ARCHITECTURE, README |
@@ -454,6 +457,9 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `agent-meta-manager.md` | 1.9.0 | read, write, edit, glob, grep | agent-meta verwalten |
 | `agent-meta-scout.md` | — | read, write, glob, grep | Ökosystem scouten |
 | `security-auditor.md` | — | read, run_command | Sicherheits-Audit |
+| `database-engineer.md` | 1.0.0 | read, write, edit, glob, grep, bash | Powerful-Tier: DB-Schema, backwards-kompatible Migrationen, Query-Optimierung |
+| `incident-responder.md` | 1.0.0 | read, glob, grep, bash | Powerful-Tier: Live-Incident-Koordination, RCA (5-Whys/Fishbone), Hotfix-Priorisierung |
+| `dependency-auditor.md` | 1.0.0 | read, glob, grep, bash | Balanced-Tier: Supply-Chain-Hygiene, SBOM-Analyse, CVE-Checks, Lizenz-Compliance |
 | `docker.md` | — | run_command | Docker-Stack verwalten |
 | `meta-feedback.md` | 2.0.0 | read, write, run_command | Verbesserungsvorschläge als Issues |
 | `feedback.md` | — | read, write, run_command | Projekt-Feedback als Issues |

@@ -42,6 +42,10 @@ graph TD
 | `orchestrator` | Einstiegspunkt — koordiniert alle anderen Agenten | Alle Entwicklungsaufgaben | *(voll)* |
 | `feature` | Vollständiger Feature-Lifecycle via Sub-Agent-Delegation | "Ich will ein neues Feature bauen" | *(voll)* |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs | Implementierungsaufgaben | *(voll)* |
+| `junior-developer` | Triviale Fixes (1-2 Dateien, kein Architektur-Impact), eskaliert strukturiert | Kleine Änderungen | haiku |
+| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs | Architektur-Impact, Cross-Cutting | max |
+| `principal-developer` | Ultra-Tier Last-Resort-Eskalation nach wiederholtem senior-developer-Versagen. Mandatiert Root-Cause-Diagnose vor Implementierung | Nur nach Eskalation, `orchestrator_only: true` | ultra |
+| `intern-developer` | Easter-Egg/Gag-Agent. Übereifriger, ahnungsloser Intern — read-only, nie für echte Arbeit geroutet | — | nano |
 | `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase | sonnet |
 | `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR | sonnet |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben | Neue Anforderungen | *(voll)* |
@@ -54,6 +58,9 @@ graph TD
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projekt-Agenten | Meta-Management | sonnet |
 | `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns | Ökosystem-Erkundung | sonnet |
 | `security-auditor` | Sicherheitsanalyse: OWASP, Secrets, Dependency-Audit | Security-Reviews | sonnet |
+| `database-engineer` | DB-Schema-Design, backwards-kompatible Migrationen, Query-Optimierung, Index-Strategie | DB-Änderungen, Migrations, Performance | powerful |
+| `incident-responder` | Live-Incident-Koordination, RCA (5-Whys/Fishbone), Severity-Klassifikation, priorisierte Hotfixes | Aktive Incidents, Post-Mortem | powerful |
+| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift, CVE-Checks | Security-Reviews, Release-Vorbereitung | balanced |
 | `0-external skills` | Domänenspezifische Agenten aus Drittrepos | Spezialwissen | variiert |
 | `orchestrator (SE-Mode)` | Koordiniert 6-stufige rekursive SE-Kaskade | Systems-Engineering | balanced |
 | `se-requirements` | Stakeholder-Bedürfnisse → formale L1-Blackbox-REQs | SE-Start | balanced |

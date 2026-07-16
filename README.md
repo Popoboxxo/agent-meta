@@ -13,10 +13,10 @@
 >
 > In short: this is a practical lab setup to evaluate VibeCoding methods, compare approaches, and develop agent frameworks while keeping limitations visible.
 
-[![Version](https://img.shields.io/badge/version-0.71.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.74.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
-| **Date:** 2026-07-12
+| **Date:** 2026-07-16
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
@@ -28,7 +28,7 @@
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.71.0 && cd ..
+cd .agent-meta && git checkout v0.74.0 && cd ..
 
 # Run interactive setup
 python .agent-meta/scripts/sync.py --setup
@@ -37,7 +37,7 @@ python .agent-meta/scripts/sync.py --setup
 python .agent-meta/scripts/sync.py
 ```
 
-## Agent Roster — 39 Generic Agents
+## Agent Roster — 44 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -277,6 +277,9 @@ Or via slash command: `/set-preset`
 | **balanced** | claude-sonnet-4-6 | gemini-3.1-pro-low | qwen3.7-plus |
 | **powerful** | claude-opus-4-8 | gemini-3.1-pro-high | kimi-k2.6 |
 | **max** | claude-fable-5 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **ultra** | claude-opus-4-8 | gemini-3.1-pro-high | kimi-k2.7-code |
+
+**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Resolves to the strongest *real* model (not fictitious IDs like claude-fable-5).
 
 Continue and Copilot: no per-agent model tiers (managed centrally).
 
@@ -466,7 +469,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 ```
 agents/
   0-external/                # External skill wrappers (git submodules)
-  1-generic/                 # Universal provider-agnostic templates (37 + 13 SE agents)
+  1-generic/                 # Universal provider-agnostic templates (44 + 13 SE agents)
   1-generic-modern/          # Modern mode (6-block XML, 29 main roles)
   2-platform/                # Platform-specific overrides (extends + patches)
 config/
@@ -509,7 +512,7 @@ docs/
   admin-ui.html              # Web frontend for Admin UI
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
-VERSION                      # Current version (v0.71.0)
+VERSION                      # Current version (v0.74.0)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```

@@ -226,7 +226,7 @@ mindmap
 
 ### se-orchestrator (deprecated)
 - **Tier:** optional (deprecated)
-- **Beschreibung:** SE-Funktionalit�t jetzt im Haupt-orchestrator (SE-Mode). Wrapper f�r Backward-Compatibility.
+- **Beschreibung:** SE-Funktionalit�t jetzt im Haupt-orchestrator (SE-Mode). Wrapper f�r Backward-Compatibility.
 - **Model:** Claude: claude-sonnet-4-6, Opencode: opencode-go/qwen3.6-plus
 
 ### se-requirements
@@ -264,10 +264,35 @@ mindmap
 - **Beschreibung:** Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution.
 - **Model:** Claude: claude-opus-4-7, Opencode: opencode-go/kimi-k2.5
 
+### database-engineer
+- **Tier:** powerful
+- **Beschreibung:** DB-Schema-Design, backwards-kompatible Migrationen, Query-Optimierung, Index-Strategie. Führt keine destruktiven Schema-Änderungen ohne Rollback-Plan durch.
+- **Model:** Claude: claude-opus-4-8, Opencode: opencode-go/kimi-k2.6
+
+### dependency-auditor
+- **Tier:** balanced
+- **Beschreibung:** Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilitätsprüfung, Version-Drift-Detection, CVE-Checks. Reine Audit-Rolle — keine Code-Änderungen.
+- **Model:** Claude: claude-sonnet-4-6, Opencode: opencode-go/qwen3.7-plus
+
+### incident-responder
+- **Tier:** powerful
+- **Beschreibung:** Live-Incident-Koordination, RCA (5-Whys/Fishbone), Severity-Klassifikation (SEV1-SEV4), priorisierte Hotfix-Handoffs, Post-Mortem-Vorbereitung.
+- **Model:** Claude: claude-opus-4-8, Opencode: opencode-go/kimi-k2.6
+
 ### senior-developer
 - **Tier:** optional
 - **Beschreibung:** Komplexe Features, Architektur-Entscheidungen, schwierige Bugs und Cross-Cutting-Refactorings. Analysiert vor der Implementierung und dokumentiert Entscheidungen.
 - **Model:** Claude: claude-fable-5, Opencode: opencode-go/kimi-k2.7-code
+
+### principal-developer
+- **Tier:** ultra (Last-Resort-Eskalation)
+- **Beschreibung:** Ultra-Tier Last-Resort-Eskalation, nur nach wiederholtem senior-developer-Versagen. Mandatiert Root-Cause-Diagnose vor Implementierung. `orchestrator_only: true` — niemals direkt vom User geroutet.
+- **Model:** Claude: claude-opus-4-8, Opencode: opencode-go/kimi-k2.7-code
+
+### intern-developer
+- **Tier:** nano (Easter-Egg/Gag)
+- **Beschreibung:** Übereifriger, ahnungsloser Intern mit read-only Tools. Nie für echte Arbeit geroutet — reiner Gag-Agent.
+- **Model:** Claude: claude-haiku-4-5-20251001, Opencode: opencode-go/deepseek-v4-flash
 
 ### tester
 - **Tier:** recommended
