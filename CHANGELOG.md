@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.75.0] — 2026-07-16
+
 ### Added
 - `sre-engineer` agent role: proactive reliability discipline, SLI/SLO definitions, error budgets, capacity planning, toil reduction and runbooks (`agents/1-generic/sre-engineer.md`, `agents/1-generic-modern/sre-engineer.md`, `config/role-defaults.yaml`)
 - `technical-writer` agent role: external developer- and user-facing docs, API references, getting-started guides, SDK docs, tutorials, CLI help and UX microcopy (`agents/1-generic/technical-writer.md`, `agents/1-generic-modern/technical-writer.md`, `config/role-defaults.yaml`)
