@@ -2763,7 +2763,7 @@ async function viewExport() {
       tr.appendChild(el("td", {}, [dirInp]));
 
       // delete row
-      const delBtn = el("button", { class: "btn btn-danger" }, ["×"]);
+      const delBtn = el("button", { class: "btn btn-danger", title: "Remove mapping" }, ["×"]);
       delBtn.addEventListener("click", () => {
         if (!confirm(`Remove export mapping "${name}"?`)) return;
         delete data[name];
@@ -3174,12 +3174,15 @@ async function viewAgentTemplates() {
 
   saveBtn.addEventListener("click", async () => {
     if (!activeRole) return;
+    saveBtn.disabled = true;
     try {
       const r = await api.put(`/api/agent-template/${activeRole}`, { content: textarea.value });
       toast(`Saved ${activeRole}.md (${r.bytes} bytes)`, "success");
       status.textContent = `Saved ${activeRole}.md`;
     } catch (err) {
       toast(`Save failed: ${err.message}`, "error");
+    } finally {
+      saveBtn.disabled = false;
     }
   });
 
@@ -3269,7 +3272,7 @@ async function viewSync() {
 
       if (debugLines.length > 0) {
         const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px;" });
-        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug-Output (Model-Ersetzungen)"]);
+        const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug Output (Model Substitutions)"]);
         const pre = el("pre", { style: "margin-top: 10px; background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
         details.appendChild(summary);
         details.appendChild(pre);
@@ -4572,7 +4575,7 @@ async function viewProjectPromptModes() {
 
       // Clear button
       const clearTd = el("td");
-      const clearBtn = el("button", { class: "btn btn-ghost", style: "padding:2px 8px;font-size:11px;" }, ["✕"]);
+      const clearBtn = el("button", { class: "btn btn-ghost", style: "padding:2px 8px;font-size:11px;", title: "Clear override" }, ["✕"]);
       clearBtn.addEventListener("click", () => {
         delete ap.modes[role];
         sel.value = "";
@@ -4757,7 +4760,7 @@ async function viewProjectModelOverrides() {
       modelInp.addEventListener("change", () => { row.model = modelInp.value; });
       tr.appendChild(el("td", {}, [modelInp]));
 
-      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      const rm = el("button", { class: "btn btn-danger", title: "Remove override" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
       tr.appendChild(el("td", {}, [rm]));
 
@@ -4892,7 +4895,7 @@ async function viewProjectProviderTierOverrides() {
       modelInp.addEventListener("change", () => { row.model = modelInp.value; });
       tr.appendChild(el("td", {}, [modelInp]));
 
-      const rm = el("button", { class: "btn btn-danger" }, ["×"]);
+      const rm = el("button", { class: "btn btn-danger", title: "Remove override" }, ["×"]);
       rm.addEventListener("click", () => { rows.splice(idx, 1); render(); });
       tr.appendChild(el("td", {}, [rm]));
 

@@ -593,6 +593,11 @@ class ConfigManager:
 
         Returns a status dict describing where the backup was stored.
         """
+        # Guard against corrupting a YAML config file with a scalar payload
+        # (e.g. PUT /api/config/role-defaults with body "just a string").
+        # A valid config document is always a mapping or a sequence.
+        if not isinstance(data, (dict, list)):
+            raise ValueError("Invalid payload type: expected object")
         path = self.resolve_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -973,6 +978,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._dispatch_post()
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except ValueError as exc:
+            self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return
@@ -1259,6 +1266,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             body = self._read_body()
             if not isinstance(body, dict):
                 raise ValueError("expected JSON body with reflection pair object")
+            for field in ("id", "generator", "critic"):
+                value = body.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("id, generator and critic are required")
             pair_id = self._ensure_pair_id(body)
             result = self._write_reflection_pair(pair_id, body)
             return self._send_json(result)
