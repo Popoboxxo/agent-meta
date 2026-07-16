@@ -197,6 +197,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/developer.md` | `1-generic/developer.md` |
 | `.claude/agents/junior-developer.md` | `1-generic/junior-developer.md` (optional, 3-Tier-System) |
 | `.claude/agents/senior-developer.md` | `1-generic/senior-developer.md` (optional, 3-Tier-System) |
+| `.claude/agents/principal-developer.md` | `1-generic/principal-developer.md` (optional, Last-Resort-Eskalation über senior-developer, ultra-Tier) |
+| `.claude/agents/intern-developer.md` | `1-generic/intern-developer.md` (optional, Easter-Egg/Gag-Agent — read-only, nicht für echte Arbeit) |
 | `.claude/agents/tester.md` | `1-generic/tester.md` |
 | `.claude/agents/e2e-tester.md` | `1-generic/e2e-tester.md` (optional, für Web-Projekte mit E2E/visueller Regression/a11y) |
 | `.claude/agents/validator.md` | `1-generic/validator.md` |
@@ -222,6 +224,9 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-senior-developer.md` | `1-generic/se-senior-developer.md` |
 | `.claude/agents/bug-feature-analyzer.md` | `1-generic/bug-feature-analyzer.md` |
 | `.claude/agents/explorer.md` | `1-generic/explorer.md` |
+| `.claude/agents/database-engineer.md` | `1-generic/database-engineer.md` (optional, Schema-Design, Migrationen, Query-Optimierung) |
+| `.claude/agents/incident-responder.md` | `1-generic/incident-responder.md` (optional, Live-Incident-Koordination, RCA, Hotfix-Priorisierung) |
+| `.claude/agents/dependency-auditor.md` | `1-generic/dependency-auditor.md` (optional, Supply-Chain-Hygiene, SBOM, Lizenz-Compliance) |
 
 ---
 

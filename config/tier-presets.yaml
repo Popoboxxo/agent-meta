@@ -1,3 +1,19 @@
+# Tier presets — map abstract tiers to provider-specific model IDs.
+#
+# Tier hierarchy (weakest → strongest): nano < fast < balanced < powerful < max < ultra
+#
+# ultra — LAST-RESORT ESCALATION ONLY.
+#   Reserved for the principal-developer role, which is invoked only after
+#   senior-developer has failed multiple times. It is the single most expensive
+#   call in the system and must never be auto-routed by keyword.
+#   ultra is always assigned the strongest *real* (non-fictitious, non-blacklisted)
+#   model available per provider — see config/model-curation.yaml for the
+#   fictitious/unconfirmed IDs (e.g. claude-fable-5, claude-sonnet-5) that are
+#   deliberately NOT used here. The distinction between max and ultra is
+#   primarily semantic (usage-gated), not necessarily a different model.
+#   NOTE: In presets whose `max` points at a fictitious ID (claude-fable-5),
+#   `ultra` intentionally resolves to a *lower-but-real* model (claude-opus-4-8),
+#   because ultra must always be a usable model.
 Cheap:
   description: Flattens all tiers to nano/fast range.
   tiers:
@@ -6,6 +22,7 @@ Cheap:
     balanced: claude-haiku-4-5-20251001
     powerful: claude-haiku-4-5-20251001
     max: claude-sonnet-4-6
+    ultra: claude-opus-4-8        # last-resort: strongest real model, above this preset's max
   providers:
     Claude:
       tiers:
@@ -14,6 +31,7 @@ Cheap:
         balanced: claude-haiku-4-5-20251001
         powerful: claude-haiku-4-5-20251001
         max: claude-sonnet-4-6
+        ultra: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -21,6 +39,7 @@ Cheap:
         balanced: gemini-3.5-flash-medium
         powerful: gemini-3.5-flash-medium
         max: gemini-3.5-flash-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4-flash
@@ -28,6 +47,7 @@ Cheap:
         balanced: opencode-go/deepseek-v4-flash
         powerful: opencode-go/deepseek-v4-flash
         max: opencode-go/qwen3.7-plus
+        ultra: opencode-go/kimi-k2.7-code
 Normal:
   description: 1:1 tier mapping (status quo).
   tiers:
@@ -36,6 +56,7 @@ Normal:
     balanced: claude-sonnet-4-6
     powerful: claude-opus-4-8
     max: claude-fable-5
+    ultra: claude-opus-4-8        # last-resort: strongest real model (max is fictitious)
   providers:
     Claude:
       tiers:
@@ -44,6 +65,7 @@ Normal:
         balanced: claude-sonnet-4-6
         powerful: claude-opus-4-8
         max: claude-opus-4-8
+        ultra: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -51,6 +73,7 @@ Normal:
         balanced: gemini-3.1-pro-low
         powerful: gemini-3.1-pro-high
         max: gemini-3.1-pro-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4-flash
@@ -58,6 +81,7 @@ Normal:
         balanced: opencode-go/qwen3.7-plus
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
+        ultra: opencode-go/kimi-k2.7-code
 Advanced:
   description: Shifts all tiers one level up.
   tiers:
@@ -66,6 +90,7 @@ Advanced:
     balanced: claude-opus-4-8
     powerful: claude-fable-5
     max: claude-fable-5
+    ultra: claude-opus-4-8        # last-resort: strongest real model (max is fictitious)
   providers:
     Claude:
       tiers:
@@ -74,6 +99,7 @@ Advanced:
         balanced: claude-opus-4-8
         powerful: claude-fable-5
         max: claude-fable-5
+        ultra: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -81,6 +107,7 @@ Advanced:
         balanced: gemini-3.1-pro-high
         powerful: gemini-3.1-pro-high
         max: gemini-3.1-pro-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4-flash
@@ -88,6 +115,7 @@ Advanced:
         balanced: opencode-go/kimi-k2.6
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
+        ultra: opencode-go/kimi-k2.7-code
 Expensive:
   description: Strong upward tier shift.
   tiers:
@@ -96,6 +124,7 @@ Expensive:
     balanced: claude-fable-5
     powerful: claude-fable-5
     max: claude-fable-5
+    ultra: claude-opus-4-8        # last-resort: strongest real model (max is fictitious)
   providers:
     Claude:
       tiers:
@@ -104,6 +133,7 @@ Expensive:
         balanced: claude-fable-5
         powerful: claude-fable-5
         max: claude-fable-5
+        ultra: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.5-flash-high
@@ -111,6 +141,7 @@ Expensive:
         balanced: gemini-3.1-pro-high
         powerful: gemini-3.1-pro-high
         max: gemini-3.1-pro-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/qwen3.7-plus
@@ -118,6 +149,7 @@ Expensive:
         balanced: opencode-go/kimi-k2.7-code
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
+        ultra: opencode-go/kimi-k2.7-code
 Expensive as Hell:
   description: Most agents run at powerful or max tier.
   tiers:
@@ -126,6 +158,7 @@ Expensive as Hell:
     balanced: claude-fable-5
     powerful: claude-fable-5
     max: claude-fable-5
+    ultra: claude-opus-4-8        # last-resort: strongest real model (max is fictitious)
   providers:
     Claude:
       tiers:
@@ -134,6 +167,7 @@ Expensive as Hell:
         balanced: claude-fable-5
         powerful: claude-fable-5
         max: claude-fable-5
+        ultra: claude-opus-4-8
     Gemini:
       tiers:
         nano: gemini-3.1-pro-low
@@ -141,6 +175,7 @@ Expensive as Hell:
         balanced: gemini-3.1-pro-high
         powerful: gemini-3.1-pro-high
         max: gemini-3.1-pro-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/kimi-k2.6
@@ -148,3 +183,4 @@ Expensive as Hell:
         balanced: opencode-go/kimi-k2.7-code
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
+        ultra: opencode-go/kimi-k2.7-code
