@@ -485,18 +485,38 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
     # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
     variables["INTENT_ROUTING_TABLE"] = generate_intent_routing_table(agent_meta_root, config, variables)
-    # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml
+    # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
     try:
-        roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
-        if roles_defaults_path.exists() and _YAML_AVAILABLE:
-            with roles_defaults_path.open(encoding="utf-8") as f:
-                roles_defaults = _yaml.safe_load(f) or {}
-            if roles_defaults.get("reflection_pairs"):
-                variables["REFLECTION_PAIRS_ENABLED"] = "true"
+        from .reflection import (
+            load_reflection_pairs,
+            load_project_overrides,
+            apply_project_overrides,
+        )
+        _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
+        _refl_overrides = load_project_overrides(
+            str(agent_meta_root / ".meta-config" / "project.yaml")
+        )
+        _effective_pairs = apply_project_overrides(_refl_pairs, _refl_overrides)
+        if _effective_pairs:
+            variables["REFLECTION_PAIRS_ENABLED"] = "true"
+            _main_pair = next(
+                (p for p in _effective_pairs if p.get("id") == "dev-review-loop"),
+                _effective_pairs[0],
+            )
+            variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:
-        pass
+        # Fallback: keep existing behavior (check role-defaults.yaml directly)
+        try:
+            roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
+            if roles_defaults_path.exists() and _YAML_AVAILABLE:
+                with roles_defaults_path.open(encoding="utf-8") as f:
+                    roles_defaults = _yaml.safe_load(f) or {}
+                if roles_defaults.get("reflection_pairs"):
+                    variables["REFLECTION_PAIRS_ENABLED"] = "true"
+        except Exception:
+            pass
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["QUALITY_PIPELINES_ENABLED"] = "false"
     try:
