@@ -1,4 +1,4 @@
-version: "1.0.2"
+version: "1.0.3"
 
 # agent-meta MCP Registry
 # ========================
@@ -153,3 +153,51 @@ mcp-servers:
       url: "{{MCP_HONCHO_URL}}"
     secrets:
       - MCP_HONCHO_URL
+
+  playwright:
+    description: "Playwright MCP Server für Browser-Automation und E2E-Tests"
+    category: testing
+    enabled-by-default: false
+    tools:
+      allowed:
+        # Navigation
+        - browser_navigate
+        - browser_navigate_back
+        # Accessibility-Snapshot (a11y-Baum) und visuelle Erfassung
+        - browser_snapshot
+        - browser_take_screenshot
+        # Interaktion
+        - browser_click
+        - browser_type
+        - browser_hover
+        - browser_select_option
+        - browser_press_key
+        - browser_fill_form
+        - browser_wait_for
+        - browser_resize
+        - browser_tabs
+        # Network-Inspection
+        - browser_network_requests
+        - browser_network_request
+        - browser_console_messages
+      blocked:
+        # Arbiträre Code-Ausführung im Browser-Kontext — Sicherheitsrisiko
+        - browser_run_code_unsafe
+        - browser_evaluate
+        # Datei-Upload / Dialog-Handling — datenschutz-/seiteneffektrelevant
+        - browser_file_upload
+        - browser_handle_dialog
+    agent-hint: |
+      Browser-Automation für E2E-Flows, visuelle Regression und Accessibility-Audits.
+      browser_navigate: zur Ziel-URL navigieren.
+      browser_snapshot: Accessibility-Baum der Seite erfassen (Basis für a11y-Audit und stabile Selektoren).
+      browser_click/browser_type/browser_fill_form: User-Interaktionen im Flow simulieren.
+      browser_take_screenshot: visuelle Regression via Screenshot-Vergleich.
+      browser_network_requests/browser_console_messages: Netzwerk und Konsole inspizieren.
+      Arbiträre Code-Ausführung (browser_run_code_unsafe, browser_evaluate) ist gesperrt.
+    connection:
+      type: stdio
+      command: npx
+      args:
+        - "@playwright/mcp@latest"
+    secrets: []

@@ -108,6 +108,20 @@ roles:
       input_contracts: ["task-spec-v1", "req-output-v1"]
       output_contract: "test-result-v1"
 
+  e2e-tester:
+    model: balanced
+    memory: ""
+    workflow_tier: optional
+    description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units"
+    routing:
+      intent_keywords: ["E2E", "End-to-End", "Browser-Test", "visuelle Regression", "Accessibility", "a11y"]
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts: ["task-spec-v1", "dev-result-v1"]
+      output_contract: "e2e-result-v1"
+      target_roles: ["developer"]
+
   validator:
     model: balanced
     memory: project

@@ -198,6 +198,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/junior-developer.md` | `1-generic/junior-developer.md` (optional, 3-Tier-System) |
 | `.claude/agents/senior-developer.md` | `1-generic/senior-developer.md` (optional, 3-Tier-System) |
 | `.claude/agents/tester.md` | `1-generic/tester.md` |
+| `.claude/agents/e2e-tester.md` | `1-generic/e2e-tester.md` (optional, für Web-Projekte mit E2E/visueller Regression/a11y) |
 | `.claude/agents/validator.md` | `1-generic/validator.md` |
 | `.claude/agents/requirements.md` | `1-generic/requirements.md` |
 | `.claude/agents/documenter.md` | `1-generic/documenter.md` |
