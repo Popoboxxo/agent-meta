@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `e2e-tester` agent role: E2E tests, visual regression and accessibility audits via Playwright — user-flows instead of isolated units (`agents/1-generic/e2e-tester.md`, `config/role-defaults.yaml`)
+- Playwright MCP server for browser automation and E2E tests (`config/mcp-registry.yaml`, `.claude/rules/mcp-playwright.md`)
+- Main-chat orchestrator mode concept promoted to active (`docs/concepts/active/main-chat-orchestrator-mode.md`)
+
+### Changed
+- Web-development capabilities added to `developer`, `senior-developer`, `junior-developer` and `performance-optimizer` agents, including browser verification steps (`agents/1-generic/`, `agents/1-generic-modern/`)
+
 ## [0.72.0] — 2026-07-15
 
 ### Added
