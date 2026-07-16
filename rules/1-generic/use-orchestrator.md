@@ -46,6 +46,9 @@ The main chat acts as both router and worker. No separate orchestrator subagent 
 - Apply HITL gates before risky operations (branch delete, force-push, schema migration, DELETE, release)
 - Delegate to specialist agents for isolated work — one level deep, sequential
 
+**Intent-Routing:**
+{{INTENT_ROUTING_TABLE}}
+
 **Reduced overhead (no multi-agent protocol):**
 - No BARRIER / FANOUT
 - No A2A envelope protocol

@@ -104,7 +104,7 @@ Im `main-chat`-Modus soll `agents/1-generic/orchestrator.md` **gar nicht** in `.
 
 ### 4.2 Konsequenzen für abgeleitete Artefakte
 
-- `AGENT_DELEGATION_TABLE` wird für den `main_chat` (in `use-orchestrator.md`) aufbereitet statt für einen Orchestrator-Subagenten
+- `INTENT_ROUTING_TABLE` (bisher nur für `orchestrator.md` verwendet) wird für den `main_chat` (in `use-orchestrator.md`) aufbereitet statt der vollen `AGENT_DELEGATION_TABLE` — vermeidet Duplikation der Agent-Beschreibungen, die Claude Code bereits nativ über Subagent-Descriptions injiziert
 - Routing-Tabellen wandern in die Main-Chat-Rule
 - Der Singleton-Guard-Hook (`orchestrator-guard.sh`) entfällt oder wird deaktiviert, da es keinen Orchestrator gibt
 
