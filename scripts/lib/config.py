@@ -591,8 +591,12 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                 return stripped
 
             # Guard: prevent simple-if from matching if-else blocks
-            # by not crossing {{/if}} or {{else}} boundaries.
-            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
+            # by not crossing {{/if}} or {{else}} boundaries. Also refuse to
+            # cross a nested opening marker ({{#if}}/{{#unless}}), so only true
+            # innermost blocks match. This makes stripping resolve nested blocks
+            # inner-to-outer regardless of the (set-derived) variable iteration
+            # order — otherwise output is non-deterministic across processes.
+            _simple_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
             pattern_if = rf"\{{{{#if {var_pattern}\}}}}\n?({_simple_body})\{{{{/if\}}}}\n?"
             old_text = text
             text = re.sub(pattern_if, replace_if, text, flags=re.DOTALL)
@@ -610,7 +614,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                     return stripped + "\n"
                 return stripped
 
-            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}).)*?"
+            _unless_body = r"(?:(?!\{\{/unless\}\}|\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
             pattern_unless = rf"\{{{{#unless {var_pattern}\}}}}\n?({_unless_body})\{{{{/unless\}}}}\n?"
             old_text = text
             text = re.sub(pattern_unless, replace_unless, text, flags=re.DOTALL)
@@ -631,8 +635,10 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
 
             # Guard: prevent if-else from matching past {{/if}} into
             # other blocks (e.g. DOD simple-if capturing orchestrator's {{else}}).
-            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}).)*?"
-            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?(.*?)\{{{{/if\}}}}\n?"
+            # Both branches refuse to cross nested opening markers so if-else
+            # blocks also resolve inner-to-outer (order-independent, see above).
+            _ife_body = r"(?:(?!\{\{/if\}\}|\{\{else\}\}|\{\{#if |\{\{#unless ).)*?"
+            pattern_ife = rf"\{{{{#if {var_pattern}\}}}}\n?({_ife_body})\{{{{else\}}}}\n?({_ife_body})\{{{{/if\}}}}\n?"
             old_text = text
             text = re.sub(pattern_ife, replace_if_else, text, flags=re.DOTALL)
             if text != old_text:
