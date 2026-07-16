@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+- `sre-engineer` agent role: proactive reliability discipline, SLI/SLO definitions, error budgets, capacity planning, toil reduction and runbooks (`agents/1-generic/sre-engineer.md`, `agents/1-generic-modern/sre-engineer.md`, `config/role-defaults.yaml`)
+- `technical-writer` agent role: external developer- and user-facing docs, API references, getting-started guides, SDK docs, tutorials, CLI help and UX microcopy (`agents/1-generic/technical-writer.md`, `agents/1-generic-modern/technical-writer.md`, `config/role-defaults.yaml`)
+- `data-engineer` agent role: ETL/ELT pipelines, data-layer schema migrations, data quality checks, lineage analysis and pipeline monitoring (`agents/1-generic/data-engineer.md`, `agents/1-generic-modern/data-engineer.md`, `config/role-defaults.yaml`)
+- `accessibility-specialist` agent role: WCAG 2.1/2.2 compliance audit, ARIA checks, keyboard navigation, screen reader guidelines, color contrast and focus management (`agents/1-generic/accessibility-specialist.md`, `agents/1-generic-modern/accessibility-specialist.md`, `config/role-defaults.yaml`)
+- `refactoring-specialist` agent role: systematic large-scale code transformation, Strangler Fig, incremental refactoring, legacy modernization and feature-flag-driven rewrites (`agents/1-generic/refactoring-specialist.md`, `agents/1-generic-modern/refactoring-specialist.md`, `config/role-defaults.yaml`)
+- `product-manager` agent role: strategic product management, backlog, user stories, sprint planning, RICE/MoSCoW prioritization and KPI definition (`agents/1-generic/product-manager.md`, `agents/1-generic-modern/product-manager.md`, `config/role-defaults.yaml`)
+
+### Changed
+- `devops-engineer` 1.2.0 MINOR: add Reliability Delegation section (`agents/1-generic/devops-engineer.md`, `agents/1-generic-modern/devops-engineer.md`)
+- `documenter` 1.5.0 MINOR: add Scope Boundaries section (`agents/1-generic/documenter.md`, `agents/1-generic-modern/documenter.md`)
+- `explorer` 1.1.0 MINOR: add Structured Output Contract, Module Overview, Hotspots and Dependency Graph sections (`agents/1-generic/explorer.md`, `agents/1-generic-modern/explorer.md`)
+- `log-analyzer` 1.2.0 MINOR: add Scope & Delegation section (`agents/1-generic/log-analyzer.md`, `agents/1-generic-modern/log-analyzer.md`)
+- `requirements` 1.5.0 MINOR: add User Story Mode section (`agents/1-generic/requirements.md`, `agents/1-generic-modern/requirements.md`)
+- `security-auditor` 1.3.0 MINOR: add Supply Chain Security and Finding-Format sections (`agents/1-generic/security-auditor.md`, `agents/1-generic-modern/security-auditor.md`)
+
 ## [0.74.1] — 2026-07-16
 
 ### Fixed

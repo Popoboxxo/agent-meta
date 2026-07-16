@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.4.2"
+version: "1.5.0"
 description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen und Traceability prüfen."
 hint: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
 tools:
@@ -91,6 +91,42 @@ Bei geänderter Anforderung:
 2. Betroffene Tests in `tests/` identifizieren
 3. Abhängigkeiten zu anderen REQs prüfen
 4. Impact-Report erstellen
+
+---
+
+## User Story Mode
+
+**Ausgelöst**, wenn der Nutzer explizit User-Stories oder Akzeptanzkriterien (AC) verlangt.
+
+**Story-Format:**
+```
+Als <Rolle> möchte ich <Ziel>, damit <Nutzen>.
+```
+
+**Akzeptanzkriterien:** mindestens **2 pro Story** im Given/When/Then-Format:
+```
+Gegeben <Kontext>, wenn <Aktion>, dann <erwartetes Ergebnis>
+```
+
+**Ausgabe pro Story:** REQ-ID + User-Story + AC-Block:
+```
+### REQ-xxx
+**Story:** Als <Rolle> möchte ich <Ziel>, damit <Nutzen>.
+**Akzeptanzkriterien:**
+  - Gegeben <Kontext>, wenn <Aktion>, dann <Ergebnis>
+  - Gegeben <Kontext>, wenn <Aktion>, dann <Ergebnis>
+**Priorität:** <Must | Should | Could>
+```
+
+- Jede Story bleibt atomar und testbar — die AC sind die Testbasis
+- Strategische Backlog-Priorisierung (RICE/MoSCoW, Roadmap) → `product-manager`; du lieferst die technische, traceable REQ-Formulierung
+
+### Modern vs. Legacy
+
+Die Anforderungs-Form richtet sich nach dem Vorgehensmodell — REQ-ID und Testbarkeit bleiben Pflicht:
+
+- **Modern:** Continuous Discovery, hypothesen-getriebene User-Stories, BDD-Akzeptanzkriterien (Given/When/Then, z.B. mit Cucumber/SpecFlow ausführbar). Story bleibt atomar und iterierbar.
+- **Legacy:** Wasserfall-Anforderungsdokumente, Use Cases mit Aktoren und Abläufen, IEEE-830-SRS-Struktur. Dann die Anforderung als vollständiges, vorab abgenommenes Statement formulieren (Vorbedingung/Ablauf/Nachbedingung) statt als iterierbare Story — die REQ-ID trägt trotzdem jede Aussage.
 
 ---
 

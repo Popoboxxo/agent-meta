@@ -58,6 +58,7 @@
       "items": {
         "type": "string",
         "enum": [
+          "accessibility-specialist",
           "agent-meta-manager",
           "agent-meta-scout",
           "api-specialist",
@@ -67,6 +68,7 @@
           "concept-reviewer",
           "continue-expert",
           "copilot-expert",
+          "data-engineer",
           "database-engineer",
           "dependency-auditor",
           "developer",
@@ -92,7 +94,9 @@
           "orchestrator",
           "performance-optimizer",
           "principal-developer",
+          "product-manager",
           "prompt-engineer",
+          "refactoring-specialist",
           "release",
           "requirements",
           "se-architect",
@@ -110,6 +114,8 @@
           "se-verifier",
           "security-auditor",
           "senior-developer",
+          "sre-engineer",
+          "technical-writer",
           "tester",
           "ui-ux-designer",
           "validator"

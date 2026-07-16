@@ -47,6 +47,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 ## 3. Intent routing
 | Intent | Ziel | Tier | Parallel |
 |--------|------|------|----------|
+| accessibility / a11y / WCAG / ARIA | `accessibility-specialist` | balanced | Ja |
 | Meta-Fragen / agent-meta / Agenten verwalten | `agent-meta-manager` | balanced | Nein |
 | Scout / neue Skills / Ökosystem | `agent-meta-scout` | balanced | Ja |
 | API / OpenAPI / Contract-First | `api-specialist` | balanced | Nein |
@@ -56,6 +57,9 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Konzept Review / Design Review | `concept-reviewer` | powerful | Ja |
 | Continue | `continue-expert` | powerful | Nein |
 | Copilot / GitHub Copilot | `copilot-expert` | powerful | Nein |
+| ETL / ELT / data pipeline / data quality | `data-engineer` | balanced | Ja |
+| database / schema / migration / query optimization | `database-engineer` | powerful | Nein |
+| dependency / license / SBOM / package audit | `dependency-auditor` | balanced | Ja |
 | Feature / Bugfix / Refactoring / Implementierung | `developer` | powerful | Ja |
 | CI/CD / Kubernetes / Infrastruktur | `devops-engineer` | fast | Ja |
 | Docker / Dev-Stack / Container | `docker` | fast | Nein |
@@ -69,16 +73,23 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Gemini / Antigravity | `gemini-expert` | powerful | Nein |
 | Git / Commit / Branch / Push | `git` | fast | Nein |
 | Design / Konzept / Architektur / Idee | `ideation` | balanced | Ja |
+| incident / outage / RCA / root cause | `incident-responder` | powerful | Nein |
+| [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
 | Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
 | Log / Logs / Fehleranalyse | `log-analyzer` | balanced | Ja |
 | Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |
 | Opencode | `opencode-expert` | powerful | Nein |
 | Performance / Bottleneck / Optimierung | `performance-optimizer` | powerful | Nein |
+| Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten. | `principal-developer` | ultra | Nein |
+| backlog / user story / sprint planning / prioritization | `product-manager` | balanced | Nein |
 | Prompt / Prompt Engineering / Agenten-Definition | `prompt-engineer` | powerful | Nein |
+| refactoring / strangler fig / legacy modernization / code smell | `refactoring-specialist` | balanced | Nein |
 | Release / Version / Changelog | `release` | balanced | Nein |
 | Anforderungen / REQ-ID / Requirements | `requirements` | balanced | Nein |
 | Security / Audit / OWASP | `security-auditor` | powerful | Nein |
 | Komplex / Architektur / schwieriger Bug / Cross-Cutting | `senior-developer` | max | Nein |
+| SLO / SLI / error budget / reliability | `sre-engineer` | balanced | Ja |
+| API reference / getting started / tutorial / SDK docs | `technical-writer` | fast | Ja |
 | UI / UX / Mockup / Design | `ui-ux-designer` | balanced | Ja |
 | Reflection-Loop | self (REPEAT_UNTIL) | balanced→powerful | Nein |
 | Nicht in Tabelle | User fragen | — | — |
