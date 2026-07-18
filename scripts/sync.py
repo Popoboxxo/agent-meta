@@ -536,6 +536,8 @@ def main():
 
     elif args.only_variables:
         mode = "only-variables"
+        provider_config = load_providers_config(agent_meta_root)
+        providers = resolve_providers(config, provider_config)
         only_variables(project_root, variables, log, args.dry_run,
                        providers=providers, provider_config=provider_config)
 
