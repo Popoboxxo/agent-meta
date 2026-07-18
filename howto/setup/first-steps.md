@@ -91,7 +91,7 @@ cp .agent-meta/howto/configs/project.yaml.example .meta-config/project.yaml
 
 ### Git
 
-- **`variables.GIT_PLATFORM`** — `GitHub`, `GitLab` oder `Gitea`
+- **`variables.GIT_PLATFORM`** — `GitHub`, `GitLab`, `Gitea` oder `Codeberg`
 - **`variables.GIT_REMOTE_URL`** — Remote-URL des Repositories
 - **`variables.GIT_MAIN_BRANCH`** — Haupt-Branch (Standard: `main`)
 
