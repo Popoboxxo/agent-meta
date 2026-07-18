@@ -1061,13 +1061,10 @@ def sync_agents(
         if layer == MODERN_DIR:
             rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
-        if not dry_run:
-            if write_checked(target_path, content, log, rel_label, config=config):
-                log.action("WRITE", rel_out, rel_label)
-            else:
-                log.skip(rel_out, "unchanged")
-        else:
+        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run):
             log.action("WRITE", rel_out, rel_label)
+        else:
+            log.skip(rel_out, "unchanged")
 
     # Also track external skill agent filenames (they are not in overrides)
     ext_config = load_external_skills_config(agent_meta_root)
@@ -1485,13 +1482,10 @@ def sync_agents_for_provider(
         if layer == MODERN_DIR:
             rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
-        if not dry_run:
-            if write_checked(target_path, content, log, rel_label, config=config):
-                log.action('WRITE', rel_out, rel_label)
-            else:
-                log.skip(rel_out, 'unchanged')
-        else:
+        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run):
             log.action('WRITE', rel_out, rel_label)
+        else:
+            log.skip(rel_out, 'unchanged')
 
     # External skill filenames are always in .claude/agents/ (Claude only)
     if provider == 'Claude':

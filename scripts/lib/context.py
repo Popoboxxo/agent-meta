@@ -4,10 +4,148 @@ import json
 import re
 from pathlib import Path
 
-from .io import safe_path
+from .io import safe_path, content_hash
 from .log import SyncLog
 
 SNIPPETS_DIR = "snippets"
+
+# Sidecar store recording the hash of each generated static header, so a later
+# sync can tell its own staleness apart from manual user edits.
+_CONTEXT_HASHES_FILE = "context-hashes.json"
+_CONTEXT_HASHES_DIR = ".meta-config"
+
+# Marker that separates the static header from the managed block in context files.
+_MANAGED_BLOCK_RE = re.compile(
+    r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+    re.DOTALL,
+)
+
+
+def _context_hashes_path(project_root: Path) -> Path:
+    return project_root / _CONTEXT_HASHES_DIR / _CONTEXT_HASHES_FILE
+
+
+def _load_context_hashes(project_root: Path) -> dict:
+    """Read .meta-config/context-hashes.json; return {} if absent or invalid."""
+    path = _context_hashes_path(project_root)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, ValueError, OSError):
+        return {}
+    hashes = data.get("hashes") if isinstance(data, dict) else None
+    return hashes if isinstance(hashes, dict) else {}
+
+
+def _save_context_hashes(project_root: Path, hashes: dict, dry_run: bool) -> None:
+    """Write the sidecar hash store (no-op in dry_run)."""
+    if dry_run:
+        return
+    path = _context_hashes_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"version": 1, "hashes": hashes}
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
+def _record_static_hash(
+    project_root: Path, rel_label: str, header_text: str, dry_run: bool
+) -> None:
+    """Store hash(header_text) for rel_label in the sidecar store."""
+    hashes = _load_context_hashes(project_root)
+    hashes[rel_label] = content_hash(header_text)
+    _save_context_hashes(project_root, hashes, dry_run)
+
+
+def _split_context_file(text: str) -> tuple[str, str | None, str]:
+    """Split a context file into (header, managed_block, footer).
+
+    - header: everything above the managed-begin marker.
+    - managed_block: the full begin..end block (None if the file has none).
+    - footer: everything after the managed-end marker.
+
+    Concatenating header + managed_block + footer reproduces the original text
+    exactly, so it is safe to regenerate only the header and keep the rest.
+    """
+    match = _MANAGED_BLOCK_RE.search(text)
+    if not match:
+        return text, None, ""
+    return text[:match.start()], match.group(0), text[match.end():]
+
+
+def _backup_context_file(
+    target_path: Path, existing_content: str, rel_label: str, log: SyncLog, dry_run: bool
+) -> None:
+    """Write a timestamped backup before overwriting a user-modified static part."""
+    from datetime import datetime
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = target_path.with_name(f"{target_path.name}.sync-backup-{ts}")
+    log.warn(
+        f"{rel_label}: static part differs from the last generated version "
+        f"(manual edit or first-time migration). Backup written to {backup.name} — "
+        f"review and merge any wanted changes."
+    )
+    print(f"  !  {rel_label}: static part changed -> backup {backup.name}")
+    if not dry_run:
+        backup.write_text(existing_content, encoding="utf-8")
+
+
+def _regenerate_static_context(
+    project_root: Path,
+    target_path: Path,
+    template_path: Path | None,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    rel_label: str,
+    source_label: str,
+) -> None:
+    """Regenerate the static header of an existing managed context file.
+
+    Distinguishes agent-meta's own staleness (hash matches the last generated
+    header → silent overwrite) from manual user edits (hash mismatch or no
+    record → timestamped backup, then overwrite; drift is worse than a
+    recoverable overwrite). The managed block and footer are preserved verbatim.
+    """
+    from .config import substitute
+
+    if not target_path.exists():
+        return
+    if not template_path or not template_path.exists():
+        log.info(rel_label, "no static template — skipping static regeneration")
+        return
+
+    rendered = substitute(
+        template_path.read_text(encoding="utf-8"), variables, source_label, log
+    )
+    new_header, _tmpl_managed, _tmpl_footer = _split_context_file(rendered)
+
+    existing = target_path.read_text(encoding="utf-8")
+    existing_header, existing_managed, existing_footer = _split_context_file(existing)
+    if existing_managed is None:
+        # File has no managed block — not structured for a static/managed split.
+        # Leave it untouched to avoid corrupting user content.
+        log.info(rel_label, "no managed block — skipping static regeneration")
+        return
+
+    if existing_header == new_header:
+        log.skip(rel_label, "static part unchanged")
+        _record_static_hash(project_root, rel_label, new_header, dry_run)
+        return
+
+    stored = _load_context_hashes(project_root).get(rel_label)
+    user_modified = stored is None or content_hash(existing_header) != stored
+    if user_modified:
+        _backup_context_file(target_path, existing, rel_label, log, dry_run)
+
+    new_content = new_header + existing_managed + existing_footer
+    log.action("UPDATE", rel_label, "static part regenerated from template")
+    if not dry_run:
+        target_path.write_text(new_content, encoding="utf-8")
+    _record_static_hash(project_root, rel_label, new_header, dry_run)
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
 
@@ -187,14 +325,21 @@ def _sync_managed_block_context(
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
 
-    # Claude's CLAUDE.md is created by init_claude_md() in the main sync loop;
-    # this strategy only updates the managed block for Claude.
+    # Claude's CLAUDE.md static part is handled by sync_claude_md_static() in the
+    # main sync loop; this strategy only refreshes the managed block for Claude.
+    # For every other managed-block provider we also regenerate the static header
+    # here (same hash-drift detection), when a static template is configured.
     if provider != "Claude":
         _ensure_context_file(
             project_root, agent_meta_root, target_path, template_path, variables, config,
             log, dry_run,
             fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
         )
+        if target_path.exists():
+            _regenerate_static_context(
+                project_root, target_path, template_path, variables, log, dry_run,
+                rel_label=context_file, source_label=template_name or context_file,
+            )
     if target_path.exists():
         _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider)
 
@@ -873,7 +1018,7 @@ def ensure_gitignore_entries(
         gitignore_path.write_text(new_content, encoding="utf-8")
 
 
-def init_claude_md(
+def sync_claude_md_static(
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
@@ -881,26 +1026,41 @@ def init_claude_md(
     log: SyncLog,
     dry_run: bool,
 ):
-    """Create CLAUDE.md from template if it does not exist."""
+    """Create or regenerate the STATIC part of CLAUDE.md (above the managed block).
+
+    Supersedes the old write-once init_claude_md(): the static header (project
+    name, tech stack, architecture — all derived from project.yaml) is now
+    refreshed on every sync so it never drifts. The managed block itself stays
+    owned by sync_claude_md_managed()/_update_managed_html_block() and is
+    preserved verbatim here. User edits to the static part are detected via the
+    sidecar hash store and backed up before overwrite.
+    """
     from .config import substitute
 
     template_path = agent_meta_root / "howto" / "configs" / "CLAUDE.project-template.md"
     target_path = project_root / "CLAUDE.md"
-
-    if target_path.exists():
-        print("  i  CLAUDE.md already exists — skipped (use --only-variables)")
-        log.skip("CLAUDE.md", "already exists")
-        return
+    rel = "CLAUDE.md"
 
     if not template_path.exists():
         log.warn(f"CLAUDE.project-template.md not found at {template_path}")
         return
 
-    content = template_path.read_text(encoding="utf-8")
-    content = substitute(content, variables, "CLAUDE.project-template.md", log)
-    log.action("INIT", "CLAUDE.md", "howto/configs/CLAUDE.project-template.md")
-    if not dry_run:
-        target_path.write_text(content, encoding="utf-8")
+    if not target_path.exists():
+        rendered = substitute(
+            template_path.read_text(encoding="utf-8"), variables,
+            "CLAUDE.project-template.md", log,
+        )
+        new_header, _managed, _footer = _split_context_file(rendered)
+        log.action("INIT", rel, "howto/configs/CLAUDE.project-template.md")
+        if not dry_run:
+            target_path.write_text(rendered, encoding="utf-8")
+        _record_static_hash(project_root, rel, new_header, dry_run)
+        return
+
+    _regenerate_static_context(
+        project_root, target_path, template_path, variables, log, dry_run,
+        rel_label=rel, source_label="CLAUDE.project-template.md",
+    )
 
 
 def only_variables(

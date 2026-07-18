@@ -88,7 +88,7 @@ from lib.io import SyncError
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
-    init_claude_md, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
+    sync_claude_md_static, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
 )
 from lib.viz import (
     generate_viz, get_gitignore_entries as viz_gitignore_entries,
@@ -335,6 +335,10 @@ def main():
                              "followed by --init sync. Use before the first sync on a new project.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
+    parser.add_argument("--check", action="store_true",
+                        help="CI mode (use with --dry-run): exit 1 if any file would be "
+                             "written/changed, exit 0 if everything is up to date. "
+                             "Use to fail CI when provider context files are out of sync.")
     parser.add_argument("--validate", action="store_true",
                         help="Validate sync output against the configured test repository. "
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
@@ -757,7 +761,7 @@ def main():
                     if _ctx and _ctx != "CLAUDE.md":
                         base_gitignore_entries.append(_ctx)
         if is_claude:
-            init_claude_md(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
         init_settings_json(agent_meta_root, project_root, log, args.dry_run,
                            providers=providers, provider_config=provider_config,
@@ -948,6 +952,19 @@ def main():
     _speech = config.get("speech-mode", "full") if config else "full"
     log.write(log_path, args.config, source_version, mode, platforms, args.dry_run,
               providers=_providers, speech_mode=_speech)
+
+    # CI check mode: signal pending changes via exit code.
+    if getattr(args, "check", False):
+        pending = len(log.actions)
+        if pending > 0:
+            print(
+                f"  X  {pending} file(s) out of sync — run "
+                f"`python scripts/sync.py` to regenerate.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print("  i  Provider context files are up to date.")
+        sys.exit(0)
 
     if getattr(args, "admin", False):
         admin_script = agent_meta_root / "scripts" / "admin-server.py"
