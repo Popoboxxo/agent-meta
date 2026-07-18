@@ -664,6 +664,9 @@ class ConfigManager:
 class SyncExecutor:
     """Run ``sync.py`` as a subprocess and capture its output."""
 
+    #: Sidecar file that records metadata about the most recent sync run.
+    STATUS_FILE = Path(".meta-viz") / "sync-status.json"
+
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
         # Fallback to the submodule layout for target repos that embed
@@ -689,16 +692,43 @@ class SyncExecutor:
                 timeout=300,
             )
             output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
-            return {
+            result = {
                 "success": proc.returncode == 0,
                 "output": output,
                 "returncode": proc.returncode,
                 "command": " ".join(cmd),
             }
         except subprocess.TimeoutExpired:
-            return {"success": False, "output": "sync.py timed out (300s)", "returncode": -1}
+            result = {"success": False, "output": "sync.py timed out (300s)", "returncode": -1}
         except Exception as exc:  # pragma: no cover
-            return {"success": False, "output": f"sync.py failed: {exc}", "returncode": -1}
+            result = {"success": False, "output": f"sync.py failed: {exc}", "returncode": -1}
+        self._record_run(result)
+        return result
+
+    @staticmethod
+    def _extract_summary(output: str) -> Optional[str]:
+        """Return the sync SUMMARY line (e.g. ``61 action(s) | 89 skipped | ...``)."""
+        for line in output.splitlines():
+            stripped = line.strip()
+            if "action(s)" in stripped and "skipped" in stripped:
+                return stripped
+        return None
+
+    def _record_run(self, result: dict) -> None:
+        """Persist run metadata to ``.meta-viz/sync-status.json``."""
+        status_path = self.root / self.STATUS_FILE
+        payload = {
+            "last_run_timestamp": datetime.now(timezone.utc).isoformat(),
+            "last_run_exit_code": result.get("returncode"),
+            "last_run_summary": self._extract_summary(result.get("output", "")),
+        }
+        try:
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(
+                json.dumps(payload, indent=2), encoding="utf-8"
+            )
+        except OSError:
+            pass  # status persistence is best-effort
 
     def dry_run(self) -> dict:
         """Execute ``sync.py --validate``. The flag is used because ``--dry-run``
@@ -709,6 +739,44 @@ class SyncExecutor:
     def run(self) -> dict:
         """Execute a real ``sync.py`` run (no extra flags)."""
         return self._run([])
+
+    def status(self) -> dict:
+        """Return current sync status for the admin UI.
+
+        Combines persisted run metadata (``.meta-viz/sync-status.json``) with
+        live filesystem checks for context hashes and pending tasks.
+        """
+        status = {
+            "last_run_timestamp": None,
+            "last_run_exit_code": None,
+            "last_run_summary": None,
+            "context_hashes_present": (
+                self.root / ".meta-config" / "context-hashes.json"
+            ).exists(),
+            "pending_tasks_present": self._has_pending_tasks(),
+        }
+        status_path = self.root / self.STATUS_FILE
+        if status_path.exists():
+            try:
+                saved = json.loads(status_path.read_text(encoding="utf-8"))
+                for key in ("last_run_timestamp", "last_run_exit_code", "last_run_summary"):
+                    status[key] = saved.get(key)
+            except (OSError, json.JSONDecodeError):
+                pass
+        return status
+
+    def _has_pending_tasks(self) -> bool:
+        """True if ``.claude/pending-tasks.md`` exists with at least one open item."""
+        pending = self.root / ".claude" / "pending-tasks.md"
+        if not pending.exists():
+            return False
+        try:
+            return any(
+                line.lstrip().startswith("- [ ]")
+                for line in pending.read_text(encoding="utf-8").splitlines()
+            )
+        except OSError:
+            return False
 
 
 # --------------------------------------------------------------------------- #
@@ -1042,6 +1110,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 raise FileNotFoundError("project-config.schema.json")
             self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
             return
+
+        if path == "/api/sync/status":
+            return self._send_json(self.__class__.sync_executor.status())
 
         if path == "/api/agents/hierarchy":
             return self._send_json(self._build_agent_hierarchy())

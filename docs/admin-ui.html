@@ -3203,6 +3203,49 @@ async function viewSync() {
   wrap.appendChild(el("h1", {}, ["Sync"]));
   wrap.appendChild(el("p", {}, ["Run sync.py and view its output in real time."]));
 
+  // Status card — reflects the most recent sync run and current sync state.
+  const statusEl = el("div", { style: "margin-bottom: 16px;" });
+  wrap.appendChild(statusEl);
+
+  const loadStatus = async () => {
+    const s = await api.get("/api/sync/status").catch(() => null);
+    statusEl.replaceChildren();
+    if (!s) return;
+
+    const ts = s.last_run_timestamp
+      ? new Date(s.last_run_timestamp).toLocaleString()
+      : "never";
+
+    let codeCls = "optional", codeVal = "—";
+    if (s.last_run_exit_code === 0) { codeCls = "ok"; codeVal = "0 (ok)"; }
+    else if (typeof s.last_run_exit_code === "number") { codeCls = "required"; codeVal = String(s.last_run_exit_code); }
+
+    const card = el("div", {
+      class: "metric",
+      style: "display: block; padding: 16px;",
+    });
+    card.appendChild(el("div", { class: "label", style: "margin-bottom: 10px;" }, ["Sync status"]));
+
+    const row = el("div", { style: "display: flex; flex-wrap: wrap; gap: 8px; align-items: center;" });
+    row.appendChild(el("span", { class: "value mono", style: "font-size: 13px; color: var(--text-secondary);" }, [`Last run: ${ts}`]));
+    row.appendChild(el("span", { class: `badge ${codeCls}` }, [`exit ${codeVal}`]));
+    row.appendChild(el("span", {
+      class: `badge ${s.context_hashes_present ? "ok" : "warn"}`,
+    }, [`Context hashes: ${s.context_hashes_present ? "present" : "missing"}`]));
+    row.appendChild(el("span", {
+      class: `badge ${s.pending_tasks_present ? "warn" : "ok"}`,
+    }, [`Pending tasks: ${s.pending_tasks_present ? "yes" : "no"}`]));
+    card.appendChild(row);
+
+    if (s.last_run_summary) {
+      card.appendChild(el("div", {
+        class: "mono",
+        style: "margin-top: 10px; font-size: 12px; color: var(--text-muted);",
+      }, [s.last_run_summary]));
+    }
+    statusEl.appendChild(card);
+  };
+
   // Renamed from ``console`` to avoid shadowing the global console object.
   const consoleEl = el("div", { class: "console" }, ["(idle)"]);
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
@@ -3211,6 +3254,8 @@ async function viewSync() {
   wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: 12px;" }, [runBtn, dryBtn]));
   wrap.appendChild(consoleEl);
   wrap.appendChild(statsWrap);
+
+  loadStatus();
 
   const setOutput = (text) => {
     consoleEl.replaceChildren();
@@ -3289,7 +3334,7 @@ async function viewSync() {
       setOutput(r.output);
       toast(r.success ? "Sync complete" : "Sync failed", r.success ? "success" : "error");
     } catch (err) { setOutput(err.message); toast(err.message, "error"); }
-    finally { runBtn.disabled = false; dryBtn.disabled = false; }
+    finally { runBtn.disabled = false; dryBtn.disabled = false; loadStatus(); }
   });
   dryBtn.addEventListener("click", async () => {
     runBtn.disabled = true; dryBtn.disabled = true;
@@ -3299,7 +3344,7 @@ async function viewSync() {
       setOutput(r.output);
       toast(r.success ? "Dry-run OK" : "Dry-run reported issues", r.success ? "success" : "warning");
     } catch (err) { setOutput(err.message); toast(err.message, "error"); }
-    finally { runBtn.disabled = false; dryBtn.disabled = false; }
+    finally { runBtn.disabled = false; dryBtn.disabled = false; loadStatus(); }
   });
   return wrap;
 }
