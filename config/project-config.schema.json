@@ -176,7 +176,8 @@
           "enum": [
             "GitHub",
             "GitLab",
-            "Gitea"
+            "Gitea",
+            "Codeberg"
           ]
         },
         "GIT_REMOTE_URL": {
@@ -446,35 +447,19 @@
     },
     "tier-overrides": {
       "type": "object",
-      "description": "Override the resolved tier per role.",
+      "description": "Override the resolved tier per role. Value is a tier name (nano/fast/balanced/powerful/max/ultra) or a raw model-id string (e.g. claude-sonnet-5).",
       "additionalProperties": {
-        "type": "string",
-        "enum": [
-          "nano",
-          "fast",
-          "balanced",
-          "powerful",
-          "max",
-          "ultra"
-        ]
+        "type": "string"
       }
     },
     "provider-tier-overrides": {
       "type": "object",
-      "description": "Override the resolved tier per role for a specific provider. Keys are provider names (Claude, Gemini, Opencode). Values are objects mapping role → tier string.",
+      "description": "Override the resolved tier per role for a specific provider. Keys are provider names (Claude, Gemini, Opencode). Values are objects mapping role → tier name or model-id string.",
       "additionalProperties": {
         "type": "object",
-        "description": "Role-to-tier overrides for this provider.",
+        "description": "Role-to-tier overrides for this provider. Value is a tier name or a raw model-id string.",
         "additionalProperties": {
-          "type": "string",
-          "enum": [
-            "nano",
-            "fast",
-            "balanced",
-            "powerful",
-            "max",
-            "ultra"
-          ]
+          "type": "string"
         }
       }
     },

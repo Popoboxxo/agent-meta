@@ -156,7 +156,7 @@ def run_setup_wizard(
     # 6. Git
     # ------------------------------------------------------------------
     _section("6/7  Git-Konfiguration")
-    git_platform = _ask_choice("Git-Plattform", ["GitHub", "GitLab", "Gitea"], default="GitHub")
+    git_platform = _ask_choice("Git-Plattform", ["GitHub", "GitLab", "Gitea", "Codeberg"], default="GitHub")
     git_remote = _ask("Remote-URL (z.B. https://github.com/owner/repo)", default="")
     git_branch = _ask("Haupt-Branch", default="main")
     agent_meta_repo = _ask(
