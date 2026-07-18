@@ -206,13 +206,10 @@ def sync_rules(
         src_label = f"rules/{layer}/{source_path.name}"
         now_managed.add(output_name)
 
-        if not dry_run:
-            if write_checked(target_path, source_content, log, rel_source):
-                log.action("COPY", rel_out, src_label)
-            else:
-                log.skip(rel_out, "unchanged")
-        else:
+        if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
             log.action("COPY", rel_out, src_label)
+        else:
+            log.skip(rel_out, "unchanged")
 
     # Remove stale managed rules no longer in current sources
     for stale_name in sorted(previously_managed - now_managed):
@@ -270,12 +267,15 @@ def sync_speech_mode(
         return
 
     source_content = source_path.read_text(encoding="utf-8")
-    log.action("COPY", str(target_path.relative_to(project_root)), f"speech/{mode}.md")
-
+    rel_out = str(target_path.relative_to(project_root))
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(source_content, encoding="utf-8")
+    if write_checked(target_path, source_content, log, f"speech/{mode}.md", dry_run=dry_run):
+        log.action("COPY", rel_out, f"speech/{mode}.md")
+    else:
+        log.skip(rel_out, "unchanged")
 
+    if not dry_run:
         currently_managed: list[str] = []
         if managed_index_path.exists():
             currently_managed = [l.strip() for l in

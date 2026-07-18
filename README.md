@@ -156,6 +156,7 @@ python scripts/sync.py --add-skill <repo-url> --skill-name <name> --role <role>
 | `--init` | Generate CLAUDE.md from template (if absent) |
 | `--only-variables` | Substitute {{VARIABLE}} in existing CLAUDE.md only |
 | `--dry-run` | Show what would be done without writing |
+| `--check` | Exit code 1 if context files (CLAUDE.md, AGENTS.md, etc.) are out of sync, 0 if up-to-date. Use in CI. |
 | `--validate` | Full sync into test repo, check sync.log for errors |
 | `--fill-defaults` | Write missing config fields with defaults into project.yaml |
 | `--setup` | Interactive setup wizard, guided project.yaml creation + --init |
@@ -340,13 +341,14 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **se-test-loop** | se-test-engineer | se-testreviewer | 3 |
 | **se-dev-review-loop** | se-developer | code-reviewer | 3 |
 
-## Hooks (4 hooks, propagated to all providers)
+## Hooks (5 hooks, propagated to all providers)
 
 | Hook | Trigger | Effect |
 |------|---------|--------|
 | `orchestrator-guard.sh` | PreToolUse | Enforces orchestrator-first rules (prevents self-handoff, validates delegation depth) |
 | `dod-push-check.sh` | PrePush | Blocks push if DoD criteria unmet (commit conventions, REQ-IDs if traceability active) |
 | `lifecycle-check.sh` | Post-commit | Detects Git events (release-tag, merge), writes pending-tasks.md for triggered agents |
+| `sync-on-config-change.sh` | PostToolUse | Triggers sync.py re-run when `.meta-config/project.yaml` changes (detects via Write/Edit tools) |
 | `viz-log.sh` | Events | Logs agent events to viz event file for dashboard tracking |
 
 ## MCP Servers (4 servers)

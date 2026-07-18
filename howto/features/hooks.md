@@ -117,6 +117,8 @@ Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
 | Hook | Event | Matcher | Beschreibung |
 |------|-------|---------|-------------|
 | `dod-push-check` | `PreToolUse` | `Bash` | Blockiert `git push` wenn Tests nicht grün sind |
+| `sync-on-config-change` | `PostToolUse` | `Write`, `Edit` | Triggert `sync.py`-Re-run wenn `.meta-config/project.yaml` geändert wird |
+| `lifecycle-check` | `PostToolUse` | `Bash` | Erkennt Git-Events (Release-Tag, Merge) und triggert Lifecycle-Tasks |
 
 ---
 
@@ -181,6 +183,39 @@ Der `dod-push-check`-Hook liest den Test-Command aus:
   }
 }
 ```
+
+---
+
+## sync-on-config-change: Automatische Re-Sync
+
+Dieser Hook erkennt wenn `.meta-config/project.yaml` geändert wird und triggert automatische `sync.py`-Re-Generierung.
+
+**Trigger:**
+- Write oder Edit-Tool-Aufruf auf `.meta-config/project.yaml`
+- Wird nach dem Schreiben erkannt (PostToolUse-Event)
+
+**Aktion:**
+1. Hook prüft ob `.meta-config/project.yaml` geändert wurde
+2. Schreibt pending-task in `.claude/pending-tasks.md` für `agent-meta-manager`
+3. `agent-meta-manager` merkt beim nächsten Start dass sync.py laufen muss
+4. agent-meta-manager führt `sync.py` aus und updated alle context files
+
+**Konfiguration:**
+
+```yaml
+hooks:
+  sync-on-config-change:
+    enabled: true
+
+lifecycle-triggers:
+  on-config-change:
+    - agent: agent-meta-manager
+      task: "Re-run sync.py to regenerate provider context files."
+```
+
+**Vorteil:** Keine manuellen `sync.py`-Aufrufe nötig — regeneration läuft vollautomatisch.
+
+**Wann sinnvoll:** Projekte die `.meta-config/project.yaml` öfters ändern (neue Provider, neue Rollen, Konfiguration-Tuning).
 
 ---
 

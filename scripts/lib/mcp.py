@@ -267,16 +267,10 @@ def _update_json_config(
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            written = write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config)
-        except SyncError:
-            raise
-        if written:
-            log.action("WRITE", rel, f"mcp-registry → {mcp_key}")
-        else:
-            log.skip(rel, "unchanged")
-    else:
+    if write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run):
         log.action("WRITE", rel, f"mcp-registry → {mcp_key}")
+    else:
+        log.skip(rel, "unchanged")
 
 
 def _update_continue_yaml_config(
@@ -348,16 +342,10 @@ def _update_continue_yaml_config(
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            written = write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config)
-        except SyncError:
-            raise
-        if written:
-            log.action("WRITE", rel, "mcp-registry → mcpServers")
-        else:
-            log.skip(rel, "unchanged")
-    else:
+    if write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run):
         log.action("WRITE", rel, "mcp-registry → mcpServers")
+    else:
+        log.skip(rel, "unchanged")
 
 
 # ---------------------------------------------------------------------------
@@ -578,13 +566,10 @@ def generate_mcp_artifacts(
             rel_out = str(target_path.relative_to(project_root))
             src_label = f"mcp-registry/{server_name}"
 
-            if not dry_run:
-                if write_checked(target_path, content, log, src_label, config=config):
-                    log.action("WRITE", rel_out, src_label)
-                else:
-                    log.skip(rel_out, "unchanged")
-            else:
+            if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
                 log.action("WRITE", rel_out, src_label)
+            else:
+                log.skip(rel_out, "unchanged")
 
     # --- Provider config generation ---
     generate_provider_configs(
