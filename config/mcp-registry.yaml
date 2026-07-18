@@ -1,203 +1,207 @@
-version: "1.0.3"
-
-# agent-meta MCP Registry
-# ========================
-# Global, provider-agnostic catalog of MCP servers.
-# Projects activate servers via mcp-servers: [...] in project.yaml
-# or implicitly via platform bundles (rules/2-platform/<platform>-mcp.yaml).
-#
-# sync.py reads this file and:
-#   - Generates rule files per active server + provider (allowed/blocked tools, hints)
-#   - Generates committed provider configs (${ENV_VAR} refs only — no secrets)
-#   - Adds secrets-files to the managed .gitignore block
-#
-# Adding a new server:
-#   1. Add entry here with tools, agent-hint, connection, secrets
-#   2. If platform-specific: add to rules/2-platform/<platform>-mcp.yaml
-#   3. Run sync.py — rule files and gitignore entries are generated automatically
-
+version: 1.0.3
 mcp-servers:
-
   home-assistant:
-    description: "Home Assistant real-time device status, sensors, datetime and read-only data"
+    description: Home Assistant real-time device status, sensors, datetime and read-only
+      data
     category: iot
-    enabled-by-default: true
+    enabled-by-default: false
     tools:
       allowed:
-        - GetLiveContext
-        - GetDateTime
-        - todo_get_items
+      - GetLiveContext
+      - GetDateTime
+      - todo_get_items
       blocked:
-        - HassTurnOn
-        - HassTurnOff
-        - HassLightSet
-        - HassCallService
-        - HassSetVolume
-        - HassBroadcast
-        - HassMediaPlay
-        - HassMediaPause
-    agent-hint: |
-      Primäres Tool: GetLiveContext für Echtzeit-Status.
-      Schreibende Operationen sind ABSOLUT VERBOTEN — kein HassTurnOn, HassTurnOff etc.
+      - HassTurnOn
+      - HassTurnOff
+      - HassLightSet
+      - HassCallService
+      - HassSetVolume
+      - HassBroadcast
+      - HassMediaPlay
+      - HassMediaPause
+    agent-hint: 'Primäres Tool: GetLiveContext für Echtzeit-Status.
+
+      Schreibende Operationen sind ABSOLUT VERBOTEN — kein HassTurnOn, HassTurnOff
+      etc.
+
       Gerätesteuerung nur über HA-App, Dashboard oder Sprachassistent.
+
+      '
     connection:
       type: sse
-      url: "{{MCP_HA_URL}}/api/mcp"
+      url: '{{MCP_HA_URL}}/api/mcp'
       headers:
-        Authorization: "Bearer {{MCP_HA_TOKEN}}"
+        Authorization: Bearer {{MCP_HA_TOKEN}}
     secrets:
-      - MCP_HA_URL
-      - MCP_HA_TOKEN
-
+    - MCP_HA_URL
+    - MCP_HA_TOKEN
   influxdb:
-    description: "InfluxDB time-series database for historical trends and analysis via Flux"
+    description: InfluxDB time-series database for historical trends and analysis
+      via Flux
     category: database
     enabled-by-default: false
     tools:
       allowed:
-        - query
+      - query
       blocked:
-        - write
-        - create_bucket
-        - delete_bucket
-        - update_retention
-        - delete_measurement
-    agent-hint: |
-      Nur für historische Zeitreihendaten und Trend-Analysen via Flux-Queries.
+      - write
+      - create_bucket
+      - delete_bucket
+      - update_retention
+      - delete_measurement
+    agent-hint: 'Nur für historische Zeitreihendaten und Trend-Analysen via Flux-Queries.
+
       Schreiben, Bucket-Verwaltung und Retention-Änderungen sind VERBOTEN.
+
       Timestamps: InfluxDB speichert UTC — Abfragefenster entsprechend anpassen.
+
+      '
     connection:
       type: stdio
       command: npx
       args:
-        - "-y"
-        - "influxdb-mcp-server"
+      - -y
+      - influxdb-mcp-server
       env:
-        INFLUXDB_URL: "{{MCP_INFLUXDB_URL}}"
-        INFLUXDB_TOKEN: "{{MCP_INFLUXDB_TOKEN}}"
-        INFLUXDB_ORG: "{{MCP_INFLUXDB_ORG}}"
-        INFLUXDB_BUCKET: "{{MCP_INFLUXDB_BUCKET}}"
+        INFLUXDB_URL: '{{MCP_INFLUXDB_URL}}'
+        INFLUXDB_TOKEN: '{{MCP_INFLUXDB_TOKEN}}'
+        INFLUXDB_ORG: '{{MCP_INFLUXDB_ORG}}'
+        INFLUXDB_BUCKET: '{{MCP_INFLUXDB_BUCKET}}'
     secrets:
-      - MCP_INFLUXDB_URL
-      - MCP_INFLUXDB_TOKEN
-      - MCP_INFLUXDB_ORG
-      - MCP_INFLUXDB_BUCKET
-
+    - MCP_INFLUXDB_URL
+    - MCP_INFLUXDB_TOKEN
+    - MCP_INFLUXDB_ORG
+    - MCP_INFLUXDB_BUCKET
   viz-logger:
-    description: "agent-meta visualization event logger — tracks agent_start, delegate_out, agent_end for graph generation"
+    description: agent-meta visualization event logger — tracks agent_start, delegate_out,
+      agent_end for graph generation
     category: agent-meta
     enabled-by-default: true
     tools:
       allowed:
-        - log_viz_event
-    agent-hint: |
-      Nutze log_viz_event um Agenten-Starts, Delegationen und Beendigungen zu protokollieren.
-      Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, target, caller, task_id, payload.
+      - log_viz_event
+    agent-hint: 'Nutze log_viz_event um Agenten-Starts, Delegationen und Beendigungen
+      zu protokollieren.
+
+      Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status,
+      target, caller, task_id, payload.
+
+      '
     connection:
       type: stdio
       command: python
       args:
-        - "scripts/viz-logger.py"
-        - "--mcp"
+      - scripts/viz-logger.py
+      - --mcp
     secrets: []
-
   a2a-handoff:
-    description: "A2A Handoff Protocol tools: Schema-Validierung und Route-Resolution"
+    description: 'A2A Handoff Protocol tools: Schema-Validierung und Route-Resolution'
     category: agent-meta
     enabled-by-default: true
     tools:
       allowed:
-        - validate_handoff
-        - resolve_handoff_schema
-        - resolve_handoff
-    agent-hint: |
-      validate_handoff: Prüft A2A-Envelope gegen referenziertes Schema.
+      - validate_handoff
+      - resolve_handoff_schema
+      - resolve_handoff
+    agent-hint: 'validate_handoff: Prüft A2A-Envelope gegen referenziertes Schema.
+
       resolve_handoff_schema: Liefert Schema-URI für source-target Route.
+
       resolve_handoff: Rekonstruiert Envelope aus Event-Log (für Supersession-History).
+
+      '
     connection:
       type: stdio
       command: python
       args:
-        - "scripts/viz-logger.py"
-        - "--mcp"
-        - "--mode"
-        - "a2a"
+      - scripts/viz-logger.py
+      - --mcp
+      - --mode
+      - a2a
     secrets: []
-
   honcho:
-    description: "Honcho local memory and context server"
+    description: Honcho local memory and context server
     category: memory
     enabled-by-default: false
     tools:
       allowed:
-        - chat
-        - get_context
-        - get_representation
-        - search
-        - list_conclusions
-        - create_conclusion
+      - chat
+      - get_context
+      - get_representation
+      - search
+      - list_conclusions
+      - create_conclusion
       blocked:
-        - delete_conclusion
-        - set_config
-    agent-hint: |
-      Honcho bietet persistentes Cross-Session-Memory.
+      - delete_conclusion
+      - set_config
+    agent-hint: 'Honcho bietet persistentes Cross-Session-Memory.
+
       get_context: aktuellen Sitzungskontext abrufen.
+
       search: Wissensdatenbank und frühere Sessions durchsuchen.
+
       create_conclusion: Erkenntnisse dauerhaft speichern.
+
       list_conclusions: gespeicherte Erkenntnisse auflisten.
+
       chat: direkte Interaktion mit dem Honcho-Speicher.
+
       get_representation: personalisierte Nutzer-Darstellung abrufen.
+
       Destruktive Tools (delete_conclusion, set_config) sind gesperrt.
+
+      '
     connection:
       type: sse
-      url: "{{MCP_HONCHO_URL}}"
+      url: '{{MCP_HONCHO_URL}}'
     secrets:
-      - MCP_HONCHO_URL
-
+    - MCP_HONCHO_URL
   playwright:
-    description: "Playwright MCP Server für Browser-Automation und E2E-Tests"
+    description: Playwright MCP Server für Browser-Automation und E2E-Tests
     category: testing
     enabled-by-default: false
     tools:
       allowed:
-        # Navigation
-        - browser_navigate
-        - browser_navigate_back
-        # Accessibility-Snapshot (a11y-Baum) und visuelle Erfassung
-        - browser_snapshot
-        - browser_take_screenshot
-        # Interaktion
-        - browser_click
-        - browser_type
-        - browser_hover
-        - browser_select_option
-        - browser_press_key
-        - browser_fill_form
-        - browser_wait_for
-        - browser_resize
-        - browser_tabs
-        # Network-Inspection
-        - browser_network_requests
-        - browser_network_request
-        - browser_console_messages
+      - browser_navigate
+      - browser_navigate_back
+      - browser_snapshot
+      - browser_take_screenshot
+      - browser_click
+      - browser_type
+      - browser_hover
+      - browser_select_option
+      - browser_press_key
+      - browser_fill_form
+      - browser_wait_for
+      - browser_resize
+      - browser_tabs
+      - browser_network_requests
+      - browser_network_request
+      - browser_console_messages
       blocked:
-        # Arbiträre Code-Ausführung im Browser-Kontext — Sicherheitsrisiko
-        - browser_run_code_unsafe
-        - browser_evaluate
-        # Datei-Upload / Dialog-Handling — datenschutz-/seiteneffektrelevant
-        - browser_file_upload
-        - browser_handle_dialog
-    agent-hint: |
-      Browser-Automation für E2E-Flows, visuelle Regression und Accessibility-Audits.
+      - browser_run_code_unsafe
+      - browser_evaluate
+      - browser_file_upload
+      - browser_handle_dialog
+    agent-hint: 'Browser-Automation für E2E-Flows, visuelle Regression und Accessibility-Audits.
+
       browser_navigate: zur Ziel-URL navigieren.
-      browser_snapshot: Accessibility-Baum der Seite erfassen (Basis für a11y-Audit und stabile Selektoren).
+
+      browser_snapshot: Accessibility-Baum der Seite erfassen (Basis für a11y-Audit
+      und stabile Selektoren).
+
       browser_click/browser_type/browser_fill_form: User-Interaktionen im Flow simulieren.
+
       browser_take_screenshot: visuelle Regression via Screenshot-Vergleich.
+
       browser_network_requests/browser_console_messages: Netzwerk und Konsole inspizieren.
+
       Arbiträre Code-Ausführung (browser_run_code_unsafe, browser_evaluate) ist gesperrt.
+
+      '
     connection:
       type: stdio
       command: npx
       args:
-        - "@playwright/mcp@latest"
+      - '@playwright/mcp@latest'
     secrets: []

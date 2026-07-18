@@ -4,7 +4,7 @@ description: The ultimate expert for prompt engineering. Designs, reviews, and o
   agent definitions based on best practices (OpenAI, Lakera).
 prompt_mode: modern
 mode: subagent
-model: opencode-go/minimax-m3
+model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow

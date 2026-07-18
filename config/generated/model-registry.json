@@ -199,6 +199,15 @@
       "tier": "Standard"
     },
     {
+      "id": "opencode-go/kimi-k3",
+      "name": "Kimi K3",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
       "id": "opencode-go/kimi-k2.7-code",
       "name": "Kimi K2.7 Code",
       "provider": "opencode-go",
@@ -345,6 +354,15 @@
     {
       "id": "opencode-go/hy3-preview",
       "name": "Hy3 Preview",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode-go/grok-4.5",
+      "name": "Grok 4.5",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,

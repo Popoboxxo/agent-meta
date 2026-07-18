@@ -4,7 +4,7 @@ description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, pa
   delegates.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/minimax-m3
+model: opencode-go/qwen3.7-plus
 permission:
   todowrite: allow
   task: allow
