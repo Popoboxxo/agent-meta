@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.57.1 — `2026-06-13`
+> Generiert von agent-meta v0.76.0 — `2026-07-18`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -39,13 +39,17 @@
 agents/
   0-external/       # Wrapper-Template für externe Skills
   1-generic/        # Universelle Agent-Templates
-  2-platform/       # Plattform-Overrides (z.B. sharkord)
+  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
 scripts/
   sync.py           # Agent-Generator
-snippets/           # Sprachspezifische Code-Snippets
+  admin-server.py   # Lokaler Admin-UI HTTP-Server
+snippets/           # Sprachspezifische Code-Snippets (tester/, developer/)
 external/           # Git Submodule (externe Skill-Repos)
 howto/              # Anleitungen und Beispiel-Config
-docs/architecture/  # Architektur-Diagramme (Mermaid)
+docs/
+  architecture/     # Architektur-Diagramme (Mermaid)
+  admin-ui.html     # Admin-UI Frontend
+tests/              # Test-Suite (automated, manual, orchestration)
 
 ```
 
@@ -99,6 +103,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
 - Entwickler-Experience (Howto, Beispiele, Doku)
 
+
 ---
 
 ## Agenten-Konfiguration
@@ -107,7 +112,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.75.0 — `2026-07-16`
+Generiert von agent-meta v0.76.0 — `2026-07-18`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.76.0] — 2026-07-18
+
+### Added
+- Regenerate static provider context headers (CLAUDE.md, AGENTS.md, GEMINI.md) on every `sync.py` run — eliminates stale headers after version bumps
+- `sync-on-config-change` hook: automatically triggers `sync.py` when `.meta-config/project.yaml` is edited
+- `--check` flag for `sync.py`: dry-run validation mode for CI pipelines; includes GitHub Actions workflow template (`howto/ci/sync-check.yml`)
+- Sync status endpoint (`GET /api/sync/status`) and panel in admin UI showing last sync time, changed files, and validation state
+
+### Fixed
+- Missing `get_deactivation_status` import in deactivation handlers (caused `NameError` at runtime)
+
+### Documentation
+- Provider context regeneration revamp: architecture notes and upgrade guide (`docs/provider-context-regeneration.md`)
+
 ## [0.75.0] — 2026-07-16
 
 ### Added

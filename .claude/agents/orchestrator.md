@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 ---
 
 > **Extension:** If `.claude/3-project/am-orchestrator-ext.md` exists → read and apply immediately.
