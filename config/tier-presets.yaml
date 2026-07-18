@@ -53,7 +53,7 @@ Normal:
   tiers:
     nano: claude-haiku-4-5-20251001
     fast: claude-haiku-4-5-20251001
-    balanced: claude-sonnet-4-6
+    balanced: claude-sonnet-5
     powerful: claude-opus-4-8
     max: claude-fable-5
     ultra: claude-opus-4-8        # last-resort: strongest real model (max is fictitious)
@@ -62,7 +62,7 @@ Normal:
       tiers:
         nano: claude-haiku-4-5-20251001
         fast: claude-haiku-4-5-20251001
-        balanced: claude-sonnet-4-6
+        balanced: claude-sonnet-5
         powerful: claude-opus-4-8
         max: claude-opus-4-8
         ultra: claude-opus-4-8
