@@ -3002,7 +3002,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
             from lib.providers import load_providers_config  # type: ignore[import]
-            from lib.deactivation import deactivate_providers  # type: ignore[import]
+            from lib.deactivation import deactivate_providers, get_deactivation_status  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
@@ -3037,7 +3037,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
             from lib.providers import load_providers_config  # type: ignore[import]
-            from lib.deactivation import activate_providers  # type: ignore[import]
+            from lib.deactivation import activate_providers, get_deactivation_status  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
