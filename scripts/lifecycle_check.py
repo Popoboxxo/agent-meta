@@ -72,6 +72,21 @@ TRIGGER_LABELS = {
     "on-version-bump-minor":  "Minor-Version-Bump",
     "on-version-bump-major":  "Major-Version-Bump",
     "on-release":             "Release / Git-Tag",
+    "on-config-change":       "Config-Änderung",
+}
+
+# Default tasks for events that should fire even without explicit configuration.
+# Used only when no lifecycle-triggers.<event> is set in project.yaml.
+DEFAULT_TASKS: dict[str, list[dict]] = {
+    "on-config-change": [
+        {
+            "agent": "agent-meta-manager",
+            "task": (
+                ".meta-config/project.yaml was modified. Run "
+                "`python scripts/sync.py` to regenerate provider context files."
+            ),
+        }
+    ],
 }
 
 
@@ -150,6 +165,11 @@ def main() -> None:
 
     triggers = config.get("lifecycle-triggers", {})
     tasks = triggers.get(event, [])
+
+    # Fall back to a built-in default task when the event is not explicitly
+    # configured (e.g. on-config-change always suggests a re-sync).
+    if not tasks:
+        tasks = DEFAULT_TASKS.get(event, [])
 
     if not tasks:
         sys.exit(0)

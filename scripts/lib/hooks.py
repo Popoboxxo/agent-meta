@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import safe_path
+from .io import is_unchanged, safe_path, write_checked
 from .log import SyncLog
 
 HOOKS_DIR = "hooks"
@@ -166,14 +166,21 @@ def _update_settings_hooks(
 
     stale = previously_managed - now_managed
     settings_rel = str(settings_path_rel)
+    if not stale and not active_entries:
+        return  # no effective change
+
+    # Only report an action when the file content would actually change, so
+    # dry-run counts (used by --check) reflect real pending changes.
+    if is_unchanged(settings_path, new_content):
+        log.skip(settings_rel, "hooks registration unchanged")
+        return
+
     if stale:
         log.action("UPDATE", settings_rel,
                    f"removed stale hooks: {', '.join(Path(s).stem for s in sorted(stale))}")
     if active_entries:
         names = ", ".join(e["name"] for e in active_entries)
         log.action("UPDATE", settings_rel, f"registered hooks: {names}")
-    elif not stale:
-        return  # no effective change
 
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -255,12 +262,15 @@ def sync_hooks(
                      f"provider-specific hook ({hook_provider} only)")
             continue
 
-        log.action("COPY", str(target_path.relative_to(project_root)),
-                   f"hooks/{layer}/{source_path.name}")
         now_managed.add(output_name)
-
+        rel_out = str(target_path.relative_to(project_root))
+        rel_source = f"hooks/{layer}/{source_path.name}"
         if not dry_run:
-            target_path.write_text(source_content, encoding="utf-8")
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
+            log.action("COPY", rel_out, rel_source)
+        else:
+            log.skip(rel_out, "unchanged")
 
         # Auto-enable viz-log when viz mode is dynamic/full
         if hook_stem == "viz-log" and viz_active:

@@ -682,6 +682,9 @@
         },
         "on-release": {
           "$ref": "#/$defs/lifecycleTriggerList"
+        },
+        "on-config-change": {
+          "$ref": "#/$defs/lifecycleTriggerList"
         }
       },
       "additionalProperties": false
