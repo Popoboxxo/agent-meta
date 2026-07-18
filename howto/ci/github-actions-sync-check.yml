@@ -1,0 +1,22 @@
+# CI template: agent-meta sync check
+# Copy this job into your project's CI workflow.
+# Fails if provider context files (CLAUDE.md, AGENTS.md, etc.) are out of sync with project.yaml.
+#
+# Prerequisites: Python 3.8+, agent-meta submodule checked out
+
+name: agent-meta sync check
+
+on: [push, pull_request]
+
+jobs:
+  sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Check provider context files are up to date
+        run: python .agent-meta/scripts/sync.py --dry-run --check
+        # Exit 1 if CLAUDE.md, AGENTS.md, GEMINI.md etc. would be regenerated.
+        # Run `python .agent-meta/scripts/sync.py` locally to fix.

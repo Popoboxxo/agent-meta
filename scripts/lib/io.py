@@ -86,6 +86,7 @@ def write_checked(
     force: bool = False,
     allow_secrets: bool = False,
     config: dict | None = None,
+    dry_run: bool = False,
 ) -> bool:
     """Write content to path unless it is already identical (incremental sync).
 
@@ -100,10 +101,20 @@ def write_checked(
     config: optional project config dict — extends secret detection with
             security.secret-patterns from project.yaml.
 
+    dry_run: when True, perform only the change detection — skip the secret
+             scan and the actual write. Returns True when the file *would* be
+             written (content differs / missing), False when unchanged. This
+             lets callers report accurate action/skip counts in dry-run mode
+             (used by ``sync.py --dry-run --check`` for CI).
+
     Returns True when the file was written, False when skipped as unchanged.
     """
     if not force and is_unchanged(path, content):
         return False
+    if dry_run:
+        # Change detected but do not touch the filesystem (or scan secrets —
+        # dry-run must never fail on secrets it would not write).
+        return True
     from .secrets import scan_for_secrets
     findings = scan_for_secrets(content, config=config)
     if findings:

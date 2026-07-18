@@ -315,9 +315,18 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         variables["REQ_CATEGORIES"] = variables.get("REQ_CATEGORIES_LIST") or (
             "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen"
         )
-    # AGENTS_DIR: provider-agnostic generated agents directory (default: .claude/agents)
+    # AGENTS_DIR: generated agents directory of the first active provider.
+    # Derived from provider config so multi-provider setups (Gemini, Opencode, …)
+    # don't inherit a Claude-specific path. Falls back to ".claude/agents" only
+    # when no provider resolves (e.g. all deactivated).
     if "AGENTS_DIR" not in variables:
-        variables["AGENTS_DIR"] = ".claude/agents"
+        _pc_for_dir = load_providers_config(agent_meta_root)
+        _active_providers = resolve_providers(config, _pc_for_dir)
+        _first_provider = _active_providers[0] if _active_providers else None
+        variables["AGENTS_DIR"] = (
+            _pc_for_dir.get(_first_provider, {}).get("agents_dir", ".claude/agents")
+            if _first_provider else ".claude/agents"
+        )
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]

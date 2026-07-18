@@ -254,6 +254,7 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 | `.continue/config.yaml` | **Einmalig anlegen** (Skeleton) | Einmalig, wenn nicht vorhanden |
 | `.claude/3-project/*-ext.md` | **Einmalig anlegen** via `--create-ext` | Manuell angefordert |
 | `.claude/rules/*.md` (projekt-eigen) | **Nie anfassen** — nicht in `.agent-meta-managed` | — |
+| `.meta-config/context-hashes.json` | **Aktualisieren** mit Hashes der generierten Static Header | Jeder Sync |
 | `sync.log` | Überschreiben | Jeder Lauf |
 
 > Einmalige Aktionen für Claude (CLAUDE.md, settings.json, CLAUDE.personal.md) sind nur aktiv wenn `"Claude"` in `ai-providers` steht.
@@ -482,6 +483,39 @@ Das gilt für alle generisch generierten Agenten. **Externe Skill-Agenten** (`.c
 Projektspezifisches Wissen gehört in:
 - **Extension** `.claude/3-project/<prefix>-<rolle>-ext.md` — additiv, nie überschrieben
 - **Override** `.claude/3-project/<rolle>.md` — ersetzt Agenten komplett, nie überschrieben
+
+---
+
+## Drift-Erkennung: context-hashes.json
+
+Seit dem Feature "provider-context-generation-revamp" speichert `sync.py` die Hashes der generierten statischen Header in einem Sidecar-File:
+
+```
+.meta-config/context-hashes.json
+```
+
+**Inhalt:**
+```json
+{
+  "version": 1,
+  "hashes": {
+    "claude": "sha256:abcdef...",
+    "gemini": "sha256:123456...",
+    "continue": "sha256:fedcba..."
+  }
+}
+```
+
+**Zweck:**
+- Erkennt wenn User die context files manuell bearbeitet hat (Drift)
+- Unterscheidet zwischen "Benutzer hat was geändert" und "sync.py braucht Re-Run"
+- Ermöglicht automatische Backups bei Drift (`CLAUDE.md.sync-backup-<timestamp>`)
+
+**Wichtig: Mit Git committen** — nicht gitignoren. Dadurch funktioniert Drift-Erkennung über Rechner und CI hinweg.
+
+**Nutzen:**
+- `sync.py --dry-run --check` prüft ob context files aktuell sind (via Hash-Vergleich)
+- CI-Pipelines können damit feststellen ob context files neu generiert werden müssen
 
 ---
 

@@ -55,7 +55,7 @@ providers:
     model-tiers:
       nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
       fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
-      balanced: claude-sonnet-4-6           # default workhorse: dev, docs, review
+      balanced: claude-sonnet-5             # default workhorse: dev, docs, review
       powerful: claude-opus-4-8             # complex reasoning: architecture, security
       max:      claude-fable-5              # most capable widely released model
     # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)

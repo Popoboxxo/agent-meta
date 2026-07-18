@@ -188,15 +188,10 @@ def _sync_claude_isolation(
 
     settings_content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
     rel_settings = ".claude/settings.json"
-    rel_state = _CLAUDE_STATE_FILE
 
-    if dry_run:
-        log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed)}")
-        log.action("WRITE", rel_state, "provider-isolation state")
-        return
-
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(settings_path, settings_content, log, rel_settings):
+    if not dry_run:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
         log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed)}")
     else:
         log.skip(rel_settings, "provider-isolation unchanged")
@@ -245,15 +240,10 @@ def _sync_opencode_isolation(
 
     settings_content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
     rel_settings = "opencode.json"
-    rel_state = _OPENCODE_STATE_FILE
 
-    if dry_run:
-        log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed_keys)}")
-        log.action("WRITE", rel_state, "provider-isolation state")
-        return
-
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(settings_path, settings_content, log, rel_settings):
+    if not dry_run:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
         log.action("WRITE", rel_settings, f"provider-isolation deny: {', '.join(new_managed_keys)}")
     else:
         log.skip(rel_settings, "provider-isolation unchanged")
@@ -329,12 +319,9 @@ def _sync_gemini_isolation(
     content_lines.extend("\n".join(rule_blocks[i:i+1]) for i in range(len(rule_blocks)))
     content = "\n\n".join(content_lines[:4] + rule_blocks) + "\n"
 
-    if dry_run:
-        log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} rule(s))")
-        return
-
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(target_path, content, log, rel):
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(target_path, content, log, rel, dry_run=dry_run):
         log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} rule(s))")
     else:
         log.skip(rel, "provider-isolation unchanged")
@@ -377,12 +364,9 @@ def _sync_continue_isolation(
         "<!-- agent-meta managed — do not edit manually -->\n"
     )
 
-    if dry_run:
-        log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} dir(s))")
-        return
-
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(target_path, content, log, rel):
+    if not dry_run:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(target_path, content, log, rel, dry_run=dry_run):
         log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} dir(s))")
     else:
         log.skip(rel, "provider-isolation unchanged")

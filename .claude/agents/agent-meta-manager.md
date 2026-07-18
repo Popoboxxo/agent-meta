@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 ---
 
 > **Extension:** If `.claude/3-project/am-agent-meta-manager-ext.md` exists → read and apply immediately.
@@ -157,7 +157,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.74.1 (2026-07-16)
+**Version info:** v0.76.0 (2026-07-18)
 </context>
 
 <tools>

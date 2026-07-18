@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from .io import safe_path
+from .io import safe_path, write_checked
 from .log import SyncLog
 
 COMMANDS_DIR = "commands"
@@ -173,11 +173,14 @@ def sync_commands_for_provider(
         elif provider == "Gemini":
             content = _md_to_toml(content, stem)
 
-        log.action("COPY", str(target_path.relative_to(project_root)), rel_source)
         now_managed.add(final_name)
-
+        rel_out = str(target_path.relative_to(project_root))
         if not dry_run:
-            target_path.write_text(content, encoding="utf-8")
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(target_path, content, log, rel_source, dry_run=dry_run):
+            log.action("COPY", rel_out, rel_source)
+        else:
+            log.skip(rel_out, "unchanged")
 
     for stale_name in sorted(previously_managed - now_managed):
         stale_path = target_dir / stale_name
