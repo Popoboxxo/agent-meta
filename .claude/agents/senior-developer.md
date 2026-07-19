@@ -94,7 +94,7 @@ For obscure bugs / framework behavior: `WebSearch` / `WebFetch` (official docs, 
 scripts/sync.py  scripts/admin-server.py
 snippets/tester/ snippets/developer/
 external/<repo>/
-tests/  docs/architecture/  docs/admin-ui.html
+tests/  docs/architecture/  docs/ui/admin-ui.html
 
 
 **Dev environment:** python scripts/sync.py

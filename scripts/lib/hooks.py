@@ -21,7 +21,7 @@ HOOK_TEMPLATE_SH = """\
 
 # Claude Code passes hook context as JSON on stdin.
 # Exit 0 = allow, exit 2 = block (stdout shown to Claude as context).
-# See howto/hooks.md for full documentation.
+# See docs/guides/hooks.md for full documentation.
 
 INPUT=$(cat)
 

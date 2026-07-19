@@ -690,7 +690,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
     log.info(f"project_root : {project_root}")
     log.info(f"event_log    : {event_log}  exists={event_log.exists()}")
     log.info(f"docs_dir     : {docs_dir}  exists={docs_dir.exists()}")
-    _dashboard_path = _resolve_docs_asset("live-dashboard.html")
+    _dashboard_path = _resolve_docs_asset("ui/live-dashboard.html")
     log.info(f"dashboard    : {_dashboard_path}  "
              f"exists={_dashboard_path.exists()}")
     if event_log.exists():
@@ -722,7 +722,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
         try:
             # ── Static HTML files ──────────────────────────────────────────
             if path in ("/", "/live-dashboard.html"):
-                html_path = _resolve_docs_asset("live-dashboard.html")
+                html_path = _resolve_docs_asset("ui/live-dashboard.html")
                 if html_path.exists():
                     body = html_path.read_bytes()
                     log.req(method, path, 200, extra=f"{len(body)//1024}KB  src={html_path}")
@@ -733,7 +733,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                 return [b'{"error":"live-dashboard.html not found"}']
 
             if path == "/agent-graph.html":
-                html_path = _resolve_docs_asset("agent-graph.html")
+                html_path = _resolve_docs_asset("ui/agent-graph.html")
                 if html_path.exists():
                     start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
                     log.req(method, path, 200, extra=f"src={html_path}")

@@ -146,108 +146,30 @@ External skills are registered in `config/skills-registry.yaml` and pulled as Gi
 python scripts/sync.py --add-skill <repo-url> --skill-name <name> --role <role>
 ```
 
-## sync.py — Complete CLI Reference
+## 📖 Documentation Index
 
-### Core Sync Operations
+The extensive documentation for Agent-Meta has been reorganized into the `docs/` folder for better readability.
 
-| Flag | Description |
-|------|-------------|
-| `--config CONFIG` | Path to project.yaml (default: `.meta-config/project.yaml`) |
-| `--init` | Generate CLAUDE.md from template (if absent) |
-| `--only-variables` | Substitute {{VARIABLE}} in existing CLAUDE.md only |
-| `--dry-run` | Show what would be done without writing |
-| `--check` | Exit code 1 if context files (CLAUDE.md, AGENTS.md, etc.) are out of sync, 0 if up-to-date. Use in CI. |
-| `--validate` | Full sync into test repo, check sync.log for errors |
-| `--fill-defaults` | Write missing config fields with defaults into project.yaml |
-| `--setup` | Interactive setup wizard, guided project.yaml creation + --init |
-| `--audit-config` | Audit project config vs templates (roles_without_template, deprecated_roles, orphaned_pipelines) |
-| `--apply` | Combined with --audit-config: rewrite project.yaml to comment out deprecated roles |
+### Guides & How-Tos (`docs/guides/`)
+- Setup, CI integration, feature guides, and reflection loops.
+- MCP configurations and quality pipelines.
 
-### Extensions, Rules, Hooks
+### API & Framework Reference (`docs/api/`)
+Detailed definitions of all core functions, CLI commands, and framework mappings:
+- **[CLI Reference](docs/api/cli-reference.md)**: Full list of all `sync.py` flags and operations.
+- **[Slash Commands](docs/api/slash-commands.md)**: All available chat-UI commands.
+- **[Composition System](docs/api/composition-system.md)**: Documentation on Agent overrides (`2-platform`, `3-project`) and patches.
+- **[PAL Variables](docs/api/pal-variables.md)**: Mappings for `{{PAL_DELEGATE}}` and other abstraction layer placeholders.
+- **[Admin UI Reference](docs/api/admin-ui-reference.md)**: Detailed configuration guide and help texts for the Agent Meta Manager.
 
-| Flag | Description |
-|------|-------------|
-| `--create-ext ROLE` | Create extension file for ROLE (or 'all') |
-| `--update-ext` | Update managed block in all existing extension files |
-| `--create-rule NAME` | Create .claude/rules/<NAME>.md template |
-| `--create-hook NAME` | Create .claude/hooks/<NAME>.sh template |
-| `--create-command NAME` | Create .claude/commands/<NAME>.md template |
+### Architecture & UI (`docs/ui/`)
+- **[Agent Graph Visualization](docs/ui/agent-graph.html)**: Interactive node-graph of agent delegations.
+- **[Admin UI](docs/ui/admin-ui.html)**: The web-frontend for `admin-server.py`.
+- **[Viz API](docs/api/viz-api.md)**: Architecture documentation for the Viz Server.
+- **[Viz Event Schema](docs/api/viz-event-schema.md)**: JSON schema for Viz events.
 
-### Visualization
-
-| Flag | Description |
-|------|-------------|
-| `--viz` | Generate static agent visualization (mindmap + interactive HTML) |
-| `--viz-mode {off,static,dynamic,full}` | Visualization mode |
-| `--viz-only` | Only generate visualization, skip sync |
-| `--viz-cleanup` | Clean up old visualization sessions |
-
-### Provider Management
-
-| Flag | Description |
-|------|-------------|
-| `--deactivate-providers [PROVIDER ...]` | Zip and remove provider directories |
-| `--activate-providers [PROVIDER ...]` | Restore providers from backup zips |
-| `--deactivation-status` | Show provider deactivation status |
-
-### Backup & Restore
-
-| Flag | Description |
-|------|-------------|
-| `--backup [PROVIDER ...]` | Create timestamped backup |
-| `--label TEXT` | Optional label for --backup |
-| `--restore ARCHIVE` | Restore from backup archive |
-| `--restore-providers [...]` | Which providers to restore |
-| `--force` | Force overwrite when restoring |
-| `--list-backups` | List available backup archives with metadata |
-| `--delete-backup ARCHIVE` | Delete specific backup archive |
-| `--prune-backups` | Delete old backups per retention policy |
-
-### Cache & Discovery
-
-| Flag | Description |
-|------|-------------|
-| `--clear-cache` | Clear the outcome cache |
-| `--update-models` | Update model registry from provider APIs (OpenRouter, Zen, Go) |
-
-### Admin UI & External Skills
-
-| Flag | Description |
-|------|-------------|
-| `--admin` | Start Admin UI server after sync (default port: 7420) |
-| `--admin-only` | Start Admin UI without sync |
-| `--admin-port PORT` | Admin UI port |
-| `--add-skill REPO_URL` | Register new external skill (git submodule add + config entry) |
-| `--skill-name NAME` | Name for the skill |
-| `--source PATH` | Source path within the repo |
-| `--role ROLE` | Agent role name |
-| `--entry FILE` | Entry file for the skill |
-
-## Composition System
-
-**Override Order:** `1-generic → 2-platform → 3-project/<role>.md → 0-external`
-
-Platform and project agents can extend generic templates via `extends:` + `patches:`:
-
-```yaml
-extends: "1-generic/<role>.md"
-patches:
-  - op: append-after
-    anchor: "## Section"
-    content: |
-      ## New Content...
-  - op: replace
-    anchor: "## Section"
-    content: |
-      ## Replaced Content...
-  - op: delete
-    anchor: "## Section"
-  - op: append
-    content: |
-      ## Appended at end...
-```
-
-Extension files (`3-project/<role>-ext.md`) are loaded additively at runtime — not at build time.
+### Systems Engineering Cascade (`docs/se-cascade/`)
+- V-Model documentation and workflow specifications for the SE cascade.
 
 ## DoD Presets (6 presets)
 

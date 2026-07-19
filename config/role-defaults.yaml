@@ -23,7 +23,7 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff: &dev_handoff
-      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1", "slo-report-v1", "data-pipeline-v1", "a11y-audit-v1", "refactoring-plan-v1"]
+      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1", "slo-report-v1", "data-pipeline-v1", "a11y-audit-v1", "refactoring-plan-v1", "design-spec-v1", "api-spec-v1", "explorer-output-v1"]
       output_contract: "dev-result-v1"
       input_schema: "schemas/handoffs/task-spec.schema.json"
       timeout_sec: 300

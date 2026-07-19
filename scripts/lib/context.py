@@ -822,7 +822,7 @@ def init_claude_personal(
         return
 
     content = template_path.read_text(encoding="utf-8")
-    log.action("INIT", "CLAUDE.personal.md", "howto/configs/CLAUDE.personal-template.md")
+    log.action("INIT", "CLAUDE.personal.md", "templates/configs/CLAUDE.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 
@@ -850,7 +850,7 @@ def init_opencode_personal(
         return
 
     content = template_path.read_text(encoding="utf-8")
-    log.action("INIT", "AGENTS.personal.md", "howto/configs/AGENTS.personal-template.md")
+    log.action("INIT", "AGENTS.personal.md", "templates/configs/AGENTS.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 
@@ -1051,7 +1051,7 @@ def sync_claude_md_static(
             "CLAUDE.project-template.md", log,
         )
         new_header, _managed, _footer = _split_context_file(rendered)
-        log.action("INIT", rel, "howto/configs/CLAUDE.project-template.md")
+        log.action("INIT", rel, "templates/configs/CLAUDE.project-template.md")
         if not dry_run:
             target_path.write_text(rendered, encoding="utf-8")
         _record_static_hash(project_root, rel, new_header, dry_run)

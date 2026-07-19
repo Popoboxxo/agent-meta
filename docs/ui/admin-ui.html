@@ -1357,6 +1357,7 @@ function buildSidebar() {
         { route: "/reflection-pairs", label: "Reflection pairs", icon: "↻" },
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
         { route: "/config-audit", label: "Config audit", icon: "✓" },
+        { route: "/consistency-check", label: "Consistency check", icon: "🛡️" },
       ],
     },
   ];
@@ -3536,6 +3537,119 @@ async function viewReflectionPairs() {
   render();
   return wrap;
 }
+
+  // ============================================================================
+  // * Views — Consistency Check
+  // ============================================================================
+
+  async function viewConsistencyCheck() {
+    const wrap = el("div");
+    wrap.appendChild(el("h1", {}, ["Consistency Check"]));
+    wrap.appendChild(
+      el("div", { class: "info-box", style: "margin-bottom: 24px;" }, [
+        "This runs a strict cross-reference scan across the agent-meta framework. It ensures parity between documentation, CLI arguments, UI routes, templates, and handoff contracts."
+      ])
+    );
+
+    const resultBox = el("div", { style: "margin-top: 16px;" });
+    const runBtn = el("button", { class: "primary" }, ["Run Full Consistency Check"]);
+    wrap.appendChild(runBtn);
+    wrap.appendChild(resultBox);
+
+    runBtn.addEventListener("click", async () => {
+      runBtn.disabled = true;
+      runBtn.textContent = "Scanning Repository...";
+      resultBox.innerHTML = "<div class='empty'>Running checks... this may take a few seconds.</div>";
+
+      try {
+        const res = await apiGet("/api/consistency-check");
+        resultBox.innerHTML = "";
+        
+        if (res.error) {
+           resultBox.appendChild(el("div", { class: "error-banner", style: "padding: 16px; background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; margin-top: 16px;" }, [
+             el("h3", { style: "margin:0 0 8px 0;" }, ["Execution Error"]),
+             el("pre", { style: "margin:0; font-family: monospace;" }, [res.error]),
+             res.output ? el("pre", { style: "margin-top:8px; font-family: monospace; color: #9ca3af; font-size: 0.85em;" }, [res.output]) : ""
+           ]));
+           if (!res.findings || res.findings.length === 0) return;
+        }
+
+        const summaryBox = el("div", { 
+          style: `padding: 16px; border-radius: 6px; margin-bottom: 24px; border: 1px solid ${res.summary.total === 0 ? 'rgba(10,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; background: ${res.summary.total === 0 ? 'rgba(10,185,129,0.05)' : 'rgba(239,68,68,0.05)'}; display: flex; gap: 24px; align-items: center; margin-top: 16px;`
+        });
+
+        if (res.summary.total === 0) {
+          summaryBox.innerHTML = `
+            <div style="font-size: 24px;">🎉</div>
+            <div>
+              <div style="font-size: 1.1em; font-weight: 600; color: #10b981;">All checks passed!</div>
+              <div style="color: #9ca3af; font-size: 0.9em; margin-top: 4px;">The repository is completely consistent. 0 errors, 0 warnings.</div>
+            </div>
+          `;
+          resultBox.appendChild(summaryBox);
+          return;
+        }
+
+        summaryBox.innerHTML = `
+          <div style="font-size: 24px;">🛡️</div>
+          <div>
+            <div style="font-size: 1.1em; font-weight: 600; color: #ef4444;">Issues Found: ${res.summary.total}</div>
+            <div style="color: #9ca3af; font-size: 0.9em; margin-top: 4px;">
+              <span style="color: #ef4444; font-weight: 600;">${res.summary.errors} Errors</span> &nbsp;|&nbsp; 
+              <span style="color: #f59e0b; font-weight: 600;">${res.summary.warnings} Warnings</span>
+            </div>
+          </div>
+        `;
+        resultBox.appendChild(summaryBox);
+
+        // Group findings by file
+        const byFile = {};
+        res.findings.forEach(f => {
+          if (!byFile[f.file]) byFile[f.file] = [];
+          byFile[f.file].push(f);
+        });
+
+        for (const [file, items] of Object.entries(byFile)) {
+          const fileWrap = el("div", { class: "setting-section", style: "padding: 16px; margin-bottom: 16px; background: var(--bg-1);" }, [
+            el("h3", { style: "margin: 0 0 12px 0; font-family: monospace; color: #e5e7eb; border-bottom: 1px solid var(--border); padding-bottom: 8px;" }, [file])
+          ]);
+
+          items.forEach(item => {
+            const isError = item.severity === "ERROR";
+            const color = isError ? "#ef4444" : "#f59e0b";
+            const bg = isError ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)";
+
+            const itemWrap = el("div", { style: `margin-bottom: 12px; padding: 12px; background: ${bg}; border-left: 3px solid ${color}; border-radius: 4px;` }, [
+              el("div", { style: "display: flex; gap: 8px; margin-bottom: 6px; font-size: 0.85em; font-weight: 600; color: " + color + ";" }, [
+                el("span", {}, [`[${item.severity}]`]),
+                el("span", { style: "color: #9ca3af;" }, [item.check])
+              ]),
+              el("div", { style: "color: #e5e7eb; line-height: 1.4;" }, [item.message])
+            ]);
+
+            if (item.suggestion) {
+              itemWrap.appendChild(
+                el("div", { style: "margin-top: 8px; font-size: 0.9em; color: #9ca3af; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);" }, [
+                  "💡 ", item.suggestion
+                ])
+              );
+            }
+            fileWrap.appendChild(itemWrap);
+          });
+          resultBox.appendChild(fileWrap);
+        }
+
+      } catch (err) {
+        resultBox.innerHTML = `<div class='empty' style='color: #ef4444;'>Error: ${err.message}</div>`;
+      } finally {
+        runBtn.disabled = false;
+        runBtn.textContent = "Run Full Consistency Check";
+      }
+    });
+    return wrap;
+  }
+
+  // ============================================================================
 
 /* =========================================================================
  * Views — Model Mapping
@@ -6265,6 +6379,7 @@ async function init() {
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
   router.register("/config-audit",             viewConfigAudit);
+  router.register("/consistency-check",        viewConsistencyCheck);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/reflection-pairs", viewReflectionPairs);
@@ -6279,6 +6394,178 @@ async function init() {
 }
 
 init();
+</script>
+<script>
+// --- 3-State Help System ---
+(async function() {
+  const helpDocs = await fetch('/api/help').then(r => r.json()).catch(() => ({}));
+  if (Object.keys(helpDocs).length === 0) return;
+
+  let helpState = parseInt(localStorage.getItem('agent-meta-help-state') || '0');
+
+  const toggleContainer = document.createElement('div');
+  toggleContainer.innerHTML = `
+    <style>
+      .help-toggle-widget { position: fixed; top: 12px; right: 20px; display: flex; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; z-index: 1000; font-size: 11px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+      .help-btn { padding: 4px 12px; cursor: pointer; color: var(--text-muted); border-right: 1px solid var(--border-color); transition: all 0.2s; }
+      .help-btn:last-child { border-right: none; }
+      .help-btn:hover { color: var(--text-primary); }
+      .help-btn.active { background: var(--accent-blue-soft); color: var(--accent-blue); font-weight: bold; }
+      
+      .help-icon-wrapper { position: relative; display: inline-block; margin-left: 10px; vertical-align: middle; }
+      .help-icon-badge { cursor: help; background: var(--accent-blue); color: #fff; border-radius: 50%; width: 18px; height: 18px; text-align: center; line-height: 18px; font-size: 12px; display: inline-block; box-shadow: 0 0 8px rgba(88,166,255,0.4); }
+      .help-icon-wrapper:hover .help-tooltip { display: block; }
+      .help-tooltip { display: none; position: absolute; left: 28px; top: -10px; width: 400px; background: var(--bg-secondary); border: 1px solid var(--accent-blue); padding: 14px; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 9999; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+      
+      .help-expanded-block { background: var(--bg-tertiary); border-left: 4px solid var(--accent-blue); padding: 16px 20px; margin-top: 16px; margin-bottom: 24px; border-radius: 0 6px 6px 0; font-size: 13.5px; color: var(--text-primary); line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .help-expanded-block p { margin: 0 0 10px 0; }
+      .help-expanded-block p:last-child { margin: 0; }
+      
+      .field-expanded { margin-top: 6px; margin-bottom: 16px; padding: 12px 16px; border-left: 3px solid var(--accent-green); font-size: 13px; background: rgba(33,38,45,0.7); box-shadow: none; }
+      .field-tooltip { width: 320px; border-color: var(--accent-green); }
+    </style>
+    <div class="help-toggle-widget">
+      <div class="help-btn ${helpState===0?'active':''}" data-state="0">Help: Off</div>
+      <div class="help-btn ${helpState===1?'active':''}" data-state="1">Icons</div>
+      <div class="help-btn ${helpState===2?'active':''}" data-state="2">Full</div>
+    </div>
+  `;
+  document.body.appendChild(toggleContainer);
+
+  const btns = toggleContainer.querySelectorAll('.help-btn');
+  btns.forEach(b => b.addEventListener('click', (e) => {
+    btns.forEach(btn => btn.classList.remove('active'));
+    e.target.classList.add('active');
+    helpState = parseInt(e.target.dataset.state);
+    localStorage.setItem('agent-meta-help-state', helpState);
+    renderHelp();
+  }));
+
+  const routeMap = {
+    "project/general": "project_instance-general",
+    "project/providers": "project_instance-providers",
+    "project/provider-deactivation": "project_instance-deactivation",
+    "project/backups": "project_instance-backups",
+    "project/roles": "project_instance-roles",
+    "project/orchestrator": "project_instance-orchestrator",
+    "project/prompt-modes": "project_instance-prompt_modes",
+    "project/viz-admin": "project_instance-viz_admin",
+    "project/model-overrides": "project_instance-model_overrides",
+    "project/provider-tier-overrides": "project_instance-tier_overrides",
+    "project/model-mapping": "project_instance-model_mapping",
+    "project/dod-overrides": "project_instance-dod_overrides",
+    "project/rules-overrides": "project_instance-rules_overrides",
+    "project/advanced": "project_instance-advanced",
+    "models": "framework_defaults-models",
+    "provider-tiers": "framework_defaults-tier_mappings",
+    "tier-presets": "framework_defaults-tier_presets",
+    "config/role-defaults": "framework_defaults-role_defaults",
+    "config/ai-providers": "framework_defaults-ai_providers",
+    "config/skills-registry": "framework_defaults-skills",
+    "config/mcp-registry": "framework_defaults-mcp_registry",
+    "config/dod-presets": "framework_defaults-dod_presets",
+    "config/rules-presets": "framework_defaults-rules_presets",
+    "config/delegation-syntax": "framework_defaults-delegation",
+    "config/export": "framework_defaults-export",
+    "roles": "workflows-roles_graph",
+    "pipelines": "workflows-pipelines",
+    "reflection-pairs": "workflows-reflection_pairs",
+    "agents": "workflows-agent_templates",
+    "config-audit": "workflows-config_audit",
+    "consistency-check": "workflows-consistency_check",
+    "": "super_admin-dashboard",
+    "viz-dashboard": "super_admin-viz_dashboard",
+    "sync": "super_admin-sync",
+    "live": "super_admin-live_events"
+  };
+
+  // Convert markdown-lite to HTML
+  function mdToHtml(md) {
+    if(!md) return "";
+    return md.split('\\n\\n').map(p => `<p>${p}</p>`).join('');
+  }
+
+  let helpTimeout = null;
+
+  function scheduleRenderHelp() {
+    if (helpState === 0) return;
+    if (helpTimeout) clearTimeout(helpTimeout);
+    helpTimeout = setTimeout(renderHelp, 100);
+  }
+
+  function renderHelp() {
+    document.querySelectorAll('.help-injected').forEach(e => e.remove());
+    if (helpState === 0) return;
+
+    let currentRoute = window.location.hash.replace('#/', '').replace('#', '');
+    let pageHelpId = routeMap[currentRoute];
+
+    // --- Page Level Help ---
+    if (pageHelpId && helpDocs[pageHelpId]) {
+      let textHTML = mdToHtml(helpDocs[pageHelpId]);
+      const pageHeader = document.querySelector('#content h2, #content h1');
+      if (pageHeader) {
+        if (helpState === 1) {
+          const icon = document.createElement('span');
+          icon.className = 'help-icon-wrapper help-injected';
+          icon.innerHTML = `<span class="help-icon-badge">?</span><div class="help-tooltip">${textHTML}</div>`;
+          pageHeader.appendChild(icon);
+        } else if (helpState === 2) {
+          const block = document.createElement('div');
+          block.className = 'help-expanded-block help-injected';
+          block.innerHTML = textHTML;
+          pageHeader.parentNode.insertBefore(block, pageHeader.nextSibling);
+        }
+      }
+    }
+
+    // --- Field Level Help ---
+    document.querySelectorAll('.field-label').forEach(label => {
+        let labelText = label.innerText.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+        let fieldKey = "field-" + labelText;
+        
+        if (helpDocs[fieldKey]) {
+            let textHTML = mdToHtml(helpDocs[fieldKey]);
+            if (helpState === 1) {
+              const icon = document.createElement('span');
+              icon.className = 'help-icon-wrapper help-injected';
+              icon.innerHTML = `<span class="help-icon-badge" style="background:var(--accent-green)">?</span><div class="help-tooltip field-tooltip">${textHTML}</div>`;
+              label.appendChild(icon);
+            } else if (helpState === 2) {
+              const block = document.createElement('div');
+              block.className = 'help-expanded-block field-expanded help-injected';
+              block.innerHTML = textHTML;
+              let fieldWrapper = label.closest('.field') || label.parentNode;
+              if (fieldWrapper && fieldWrapper.parentNode) {
+                  fieldWrapper.parentNode.insertBefore(block, fieldWrapper.nextSibling);
+              }
+            }
+        }
+    });
+  }
+
+  window.addEventListener('hashchange', scheduleRenderHelp);
+  scheduleRenderHelp();
+
+  const observer = new MutationObserver((mutations) => {
+     if (helpState === 0) return;
+     let realMutation = false;
+     for (const m of mutations) {
+       for (const node of m.addedNodes) {
+         if (node.nodeType === 1 && !node.classList.contains('help-injected')) realMutation = true;
+         if (node.nodeType === 3) realMutation = true; // Text nodes count
+       }
+       for (const node of m.removedNodes) {
+         if (node.nodeType === 1 && !node.classList.contains('help-injected')) realMutation = true;
+         if (node.nodeType === 3) realMutation = true;
+       }
+     }
+     if (realMutation) {
+       scheduleRenderHelp();
+     }
+  });
+  observer.observe(document.querySelector('#content'), {childList: true, subtree: true});
+})();
 </script>
 </body>
 </html>

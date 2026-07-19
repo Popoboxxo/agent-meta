@@ -100,9 +100,7 @@ variables:
     \ Skills\n  1-generic/        # Universelle Agent-Templates\n  2-platform/   \
     \    # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)\nscripts/\n\
     \  sync.py           # Agent-Generator\n  admin-server.py   # Lokaler Admin-UI\
-    \ HTTP-Server\nsnippets/           # Sprachspezifische Code-Snippets (tester/,\
-    \ developer/)\nexternal/           # Git Submodule (externe Skill-Repos)\nhowto/\
-    \              # Anleitungen und Beispiel-Config\ndocs/\n  architecture/     #\
+    \ developer/)\nexternal/           # Git Submodule (externe Skill-Repos)\ndocs/guides/        # Anleitungen und Beispiel-Config\ndocs/ui/            # UI Assets\n  architecture/     #\
     \ Architektur-Diagramme (Mermaid)\n  admin-ui.html     # Admin-UI Frontend\ntests/\
     \              # Test-Suite (automated, manual, orchestration)\n"
   ENTRY_POINT_PATTERN: scripts/sync.py — Haupt-CLI für Agent-Generierung
@@ -119,7 +117,7 @@ variables:
     '
   ARCHITECTURE: "agents/\n  0-external/  1-generic/  2-platform/\nscripts/sync.py\
     \  scripts/admin-server.py\nsnippets/tester/ snippets/developer/\nexternal/<repo>/\n\
-    tests/  docs/architecture/  docs/admin-ui.html\n"
+    tests/  docs/architecture/  docs/ui/admin-ui.html\n"
   CODE_CONVENTIONS: '- Python: PEP 8, snake_case, klare Funktionsnamen
 
     - Keine externen Python-Dependencies außer Stdlib

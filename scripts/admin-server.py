@@ -4,7 +4,7 @@ agent-meta Admin UI Server
 ==========================
 Zero-dependency HTTP server (Python stdlib + PyYAML) that exposes a visual
 configuration surface for agent-meta. Serves a single-page web UI from
-``docs/admin-ui.html`` and provides REST + SSE endpoints over the YAML/JSON
+``docs/ui/admin-ui.html`` and provides REST + SSE endpoints over the YAML/JSON
 configuration files of the framework.
 
 Two modes:
@@ -1111,6 +1111,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
             return
 
+        if path == "/api/help":
+            return self._send_json(self._get_help_docs())
+
         if path == "/api/sync/status":
             return self._send_json(self.__class__.sync_executor.status())
 
@@ -1160,6 +1163,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
+            
+        if path == "/api/consistency-check":
+            return self._send_json(self._run_consistency_check())
 
         if path == "/api/models":
             return self._handle_get_models()
@@ -1982,9 +1988,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _serve_ui(self) -> None:
-        ui_path = resolve_asset(self.root, "docs", "admin-ui.html")
+        ui_path = resolve_asset(self.root, "docs", "ui", "admin-ui.html")
         if not ui_path.exists():
-            raise FileNotFoundError("docs/admin-ui.html (UI bundle missing)")
+            raise FileNotFoundError("docs/ui/admin-ui.html (UI bundle missing)")
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
 
     def _find_schema_path(self) -> Path:
@@ -2857,6 +2863,71 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         lib = self.__class__.root / "scripts" / "lib"
         if str(lib) not in sys.path:
             sys.path.insert(0, str(lib))
+
+    def _get_help_docs(self) -> dict:
+        """Parse admin-ui-reference.md and return help-id mapping."""
+        ref_path = self.__class__.root / "docs" / "api" / "admin-ui-reference.md"
+        if not ref_path.exists():
+            return {}
+            
+        content = ref_path.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        
+        help_map = {}
+        current_id = None
+        current_text = []
+        
+        for line in lines:
+            if line.startswith("<!-- help-id: "):
+                # Save previous block if exists
+                if current_id:
+                    help_map[current_id] = "\n".join(current_text).strip()
+                current_id = line.replace("<!-- help-id: ", "").replace(" -->", "").strip()
+                current_text = []
+            elif line.startswith("### ") or line.startswith("## "):
+                # A new heading stops the current block parsing until the next help-id
+                if current_id:
+                    help_map[current_id] = "\n".join(current_text).strip()
+                    current_id = None
+            elif current_id:
+                # Skip other HTML comments like <!-- last-updated -->
+                if line.startswith("<!--"):
+                    continue
+                current_text.append(line)
+                
+        # Catch the last one
+        if current_id:
+            help_map[current_id] = "\n".join(current_text).strip()
+            
+        return help_map
+
+    def _run_consistency_check(self) -> dict:
+        """Run the overall repository consistency check and return JSON."""
+        import subprocess
+        import sys
+        import json
+        try:
+            r = subprocess.run(
+                [sys.executable, "scripts/consistency-check.py", "--json"], 
+                cwd=str(self.__class__.root), 
+                capture_output=True, 
+                text=True
+            )
+            # consistency-check.py --json prints pure JSON to stdout regardless of exit code
+            return json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return {
+                "error": "Failed to parse JSON output",
+                "output": r.stdout,
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0}
+            }
+        except Exception as e:
+            return {
+                "error": str(e),
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0}
+            }
 
     def _run_config_audit(self) -> dict:
         """Run the consistency audit over the current configuration."""
