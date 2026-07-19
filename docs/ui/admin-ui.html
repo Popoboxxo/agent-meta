@@ -939,9 +939,14 @@ class Router {
       const node = view();
       if (node instanceof Promise) {
         content.appendChild(el("div", { class: "empty" }, ["Loading…"]));
-        node.then(real => { content.innerHTML = ""; content.appendChild(real); })
-            .catch(err => { content.innerHTML = ""; content.appendChild(renderError(err)); });
+        node.then(real => { 
+          applyReadOnlyLock(hash, real);
+          content.innerHTML = ""; 
+          content.appendChild(real); 
+        })
+        .catch(err => { content.innerHTML = ""; content.appendChild(renderError(err)); });
       } else {
+        applyReadOnlyLock(hash, node);
         content.appendChild(node);
       }
     } catch (err) {
@@ -954,6 +959,30 @@ class Router {
 }
 function renderError(err) {
   return el("div", { class: "error-box" }, [String(err.message || err)]);
+}
+
+window.superOnlyRoutes = new Set();
+
+function applyReadOnlyLock(hash, container) {
+  if (state && state.state && state.state.mode !== "super_admin" && window.superOnlyRoutes.has("/" + hash)) {
+    const banner = document.createElement("div");
+    banner.className = "info-box";
+    banner.style.marginBottom = "24px";
+    banner.style.backgroundColor = "rgba(245, 158, 11, 0.05)";
+    banner.style.color = "#d97706";
+    banner.style.border = "1px solid rgba(245, 158, 11, 0.2)";
+    banner.innerHTML = "<strong style='display:flex;align-items:center;gap:6px;'><span style='font-size:1.2em;'>🔒</span> Framework defaults (Read-Only)</strong><div style='margin-top:6px;opacity:0.9;'>These settings are defined by the agent-meta framework. In this project context, they can only be viewed.</div>";
+    container.insertBefore(banner, container.firstChild);
+    
+    // Disable inputs and buttons
+    container.querySelectorAll("input, textarea, select, button").forEach(el => {
+      el.disabled = true;
+      if (el.tagName === "BUTTON") {
+         el.style.opacity = "0.5";
+         el.style.cursor = "not-allowed";
+      }
+    });
+  }
 }
 
 const router = new Router();
@@ -1356,23 +1385,25 @@ function buildSidebar() {
         { route: "/pipelines", label: "Pipelines", icon: "↦" },
         { route: "/reflection-pairs", label: "Reflection pairs", icon: "↻" },
         { route: "/agents", label: "Agent templates", icon: "✎", superOnly: true },
-        { route: "/config-audit", label: "Config audit", icon: "✓" },
-        { route: "/consistency-check", label: "Consistency check", icon: "🛡️" },
+        { route: "/system-audit", label: "System Health & Audit", icon: "🛡️" },
       ],
     },
   ];
+  window.superOnlyRoutes.clear();
   nav.innerHTML = "";
   for (const group of groups) {
     nav.appendChild(el("div", { class: "nav-group-title" }, [group.title]));
     for (const item of group.items) {
-      const disabled = item.superOnly && state.state.mode !== "super_admin";
+      if (item.superOnly) window.superOnlyRoutes.add(item.route);
+      const isReadonly = item.superOnly && state.state.mode !== "super_admin";
       const node = el("div", {
-        class: `nav-item ${disabled ? "disabled" : ""}`,
+        class: `nav-item`,
         dataset: { route: item.route },
-        onclick: () => disabled ? null : router.navigate(item.route),
+        onclick: () => router.navigate(item.route),
       }, [
         el("span", { class: "icon" }, [item.icon]),
         item.label,
+        isReadonly ? el("span", { style: "margin-left:auto; font-size: 0.85em; opacity: 0.5;", title: "Read-Only" }, ["🔒"]) : ""
       ]);
       nav.appendChild(node);
     }
@@ -3542,65 +3573,53 @@ async function viewReflectionPairs() {
   // * Views — Consistency Check
   // ============================================================================
 
-  async function viewConsistencyCheck() {
+  async function buildConsistencyCheck() {
     const wrap = el("div");
-    wrap.appendChild(el("h1", {}, ["Consistency Check"]));
-    wrap.appendChild(
-      el("div", { class: "info-box", style: "margin-bottom: 24px;" }, [
-        "This runs a strict cross-reference scan across the agent-meta framework. It ensures parity between documentation, CLI arguments, UI routes, templates, and handoff contracts."
-      ])
-    );
+    wrap.appendChild(el("h2", {}, ["Consistency Check"]));
+    wrap.appendChild(el("p", { class: "muted" }, [
+      "This runs a strict cross-reference scan across the agent-meta framework. It ensures parity between documentation, CLI arguments, UI routes, templates, and handoff contracts."
+    ]));
 
-    const resultBox = el("div", { style: "margin-top: 16px;" });
-    const runBtn = el("button", { class: "primary" }, ["Run Full Consistency Check"]);
-    wrap.appendChild(runBtn);
+    const runBtn = el("button", { class: "btn btn-primary" }, ["Run check"]);
+    wrap.appendChild(el("div", { class: "btn-row" }, [runBtn]));
+
+    const summary = el("div", { class: "muted", style: "margin-top:1rem;" }, ["(no check run yet)"]);
+    wrap.appendChild(summary);
+
+    const resultBox = el("div", { style: "margin-top:1rem;" });
     wrap.appendChild(resultBox);
 
-    runBtn.addEventListener("click", async () => {
+    async function runCheck() {
       runBtn.disabled = true;
-      runBtn.textContent = "Scanning Repository...";
-      resultBox.innerHTML = "<div class='empty'>Running checks... this may take a few seconds.</div>";
+      summary.textContent = "Running consistency check…";
+      summary.style.color = "var(--text-secondary)";
+      resultBox.innerHTML = "";
 
       try {
-        const res = await apiGet("/api/consistency-check");
+        const res = await api.get("/api/consistency-check");
         resultBox.innerHTML = "";
         
         if (res.error) {
-           resultBox.appendChild(el("div", { class: "error-banner", style: "padding: 16px; background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; margin-top: 16px;" }, [
-             el("h3", { style: "margin:0 0 8px 0;" }, ["Execution Error"]),
-             el("pre", { style: "margin:0; font-family: monospace;" }, [res.error]),
-             res.output ? el("pre", { style: "margin-top:8px; font-family: monospace; color: #9ca3af; font-size: 0.85em;" }, [res.output]) : ""
+           summary.textContent = `Check failed.`;
+           summary.style.color = "var(--accent-red)";
+           const errPanel = el("div", { class: "panel" });
+           errPanel.appendChild(el("div", { class: "panel-title" }, [
+             el("h2", { style: "margin:0; color:var(--accent-red);" }, ["Execution Error"])
            ]));
+           errPanel.appendChild(el("pre", { style: "margin:10px; font-family:monospace; color:var(--accent-red);" }, [res.error]));
+           if (res.output) errPanel.appendChild(el("pre", { style: "margin:10px; font-family:monospace; color:var(--text-muted);" }, [res.output]));
+           resultBox.appendChild(errPanel);
            if (!res.findings || res.findings.length === 0) return;
         }
 
-        const summaryBox = el("div", { 
-          style: `padding: 16px; border-radius: 6px; margin-bottom: 24px; border: 1px solid ${res.summary.total === 0 ? 'rgba(10,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; background: ${res.summary.total === 0 ? 'rgba(10,185,129,0.05)' : 'rgba(239,68,68,0.05)'}; display: flex; gap: 24px; align-items: center; margin-top: 16px;`
-        });
-
         if (res.summary.total === 0) {
-          summaryBox.innerHTML = `
-            <div style="font-size: 24px;">🎉</div>
-            <div>
-              <div style="font-size: 1.1em; font-weight: 600; color: #10b981;">All checks passed!</div>
-              <div style="color: #9ca3af; font-size: 0.9em; margin-top: 4px;">The repository is completely consistent. 0 errors, 0 warnings.</div>
-            </div>
-          `;
-          resultBox.appendChild(summaryBox);
+          summary.textContent = "Consistency check: no issues found.";
+          summary.style.color = "var(--accent-green)";
           return;
         }
 
-        summaryBox.innerHTML = `
-          <div style="font-size: 24px;">🛡️</div>
-          <div>
-            <div style="font-size: 1.1em; font-weight: 600; color: #ef4444;">Issues Found: ${res.summary.total}</div>
-            <div style="color: #9ca3af; font-size: 0.9em; margin-top: 4px;">
-              <span style="color: #ef4444; font-weight: 600;">${res.summary.errors} Errors</span> &nbsp;|&nbsp; 
-              <span style="color: #f59e0b; font-weight: 600;">${res.summary.warnings} Warnings</span>
-            </div>
-          </div>
-        `;
-        resultBox.appendChild(summaryBox);
+        summary.textContent = `${res.summary.total} issue(s) found (${res.summary.errors} Error(s), ${res.summary.warnings} Warning(s)).`;
+        summary.style.color = "var(--text-secondary)";
 
         // Group findings by file
         const byFile = {};
@@ -3609,43 +3628,47 @@ async function viewReflectionPairs() {
           byFile[f.file].push(f);
         });
 
+        const severityColor = (sev) => ({
+          ERROR: "var(--accent-red)",
+          WARN:  "var(--accent-yellow, #c9a227)",
+          INFO:  "var(--text-muted)",
+        }[sev] || "var(--text-muted)");
+
         for (const [file, items] of Object.entries(byFile)) {
-          const fileWrap = el("div", { class: "setting-section", style: "padding: 16px; margin-bottom: 16px; background: var(--bg-1);" }, [
-            el("h3", { style: "margin: 0 0 12px 0; font-family: monospace; color: #e5e7eb; border-bottom: 1px solid var(--border); padding-bottom: 8px;" }, [file])
-          ]);
-
-          items.forEach(item => {
-            const isError = item.severity === "ERROR";
-            const color = isError ? "#ef4444" : "#f59e0b";
-            const bg = isError ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)";
-
-            const itemWrap = el("div", { style: `margin-bottom: 12px; padding: 12px; background: ${bg}; border-left: 3px solid ${color}; border-radius: 4px;` }, [
-              el("div", { style: "display: flex; gap: 8px; margin-bottom: 6px; font-size: 0.85em; font-weight: 600; color: " + color + ";" }, [
-                el("span", {}, [`[${item.severity}]`]),
-                el("span", { style: "color: #9ca3af;" }, [item.check])
-              ]),
-              el("div", { style: "color: #e5e7eb; line-height: 1.4;" }, [item.message])
-            ]);
-
-            if (item.suggestion) {
-              itemWrap.appendChild(
-                el("div", { style: "margin-top: 8px; font-size: 0.9em; color: #9ca3af; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);" }, [
-                  "💡 ", item.suggestion
-                ])
-              );
-            }
-            fileWrap.appendChild(itemWrap);
-          });
-          resultBox.appendChild(fileWrap);
+          const panel = el("div", { class: "panel" });
+          panel.appendChild(el("div", { class: "panel-title" }, [
+            el("h2", { style: `margin:0; color:var(--text-secondary);` },
+               [`${file} (${items.length})`]),
+          ]));
+          const list = el("div");
+          for (const item of items) {
+             const row = el("div", { style: "padding:0.4rem 0; border-bottom:1px solid var(--border-color);" });
+             const color = severityColor(item.severity);
+             
+             row.appendChild(el("div", { style: `font-weight:600; color:${color};` }, [`[${item.severity}] ${item.check}`]));
+             row.appendChild(el("div", { class: "muted", style: "font-size:0.9em;" }, [item.message || ""]));
+             if (item.suggestion) {
+               row.appendChild(el("div", { class: "muted", style: "font-size:0.8em;" }, ["💡 " + item.suggestion]));
+             }
+             list.appendChild(row);
+          }
+          panel.appendChild(list);
+          resultBox.appendChild(panel);
         }
 
       } catch (err) {
-        resultBox.innerHTML = `<div class='empty' style='color: #ef4444;'>Error: ${err.message}</div>`;
+        summary.textContent = `Check failed: ${err.message}`;
+        summary.style.color = "var(--accent-red)";
       } finally {
         runBtn.disabled = false;
-        runBtn.textContent = "Run Full Consistency Check";
       }
-    });
+    }
+
+    runBtn.addEventListener("click", runCheck);
+    
+    // Auto-run on load to match Config Audit
+    runCheck();
+    
     return wrap;
   }
 
@@ -3716,9 +3739,9 @@ async function viewModelMapping() {
  * orphaned pipeline references in the active project.yaml. Mirrors the
  * `python scripts/sync.py --audit-config` CLI.
  * ========================================================================= */
-async function viewConfigAudit() {
+async function buildConfigAudit() {
   const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Config Audit"]));
+  wrap.appendChild(el("h2", {}, ["Config Audit"]));
   wrap.appendChild(el("p", { class: "muted" }, [
     "Compares .meta-config/project.yaml against role-defaults.yaml and the ",
     "generic agent templates. Deprecated roles can be auto-disabled (a ",
@@ -3842,6 +3865,21 @@ async function viewConfigAudit() {
 
   // Auto-run on view open so users get immediate feedback.
   runAudit();
+  return wrap;
+}
+
+async function viewSystemAudit() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["System Health & Audit"]));
+  
+  const auditNode = await buildConfigAudit();
+  wrap.appendChild(auditNode);
+  
+  wrap.appendChild(el("hr", { style: "margin: 32px 0; border: 0; border-top: 1px solid var(--border-color);" }));
+  
+  const consNode = await buildConsistencyCheck();
+  wrap.appendChild(consNode);
+  
   return wrap;
 }
 
@@ -6378,8 +6416,7 @@ async function init() {
   router.register("/config/rules-presets",     viewRulesPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
-  router.register("/config-audit",             viewConfigAudit);
-  router.register("/consistency-check",        viewConsistencyCheck);
+  router.register("/system-audit",             viewSystemAudit);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);
   router.register("/reflection-pairs", viewReflectionPairs);
