@@ -21,7 +21,7 @@
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
 > Generates project-ready agent files in `.claude/agents/` via `sync.py`.
-> Supports 5 AI providers: Claude Code, Gemini, Opencode, Continue, GitHub Copilot.
+> Supports 6 AI providers: Claude Code, Gemini, Opencode, Continue, GitHub Copilot, Mammouth Code.
 
 ## Quick Start
 
@@ -98,6 +98,7 @@ python .agent-meta/scripts/sync.py
 | **claude-expert** | powerful | 1.0.0 | Claude Code platform analysis: .claude/ config, best practices, MCP integration |
 | **gemini-expert** | powerful | 1.0.0 | Gemini expert: configuration (.gemini), best practices, MCP integration |
 | **opencode-expert** | powerful | 1.0.0 | Opencode expert: configuration (.opencode), best practices, MCP integration |
+| **mammouth-expert** | powerful | 1.0.0 | Mammouth Code expert: configuration (.mammouth), best practices, MCP integration |
 | **continue-expert** | powerful | 1.0.0 | Continue expert: configuration (.continue), best practices, MCP integration |
 | **copilot-expert** | powerful | 1.0.0 | GitHub Copilot expert: configuration (.github/copilot), best practices, MCP integration |
 
@@ -129,7 +130,7 @@ Overrides provide platform-specific customizations. Two modes:
 
 | Platform | Overrides | Mode |
 |----------|-----------|------|
-| agent-meta | developer, claude-expert, continue-expert, copilot-expert, gemini-expert, opencode-expert | composition |
+| agent-meta | developer, claude-expert, continue-expert, copilot-expert, gemini-expert, opencode-expert, mammouth-expert | composition |
 | Home Assistant | developer, documenter, log-analyzer | composition |
 | Sharkord | developer, docker, release | composition |
 
@@ -401,7 +402,7 @@ config/
   skills-registry.yaml       # External skill repos
   dod-presets.yaml           # 6 DoD presets
   tier-presets.yaml          # 5 tier presets (cheap, normal, advanced, expensive)
-  ai-providers.yaml          # 5 provider configs (Claude, Gemini, Opencode, Continue, Copilot)
+  ai-providers.yaml          # 6 provider configs (Claude, Gemini, Opencode, Continue, Copilot, Mammouth)
   mcp-registry.yaml          # 4 MCP server configs
   generated/
     model-registry.json      # Cached real models (338+ models from APIs)

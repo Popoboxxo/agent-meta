@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.76.0 — `2026-07-18`
+> Generiert von agent-meta v0.76.0 — `2026-07-20`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -42,11 +42,10 @@ agents/
   2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
 scripts/
   sync.py           # Agent-Generator
-  admin-server.py   # Lokaler Admin-UI HTTP-Server
-snippets/           # Sprachspezifische Code-Snippets (tester/, developer/)
+  admin-server.py   # Lokaler Admin-UI developer/)
 external/           # Git Submodule (externe Skill-Repos)
-howto/              # Anleitungen und Beispiel-Config
-docs/
+docs/guides/        # Anleitungen und Beispiel-Config
+docs/ui/            # UI Assets
   architecture/     # Architektur-Diagramme (Mermaid)
   admin-ui.html     # Admin-UI Frontend
 tests/              # Test-Suite (automated, manual, orchestration)
@@ -112,7 +111,9 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-Generiert von agent-meta v0.76.0 — `2026-07-19`
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode -> AGENTS.md
+
+Generiert von agent-meta v0.76.0 — `2026-07-20`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.

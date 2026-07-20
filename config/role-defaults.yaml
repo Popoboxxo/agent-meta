@@ -741,6 +741,16 @@ roles:
       parallel: false
       orchestrator_only: false
 
+  mammouth-expert:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: "Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    routing:
+      intent_keywords: ["Mammouth", "Mammouth Code"]
+      parallel: false
+      orchestrator_only: false
+
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

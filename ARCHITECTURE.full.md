@@ -291,7 +291,7 @@ PAL verhindert dass provider-spezifische Delegationssyntax (z.B. `Agent()`, `tas
         ↓
 Provider Abstraction Layer (Syntax-Registry + Capability Matrix + Bootstrap)
         ↓
-Claude | Gemini | Opencode | Continue | Copilot
+Claude | Gemini | Opencode | Continue | Copilot | Mammouth
 ```
 
 ### Komponenten
@@ -321,7 +321,7 @@ _compose_agent() (agents.py)
 
 ### Capability Matrix (Auszug)
 
-| Capability | Claude | Opencode | Gemini | Continue | Copilot |
+| Capability | Claude | Opencode | Gemini | Continue | Copilot | Mammouth |
 |------------|--------|----------|--------|----------|---------|
 | subagent_dispatch | ✅ | ✅ | ✅ | ❌ | ❌ |
 | parallel_execution | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -426,6 +426,7 @@ schemas/handoffs/
 | Gemini | `true` | JSON | `batch: true` | `history[]` |
 | Continue | `false` | YAML-Block | Sequential | `history[]` |
 | Copilot | `false` | YAML-Block | Sequential | `history[]` |
+| Mammouth | `false` | YAML-Block | Sequential | `history[]` |
 
 ### Orchestrator-Integration
 

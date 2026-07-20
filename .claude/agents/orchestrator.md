@@ -77,6 +77,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
 | Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
 | Log / Logs / Fehleranalyse | `log-analyzer` | balanced | Ja |
+| Mammouth / Mammouth Code | `mammouth-expert` | powerful | Nein |
 | Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |
 | Opencode | `opencode-expert` | powerful | Nein |
 | Performance / Bottleneck / Optimierung | `performance-optimizer` | powerful | Nein |
