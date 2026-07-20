@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-07-20
+
+### Added
+- Platform-specific best practices to all expert agents (Mammouth Plan vs Build modes, Claude CLI context, Gemini artifact guidance).
+
+### Fixed
+- Provider routing logic updated for shared AGENTS.md.
+- Gemini and Mammouth now use AGENTS.md natively instead of generating redundant context files.
+- Renamed `OPENCODE.project-template.md` to `AGENTS.project-template.md`.
+
 ## [0.77.0] - 2026-07-20
 
 ### Added

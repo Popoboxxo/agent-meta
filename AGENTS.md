@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Mammouth, Gemini -> AGENTS.md
 
-Generiert von agent-meta v0.77.0 — `2026-07-20`
+Generiert von agent-meta v0.78.0 — `2026-07-20`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
