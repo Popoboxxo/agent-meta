@@ -75,6 +75,24 @@ def _split_context_file(text: str) -> tuple[str, str | None, str]:
     return text[:match.start()], match.group(0), text[match.end():]
 
 
+def _split_injected_footer_tail(footer: str) -> tuple[str, str]:
+    """Split a footer into (template_part, injected_tail).
+
+    The injected tail is any trailing block appended below the template footer by
+    a separate step or external tool — e.g. agent-meta's own bootstrap block
+    (``<!-- agent-meta:bootstrap-begin -->``) or a third-party wrapper block. All
+    of these are delimited by HTML comments, and the context template footers are
+    plain markdown with no HTML comments below the managed block, so the first
+    ``<!--`` in the footer reliably marks the boundary. Returning the tail
+    separately lets us regenerate the template part of the footer while preserving
+    every injected trailing block byte-for-byte, exactly like the managed block.
+    """
+    idx = footer.find("<!--")
+    if idx == -1:
+        return footer, ""
+    return footer[:idx], footer[idx:]
+
+
 def _backup_context_file(
     target_path: Path, existing_content: str, rel_label: str, log: SyncLog, dry_run: bool
 ) -> None:
@@ -102,13 +120,22 @@ def _regenerate_static_context(
     dry_run: bool,
     rel_label: str,
     source_label: str,
+    rebuild_footer: bool = False,
 ) -> None:
-    """Regenerate the static header of an existing managed context file.
+    """Regenerate the static part of an existing managed context file.
 
     Distinguishes agent-meta's own staleness (hash matches the last generated
-    header → silent overwrite) from manual user edits (hash mismatch or no
+    static part → silent overwrite) from manual user edits (hash mismatch or no
     record → timestamped backup, then overwrite; drift is worse than a
-    recoverable overwrite). The managed block and footer are preserved verbatim.
+    recoverable overwrite). The managed block is always preserved verbatim.
+
+    The footer (everything below the managed block) is preserved verbatim by
+    default (CLAUDE.md behaviour). When ``rebuild_footer`` is set — the AGENTS.md
+    family, whose footer holds the dynamic ``## Agents`` provider list — the
+    footer template part is regenerated from the template too, while any
+    agent-injected trailing block (e.g. the bootstrap block) is preserved
+    verbatim, exactly like the managed block. The static signature used for
+    drift detection then covers header + template footer instead of header only.
     """
     from .config import substitute
 
@@ -121,7 +148,7 @@ def _regenerate_static_context(
     rendered = substitute(
         template_path.read_text(encoding="utf-8"), variables, source_label, log
     )
-    new_header, _tmpl_managed, _tmpl_footer = _split_context_file(rendered)
+    new_header, _tmpl_managed, new_footer = _split_context_file(rendered)
 
     existing = target_path.read_text(encoding="utf-8")
     existing_header, existing_managed, existing_footer = _split_context_file(existing)
@@ -131,21 +158,38 @@ def _regenerate_static_context(
         log.info(rel_label, "no managed block — skipping static regeneration")
         return
 
-    if existing_header == new_header:
+    if rebuild_footer:
+        existing_footer_tmpl, injected_tail = _split_injected_footer_tail(existing_footer)
+        if injected_tail:
+            # Re-attach the agent-injected tail below the fresh template footer,
+            # reproducing the exact spacing the agents step uses when appending.
+            target_footer = new_footer.rstrip("\n") + "\n\n" + injected_tail
+        else:
+            target_footer = new_footer
+        # Signature covers header + template footer (ignoring the injected tail,
+        # which is owned by the agents step and changes independently).
+        new_sig = new_header + "\x00" + new_footer.rstrip("\n")
+        existing_sig = existing_header + "\x00" + existing_footer_tmpl.rstrip("\n")
+    else:
+        target_footer = existing_footer
+        new_sig = new_header
+        existing_sig = existing_header
+
+    if existing_sig == new_sig:
         log.skip(rel_label, "static part unchanged")
-        _record_static_hash(project_root, rel_label, new_header, dry_run)
+        _record_static_hash(project_root, rel_label, new_sig, dry_run)
         return
 
     stored = _load_context_hashes(project_root).get(rel_label)
-    user_modified = stored is None or content_hash(existing_header) != stored
+    user_modified = stored is None or content_hash(existing_sig) != stored
     if user_modified:
         _backup_context_file(target_path, existing, rel_label, log, dry_run)
 
-    new_content = new_header + existing_managed + existing_footer
+    new_content = new_header + existing_managed + target_footer
     log.action("UPDATE", rel_label, "static part regenerated from template")
     if not dry_run:
         target_path.write_text(new_content, encoding="utf-8")
-    _record_static_hash(project_root, rel_label, new_header, dry_run)
+    _record_static_hash(project_root, rel_label, new_sig, dry_run)
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
 
@@ -341,6 +385,7 @@ def _sync_managed_block_context(
             _regenerate_static_context(
                 project_root, target_path, template_path, variables, log, dry_run,
                 rel_label=context_file, source_label=template_name or context_file,
+                rebuild_footer=True,
             )
     if target_path.exists():
         _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider)
@@ -384,6 +429,17 @@ def _sync_opencode_context(
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(ocontent, encoding="utf-8")
+
+    # Refresh the static header AND footer from the template on every sync so the
+    # dynamic `## Agents` provider list never freezes at INIT (same header+footer
+    # regeneration the managed-block providers get). The managed block and any
+    # agent-injected trailing block are preserved verbatim.
+    if target_path.exists():
+        _regenerate_static_context(
+            project_root, target_path, template_path, variables, log, dry_run,
+            rel_label=context_file, source_label=template_name or context_file,
+            rebuild_footer=True,
+        )
 
     managed_pattern = re.compile(
         r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
