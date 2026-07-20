@@ -3,6 +3,8 @@ provider-isolation: disabled
 ai-providers:
 - Claude
 - Opencode
+- Mammouth
+- Gemini
 dod-preset: rapid-prototyping
 rules-preset: silent
 systems-engineering:
@@ -59,6 +61,8 @@ provider-options:
     generate-prompts: true
     prompt-mode: slim
   Copilot: {}
+  Mammouth: {}
+  Opencode: {}
 speech-mode: short
 variables:
   PROJECT_NAME: agent-meta
@@ -100,9 +104,10 @@ variables:
     \ Skills\n  1-generic/        # Universelle Agent-Templates\n  2-platform/   \
     \    # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)\nscripts/\n\
     \  sync.py           # Agent-Generator\n  admin-server.py   # Lokaler Admin-UI\
-    \ developer/)\nexternal/           # Git Submodule (externe Skill-Repos)\ndocs/guides/        # Anleitungen und Beispiel-Config\ndocs/ui/            # UI Assets\n  architecture/     #\
-    \ Architektur-Diagramme (Mermaid)\n  admin-ui.html     # Admin-UI Frontend\ntests/\
-    \              # Test-Suite (automated, manual, orchestration)\n"
+    \ developer/)\nexternal/           # Git Submodule (externe Skill-Repos)\ndocs/guides/\
+    \        # Anleitungen und Beispiel-Config\ndocs/ui/            # UI Assets\n\
+    \  architecture/     # Architektur-Diagramme (Mermaid)\n  admin-ui.html     #\
+    \ Admin-UI Frontend\ntests/              # Test-Suite (automated, manual, orchestration)\n"
   ENTRY_POINT_PATTERN: scripts/sync.py — Haupt-CLI für Agent-Generierung
   KEY_PATTERNS: '- Agent-Templates haben YAML-Frontmatter (name, version, description,
     tools)

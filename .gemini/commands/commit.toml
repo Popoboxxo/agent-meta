@@ -1,0 +1,8 @@
+description = "Stage changes and create a conventional commit with a suggested message"
+prompt = """
+Create a git commit for the current changes. {{args}}
+
+Workflow: check branch (warn on main), show status/diff, stage changes, suggest a Conventional Commit message, confirm with user, commit.
+
+Report commit hash and message.
+"""

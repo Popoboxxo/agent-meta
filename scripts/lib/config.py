@@ -290,13 +290,30 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # Build dynamic provider routing string
     provider_config = load_providers_config(agent_meta_root)
     providers = resolve_providers(config, provider_config)
-    routing_hints = []
+    
+    from collections import defaultdict
+    routing_groups = defaultdict(list)
+    agent_locations = []
+    
     for p in providers:
         if p in provider_config:
-            cfile = provider_config[p].get("context_file")
+            pc = provider_config[p]
+            cfile = pc.get("context_file")
             if cfile:
-                routing_hints.append(f"{p} -> {cfile}")
+                routing_groups[cfile].append(p)
+            
+            # Collect agent locations for AGENTS.md
+            agents_dir = pc.get("agents_dir")
+            if agents_dir and cfile == "AGENTS.md":
+                display_name = pc.get("display-name", p)
+                agent_locations.append(f"- **{display_name}:** Agent files in `{agents_dir}/`. Invoke by name.")
+                
+    routing_hints = []
+    for cfile, p_list in routing_groups.items():
+        routing_hints.append(f"{', '.join(p_list)} -> {cfile}")
+        
     variables["PROVIDER_ROUTING"] = "> **AI ROUTING:** " + " | ".join(routing_hints) if routing_hints else ""
+    variables["AGENT_LOCATIONS"] = "\n".join(agent_locations) if agent_locations else "Agent files in provider-specific directories."
     # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
     # Claude Code injects agent descriptions natively into the system prompt,
     # so the table in CLAUDE.md would be a duplication — dropped for Claude only.

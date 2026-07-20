@@ -1,0 +1,10 @@
+description = "Create a PR for the current branch and merge it into main"
+prompt = """
+Create a pull request for the current branch and merge it. {{args}}
+
+Workflow: check current branch (abort if on main), ensure clean working tree, push HEAD, create PR if none exists, squash-merge and delete branch.
+
+Use {{args}} as PR title if provided; otherwise derive from commits.
+
+Report PR URL and merge confirmation.
+"""

@@ -68,8 +68,8 @@ providers:
   Gemini:
     agents_dir: .gemini/agents
     agent_ext: .md
-    context_file: .gemini/GEMINI.md
-    context_template: templates/configs/GEMINI.project-template.md
+    context_file: AGENTS.md
+    context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: .gemini/rules
     has_hooks: false
@@ -118,7 +118,7 @@ providers:
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
-    context_template: templates/configs/OPENCODE.project-template.md
+    context_template: templates/configs/AGENTS.project-template.md
     has_rules: false         # Rules have no native dir in opencode — embedded into AGENTS.md
     has_hooks: false
     has_commands: true
@@ -245,8 +245,8 @@ providers:
     display-name: "Mammouth Code"
     agents_dir: .mammouth/agents
     agent_ext: .md
-    context_file: .mammouth/MAMMOUTH.md
-    context_template: templates/configs/MAMMOUTH.project-template.md
+    context_file: AGENTS.md
+    context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: .mammouth/rules
     has_hooks: false

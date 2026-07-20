@@ -1,0 +1,10 @@
+description = "Open the docs/ folder or a specific analysis document in the terminal"
+prompt = """
+Browse or open documentation. {{args}}
+
+- No argument: List all docs with short descriptions
+- `analysis`: List analysis documents in `docs/analysis/`
+- `architecture`: Show architecture diagrams
+- `requirements`: Open REQUIREMENTS.md
+- `<filename>`: Open specific file (fuzzy match)
+"""

@@ -6,7 +6,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 <!-- This block is automatically updated by sync.py on every sync. -->
 <!-- Manual changes here will be overwritten. -->
 
-> **AI ROUTING:** Claude -> CLAUDE.md | Opencode -> AGENTS.md
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Mammouth, Gemini -> AGENTS.md
 
 Generiert von agent-meta v0.77.0 — `2026-07-20`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
@@ -47,18 +47,15 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `senior-developer` | High-Tier-Developer: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs — analysiert erst, implementiert dann |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
-
-## Regeln
-
-> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen. Siehe `.opencode/rules/`.
-
 <!-- agent-meta:managed-end -->
 
 > **Hinweis:** Pfade im managed Block (z.B. `.claude/`) beschreiben die agent-meta-Framework-Architektur. Dieses Projekt verwendet `.opencode/` als Laufzeit-Plattform.
 
 ## Agents
 
-Agent files are in `.opencode/agents/`. Invoke them by name in opencode.
+- **Opencode:** Agent files in `.opencode/agents/`. Invoke by name.
+- **Gemini:** Agent files in `.gemini/agents/`. Invoke by name.
+- **Mammouth Code:** Agent files in `.mammouth/agents/`. Invoke by name.
 
 ## Project Setup
 
@@ -110,3 +107,86 @@ rtk pip list            rtk pnpm install        rtk npm run <script>
 - For debugging, use raw command without rtk prefix
 - `rtk proxy <cmd>` runs command without filtering but tracks usage
 <!-- /headroom:rtk-instructions -->
+
+<!-- agent-meta:bootstrap-begin -->
+
+## Agent Bootstrap — Session-Start Pflicht
+
+Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
+**Führe folgende Schritte zu Beginn JEDER Session aus:**
+
+1. Lies alle Agenten-Dateien aus `.gemini/agents/`:
+   - `agent-meta-manager.md` → registriere als `agent-meta-manager`
+   - `agent-meta-scout.md` → registriere als `agent-meta-scout`
+   - `api-specialist.md` → registriere als `api-specialist`
+   - `bug-feature-analyzer.md` → registriere als `bug-feature-analyzer`
+   - `claude-expert.md` → registriere als `claude-expert`
+   - `code-reviewer.md` → registriere als `code-reviewer`
+   - `concept-reviewer.md` → registriere als `concept-reviewer`
+   - `continue-expert.md` → registriere als `continue-expert`
+   - `copilot-expert.md` → registriere als `copilot-expert`
+   - `developer.md` → registriere als `developer`
+   - `devops-engineer.md` → registriere als `devops-engineer`
+   - `documenter.md` → registriere als `documenter`
+   - `e2e-tester.md` → registriere als `e2e-tester`
+   - `effort-estimator.md` → registriere als `effort-estimator`
+   - `explorer.md` → registriere als `explorer`
+   - `export-manager.md` → registriere als `export-manager`
+   - `feature.md` → registriere als `feature`
+   - `feedback.md` → registriere als `feedback`
+   - `gemini-expert.md` → registriere als `gemini-expert`
+   - `git.md` → registriere als `git`
+   - `ideation.md` → registriere als `ideation`
+   - `junior-developer.md` → registriere als `junior-developer`
+   - `log-analyzer.md` → registriere als `log-analyzer`
+   - `meta-feedback.md` → registriere als `meta-feedback`
+   - `opencode-expert.md` → registriere als `opencode-expert`
+   - `orchestrator.md` → registriere als `orchestrator`
+   - `performance-optimizer.md` → registriere als `performance-optimizer`
+   - `prompt-engineer.md` → registriere als `prompt-engineer`
+   - `release.md` → registriere als `release`
+   - `requirements.md` → registriere als `requirements`
+   - `senior-developer.md` → registriere als `senior-developer`
+   - `ui-ux-designer.md` → registriere als `ui-ux-designer`
+
+2. Registriere jeden Agenten via define_subagent API-Call:
+   ```
+   define_subagent(name="agent-meta-manager", ...)
+   define_subagent(name="agent-meta-scout", ...)
+   define_subagent(name="api-specialist", ...)
+   define_subagent(name="bug-feature-analyzer", ...)
+   define_subagent(name="claude-expert", ...)
+   define_subagent(name="code-reviewer", ...)
+   define_subagent(name="concept-reviewer", ...)
+   define_subagent(name="continue-expert", ...)
+   define_subagent(name="copilot-expert", ...)
+   define_subagent(name="developer", ...)
+   define_subagent(name="devops-engineer", ...)
+   define_subagent(name="documenter", ...)
+   define_subagent(name="e2e-tester", ...)
+   define_subagent(name="effort-estimator", ...)
+   define_subagent(name="explorer", ...)
+   define_subagent(name="export-manager", ...)
+   define_subagent(name="feature", ...)
+   define_subagent(name="feedback", ...)
+   define_subagent(name="gemini-expert", ...)
+   define_subagent(name="git", ...)
+   define_subagent(name="ideation", ...)
+   define_subagent(name="junior-developer", ...)
+   define_subagent(name="log-analyzer", ...)
+   define_subagent(name="meta-feedback", ...)
+   define_subagent(name="opencode-expert", ...)
+   define_subagent(name="orchestrator", ...)
+   define_subagent(name="performance-optimizer", ...)
+   define_subagent(name="prompt-engineer", ...)
+   define_subagent(name="release", ...)
+   define_subagent(name="requirements", ...)
+   define_subagent(name="senior-developer", ...)
+   define_subagent(name="ui-ux-designer", ...)
+   ```
+
+3. Erst danach: Bearbeite User-Anfragen (Delegation an Orchestrator etc.)
+
+> **Ohne diese Registrierung existieren die Agenten NICHT in der Runtime**
+> und der Orchestrator kann nicht delegieren.
+<!-- agent-meta:bootstrap-end -->

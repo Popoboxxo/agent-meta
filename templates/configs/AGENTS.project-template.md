@@ -10,7 +10,7 @@
 
 ## Agents
 
-Agent files are in `.opencode/agents/`. Invoke them by name in opencode.
+{{AGENT_LOCATIONS}}
 
 ## Project Setup
 

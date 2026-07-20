@@ -10,6 +10,8 @@ sync.log
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
+.gemini/settings.local.json
+.mammouth/settings.local.json
 .mcp.json
 .meta-config/secrets.local.yaml
 .opencode/mcp.local.json
