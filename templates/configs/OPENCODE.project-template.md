@@ -3,9 +3,10 @@
 {{PROJECT_CONTEXT}}
 
 <!-- agent-meta:managed-begin -->
+{{PROVIDER_ROUTING}}
 <!-- agent-meta:managed-end -->
 
-> **Hinweis:** Pfade im managed Block (z.B. `.claude/`) beschreiben die agent-meta-Framework-Architektur. Dieses Projekt verwendet `.opencode/` als Laufzeit-Plattform.
+
 
 ## Agents
 

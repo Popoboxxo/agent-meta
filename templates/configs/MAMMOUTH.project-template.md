@@ -16,7 +16,10 @@ DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | Te
 
 ## Agents
 
-Agent files are in `.github/copilot/agents/`. Invoke them by name in GitHub Copilot Chat.
+Agent files are in `.mammouth/agents/`. Agents must be registered at session start via the bootstrap instructions above. `@agent` text mentions are not intercepted by Mammouth.
+
+<!-- agent-meta:bootstrap-begin -->
+<!-- agent-meta:bootstrap-end -->
 
 ## Project Setup
 

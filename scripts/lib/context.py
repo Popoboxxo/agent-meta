@@ -164,6 +164,8 @@ def _load_claude_md_managed_template(agent_meta_root: Path) -> str:
         "<!-- This block is automatically updated by sync.py on every sync. -->\n"
         "<!-- Manual changes here will be overwritten. -->\n"
         "\n"
+        "{{PROVIDER_ROUTING}}\n"
+        "\n"
         "Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`\n"
         "DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | "
         "Tests: {{DOD_TESTS_REQUIRED}} | Codebase-Overview: {{DOD_CODEBASE_OVERVIEW}} | "
@@ -784,6 +786,7 @@ def _build_opencode_managed_block(
         "Gemini": ".gemini/agents",
         "Continue": ".continue/agents",
         "Copilot": ".github/copilot/agents",
+        "Mammouth": ".mammouth/agents",
     }
     local_vars = dict(variables)
     if provider in provider_dirs:
@@ -1037,7 +1040,7 @@ def sync_claude_md_static(
     """
     from .config import substitute
 
-    template_path = agent_meta_root / "howto" / "configs" / "CLAUDE.project-template.md"
+    template_path = agent_meta_root / "templates" / "configs" / "CLAUDE.project-template.md"
     target_path = project_root / "CLAUDE.md"
     rel = "CLAUDE.md"
 

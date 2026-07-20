@@ -286,6 +286,17 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
+
+    # Build dynamic provider routing string
+    provider_config = load_providers_config(agent_meta_root)
+    providers = resolve_providers(config, provider_config)
+    routing_hints = []
+    for p in providers:
+        if p in provider_config:
+            cfile = provider_config[p].get("context_file")
+            if cfile:
+                routing_hints.append(f"{p} -> {cfile}")
+    variables["PROVIDER_ROUTING"] = "> **AI ROUTING:** " + " | ".join(routing_hints) if routing_hints else ""
     # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
     # Claude Code injects agent descriptions natively into the system prompt,
     # so the table in CLAUDE.md would be a duplication — dropped for Claude only.

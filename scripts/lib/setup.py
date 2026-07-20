@@ -115,7 +115,7 @@ def run_setup_wizard(
     _section("2/7  AI-Provider")
     print("  Unterstützte Provider: Claude, Gemini, Continue")
     providers_raw = _ask_list("Aktive Provider", default=["Claude"])
-    valid_providers = {"Claude", "Gemini", "Continue", "Opencode", "Copilot"}
+    valid_providers = {"Claude", "Gemini", "Continue", "Opencode", "Copilot", "Mammouth"}
     providers = [p for p in providers_raw if p in valid_providers]
     if not providers:
         print("  ! Keine gültigen Provider — verwende Claude als Default.")

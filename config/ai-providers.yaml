@@ -3,7 +3,7 @@ providers:
     agents_dir: .claude/agents
     agent_ext: .md
     context_file: CLAUDE.md
-    context_template: howto/configs/CLAUDE.project-template.md
+    context_template: templates/configs/CLAUDE.project-template.md
     has_rules: true
     has_hooks: true
     has_commands: true
@@ -23,9 +23,9 @@ providers:
     artifact_dir: .claude/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .claude/settings.json
-    settings_template: howto/configs/CLAUDE.settings-template.json
+    settings_template: templates/configs/CLAUDE.settings-template.json
     settings_local_file: .claude/settings.local.json
-    settings_local_template: howto/configs/CLAUDE.settings-local-template.json
+    settings_local_template: templates/configs/CLAUDE.settings-local-template.json
     isolation-dirs:
       - .claude/
       - CLAUDE.md
@@ -69,7 +69,7 @@ providers:
     agents_dir: .gemini/agents
     agent_ext: .md
     context_file: .gemini/GEMINI.md
-    context_template: howto/configs/GEMINI.project-template.md
+    context_template: templates/configs/GEMINI.project-template.md
     has_rules: true
     rules_dir: .gemini/rules
     has_hooks: false
@@ -89,7 +89,7 @@ providers:
     artifact_dir: .gemini/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .gemini/settings.json
-    settings_template: howto/configs/GEMINI.settings-template.json
+    settings_template: templates/configs/GEMINI.settings-template.json
     settings_local_file: .gemini/settings.local.json
     isolation-dirs:
       - .gemini/
@@ -118,7 +118,7 @@ providers:
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
-    context_template: howto/configs/OPENCODE.project-template.md
+    context_template: templates/configs/OPENCODE.project-template.md
     has_rules: false         # Rules have no native dir in opencode — embedded into AGENTS.md
     has_hooks: false
     has_commands: true
@@ -137,7 +137,7 @@ providers:
     artifact_dir: .opencode/artifacts
     checkpoint_dir: .meta-viz
     settings_file: opencode.json
-    settings_template: howto/configs/OPENCODE.settings-template.json
+    settings_template: templates/configs/OPENCODE.settings-template.json
     settings_local_file: .opencode/settings.local.json
     isolation-dirs:
       - .opencode/
@@ -174,7 +174,7 @@ providers:
     agents_dir: .continue/agents
     agent_ext: .md
     context_file: .continue/rules/project-context.md
-    context_template: howto/configs/CONTINUE.project-template.md
+    context_template: templates/configs/CONTINUE.project-template.md
     has_rules: true
     rules_dir: .continue/rules
     has_hooks: false
@@ -192,7 +192,7 @@ providers:
     artifact_dir: .continue/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .continue/config.yaml
-    settings_template: howto/configs/CONTINUE.config-template.yaml
+    settings_template: templates/configs/CONTINUE.config-template.yaml
     settings_local_file: .continue/config.local.yaml
     isolation-dirs:
       - .continue/
@@ -215,7 +215,7 @@ providers:
     agents_dir: .github/copilot/agents
     agent_ext: .md
     context_file: .github/copilot/COPILOT.md
-    context_template: howto/configs/COPILOT.project-template.md
+    context_template: templates/configs/COPILOT.project-template.md
     has_rules: true
     rules_dir: .github/copilot/rules
     has_hooks: false
@@ -239,4 +239,42 @@ providers:
     extension_dir: .github/copilot/3-project
     orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
     model-tiers: {}
+    model-aliases: {}
+
+  Mammouth:
+    display-name: "Mammouth Code"
+    agents_dir: .mammouth/agents
+    agent_ext: .md
+    context_file: .mammouth/MAMMOUTH.md
+    context_template: templates/configs/MAMMOUTH.project-template.md
+    has_rules: true
+    rules_dir: .mammouth/rules
+    has_hooks: false
+    has_commands: false
+    has_settings: false
+    capabilities:
+      - agents
+      - rules
+      - snippets
+      - skills
+      - context-managed-block
+      - mcp
+    artifact_dir: .mammouth/artifacts
+    checkpoint_dir: .meta-viz
+    isolation-dirs:
+      - .mammouth/
+    gitignore_entries:
+      - .mammouth/settings.local.json
+    mcp-config: {}
+    skills_dir: .mammouth/skills
+    snippets_dir: .mammouth/snippets
+    pending_tasks_file: .mammouth/pending-tasks.md
+    extension_dir: .mammouth/3-project
+    orchestrator_hint: "- **In Mammouth Code:** Nutzt den Befehl `mammouth` im Terminal und referenziert `@orchestrator`."
+    model-tiers:
+      nano:     mammouth-recommended
+      fast:     mammouth-recommended
+      balanced: mammouth-recommended
+      powerful: mammouth-recommended
+      max:      mammouth-recommended
     model-aliases: {}

@@ -87,6 +87,8 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
 <!-- Manuelle Änderungen hier werden überschrieben. -->
 
+{{PROVIDER_ROUTING}}
+
 Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
 {{AGENT_HINTS}}

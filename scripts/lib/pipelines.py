@@ -201,7 +201,7 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         variables[f"PIPELINE_{var_name}_BLOCK"] = ""
         # Pre-compute provider-specific blocks for later injection
         provider_blocks = {}
-        for provider in ("Claude", "Opencode", "Gemini", "Continue"):
+        for provider in ("Claude", "Opencode", "Gemini", "Continue", "Mammouth"):
             provider_blocks[provider] = _generate_pipeline_block(
                 pipeline, provider
             )
@@ -247,6 +247,20 @@ _PROVIDER_NOTATION = {
         "sequential_item": '{index}. task(subagent_type="{agent}", prompt="{task}")',
     },
     "claude": {
+        "task_fmt": 'background(agent="{agent}", prompt="{task}")',
+        "mention_fmt": "@{agent} {task}",
+        "loop_start": "REPEAT_UNTIL Loop:",
+        "loop_item": '  - background(agent="{agent}", prompt="{task}")',
+        "parallel_start": "Parallel dispatch:",
+        "parallel_item": '  - background(agent="{agent}", prompt="{task}")',
+        "fanout_start": "FANOUT({count}, {agent}):",
+        "fanout_item": '  - background(agent="{agent}", prompt="{task}")',
+        "conditional_start": "Conditional execution:",
+        "conditional_item": '  - Condition evaluated by {agent}: {task}',
+        "sequential_start": "",
+        "sequential_item": '{index}. background(agent="{agent}", prompt="{task}")',
+    },
+    "mammouth": {
         "task_fmt": 'background(agent="{agent}", prompt="{task}")',
         "mention_fmt": "@{agent} {task}",
         "loop_start": "REPEAT_UNTIL Loop:",
