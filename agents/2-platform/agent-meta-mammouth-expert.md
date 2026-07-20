@@ -31,3 +31,10 @@ Your task is to perfectly adapt and validate the `agent-meta` framework for this
 - Provide expert advice on configuring Mammouth Code for `agent-meta`.
 - Ensure optimal usage of tools and context windows.
 - Help the `agent-meta-manager` to validate generated agents for Mammouth Code.
+
+## Mammouth-Specific Best Practices
+- **Plan vs. Build Mode:** Mammouth Code features two primary agent modes:
+  - `Plan`: Read-only, safe mode for exploration and architecture review. (Ideal for `explorer`, `concept-reviewer`).
+  - `Build`: Full execution mode with file editing and shell command capabilities. (Ideal for `developer`, `orchestrator`).
+  When defining agent roles, consider explicitly advising the user which mode they should use to run the agent.
+- **Terminal vs. IDE:** Mammouth Code is a CLI-first tool. However, users can also use Mammouth AI models in IDE extensions (like Cline or Continue) by pointing to the OpenAI-compatible API endpoint. Explain this flexibility when users ask for IDE support.
