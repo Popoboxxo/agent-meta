@@ -23,3 +23,8 @@ Your task is to perfectly adapt and validate the `agent-meta` framework for this
 - Provide expert advice on configuring `.gemini/` for `agent-meta`.
 - Ensure optimal usage of tools and context windows.
 - Help the `agent-meta-manager` to validate generated agents for Gemini.
+
+## Gemini-Specific Best Practices
+- **Artifacts:** Gemini (Antigravity) natively supports markdown artifacts. Encourage the use of artifacts for complex implementation plans, checklists, or extensive documentation updates instead of dumping large blocks of text in the chat.
+- **Subagents:** Gemini can spawn subagents using `invoke_subagent`. Design tasks so that complex, parallelizable jobs (like deep codebase research) are delegated to subagents.
+- **Tools & Permissions:** Gemini Antigravity executes commands and edits files natively. Be aware of the sandbox constraints and ensure agents request minimum required permissions using `ask_permission` rather than root-level access.

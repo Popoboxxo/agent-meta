@@ -30,3 +30,8 @@ Your task is to perfectly adapt and validate the `agent-meta` framework for this
 - Provide expert advice on configuring `.claude/` for `agent-meta`.
 - Ensure optimal usage of tools and context windows.
 - Help the `agent-meta-manager` to validate generated agents for Claude Code.
+
+## Claude-Specific Best Practices
+- **CLI Commands & Flags:** Claude Code is a terminal CLI. Remind users they can use `--print` or `-p` to just output responses without executing (useful for read-only agents). 
+- **REPL Slash Commands:** Claude Code natively supports REPL commands like `/bug`, `/help`, and `/clear` to manage context.
+- **Permissions:** Claude Code prompts for permissions before executing dangerous shell commands or modifying files outside allowed directories. Design agents to be mindful of this interaction loop.
