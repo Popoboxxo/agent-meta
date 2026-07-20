@@ -675,6 +675,7 @@ _PROVIDER_TERMINAL_TOOL: dict[str, str | None] = {
     "Opencode": "bash",
     "Continue": None,
     "Copilot": None,
+    "Mammouth": "bash",
 }
 
 

@@ -26,12 +26,13 @@
         "Gemini",
         "Continue",
         "GitHub",
-        "Opencode"
+        "Opencode",
+        "Mammouth"
       ]
     },
     "ai-providers": {
       "type": "array",
-      "description": "List of AI providers. Supports Claude, Gemini, Continue. Replaces the deprecated ai-provider string field. Backward-compatible: ai-provider (string) still works.",
+      "description": "List of AI providers. Supports Claude, Gemini, Continue, Opencode, Copilot, Mammouth. Replaces the deprecated ai-provider string field. Backward-compatible: ai-provider (string) still works.",
       "items": {
         "type": "string",
         "enum": [
@@ -39,7 +40,8 @@
           "Gemini",
           "Continue",
           "Opencode",
-          "Copilot"
+          "Copilot",
+          "Mammouth"
         ]
       },
       "uniqueItems": true
@@ -466,7 +468,7 @@
     },
     "provider-tier-overrides": {
       "type": "object",
-      "description": "Override the resolved tier per role for a specific provider. Keys are provider names (Claude, Gemini, Opencode). Values are objects mapping role → tier name or model-id string.",
+      "description": "Override the resolved tier per role for a specific provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Values are objects mapping role → tier name or model-id string.",
       "additionalProperties": {
         "type": "object",
         "description": "Role-to-tier overrides for this provider. Value is a tier name or a raw model-id string.",
@@ -580,7 +582,7 @@
     },
     "provider-options": {
       "type": "object",
-      "description": "Provider-specific options. Each key is a provider name (Claude, Gemini, Continue).",
+      "description": "Provider-specific options. Each key is a provider name (Claude, Gemini, Continue, Opencode, Copilot, Mammouth).",
       "properties": {
         "Claude": {
           "type": "object",
@@ -617,6 +619,12 @@
         "Opencode": {
           "type": "object",
           "description": "Options for the Opencode provider.",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "Mammouth": {
+          "type": "object",
+          "description": "Options for the Mammouth Code provider.",
           "additionalProperties": false,
           "properties": {}
         }
