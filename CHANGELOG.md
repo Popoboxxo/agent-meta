@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-07-20
+
+### Added
+- Added full support for the **Mammouth Code** provider.
+- Created `mammouth-expert` agent.
+- Updated `ai-providers.yaml`, schema, and routing logic for Mammouth.
+- Included `{{PROVIDER_ROUTING}}` dynamic variable injection via `scripts/lib/config.py` to keep agent definitions compact and provider-agnostic.
+
 ## [0.76.0] — 2026-07-18
 
 ### Added
