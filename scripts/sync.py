@@ -78,7 +78,7 @@ from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_sec
 from lib.isolation import sync_provider_isolation
 from lib.deactivation import (
     deactivate_providers, activate_providers, get_deactivation_status,
-    is_provider_active,
+    is_provider_active, update_deactivation_config, resolve_deactivation_targets,
 )
 from lib.backup import (
     create_backup, restore_backup, list_backups,
@@ -626,6 +626,18 @@ def main():
         results = deactivate_providers(
             project_root, targets, provider_config, config, log, args.dry_run
         )
+        # Update project.yaml so resolve_providers() reflects the change.
+        deactivated_list = resolve_deactivation_targets(targets, provider_config)
+        update_deactivation_config(config_path, provider_config, deactivated_list,
+                                    config, log, args.dry_run)
+        # Re-sync context files so AGENTS.md reflects the updated provider list.
+        if not args.dry_run:
+            config = load_config(config_path)
+            variables, _ = build_variables(config, agent_meta_root)
+            for prov in resolve_providers(config, provider_config):
+                sync_context_for_provider(agent_meta_root, project_root, config,
+                                          variables, log, args.dry_run,
+                                          prov, provider_config)
         import json as _json
         print(_json.dumps(results, indent=2, ensure_ascii=False))
 
@@ -636,6 +648,22 @@ def main():
         results = activate_providers(
             project_root, targets, provider_config, config, log, args.dry_run
         )
+        # Update project.yaml: remove activated providers from deactivation list.
+        dc = config.get("provider-deactivation", {})
+        current = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
+        if not targets:
+            remaining = []  # activate all → clear deactivation
+        else:
+            remaining = sorted(current - set(resolve_deactivation_targets(targets, provider_config)))
+        update_deactivation_config(config_path, provider_config, remaining,
+                                    config, log, args.dry_run)
+        if not args.dry_run:
+            config = load_config(config_path)
+            variables, _ = build_variables(config, agent_meta_root)
+            for prov in resolve_providers(config, provider_config):
+                sync_context_for_provider(agent_meta_root, project_root, config,
+                                          variables, log, args.dry_run,
+                                          prov, provider_config)
         import json as _json
         print(_json.dumps(results, indent=2, ensure_ascii=False))
 

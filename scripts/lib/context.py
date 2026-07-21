@@ -341,6 +341,23 @@ def _update_managed_html_block(
     if provider == "Claude" and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
     new_managed = substitute(template, render_vars, rel, log)
+
+    # For AGENTS.md, also inject dynamic content into the managed block:
+    # 1. Provider agent locations (stays in sync with deactivations)
+    # 2. Rules pointer (all providers share AGENTS.md, so all must produce
+    #    the same managed block content to avoid ping-pong updates).
+    if target_path.name == "AGENTS.md":
+        agent_locations = variables.get("AGENT_LOCATIONS", "")
+        if agent_locations:
+            new_managed = new_managed.replace(
+                '<!-- agent-meta:managed-end -->',
+                f'\n## Agents\n\n{agent_locations}\n\n<!-- agent-meta:managed-end -->',
+            )
+        new_managed = new_managed.replace(
+            '<!-- agent-meta:managed-end -->',
+            '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.\n\n<!-- agent-meta:managed-end -->',
+        )
+
     new_content = managed_pattern.sub(new_managed, existing, count=1)
     if new_content != existing:
         log.action("UPDATE", rel, "managed block")
@@ -462,8 +479,54 @@ def _sync_opencode_context(
             else:
                 log.skip(context_file, "managed block unchanged")
 
+    # Bootstrap block cleanup: remove Gemini bootstrap if Gemini is not active.
+    _cleanup_bootstrap_block(target_path, config, provider_config, log, dry_run,
+                              project_root=project_root)
+
     init_opencode_personal(agent_meta_root, project_root, log, dry_run)
     _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+
+
+def _cleanup_bootstrap_block(
+    target_path: Path,
+    config: dict,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    project_root: Path | None = None,
+) -> None:
+    """Remove the Gemini bootstrap block from AGENTS.md if Gemini is not active.
+
+    The bootstrap block (<!-- agent-meta:bootstrap-begin --> ... <!-- agent-meta:bootstrap-end -->)
+    is Gemini-specific. When Gemini is deactivated, it should not appear in AGENTS.md
+    because 1) it lists agents that won't work without Gemini, and 2) it wastes context.
+    """
+    from .providers import resolve_providers
+    active = set(resolve_providers(config, provider_config))
+    gemini_active = "Gemini" in active
+
+    if not target_path.exists():
+        return
+
+    content = target_path.read_text(encoding="utf-8")
+    bootstrap_pattern = re.compile(
+        r"<!--\s*agent-meta:bootstrap-begin\s*-->.*?<!--\s*agent-meta:bootstrap-end\s*-->",
+        re.DOTALL,
+    )
+    has_bootstrap = bootstrap_pattern.search(content)
+
+    if gemini_active or not has_bootstrap:
+        return
+
+    new_content = bootstrap_pattern.sub("", content)
+    new_content = re.sub(r"\n{3,}", "\n\n", new_content)
+    if new_content != content:
+        rel_label = (str(target_path.relative_to(project_root))
+                     if project_root else target_path.name)
+        log.action("CLEANUP", rel_label,
+                   "removed Gemini bootstrap block (Gemini deactivated)")
+        if not dry_run:
+            target_path.write_text(new_content, encoding="utf-8")
 
 
 def _sync_continue_context(
@@ -851,12 +914,20 @@ def _build_opencode_managed_block(
     template = _load_claude_md_managed_template(agent_meta_root)
     managed = substitute(template, local_vars, 'AGENTS.md managed block', log)
 
-    # Phase 2: Opencode loads rules natively via the provider rules mechanism.
-    # The managed block only keeps a compact pointer; full rules live in
-    # rules/<layer>/*.md and are surfaced to the runtime via .opencode/rules/.
+    # Phase 2: Inject dynamic provider agent locations (AGENTS.md users see
+    # which agent directories belong to which provider).
+    agent_locations = variables.get("AGENT_LOCATIONS", "")
+    if agent_locations:
+        managed = managed.replace(
+            '<!-- agent-meta:managed-end -->',
+            f'\n## Agents\n\n{agent_locations}\n\n<!-- agent-meta:managed-end -->',
+        )
+
+    # Phase 3: Rules pointer — AGENTS.md is shared by Opencode, Gemini and
+    # Mammouth, so the pointer must be generic (no provider-specific path).
     managed = managed.replace(
         '<!-- agent-meta:managed-end -->',
-        '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen. Siehe `.opencode/rules/`.\n\n<!-- agent-meta:managed-end -->',
+        '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.\n\n<!-- agent-meta:managed-end -->',
     )
 
     return managed

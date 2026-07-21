@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .log import SyncLog
 from .backup import backup_provider_dir as _backup_single, restore_provider_dir as _restore_single
+from .io import _write_yaml
 
 
 DEFAULT_BACKUP_DIR = ".backup/provider-deactivation"
@@ -149,6 +150,59 @@ def get_deactivation_status(
     return result
 
 
+def resolve_deactivation_targets(
+    providers: list[str],
+    provider_config: dict,
+) -> list[str]:
+    """Resolve provider names: ["all"] or empty → all configured providers."""
+    if not providers or "all" in [p.lower() for p in providers]:
+        return list(provider_config.keys())
+    return [p for p in providers if p in provider_config]
+
+
+def update_deactivation_config(
+    config_path: Path,
+    provider_config: dict,
+    deactivated_providers: list[str],
+    config: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+) -> None:
+    """Write (or update) the provider-deactivation block in project.yaml.
+
+    Sets mode to 'selective' and adds the deactivated providers to the list.
+    When deactivated_providers is empty, sets enabled: false so all providers
+    are active again.
+    """
+    dc = config.get("provider-deactivation", {})
+    current = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
+    updated = current | set(deactivated_providers)
+
+    if not updated:
+        # No deactivated providers → disable deactivation
+        config["provider-deactivation"] = {
+            "enabled": False,
+            "mode": "selective",
+            "providers": [],
+            "backup-dir": dc.get("backup-dir", DEFAULT_BACKUP_DIR),
+        }
+    else:
+        config["provider-deactivation"] = {
+            "enabled": True,
+            "mode": "selective",
+            "providers": sorted(updated),
+            "backup-dir": dc.get("backup-dir", DEFAULT_BACKUP_DIR),
+        }
+
+    if dry_run:
+        log.info("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")
+        return
+
+    _write_yaml(config_path, config)
+    log.info("deactivation-config", f"updated provider-deactivation in {config_path.name}: "
+             f"{', '.join(sorted(updated)) if updated else 'none (all active)'}")
+
+
 def zip_provider_dir(
     project_root: Path,
     provider: str,
@@ -219,10 +273,7 @@ def deactivate_providers(
     Returns:
         A dict with status per provider.
     """
-    if not providers or "all" in [p.lower() for p in providers]:
-        targets = list(provider_config.keys())
-    else:
-        targets = [p for p in providers if p in provider_config]
+    targets = resolve_deactivation_targets(providers, provider_config)
 
     results: dict = {}
     for provider in targets:

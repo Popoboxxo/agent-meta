@@ -6,12 +6,6 @@
 {{PROVIDER_ROUTING}}
 <!-- agent-meta:managed-end -->
 
-
-
-## Agents
-
-{{AGENT_LOCATIONS}}
-
 ## Project Setup
 
 - **Build:** `{{BUILD_COMMAND}}`
