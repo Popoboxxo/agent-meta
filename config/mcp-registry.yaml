@@ -154,8 +154,11 @@ mcp-servers:
     connection:
       type: sse
       url: '{{MCP_HONCHO_URL}}'
+      headers:
+        X-API-Key: '{{MCP_HONCHO_API_KEY}}'
     secrets:
     - MCP_HONCHO_URL
+    - MCP_HONCHO_API_KEY
   playwright:
     description: Playwright MCP Server für Browser-Automation und E2E-Tests
     category: testing
