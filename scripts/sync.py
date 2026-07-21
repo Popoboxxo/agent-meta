@@ -955,6 +955,16 @@ def main():
             # Audit must never break a sync — degrade gracefully.
             log.info("config-audit", f"skipped (error: {exc})")
 
+    # Environment script generation: produce platform-specific setup scripts
+    # (.ps1 / .sh) from the environments: section in project.yaml.
+    from lib.env import generate_env_scripts
+    env_results = generate_env_scripts(config, project_root, dry_run=args.dry_run)
+    for rel, status in sorted(env_results.items()):
+        if status == "skipped":
+            log.skip(rel, "unchanged")
+        elif status != "dry-run":
+            log.action("WRITE", rel, f"env script ({status})")
+
     # Visualization: generate static mindmap if requested (static or full mode)
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
     if args.viz or viz_cfg.get("enabled", False) or viz_mode in ("static", "full"):

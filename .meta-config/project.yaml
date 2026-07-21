@@ -275,3 +275,5 @@ backup:
     max_backups: 10
     max_age_days: 30
   auto-backup-before-sync: false
+environments: {}
+

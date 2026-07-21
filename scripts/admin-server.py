@@ -1191,6 +1191,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/backups":
             return self._handle_get_backups()
 
+        if path == "/api/environments":
+            return self._send_json(self._read_environments())
+
+        if path == "/api/environments/scripts":
+            return self._send_json(self._read_env_scripts())
+
         raise FileNotFoundError(path)
 
     # ------------------------------------------------------------------ #
@@ -1216,6 +1222,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/backups/"):
             archive_name = path[len("/api/backups/"):]
             return self._handle_delete_backup(archive_name)
+
+        if path.startswith("/api/environments/"):
+            name = path[len("/api/environments/"):]
+            return self._send_json(self._delete_environment(name))
 
         raise FileNotFoundError(path)
 
@@ -2731,7 +2741,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
-            "provider-isolation",
+            "provider-isolation", "environments",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
@@ -3060,6 +3070,39 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return get_deactivation_status(root, project_config, provider_config)
         except Exception as exc:
             return {"error": str(exc)}
+
+    def _read_environments(self) -> dict:
+        """Return the environments: section from project.yaml."""
+        project_config = self.__class__.config_manager.read("project")
+        if not isinstance(project_config, dict):
+            return {}
+        return project_config.get("environments", {})
+
+    def _read_env_scripts(self) -> dict:
+        """Return the generated env script contents."""
+        root = self.__class__.root
+        scripts = {}
+        for script_file in (".meta-config/env.ps1", ".meta-config/env.sh",
+                             ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"):
+            p = root / script_file
+            if p.exists():
+                scripts[script_file] = p.read_text(encoding="utf-8")
+            else:
+                scripts[script_file] = None
+        return scripts
+
+    def _delete_environment(self, name: str) -> dict:
+        """Remove a single env var from the environments section of project.yaml."""
+        project_config = self.__class__.config_manager.read("project")
+        if not isinstance(project_config, dict):
+            return {"error": "project config not found"}
+        envs = project_config.get("environments", {})
+        if not isinstance(envs, dict) or name not in envs:
+            raise FileNotFoundError(f"environment variable '{name}' not found")
+        del envs[name]
+        project_config["environments"] = envs
+        result = self.__class__.config_manager.write("project", project_config)
+        return {"ok": True, "deleted": name, "result": result}
 
     def _handle_deactivate_providers(self) -> None:
         """Deactivate providers: zip and remove their directories."""
