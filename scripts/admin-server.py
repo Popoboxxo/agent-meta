@@ -68,7 +68,12 @@ SSE_HEARTBEAT_SECONDS = 15
 # ``.meta-config/project.yaml`` under ``model-source-preference`` and is the
 # single source of truth for every model suggestion endpoint — no client-side
 # state, no mixing of both sources.
-DEFAULT_MODEL_SOURCE = "registry"
+#
+# The framework-wide default (fallback when no per-provider override exists)
+# lives in ``config/ai-providers.yaml`` -> ``default-model-source`` (see
+# ``AdminRequestHandler._default_model_source``) rather than being hardcoded
+# here, so operators can change it without touching Python.
+_FALLBACK_MODEL_SOURCE = "registry"
 VALID_MODEL_SOURCES: tuple[str, ...] = ("registry", "modelsdev")
 
 # Framework provider name -> models.dev catalog slug. Mirrors
@@ -1367,6 +1372,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/model-source":
             return self._handle_post_model_source()
 
+        if path == "/api/model-source/batch":
+            return self._handle_post_model_source_batch()
+
         if path == "/api/models/exclude":
             return self._handle_post_models_exclude()
 
@@ -2072,8 +2080,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
         any entries whose value is not a recognised source. Missing/invalid
-        section yields ``{}`` (every provider then defaults to
-        ``DEFAULT_MODEL_SOURCE``).
+        section yields ``{}`` (every provider then defaults to the central
+        ``default-model-source`` from ``config/ai-providers.yaml``, see
+        ``_default_model_source``).
         """
         project = self.__class__.config_manager.read("project") or {}
         prefs = project.get("model-source-preference") if isinstance(project, dict) else None
@@ -2084,10 +2093,30 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if isinstance(v, str) and v in VALID_MODEL_SOURCES
         }
 
+    def _default_model_source(self) -> str:
+        """Read the framework-wide default model source from
+        ``config/ai-providers.yaml`` -> ``default-model-source``.
+
+        Falls back to ``_FALLBACK_MODEL_SOURCE`` when the file or key is
+        missing (older projects synced before this key existed) or the value
+        is not one of ``VALID_MODEL_SOURCES``.
+        """
+        try:
+            path = self._ai_providers_path()
+            if not path.exists():
+                return _FALLBACK_MODEL_SOURCE
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            value = data.get("default-model-source") if isinstance(data, dict) else None
+            if isinstance(value, str) and value in VALID_MODEL_SOURCES:
+                return value
+            return _FALLBACK_MODEL_SOURCE
+        except Exception:
+            return _FALLBACK_MODEL_SOURCE
+
     def _resolve_model_source(self, provider_name: str) -> str:
-        """Resolve the effective source for ``provider_name`` (central setting
-        or ``DEFAULT_MODEL_SOURCE`` when unset)."""
-        return self._read_model_source_prefs().get(provider_name, DEFAULT_MODEL_SOURCE)
+        """Resolve the effective source for ``provider_name`` (per-provider
+        override from ``project.yaml``, or the central default when unset)."""
+        return self._read_model_source_prefs().get(provider_name, self._default_model_source())
 
     def _provider_model_tiers(self, provider_name: str) -> dict:
         """Return the ``model-tiers`` map for ``provider_name`` from
@@ -2163,7 +2192,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             return self._send_json({
                 "preferences": self._read_model_source_prefs(),
-                "default": DEFAULT_MODEL_SOURCE,
+                "default": self._default_model_source(),
             })
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
@@ -2193,6 +2222,52 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(prefs, dict):
                 prefs = {}
             prefs[provider] = source
+            project["model-source-preference"] = prefs
+            self.__class__.config_manager.write("project", project)
+
+            return self._send_json({
+                "success": True,
+                "preferences": {
+                    str(k): v for k, v in prefs.items()
+                    if isinstance(v, str) and v in VALID_MODEL_SOURCES
+                },
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_model_source_batch(self) -> None:
+        """Set the model source for multiple providers in a single write.
+
+        Persists the whole ``model-source-preference`` map in one
+        ``config_manager.write`` call, so the Admin UI's "Per provider" row
+        can offer a batched Save instead of one POST per dropdown change.
+
+        Body: ``{"preferences": {"Opencode": "modelsdev", "Claude": "registry"}}``.
+        """
+        try:
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body")
+            incoming = body.get("preferences")
+            if not isinstance(incoming, dict) or not incoming:
+                return self._send_json({"error": "preferences object required"}, status=400)
+
+            invalid_sources = {
+                str(source) for source in incoming.values()
+                if source not in VALID_MODEL_SOURCES
+            }
+            if invalid_sources:
+                return self._send_json(
+                    {"error": f"source must be one of {list(VALID_MODEL_SOURCES)}"}, status=400)
+
+            project = self.__class__.config_manager.read("project")
+            if not isinstance(project, dict):
+                project = {}
+            prefs = project.get("model-source-preference")
+            if not isinstance(prefs, dict):
+                prefs = {}
+            for provider, source in incoming.items():
+                prefs[str(provider)] = str(source)
             project["model-source-preference"] = prefs
             self.__class__.config_manager.write("project", project)
 

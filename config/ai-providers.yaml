@@ -1,3 +1,9 @@
+# Central default for the per-provider model-source toggle in the Admin UI
+# (registry vs. live models.dev catalog). Per-provider overrides live in
+# .meta-config/project.yaml -> model-source-preference and take precedence
+# over this default. See scripts/admin-server.py _default_model_source().
+default-model-source: registry
+
 providers:
   Claude:
     agents_dir: .claude/agents

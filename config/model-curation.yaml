@@ -1,18 +1,16 @@
-# Model curation — controls visibility and inclusion of models.
-#
-# blacklist: hard exclusion — filtered during discovery, never appears in the
-#            generated model-registry.json.
-# disabled:  soft exclusion — stays in the registry but is hidden from tier
-#            dropdowns and pickers in the admin UI.
-#
-# Migrated from pricing-overlay.yaml:excluded_models on 2026-06-21 (REQ-MOD-01).
 blacklist:
-  - google/gemini-3.1-flash-image
-  - google/gemini-3-pro-image
-  # Fictitious / unconfirmed Claude model IDs surfaced by discovery
-  - anthropic/claude-fable-5
-  - ~anthropic/claude-fable-latest
-  - anthropic/claude-sonnet-5
-  - opencode/claude-fable-5
-  - opencode/claude-sonnet-5
-disabled: []
+- google/gemini-3.1-flash-image
+- google/gemini-3-pro-image
+- anthropic/claude-fable-5
+- ~anthropic/claude-fable-latest
+- anthropic/claude-sonnet-5
+- opencode/claude-fable-5
+- opencode/claude-sonnet-5
+disabled:
+- anthropic/claude-3-haiku
+- anthropic/claude-sonnet-4
+- anthropic/claude-opus-4
+- anthropic/claude-opus-4.7-fast
+- anthropic/claude-opus-4.8-fast
+- claude-opus-4-1
+- claude-opus-4-1-20250805

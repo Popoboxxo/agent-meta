@@ -480,7 +480,7 @@
     },
     "model-source-preference": {
       "type": "object",
-      "description": "Central per-provider model source that drives every model dropdown/suggestion in the Admin UI. Keys are provider names (Claude, Gemini, Opencode, Copilot, Mammouth, Continue). Missing providers default to 'registry'.",
+      "description": "Per-provider override of the model source that drives every model dropdown/suggestion in the Admin UI. Keys are provider names (Claude, Gemini, Opencode, Copilot, Mammouth, Continue). Providers without an entry here fall back to the central 'default-model-source' in config/ai-providers.yaml (itself defaulting to 'registry' if unset).",
       "additionalProperties": {
         "type": "string",
         "enum": [

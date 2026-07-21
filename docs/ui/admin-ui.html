@@ -5021,8 +5021,10 @@ async function viewProjectModelOverrides() {
  * provider set to "registry" only ever suggests registry models, one set to
  * "modelsdev" only ever suggests models.dev models -- the two sources are
  * never mixed. `modelSourceState.providerSource` is an in-memory cache of the
- * server map, refreshed via loadModelSourcePrefs() when a view mounts and
- * updated (server-first) via setModelSourcePref() when the user toggles.
+ * server map, refreshed via loadModelSourcePrefs() when a view mounts.
+ * Changes are batched client-side (see viewModels()'s "Per provider:" row)
+ * and persisted in one shot via POST /api/model-source/batch when the user
+ * clicks Save -- there is no longer an immediate POST per dropdown change.
  */
 
 // Map agent-meta provider names -> models.dev provider IDs. Mirrors
@@ -5040,38 +5042,33 @@ const PROVIDER_MODELSDEV_MAP = {
 // a real models.dev catalog entry -- see _apply_pricing_overlay.
 const MODELSDEV_REGISTRY_ONLY_PROVIDERS = new Set(["Mammouth", "Continue"]);
 
-// Default source for any provider without an explicit central setting.
+// Fallback default source, used only until loadModelSourcePrefs() resolves
+// the real central default (config/ai-providers.yaml -> default-model-source,
+// see admin-server.py _default_model_source) or if that fetch fails.
 const DEFAULT_MODEL_SOURCE = "registry";
 
-// In-memory mirror of the server-side per-provider map. Populated by
-// loadModelSourcePrefs(); never persisted client-side (no localStorage).
-const modelSourceState = { providerSource: {} };
+// In-memory mirror of the server-side per-provider map, plus the central
+// default reported by the server. Populated by loadModelSourcePrefs(); never
+// persisted client-side (no localStorage).
+const modelSourceState = { providerSource: {}, defaultSource: DEFAULT_MODEL_SOURCE };
 
-/** Fetch the central per-provider source map from the server into the local
- * cache. Called when a source-aware view mounts. Best-effort: on failure the
- * cache is left as-is (providers fall back to DEFAULT_MODEL_SOURCE). */
+/** Fetch the central per-provider source map (and the central default) from
+ * the server into the local cache. Called when a source-aware view mounts.
+ * Best-effort: on failure the cache is left as-is (providers fall back to
+ * DEFAULT_MODEL_SOURCE). */
 async function loadModelSourcePrefs() {
   try {
     const res = await api.get("/api/model-source");
     modelSourceState.providerSource = (res && res.preferences) || {};
+    if (res && typeof res.default === "string") modelSourceState.defaultSource = res.default;
   } catch { /* keep existing cache */ }
   return modelSourceState.providerSource;
 }
 
-/** Persist one provider's source centrally (POST /api/model-source), then
- * update the local cache from the server response so the UI reflects exactly
- * what was stored. Returns true on success. */
-async function setModelSourcePref(providerName, source) {
-  const res = await api.post("/api/model-source", { provider: providerName, source });
-  if (res && res.preferences) modelSourceState.providerSource = res.preferences;
-  else modelSourceState.providerSource[providerName] = source;
-  return true;
-}
-
 /** Effective source ("registry" | "modelsdev") for a provider name: the
- * central per-provider setting, or DEFAULT_MODEL_SOURCE when unset. */
+ * central per-provider setting, or the central default when unset. */
 function effectiveModelSource(providerName) {
-  return modelSourceState.providerSource[providerName] || DEFAULT_MODEL_SOURCE;
+  return modelSourceState.providerSource[providerName] || modelSourceState.defaultSource;
 }
 
 /* ------------------------ Provider Tier Overrides ------------------------ */
@@ -5081,95 +5078,37 @@ async function viewProjectProviderTierOverrides() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Override the model used per provider + tier. Providers that manage models centrally are excluded.",
   ]));
-  const [data, providers, modelsRes, modelsDevRes] = await Promise.all([
+  const [data, providers] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
-    // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
-    api.get("/api/models/active").catch(() => ({ models: [] })),
-    // Same models.dev catalog #/models uses -- fetched so any provider whose
-    // EFFECTIVE source (see modelSourceState / effectiveModelSource() above,
-    // shared with the Models & Pricing view) is "modelsdev" can suggest the
-    // full live catalog instead of only the locally-imported registry subset.
-    api.get("/api/models-dev").catch(() => null),
   ]);
 
   const tierProviders = providers.filter(p => p.has_model_tiers);
-  const specificModels = modelsRes.models || [];
   const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
-  // Per-provider datalists keyed by framework provider name (e.g. "Claude", "Gemini").
-  // Source (registry vs. models.dev) follows the SAME shared, persisted
-  // state the user set on #/models -- no more hardcoding /api/models/active.
-  tierProviders.forEach(tp => {
-    const tierVals = Object.values(tp.model_tiers || {}).filter(Boolean);
-    // Registry ids for some providers (e.g. opencode-go) are namespaced as
-    // "<provider>/<raw-id>" to disambiguate multiple upstream catalogs (see
-    // scripts/lib/model_discovery.py); models.dev's own raw ids are bare.
-    // Detect the convention from the provider's existing tier values so the
-    // models.dev-sourced candidates below get formatted the same way.
-    const usesNamespacedIds = tierVals.some(v => v.includes("/"));
-
-    const mdId = PROVIDER_MODELSDEV_MAP[tp.name];
-    const modelsDevProvider = mdId && modelsDevRes && modelsDevRes.providers && modelsDevRes.providers[mdId];
-    const useModelsDev = Boolean(modelsDevProvider)
-      && !MODELSDEV_REGISTRY_ONLY_PROVIDERS.has(tp.name)
-      && effectiveModelSource(tp.name) === "modelsdev";
-
-    let candidates;
-    if (useModelsDev) {
-      candidates = Object.values(modelsDevProvider.models || {}).map(m => ({
-        id: usesNamespacedIds ? `${mdId}/${m.id}` : m.id,
-        name: m.name || m.id,
-        provider: mdId,
-      }));
-    } else {
-      // Registry fallback (also used when the provider has no models.dev
-      // entry at all, or when its effective source is explicitly "registry").
-      const registryProvs = new Set();
-      tierVals.forEach(modelId => {
-        if (modelId.includes("/")) {
-          const prefix = modelId.split("/")[0];
-          specificModels.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
-        } else {
-          const match = specificModels.find(m => m.id === modelId);
-          if (match) registryProvs.add(match.provider);
-        }
-      });
-      candidates = registryProvs.size > 0
-        ? specificModels.filter(m => registryProvs.has(m.provider))
-        : specificModels;
-    }
-
-    // Provenance check: the registry (model-registry.json, fed by
-    // fetch_opencode_go_models() et al. in scripts/lib/model_discovery.py)
-    // and models.dev are TWO INDEPENDENT upstream catalogs that happen to
-    // share provider slugs (e.g. "opencode-go"). A registry-fallback
-    // candidate can therefore be a real model that simply doesn't exist in
-    // models.dev's narrower snapshot (e.g. opencode-go/mimo-v2.5). Without a
-    // marker, that reads as a bug ("why does #/models not show this?") --
-    // see bug report on #/project/provider-tier-overrides. Only meaningful
-    // when this provider actually HAS a models.dev catalog (modelsDevProvider
-    // from above); otherwise every candidate would be trivially "registry
-    // only" and the label would just be noise.
-    const inModelsDev = (m) => {
-      if (!modelsDevProvider || !modelsDevProvider.models) return true;
-      const rawId = m.id.includes("/") ? m.id.slice(m.id.indexOf("/") + 1) : m.id;
-      return Object.prototype.hasOwnProperty.call(modelsDevProvider.models, rawId);
-    };
+  // Per-provider datalists keyed by framework provider name (e.g. "Claude").
+  // Candidates come EXCLUSIVELY from the provider's centrally-configured
+  // source via GET /api/model-suggestions -- the single source of truth also
+  // used by the Models & Pricing view. The server decides registry vs.
+  // models.dev per provider (model-source-preference in project.yaml), so
+  // there is no client-side merging of the two catalogs and no
+  // "(registry only)" annotations.
+  await Promise.all(tierProviders.map(async tp => {
+    let suggestions = [];
+    try {
+      const res = await api.get(`/api/model-suggestions?provider=${encodeURIComponent(tp.name)}`);
+      suggestions = (res && res.models) || [];
+    } catch { suggestions = []; }
 
     const dlId = `pto-dl-${tp.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
     let dl = document.getElementById(dlId);
     if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
     else { dl.innerHTML = ""; }
-    candidates.forEach(m => {
-      let label = m.name ? `${m.name} (${m.provider})` : m.id;
-      // Same "registry only" wording used as the source-badge title in
-      // #/models (renderModelsDevTable) -- keeps provenance terminology
-      // consistent across both views instead of inventing new phrasing.
-      if (!useModelsDev && modelsDevProvider && !inModelsDev(m)) label += " (registry only)";
+    suggestions.forEach(m => {
+      const label = m.name ? `${m.name} (${m.provider})` : m.id;
       dl.appendChild(el("option", { value: m.id }, [label]));
     });
-  });
+  }));
 
   // Flatten existing
   const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
@@ -5792,19 +5731,22 @@ async function viewModels() {
   const wrap = el("div");
 
   const state = {
-    // Both `source` and `providerSource` mirror the shared, localStorage-
-    // backed `modelSourceState` (declared above viewProjectProviderTierOverrides)
-    // instead of being reset on every call -- this is what lets the
-    // Provider Tier Overrides view see the same source selection. `providerSource`
-    // is the SAME object reference as modelSourceState.providerSource, so
-    // in-place mutations (`state.providerSource[x] = y`) update the shared
-    // state automatically; only `state.source` needs an explicit mirror-write
-    // (see the button handler below) since primitives can't be aliased.
-    source: modelSourceState.source,   // "registry" | "modelsdev"
+    // `source` is a purely local VIEW toggle (which catalog table to render);
+    // it is NOT a persisted setting. The persisted, per-provider setting is
+    // the central `model-source-preference` (server-backed), mirrored into
+    // `providerSource` -- the SAME object reference as
+    // modelSourceState.providerSource, so effectiveModelSource() and the
+    // Provider Tier Overrides view resolve the identical central values.
+    source: DEFAULT_MODEL_SOURCE,   // local view toggle: "registry" | "modelsdev"
     registry: [],              // model-registry.json data
     modelsDev: null,           // { providers, models } from models.dev
     configuredProviders: [],   // provider names from .meta-config/project.yaml → ai-providers
-    providerSource: modelSourceState.providerSource,   // per-provider: "registry" | "modelsdev"
+    providerSource: modelSourceState.providerSource,   // central per-provider: "registry" | "modelsdev"
+    // Local-only, unsaved per-provider source changes from the "Per provider:"
+    // dropdowns. Keyed by provider name -> "registry" | "modelsdev". Cleared
+    // once "Save" persists them via POST /api/model-source/batch. Nothing in
+    // here is sent to the server until Save is clicked.
+    pendingSourceChanges: {},
     loading: true,
     filterProvider: "",
     filterModel: "",
@@ -5832,7 +5774,7 @@ async function viewModels() {
       const active = state.source === val;
       srcRow.appendChild(el("button", {
         class: "btn" + (active ? " btn-primary" : ""),
-        onclick: () => { state.source = val; modelSourceState.source = val; persistModelSourceState(); render(); },
+        onclick: () => { state.source = val; render(); },
         style: active ? "" : "opacity:0.6;"
       }, [label]));
     }
@@ -5846,15 +5788,23 @@ async function viewModels() {
     }
     wrap.appendChild(srcRow);
 
-    // Per-provider source override
+    // Per-provider source override. Dropdowns only change LOCAL state
+    // (state.pendingSourceChanges) — nothing is sent to the server until the
+    // "Save" button at the end of the row is clicked, which persists every
+    // changed provider in one batched POST /api/model-source/batch call.
     if (state.configuredProviders.length > 0) {
       const provRow = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:0.82em;" });
       provRow.appendChild(el("span", { style: "opacity:0.6;margin-right:4px;" }, ["Per provider:"]));
       state.configuredProviders.forEach(provName => {
         const mdId = PROVIDER_MAP[provName];
-        const src = state.providerSource[provName] || state.source;
+        const saved = effectiveModelSource(provName);
+        const hasPending = Object.prototype.hasOwnProperty.call(state.pendingSourceChanges, provName);
+        const displayed = hasPending ? state.pendingSourceChanges[provName] : saved;
         const isRegistryOnly = REGISTRY_ONLY.has(provName) || !mdId;
-        const wrap_el = el("span", { style: "display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);" });
+        const wrap_el = el("span", {
+          style: "display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;background:var(--bg2);" +
+            (hasPending ? "border:1px solid var(--accent-yellow);" : "border:1px solid var(--border);")
+        });
         wrap_el.appendChild(el("span", { style: "font-weight:600;" }, [provName]));
         if (isRegistryOnly) {
           wrap_el.appendChild(el("span", { class: "badge warn", title: "Not available in models.dev — registry only" }, ["registry"]));
@@ -5862,15 +5812,50 @@ async function viewModels() {
           wrap_el.appendChild(el("span", { class: "badge ok" }, ["models.dev"]));
           const sel = el("select", {
             style: "font-size:0.85em;padding:1px 3px;background:transparent;color:var(--fg);border:none;cursor:pointer;",
-            onchange: e => { state.providerSource[provName] = e.target.value; persistModelSourceState(); render(); }
+            onchange: e => {
+              const val = e.target.value;
+              // No network call here — just record the pending change (or
+              // drop it if the user toggled back to the saved value) and
+              // re-render so the unsaved-indicator and Save button update.
+              if (val === saved) delete state.pendingSourceChanges[provName];
+              else state.pendingSourceChanges[provName] = val;
+              render();
+            }
           });
           for (const [val, lbl] of [["modelsdev", "models.dev"], ["registry", "registry"]]) {
-            sel.appendChild(el("option", { value: val, selected: src === val ? "selected" : undefined }, [lbl]));
+            sel.appendChild(el("option", { value: val, selected: displayed === val ? "selected" : undefined }, [lbl]));
           }
           wrap_el.appendChild(sel);
+          if (hasPending) {
+            wrap_el.appendChild(el("span", { class: "badge warn", title: "Unsaved — click Save to persist" }, ["unsaved"]));
+          }
         }
         provRow.appendChild(wrap_el);
       });
+
+      const pendingCount = Object.keys(state.pendingSourceChanges).length;
+      const saveBtn = el("button", {
+        class: "btn btn-primary",
+        disabled: pendingCount === 0,
+        style: "font-size:0.85em;margin-left:4px;" + (pendingCount === 0 ? "opacity:0.5;cursor:not-allowed;" : ""),
+        onclick: async () => {
+          if (pendingCount === 0) return;
+          const changes = { ...state.pendingSourceChanges };
+          saveBtn.disabled = true;
+          try {
+            const res = await api.post("/api/model-source/batch", { preferences: changes });
+            if (res && res.preferences) modelSourceState.providerSource = res.preferences;
+            else Object.assign(modelSourceState.providerSource, changes);
+            state.pendingSourceChanges = {};
+          } catch (err) {
+            alert("Failed to save model source: " + (err && err.message || err));
+          } finally {
+            render();
+          }
+        }
+      }, [pendingCount > 0 ? `Save (${pendingCount})` : "Save"]);
+      provRow.appendChild(saveBtn);
+
       wrap.appendChild(provRow);
     }
 
@@ -6363,8 +6348,10 @@ async function viewModels() {
     } catch { state.configuredProviders = []; }
   }
 
-  // Init
-  await Promise.all([loadProviders(), loadRegistry(), loadModelsDev()]);
+  // Init -- loadModelSourcePrefs() seeds the central per-provider setting so
+  // the per-provider toggles and effectiveModelSource() reflect what's stored
+  // server-side in project.yaml (model-source-preference).
+  await Promise.all([loadProviders(), loadRegistry(), loadModelsDev(), loadModelSourcePrefs()]);
   state.loading = false;
   render();
   return wrap;
@@ -6728,31 +6715,7 @@ async function viewProviderTiers() {
   const providersWrap = el("div", { id: "providers-wrap" });
   wrap.appendChild(providersWrap);
 
-  // Infer which registry-provider labels belong to a given ai-providers entry,
-  // by looking at existing tier values and matching them to registry models.
-  // Returns an array of registry provider names (e.g. ["anthropic"], ["opencode-go"]).
-  const inferRegistryProviders = (pData, models) => {
-    const tierValues = Object.values((pData && pData["model-tiers"]) || {}).filter(Boolean);
-    const providers = new Set();
-
-    tierValues.forEach(modelId => {
-      if (modelId.includes("/")) {
-        // namespaced id like "opencode/deepseek-v4-flash" or "opencode-go/kimi-k2.6"
-        const prefix = modelId.split("/")[0];
-        models
-          .filter(m => m.id.startsWith(prefix + "/"))
-          .forEach(m => providers.add(m.provider));
-      } else {
-        // native id like "claude-sonnet-4-6" → look up by exact id in registry
-        const match = models.find(m => m.id === modelId);
-        if (match) providers.add(match.provider);
-      }
-    });
-
-    return [...providers];
-  };
-
-  const renderProviders = () => {
+  const renderProviders = async () => {
     providersWrap.innerHTML = "";
 
     // Remove obsolete global datalist if it exists (replaced by per-row datalists)
@@ -6769,6 +6732,41 @@ async function viewProviderTiers() {
     const tbody = el("tbody");
     const providersList = aiProvidersData.providers ? Object.keys(aiProvidersData.providers) : (Object.keys(aiProvidersData).length > 0 ? Object.keys(aiProvidersData) : uniqueProviders);
 
+    // Build per-provider datalists first. Candidates come EXCLUSIVELY from the
+    // provider's centrally-configured source via GET /api/model-suggestions --
+    // the same source of truth used by the Models & Pricing view. The server
+    // decides registry vs. models.dev per provider (model-source-preference in
+    // project.yaml), so there is no client-side merging of catalogs here.
+    await Promise.all(providersList.map(async p => {
+      const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
+      const tData = pData["model-tiers"] || {};
+
+      let suggestions = [];
+      try {
+        const res = await api.get(`/api/model-suggestions?provider=${encodeURIComponent(p)}`);
+        suggestions = (res && res.models) || [];
+      } catch { suggestions = []; }
+
+      const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      let dl = document.getElementById(dlId);
+      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
+      else { dl.innerHTML = ""; }
+
+      const addedIds = new Set();
+      suggestions.forEach(m => {
+        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
+        addedIds.add(m.id);
+      });
+
+      // Also add existing tier values that aren't in the suggestion set (e.g. native Gemini IDs)
+      Object.values(tData).forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
+          addedIds.add(val);
+        }
+      });
+    }));
+
     // Render each provider as a single row (no grouping — providers are 1:1 now).
     providersList.forEach(p => {
       const tr = el("tr");
@@ -6782,36 +6780,7 @@ async function viewProviderTiers() {
       const tiers = ["nano", "fast", "balanced", "powerful", "max"];
       const pData = aiProvidersData.providers ? aiProvidersData.providers[p] : (aiProvidersData[p] || {});
       const tData = pData["model-tiers"] || {};
-
-      // Build per-provider datalist filtered to relevant registry providers.
-      // inferRegistryProviders handles mixed-prefix tier values automatically
-      // (e.g. Opencode with both opencode/ and opencode-go/ tiers).
-      const registryProviders = inferRegistryProviders(pData, modelsData);
-
       const dlId = `tier-dl-${p.replace(/[^a-zA-Z0-9]/g, "-")}`;
-      let dl = document.getElementById(dlId);
-      if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
-      else { dl.innerHTML = ""; }
-
-      // If we identified registry providers from existing tier values, use them.
-      // Otherwise fall back to all active models so free-text input still gets suggestions.
-      const candidates = registryProviders.length > 0
-        ? modelsData.filter(m => registryProviders.includes(m.provider))
-        : modelsData;
-
-      const addedIds = new Set();
-      candidates.forEach(m => {
-        dl.appendChild(el("option", { value: m.id, label: `${m.provider}: ${m.name || m.id}` }));
-        addedIds.add(m.id);
-      });
-
-      // Also add existing tier values that aren't in the candidate set (e.g. native Gemini IDs)
-      Object.values(tData).forEach(val => {
-        if (val && !addedIds.has(val)) {
-          dl.appendChild(el("option", { value: val, label: `${val} (current)` }));
-          addedIds.add(val);
-        }
-      });
 
       tiers.forEach(t => {
         const td = el("td", {});
@@ -6842,14 +6811,14 @@ async function viewProviderTiers() {
       modelsData = resModels.models || [];
       aiProvidersData = resProviders || {};
       displayNameMap = Object.fromEntries((Array.isArray(provList) ? provList : []).map(p => [p.name, p.display_name || p.name]));
-      renderProviders();
+      await renderProviders();
     } catch (err) { providersWrap.replaceChildren(renderError(err)); }
   };
 
-  editToggle.addEventListener("change", (e) => {
+  editToggle.addEventListener("change", async (e) => {
     editMode = e.target.checked;
     saveBtn.style.display = editMode ? "inline-block" : "none";
-    renderProviders();
+    await renderProviders();
   });
 
   saveBtn.onclick = async () => {
@@ -7066,7 +7035,7 @@ async function viewTierPresets() {
     presetsWrap.appendChild(table);
   };
 
-  const renderEdit = () => {
+  const renderEdit = async () => {
     const providersMap = aiProvidersData.providers || aiProvidersData || {};
     const providerNames = Object.keys(providersMap).filter(p => providersMap[p] && providersMap[p]["model-tiers"]);
 
@@ -7079,33 +7048,41 @@ async function viewTierPresets() {
     ]));
     table.appendChild(thead);
 
-    // Per-provider datalists — map framework provider name → registry provider names
-    // via model-tier values (e.g. "claude-sonnet-4-6" → registry provider "anthropic")
-    providerNames.forEach(pName => {
+    // Per-provider datalists. Candidates come EXCLUSIVELY from the provider's
+    // centrally-configured source via GET /api/model-suggestions -- the same
+    // source of truth used by the Models & Pricing view. The server decides
+    // registry vs. models.dev per provider (model-source-preference in
+    // project.yaml), so there is no client-side merging of catalogs here.
+    await Promise.all(providerNames.map(async pName => {
       const pData = providersMap[pName] || {};
       const tierVals = Object.values(pData["model-tiers"] || {}).filter(Boolean);
-      const registryProvs = new Set();
-      tierVals.forEach(modelId => {
-        if (modelId.includes("/")) {
-          const prefix = modelId.split("/")[0];
-          modelsData.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
-        } else {
-          const match = modelsData.find(m => m.id === modelId);
-          if (match) registryProvs.add(match.provider);
-        }
-      });
-      const candidates = registryProvs.size > 0
-        ? modelsData.filter(m => registryProvs.has(m.provider))
-        : modelsData;
+
+      let suggestions = [];
+      try {
+        const res = await api.get(`/api/model-suggestions?provider=${encodeURIComponent(pName)}`);
+        suggestions = (res && res.models) || [];
+      } catch { suggestions = []; }
+
       const dlId = `tp-dl-${pName.replace(/[^a-zA-Z0-9]/g, "-")}`;
       let dl = document.getElementById(dlId);
       if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
       else { dl.innerHTML = ""; }
-      candidates.forEach(m => {
+
+      const addedIds = new Set();
+      suggestions.forEach(m => {
         const label = m.name ? `${m.name} (${m.provider})` : m.id;
         dl.appendChild(el("option", { value: m.id }, [label]));
+        addedIds.add(m.id);
       });
-    });
+
+      // Also add existing tier values that aren't in the suggestion set (e.g. native Gemini IDs)
+      tierVals.forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val }, [`${val} (current)`]));
+          addedIds.add(val);
+        }
+      });
+    }));
 
     const tbody = el("tbody");
     Object.keys(tierPresetsData).forEach(presetId => {
@@ -7182,27 +7159,27 @@ async function viewTierPresets() {
     presetsWrap.appendChild(table);
   };
 
-  const renderPresets = () => {
+  const renderPresets = async () => {
     presetsWrap.innerHTML = "";
     updateTabStyles();
     if (currentTab === "edit") {
       saveBtn.style.display = "";
-      renderEdit();
+      await renderEdit();
     } else {
       saveBtn.style.display = "none";
       renderResolved();
     }
   };
 
-  tabResolved.onclick = () => {
+  tabResolved.onclick = async () => {
     if (currentTab === "resolved") return;
     currentTab = "resolved";
-    renderPresets();
+    await renderPresets();
   };
-  tabEdit.onclick = () => {
+  tabEdit.onclick = async () => {
     if (currentTab === "edit") return;
     currentTab = "edit";
-    renderPresets();
+    await renderPresets();
   };
 
   const loadData = async () => {
@@ -7215,7 +7192,7 @@ async function viewTierPresets() {
       tierPresetsData = tp;
       aiProvidersData = ap;
       modelsData = modelsRes.models || [];
-      renderPresets();
+      await renderPresets();
     } catch (err) { presetsWrap.replaceChildren(renderError(err)); }
   };
 

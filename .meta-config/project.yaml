@@ -285,3 +285,6 @@ backup:
     max_age_days: 30
   auto-backup-before-sync: false
 environments: {}
+model-source-preference:
+  Claude: registry
+  Opencode: modelsdev
