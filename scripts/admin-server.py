@@ -61,6 +61,27 @@ DEFAULT_HOST = "127.0.0.1"
 MAX_BACKUPS = 5
 SSE_HEARTBEAT_SECONDS = 15
 
+# --- Centralized per-provider model-source preference ---------------------- #
+# A provider's model dropdowns/suggestions are served EXCLUSIVELY from one
+# source: the local registry (model-registry.json + pricing overlay) or the
+# live models.dev catalog. The preference is persisted centrally in
+# ``.meta-config/project.yaml`` under ``model-source-preference`` and is the
+# single source of truth for every model suggestion endpoint — no client-side
+# state, no mixing of both sources.
+DEFAULT_MODEL_SOURCE = "registry"
+VALID_MODEL_SOURCES: tuple[str, ...] = ("registry", "modelsdev")
+
+# Framework provider name -> models.dev catalog slug. Mirrors
+# ``PROVIDER_MODELSDEV_MAP`` in ``docs/ui/admin-ui.html`` — keep both in sync.
+# Providers absent here (e.g. Mammouth, Continue) have no models.dev catalog
+# entry, so ``modelsdev`` yields no suggestions for them.
+PROVIDER_MODELSDEV_SLUGS: dict[str, str] = {
+    "Claude": "anthropic",
+    "Gemini": "google",
+    "Opencode": "opencode-go",
+    "Copilot": "github-copilot",
+}
+
 # PID files and logs for supervised sub-servers (relative to project root).
 VIZ_PID_FILE   = ".meta-viz/.server-pid"
 VIZ_LOG_FILE   = ".meta-viz/server.log"
@@ -1176,6 +1197,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models-dev":
             return self._handle_get_models_dev()
 
+        if path == "/api/model-source":
+            return self._handle_get_model_source()
+
+        if path == "/api/model-suggestions":
+            return self._handle_get_model_suggestions()
+
         if path == "/api/ai-providers":
             return self._handle_get_ai_providers()
 
@@ -1336,6 +1363,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/models-dev/import":
             return self._handle_post_models_dev_import()
+
+        if path == "/api/model-source":
+            return self._handle_post_model_source()
 
         if path == "/api/models/exclude":
             return self._handle_post_models_exclude()
@@ -2030,6 +2060,174 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                             yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
                             
             return self._send_json({"success": True})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    # ------------------------------------------------------------------ #
+    # Centralized per-provider model-source preference                    #
+    # ------------------------------------------------------------------ #
+
+    def _read_model_source_prefs(self) -> dict:
+        """Load the per-provider model-source map from ``project.yaml``.
+
+        Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
+        any entries whose value is not a recognised source. Missing/invalid
+        section yields ``{}`` (every provider then defaults to
+        ``DEFAULT_MODEL_SOURCE``).
+        """
+        project = self.__class__.config_manager.read("project") or {}
+        prefs = project.get("model-source-preference") if isinstance(project, dict) else None
+        if not isinstance(prefs, dict):
+            return {}
+        return {
+            str(k): v for k, v in prefs.items()
+            if isinstance(v, str) and v in VALID_MODEL_SOURCES
+        }
+
+    def _resolve_model_source(self, provider_name: str) -> str:
+        """Resolve the effective source for ``provider_name`` (central setting
+        or ``DEFAULT_MODEL_SOURCE`` when unset)."""
+        return self._read_model_source_prefs().get(provider_name, DEFAULT_MODEL_SOURCE)
+
+    def _provider_model_tiers(self, provider_name: str) -> dict:
+        """Return the ``model-tiers`` map for ``provider_name`` from
+        ``ai-providers.yaml`` (``{}`` when absent)."""
+        path = self._ai_providers_path()
+        if not path.exists():
+            return {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        providers = data.get("providers") or {}
+        conf = providers.get(provider_name) or {} if isinstance(providers, dict) else {}
+        tiers = conf.get("model-tiers") or {} if isinstance(conf, dict) else {}
+        return tiers if isinstance(tiers, dict) else {}
+
+    def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
+        """Registry-sourced model suggestions for ``provider_name``.
+
+        Mirrors the registry-fallback logic the Admin UI used client-side:
+        the provider's tier values pin down which registry provider slug(s)
+        (e.g. ``opencode-go``, ``anthropic``) belong to this framework
+        provider, and only active (non-disabled) models for those slugs are
+        returned. When no slug can be inferred, all active models are offered
+        (matches the previous UI behaviour).
+        """
+        models = [m for m in self._collect_models() if m.get("enabled")]
+        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
+        registry_slugs: set = set()
+        for model_id in tier_vals:
+            if "/" in model_id:
+                prefix = model_id.split("/", 1)[0]
+                for m in models:
+                    if str(m.get("id", "")).startswith(prefix + "/"):
+                        registry_slugs.add(m.get("provider"))
+            else:
+                for m in models:
+                    if m.get("id") == model_id:
+                        registry_slugs.add(m.get("provider"))
+        selected = [m for m in models if m.get("provider") in registry_slugs] if registry_slugs else models
+        return [
+            {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
+            for m in selected
+        ]
+
+    def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
+        """models.dev-sourced model suggestions for ``provider_name``.
+
+        Returns ``[]`` for providers without a models.dev catalog slug. Ids are
+        namespaced (``<slug>/<raw-id>``) when the provider's registry tier
+        values use that convention, so suggestions stay format-compatible with
+        the registry view.
+        """
+        slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
+        if not slug:
+            return []
+        data = self._load_models_dev_data()
+        providers = self._apply_pricing_overlay(dict(data.get("providers", {})))
+        node = providers.get(slug)
+        if not isinstance(node, dict):
+            return []
+        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
+        uses_namespaced = any("/" in v for v in tier_vals)
+        out: list[dict] = []
+        for m in (node.get("models") or {}).values():
+            raw_id = m.get("id")
+            if not raw_id:
+                continue
+            model_id = f"{slug}/{raw_id}" if uses_namespaced else raw_id
+            out.append({"id": model_id, "name": m.get("name") or raw_id, "provider": slug})
+        return out
+
+    def _handle_get_model_source(self) -> None:
+        """Return the central per-provider model-source map (single source of
+        truth for every model dropdown/suggestion in the Admin UI)."""
+        try:
+            return self._send_json({
+                "preferences": self._read_model_source_prefs(),
+                "default": DEFAULT_MODEL_SOURCE,
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_model_source(self) -> None:
+        """Set one provider's model source and persist it centrally to
+        ``.meta-config/project.yaml`` → ``model-source-preference``.
+
+        Body: ``{"provider": "Opencode", "source": "modelsdev"}``.
+        """
+        try:
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body")
+            provider = str(body.get("provider", "")).strip()
+            source = str(body.get("source", "")).strip()
+            if not provider:
+                return self._send_json({"error": "provider required"}, status=400)
+            if source not in VALID_MODEL_SOURCES:
+                return self._send_json(
+                    {"error": f"source must be one of {list(VALID_MODEL_SOURCES)}"}, status=400)
+
+            project = self.__class__.config_manager.read("project")
+            if not isinstance(project, dict):
+                project = {}
+            prefs = project.get("model-source-preference")
+            if not isinstance(prefs, dict):
+                prefs = {}
+            prefs[provider] = source
+            project["model-source-preference"] = prefs
+            self.__class__.config_manager.write("project", project)
+
+            return self._send_json({
+                "success": True,
+                "preferences": {
+                    str(k): v for k, v in prefs.items()
+                    if isinstance(v, str) and v in VALID_MODEL_SOURCES
+                },
+            })
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_get_model_suggestions(self) -> None:
+        """Return the model suggestions for one provider, drawn EXCLUSIVELY
+        from that provider's centrally-configured source. This is the single
+        endpoint every model dropdown (Models & Pricing per-provider view and
+        Provider Tier Overrides datalists) consumes — guaranteeing identical,
+        un-mixed results across views.
+
+        Query: ``?provider=<framework provider name>``.
+        Response: ``{"provider", "source", "models": [{"id","name","provider"}]}``.
+        """
+        try:
+            from urllib.parse import parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            provider = (qs.get("provider", [""])[0] or "").strip()
+            if not provider:
+                return self._send_json({"error": "provider query param required"}, status=400)
+            source = self._resolve_model_source(provider)
+            if source == "modelsdev":
+                models = self._suggestions_from_models_dev(provider)
+            else:
+                models = self._suggestions_from_registry(provider)
+            return self._send_json({"provider": provider, "source": source, "models": models})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 
@@ -3012,7 +3210,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
-            "provider-isolation", "environments",
+            "provider-isolation", "environments", "model-source-preference",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")

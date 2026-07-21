@@ -478,6 +478,17 @@
         }
       }
     },
+    "model-source-preference": {
+      "type": "object",
+      "description": "Central per-provider model source that drives every model dropdown/suggestion in the Admin UI. Keys are provider names (Claude, Gemini, Opencode, Copilot, Mammouth, Continue). Missing providers default to 'registry'.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "registry",
+          "modelsdev"
+        ]
+      }
+    },
     "max-tokens-overrides": {
       "type": "object",
       "description": "Override max output tokens per role. Positive integer.",

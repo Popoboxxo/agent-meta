@@ -5012,22 +5012,21 @@ async function viewProjectModelOverrides() {
 }
 
 /* =========================================================================
- * Shared Model-Source State (Models & Pricing <-> Provider Tier Overrides)
+ * Central Per-Provider Model-Source (Models & Pricing <-> Provider Tier Overrides)
  * =========================================================================
- * The "Source" toggle and the per-provider "Source" override on #/models
- * used to live as closure-local variables inside viewModels(), reset on
- * every navigation and never persisted anywhere. That meant
- * #/project/provider-tier-overrides had no way to know which source
- * (registry vs. models.dev) was currently selected for a provider, so it
- * always pulled suggestions from the (registry-only) /api/models/active
- * endpoint regardless of the toggle. Hoisting the state to module scope and
- * backing it with localStorage makes the selection survive both route
- * changes and page reloads; effectiveModelSource() lets any view resolve
- * the currently-active source for a given provider.
+ * The source (registry vs. models.dev) each provider draws its models from is
+ * a CENTRAL, server-persisted setting, stored in .meta-config/project.yaml
+ * under `model-source-preference` and served by GET/POST /api/model-source.
+ * It is the single source of truth for every model dropdown/suggestion: a
+ * provider set to "registry" only ever suggests registry models, one set to
+ * "modelsdev" only ever suggests models.dev models -- the two sources are
+ * never mixed. `modelSourceState.providerSource` is an in-memory cache of the
+ * server map, refreshed via loadModelSourcePrefs() when a view mounts and
+ * updated (server-first) via setModelSourcePref() when the user toggles.
  */
-const MODEL_SOURCE_STORAGE_KEY = "agent-meta-admin:model-source";
 
-// Map agent-meta provider names -> models.dev provider IDs.
+// Map agent-meta provider names -> models.dev provider IDs. Mirrors
+// PROVIDER_MODELSDEV_SLUGS in scripts/admin-server.py -- keep both in sync.
 const PROVIDER_MODELSDEV_MAP = {
   "Claude": "anthropic",
   "Gemini": "google",
@@ -5041,27 +5040,38 @@ const PROVIDER_MODELSDEV_MAP = {
 // a real models.dev catalog entry -- see _apply_pricing_overlay.
 const MODELSDEV_REGISTRY_ONLY_PROVIDERS = new Set(["Mammouth", "Continue"]);
 
-function loadModelSourceState() {
-  let parsed = null;
-  try { parsed = JSON.parse(localStorage.getItem(MODEL_SOURCE_STORAGE_KEY) || "null"); } catch { parsed = null; }
-  return {
-    source: (parsed && parsed.source) || "registry",       // "registry" | "modelsdev"
-    providerSource: (parsed && typeof parsed.providerSource === "object" && parsed.providerSource) || {},
-  };
+// Default source for any provider without an explicit central setting.
+const DEFAULT_MODEL_SOURCE = "registry";
+
+// In-memory mirror of the server-side per-provider map. Populated by
+// loadModelSourcePrefs(); never persisted client-side (no localStorage).
+const modelSourceState = { providerSource: {} };
+
+/** Fetch the central per-provider source map from the server into the local
+ * cache. Called when a source-aware view mounts. Best-effort: on failure the
+ * cache is left as-is (providers fall back to DEFAULT_MODEL_SOURCE). */
+async function loadModelSourcePrefs() {
+  try {
+    const res = await api.get("/api/model-source");
+    modelSourceState.providerSource = (res && res.preferences) || {};
+  } catch { /* keep existing cache */ }
+  return modelSourceState.providerSource;
 }
 
-// Singleton -- created once when the script loads, shared by every view
-// (viewModels() and viewProjectProviderTierOverrides() both read/write it).
-const modelSourceState = loadModelSourceState();
-
-function persistModelSourceState() {
-  try { localStorage.setItem(MODEL_SOURCE_STORAGE_KEY, JSON.stringify(modelSourceState)); } catch { /* best effort */ }
+/** Persist one provider's source centrally (POST /api/model-source), then
+ * update the local cache from the server response so the UI reflects exactly
+ * what was stored. Returns true on success. */
+async function setModelSourcePref(providerName, source) {
+  const res = await api.post("/api/model-source", { provider: providerName, source });
+  if (res && res.preferences) modelSourceState.providerSource = res.preferences;
+  else modelSourceState.providerSource[providerName] = source;
+  return true;
 }
 
-/** Effective source ("registry" | "modelsdev") for a given provider name:
- * the per-provider override if one is set, otherwise the global toggle. */
+/** Effective source ("registry" | "modelsdev") for a provider name: the
+ * central per-provider setting, or DEFAULT_MODEL_SOURCE when unset. */
 function effectiveModelSource(providerName) {
-  return modelSourceState.providerSource[providerName] || modelSourceState.source;
+  return modelSourceState.providerSource[providerName] || DEFAULT_MODEL_SOURCE;
 }
 
 /* ------------------------ Provider Tier Overrides ------------------------ */
