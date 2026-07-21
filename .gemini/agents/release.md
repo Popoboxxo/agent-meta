@@ -6,7 +6,7 @@ hint: Versioning, changelog, build artifact, create GitHub release
 prompt_mode: modern
 tools:
 - code_execution
-model: gemini-3.1-pro-low
+model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

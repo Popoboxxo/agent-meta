@@ -4,7 +4,7 @@ description: Complex features, architecture decisions, hard bugs and cross-cutti
   refactorings. Analyzes before implementing and documents decisions.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow

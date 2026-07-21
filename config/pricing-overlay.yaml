@@ -36,3 +36,14 @@ prices:
     gemini-1.5-flash:
       input: 0.35
       output: 1.05
+  # Curated-only provider: Mammouth Code has no models.dev catalog entry
+  # (flat-fee multi-model subscription gateway, no public per-token
+  # pricing). This entry is synthesized into the models.dev live view as a
+  # "curated" provider by admin-server.py (_apply_pricing_overlay) instead
+  # of the previous strikethrough/registry-only workaround. Add real
+  # input/output figures here if Mammouth ever publishes per-token pricing.
+  mammouth:
+    _name: Mammouth Code
+    _url: https://mammouth.ai/
+    mammouth-code:
+      name: "Mammouth Code (flat-fee subscription — no public per-token pricing)"

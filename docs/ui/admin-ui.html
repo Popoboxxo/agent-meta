@@ -1367,6 +1367,7 @@ function buildSidebar() {
       title: "Framework defaults",
       items: [
         { route: "/models", label: "Models & Pricing", icon: "💲", superOnly: true },
+        { route: "/models-legacy", label: "Models & Pricing (Legacy)", icon: "💲", superOnly: true },
         { route: "/provider-tiers", label: "Provider Tier Mappings", icon: "❖", superOnly: true },
         { route: "/tier-presets", label: "Tier Presets", icon: "★", superOnly: true },
         { route: "/config/role-defaults", label: "role-defaults", icon: "⍟", superOnly: true },
@@ -5010,6 +5011,59 @@ async function viewProjectModelOverrides() {
   return wrap;
 }
 
+/* =========================================================================
+ * Shared Model-Source State (Models & Pricing <-> Provider Tier Overrides)
+ * =========================================================================
+ * The "Source" toggle and the per-provider "Source" override on #/models
+ * used to live as closure-local variables inside viewModels(), reset on
+ * every navigation and never persisted anywhere. That meant
+ * #/project/provider-tier-overrides had no way to know which source
+ * (registry vs. models.dev) was currently selected for a provider, so it
+ * always pulled suggestions from the (registry-only) /api/models/active
+ * endpoint regardless of the toggle. Hoisting the state to module scope and
+ * backing it with localStorage makes the selection survive both route
+ * changes and page reloads; effectiveModelSource() lets any view resolve
+ * the currently-active source for a given provider.
+ */
+const MODEL_SOURCE_STORAGE_KEY = "agent-meta-admin:model-source";
+
+// Map agent-meta provider names -> models.dev provider IDs.
+const PROVIDER_MODELSDEV_MAP = {
+  "Claude": "anthropic",
+  "Gemini": "google",
+  "Opencode": "opencode-go",
+  "Copilot": "github-copilot",
+  // Mammouth & Continue not available in models.dev -> registry-only
+};
+// Providers that have NO models.dev data (registry-only). For these,
+// admin-server.py synthesizes a "curated" provider node (id = name
+// lowercased, e.g. "mammouth") from config/pricing-overlay.yaml instead of
+// a real models.dev catalog entry -- see _apply_pricing_overlay.
+const MODELSDEV_REGISTRY_ONLY_PROVIDERS = new Set(["Mammouth", "Continue"]);
+
+function loadModelSourceState() {
+  let parsed = null;
+  try { parsed = JSON.parse(localStorage.getItem(MODEL_SOURCE_STORAGE_KEY) || "null"); } catch { parsed = null; }
+  return {
+    source: (parsed && parsed.source) || "registry",       // "registry" | "modelsdev"
+    providerSource: (parsed && typeof parsed.providerSource === "object" && parsed.providerSource) || {},
+  };
+}
+
+// Singleton -- created once when the script loads, shared by every view
+// (viewModels() and viewProjectProviderTierOverrides() both read/write it).
+const modelSourceState = loadModelSourceState();
+
+function persistModelSourceState() {
+  try { localStorage.setItem(MODEL_SOURCE_STORAGE_KEY, JSON.stringify(modelSourceState)); } catch { /* best effort */ }
+}
+
+/** Effective source ("registry" | "modelsdev") for a given provider name:
+ * the per-provider override if one is set, otherwise the global toggle. */
+function effectiveModelSource(providerName) {
+  return modelSourceState.providerSource[providerName] || modelSourceState.source;
+}
+
 /* ------------------------ Provider Tier Overrides ------------------------ */
 async function viewProjectProviderTierOverrides() {
   const wrap = el("div");
@@ -5017,40 +5071,92 @@ async function viewProjectProviderTierOverrides() {
   wrap.appendChild(el("p", { class: "muted" }, [
     "Override the model used per provider + tier. Providers that manage models centrally are excluded.",
   ]));
-  const [data, providers, modelsRes] = await Promise.all([
+  const [data, providers, modelsRes, modelsDevRes] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
     // Only enabled (non-disabled, non-blacklisted) models should appear as picker options.
     api.get("/api/models/active").catch(() => ({ models: [] })),
+    // Same models.dev catalog #/models uses -- fetched so any provider whose
+    // EFFECTIVE source (see modelSourceState / effectiveModelSource() above,
+    // shared with the Models & Pricing view) is "modelsdev" can suggest the
+    // full live catalog instead of only the locally-imported registry subset.
+    api.get("/api/models-dev").catch(() => null),
   ]);
 
   const tierProviders = providers.filter(p => p.has_model_tiers);
   const specificModels = modelsRes.models || [];
   const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
-  // Per-provider datalists keyed by framework provider name (e.g. "Claude", "Gemini")
-  // Derive registry provider names from model_tiers values so the filter works
+  // Per-provider datalists keyed by framework provider name (e.g. "Claude", "Gemini").
+  // Source (registry vs. models.dev) follows the SAME shared, persisted
+  // state the user set on #/models -- no more hardcoding /api/models/active.
   tierProviders.forEach(tp => {
     const tierVals = Object.values(tp.model_tiers || {}).filter(Boolean);
-    const registryProvs = new Set();
-    tierVals.forEach(modelId => {
-      if (modelId.includes("/")) {
-        const prefix = modelId.split("/")[0];
-        specificModels.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
-      } else {
-        const match = specificModels.find(m => m.id === modelId);
-        if (match) registryProvs.add(match.provider);
-      }
-    });
-    const candidates = registryProvs.size > 0
-      ? specificModels.filter(m => registryProvs.has(m.provider))
-      : specificModels;
+    // Registry ids for some providers (e.g. opencode-go) are namespaced as
+    // "<provider>/<raw-id>" to disambiguate multiple upstream catalogs (see
+    // scripts/lib/model_discovery.py); models.dev's own raw ids are bare.
+    // Detect the convention from the provider's existing tier values so the
+    // models.dev-sourced candidates below get formatted the same way.
+    const usesNamespacedIds = tierVals.some(v => v.includes("/"));
+
+    const mdId = PROVIDER_MODELSDEV_MAP[tp.name];
+    const modelsDevProvider = mdId && modelsDevRes && modelsDevRes.providers && modelsDevRes.providers[mdId];
+    const useModelsDev = Boolean(modelsDevProvider)
+      && !MODELSDEV_REGISTRY_ONLY_PROVIDERS.has(tp.name)
+      && effectiveModelSource(tp.name) === "modelsdev";
+
+    let candidates;
+    if (useModelsDev) {
+      candidates = Object.values(modelsDevProvider.models || {}).map(m => ({
+        id: usesNamespacedIds ? `${mdId}/${m.id}` : m.id,
+        name: m.name || m.id,
+        provider: mdId,
+      }));
+    } else {
+      // Registry fallback (also used when the provider has no models.dev
+      // entry at all, or when its effective source is explicitly "registry").
+      const registryProvs = new Set();
+      tierVals.forEach(modelId => {
+        if (modelId.includes("/")) {
+          const prefix = modelId.split("/")[0];
+          specificModels.filter(m => m.id.startsWith(prefix + "/")).forEach(m => registryProvs.add(m.provider));
+        } else {
+          const match = specificModels.find(m => m.id === modelId);
+          if (match) registryProvs.add(match.provider);
+        }
+      });
+      candidates = registryProvs.size > 0
+        ? specificModels.filter(m => registryProvs.has(m.provider))
+        : specificModels;
+    }
+
+    // Provenance check: the registry (model-registry.json, fed by
+    // fetch_opencode_go_models() et al. in scripts/lib/model_discovery.py)
+    // and models.dev are TWO INDEPENDENT upstream catalogs that happen to
+    // share provider slugs (e.g. "opencode-go"). A registry-fallback
+    // candidate can therefore be a real model that simply doesn't exist in
+    // models.dev's narrower snapshot (e.g. opencode-go/mimo-v2.5). Without a
+    // marker, that reads as a bug ("why does #/models not show this?") --
+    // see bug report on #/project/provider-tier-overrides. Only meaningful
+    // when this provider actually HAS a models.dev catalog (modelsDevProvider
+    // from above); otherwise every candidate would be trivially "registry
+    // only" and the label would just be noise.
+    const inModelsDev = (m) => {
+      if (!modelsDevProvider || !modelsDevProvider.models) return true;
+      const rawId = m.id.includes("/") ? m.id.slice(m.id.indexOf("/") + 1) : m.id;
+      return Object.prototype.hasOwnProperty.call(modelsDevProvider.models, rawId);
+    };
+
     const dlId = `pto-dl-${tp.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
     let dl = document.getElementById(dlId);
     if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
     else { dl.innerHTML = ""; }
     candidates.forEach(m => {
-      const label = m.name ? `${m.name} (${m.provider})` : m.id;
+      let label = m.name ? `${m.name} (${m.provider})` : m.id;
+      // Same "registry only" wording used as the source-badge title in
+      // #/models (renderModelsDevTable) -- keeps provenance terminology
+      // consistent across both views instead of inventing new phrasing.
+      if (!useModelsDev && modelsDevProvider && !inModelsDev(m)) label += " (registry only)";
       dl.appendChild(el("option", { value: m.id }, [label]));
     });
   });
@@ -5670,11 +5776,596 @@ async function viewVizDashboard() {
 }
 
 /* =========================================================================
- * Models & Pricing
+ * Models & Pricing (unified — Registry + models.dev)
  * ========================================================================= */
 async function viewModels() {
   const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Models & Pricing"]));
+
+  const state = {
+    // Both `source` and `providerSource` mirror the shared, localStorage-
+    // backed `modelSourceState` (declared above viewProjectProviderTierOverrides)
+    // instead of being reset on every call -- this is what lets the
+    // Provider Tier Overrides view see the same source selection. `providerSource`
+    // is the SAME object reference as modelSourceState.providerSource, so
+    // in-place mutations (`state.providerSource[x] = y`) update the shared
+    // state automatically; only `state.source` needs an explicit mirror-write
+    // (see the button handler below) since primitives can't be aliased.
+    source: modelSourceState.source,   // "registry" | "modelsdev"
+    registry: [],              // model-registry.json data
+    modelsDev: null,           // { providers, models } from models.dev
+    configuredProviders: [],   // provider names from .meta-config/project.yaml → ai-providers
+    providerSource: modelSourceState.providerSource,   // per-provider: "registry" | "modelsdev"
+    loading: true,
+    filterProvider: "",
+    filterModel: "",
+    filterCap: { reasoning: false, toolCall: false, attachment: false, vision: false, structured: false },
+    showAllProviders: false,   // false = scope models.dev table to configured providers only
+  };
+
+  // Local aliases for the module-level maps (shared with
+  // viewProjectProviderTierOverrides) so the rest of this function needs no
+  // further changes.
+  const PROVIDER_MAP = PROVIDER_MODELSDEV_MAP;
+  const REGISTRY_ONLY = MODELSDEV_REGISTRY_ONLY_PROVIDERS;
+
+  function fmtCost(val) { if (val == null) return "\u2014"; if (val === 0) return "Free"; return "$" + val.toFixed(val < 0.01 ? 4 : 2); }
+  function fmtCtx(v) { if (!v) return "\u2014"; if (v >= 1000000) return (v / 1000000).toFixed(1) + "M"; return (v / 1000).toFixed(0) + "K"; }
+
+  function render() {
+    wrap.innerHTML = "";
+    wrap.appendChild(el("h1", {}, ["Models & Pricing"]));
+
+    // Source toggle
+    const srcRow = el("div", { class: "btn-row", style: "margin-bottom:16px;align-items:center;display:flex;gap:8px;" });
+    srcRow.appendChild(el("span", { style: "font-weight:600;margin-right:4px;" }, ["Source:"]));
+    for (const [val, label] of [["registry", "model-registry.json"], ["modelsdev", "models.dev"]]) {
+      const active = state.source === val;
+      srcRow.appendChild(el("button", {
+        class: "btn" + (active ? " btn-primary" : ""),
+        onclick: () => { state.source = val; modelSourceState.source = val; persistModelSourceState(); render(); },
+        style: active ? "" : "opacity:0.6;"
+      }, [label]));
+    }
+    if (state.modelsDev) {
+      const d = state.modelsDev;
+      const srcBadge = d.source === "sdk" ? "SDK" : d.source === "api" ? "API" : "ERR";
+      const srcColor = d.source === "sdk" ? "var(--accent-green)" : d.source === "api" ? "var(--accent-yellow)" : "var(--accent-red)";
+      srcRow.appendChild(el("span", { class: "badge ok", style: `margin-left:auto;background:${srcColor};color:#000;` }, [srcBadge]));
+      if (d.generated_at) srcRow.appendChild(el("span", { style: "font-size:0.8em;opacity:0.6;" }, [new Date(d.generated_at).toLocaleDateString()]));
+      srcRow.appendChild(el("button", { class: "btn", onclick: async () => { await api.post("/api/models-dev/refresh", {}); loadModelsDev(); render(); }, style: "font-size:0.85em;" }, ["↻"]));
+    }
+    wrap.appendChild(srcRow);
+
+    // Per-provider source override
+    if (state.configuredProviders.length > 0) {
+      const provRow = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:0.82em;" });
+      provRow.appendChild(el("span", { style: "opacity:0.6;margin-right:4px;" }, ["Per provider:"]));
+      state.configuredProviders.forEach(provName => {
+        const mdId = PROVIDER_MAP[provName];
+        const src = state.providerSource[provName] || state.source;
+        const isRegistryOnly = REGISTRY_ONLY.has(provName) || !mdId;
+        const wrap_el = el("span", { style: "display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);" });
+        wrap_el.appendChild(el("span", { style: "font-weight:600;" }, [provName]));
+        if (isRegistryOnly) {
+          wrap_el.appendChild(el("span", { class: "badge warn", title: "Not available in models.dev — registry only" }, ["registry"]));
+        } else {
+          wrap_el.appendChild(el("span", { class: "badge ok" }, ["models.dev"]));
+          const sel = el("select", {
+            style: "font-size:0.85em;padding:1px 3px;background:transparent;color:var(--fg);border:none;cursor:pointer;",
+            onchange: e => { state.providerSource[provName] = e.target.value; persistModelSourceState(); render(); }
+          });
+          for (const [val, lbl] of [["modelsdev", "models.dev"], ["registry", "registry"]]) {
+            sel.appendChild(el("option", { value: val, selected: src === val ? "selected" : undefined }, [lbl]));
+          }
+          wrap_el.appendChild(sel);
+        }
+        provRow.appendChild(wrap_el);
+      });
+      wrap.appendChild(provRow);
+    }
+
+    if (state.loading) {
+      wrap.appendChild(el("div", { style: "padding:32px;text-align:center;opacity:0.6;" }, ["Loading..."]));
+      return;
+    }
+
+    if (state.source === "registry") renderRegistryTable(wrap);
+    else renderModelsDevTable(wrap);
+  }
+
+  // =========================================================================
+  // Registry Table (same as legacy)
+  // =========================================================================
+  /** Convert models.dev catalog entries for `mdId` into rows shaped like
+   * registry entries, so a provider overridden to "modelsdev" can still be
+   * rendered inside the registry table (instead of just disappearing). */
+  function modelsDevRowsAsRegistryRows(provName, mdId) {
+    const providerNode = state.modelsDev && state.modelsDev.providers && state.modelsDev.providers[mdId];
+    if (!providerNode) return [];
+    return Object.values(providerNode.models || {}).map(m => {
+      const inputCost = (m.cost && m.cost.input) || 0;
+      const outputCost = (m.cost && m.cost.output) || 0;
+      return {
+        id: m.id,
+        name: m.name || m.id,
+        provider: mdId,
+        input_cost: inputCost,
+        output_cost: outputCost,
+        input_source: "models.dev",
+        output_source: "models.dev",
+        cost_factor: Math.round((inputCost * 0.3 + outputCost * 0.7) * 100) / 100,
+        tier: "Standard",
+        enabled: true,
+        source_url: "",
+        _fromModelsDev: true,
+      };
+    });
+  }
+
+  function renderRegistryTable(parent) {
+    // Base registry rows, but any configured provider whose EFFECTIVE
+    // source (global toggle, or its own per-provider override -- see
+    // effectiveModelSource()) is "modelsdev" gets its rows swapped for
+    // models.dev-sourced data instead of being silently ignored. This is
+    // what makes the "Per provider:" dropdown actually change what's
+    // rendered even while the Registry table (the default view) is active.
+    const modelsDevOverriddenProviders = state.configuredProviders.filter(p => {
+      const mdId = PROVIDER_MAP[p];
+      return mdId && !REGISTRY_ONLY.has(p) && effectiveModelSource(p) === "modelsdev";
+    });
+    const overriddenMdIds = new Set(modelsDevOverriddenProviders.map(p => PROVIDER_MAP[p]));
+    const models = [
+      ...state.registry.filter(m => !overriddenMdIds.has(m.provider)),
+      ...modelsDevOverriddenProviders.flatMap(p => modelsDevRowsAsRegistryRows(p, PROVIDER_MAP[p])),
+    ];
+    const filterState = { provider: "", model: "", category: "" };
+
+    const controls = el("div", { class: "btn-row", style: "margin-bottom:12px;align-items:center;display:flex;gap:8px;" });
+    const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+    controls.appendChild(refreshBtn);
+    parent.appendChild(controls);
+
+    const QUICK = [...new Set(["", ...state.configuredProviders])];
+    if (QUICK.length > 1) {
+      const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:8px;" });
+      QUICK.forEach((val, i) => {
+        const label = val === "" ? "All" : val.charAt(0).toUpperCase() + val.slice(1);
+        const btn = el("button", { class: "badge" + (i === 0 ? " active" : "") }, [label]);
+        btn.addEventListener("click", () => {
+          filterState.provider = val;
+          strip.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          applyFilters();
+        });
+        strip.appendChild(btn);
+      });
+      parent.appendChild(strip);
+    }
+
+    const tableWrap = el("div");
+    parent.appendChild(tableWrap);
+
+    const applyFilters = () => {
+      tableWrap.querySelectorAll("tbody tr").forEach(tr => {
+        const p = (tr.children[1]?.textContent || "").toLowerCase();
+        const m = (tr.children[2]?.textContent || "").toLowerCase();
+        const c = (tr.children[3]?.textContent || "").toLowerCase();
+        tr.style.display = (
+          (!filterState.provider || p.includes(filterState.provider)) &&
+          (!filterState.model || m.includes(filterState.model)) &&
+          (!filterState.category || c === filterState.category)
+        ) ? "" : "none";
+      });
+    };
+
+    const mkSelect = (key, opts) => {
+      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      s.appendChild(el("option", { value: "" }, ["All"]));
+      opts.forEach(o => s.appendChild(el("option", { value: o }, [o])));
+      s.addEventListener("change", e => { filterState[key] = e.target.value; applyFilters(); });
+      return s;
+    };
+    const mkText = (key) => {
+      const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      inp.addEventListener("input", e => { filterState[key] = e.target.value; applyFilters(); });
+      return inp;
+    };
+
+    if (models.length === 0) {
+      tableWrap.appendChild(el("div", { class: "empty" }, ["No models in registry. Run sync.py --update-models."]));
+      return;
+    }
+
+    const provs = [...new Set(models.map(m => m.provider))].sort();
+    const cats = [...new Set(models.map(m => m.tier || "Standard"))].sort();
+
+    const tbl = el("table", { class: "data" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, [
+      el("th", { style: "width:40px;" }, []),
+      el("th", {}, ["Provider", el("br"), mkSelect("provider", provs)]),
+      el("th", {}, ["Model (Name & ID)", el("br"), mkText("model")]),
+      el("th", {}, ["Category", el("br"), mkSelect("category", cats)]),
+      el("th", {}, ["Input Cost ($/1M)"]),
+      el("th", {}, ["Output Cost ($/1M)"]),
+      el("th", {}, ["Cost Factor (1-100)"]),
+      el("th", {}, ["Status"]),
+      el("th", {}, ["Actions / Ref"]),
+    ]));
+    tbl.appendChild(thead);
+
+    const tbody = el("tbody");
+    models.forEach(m => {
+      const tr = el("tr");
+      const enabled = m.enabled !== false;
+      if (!enabled) tr.style.opacity = "0.5";
+
+      tr.appendChild(el("td", {}, [el("input", { type: "checkbox", class: "model-cb", value: m.id })]));
+      tr.appendChild(el("td", {}, [m.provider]));
+      tr.appendChild(el("td", {}, [el("strong", {}, [m.name || m.id]), el("br"), el("small", { class: "muted mono" }, [m.id])]));
+      tr.appendChild(el("td", {}, [el("span", { class: "badge" }, [m.tier || "Standard"])]));
+
+      const inVal = (m.input_cost || 0).toFixed(2);
+      const outVal = (m.output_cost || 0).toFixed(2);
+      tr.appendChild(el("td", { class: "mono" }, [inVal, el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:6px;" }, [m.input_source || "API"])]));
+      tr.appendChild(el("td", { class: "mono" }, [outVal, el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:6px;" }, [m.output_source || "API"])]));
+
+      const cf = m.cost_factor || 0;
+      let hc = "var(--accent-blue)";
+      if (cf > 20) hc = "var(--accent-yellow)";
+      if (cf > 50) hc = "var(--accent-red)";
+      tr.appendChild(el("td", { style: `color:${hc};font-weight:bold;` }, [cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left:6px;" }, ["Calc"])]));
+
+      const st = el("td");
+      if (m._fromModelsDev) {
+        // Synthetic row sourced live from models.dev via the per-provider
+        // override -- it isn't a real model-registry.json entry, so there's
+        // nothing to enable/disable here (manage the override above instead).
+        st.appendChild(el("span", { class: "badge ok", title: "Sourced from models.dev via the per-provider override above" }, ["models.dev"]));
+      } else {
+        const tb = el("button", {
+          class: "btn",
+          style: `padding:4px 10px;font-size:0.85em;background:${enabled ? "var(--accent-yellow)" : "var(--accent-green)"};color:#fff;border:none;border-radius:4px;`,
+          onclick: async () => {
+            tb.disabled = true;
+            const ep = enabled ? "/api/models/disable" : "/api/models/enable";
+            const r = await api.post(ep, { ids: [m.id] });
+            if (r && r.success !== false) { toast(enabled ? "Disabled" : "Enabled", "success"); await loadRegistry(); render(); }
+            else toast((r && r.error) || "Failed", "error");
+            tb.disabled = false;
+          }
+        }, [enabled ? "Disable" : "Enable"]);
+        st.appendChild(tb);
+      }
+      tr.appendChild(st);
+
+      const at = el("td");
+      if (m.source_url) at.appendChild(el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"]));
+      tr.appendChild(at);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    tableWrap.appendChild(tbl);
+  }
+
+  // =========================================================================
+  // models.dev Table
+  // =========================================================================
+  function renderModelsDevTable(parent) {
+    const d = state.modelsDev;
+    if (!d || !d.providers) {
+      parent.appendChild(el("div", { class: "empty" }, ["No models.dev data loaded."]));
+      return;
+    }
+
+    // Reverse lookup: models.dev provider id -> agent-meta provider name
+    // (e.g. "anthropic" -> "Claude"), used by getEffectiveModelsDevRows()
+    // below to resolve a provider id's per-provider source override.
+    const mdIdToProvName = Object.fromEntries(
+      Object.entries(PROVIDER_MAP).map(([name, mdId]) => [mdId, name])
+    );
+
+    /** Effective rows for provider id `pid`, honoring its per-provider
+     * source override: if the provider is configured and overridden to
+     * "registry", substitute registry-sourced rows instead of hiding the
+     * provider entirely (the previous behavior just filtered the row out,
+     * which meant the dropdown had no visible effect in some paths). */
+    function getEffectiveModelsDevRows(pid) {
+      const provName = mdIdToProvName[pid];
+      if (provName && effectiveModelSource(provName) === "registry") {
+        return state.registry
+          .filter(m => m.provider === pid)
+          .map(m => ({
+            id: m.id,
+            name: m.name || m.id,
+            cost: { input: m.input_cost, output: m.output_cost },
+            limit: {},
+            _providerId: pid,
+            _providerName: provName,
+            _curated: false,
+            _fromRegistry: true,
+          }));
+      }
+      const p = d.providers[pid];
+      if (!p || !p.models) return [];
+      return Object.values(p.models).map(m => ({
+        ...m, _providerId: pid, _providerName: p.name || provName || pid, _curated: p.source === "curated",
+      }));
+    }
+
+    // Candidate provider ids: real models.dev ids (e.g. "anthropic") plus
+    // curated ids synthesized server-side from pricing-overlay.yaml (e.g.
+    // "mammouth" — see admin-server.py _apply_pricing_overlay). A provider
+    // whose per-provider override is "registry" is no longer hidden here —
+    // getEffectiveModelsDevRows() substitutes registry-sourced rows for it
+    // instead, so the provider stays visible with the correct data.
+    const allProviderIdsRaw = Object.keys(d.providers).sort();
+    // Map configured agent-meta provider names → the provider id they'd
+    // appear under in d.providers (models.dev id via PROVIDER_MAP, or the
+    // lowercased name for a curated/registry-only provider like Mammouth).
+    const configuredProviderIds = new Set(
+      state.configuredProviders
+        .map(name => PROVIDER_MAP[name] || (REGISTRY_ONLY.has(name) ? name.toLowerCase() : null))
+        .filter(Boolean)
+    );
+
+    const allProviderIds = state.showAllProviders
+      ? allProviderIdsRaw
+      : allProviderIdsRaw.filter(id => configuredProviderIds.has(id));
+    const configuredFirst = allProviderIds.filter(id => configuredProviderIds.has(id));
+    const otherProviders = state.showAllProviders
+      ? allProviderIds.filter(id => !configuredProviderIds.has(id))
+      : [];
+
+    // Whether the configured-only candidate set has any real data at all
+    // (independent of active filters) — drives the dedicated empty state.
+    // Uses the EFFECTIVE rows (registry substitution included) so a
+    // provider overridden to "registry" with imported models still counts.
+    const configuredHasData = configuredFirst.some(pid => getEffectiveModelsDevRows(pid).length > 0);
+
+    // Provider quick-filter strip: configured providers first, then rest.
+    const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:8px;" });
+    const allBtn = el("button", { class: "badge" + (!state.filterProvider ? " active" : "") }, [
+      state.showAllProviders ? "All Providers" : "All Configured"
+    ]);
+    allBtn.addEventListener("click", () => { state.filterProvider = ""; render(); });
+    strip.appendChild(allBtn);
+
+    configuredFirst.forEach(pid => {
+      const p = d.providers[pid];
+      const count = getEffectiveModelsDevRows(pid).length;
+      const active = state.filterProvider === pid;
+      const btn = el("button", { class: "badge" + (active ? " active" : ""), style: "font-weight:600;" }, [p.name + " (" + count + ")"]);
+      btn.addEventListener("click", () => { state.filterProvider = pid; render(); });
+      strip.appendChild(btn);
+    });
+    // "Other" dropdown — only relevant once "Show all providers" is on.
+    if (otherProviders.length > 0) {
+      const sel = el("select", { style: "margin-left:4px;padding:2px 4px;background:var(--bg2);color:var(--fg);border:1px solid var(--border);border-radius:3px;max-width:180px;" });
+      sel.appendChild(el("option", { value: "" }, ["Other providers (" + otherProviders.length + ")"]));
+      otherProviders.forEach(pid => {
+        const p = d.providers[pid];
+        const opt = el("option", { value: pid }, [p.name + " (" + getEffectiveModelsDevRows(pid).length + ")"]);
+        if (state.filterProvider === pid) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", e => { state.filterProvider = e.target.value; render(); });
+      strip.appendChild(sel);
+    }
+    // "Show all providers" toggle — reuses the shared toggleField() slider,
+    // pushed to the far right of the flex strip.
+    strip.appendChild(el("span", { style: "margin-left:auto;font-size:0.82em;opacity:0.7;" }, ["Show all providers"]));
+    strip.appendChild(toggleField(state.showAllProviders, v => {
+      state.showAllProviders = v;
+      if (!v) state.filterProvider = "";
+      render();
+    }));
+    parent.appendChild(strip);
+
+    // Capability filters — wrapped in a quick-filter-strip so they inherit
+    // the same hover/active-blue styling as the provider strip above,
+    // instead of a bare unstyled badge row.
+    const ctrl = el("div", { style: "display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;" });
+    const capsStrip = el("div", { class: "quick-filter-strip", style: "margin:0;" });
+    for (const [k, label] of Object.entries({ reasoning: "🧠", toolCall: "🔧", attachment: "📎", vision: "👁", structured: "📋" })) {
+      const active = state.filterCap[k];
+      const btn = el("button", { class: "badge" + (active ? " active" : "") }, [label]);
+      btn.addEventListener("click", () => { state.filterCap[k] = !state.filterCap[k]; render(); });
+      capsStrip.appendChild(btn);
+    }
+    ctrl.appendChild(capsStrip);
+    parent.appendChild(ctrl);
+
+    // Collect models from the candidate provider set (respecting the
+    // active provider filter, if any).
+    const providerFilter = state.filterProvider ? d.providers[state.filterProvider] : null;
+    const provIds = providerFilter ? [state.filterProvider] : allProviderIds;
+    let allModels = [];
+    provIds.forEach(pid => { allModels.push(...getEffectiveModelsDevRows(pid)); });
+
+    // Apply model-name + capability filters
+    allModels = allModels.filter(m => {
+      const nm = ((m.name || "") + " " + (m.id || "") + " " + (m.description || "")).toLowerCase();
+      const q = state.filterModel.toLowerCase();
+      if (q && !nm.includes(q)) return false;
+      const mi = (m.modalities && m.modalities.input) || [];
+      const mo = (m.modalities && m.modalities.output) || [];
+      if (state.filterCap.reasoning && !m.reasoning) return false;
+      if (state.filterCap.toolCall && !m.tool_call) return false;
+      if (state.filterCap.attachment && !m.attachment) return false;
+      if (state.filterCap.vision && !mi.includes("image") && !mo.includes("image")) return false;
+      if (state.filterCap.structured && !m.structured_output) return false;
+      return true;
+    });
+
+    if (allModels.length === 0) {
+      if (!state.showAllProviders && !configuredHasData) {
+        parent.appendChild(el("div", { class: "empty" }, [
+          'No models.dev data for configured providers. Toggle "Show all providers" to browse the full catalog.'
+        ]));
+      } else {
+        parent.appendChild(el("div", { class: "empty" }, ["No models match filters."]));
+      }
+      return;
+    }
+
+    // Header inline filters — mirrors renderRegistryTable's mkSelect/mkText-in-<th> pattern.
+    const mkHeaderSelect = (opts, value, onChange) => {
+      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      s.appendChild(el("option", { value: "" }, ["All"]));
+      opts.forEach(o => {
+        const opt = el("option", { value: o.id }, [o.label]);
+        if (o.id === value) opt.selected = true;
+        s.appendChild(opt);
+      });
+      s.addEventListener("change", e => onChange(e.target.value));
+      return s;
+    };
+    const mkHeaderText = (value, onChange) => {
+      const inp = el("input", { type: "text", placeholder: "Filter...", value, style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      inp.addEventListener("input", e => onChange(e.target.value));
+      return inp;
+    };
+
+    // Table
+    const tbl = el("table", { class: "data" });
+    const thead = el("thead");
+    thead.appendChild(el("tr", {}, [
+      el("th", {}, ["Provider", el("br"), mkHeaderSelect(
+        allProviderIds.map(pid => ({ id: pid, label: (d.providers[pid].name || pid) + " (" + getEffectiveModelsDevRows(pid).length + ")" })),
+        state.filterProvider,
+        v => { state.filterProvider = v; render(); }
+      )]),
+      el("th", {}, ["Model (Name & ID)", el("br"), mkHeaderText(state.filterModel, v => { state.filterModel = v; render(); })]),
+      el("th", {}, ["Capabilities"]),
+      el("th", {}, ["Input Cost ($/1M)"]),
+      el("th", {}, ["Output Cost ($/1M)"]),
+      el("th", {}, ["Context"]),
+      el("th", {}, ["Source"]),
+      el("th", {}, ["Actions / Ref"]),
+    ]));
+    tbl.appendChild(thead);
+
+    const tbody = el("tbody");
+    allModels.forEach(m => {
+      const tr = el("tr");
+
+      tr.appendChild(el("td", {}, [m._providerName || m._providerId]));
+
+      const nm = el("td");
+      nm.appendChild(el("strong", {}, [m.name || m.id]));
+      nm.appendChild(el("br"));
+      nm.appendChild(el("small", { class: "muted mono" }, [m.id]));
+      if (m.description) nm.appendChild(el("div", { class: "muted", style: "font-size:0.8em;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" }, [m.description]));
+      tr.appendChild(nm);
+
+      const ct = el("td");
+      const cw = el("div", { style: "display:flex;gap:2px;flex-wrap:wrap;" });
+      const capBadge = (glyph, modifier) => el("span", { class: "badge" + (modifier ? " " + modifier : "") }, [glyph]);
+      if (m.reasoning) cw.appendChild(capBadge("🧠", "modern"));
+      if (m.tool_call) cw.appendChild(capBadge("🔧", "ok"));
+      if (m.attachment) cw.appendChild(capBadge("📎", "hybrid"));
+      if (m.structured_output) cw.appendChild(capBadge("📋", null));
+      const mi = (m.modalities && m.modalities.input) || [];
+      const mo = (m.modalities && m.modalities.output) || [];
+      if (mi.includes("image")) cw.appendChild(capBadge("👁", null));
+      if (mo.includes("image")) cw.appendChild(capBadge("🖼", null));
+      if (mi.includes("audio") || mo.includes("audio")) cw.appendChild(capBadge("🎤", null));
+      if (m.knowledge) cw.appendChild(el("span", { class: "badge optional" }, [m.knowledge]));
+      ct.appendChild(cw);
+      tr.appendChild(ct);
+
+      const co = m.cost || {};
+      tr.appendChild(el("td", { class: "mono" }, [fmtCost(co.input)]));
+      tr.appendChild(el("td", { class: "mono" }, [fmtCost(co.output)]));
+      tr.appendChild(el("td", { class: "mono" }, [fmtCtx((m.limit || {}).context)]));
+
+      // Source / provenance badge — mirrors the registry table's per-cost-cell
+      // badge ok / badge warn pattern so both tables communicate provenance
+      // the same way. Replaces the former strikethrough/opacity hack.
+      const srcTd = el("td");
+      if (d.source === "error") {
+        srcTd.appendChild(el("span", { class: "badge", style: "color:var(--accent-red);border-color:rgba(248,81,73,0.4);" }, ["unavailable"]));
+      } else if (m._fromRegistry) {
+        srcTd.appendChild(el("span", { class: "badge warn", title: "Per-provider override: sourced from model-registry.json" }, ["registry (override)"]));
+      } else if (m._curated) {
+        srcTd.appendChild(el("span", { class: "badge warn", title: "Not available in models.dev — registry only" }, ["Registry (curated)"]));
+      } else if (m._costSource === "overlay") {
+        srcTd.appendChild(el("span", { class: "badge warn" }, ["models.dev (overlay)"]));
+      } else {
+        srcTd.appendChild(el("span", { class: "badge ok" }, ["models.dev"]));
+      }
+      tr.appendChild(srcTd);
+
+      // Import button / Actions (unchanged logic, relocated to the last column)
+      const imp = el("td");
+      const inRegistry = state.registry.some(r => r.id === (m._providerId + "/" + m.id) || r.id === m.id);
+      if (inRegistry) {
+        imp.appendChild(el("span", { class: "badge ok" }, ["In Registry"]));
+      } else if (m.cost && m.cost.input != null) {
+        const impBtn = el("button", { class: "btn", style: "font-size:0.8em;padding:2px 8px;" }, ["Import"]);
+        impBtn.onclick = async () => {
+          impBtn.disabled = true;
+          impBtn.textContent = "...";
+          try {
+            const r = await api.post("/api/models-dev/import", { provider: m._providerId, model_id: m.id, name: m.name, input_cost: m.cost.input, output_cost: m.cost.output, context: (m.limit || {}).context });
+            if (r && r.success !== false) { toast("Imported — run sync.py", "success"); await loadRegistry(); render(); }
+            else toast((r && r.error) || "Import failed", "error");
+          } catch (e) { toast("Import error: " + e.message, "error"); }
+          impBtn.disabled = false;
+          impBtn.textContent = "Import";
+        };
+        imp.appendChild(impBtn);
+      } else {
+        imp.appendChild(el("span", { style: "font-size:0.8em;opacity:0.4;" }, ["No pricing"]));
+      }
+      tr.appendChild(imp);
+
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    parent.appendChild(tbl);
+    parent.appendChild(el("div", { style: "margin-top:8px;font-size:0.85em;opacity:0.5;" }, [allModels.length + " models shown"]));
+  }
+
+  // Data loading
+  async function loadRegistry() {
+    try { state.registry = (await api.get("/api/models")).models || []; } catch { state.registry = []; }
+  }
+  async function loadModelsDev() {
+    try {
+      // Fetch the full merged catalog (real models.dev providers + curated
+      // pricing-overlay.yaml providers). Default-scoping to configured
+      // providers and the "Show all providers" toggle are applied client-side
+      // in renderModelsDevTable so toggling doesn't require a re-fetch.
+      state.modelsDev = await api.get("/api/models-dev");
+    } catch { state.modelsDev = null; }
+  }
+  async function loadProviders() {
+    try {
+      // Configured providers for *this* project come from
+      // .meta-config/project.yaml → ai-providers (NOT config/ai-providers.yaml,
+      // which lists every provider agent-meta supports, not just this
+      // project's four).
+      const project = await loadProject();
+      const provs = project && Array.isArray(project["ai-providers"]) ? project["ai-providers"] : [];
+      state.configuredProviders = provs;
+    } catch { state.configuredProviders = []; }
+  }
+
+  // Init
+  await Promise.all([loadProviders(), loadRegistry(), loadModelsDev()]);
+  state.loading = false;
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Models & Pricing (Legacy — model-registry.json based)
+ * ========================================================================= */
+async function viewModelsLegacy() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Models & Pricing (Legacy)"]));
 
   let editMode = false;
   let modelsData = [];
@@ -6190,7 +6881,7 @@ async function viewTierPresets() {
   let modelsData = [];
   let currentTab = "resolved"; // "resolved" | "edit"
 
-  const TIERS = ["nano", "fast", "balanced", "powerful", "max"];
+  const TIERS = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
   // ---- Tab strip --------------------------------------------------------
   const tabStrip = el("div", { class: "btn-row", style: "margin-bottom: 16px; display: flex; gap: 8px;" });
@@ -6584,6 +7275,7 @@ async function init() {
   router.register("/project/model-mapping", viewModelMapping);
   router.register("/agents",    viewAgentTemplates);
   router.register("/models", viewModels);
+  router.register("/models-legacy", viewModelsLegacy);
   router.register("/provider-tiers", viewProviderTiers);
   router.register("/tier-presets", viewTierPresets);
 

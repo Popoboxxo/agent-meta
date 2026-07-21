@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-model: claude-haiku-4-5-20251001
+model: claude-sonnet-5
 ---
 
 > **Extension:** If `.claude/3-project/am-junior-developer-ext.md` exists → read and apply immediately.

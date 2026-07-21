@@ -4,7 +4,7 @@ description: 'Analyzes and classifies incoming bug reports and feature requests 
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

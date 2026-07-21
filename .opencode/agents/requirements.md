@@ -4,7 +4,7 @@ description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and 
   traceability.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

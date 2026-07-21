@@ -5,7 +5,7 @@ description: 'Analyzes system and application logs: frequency clustering, severi
   routing.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

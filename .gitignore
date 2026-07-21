@@ -5,6 +5,7 @@ __pycache__/
 .local/
 CLAUDE.personal.md
 sync.log
+package-lock.json
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/
@@ -50,3 +51,4 @@ docs/concepts/.local-Inputs/reqmanager-se.md
 # tokensave runtime cache files (never commit)
 .tokensave/*.db-shm
 .tokensave/*.db-wal
+node_modules/

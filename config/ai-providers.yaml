@@ -52,6 +52,7 @@ providers:
       balanced: claude-sonnet-5
       powerful: claude-opus-4-8
       max: claude-fable-5
+      ultra: claude-opus-4-8
     model-aliases:
       haiku: claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
@@ -106,6 +107,7 @@ providers:
       balanced: gemini-3.1-pro-low
       powerful: gemini-3.1-pro-high
       max: gemini-3.1-pro-high
+      ultra: gemini-3.1-pro-high
     model-aliases: {}
   Opencode:
     display-name: OpenCode
@@ -156,6 +158,7 @@ providers:
       balanced: opencode-go/deepseek-v4-pro
       powerful: opencode-go/kimi-k2.6
       max: opencode-go/kimi-k2.7-code
+      ultra: opencode-go/kimi-k2.7-code
     model-aliases:
       flash: opencode-go/deepseek-v4-flash
       qwen: opencode-go/qwen3.7-plus
@@ -269,4 +272,5 @@ providers:
       balanced: deepseek-v4-pro
       powerful: kimi-k2.6
       max: glm-5.2
+      ultra: glm-5.2
     model-aliases: {}

@@ -5,7 +5,7 @@ description: Read-only codebase research, dependency and impact mapping, file an
   symbol search.
 hint: Analyze codebase / dependencies / impact — read-only, delegates findings
 prompt_mode: modern
-model: gemini-3.1-pro-low
+model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

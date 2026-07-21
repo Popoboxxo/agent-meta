@@ -9,7 +9,7 @@ hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Mark
 tools:
 - code_execution
 based-on: 1-generic/developer.md@2.5.2
-model: gemini-3.1-pro-high
+model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

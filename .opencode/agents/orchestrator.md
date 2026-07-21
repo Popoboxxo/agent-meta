@@ -4,7 +4,7 @@ description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, pa
   delegates.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-pro
 permission:
   todowrite: allow
   task: allow
@@ -46,10 +46,10 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Intent | Ziel | Tier | Parallel |
 |--------|------|------|----------|
 | accessibility / a11y / WCAG / ARIA | `accessibility-specialist` | balanced | Ja |
-| Meta-Fragen / agent-meta / Agenten verwalten | `agent-meta-manager` | balanced | Nein |
-| Scout / neue Skills / Ökosystem | `agent-meta-scout` | balanced | Ja |
+| Meta-Fragen / agent-meta / Agenten verwalten | `agent-meta-manager` | fast | Nein |
+| Scout / neue Skills / Ökosystem | `agent-meta-scout` | fast | Ja |
 | API / OpenAPI / Contract-First | `api-specialist` | balanced | Nein |
-| Triage / Bug/Feature / klassifizieren | `bug-feature-analyzer` | balanced | Ja |
+| Triage / Bug/Feature / klassifizieren | `bug-feature-analyzer` | fast | Ja |
 | Claude / Claude Code | `claude-expert` | powerful | Nein |
 | Code Review / Code-Qualität / Audit | `code-reviewer` | powerful | Ja |
 | Konzept Review / Design Review | `concept-reviewer` | powerful | Ja |
@@ -58,38 +58,39 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | ETL / ELT / data pipeline / data quality | `data-engineer` | balanced | Ja |
 | database / schema / migration / query optimization | `database-engineer` | powerful | Nein |
 | dependency / license / SBOM / package audit | `dependency-auditor` | balanced | Ja |
-| Feature / Bugfix / Refactoring / Implementierung | `developer` | powerful | Ja |
+| Feature / Bugfix / Refactoring / Implementierung | `developer` | balanced | Ja |
 | CI/CD / Kubernetes / Infrastruktur | `devops-engineer` | fast | Ja |
 | Docker / Dev-Stack / Container | `docker` | fast | Nein |
 | Dokumentation / README / Docs / Doku | `documenter` | fast | Ja |
 | E2E / End-to-End / Browser-Test / visuelle Regression | `e2e-tester` | balanced | Ja |
 | Aufwand / Schätzung / Kosten | `effort-estimator` | fast | Nein |
-| Codebase / Dependencies / Impact / Recherche | `explorer` | balanced | Ja |
+| Codebase / Dependencies / Impact / Recherche | `explorer` | fast | Ja |
 | Export / Routing / Target | `export-manager` | fast | Nein |
 | Feature Lifecycle / komplexes Feature / Feature Pipeline | `feature` | balanced | Ja |
-| Feedback / Issue / Bug melden | `feedback` | fast | Nein |
-| Gemini / Antigravity | `gemini-expert` | powerful | Nein |
-| Git / Commit / Branch / Push | `git` | fast | Nein |
+| Feedback / Issue / Bug melden | `feedback` | nano | Nein |
+| Gemini / Antigravity | `gemini-expert` | balanced | Nein |
+| Git / Commit / Branch / Push | `git` | nano | Nein |
 | Design / Konzept / Architektur / Idee | `ideation` | balanced | Ja |
-| incident / outage / RCA / root cause | `incident-responder` | powerful | Nein |
+| incident / outage / RCA / root cause | `incident-responder` | balanced | Nein |
 | [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
 | Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
-| Log / Logs / Fehleranalyse | `log-analyzer` | balanced | Ja |
-| Mammouth / Mammouth Code | `mammouth-expert` | powerful | Nein |
+| Log / Logs / Fehleranalyse | `log-analyzer` | fast | Ja |
+| Mammouth / Mammouth Code | `mammouth-expert` | balanced | Nein |
 | Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |
-| Opencode | `opencode-expert` | powerful | Nein |
+| Opencode | `opencode-expert` | balanced | Nein |
 | Performance / Bottleneck / Optimierung | `performance-optimizer` | powerful | Nein |
-| Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten. | `principal-developer` | ultra | Nein |
+| Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten. | `principal-developer` | max | Nein |
 | backlog / user story / sprint planning / prioritization | `product-manager` | balanced | Nein |
-| Prompt / Prompt Engineering / Agenten-Definition | `prompt-engineer` | powerful | Nein |
+| Prompt / Prompt Engineering / Agenten-Definition | `prompt-engineer` | balanced | Nein |
 | refactoring / strangler fig / legacy modernization / code smell | `refactoring-specialist` | balanced | Nein |
-| Release / Version / Changelog | `release` | balanced | Nein |
-| Anforderungen / REQ-ID / Requirements | `requirements` | balanced | Nein |
+| Release / Version / Changelog | `release` | fast | Nein |
+| Anforderungen / REQ-ID / Requirements | `requirements` | fast | Nein |
 | Security / Audit / OWASP | `security-auditor` | powerful | Nein |
-| Komplex / Architektur / schwieriger Bug / Cross-Cutting | `senior-developer` | max | Nein |
+| Komplex / Architektur / schwieriger Bug / Cross-Cutting | `senior-developer` | powerful | Nein |
 | SLO / SLI / error budget / reliability | `sre-engineer` | balanced | Ja |
 | API reference / getting started / tutorial / SDK docs | `technical-writer` | fast | Ja |
 | UI / UX / Mockup / Design | `ui-ux-designer` | balanced | Ja |
+| Validierung / DoD / Traceability | `validator` | balanced | Nein |
 | Reflection-Loop | self (REPEAT_UNTIL) | balanced→powerful | Nein |
 | Nicht in Tabelle | User fragen | — | — |
 
@@ -194,39 +195,47 @@ SE mode: optional
 <!-- agent-meta:managed-begin -->
 | Agent | Responsibility | Tier | Parallel |
 |-------|----------------|------|----------|
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen | balanced | ❌ (atomar) |
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken | balanced | ✅ (Multi-Quellen) |
+| `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse. | balanced | ✅ (Multi-Tasks) |
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen | fast | ❌ (atomar) |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken | fast | ✅ (Multi-Quellen) |
 | `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. | balanced | ❌ (sequentiell) |
-| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation | balanced | ✅ (Multi-Issues) |
+| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation | fast | ✅ (Multi-Issues) |
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit. | powerful | ✅ (Multi-Prüfungen) |
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops | powerful | ✅ (Multi-Tasks) |
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
 | `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
-| `developer` | Feature-Implementierung und Bugfixes | powerful | ✅ (Multi-Dateien) |
+| `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer. | balanced | ✅ (Multi-Tasks) |
+| `developer` | Feature-Implementierung und Bugfixes | balanced | ✅ (Multi-Dateien) |
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. | fast | ✅ (Multi-Targets) |
+| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen | fast | ❌ (sequentiell) |
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen | fast | ✅ (Multi-Sections) |
 | `e2e-tester` | E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units | balanced | ✅ (Multi-Flows) |
 | `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung | fast | ❌ (sequentiell) |
-| `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche. | balanced | ✅ (Multi-Tasks) |
+| `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche. | fast | ✅ (Multi-Tasks) |
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. | fast | ❌ (sequentiell) |
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. | — | ✅ (intern) |
-| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung | fast | ❌ (atomar) |
-| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
-| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen | fast | ❌ (atomar) |
-| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements | — | ✅ (Multi-Aspekte) |
+| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User. | balanced | ✅ (intern) |
+| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung | nano | ❌ (atomar) |
+| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | balanced | ❌ (sequentiell) |
+| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen | nano | ❌ (atomar) |
+| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements | balanced | ✅ (Multi-Aspekte) |
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert | fast | ✅ (Multi-Tasks) |
-| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor | balanced | ✅ (Multi-Quellen) |
+| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor | fast | ✅ (Multi-Quellen) |
+| `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | balanced | ✅ (Multi-Tasks) |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen | fast | ❌ (atomar) |
-| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | powerful | ❌ (sequentiell) |
+| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | balanced | ❌ (sequentiell) |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max). | balanced | ❌ (Meta-Orchestrator) |
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. | powerful | ❌ (sequentiell) |
-| `prompt-engineer` | Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera). | powerful | ✅ (Multi-Tasks) |
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | balanced | ❌ (sequentiell) |
-| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | balanced | ❌ (sequentiell) |
-| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings | max | ✅ (Multi-Tasks) |
-| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | balanced | ✅ (Multi-Suites) |
+| `principal-developer` | Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten. | max | ✅ (Multi-Tasks) |
+| `prompt-engineer` | Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera). | balanced | ✅ (Multi-Tasks) |
+| `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene Rewrites. | balanced | ✅ (Multi-Tasks) |
+| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen | fast | ❌ (sequentiell) |
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen | fast | ❌ (sequentiell) |
+| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings | powerful | ✅ (Multi-Tasks) |
+| `technical-writer` | Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy. | fast | ✅ (Multi-Tasks) |
+| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern | fast | ✅ (Multi-Suites) |
 | `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. | balanced | ✅ (Multi-Entwürfe) |
+| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit | balanced | ❌ (Abhängigkeiten) |
 Parallel: max 4. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
 

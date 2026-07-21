@@ -1173,6 +1173,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models/active":
             return self._handle_get_models_active()
 
+        if path == "/api/models-dev":
+            return self._handle_get_models_dev()
+
         if path == "/api/ai-providers":
             return self._handle_get_ai_providers()
 
@@ -1327,6 +1330,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/models/update":
             return self._handle_post_models_update()
+
+        if path == "/api/models-dev/refresh":
+            return self._handle_post_models_dev_refresh()
+
+        if path == "/api/models-dev/import":
+            return self._handle_post_models_dev_import()
 
         if path == "/api/models/exclude":
             return self._handle_post_models_exclude()
@@ -1548,6 +1557,268 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             models = [m for m in self._collect_models() if m.get("enabled")]
             return self._send_json({"models": models})
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    # ------------------------------------------------------------------ #
+    # Models.dev integration (SDK primary, API fallback)                  #
+    # ------------------------------------------------------------------ #
+
+    def _load_models_dev_data(self) -> dict:
+        cache = getattr(self.__class__, '_models_dev_cache', None)
+        cache_ts = getattr(self.__class__, '_models_dev_cache_ts', 0)
+
+        if cache and cache.get('source') == 'sdk':
+            return cache
+        if cache and cache.get('source') == 'api' and (time.time() - cache_ts) < 3600:
+            return cache
+
+        sdk_data = self._load_from_sdk_snapshot()
+        if sdk_data:
+            self.__class__._models_dev_cache = sdk_data
+            self.__class__._models_dev_cache_ts = time.time()
+            return sdk_data
+
+        api_data = self._load_from_models_dev_api()
+        if api_data:
+            self.__class__._models_dev_cache = api_data
+            self.__class__._models_dev_cache_ts = time.time()
+            return api_data
+
+        if cache:
+            return cache
+        return {"source": "error", "error": "No data available", "providers": {}, "models": {}}
+
+    def _load_from_sdk_snapshot(self) -> dict | None:
+        try:
+            snapshot_path = resolve_asset(self.__class__.root, "node_modules",
+                                          "@opencode-ai", "models", "dist", "snapshot.js")
+            if not snapshot_path.exists():
+                return None
+
+            content = snapshot_path.read_text(encoding="utf-8")
+            prefix = 'JSON.parse("'
+            start = content.find(prefix)
+            if start == -1:
+                return None
+            start += len(prefix)
+            # Find closing ") before \nexport
+            end = content.find('")' + '\nexport', start)
+            if end == -1:
+                # Fallback: find last ") before export
+                export_pos = content.find('\nexport const providers', start)
+                if export_pos == -1:
+                    return None
+                end = content.rfind('")', start, export_pos)
+                if end == -1:
+                    return None
+
+            json_str = content[start:end]
+            # Unescape JS string: \" → "  \\ → \
+            json_str = json_str.replace('\\\\', '\x00bs\x00')
+            json_str = json_str.replace('\\"', '"')
+            json_str = json_str.replace('\x00bs\x00', '\\')
+            data = json.loads(json_str)
+
+            generated_at = ""
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("export const generatedAt = "):
+                    quote_start = stripped.find('"')
+                    if quote_start != -1:
+                        quote_end = stripped.find('"', quote_start + 1)
+                        if quote_end != -1:
+                            generated_at = stripped[quote_start + 1:quote_end]
+                    break
+
+            return {
+                "source": "sdk",
+                "generated_at": generated_at,
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception:
+            return None
+
+    def _load_from_models_dev_api(self) -> dict | None:
+        try:
+            from urllib.request import Request, urlopen
+
+            req = Request("https://models.dev/catalog.json",
+                          headers={"User-Agent": "agent-meta-admin/1.0"})
+            with urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            return {
+                "source": "api",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception:
+            return None
+
+    # Provider keys in ``config/pricing-overlay.yaml`` that never have a real
+    # models.dev catalog entry (subscription/flat-fee gateways with no public
+    # per-token pricing). Mirrors ``REGISTRY_ONLY`` in
+    # ``docs/ui/admin-ui.html`` — keep both lists in sync. Any other overlay
+    # key that doesn't match a live models.dev provider id is treated as
+    # inert legacy data and ignored here (e.g. a naming mismatch), so we
+    # never fabricate a phantom provider for real catalog entries.
+    CURATED_ONLY_PROVIDER_KEYS = {"mammouth", "continue"}
+
+    def _apply_pricing_overlay(self, providers: dict) -> dict:
+        """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
+
+        Two behaviors, mirroring how ``_collect_models`` already merges the
+        overlay into the Legacy registry view:
+
+        * **Override** — if the overlay's provider key matches a real
+          models.dev provider id (e.g. ``anthropic``), matching model ids get
+          their ``cost.input``/``cost.output`` replaced by the overlay value.
+          Overridden models are tagged ``_costSource: "overlay"`` so the UI
+          can surface provenance.
+        * **Curated** — if the overlay's provider key is listed in
+          ``CURATED_ONLY_PROVIDER_KEYS`` (no real models.dev catalog entry,
+          e.g. Mammouth — a flat-fee multi-model gateway with no public
+          per-token pricing), a synthetic provider node is added with
+          ``source: "curated"`` so the models.dev live view can render it
+          with a provenance badge instead of the previous strikethrough
+          workaround.
+
+        Returns a new dict; ``providers`` is not mutated in place (the caller
+        may hold a reference to the cached models.dev payload).
+        """
+        config_dir = resolve_asset(self.__class__.root, "config")
+        pricing_path = config_dir / "pricing-overlay.yaml"
+        if not pricing_path.exists():
+            return providers
+
+        try:
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            return providers
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+        if not isinstance(prices, dict):
+            return providers
+
+        merged = dict(providers)
+        for provider_key, provider_prices in prices.items():
+            if not isinstance(provider_prices, dict):
+                continue
+            model_entries = {
+                k: v for k, v in provider_prices.items()
+                if not k.startswith("_") and isinstance(v, dict)
+            }
+            if not model_entries:
+                continue
+
+            if provider_key in merged:
+                # Override path: real models.dev provider — patch matching models only.
+                provider_node = dict(merged[provider_key])
+                models = dict(provider_node.get("models", {}))
+                for model_id, price in model_entries.items():
+                    if model_id not in models:
+                        continue
+                    model = dict(models[model_id])
+                    cost = dict(model.get("cost") or {})
+                    if price.get("input") is not None:
+                        cost["input"] = price["input"]
+                    if price.get("output") is not None:
+                        cost["output"] = price["output"]
+                    model["cost"] = cost
+                    model["_costSource"] = "overlay"
+                    models[model_id] = model
+                provider_node["models"] = models
+                merged[provider_key] = provider_node
+            elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
+                # Curated path: no real models.dev slug for this provider.
+                curated_models = {}
+                for model_id, price in model_entries.items():
+                    curated_models[model_id] = {
+                        "id": model_id,
+                        "name": price.get("name") or model_id,
+                        "cost": {"input": price.get("input"), "output": price.get("output")},
+                    }
+                merged[provider_key] = {
+                    "name": provider_prices.get("_name") or provider_key.capitalize(),
+                    "models": curated_models,
+                    "source": "curated",
+                }
+            # else: overlay key doesn't match a real provider and isn't on
+            # the curated allow-list — inert legacy data, ignored.
+        return merged
+
+    def _handle_get_models_dev(self) -> None:
+        try:
+            raw = self._load_models_dev_data()
+            data = dict(raw)
+            providers = self._apply_pricing_overlay(dict(raw.get("providers", {})))
+            # Optional: filter to specific providers via ?providers=a,b,c.
+            # Applied AFTER the overlay merge so curated providers (and
+            # overlay overrides) are resolved against the full catalog —
+            # filtering first would make a curated key look "unmatched" and
+            # get miscategorized.
+            parsed = urlparse(self.path)
+            from urllib.parse import parse_qs
+            qs = parse_qs(parsed.query)
+            provider_filter = qs.get('providers', [None])[0]
+            if provider_filter:
+                requested = set(p.strip() for p in provider_filter.split(',') if p.strip())
+                if requested:
+                    providers = {k: v for k, v in providers.items() if k in requested}
+                    data['_filtered'] = True
+            data['providers'] = providers
+            return self._send_json(data)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_dev_refresh(self) -> None:
+        try:
+            for attr in ('_models_dev_cache', '_models_dev_cache_ts'):
+                if hasattr(self.__class__, attr):
+                    delattr(self.__class__, attr)
+            return self._send_json(self._load_models_dev_data())
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_dev_import(self) -> None:
+        """Import a model from models.dev into pricing-overlay.yaml."""
+        try:
+            body = self._read_body()
+            if not isinstance(body, dict):
+                raise ValueError("expected JSON body")
+            provider_id = body.get("provider", "").strip()
+            model_id = body.get("model_id", "").strip()
+            input_cost = body.get("input_cost")
+            output_cost = body.get("output_cost")
+            if not provider_id or not model_id:
+                raise ValueError("provider and model_id required")
+
+            config_dir = resolve_asset(self.__class__.root, "config")
+            pricing_path = config_dir / "pricing-overlay.yaml"
+
+            pricing = {}
+            if pricing_path.exists():
+                pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+            if not isinstance(pricing, dict):
+                pricing = {}
+            prices = pricing.setdefault("prices", {})
+            if not isinstance(prices, dict):
+                prices = {}
+                pricing["prices"] = prices
+            prov = prices.setdefault(provider_id, {})
+            if not isinstance(prov, dict):
+                prov = {}
+                prices[provider_id] = prov
+            prov[model_id] = {"input": float(input_cost) if input_cost is not None else 0.0,
+                              "output": float(output_cost) if output_cost is not None else 0.0}
+
+            # Atomic write with backup
+            self.__class__.config_manager._backup(pricing_path)
+            pricing_path.write_text(yaml.dump(pricing, default_flow_style=False, allow_unicode=True, sort_keys=False),
+                                    encoding="utf-8")
+            return self._send_json({"success": True, "provider": provider_id, "model_id": model_id})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 

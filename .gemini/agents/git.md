@@ -5,7 +5,7 @@ description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
 - code_execution
-model: gemini-3.5-flash-high
+model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

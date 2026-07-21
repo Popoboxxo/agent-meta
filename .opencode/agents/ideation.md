@@ -4,6 +4,7 @@ description: Idea generation, vision sharpening and concept concretization — a
   questions, thinks around corners, hands mature ideas to Requirements.
 prompt_mode: modern
 mode: subagent
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

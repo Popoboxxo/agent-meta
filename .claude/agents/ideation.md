@@ -13,6 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
+model: claude-sonnet-5
 ---
 
 > **Extension:** If `.claude/3-project/am-ideation-ext.md` exists → read and apply immediately.

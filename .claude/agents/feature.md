@@ -11,6 +11,7 @@ tools:
 - Read
 - Agent
 - TodoWrite
+model: claude-sonnet-5
 ---
 
 > **Extension:** If `.claude/3-project/am-feature-ext.md` exists → read and apply immediately.

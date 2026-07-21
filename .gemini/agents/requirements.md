@@ -5,7 +5,7 @@ description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and 
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
 prompt_mode: modern
-model: gemini-3.1-pro-low
+model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

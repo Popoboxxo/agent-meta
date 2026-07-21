@@ -4,7 +4,7 @@ description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwri
   — User-Flows statt isolierter Units.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

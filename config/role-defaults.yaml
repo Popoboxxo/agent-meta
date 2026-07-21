@@ -1,1031 +1,1388 @@
-# Central role defaults for agent-meta. Read by sync.py.
-# Fields: model, memory, permission_mode, steps, workflow_tier, temperature, max_tokens.
-# Project overrides live in .meta-config/project.yaml.
-
 roles:
-
   orchestrator:
-    model: "balanced"     # Routing/Delegation braucht Reasoning; balanced ist der richtige Kompromiss
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: required
-    description: "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max)."
+    description: Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen
+      Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation
+      (nano/fast/balanced/powerful/max).
     handoff:
-      output_contract: "task-spec-v1"
-      handoff_routing: "static"
-
+      output_contract: task-spec-v1
+      handoff_routing: static
   developer:
-    model: powerful          # erbt — oft das stärkste verfügbare Modell gewünscht
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: required
-    description: "Feature-Implementierung und Bugfixes"
+    description: Feature-Implementierung und Bugfixes
     routing:
-      intent_keywords: ["Feature", "Bugfix", "Refactoring", "Implementierung", "Code schreiben"]
-      parallel: true
-      orchestrator_only: false
-    handoff: &dev_handoff
-      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "db-schema-v1", "rca-report-v1", "slo-report-v1", "data-pipeline-v1", "a11y-audit-v1", "refactoring-plan-v1", "design-spec-v1", "api-spec-v1", "explorer-output-v1"]
-      output_contract: "dev-result-v1"
-      input_schema: "schemas/handoffs/task-spec.schema.json"
-      timeout_sec: 300
-
-  junior-developer:
-    model: fast              # günstige Stufe — triviale, klar umrissene Änderungen
-    memory: ""
-    workflow_tier: optional
-    description: "Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert"
-    routing:
-      intent_keywords: ["Trivialer Fix", "kleiner Fix", "≤2 Dateien"]
+      intent_keywords:
+      - Feature
+      - Bugfix
+      - Refactoring
+      - Implementierung
+      - Code schreiben
       parallel: true
       orchestrator_only: false
     handoff:
-      <<: *dev_handoff
-      timeout_sec: 120
-
-  intern-developer:
-    model: nano              # cheapest tier — it's a gag agent, spend nothing on it
-    memory: ""
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
+      timeout_sec: 300
+  junior-developer:
+    model: fast
+    memory: ''
     workflow_tier: optional
-    description: "[EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen."
+    description: Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) —
+      eskaliert strukturiert
     routing:
-      # NO intent_keywords — never auto-routed; invoke manually as a joke only
+      intent_keywords:
+      - Trivialer Fix
+      - kleiner Fix
+      - ≤2 Dateien
       parallel: true
       orchestrator_only: false
-
-  senior-developer:
-    model: max               # höchste Stufe — Architektur, komplexe Bugs, Risiko-Pfade
-    memory: project          # Architektur-Entscheidungen über Sessions hinweg erinnern
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
+      timeout_sec: 120
+  intern-developer:
+    model: nano
+    memory: ''
     workflow_tier: optional
-    description: "Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings"
+    description: '[EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht
+      fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only,
+      technisch harmlos. NICHT für echte Arbeit routen.'
     routing:
-      intent_keywords: ["Komplex", "Architektur", "schwieriger Bug", "Cross-Cutting"]
+      parallel: true
+      orchestrator_only: false
+  senior-developer:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings
+    routing:
+      intent_keywords:
+      - Komplex
+      - Architektur
+      - schwieriger Bug
+      - Cross-Cutting
       parallel: false
       orchestrator_only: false
     handoff:
-      <<: *dev_handoff
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
-
   principal-developer:
-    model: ultra             # ultra tier — LAST-RESORT escalation only, most expensive call in the system
-    memory: project          # Root-Cause- und Architektur-Entscheidungen über Sessions hinweg erinnern
+    model: max
+    memory: project
     workflow_tier: optional
-    description: "Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten."
+    description: Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach
+      gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit,
+      maximale Kosten.
     routing:
-      # NO intent_keywords — never auto-routed by keyword; only reached via escalation from a blocked reflection loop
       parallel: false
       orchestrator_only: true
     handoff:
-      <<: *dev_handoff
-      input_contracts: ["task-spec-v1", "review-output-v1", "e2e-result-v1", "blocked-review-v1"]
-      target_roles: []       # the buck stops here — no further delegation down
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - blocked-review-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 900
-
+      target_roles: []
   requirements:
-    model: balanced
+    model: fast
     memory: project
     workflow_tier: recommended
-    description: "Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen"
+    description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
     routing:
-      intent_keywords: ["Anforderungen", "REQ-ID", "Requirements"]
+      intent_keywords:
+      - Anforderungen
+      - REQ-ID
+      - Requirements
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["ideation-output-v1", "task-spec-v1", "backlog-v1"]
-      output_contract: "req-output-v1"
-      target_roles: ["developer", "tester"]
-
+      input_contracts:
+      - ideation-output-v1
+      - task-spec-v1
+      - backlog-v1
+      output_contract: req-output-v1
+      target_roles:
+      - developer
+      - tester
   ideation:
-    model: ""           # erbt
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: optional
-    description: "Neue Ideen explorieren, Vision schärfen, Übergabe an requirements"
+    description: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
     routing:
-      intent_keywords: ["Design", "Konzept", "Architektur", "Idee"]
+      intent_keywords:
+      - Design
+      - Konzept
+      - Architektur
+      - Idee
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "ideation-output-v1"
-      output_schema: "schemas/handoffs/ext/ideation-extension.schema.json"
-      target_roles: ["requirements"]
-
+      output_contract: ideation-output-v1
+      output_schema: schemas/handoffs/ext/ideation-extension.schema.json
+      target_roles:
+      - requirements
   feature:
-    model: ""           # erbt — koordiniert andere Agenten, kein eigenes Coding
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: recommended
-    description: "Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR. Wird vom Orchestrator gestartet, nicht direkt vom User."
+    description: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate
+      → PR. Wird vom Orchestrator gestartet, nicht direkt vom User.'
     routing:
-      intent_keywords: ["Feature Lifecycle", "komplexes Feature", "Feature Pipeline"]
+      intent_keywords:
+      - Feature Lifecycle
+      - komplexes Feature
+      - Feature Pipeline
       parallel: true
       orchestrator_only: true
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "feature-result-v1"
-
+      input_contracts:
+      - task-spec-v1
+      output_contract: feature-result-v1
   tester:
-    model: balanced
-    memory: ""
+    model: fast
+    memory: ''
     workflow_tier: recommended
-    description: "TDD, Test-Suite ausführen, Testabdeckung sichern"
+    description: TDD, Test-Suite ausführen, Testabdeckung sichern
     routing:
-      intent_keywords: ["Tests", "TDD", "Testabdeckung"]
+      intent_keywords:
+      - Tests
+      - TDD
+      - Testabdeckung
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "req-output-v1"]
-      output_contract: "test-result-v1"
-
+      input_contracts:
+      - task-spec-v1
+      - req-output-v1
+      output_contract: test-result-v1
   e2e-tester:
     model: balanced
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units"
+    description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
+      — User-Flows statt isolierter Units
     routing:
-      intent_keywords: ["E2E", "End-to-End", "Browser-Test", "visuelle Regression", "Accessibility", "a11y"]
+      intent_keywords:
+      - E2E
+      - End-to-End
+      - Browser-Test
+      - visuelle Regression
+      - Accessibility
+      - a11y
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "dev-result-v1"]
-      output_contract: "e2e-result-v1"
-      target_roles: ["developer"]
-
+      input_contracts:
+      - task-spec-v1
+      - dev-result-v1
+      output_contract: e2e-result-v1
+      target_roles:
+      - developer
   validator:
     model: balanced
     memory: project
     permission_mode: plan
     workflow_tier: recommended
-    description: "Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit"
+    description: Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit
     routing:
-      intent_keywords: ["Validierung", "DoD", "Traceability"]
+      intent_keywords:
+      - Validierung
+      - DoD
+      - Traceability
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "dev-result-v1"]
+      input_contracts:
+      - task-spec-v1
+      - dev-result-v1
       validate_handoff: true
-      output_schema: "schemas/a2a-handoff.schema.json"
-
+      output_schema: schemas/a2a-handoff.schema.json
   documenter:
     model: fast
     memory: project
     workflow_tier: recommended
-    description: "CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen"
+    description: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen
     routing:
-      intent_keywords: ["Dokumentation", "README", "Docs", "Doku"]
+      intent_keywords:
+      - Dokumentation
+      - README
+      - Docs
+      - Doku
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["slo-report-v1", "refactoring-plan-v1"]
-
+      input_contracts:
+      - slo-report-v1
+      - refactoring-plan-v1
   security-auditor:
     model: powerful
     memory: project
     permission_mode: plan
     workflow_tier: optional
-    description: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
+    description: 'Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain —
+      statische Analyse'
     routing:
-      intent_keywords: ["Security", "Audit", "OWASP"]
+      intent_keywords:
+      - Security
+      - Audit
+      - OWASP
       parallel: false
       orchestrator_only: false
-
   dependency-auditor:
-    model: balanced          # manifest scanning and categorization, no deep code reasoning
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: optional
-    description: "Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und veraltete/verwundbare Pakete — reicht Findings über feedback ein."
+    description: 'Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift
+      und veraltete/verwundbare Pakete — reicht Findings über feedback ein.'
     routing:
-      intent_keywords: ["dependency", "license", "SBOM", "package audit", "vulnerability", "outdated", "supply chain"]
+      intent_keywords:
+      - dependency
+      - license
+      - SBOM
+      - package audit
+      - vulnerability
+      - outdated
+      - supply chain
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "dependency-audit-v1"
-      target_roles: ["feedback"]
-
+      output_contract: dependency-audit-v1
+      target_roles:
+      - feedback
   agent-meta-scout:
-    model: balanced
+    model: fast
     memory: local
     workflow_tier: optional
-    description: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
+    description: 'Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns
+      entdecken'
     routing:
-      intent_keywords: ["Scout", "neue Skills", "Ökosystem"]
+      intent_keywords:
+      - Scout
+      - neue Skills
+      - Ökosystem
       parallel: true
       orchestrator_only: false
-
   prompt-engineer:
-    model: powerful
+    model: balanced
     memory: project
     workflow_tier: optional
-    description: "Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera)."
+    description: Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und
+      optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera).
     routing:
-      intent_keywords: ["Prompt", "Prompt Engineering", "Agenten-Definition"]
+      intent_keywords:
+      - Prompt
+      - Prompt Engineering
+      - Agenten-Definition
       parallel: false
       orchestrator_only: false
-
   agent-meta-manager:
-    model: balanced
-    memory: ""
-    workflow_tier: optional
-    description: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
-    routing:
-      intent_keywords: ["Meta-Fragen", "agent-meta", "Agenten verwalten"]
-      parallel: false
-      orchestrator_only: false
-
-
-  release:
-    model: balanced
-    memory: ""
-    workflow_tier: optional
-    description: "Versioning, Changelog, Build-Artifact, GitHub Release erstellen"
-    routing:
-      intent_keywords: ["Release", "Version", "Changelog"]
-      parallel: false
-      orchestrator_only: false
-
-  git:
     model: fast
-    memory: ""
-    workflow_tier: required
-    description: "Commits, Branches, Tags, Push/Pull und alle Git-Operationen"
+    memory: ''
+    workflow_tier: optional
+    description: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische
+      Agenten anlegen'
     routing:
-      intent_keywords: ["Git", "Commit", "Branch", "Push", "Pull"]
+      intent_keywords:
+      - Meta-Fragen
+      - agent-meta
+      - Agenten verwalten
       parallel: false
       orchestrator_only: false
-
+  release:
+    model: fast
+    memory: ''
+    workflow_tier: optional
+    description: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
+    routing:
+      intent_keywords:
+      - Release
+      - Version
+      - Changelog
+      parallel: false
+      orchestrator_only: false
+  git:
+    model: nano
+    memory: ''
+    workflow_tier: required
+    description: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
+    routing:
+      intent_keywords:
+      - Git
+      - Commit
+      - Branch
+      - Push
+      - Pull
+      parallel: false
+      orchestrator_only: false
   meta-feedback:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen"
+    description: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
     routing:
-      intent_keywords: ["Meta-Feedback", "Verbesserung"]
+      intent_keywords:
+      - Meta-Feedback
+      - Verbesserung
       parallel: false
       orchestrator_only: false
-
   docker:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen"
+    description: Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles
+      erstellen
     routing:
-      intent_keywords: ["Docker", "Dev-Stack", "Container"]
+      intent_keywords:
+      - Docker
+      - Dev-Stack
+      - Container
       parallel: false
       orchestrator_only: false
-
   log-analyzer:
-    model: balanced
-    memory: ""
+    model: fast
+    memory: ''
     workflow_tier: required
-    description: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
+    description: 'System- und Applikations-Logs analysieren: Frequency-Clustering,
+      Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor'
     routing:
-      intent_keywords: ["Log", "Logs", "Fehleranalyse"]
+      intent_keywords:
+      - Log
+      - Logs
+      - Fehleranalyse
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "log-analysis-v1"
-      target_roles: ["incident-responder"]
-
+      output_contract: log-analysis-v1
+      target_roles:
+      - incident-responder
   incident-responder:
-    model: powerful          # incident coordination under pressure — deep reasoning required
-    memory: project          # remember prior incidents and their root causes across sessions
-    workflow_tier: optional
-    description: "Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schritte aus, liefert RCA-Report und priorisierte Hotfix-Liste unter Zeitdruck."
-    routing:
-      intent_keywords: ["incident", "outage", "RCA", "root cause", "post-mortem", "hotfix", "P0", "P1"]
-      parallel: false
-      orchestrator_only: false
-    handoff:
-      input_contracts: ["log-analysis-v1"]
-      output_contract: "rca-report-v1"
-      target_roles: ["developer", "documenter"]
-
-  feedback:
-    model: fast
-    memory: ""
-    workflow_tier: required
-    description: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
-    routing:
-      intent_keywords: ["Feedback", "Issue", "Bug melden"]
-      parallel: false
-      orchestrator_only: false
-    handoff:
-      input_contracts: ["dependency-audit-v1"]
-
-  bug-feature-analyzer:
     model: balanced
-    memory: ""
-    workflow_tier: recommended
-    description: "Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation"
+    memory: project
+    workflow_tier: optional
+    description: 'Live-Incident-Koordination: korreliert Logs und Metriken, führt
+      Runbook-Schritte aus, liefert RCA-Report und priorisierte Hotfix-Liste unter
+      Zeitdruck.'
     routing:
-      intent_keywords: ["Triage", "Bug/Feature", "klassifizieren"]
+      intent_keywords:
+      - incident
+      - outage
+      - RCA
+      - root cause
+      - post-mortem
+      - hotfix
+      - P0
+      - P1
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - log-analysis-v1
+      output_contract: rca-report-v1
+      target_roles:
+      - developer
+      - documenter
+  feedback:
+    model: nano
+    memory: ''
+    workflow_tier: required
+    description: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
+      als GitHub Issues einreichen — immer vor git für Issue-Erstellung'
+    routing:
+      intent_keywords:
+      - Feedback
+      - Issue
+      - Bug melden
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - dependency-audit-v1
+  bug-feature-analyzer:
+    model: fast
+    memory: ''
+    workflow_tier: recommended
+    description: 'Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren
+      und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation'
+    routing:
+      intent_keywords:
+      - Triage
+      - Bug/Feature
+      - klassifizieren
       parallel: true
       orchestrator_only: true
-
   openscad-developer:
     model: balanced
     memory: local
     workflow_tier: optional
-    description: "Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung"
-
+    description: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
+      via MCP, Druck-Optimierung
   se-requirements:
     model: balanced
     memory: project
     workflow_tier: optional
-    description: "Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement."
+    description: Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement.
     routing:
-      intent_keywords: ["SE Requirements", "Stakeholder Needs"]
+      intent_keywords:
+      - SE Requirements
+      - Stakeholder Needs
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "critic-result-v1"]
-      output_contract: "se-req-output-v1"
-      target_roles: ["se-critic"]
-
+      input_contracts:
+      - task-spec-v1
+      - critic-result-v1
+      output_contract: se-req-output-v1
+      target_roles:
+      - se-critic
   se-architect:
     model: powerful
     memory: project
     workflow_tier: optional
-    description: "Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität)."
+    description: Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen
+      (CQRS, Orthogonalität).
     routing:
-      intent_keywords: ["SE Architektur", "Decomposition"]
+      intent_keywords:
+      - SE Architektur
+      - Decomposition
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "critic-result-v1"]
-      output_contract: "se-arch-output-v1"
-      output_schema: "schemas/se-decomposition.schema.json"
-      target_roles: ["se-critic"]
-
+      input_contracts:
+      - task-spec-v1
+      - critic-result-v1
+      output_contract: se-arch-output-v1
+      output_schema: schemas/se-decomposition.schema.json
+      target_roles:
+      - se-critic
   se-critic:
     model: powerful
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit."
+    description: Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz
+      und Testbarkeit.
     routing:
-      intent_keywords: ["SE Critic", "Architektur Review"]
+      intent_keywords:
+      - SE Critic
+      - Architektur Review
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["se-arch-output-v1", "se-req-output-v1"]
-      output_contract: "critic-result-v1"
-      target_roles: ["se-architect", "se-requirements", "se-interface-mgr"]
-
+      input_contracts:
+      - se-arch-output-v1
+      - se-req-output-v1
+      output_contract: critic-result-v1
+      target_roles:
+      - se-architect
+      - se-requirements
+      - se-interface-mgr
   se-interface-mgr:
-    model: balanced
+    model: fast
     memory: project
     workflow_tier: optional
-    description: "Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend."
+    description: Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend.
     routing:
-      intent_keywords: ["SE Interface", "Schnittstellen"]
+      intent_keywords:
+      - SE Interface
+      - Schnittstellen
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["critic-result-v1"]
-      output_contract: "interface-result-v1"
-      target_roles: ["se-termination"]
-
+      input_contracts:
+      - critic-result-v1
+      output_contract: interface-result-v1
+      target_roles:
+      - se-termination
   se-termination:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde."
+    description: Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht
+      wurde.
     routing:
-      intent_keywords: ["SE Termination"]
+      intent_keywords:
+      - SE Termination
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["interface-result-v1"]
-      output_contract: "termination-result-v1"
-
+      input_contracts:
+      - interface-result-v1
+      output_contract: termination-result-v1
   se-junior-developer:
-    model: fast              # günstige Stufe — triviale SE-Leafs, 0-1 Interfaces
-    memory: ""
+    model: fast
+    memory: ''
     workflow_tier: optional
     parallel: true
-    description: "Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert"
+    description: Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting)
+      — eskaliert strukturiert
     routing:
-      intent_keywords: ["SE trivial", "SE Leaf"]
+      intent_keywords:
+      - SE trivial
+      - SE Leaf
       parallel: true
       orchestrator_only: false
     handoff:
-      <<: *dev_handoff
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 120
-
   se-developer:
-    model: powerful          # Standard-SE-Leafs mit mehreren Interfaces
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: optional
     parallel: true
-    description: "Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin"
+    description: Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin
     routing:
-      intent_keywords: ["SE Implementierung", "SE Leaf"]
+      intent_keywords:
+      - SE Implementierung
+      - SE Leaf
       parallel: true
       orchestrator_only: false
     handoff:
-      <<: *dev_handoff
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
-
   se-senior-developer:
-    model: max               # höchste Stufe — komplexe SE-Leafs, cross-cutting, boundary-level
-    memory: project          # Architektur-/Interface-Entscheidungen über Sessions hinweg erinnern
+    model: powerful
+    memory: project
     workflow_tier: optional
     parallel: true
-    description: "Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse"
+    description: Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level,
+      security/performance-critical) mit Pre-Implementation Interface-Analyse
     routing:
-      intent_keywords: ["SE komplex", "SE Boundary"]
+      intent_keywords:
+      - SE komplex
+      - SE Boundary
       parallel: true
       orchestrator_only: false
     handoff:
-      <<: *dev_handoff
+      input_contracts:
+      - task-spec-v1
+      - review-output-v1
+      - e2e-result-v1
+      - db-schema-v1
+      - rca-report-v1
+      - slo-report-v1
+      - data-pipeline-v1
+      - a11y-audit-v1
+      - refactoring-plan-v1
+      - design-spec-v1
+      - api-spec-v1
+      - explorer-output-v1
+      output_contract: dev-result-v1
+      input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
-
   se-test-engineer:
     model: balanced
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel."
+    description: Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den
+      rechten V-Modell-Flügel.
     routing:
-      intent_keywords: ["SE Test", "MBSE Tests"]
+      intent_keywords:
+      - SE Test
+      - MBSE Tests
       parallel: true
       orchestrator_only: false
-
   se-testreviewer:
     model: powerful
-    memory: ""
+    memory: ''
     permission_mode: plan
     workflow_tier: optional
-    description: "Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness."
+    description: Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen
+      und Flakiness.
     routing:
-      intent_keywords: ["SE Test Review"]
+      intent_keywords:
+      - SE Test Review
       parallel: true
       orchestrator_only: false
-
   se-verifier:
     model: balanced
     memory: project
     workflow_tier: optional
-    description: "Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen."
+    description: 'Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen
+      Architektur-Spezifikationen.'
     routing:
-      intent_keywords: ["SE Verification"]
+      intent_keywords:
+      - SE Verification
       parallel: true
       orchestrator_only: false
-
   se-validator:
     model: powerful
     memory: project
     workflow_tier: optional
-    description: "L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse."
+    description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse.'
     routing:
-      intent_keywords: ["SE Validation"]
+      intent_keywords:
+      - SE Validation
       parallel: false
       orchestrator_only: false
-
   se-integration-and-test-manager:
     model: balanced
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen."
+    description: 'V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert
+      Test-Ebenen.'
     routing:
-      intent_keywords: ["SE Integration", "V&V"]
+      intent_keywords:
+      - SE Integration
+      - V&V
       parallel: false
       orchestrator_only: false
-
   code-reviewer:
     model: powerful
     memory: project
     permission_mode: plan
     workflow_tier: recommended
-    description: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+    description: 'Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung,
+      Code-Qualitäts-Audit.'
     routing:
-      intent_keywords: ["Code Review", "Code-Qualität", "Audit"]
+      intent_keywords:
+      - Code Review
+      - Code-Qualität
+      - Audit
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["dev-result-v1"]
-      output_contract: "review-output-v1"
-      output_schema: "schemas/handoffs/ext/review-extension.schema.json"
-      target_roles: ["developer"]
-
+      input_contracts:
+      - dev-result-v1
+      output_contract: review-output-v1
+      output_schema: schemas/handoffs/ext/review-extension.schema.json
+      target_roles:
+      - developer
   concept-reviewer:
     model: powerful
-    memory: ""
+    memory: ''
     permission_mode: plan
     workflow_tier: optional
-    description: "Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops"
+    description: 'Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit,
+      Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback
+      für Review-Loops'
     routing:
-      intent_keywords: ["Konzept Review", "Design Review"]
+      intent_keywords:
+      - Konzept Review
+      - Design Review
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["ideation-output-v1"]
-      output_contract: "concept-review-v1"
-
+      input_contracts:
+      - ideation-output-v1
+      output_contract: concept-review-v1
   ui-ux-designer:
     model: balanced
     memory: project
     workflow_tier: optional
-    description: "UI-Spezifikationen, Mockups und Design-Systeme erstellen."
+    description: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
     routing:
-      intent_keywords: ["UI", "UX", "Mockup", "Design"]
+      intent_keywords:
+      - UI
+      - UX
+      - Mockup
+      - Design
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "design-spec-v1"
-      output_schema: "schemas/handoffs/ext/design-extension.schema.json"
-      target_roles: ["developer"]
-
+      output_contract: design-spec-v1
+      output_schema: schemas/handoffs/ext/design-extension.schema.json
+      target_roles:
+      - developer
   api-specialist:
     model: balanced
     memory: project
     workflow_tier: optional
-    description: "OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen."
+    description: OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen.
     routing:
-      intent_keywords: ["API", "OpenAPI", "Contract-First"]
+      intent_keywords:
+      - API
+      - OpenAPI
+      - Contract-First
       parallel: false
       orchestrator_only: false
     handoff:
-      output_contract: "api-spec-v1"
-      output_schema: "schemas/handoffs/ext/api-extension.schema.json"
-      target_roles: ["developer"]
-
+      output_contract: api-spec-v1
+      output_schema: schemas/handoffs/ext/api-extension.schema.json
+      target_roles:
+      - developer
   database-engineer:
-    model: powerful          # schema design and migration safety warrant deep reasoning
-    memory: project          # remember schema decisions and migration history across sessions
+    model: powerful
+    memory: project
     workflow_tier: optional
-    description: "Relationales Schema-Design, Datenbank-Migrationen, Query-Optimierung und Index-Strategie — übergibt einen rückwärtskompatiblen Schema-Vertrag an developer."
+    description: Relationales Schema-Design, Datenbank-Migrationen, Query-Optimierung
+      und Index-Strategie — übergibt einen rückwärtskompatiblen Schema-Vertrag an
+      developer.
     routing:
-      intent_keywords: ["database", "schema", "migration", "query optimization", "index", "SQL", "db-design"]
+      intent_keywords:
+      - database
+      - schema
+      - migration
+      - query optimization
+      - index
+      - SQL
+      - db-design
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["req-output-v1", "api-spec-v1"]
-      output_contract: "db-schema-v1"
-      target_roles: ["developer"]
-
+      input_contracts:
+      - req-output-v1
+      - api-spec-v1
+      output_contract: db-schema-v1
+      target_roles:
+      - developer
   devops-engineer:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "CI/CD, Infrastructure as Code, Kubernetes, Observability."
+    description: CI/CD, Infrastructure as Code, Kubernetes, Observability.
     routing:
-      intent_keywords: ["CI/CD", "Kubernetes", "Infrastruktur"]
+      intent_keywords:
+      - CI/CD
+      - Kubernetes
+      - Infrastruktur
       parallel: true
       orchestrator_only: false
-
   sre-engineer:
-    model: balanced          # proactive reliability discipline needs solid reasoning, not max cost
-    memory: project          # remember SLOs, error budgets and reliability decisions across sessions
+    model: balanced
+    memory: project
     workflow_tier: optional
-    description: "Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets, Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment."
+    description: 'Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets,
+      Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment.'
     routing:
-      intent_keywords: ["SLO", "SLI", "error budget", "reliability", "runbook", "capacity planning", "toil", "post-mortem"]
+      intent_keywords:
+      - SLO
+      - SLI
+      - error budget
+      - reliability
+      - runbook
+      - capacity planning
+      - toil
+      - post-mortem
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "slo-report-v1"
-      target_roles: ["developer", "documenter"]
-
+      output_contract: slo-report-v1
+      target_roles:
+      - developer
+      - documenter
   technical-writer:
-    model: fast              # documentation writing, no deep code reasoning required
-    memory: project          # remember doc structure and terminology across sessions
+    model: fast
+    memory: project
     workflow_tier: optional
-    description: "Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy."
+    description: 'Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started,
+      SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy.'
     routing:
-      intent_keywords: ["API reference", "getting started", "tutorial", "SDK docs", "release notes", "quickstart", "user guide", "microcopy"]
+      intent_keywords:
+      - API reference
+      - getting started
+      - tutorial
+      - SDK docs
+      - release notes
+      - quickstart
+      - user guide
+      - microcopy
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "external-doc-v1"
-
+      output_contract: external-doc-v1
   data-engineer:
-    model: balanced          # pipeline design and data quality reasoning without max cost
-    memory: project          # remember pipeline topology and data contracts across sessions
+    model: balanced
+    memory: project
     workflow_tier: optional
-    description: "ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer."
+    description: ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks,
+      Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer.
     routing:
-      intent_keywords: ["ETL", "ELT", "data pipeline", "data quality", "lineage", "streaming", "batch", "schema registry"]
+      intent_keywords:
+      - ETL
+      - ELT
+      - data pipeline
+      - data quality
+      - lineage
+      - streaming
+      - batch
+      - schema registry
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "data-pipeline-v1"
-      target_roles: ["developer"]
-
+      output_contract: data-pipeline-v1
+      target_roles:
+      - developer
   accessibility-specialist:
-    model: balanced          # WCAG mapping and ARIA reasoning without max cost
-    memory: ""
+    model: balanced
+    memory: ''
     workflow_tier: optional
-    description: "WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse."
+    description: WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation,
+      Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse.
     routing:
-      intent_keywords: ["accessibility", "a11y", "WCAG", "ARIA", "screen reader", "keyboard navigation", "color contrast", "focus management"]
+      intent_keywords:
+      - accessibility
+      - a11y
+      - WCAG
+      - ARIA
+      - screen reader
+      - keyboard navigation
+      - color contrast
+      - focus management
       parallel: true
       orchestrator_only: false
     handoff:
-      output_contract: "a11y-audit-v1"
-      target_roles: ["developer"]
-
+      output_contract: a11y-audit-v1
+      target_roles:
+      - developer
   refactoring-specialist:
-    model: balanced          # systematic transformation reasoning; exclusive module access
-    memory: project          # remember transformation sequence and compatibility state across sessions
+    model: balanced
+    memory: project
     workflow_tier: optional
-    description: "Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene Rewrites."
+    description: 'Systematische großflächige Code-Transformation mit Sicherheitsnetz:
+      Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene
+      Rewrites.'
     routing:
-      intent_keywords: ["refactoring", "strangler fig", "legacy modernization", "code smell", "systematic transformation", "framework upgrade"]
+      intent_keywords:
+      - refactoring
+      - strangler fig
+      - legacy modernization
+      - code smell
+      - systematic transformation
+      - framework upgrade
       parallel: false
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1", "explorer-output-v1"]
-      output_contract: "refactoring-plan-v1"
-      target_roles: ["developer", "documenter"]
-
+      input_contracts:
+      - task-spec-v1
+      - explorer-output-v1
+      output_contract: refactoring-plan-v1
+      target_roles:
+      - developer
+      - documenter
   product-manager:
-    model: balanced          # prioritization and stakeholder reasoning without max cost
-    memory: project          # remember backlog, roadmap and priorities across sessions
+    model: balanced
+    memory: project
     workflow_tier: optional
-    description: "Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation."
+    description: 'Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung,
+      Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation.'
     routing:
-      intent_keywords: ["backlog", "user story", "sprint planning", "prioritization", "RICE", "MoSCoW", "roadmap", "KPI"]
+      intent_keywords:
+      - backlog
+      - user story
+      - sprint planning
+      - prioritization
+      - RICE
+      - MoSCoW
+      - roadmap
+      - KPI
       parallel: false
       orchestrator_only: false
     handoff:
-      output_contract: "backlog-v1"
-      target_roles: ["requirements"]
-
+      output_contract: backlog-v1
+      target_roles:
+      - requirements
   performance-optimizer:
     model: powerful
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung."
+    description: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
     routing:
-      intent_keywords: ["Performance", "Bottleneck", "Optimierung"]
+      intent_keywords:
+      - Performance
+      - Bottleneck
+      - Optimierung
       parallel: false
       orchestrator_only: false
-
   export-manager:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."
+    description: 'Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray,
+      Notion.'
     routing:
-      intent_keywords: ["Export", "Routing", "Target"]
+      intent_keywords:
+      - Export
+      - Routing
+      - Target
       parallel: false
       orchestrator_only: false
-
   effort-estimator:
     model: fast
-    memory: ""
+    memory: ''
     workflow_tier: optional
-    description: "Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung"
+    description: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ
+      und LLM-Kalibrierung
     routing:
-      intent_keywords: ["Aufwand", "Schätzung", "Kosten"]
+      intent_keywords:
+      - Aufwand
+      - Schätzung
+      - Kosten
       parallel: false
       orchestrator_only: false
-
   explorer:
-    model: balanced
-    memory: ""
+    model: fast
+    memory: ''
     workflow_tier: optional
-    description: "Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche."
+    description: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
+      und Symbol-Suche.
     routing:
-      intent_keywords: ["Codebase", "Dependencies", "Impact", "Recherche"]
+      intent_keywords:
+      - Codebase
+      - Dependencies
+      - Impact
+      - Recherche
       parallel: true
       orchestrator_only: false
     handoff:
-      input_contracts: ["task-spec-v1"]
-      output_contract: "explorer-output-v1"
-      target_roles: ["developer", "ideation", "code-reviewer"]
-
+      input_contracts:
+      - task-spec-v1
+      output_contract: explorer-output-v1
+      target_roles:
+      - developer
+      - ideation
+      - code-reviewer
   claude-expert:
     model: powerful
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise,
+      Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen
+      Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Claude", "Claude Code"]
+      intent_keywords:
+      - Claude
+      - Claude Code
       parallel: false
       orchestrator_only: false
-
   gemini-expert:
-    model: powerful
+    model: balanced
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
+      Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs)
+      zur optimalen Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Gemini", "Antigravity"]
+      intent_keywords:
+      - Gemini
+      - Antigravity
       parallel: false
       orchestrator_only: false
-
   opencode-expert:
-    model: powerful
+    model: balanced
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise,
+      Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen
+      Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Opencode"]
+      intent_keywords:
+      - Opencode
       parallel: false
       orchestrator_only: false
-
   continue-expert:
     model: powerful
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise,
+      Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen
+      Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Continue"]
+      intent_keywords:
+      - Continue
       parallel: false
       orchestrator_only: false
-
   copilot-expert:
     model: powerful
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise,
+      Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur
+      optimalen Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Copilot", "GitHub Copilot"]
+      intent_keywords:
+      - Copilot
+      - GitHub Copilot
       parallel: false
       orchestrator_only: false
-
   mammouth-expert:
-    model: powerful
+    model: balanced
     memory: project
     workflow_tier: optional
-    description: "Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+    description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
+      Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen
+      Anpassung von agent-meta.'
     routing:
-      intent_keywords: ["Mammouth", "Mammouth Code"]
+      intent_keywords:
+      - Mammouth
+      - Mammouth Code
       parallel: false
       orchestrator_only: false
-
 outcome-caching:
   enabled: false
   ttl_seconds: 3600
   max_entries: 100
   invalidation: git-commit
-
 reflection_pairs:
-  - id: dev-review-loop
-    generator: developer
-    critic: code-reviewer
-    max_iterations: 3
-    # After max_iterations without a passing review, escalate to the last-resort
-    # tier (principal-developer) instead of bouncing back to the orchestrator.
-    on_blocked: escalate_to_principal-developer
-
-  - id: se-requirements-loop
-    generator: se-requirements
-    critic: se-critic
-    max_iterations: 3
-
-  - id: se-architect-loop
-    generator: se-architect
-    critic: se-critic
-    max_iterations: 3
-
-  - id: se-test-loop
-    generator: se-test-engineer
-    critic: se-testreviewer
-    max_iterations: 3
-
-  - id: se-dev-review-loop
-    generator: se-developer
-    critic: code-reviewer
-    max_iterations: 3
-    on_blocked: escalate_to_orchestrator
-
-
+- id: dev-review-loop
+  generator: developer
+  critic: code-reviewer
+  max_iterations: 3
+  on_blocked: escalate_to_principal-developer
+- id: se-requirements-loop
+  generator: se-requirements
+  critic: se-critic
+  max_iterations: 3
+- id: se-architect-loop
+  generator: se-architect
+  critic: se-critic
+  max_iterations: 3
+- id: se-test-loop
+  generator: se-test-engineer
+  critic: se-testreviewer
+  max_iterations: 3
+- id: se-dev-review-loop
+  generator: se-developer
+  critic: code-reviewer
+  max_iterations: 3
+  on_blocked: escalate_to_orchestrator
 quality_pipelines:
   standard-feature:
-    description: "Full feature lifecycle with TDD, review, and PR"
-    signal_keywords: ["Feature implementieren", "Feature bauen", "neues Feature", "Funktion bauen"]
+    description: Full feature lifecycle with TDD, review, and PR
+    signal_keywords:
+    - Feature implementieren
+    - Feature bauen
+    - neues Feature
+    - Funktion bauen
     stages:
-      - id: branch
-        agent: git
-        task: "Feature-Branch anlegen"
-        mode: sequential
-      - id: implement
-        agent: developer
-        task: "Feature implementieren"
-        mode: sequential
-      - id: review
-        agent: developer
-        task: "Code schreiben und Review-Feedback einarbeiten"
-        mode: loop
-        loop:
-          generator: developer
-          critic: code-reviewer
-          max_iterations: 3
-      - id: commit
-        agent: git
-        task: "Commit + Push + PR"
-        mode: sequential
+    - id: branch
+      agent: git
+      task: Feature-Branch anlegen
+      mode: sequential
+    - id: implement
+      agent: developer
+      task: Feature implementieren
+      mode: sequential
+    - id: review
+      agent: developer
+      task: Code schreiben und Review-Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 3
+    - id: commit
+      agent: git
+      task: Commit + Push + PR
+      mode: sequential
     on_error: escalate_to_orchestrator
-
   quick-fix:
-    description: "Schneller Bugfix ohne Overhead"
-    signal_keywords: ["Bug fixen", "Bug beheben", "Triage", "schneller Fix", "Hotfix"]
+    description: Schneller Bugfix ohne Overhead
+    signal_keywords:
+    - Bug fixen
+    - Bug beheben
+    - Triage
+    - schneller Fix
+    - Hotfix
     stages:
-      - id: fix
-        agent: developer
-        task: "Bugfix"
-        mode: sequential
-      - id: commit
-        agent: git
-        task: "Commit + Push"
-        mode: sequential
+    - id: fix
+      agent: developer
+      task: Bugfix
+      mode: sequential
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
     on_error: escalate_to_orchestrator
-
   bugfix:
-    description: "Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig für unabhängige Bugs."
-    signal_keywords: ["Bug fixen", "Bug beheben", "Fehler beheben"]
+    description: 'Default bugfix pipeline: triage → fix → review → document. FANOUT-fähig
+      für unabhängige Bugs.'
+    signal_keywords:
+    - Bug fixen
+    - Bug beheben
+    - Fehler beheben
     stages:
-      - id: triage
-        agent: bug-feature-analyzer
-        task: "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen."
-        mode: sequential
-      - id: fix
-        agent: developer
-        task: "Bugfix implementieren"
-        mode: sequential
-      - id: review
-        agent: code-reviewer
-        task: "Code-Qualität, Blast-Radius, SOLID/DRY prüfen"
-        mode: loop
-        loop:
-          generator: developer
-          critic: code-reviewer
-          max_iterations: 2
-      - id: document
-        agent: documenter
-        task: "CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren"
-        mode: sequential
+    - id: triage
+      agent: bug-feature-analyzer
+      task: Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope
+        → Pipeline stoppen.
+      mode: sequential
+    - id: fix
+      agent: developer
+      task: Bugfix implementieren
+      mode: sequential
+    - id: review
+      agent: code-reviewer
+      task: Code-Qualität, Blast-Radius, SOLID/DRY prüfen
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: document
+      agent: documenter
+      task: CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren
+      mode: sequential
     on_error: escalate_to_orchestrator
-
   concept-development:
-    description: "Recherche → Konzept → Review-Loop für Vorfeld-/Designarbeit ohne Code"
-    signal_keywords: ["Konzept", "Design-Doc", "Recherche", "Trade-offs"]
+    description: Recherche → Konzept → Review-Loop für Vorfeld-/Designarbeit ohne
+      Code
+    signal_keywords:
+    - Konzept
+    - Design-Doc
+    - Recherche
+    - Trade-offs
     stages:
-      - id: research
-        agent: ideation
-        task: "Recherche: Stand der Technik, Optionen, Quellen, Trade-offs"
-        mode: sequential
-      - id: concept
-        agent: ideation
-        task: "Konzept/Design-Doc erstellen und Review-Feedback einarbeiten"
-        mode: loop
-        loop:
-          generator: ideation
-          critic: concept-reviewer
-          max_iterations: 3
-      - id: handoff
-        agent: requirements
-        task: "Konzept in REQs überführen"
-        mode: sequential
+    - id: research
+      agent: ideation
+      task: 'Recherche: Stand der Technik, Optionen, Quellen, Trade-offs'
+      mode: sequential
+    - id: concept
+      agent: ideation
+      task: Konzept/Design-Doc erstellen und Review-Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: ideation
+        critic: concept-reviewer
+        max_iterations: 3
+    - id: handoff
+      agent: requirements
+      task: Konzept in REQs überführen
+      mode: sequential
     on_error: escalate_to_orchestrator
-
   refactor:
-    description: "Codebase refactoring: blast-radius analysis → implement → review → commit. Use for cross-cutting refactorings, not trivial renames."
-    signal_keywords: ["Refactoring", "aufräumen", "Cleanup", "Code verbessern"]
+    description: 'Codebase refactoring: blast-radius analysis → implement → review
+      → commit. Use for cross-cutting refactorings, not trivial renames.'
+    signal_keywords:
+    - Refactoring
+    - aufräumen
+    - Cleanup
+    - Code verbessern
     stages:
-      - id: analyze
-        agent: senior-developer
-        task: "Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten"
-        mode: sequential
-      - id: implement
-        agent: developer
-        task: "Refactoring implementieren ohne funktionale Änderungen"
-        mode: sequential
-      - id: review
-        agent: developer
-        task: "Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten"
-        mode: loop
-        loop:
-          generator: developer
-          critic: code-reviewer
-          max_iterations: 2
-      - id: commit
-        agent: git
-        task: "Commit + Push"
-        mode: sequential
+    - id: analyze
+      agent: senior-developer
+      task: 'Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren,
+        Risiken bewerten'
+      mode: sequential
+    - id: implement
+      agent: developer
+      task: Refactoring implementieren ohne funktionale Änderungen
+      mode: sequential
+    - id: review
+      agent: developer
+      task: Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten
+      mode: loop
+      loop:
+        generator: developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
     on_error: escalate_to_orchestrator
-
   docs-update:
-    description: "Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW, ARCHITECTURE, and similar doc-only changes."
-    signal_keywords: ["Dokumentation", "README", "Docs", "Doku"]
+    description: 'Documentation update: write/update docs → commit. For README, CODEBASE_OVERVIEW,
+      ARCHITECTURE, and similar doc-only changes.'
+    signal_keywords:
+    - Dokumentation
+    - README
+    - Docs
+    - Doku
     stages:
-      - id: update
-        agent: documenter
-        task: "Dokumentation aktualisieren"
-        mode: sequential
-      - id: commit
-        agent: git
-        task: "Commit + Push"
-        mode: sequential
+    - id: update
+      agent: documenter
+      task: Dokumentation aktualisieren
+      mode: sequential
+    - id: commit
+      agent: git
+      task: Commit + Push
+      mode: sequential
     on_error: skip
-
   se-cascade:
-    description: "Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)"
-    signal_keywords: ["SE-Kaskade", "Zerlegung", "Systems Engineering", "SE-Breakdown"]
+    description: Systems Engineering Recursive Decomposition (Zig-Zag L0→Ln)
+    signal_keywords:
+    - SE-Kaskade
+    - Zerlegung
+    - Systems Engineering
+    - SE-Breakdown
     stages:
-      - id: l0-stakeholder
-        agent: se-requirements
-        task: "Stakeholder Needs → formal SN-xxx Requirements"
-        mode: loop
-        loop:
-          generator: se-requirements
-          critic: se-critic
-          max_iterations: 3
-      - id: l1-requirements
-        agent: se-requirements
-        task: "L1 System Requirements (REQ-L1) from Stakeholder Needs"
-        mode: loop
-        loop:
-          generator: se-requirements
-          critic: se-critic
-          max_iterations: 3
-      - id: l1-architecture
-        agent: se-architect
-        task: "L1 System White-Box Decomposition (ARCH-L1)"
-        mode: loop
-        loop:
-          generator: se-architect
-          critic: se-critic
-          max_iterations: 3
-      - id: l2-requirements
-        agent: se-requirements
-        task: "L2 System Requirements (REQ-L2) derived from L1 Architecture"
-        mode: loop
-        loop:
-          generator: se-requirements
-          critic: se-critic
-          max_iterations: 3
-      - id: l2-architecture
-        agent: se-architect
-        task: "L2 System White-Box Decomposition (ARCH-L2)"
-        mode: loop
-        loop:
-          generator: se-architect
-          critic: se-critic
-          max_iterations: 3
-      - id: l2-interface
-        agent: se-interface-mgr
-        task: "Interface Registry + Propagation Map for L2"
-        mode: sequential
-      - id: l3-requirements
-        agent: se-requirements
-        task: "L3 System Requirements (REQ-L3) derived from L2 Architecture"
-        mode: loop
-        loop:
-          generator: se-requirements
-          critic: se-critic
-          max_iterations: 3
-      - id: l3-architecture
-        agent: se-architect
-        task: "L3 System White-Box Decomposition (ARCH-L3)"
-        mode: loop
-        loop:
-          generator: se-architect
-          critic: se-critic
-          max_iterations: 3
-      - id: termination
+    - id: l0-stakeholder
+      agent: se-requirements
+      task: Stakeholder Needs → formal SN-xxx Requirements
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l1-requirements
+      agent: se-requirements
+      task: L1 System Requirements (REQ-L1) from Stakeholder Needs
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l1-architecture
+      agent: se-architect
+      task: L1 System White-Box Decomposition (ARCH-L1)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-requirements
+      agent: se-requirements
+      task: L2 System Requirements (REQ-L2) derived from L1 Architecture
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-architecture
+      agent: se-architect
+      task: L2 System White-Box Decomposition (ARCH-L2)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: l2-interface
+      agent: se-interface-mgr
+      task: Interface Registry + Propagation Map for L2
+      mode: sequential
+    - id: l3-requirements
+      agent: se-requirements
+      task: L3 System Requirements (REQ-L3) derived from L2 Architecture
+      mode: loop
+      loop:
+        generator: se-requirements
+        critic: se-critic
+        max_iterations: 3
+    - id: l3-architecture
+      agent: se-architect
+      task: L3 System White-Box Decomposition (ARCH-L3)
+      mode: loop
+      loop:
+        generator: se-architect
+        critic: se-critic
+        max_iterations: 3
+    - id: termination
+      agent: se-termination
+      task: Per-system leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)
+      mode: conditional
+      condition:
+        type: agent_decision
         agent: se-termination
-        task: "Per-system leaf/continue decision (respects SE_MIN_DEPTH / SE_MAX_DEPTH)"
-        mode: conditional
-        condition:
-          type: agent_decision
-          agent: se-termination
-      - id: implementation
-        agent: orchestrator
-        allow_orchestrator: true
-        task: |
-          For each leaf node with domain: software from the termination phase:
-          - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
-          - Route to se-developer for standard leafs (2-4 interfaces)
-          - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting, boundary-level, security/performance-critical)
-          Implement each leaf against its Black-Box specification and interface contracts from the interface-registry.
-          Each implementation must reference its req_id and leaf_id in code artifacts.
-          hardware/mechanics leafs → document as COTS/spec (not implemented).
-        mode: loop
-        loop:
-          generator: se-developer
-          critic: code-reviewer
-          max_iterations: 2
-      - id: validation
-        agent: se-validator
-        task: "L1 System Validation + Multi-Level Verification"
-        mode: parallel_group
-        parallel_group:
-          - agent: se-validator
-            task: "L1 User-Journey validation"
-          - agent: se-verifier
-            task: "Multi-Level verification"
-          - agent: se-integration-and-test-manager
-            task: "V&V orchestration"
+    - id: implementation
+      agent: orchestrator
+      allow_orchestrator: true
+      task: 'For each leaf node with domain: software from the termination phase:
 
-# SE cascade variables (defaults, overridden by .meta-config/project.yaml)
+        - Route to se-junior-developer for trivial leafs (0-1 interfaces, no cross-cutting)
+
+        - Route to se-developer for standard leafs (2-4 interfaces)
+
+        - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting,
+        boundary-level, security/performance-critical)
+
+        Implement each leaf against its Black-Box specification and interface contracts
+        from the interface-registry.
+
+        Each implementation must reference its req_id and leaf_id in code artifacts.
+
+        hardware/mechanics leafs → document as COTS/spec (not implemented).
+
+        '
+      mode: loop
+      loop:
+        generator: se-developer
+        critic: code-reviewer
+        max_iterations: 2
+    - id: validation
+      agent: se-validator
+      task: L1 System Validation + Multi-Level Verification
+      mode: parallel_group
+      parallel_group:
+      - agent: se-validator
+        task: L1 User-Journey validation
+      - agent: se-verifier
+        task: Multi-Level verification
+      - agent: se-integration-and-test-manager
+        task: V&V orchestration
 se_variables:
-  SE_BASE_DIR: "SE"
+  SE_BASE_DIR: SE
   SE_MIN_DEPTH: 2
   SE_MAX_DEPTH: 6
   SE_MAX_CRITIC_ITERATIONS: 3
   SE_MAX_PARALLEL_CELLS: 4
   SE_MAX_CELLS: 20
-  cost_limit_eur: 5.00
-  output_persistence: true              # REQ-SE-01: Enable Teilresultat-Protokoll (write-through cache)
-  resume_pointer_path: ".se-state.yaml"  # REQ-SE-03: Path to resumable state pointer (relative to SE_BASE_DIR)
-  se_pipeline_classifier: "default"      # REQ-SE-20: Pipeline A/B classification mode (default|strict|off)
-  se_persistence_schema_dir: "schemas"   # Path to schema files for FRONTMATTER validation
+  cost_limit_eur: 5
+  output_persistence: true
+  resume_pointer_path: .se-state.yaml
+  se_pipeline_classifier: default
+  se_persistence_schema_dir: schemas

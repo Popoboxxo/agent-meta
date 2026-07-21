@@ -4,7 +4,7 @@ description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-sp
   agents, external-skill lifecycle, and creating extensions.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

@@ -48,6 +48,14 @@ Cheap:
         powerful: opencode-go/deepseek-v4-flash
         max: opencode-go/qwen3.7-plus
         ultra: opencode-go/kimi-k2.7-code
+    Mammouth:
+      tiers:
+        nano: deepseek-v4-flash
+        fast: deepseek-v4-flash
+        balanced: deepseek-v4-flash
+        powerful: deepseek-v4-flash
+        max: kimi-k2.6
+        ultra: glm-5.2
 Normal:
   description: 1:1 tier mapping (status quo).
   tiers:
@@ -60,8 +68,8 @@ Normal:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-haiku-4-5-20251001
+        nano: claude-haiku-4-5
+        fast: claude-sonnet-5
         balanced: claude-sonnet-5
         powerful: claude-opus-4-8
         max: claude-opus-4-8
@@ -78,10 +86,18 @@ Normal:
       tiers:
         nano: opencode-go/deepseek-v4-flash
         fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/qwen3.7-plus
+        balanced: opencode-go/deepseek-v4-pro
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
         ultra: opencode-go/kimi-k2.7-code
+    Mammouth:
+      tiers:
+        nano: deepseek-v4-flash
+        fast: deepseek-v4-flash
+        balanced: deepseek-v4-pro
+        powerful: kimi-k2.6
+        max: glm-5.2
+        ultra: glm-5.2
 Advanced:
   description: Shifts all tiers one level up.
   tiers:
@@ -116,6 +132,14 @@ Advanced:
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
         ultra: opencode-go/kimi-k2.7-code
+    Mammouth:
+      tiers:
+        nano: deepseek-v4-flash
+        fast: deepseek-v4-pro
+        balanced: kimi-k2.6
+        powerful: glm-5.2
+        max: glm-5.2
+        ultra: glm-5.2
 Expensive:
   description: Strong upward tier shift.
   tiers:
@@ -150,6 +174,14 @@ Expensive:
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
         ultra: opencode-go/kimi-k2.7-code
+    Mammouth:
+      tiers:
+        nano: deepseek-v4-pro
+        fast: kimi-k2.6
+        balanced: glm-5.2
+        powerful: glm-5.2
+        max: glm-5.2
+        ultra: glm-5.2
 Expensive as Hell:
   description: Most agents run at powerful or max tier.
   tiers:
@@ -184,3 +216,11 @@ Expensive as Hell:
         powerful: opencode-go/kimi-k2.7-code
         max: opencode-go/kimi-k2.7-code
         ultra: opencode-go/kimi-k2.7-code
+    Mammouth:
+      tiers:
+        nano: kimi-k2.6
+        fast: glm-5.2
+        balanced: glm-5.2
+        powerful: glm-5.2
+        max: glm-5.2
+        ultra: glm-5.2

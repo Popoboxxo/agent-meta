@@ -4,7 +4,7 @@ description: Creates UI specifications, mockups, and design systems. Maps REQ-ID
   to UI elements.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

@@ -4,7 +4,7 @@ description: Scouts the AI ecosystem for new skills, agent patterns, rules, and 
   Evaluates candidates and makes concrete extension proposals for agent-meta.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   webfetch: allow

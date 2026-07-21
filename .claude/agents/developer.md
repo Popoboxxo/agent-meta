@@ -16,7 +16,7 @@ tools:
 - TodoWrite
 - Agent
 based-on: 1-generic/developer.md@2.5.2
-model: claude-opus-4-8
+model: claude-sonnet-5
 ---
 
 # Developer — agent-meta

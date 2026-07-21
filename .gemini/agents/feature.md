@@ -8,6 +8,7 @@ hint: 'Feature lifecycle subagent: Branch → REQ → TDD → Dev → Validate �
 prompt_mode: modern
 tools:
 - code_execution
+model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

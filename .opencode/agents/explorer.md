@@ -4,7 +4,7 @@ description: Read-only codebase research, dependency and impact mapping, file an
   symbol search.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

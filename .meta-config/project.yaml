@@ -47,6 +47,15 @@ roles:
 - copilot-expert
 - prompt-engineer
 - e2e-tester
+- principal-developer
+- refactoring-specialist
+- technical-writer
+- tester
+- validator
+- accessibility-specialist
+- data-engineer
+- docker
+- mammouth-expert
 project:
   name: agent-meta
   prefix: am
@@ -221,7 +230,7 @@ orchestrator:
     human_approval_required: false
     protocol_routing: static
     token-budget:
-      enabled: true
+      enabled: false
       session_budget: 200000
       max_overhead_pct: 10
       on_exceed: compact
@@ -276,4 +285,3 @@ backup:
     max_age_days: 30
   auto-backup-before-sync: false
 environments: {}
-
