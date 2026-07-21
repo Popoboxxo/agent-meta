@@ -1359,6 +1359,7 @@ function buildSidebar() {
         { route: "/project/model-mapping", label: "Model Mapping", icon: "⊞" },
         { route: "/project/dod-overrides", label: "DoD Overrides", icon: "☑" },
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
+        { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "⌨" },
       ],
     },
@@ -3948,6 +3949,22 @@ function textField(label, value, onInput, help) {
   return field;
 }
 
+function envField(label, inputEl, help) {
+  const field = el("div", { class: "field" });
+  const lbl = el("label", { class: "field-label" }, [label]);
+  if (inputEl.type === "checkbox") {
+    lbl.style.display = "inline-flex";
+    lbl.style.alignItems = "center";
+    lbl.style.gap = "6px";
+    lbl.prepend(inputEl);
+  } else {
+    field.appendChild(lbl);
+    field.appendChild(inputEl);
+  }
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
+  return field;
+}
+
 function dropdownField(label, options, value, onChange, labels) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
@@ -5352,6 +5369,149 @@ async function viewProviderDeactivation() {
   return wrap;
 }
 
+/* -------------------------- Environment Variables ------------------------- */
+async function viewProjectEnvironments() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Environment Variables"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Define environment variables that sync generates as platform scripts (.ps1/.sh). ",
+    "Set defaults, mark as required, or flag secrets for masking in logs.",
+  ]));
+
+  const data = await loadProject();
+  const envs = (data["environments"] && typeof data["environments"] === "object") ? data["environments"] : {};
+
+  const statusEl = el("span");
+  const topBar = el("div", { style: "display:flex;gap:8px;margin-bottom:12px;align-items:center;" });
+  const addBtn = el("button", { class: "btn", onclick: () => openEnvModal(null) }, ["+ Add Variable"]);
+  const scriptsBtn = el("button", { class: "btn", style: "margin-left:auto;", onclick: showEnvScripts }, ["📜 Generate Scripts"]);
+  topBar.appendChild(addBtn);
+  topBar.appendChild(scriptsBtn);
+  topBar.appendChild(statusEl);
+  wrap.appendChild(topBar);
+
+  const tableWrap = el("div");
+  wrap.appendChild(tableWrap);
+
+  function render() {
+    tableWrap.replaceChildren();
+    const names = Object.keys(envs).sort();
+    if (!names.length) {
+      tableWrap.appendChild(el("p", { class: "muted" }, ["No environment variables defined. Click '+ Add Variable' to start."]));
+      return;
+    }
+    const table = el("table", { class: "data" });
+    const th = (t) => el("th", {}, [t]);
+    table.appendChild(el("thead", {}, [el("tr", {}, [th("Name"), th("Description"), th("Default"), th("Required"), th("Secret"), th("")])]));
+    const tbody = el("tbody");
+    for (const name of names) {
+      const cfg = envs[name] || {};
+      const isReq = cfg.required === true;
+      const isSec = cfg.secret === true;
+      const defDisp = isSec && cfg.default ? "••••••••" : (cfg.default || "—");
+      const tr = el("tr", { style: "cursor:pointer;", onclick: () => openEnvModal(name) });
+      tr.appendChild(el("td", {}, [el("code", {}, [name])]));
+      tr.appendChild(el("td", {}, [cfg.description || "—"]));
+      tr.appendChild(el("td", { class: "mono" }, [defDisp]));
+      tr.appendChild(el("td", {}, [isReq ? "✅" : "—"]));
+      tr.appendChild(el("td", {}, [isSec ? "🔒" : "—"]));
+      const delCell = el("td");
+      const delBtn = el("button", { class: "btn btn-sm btn-danger", onclick: (ev) => { ev.stopPropagation(); deleteEnv(name); } }, ["✕"]);
+      delCell.appendChild(delBtn);
+      tr.appendChild(delCell);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    statusEl.textContent = `${names.length} variable(s).`;
+  }
+
+  async function deleteEnv(name) {
+    if (!confirm(`Delete environment variable "${name}"?`)) return;
+    delete envs[name];
+    await saveProjectSection("environments", envs, statusEl);
+    render();
+  }
+
+  async function openEnvModal(name) {
+    const isNew = name == null;
+    const cfg = isNew ? { description: "", default: "", required: false, secret: false } : (clone(envs[name]) || { description: "", default: "", required: false, secret: false });
+    const title = isNew ? "Add Environment Variable" : `Edit: ${name}`;
+
+    const nameInput = el("input", { type: "text", placeholder: "MCP_HONCHO_URL", value: isNew ? "" : name, class: "field" });
+    const descInput = el("input", { type: "text", placeholder: "Honcho Server URL", value: cfg.description || "", class: "field" });
+    const defInput  = el("input", { type: "text", placeholder: "http://localhost:8200", value: cfg.default || "", class: "field" });
+    const reqCheck  = el("input", { type: "checkbox", checked: cfg.required === true });
+    const secCheck  = el("input", { type: "checkbox", checked: cfg.secret === true });
+
+    const body = el("div", { style: "display:flex;flex-direction:column;gap:12px;" });
+    body.appendChild(envField("Name", nameInput, "UPPERCASE, e.g. MCP_HONCHO_URL"));
+    body.appendChild(envField("Description", descInput, "What this variable is for"));
+    body.appendChild(envField("Default", defInput, "Fallback value if not set in environment"));
+    body.appendChild(envField("Required", reqCheck, "Warn if not set at startup"));
+    body.appendChild(envField("Secret", secCheck, "Mask value in logs and generated scripts"));
+
+    const saveBtn = el("button", { class: "btn btn-primary", onclick: async () => {
+      const newName = nameInput.value.trim().toUpperCase();
+      if (!newName) { toast("Name is required", "error"); return; }
+      const oldName = isNew ? null : name;
+      if (oldName && oldName !== newName) delete envs[oldName];
+      envs[newName] = {
+        description: descInput.value.trim(),
+        default: defInput.value.trim(),
+        required: reqCheck.checked,
+        secret: secCheck.checked,
+      };
+      await saveProjectSection("environments", envs, statusEl);
+      hideModal();
+      render();
+    } }, ["Save"]);
+
+    showModal(title, body, [saveBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]);
+  }
+
+  async function showEnvScripts() {
+    try {
+      const scripts = await api.get("/api/environments/scripts");
+      const body = el("div");
+      const tabs = el("div", { style: "display:flex;gap:4px;margin-bottom:8px;" });
+      const content = el("div");
+      let active = ".meta-config/env.ps1";
+
+      for (const [file, text] of Object.entries(scripts)) {
+        const btn = el("button", {
+          class: `btn btn-sm ${file === active ? "btn-primary" : ""}`,
+          onclick: () => { active = file; renderScript(); },
+        }, [file.replace(".meta-config/", "")]);
+        tabs.appendChild(btn);
+      }
+      body.appendChild(tabs);
+
+      function renderScript() {
+        content.replaceChildren();
+        const pre = el("pre", { style: "max-height:400px;overflow:auto;background:var(--bg-code);padding:12px;border-radius:6px;font-size:0.85em;" }, [scripts[active] || "(empty)"]);
+        content.appendChild(pre);
+        const copyBtn = el("button", { class: "btn btn-sm", style: "margin-top:8px;", onclick: () => {
+          navigator.clipboard.writeText(scripts[active] || "").then(() => toast("Copied!", "success"));
+        } }, ["📋 Copy"]);
+        content.appendChild(copyBtn);
+        // Update active tab styles
+        for (const b of tabs.children) {
+          b.className = `btn btn-sm ${b.textContent === active.replace(".meta-config/", "") ? "btn-primary" : ""}`;
+        }
+      }
+      renderScript();
+      body.appendChild(content);
+      showModal("Generated Environment Scripts", body, [el("button", { class: "btn", onclick: hideModal }, ["Close"])]);
+    } catch (err) {
+      toast(`Failed to load scripts: ${err.message}`, "error");
+    }
+  }
+
+  render();
+  return wrap;
+}
+
 /* ------------------------------- Advanced -------------------------------- */
 async function viewProjectAdvanced() {
   const wrap = el("div");
@@ -6405,6 +6565,7 @@ async function init() {
   router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
   router.register("/project/dod-overrides", viewProjectDodOverrides);
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
+  router.register("/project/environments",   viewProjectEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
