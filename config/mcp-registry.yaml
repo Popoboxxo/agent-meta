@@ -159,6 +159,8 @@ mcp-servers:
     secrets:
     - MCP_HONCHO_URL
     - MCP_HONCHO_API_KEY
+    provider-skip:
+    - Opencode  # @honcho-ai/opencode-honcho plugin handles this provider natively
   playwright:
     description: Playwright MCP Server für Browser-Automation und E2E-Tests
     category: testing

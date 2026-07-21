@@ -215,12 +215,20 @@ def _build_mcp_entries(
     registry: dict,
     secrets: dict | None,
     fmt: str | None = None,
+    provider: str = "",
 ) -> dict:
-    """Build a {server_name: config_dict} map for insertion into provider configs."""
+    """Build a {server_name: config_dict} map for insertion into provider configs.
+    
+    Respects per-server provider-skip: when a server lists the current provider
+    in its provider-skip list, it is omitted (e.g. Honcho plugin for Opencode).
+    """
     entries: dict = {}
     for server_name in active_servers:
         server_def = registry.get(server_name)
         if not server_def:
+            continue
+        skip = server_def.get("provider-skip", [])
+        if isinstance(skip, list) and provider in skip:
             continue
         conn = server_def.get("connection")
         if not conn:
@@ -398,8 +406,8 @@ def generate_provider_configs(
         secrets_data, _ = _load_yaml_or_json(secrets_path)
         secrets = secrets_data or {}
 
-    committed_entries = _build_mcp_entries(active_servers, registry, secrets=None, fmt=fmt)
-    local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets, fmt=fmt) if secrets else {}
+    committed_entries = _build_mcp_entries(active_servers, registry, secrets=None, fmt=fmt, provider=provider)
+    local_entries = _build_mcp_entries(active_servers, registry, secrets=secrets, fmt=fmt, provider=provider) if secrets else {}
 
     # --- Committed provider config ---
     committed_path = safe_path(project_root, committed_file)
