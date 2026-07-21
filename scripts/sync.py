@@ -799,6 +799,9 @@ def main():
         init_settings_local_json(agent_meta_root, project_root, log, args.dry_run,
                                  providers=providers, provider_config=provider_config,
                                  variables=variables)
+        # Auto-generated env scripts — always gitignored (may contain defaults/secrets).
+        env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
+                         ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
         if args.init:
             init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync
@@ -895,6 +898,7 @@ def main():
             all_gitignore_entries = (
                 base_gitignore_entries + extra_provider_entries
                 + skill_gitignore_entries + mcp_gitignore_extras
+                + env_gitignore
             )
             ensure_gitignore_entries(project_root, log, args.dry_run,
                                      exact_entries=all_gitignore_entries)
