@@ -9,17 +9,17 @@ providers:
     has_commands: true
     has_settings: true
     capabilities:
-      - agents
-      - rules
-      - hooks
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
-      - artifacts
-      - checkpoints
-      - mcp
+    - agents
+    - rules
+    - hooks
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
+    - artifacts
+    - checkpoints
+    - mcp
     artifact_dir: .claude/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .claude/settings.json
@@ -27,44 +27,36 @@ providers:
     settings_local_file: .claude/settings.local.json
     settings_local_template: templates/configs/CLAUDE.settings-local-template.json
     isolation-dirs:
-      - .claude/
-      - CLAUDE.md
+    - .claude/
+    - CLAUDE.md
     gitignore_entries:
-      - .claude/settings.local.json
-      - .claude/agent-memory-local/
-      - .claude/pending-tasks.md
-      - CLAUDE.personal.md
-      - sync.log
-      - .mcp.json
+    - .claude/settings.local.json
+    - .claude/agent-memory-local/
+    - .claude/pending-tasks.md
+    - CLAUDE.personal.md
+    - sync.log
+    - .mcp.json
     mcp-config:
       committed-file: .claude/settings.json
       secrets-file: .claude/settings.local.json
       format: claude-settings
-    # Provider-specific directories for multi-provider orchestration
     skills_dir: .claude/skills
     snippets_dir: .claude/snippets
     pending_tasks_file: .claude/pending-tasks.md
     extension_dir: .claude/3-project
-    orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten mit `claude -a orchestrator` oder wählt ihn aus."
-    # Model tiers: abstract tier name → provider-specific model ID.
-    # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
-    # sync.py maps each tier to the model ID written into agent frontmatter.
-    # Source: https://platform.claude.com/docs/en/about-claude/models/overview (verified 2026-06-24)
-    # ID convention: 4.6+ generation uses dateless IDs (claude-sonnet-4-6);
-    # pre-4.6 models use dated snapshot IDs (claude-haiku-4-5-20251001).
+    orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten\
+      \ mit `claude -a orchestrator` oder w\xE4hlt ihn aus."
     model-tiers:
-      nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
-      fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
-      balanced: claude-sonnet-5             # default workhorse: dev, docs, review
-      powerful: claude-opus-4-8             # complex reasoning: architecture, security
-      max:      claude-fable-5              # most capable widely released model
-    # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
+      nano: claude-haiku-4-5-20251001
+      fast: claude-haiku-4-5-20251001
+      balanced: claude-sonnet-5
+      powerful: claude-opus-4-8
+      max: claude-fable-5
     model-aliases:
-      haiku:  claude-haiku-4-5-20251001
+      haiku: claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
-      opus:   claude-opus-4-8
-      fable:  claude-fable-5
-
+      opus: claude-opus-4-8
+      fable: claude-fable-5
   Gemini:
     agents_dir: .gemini/agents
     agent_ext: .md
@@ -78,23 +70,23 @@ providers:
     commands_ext: .toml
     has_settings: true
     capabilities:
-      - agents
-      - rules
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
-      - mcp
+    - agents
+    - rules
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
+    - mcp
     artifact_dir: .gemini/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .gemini/settings.json
     settings_template: templates/configs/GEMINI.settings-template.json
     settings_local_file: .gemini/settings.local.json
     isolation-dirs:
-      - .gemini/
+    - .gemini/
     gitignore_entries:
-      - .gemini/settings.local.json
+    - .gemini/settings.local.json
     mcp-config:
       committed-file: .gemini/settings.json
       secrets-file: .gemini/settings.local.json
@@ -103,49 +95,51 @@ providers:
     snippets_dir: .gemini/snippets
     pending_tasks_file: .gemini/pending-tasks.md
     extension_dir: .gemini/3-project
-    orchestrator_hint: "- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    planning_mode_hint: "Gemini's `<planning_mode>` hat Vorrang. Wenn der Orchestrator aktiv ist, unterdrückt die Orchestrator-Planning-Phase den nativen Mode. Doppelte Planung vermeiden."
+    orchestrator_hint: '- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>`
+      im Chat.'
+    planning_mode_hint: "Gemini's `<planning_mode>` hat Vorrang. Wenn der Orchestrator\
+      \ aktiv ist, unterdr\xFCckt die Orchestrator-Planning-Phase den nativen Mode.\
+      \ Doppelte Planung vermeiden."
     model-tiers:
-      nano:     gemini-3.5-flash-medium     # ultra-fast, low-cost tasks
-      fast:     gemini-3.5-flash-high       # quick ops: git, formatting
-      balanced: gemini-3.1-pro-low          # reasoning + code (default)
-      powerful: gemini-3.1-pro-high         # premium reasoning, complex coding
-      max:      gemini-3.1-pro-high         # reserved for future Gemini Ultra
+      nano: gemini-3.5-flash-medium
+      fast: gemini-3.5-flash-high
+      balanced: gemini-3.1-pro-low
+      powerful: gemini-3.1-pro-high
+      max: gemini-3.1-pro-high
     model-aliases: {}
-
   Opencode:
-    display-name: "OpenCode"
+    display-name: OpenCode
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: false         # Rules have no native dir in opencode — embedded into AGENTS.md
+    has_rules: false
     has_hooks: false
     has_commands: true
     commands_dir: .opencode/commands
     has_settings: true
     capabilities:
-      - agents
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-embedded-rules
-      - artifacts
-      - checkpoints
-      - mcp
+    - agents
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-embedded-rules
+    - artifacts
+    - checkpoints
+    - mcp
     artifact_dir: .opencode/artifacts
     checkpoint_dir: .meta-viz
     settings_file: opencode.json
     settings_template: templates/configs/OPENCODE.settings-template.json
     settings_local_file: .opencode/settings.local.json
     isolation-dirs:
-      - .opencode/
-      - opencode.json
-      - AGENTS.md
+    - .opencode/
+    - opencode.json
+    - AGENTS.md
     gitignore_entries:
-      - AGENTS.personal.md
-      - .opencode/settings.local.json
+    - AGENTS.personal.md
+    - .opencode/settings.local.json
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
@@ -154,22 +148,20 @@ providers:
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
-    orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # opencode model IDs — sourced from the Go catalog (opencode-go/).
-    # Full list: https://opencode.ai/zen/go
+    orchestrator_hint: '- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>`
+      im Chat.'
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash     # Go (cheapest, high-throughput)
-      fast:     opencode-go/deepseek-v4-flash     # Go (quick ops)
-      balanced: opencode-go/qwen3.7-plus          # Go (default workhorse)
-      powerful: opencode-go/kimi-k2.6             # Go (complex reasoning)
-      max:      opencode-go/kimi-k2.7-code        # Go (top-tier code model)
+      nano: opencode-go/deepseek-v4-flash
+      fast: opencode-go/deepseek-v4-flash
+      balanced: opencode-go/deepseek-v4-pro
+      powerful: opencode-go/kimi-k2.6
+      max: opencode-go/kimi-k2.7-code
     model-aliases:
-      flash:      opencode-go/deepseek-v4-flash
-      qwen:       opencode-go/qwen3.7-plus
-      kimi:       opencode-go/kimi-k2.6
-      kimi-code:  opencode-go/kimi-k2.7-code
-      qwen-max:   opencode-go/qwen3.7-max
-
+      flash: opencode-go/deepseek-v4-flash
+      qwen: opencode-go/qwen3.7-plus
+      kimi: opencode-go/kimi-k2.6
+      kimi-code: opencode-go/kimi-k2.7-code
+      qwen-max: opencode-go/qwen3.7-max
   Continue:
     agents_dir: .continue/agents
     agent_ext: .md
@@ -181,36 +173,35 @@ providers:
     has_commands: true
     has_settings: true
     capabilities:
-      - agents
-      - rules
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
-      - mcp
+    - agents
+    - rules
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
+    - mcp
     artifact_dir: .continue/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .continue/config.yaml
     settings_template: templates/configs/CONTINUE.config-template.yaml
     settings_local_file: .continue/config.local.yaml
     isolation-dirs:
-      - .continue/
+    - .continue/
     gitignore_entries:
-      - .continue/settings.local.yaml
+    - .continue/settings.local.yaml
     mcp-config:
       committed-file: .continue/config.yaml
       secrets-file: .continue/config.local.yaml
       format: continue-yaml
-    # Continue manages models centrally in .continue/config.yaml — no per-agent model.
     model-tiers: {}
     model-aliases: {}
     skills_dir: .continue/skills
     snippets_dir: .continue/snippets
     pending_tasks_file: .continue/pending-tasks.md
     extension_dir: .continue/3-project
-    orchestrator_hint: "- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von Eurer Aufgabe ein."
-
+    orchestrator_hint: '- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von
+      Eurer Aufgabe ein.'
   Copilot:
     agents_dir: .github/copilot/agents
     agent_ext: .md
@@ -222,27 +213,27 @@ providers:
     has_commands: false
     has_settings: false
     capabilities:
-      - agents
-      - rules
-      - snippets
-      - skills
-      - context-managed-block
+    - agents
+    - rules
+    - snippets
+    - skills
+    - context-managed-block
     artifact_dir: .github/copilot/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .github/copilot/
+    - .github/copilot/
     gitignore_entries: []
     mcp-config: {}
     skills_dir: .github/copilot/skills
     snippets_dir: .github/copilot/snippets
     pending_tasks_file: .github/copilot/pending-tasks.md
     extension_dir: .github/copilot/3-project
-    orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
+    orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator`\
+      \ oder w\xE4hlt den Orchestrator-Agenten."
     model-tiers: {}
     model-aliases: {}
-
   Mammouth:
-    display-name: "Mammouth Code"
+    display-name: Mammouth Code
     agents_dir: .mammouth/agents
     agent_ext: .md
     context_file: AGENTS.md
@@ -253,28 +244,29 @@ providers:
     has_commands: false
     has_settings: false
     capabilities:
-      - agents
-      - rules
-      - snippets
-      - skills
-      - context-managed-block
-      - mcp
+    - agents
+    - rules
+    - snippets
+    - skills
+    - context-managed-block
+    - mcp
     artifact_dir: .mammouth/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .mammouth/
+    - .mammouth/
     gitignore_entries:
-      - .mammouth/settings.local.json
+    - .mammouth/settings.local.json
     mcp-config: {}
     skills_dir: .mammouth/skills
     snippets_dir: .mammouth/snippets
     pending_tasks_file: .mammouth/pending-tasks.md
     extension_dir: .mammouth/3-project
-    orchestrator_hint: "- **In Mammouth Code:** Nutzt den Befehl `mammouth` im Terminal und referenziert `@orchestrator`."
+    orchestrator_hint: '- **In Mammouth Code:** Nutzt den Befehl `mammouth` im Terminal
+      und referenziert `@orchestrator`.'
     model-tiers:
-      nano:     mammouth-recommended
-      fast:     mammouth-recommended
-      balanced: mammouth-recommended
-      powerful: mammouth-recommended
-      max:      mammouth-recommended
+      nano: deepseek-v4-flash
+      fast: deepseek-v4-flash
+      balanced: deepseek-v4-pro
+      powerful: kimi-k2.6
+      max: glm-5.2
     model-aliases: {}

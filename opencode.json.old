@@ -1,0 +1,41 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      ".claude/**": "deny",
+      "CLAUDE.md": "deny",
+      ".continue/**": "deny",
+      ".gemini/**": "deny"
+    },
+    "edit": {
+      ".claude/**": "deny",
+      "CLAUDE.md": "deny",
+      ".continue/**": "deny",
+      ".gemini/**": "deny"
+    }
+  },
+  "mcp": {
+    "honcho": {
+      "type": "local",
+      "enabled": true,
+      "url": "{env:MCP_HONCHO_URL}"
+    },
+    "playwright": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ]
+    },
+    "viz-logger": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "python",
+        "scripts/viz-logger.py",
+        "--mcp"
+      ]
+    }
+  }
+}

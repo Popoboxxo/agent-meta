@@ -6,7 +6,10 @@
   "mcpServers": {
     "honcho": {
       "type": "sse",
-      "url": "${MCP_HONCHO_URL}"
+      "url": "${MCP_HONCHO_URL}",
+      "headers": {
+        "X-API-Key": "${MCP_HONCHO_API_KEY}"
+      }
     },
     "playwright": {
       "type": "stdio",
