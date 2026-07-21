@@ -1,24 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "permission": {
-    "read": {
-      ".claude/**": "deny",
-      "CLAUDE.md": "deny",
-      ".continue/**": "deny",
-      ".gemini/**": "deny"
-    },
-    "edit": {
-      ".claude/**": "deny",
-      "CLAUDE.md": "deny",
-      ".continue/**": "deny",
-      ".gemini/**": "deny"
-    }
-  },
+  "subagent_depth": 3,
   "mcp": {
     "honcho": {
       "type": "remote",
       "enabled": true,
-      "url": "{env:MCP_HONCHO_URL}"
+      "url": "{env:MCP_HONCHO_URL}",
+      "headers": {
+        "X-API-Key": "{env:MCP_HONCHO_API_KEY}"
+      }
     },
     "playwright": {
       "type": "local",
