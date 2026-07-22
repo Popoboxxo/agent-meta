@@ -3994,7 +3994,7 @@ async function saveProjectSections(entries, statusEl) {
   if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
 }
 
-function textField(label, value, onInput, help) {
+function labeledTextField(label, value, onInput, help) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
   const inp = el("input", { type: "text", value: value ?? "" });
@@ -4102,9 +4102,9 @@ async function viewProjectGeneral() {
   wrap.appendChild(status);
 
   const panel = el("div", { class: "panel" });
-  panel.appendChild(textField("project.name", project.name, v => project.name = v));
-  panel.appendChild(textField("project.prefix", project.prefix, v => project.prefix = v));
-  panel.appendChild(textField("project.short", project.short, v => project.short = v));
+  panel.appendChild(labeledTextField("project.name", project.name, v => project.name = v));
+  panel.appendChild(labeledTextField("project.prefix", project.prefix, v => project.prefix = v));
+  panel.appendChild(labeledTextField("project.short", project.short, v => project.short = v));
   panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
   panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => top["rules-preset"] = v));
   panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
@@ -4911,8 +4911,8 @@ async function viewProjectVizAdmin() {
   const vizPanel = el("div", { class: "panel" });
   vizPanel.appendChild(el("h2", {}, ["viz"]));
   vizPanel.appendChild(checkboxField("enabled", viz.enabled, v => viz.enabled = v));
-  vizPanel.appendChild(textField("mode", viz.mode, v => viz.mode = v));
-  vizPanel.appendChild(textField("event_log", viz.event_log, v => viz.event_log = v));
+  vizPanel.appendChild(labeledTextField("mode", viz.mode, v => viz.mode = v));
+  vizPanel.appendChild(labeledTextField("event_log", viz.event_log, v => viz.event_log = v));
   vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["server (Viz dashboard)"]));
   vizPanel.appendChild(numField("server.port",         viz.server.port,         v => viz.server.port = v));
   vizPanel.appendChild(numField("server.timeout_sec",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
