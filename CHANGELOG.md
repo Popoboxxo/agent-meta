@@ -1,9 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.81.0] - 2026-07-22
 
 ### Added
 - Optional, self-hostable `reqflow` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqFlow's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqflow-setup.md`, secrets template entries `MCP_REQFLOW_URL` / `MCP_REQFLOW_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
+- Optional `role-group` field on agent roles, with a corresponding filter control in the Admin UI (`config/role-defaults.yaml`, `docs/ui/admin-ui.html`).
+- Codeberg added as a supported Git platform (`config/project-config.schema.json`, `howto/setup/first-steps.md`, `scripts/lib/setup.py`).
+
+### Fixed
+- `AGENTS.md`/`CLAUDE.md` managed block is now correctly initialized above pre-existing foreign content instead of being appended after it, fixing stale/duplicated footer regeneration.
+- Relaxed the `tier-override` schema validation that was rejecting valid per-provider tier customizations.
+- Fixed provider definition ordering so `sync.py --only-variables` no longer runs before providers are defined.
 
 ## [0.80.0] - 2026-07-22
 
