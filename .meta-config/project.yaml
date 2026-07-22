@@ -286,5 +286,5 @@ backup:
   auto-backup-before-sync: false
 environments: {}
 model-source-preference:
-  Claude: registry
+  Claude: modelsdev
   Opencode: modelsdev
