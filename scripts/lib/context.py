@@ -861,6 +861,107 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
     return f"### {title}\n{summary}\n{details}"
 
 
+def _condense_rule_content(content: str, provider: str) -> str:
+    """Remove verbose/explanatory sections from rule content.
+
+    Keeps all actionable rules (headings, lists, tables, code blocks, bold)
+    while stripping:
+    - ``## Warum`` sections (purely explanatory)
+    - ``> **Warum:**`` and ``> Hintergrund:`` blockquotes
+    - ``## Propagation`` sections (sync admin, irrelevant for agents)
+    - Lines mentioning other providers' rule paths (``.claude/rules/``, etc.)
+    - Lines starting with "Auf Claude Code" (Claude-specific)
+    - Multiple consecutive blank lines
+
+    Purpose: embed full quality rules into provider context files (AGENTS.md)
+    without the bloat of provider-specific content for other runtimes.
+    """
+    lines = content.split('\n')
+    result: list[str] = []
+    skip_section_depth = 0
+    skip_blockquote = False
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Track section boundaries for sections to strip entirely
+        if stripped.startswith('## '):
+            section_name = stripped[3:].strip().lower()
+            if section_name == 'warum' or section_name.startswith('warum'):
+                # Skip entire ## Warum section until next ## or end
+                skip_section_depth = 1
+                i += 1
+                continue
+            if section_name == 'propagation':
+                # Skip entire ## Propagation section until next ## or end
+                skip_section_depth = 1
+                i += 1
+                continue
+
+        if skip_section_depth > 0:
+            if stripped.startswith('## '):
+                skip_section_depth = 0
+                # Process this line (don't skip it)
+            elif stripped.startswith('# '):
+                skip_section_depth = 0
+            else:
+                i += 1
+                continue
+
+        # Strip > **Warum:** and > Hintergrund: blockquotes
+        if stripped.startswith('> **Warum') or stripped.startswith('> Hintergrund'):
+            skip_blockquote = True
+            i += 1
+            continue
+
+        if skip_blockquote:
+            if stripped.startswith('>'):
+                i += 1
+                continue
+            else:
+                skip_blockquote = False
+
+        # Strip Claude-only table rows in provider-limits tables
+        if stripped.startswith('| ') and 'Claude Code' in stripped:
+            i += 1
+            continue
+
+        # Strip inline Claude Code mentions from numbered list items,
+        # but keep the general rule content before it.
+        # e.g. "2. **Tiefenlimit:** ... **Claude Code:** ..." -> keep only before "Claude Code"
+        if '**Claude Code:' in line:
+            before = line[:line.index('**Claude Code:')].rstrip('. \t')
+            if before.strip():
+                result.append(before)
+            i += 1
+            continue
+
+        # Strip standalone "Auf Claude Code" lines
+        if stripped.startswith('Auf Claude Code'):
+            i += 1
+            continue
+
+        # Strip propagation paths for other providers
+        if stripped.startswith('- `.'):
+            path_match = stripped[3:].strip('`').strip()
+            if path_match.startswith('.claude/') or path_match.startswith('.gemini/') or path_match.startswith('.continue/') or path_match.startswith('.github/'):
+                i += 1
+                continue
+
+        # Collapse multiple blank lines
+        if stripped == '':
+            if result and result[-1] == '':
+                i += 1
+                continue
+
+        result.append(line)
+        i += 1
+
+    return '\n'.join(result).strip()
+
+
 def _collect_embedded_rules_md(
     agent_meta_root: Path,
     config: dict,
@@ -873,11 +974,11 @@ def _collect_embedded_rules_md(
     """Collect all active rules and return them as concatenated markdown.
 
     Used to embed rules into AGENTS.md for providers without a native rules directory
-    (e.g. opencode). Respects `opencode: skip` rule option and speech-mode config.
+    (e.g. opencode). Respects ``opencode: skip`` rule option and speech-mode config.
 
-    When compact=True (default for Opencode), each rule is reduced to a 3-line
-    summary block (title + 1-sentence summary + path) — full content stays in
-    rules/<layer>/*.md. This shrinks AGENTS.md managed-block from ~660 to ~80 lines.
+    When compact=True, each rule is condensed via ``_condense_rule_content`` to keep
+    all actionable content (lists, tables, code blocks, headings) while stripping
+    verbose sections (Warum, Propagation, Hintergrund) and provider-specific lines.
     """
     from .config import substitute, strip_inactive_conditional_blocks
     from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
@@ -920,13 +1021,9 @@ def _collect_embedded_rules_md(
         content = source_path.read_text(encoding='utf-8')
         content = substitute(content, merged_vars, rel_source, log)
         content = strip_inactive_conditional_blocks(content, merged_vars)
+        body = _strip_rule_frontmatter(content).strip()
         if compact:
-            body = _extract_rule_compact_from_content(
-                content, output_name, rel_source,
-                provider=provider, has_native_rules=provider_has_native_rules,
-            )
-        else:
-            body = _strip_rule_frontmatter(content).strip()
+            body = _condense_rule_content(body, provider)
         if body:
             sections.append(body)
             embedded_count += 1
@@ -942,13 +1039,9 @@ def _collect_embedded_rules_md(
             speech_content = speech_path.read_text(encoding='utf-8')
             speech_content = substitute(speech_content, merged_vars, f"speech/{mode}.md", log)
             speech_content = strip_inactive_conditional_blocks(speech_content, merged_vars)
+            body = _strip_rule_frontmatter(speech_content).strip()
             if compact:
-                body = _extract_rule_compact_from_content(
-                    speech_content, f"{mode}.md", f"speech/{mode}.md",
-                    provider=provider, has_native_rules=provider_has_native_rules,
-                )
-            else:
-                body = _strip_rule_frontmatter(speech_content).strip()
+                body = _condense_rule_content(body, provider)
             if body:
                 sections.append(body)
 
@@ -966,6 +1059,7 @@ def _build_opencode_managed_block(
     """Build the managed block for AGENTS.md: agent hints + all embedded rules."""
     from .config import substitute
 
+    pc = (provider_config or {}).get(provider, {})
     provider_dirs = {
         "Claude": ".claude/agents",
         "Opencode": ".opencode/agents",
@@ -990,11 +1084,26 @@ def _build_opencode_managed_block(
             f'\n## Agents\n\n{agent_locations}\n\n<!-- agent-meta:managed-end -->',
         )
 
-    # Phase 3: Rules pointer — AGENTS.md is shared by Opencode, Gemini and
-    # Mammouth, so the pointer must be generic (no provider-specific path).
+    # Phase 3: Embedded rules block.
+    # For providers without a native rules directory (context-embedded-rules
+    # capability, e.g. Opencode), literally embed the rules content into the
+    # managed block. Providers WITH native rules get a simple pointer text.
+    has_native_rules = pc.get("has_rules", False)
+    if has_native_rules:
+        rules_block = '> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.'
+    else:
+        rules_md = _collect_embedded_rules_md(
+            agent_meta_root, config, variables, log,
+            provider=provider, provider_config=provider_config,
+            compact=True,
+        )
+        if rules_md:
+            rules_block = rules_md
+        else:
+            rules_block = '> **Regeln:** Keine aktiven Regeln konfiguriert.'
     managed = managed.replace(
         '<!-- agent-meta:managed-end -->',
-        '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.\n\n<!-- agent-meta:managed-end -->',
+        f'\n## Regeln\n\n{rules_block}\n\n<!-- agent-meta:managed-end -->',
     )
 
     return managed
