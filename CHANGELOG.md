@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-07-22
+
+### Added
+- Activated 9 previously-defined agent roles across all providers: `principal-developer`, `refactoring-specialist`, `technical-writer`, `tester`, `validator`, `accessibility-specialist`, `data-engineer`, `docker`, `mammouth-expert` (`.meta-config/project.yaml` roles list; generated into `.claude/agents/`, `.gemini/agents/`, `.opencode/agents/`, `.mammouth/agents/`).
+- Environment-variable management: define secrets/config in `project.yaml` `environments:` section; sync.py generates per-platform `env.ps1` / `env.sh` / `env.unset.ps1` / `env.unset.sh` scripts under `.meta-config/`; Admin UI can list, add and delete environment variables via new `/api/environments` endpoints (`scripts/lib/env.py`, `scripts/admin-server.py`).
+- Live model catalog integration in the Admin UI: per-provider toggle between the curated model registry and the live `models.dev` catalog (`model-source-preference` in `project.yaml`, `default-model-source` in `config/ai-providers.yaml`), pricing overlay (`config/pricing-overlay.yaml`) and model suggestions endpoint; redesigned models table (`docs/ui/specs/models-dev-table-redesign.md`, `docs/ui/admin-ui.html`, `tests/browser/test_models_page.py`).
+- `ultra` tier added to Mammouth model presets across all tier profiles (Cheap, Normal, Advanced, Expensive, Expensive as Hell) in `config/tier-presets.yaml`.
+- `@opencode-ai/models` dependency (`package.json`) to support the models.dev integration.
+
+### Fixed
+- Duplicate Honcho MCP registration in Opencode — the plugin-based entry and the MCP-generated entry collided; new `provider-skip` mechanism in the MCP registry lets a server opt out of generation for a given provider (`scripts/lib/mcp.py`).
+- Honcho MCP now supports self-hosted instances via API key, not just the hosted default.
+- Stale model dropdown in the Admin UI models table not reflecting the active provider/source selection (`docs/ui/admin-ui.html`).
+- Provider sections in `AGENTS.md` are now generated dynamically as part of the managed block instead of going stale between syncs; header and footer are regenerated on every `sync.py` run.
+
+### Changed
+- Opencode `subagent_depth` set to `3` in generated Opencode settings and template.
+
 ## [0.78.0] - 2026-07-20
 
 ### Added
