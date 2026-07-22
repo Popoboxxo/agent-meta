@@ -220,6 +220,8 @@ orchestrator:
     main-chat: true
     ask-user: false
   checkpointing: true
+  native-extensions:
+    enabled: true
   handoff:
     protocol: a2a-v1
     validate-before-delegate: true

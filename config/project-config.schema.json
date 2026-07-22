@@ -966,6 +966,18 @@
           "default": false,
           "description": "Enable persistent session checkpoints in .meta-viz/checkpoint-<timestamp>.json. Allows resuming long orchestrations after context reset. Default: false."
         },
+        "native-extensions": {
+          "type": "object",
+          "description": "Exempt platform-native extension mechanisms (Skills, Plugins, Lifecycle-Hooks) from the STRICT-mode orchestrator gate. When enabled, platform-triggered flows are not treated as a delegation bypass. Default: true.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow native extension mechanisms to run without going through the orchestrator gate. Branch-guard, commit-conventions and DoD still apply to resulting code changes. Default: true."
+            }
+          },
+          "additionalProperties": false
+        },
         "direct-dispatch-enabled": {
           "type": "boolean",
           "default": true,
