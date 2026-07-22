@@ -5,7 +5,7 @@ description: WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, s
   tree analysis. Produces WCAG audit reports with A/AA/AAA severity and ARIA fix suggestions.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

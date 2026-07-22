@@ -4,7 +4,7 @@ description: API design, OpenAPI specifications, contract-first development. Cre
   and maintains API contracts.
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   read: allow
   edit: allow

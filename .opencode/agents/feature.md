@@ -4,7 +4,7 @@ description: 'Full feature lifecycle: Branch → Requirements → TDD → Implem
   → Validation → Commit → PR.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

@@ -13,7 +13,7 @@ tools:
 - url_context
 model: gemini-3.5-flash-high
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-log-analyzer-ext.md` exists → read and apply immediately.
 

@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-model: claude-sonnet-5
+model: claude-haiku-4-5-20251001
 ---
 
 > **Extension:** If `.claude/3-project/am-log-analyzer-ext.md` exists → read and apply immediately.

@@ -6,7 +6,7 @@ description: 'Systematic large-scale code transformation with safety nets: Stran
   refactoring plan, transformation sequence, rollback strategy and compatibility matrix.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

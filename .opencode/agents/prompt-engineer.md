@@ -4,7 +4,7 @@ description: The ultimate expert for prompt engineering. Designs, reviews, and o
   agent definitions based on best practices (OpenAI, Lakera).
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

@@ -12,7 +12,6 @@ package-lock.json
 .claude/pending-tasks.md
 .claude/settings.local.json
 .gemini/settings.local.json
-.mammouth/settings.local.json
 .mcp.json
 .meta-config/env.ps1
 .meta-config/env.sh

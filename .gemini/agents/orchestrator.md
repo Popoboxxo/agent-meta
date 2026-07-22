@@ -8,7 +8,7 @@ hint: Entry point for ALL development tasks — decomposes complex tasks and dis
 prompt_mode: modern
 model: gemini-3.1-pro-low
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-orchestrator-ext.md` exists → read and apply immediately.
 

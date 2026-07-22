@@ -4,7 +4,7 @@ description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit
   Does NOT judge code quality — that''s code-reviewer.'
 prompt_mode: modern
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow

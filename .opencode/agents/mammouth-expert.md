@@ -4,7 +4,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funkti
   Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/qwen3.7-plus
 permission:
   bash: allow
   read: allow
