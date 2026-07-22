@@ -153,9 +153,13 @@ def _regenerate_static_context(
     existing = target_path.read_text(encoding="utf-8")
     existing_header, existing_managed, existing_footer = _split_context_file(existing)
     if existing_managed is None:
-        # File has no managed block — not structured for a static/managed split.
-        # Leave it untouched to avoid corrupting user content.
-        log.info(rel_label, "no managed block — skipping static regeneration")
+        # File exists but has no managed block yet (e.g. a third-party tool
+        # created it first without the agent-meta marker). Header/footer
+        # regeneration needs a marker to split around, so it is deferred here;
+        # the managed-block step later in this same sync run inserts the
+        # marker (preserving this content verbatim), and the next sync will
+        # then regenerate the static header/footer normally.
+        log.info(rel_label, "no managed block yet — static regeneration deferred until marker exists")
         return
 
     if rebuild_footer:
@@ -324,6 +328,13 @@ def _update_managed_html_block(
     For Claude, the per-agent table is dropped from the managed block:
     Claude Code injects agent descriptions natively, so the table would be a
     duplication. Other providers keep the full table via {{AGENT_HINTS}}.
+
+    If the file already exists but has no agent-meta marker at all — e.g. a
+    third-party tool (Headroom/RTK and similar wrapper proxies) created it
+    first without ever running sync.py — the foreign content is never
+    discarded. The managed block is inserted above it instead, so agent-meta
+    initializes itself alongside the pre-existing content rather than never
+    initializing at all.
     """
     from .config import substitute
 
@@ -333,8 +344,6 @@ def _update_managed_html_block(
         r".*?<!--\s*agent-meta:managed-end\s*-->",
         re.DOTALL,
     )
-    if not managed_pattern.search(existing):
-        return
     template = _load_claude_md_managed_template(agent_meta_root)
     rel = str(target_path.relative_to(project_root))
     render_vars = variables
@@ -358,6 +367,26 @@ def _update_managed_html_block(
             '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.\n\n<!-- agent-meta:managed-end -->',
         )
 
+    if not managed_pattern.search(existing):
+        if not new_managed.strip():
+            log.warn(
+                f"{rel}: exists but has no agent-meta marker, and the managed "
+                "block could not be rendered — leaving the file untouched. "
+                "Add the following block manually at the desired location:\n"
+                "  <!-- agent-meta:managed-begin -->\n"
+                "  <!-- agent-meta:managed-end -->"
+            )
+            return
+        new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+        log.action(
+            "INIT", rel,
+            "managed block inserted — file existed without an agent-meta "
+            "marker (foreign content preserved below)",
+        )
+        if not dry_run:
+            target_path.write_text(new_content, encoding="utf-8")
+        return
+
     new_content = managed_pattern.sub(new_managed, existing, count=1)
     if new_content != existing:
         log.action("UPDATE", rel, "managed block")
@@ -365,6 +394,22 @@ def _update_managed_html_block(
             target_path.write_text(new_content, encoding="utf-8")
     else:
         log.skip(rel, "managed block unchanged")
+
+
+def _insert_managed_block_above_foreign_content(existing: str, new_managed: str) -> str:
+    """Prepend a freshly rendered managed block above pre-existing foreign content.
+
+    Used when a context file already exists but was never initialized by
+    agent-meta (no ``agent-meta:managed-begin/-end`` marker) — e.g. created by
+    a third-party tool such as Headroom/RTK. The foreign content is kept
+    byte-for-byte as a trailing block, mirroring how ``_split_injected_footer_tail``
+    already treats agent-injected trailing blocks below agent-meta's own
+    managed block.
+    """
+    stripped = existing.strip()
+    if not stripped:
+        return new_managed.rstrip("\n") + "\n"
+    return new_managed.rstrip("\n") + "\n\n" + existing
 
 
 def _sync_managed_block_context(
@@ -466,11 +511,11 @@ def _sync_opencode_context(
         log.action("UPDATE", context_file, "managed block (agent hints + rules)")
     else:
         existing = target_path.read_text(encoding="utf-8")
+        new_managed = _build_opencode_managed_block(
+            agent_meta_root, config, variables, log,
+            provider=provider, provider_config=provider_config
+        )
         if managed_pattern.search(existing):
-            new_managed = _build_opencode_managed_block(
-                agent_meta_root, config, variables, log,
-                provider=provider, provider_config=provider_config
-            )
             new_content = managed_pattern.sub(new_managed, existing, count=1)
             if new_content != existing:
                 log.action("UPDATE", context_file, "managed block (agent hints + rules)")
@@ -478,6 +523,28 @@ def _sync_opencode_context(
                     target_path.write_text(new_content, encoding="utf-8")
             else:
                 log.skip(context_file, "managed block unchanged")
+        elif not new_managed.strip():
+            log.warn(
+                f"{context_file}: exists but has no agent-meta marker, and the "
+                "managed block could not be rendered — leaving the file untouched. "
+                "Add the following block manually at the desired location:\n"
+                "  <!-- agent-meta:managed-begin -->\n"
+                "  <!-- agent-meta:managed-end -->"
+            )
+        else:
+            # File already existed but was never initialized by agent-meta —
+            # e.g. created by a third-party tool (Headroom/RTK and similar
+            # wrapper proxies) without our marker. Insert the managed block
+            # above the foreign content instead of leaving it uninitialized
+            # forever or discarding what is already there.
+            new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+            log.action(
+                "INIT", context_file,
+                "managed block inserted — file existed without an agent-meta "
+                "marker (foreign content preserved below)",
+            )
+            if not dry_run:
+                target_path.write_text(new_content, encoding="utf-8")
 
     # Bootstrap block cleanup: remove Gemini bootstrap if Gemini is not active.
     _cleanup_bootstrap_block(target_path, config, provider_config, log, dry_run,
