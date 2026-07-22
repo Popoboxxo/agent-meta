@@ -2168,10 +2168,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
         """models.dev-sourced model suggestions for ``provider_name``.
 
-        Returns ``[]`` for providers without a models.dev catalog slug. Ids are
-        namespaced (``<slug>/<raw-id>``) when the provider's registry tier
-        values use that convention, so suggestions stay format-compatible with
-        the registry view.
+        Returns ``[]`` for providers without a models.dev catalog slug. Ids
+        are always the raw models.dev id (1:1, no namespace prefix) so the
+        Admin UI dropdown shows exactly what models.dev reports, and so the
+        value persisted on save (model-tiers / tier-preset / provider-tier
+        overrides) is the same raw id, unchanged. The ``provider`` field
+        still carries the models.dev slug (e.g. ``opencode-go``) purely as
+        namespace info for display -- it is never re-applied as a prefix.
         """
         slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
         if not slug:
@@ -2181,15 +2184,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         node = providers.get(slug)
         if not isinstance(node, dict):
             return []
-        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
-        uses_namespaced = any("/" in v for v in tier_vals)
         out: list[dict] = []
         for m in (node.get("models") or {}).values():
             raw_id = m.get("id")
             if not raw_id:
                 continue
-            model_id = f"{slug}/{raw_id}" if uses_namespaced else raw_id
-            out.append({"id": model_id, "name": m.get("name") or raw_id, "provider": slug})
+            out.append({"id": raw_id, "name": m.get("name") or raw_id, "provider": slug})
         return out
 
     def _handle_get_model_source(self) -> None:
