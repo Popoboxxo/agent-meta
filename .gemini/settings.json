@@ -17,6 +17,13 @@
         "@playwright/mcp@latest"
       ]
     },
+    "reqflow": {
+      "type": "sse",
+      "url": "${MCP_REQFLOW_URL}/mcp/sse/",
+      "headers": {
+        "X-API-Key": "${MCP_REQFLOW_API_KEY}"
+      }
+    },
     "viz-logger": {
       "type": "stdio",
       "command": "python",
