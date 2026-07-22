@@ -5029,6 +5029,11 @@ async function viewProjectModelOverrides() {
 
 // Map agent-meta provider names -> models.dev provider IDs. Mirrors
 // PROVIDER_MODELSDEV_SLUGS in scripts/admin-server.py -- keep both in sync.
+// Opencode maps to the "opencode-go" slug: models.dev's catalog exposes it
+// as a distinct provider entry (api https://opencode.ai/zen/go/v1) that is
+// the exact same endpoint fetch_opencode_go_models() in
+// scripts/lib/model_discovery.py fetches directly, so the two sources
+// describe the same catalog.
 const PROVIDER_MODELSDEV_MAP = {
   "Claude": "anthropic",
   "Gemini": "google",
@@ -5917,6 +5922,18 @@ async function viewModels() {
 
     const controls = el("div", { class: "btn-row", style: "margin-bottom:12px;align-items:center;display:flex;gap:8px;" });
     const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+    refreshBtn.onclick = async () => {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = "Running sync.py...";
+      try {
+        const r = await api.post("/api/models/update");
+        if (r && r.success) { toast("Models updated", "success"); await loadRegistry(); render(); }
+        else toast((r && r.error) || "Failed", "error");
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = "Refresh via sync.py";
+      }
+    };
     controls.appendChild(refreshBtn);
     parent.appendChild(controls);
 

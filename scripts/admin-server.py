@@ -79,7 +79,13 @@ VALID_MODEL_SOURCES: tuple[str, ...] = ("registry", "modelsdev")
 # Framework provider name -> models.dev catalog slug. Mirrors
 # ``PROVIDER_MODELSDEV_MAP`` in ``docs/ui/admin-ui.html`` — keep both in sync.
 # Providers absent here (e.g. Mammouth, Continue) have no models.dev catalog
-# entry, so ``modelsdev`` yields no suggestions for them.
+# entry, so ``modelsdev`` yields no suggestions for them. Opencode maps to
+# the "opencode-go" slug: models.dev's catalog exposes it as a distinct
+# provider entry (api https://opencode.ai/zen/go/v1) that is the exact same
+# endpoint ``fetch_opencode_go_models()`` in
+# ``scripts/lib/model_discovery.py`` fetches directly, so the two sources
+# describe the same catalog and it's safe to resolve suggestions from
+# models.dev for this provider.
 PROVIDER_MODELSDEV_SLUGS: dict[str, str] = {
     "Claude": "anthropic",
     "Gemini": "google",
@@ -2298,9 +2304,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if not provider:
                 return self._send_json({"error": "provider query param required"}, status=400)
             source = self._resolve_model_source(provider)
-            if source == "modelsdev":
+            # Providers with no models.dev catalog slug (Mammouth, Continue)
+            # are registry-only regardless of what's persisted in
+            # ``model-source-preference`` -- a stale/manually-edited "modelsdev"
+            # entry must not silently degrade to an empty suggestion list (see
+            # ``PROVIDER_MODELSDEV_SLUGS``). Force registry and report the
+            # honest, effective source back to the caller.
+            if source == "modelsdev" and provider in PROVIDER_MODELSDEV_SLUGS:
                 models = self._suggestions_from_models_dev(provider)
             else:
+                source = "registry"
                 models = self._suggestions_from_registry(provider)
             return self._send_json({"provider": provider, "source": source, "models": models})
         except Exception as exc:
