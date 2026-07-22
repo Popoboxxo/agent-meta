@@ -465,6 +465,7 @@ roles:
     description: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
       via MCP, Druck-Optimierung
   se-requirements:
+    group: se
     model: balanced
     memory: project
     workflow_tier: optional
@@ -483,6 +484,7 @@ roles:
       target_roles:
       - se-critic
   se-architect:
+    group: se
     model: powerful
     memory: project
     workflow_tier: optional
@@ -503,6 +505,7 @@ roles:
       target_roles:
       - se-critic
   se-critic:
+    group: se
     model: powerful
     memory: ''
     workflow_tier: optional
@@ -524,6 +527,7 @@ roles:
       - se-requirements
       - se-interface-mgr
   se-interface-mgr:
+    group: se
     model: fast
     memory: project
     workflow_tier: optional
@@ -541,6 +545,7 @@ roles:
       target_roles:
       - se-termination
   se-termination:
+    group: se
     model: fast
     memory: ''
     workflow_tier: optional
@@ -556,6 +561,7 @@ roles:
       - interface-result-v1
       output_contract: termination-result-v1
   se-junior-developer:
+    group: se
     model: fast
     memory: ''
     workflow_tier: optional
@@ -586,6 +592,7 @@ roles:
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 120
   se-developer:
+    group: se
     model: balanced
     memory: ''
     workflow_tier: optional
@@ -615,6 +622,7 @@ roles:
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
   se-senior-developer:
+    group: se
     model: powerful
     memory: project
     workflow_tier: optional
@@ -645,6 +653,7 @@ roles:
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
   se-test-engineer:
+    group: se
     model: balanced
     memory: ''
     workflow_tier: optional
@@ -657,6 +666,7 @@ roles:
       parallel: true
       orchestrator_only: false
   se-testreviewer:
+    group: se
     model: powerful
     memory: ''
     permission_mode: plan
@@ -669,6 +679,7 @@ roles:
       parallel: true
       orchestrator_only: false
   se-verifier:
+    group: se
     model: balanced
     memory: project
     workflow_tier: optional
@@ -680,6 +691,7 @@ roles:
       parallel: true
       orchestrator_only: false
   se-validator:
+    group: se
     model: powerful
     memory: project
     workflow_tier: optional
@@ -690,6 +702,7 @@ roles:
       parallel: false
       orchestrator_only: false
   se-integration-and-test-manager:
+    group: se
     model: balanced
     memory: ''
     workflow_tier: optional

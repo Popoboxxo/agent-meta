@@ -1618,20 +1618,69 @@ async function viewRoleDefaults() {
   ]);
   wrap.appendChild(buttons);
 
-  const table = el("table", { class: "data" });
-  table.appendChild(el("thead", {}, [el("tr", {}, ["Role", "Model", "Tier", "Parallel", "Permission mode"].map(h => el("th", {}, [h])))]));
-  const tbody = el("tbody");
   const tierOptions = ["", "required", "recommended", "optional"];
   const modelOptions = ["", "nano", "fast", "balanced", "powerful", "max", "haiku", "sonnet", "opus"];
   const permOptions = ["", "default", "acceptEdits", "bypassPermissions", "plan"];
 
+  // filterState/mkSelect/mkText mirror the Model-Registry table pattern
+  // (see renderRegistryTable).
+  const filterState = { name: "", tier: "", permission_mode: "", group: "" };
+
+  // Group options are derived from the data itself (free-form field, no fixed enum).
+  const groupOptions = ["", ...Array.from(new Set(
+    Object.values(roles).map(attrs => attrs.group || "").filter(Boolean)
+  )).sort()];
+
+  const table = el("table", { class: "data" });
+  const tbody = el("tbody");
+
+  const applyFilters = () => {
+    tbody.querySelectorAll("tr").forEach(tr => {
+      const nameMatch = !filterState.name || tr.dataset.name.includes(filterState.name.toLowerCase());
+      const tierMatch = !filterState.tier || tr.dataset.tier === filterState.tier;
+      const permMatch = !filterState.permission_mode || tr.dataset.perm === filterState.permission_mode;
+      const groupMatch = !filterState.group || tr.dataset.group === filterState.group;
+      tr.style.display = (nameMatch && tierMatch && permMatch && groupMatch) ? "" : "none";
+    });
+  };
+
+  const mkSelect = (key, opts) => {
+    const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+    s.appendChild(el("option", { value: "" }, ["All"]));
+    opts.filter(o => o !== "").forEach(o => s.appendChild(el("option", { value: o }, [o])));
+    s.addEventListener("change", e => { filterState[key] = e.target.value; applyFilters(); });
+    return s;
+  };
+  const mkText = (key) => {
+    const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+    inp.addEventListener("input", e => { filterState[key] = e.target.value; applyFilters(); });
+    return inp;
+  };
+
+  table.appendChild(el("thead", {}, [el("tr", {}, [
+    el("th", {}, ["Role", el("br"), mkText("name")]),
+    el("th", {}, ["Group", el("br"), mkSelect("group", groupOptions)]),
+    el("th", {}, ["Model"]),
+    el("th", {}, ["Tier", el("br"), mkSelect("tier", tierOptions)]),
+    el("th", {}, ["Parallel"]),
+    el("th", {}, ["Permission mode", el("br"), mkSelect("permission_mode", permOptions)]),
+  ])]));
+
   Object.entries(roles).sort().forEach(([name, attrs]) => {
+    const tier = attrs.workflow_tier || attrs.tier || attrs["workflow-tier"] || "";
+    const perm = attrs.permission_mode || attrs.permissionMode || "";
+    const group = attrs.group || "";
     const tr = el("tr");
+    tr.dataset.name = name.toLowerCase();
+    tr.dataset.tier = tier;
+    tr.dataset.perm = perm;
+    tr.dataset.group = group;
     tr.appendChild(el("td", { class: "mono" }, [name]));
+    tr.appendChild(el("td", {}, [textField(group, v => { tr.dataset.group = v; updateRole(name, "group", v, status); applyFilters(); })]));
     tr.appendChild(el("td", {}, [selectField(modelOptions, attrs.model || "", v => updateRole(name, "model", v, status))]));
-    tr.appendChild(el("td", {}, [selectField(tierOptions, attrs.workflow_tier || attrs.tier || attrs["workflow-tier"] || "", v => updateRole(name, "workflow_tier", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(tierOptions, tier, v => { tr.dataset.tier = v; updateRole(name, "workflow_tier", v, status); applyFilters(); })]));
     tr.appendChild(el("td", {}, [toggleField(!!attrs.parallel, v => updateRole(name, "parallel", v, status))]));
-    tr.appendChild(el("td", {}, [selectField(permOptions, attrs.permission_mode || attrs.permissionMode || "", v => updateRole(name, "permission_mode", v, status))]));
+    tr.appendChild(el("td", {}, [selectField(permOptions, perm, v => { tr.dataset.perm = v; updateRole(name, "permission_mode", v, status); applyFilters(); })]));
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -1659,6 +1708,11 @@ function selectField(options, value, onChange) {
   }
   sel.addEventListener("change", () => onChange(sel.value));
   return sel;
+}
+function textField(value, onChange) {
+  const inp = el("input", { type: "text", value: value || "", style: "width:100%;box-sizing:border-box;" });
+  inp.addEventListener("change", () => onChange(inp.value));
+  return inp;
 }
 function toggleField(value, onChange) {
   const wrap = el("label", { class: "toggle" });
@@ -3940,7 +3994,7 @@ async function saveProjectSections(entries, statusEl) {
   if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
 }
 
-function textField(label, value, onInput, help) {
+function labeledTextField(label, value, onInput, help) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
   const inp = el("input", { type: "text", value: value ?? "" });
@@ -4048,9 +4102,9 @@ async function viewProjectGeneral() {
   wrap.appendChild(status);
 
   const panel = el("div", { class: "panel" });
-  panel.appendChild(textField("project.name", project.name, v => project.name = v));
-  panel.appendChild(textField("project.prefix", project.prefix, v => project.prefix = v));
-  panel.appendChild(textField("project.short", project.short, v => project.short = v));
+  panel.appendChild(labeledTextField("project.name", project.name, v => project.name = v));
+  panel.appendChild(labeledTextField("project.prefix", project.prefix, v => project.prefix = v));
+  panel.appendChild(labeledTextField("project.short", project.short, v => project.short = v));
   panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
   panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => top["rules-preset"] = v));
   panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
@@ -4857,8 +4911,8 @@ async function viewProjectVizAdmin() {
   const vizPanel = el("div", { class: "panel" });
   vizPanel.appendChild(el("h2", {}, ["viz"]));
   vizPanel.appendChild(checkboxField("enabled", viz.enabled, v => viz.enabled = v));
-  vizPanel.appendChild(textField("mode", viz.mode, v => viz.mode = v));
-  vizPanel.appendChild(textField("event_log", viz.event_log, v => viz.event_log = v));
+  vizPanel.appendChild(labeledTextField("mode", viz.mode, v => viz.mode = v));
+  vizPanel.appendChild(labeledTextField("event_log", viz.event_log, v => viz.event_log = v));
   vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["server (Viz dashboard)"]));
   vizPanel.appendChild(numField("server.port",         viz.server.port,         v => viz.server.port = v));
   vizPanel.appendChild(numField("server.timeout_sec",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
