@@ -8,6 +8,7 @@ hint: UI specification, mockup creation, and design-system definition — specif
 prompt_mode: modern
 tools:
 - code_execution
+generated-from: 1-generic-modern/ui-ux-designer.md@1.1.3
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

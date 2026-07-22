@@ -8,6 +8,7 @@ hint: 'Low-tier developer: trivial fixes, typos, small well-scoped changes — e
 prompt_mode: modern
 tools:
 - code_execution
+generated-from: 1-generic-modern/junior-developer.md@1.2.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

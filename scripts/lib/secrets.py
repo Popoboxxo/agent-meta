@@ -21,7 +21,7 @@ _SECRET_PATTERNS = [
     (r'(?i)api[_-]?key\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}', "Generic API key assignment"),
     (r'(?i)secret\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}', "Generic secret assignment"),
     (r'(?i)token\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}', "Generic token assignment"),
-    (r'(?i)password\s*[:=]\s*["\']?.{8,}', "Generic password assignment"),
+    (r'(?i)password\s*[:=]\s*["\']?[a-zA-Z0-9_\-!@#$%^&*()+]{8,}', "Generic password assignment"),
     # Bearer tokens: JWT format (eyJ...) used by Home Assistant, Keycloak, etc.
     (r'eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}', "JWT / Bearer token"),
     # InfluxDB tokens: long base64url strings (typically 86+ chars ending with ==)

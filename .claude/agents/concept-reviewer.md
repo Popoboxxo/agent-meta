@@ -12,6 +12,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
+generated-from: 1-generic-modern/concept-reviewer.md@1.0.2
 model: claude-opus-4-8
 permissionMode: plan
 ---

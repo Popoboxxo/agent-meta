@@ -8,6 +8,7 @@ prompt_mode: modern
 tools:
 - google_search
 - url_context
+generated-from: 1-generic-modern/concept-reviewer.md@1.0.2
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

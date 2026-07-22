@@ -13,6 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
+generated-from: 1-generic-modern/performance-optimizer.md@1.2.0
 model: claude-opus-4-8
 ---
 

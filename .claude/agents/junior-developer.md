@@ -14,6 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+generated-from: 1-generic-modern/junior-developer.md@1.2.0
 model: claude-haiku-4-5-20251001
 ---
 

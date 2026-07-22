@@ -10,6 +10,7 @@ tools:
 - Read
 - WebFetch
 - TodoWrite
+generated-from: 1-generic-modern/meta-feedback.md@2.1.3
 model: claude-haiku-4-5-20251001
 ---
 

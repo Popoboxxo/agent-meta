@@ -15,6 +15,7 @@ tools:
 - WebFetch
 - TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
+generated-from: 2-platform/agent-meta-mammouth-expert.md@1.0.0
 model: claude-sonnet-5
 memory: project
 ---

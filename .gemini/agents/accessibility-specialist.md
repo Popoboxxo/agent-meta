@@ -9,6 +9,7 @@ hint: 'Accessibility-Audit: WCAG 2.1/2.2, ARIA, Keyboard-Nav, Screenreader-Guide
 prompt_mode: modern
 tools:
 - code_execution
+generated-from: 1-generic-modern/accessibility-specialist.md@0.1.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

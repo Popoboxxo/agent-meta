@@ -16,6 +16,7 @@ tools:
 - TodoWrite
 - Agent
 based-on: 1-generic/developer.md@2.5.2
+generated-from: 2-platform/agent-meta-developer.md@1.0.3
 model: claude-sonnet-5
 ---
 

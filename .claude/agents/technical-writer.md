@@ -14,6 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+generated-from: 1-generic-modern/technical-writer.md@0.1.0
 model: claude-haiku-4-5-20251001
 memory: project
 ---

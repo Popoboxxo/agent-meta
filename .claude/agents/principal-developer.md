@@ -18,6 +18,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
+generated-from: 1-generic-modern/principal-developer.md@1.0.0
 model: claude-opus-4-8
 memory: project
 ---

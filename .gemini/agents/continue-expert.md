@@ -9,6 +9,7 @@ tools:
 - code_execution
 - url_context
 based-on: 1-generic/provider-expert.md@1.0.0
+generated-from: 2-platform/agent-meta-continue-expert.md@1.0.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

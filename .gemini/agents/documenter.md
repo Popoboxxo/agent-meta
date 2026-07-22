@@ -5,6 +5,7 @@ description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and sess
   insights.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
 prompt_mode: modern
+generated-from: 1-generic-modern/documenter.md@1.4.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
