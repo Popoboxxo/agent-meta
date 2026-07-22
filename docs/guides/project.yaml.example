@@ -24,6 +24,15 @@ orchestrator:
     main-chat: true
     ask-user: false
 
+  # native-extensions.enabled: Exempt platform-native extension mechanisms
+  #   (Skills, Plugins, Lifecycle-Hooks) from the STRICT-mode orchestrator gate.
+  #   true  → platform-triggered flows (e.g. a SessionStart hook loading a skill)
+  #           are not treated as a delegation bypass (default)
+  #   false → disable native extensions; their instructions stay informative only
+  #   Note: branch-guard, commit-conventions and DoD still apply to resulting changes.
+  native-extensions:
+    enabled: true
+
 # ============================================================
 # PARALLEL EXECUTION
 # ============================================================

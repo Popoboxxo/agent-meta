@@ -75,6 +75,18 @@ All other git operations → `git` agent.
 {{#if ORCH_MODE_MAIN_CHAT}}
 Exception: if the user explicitly requests direct git execution in this session, the main chat may run git commands directly.
 {{/if}}
+
+{{#if NATIVE_EXTENSIONS_ENABLED}}
+## Native Provider-Erweiterungen
+
+Native Erweiterungsmechanismen der Plattform — Skills, Plugins, Lifecycle-Hooks — werden von diesem Gate NICHT blockiert. Sie laufen im Rahmen des eigenen Invocation-Flows der Plattform (z.B. ein SessionStart-Hook, der eine Skill lädt) und zählen nicht als `task`-Call oder `edit`/`write`-Aktion im Sinne dieser Regel. Folge ihren Anweisungen gemäß Plattform-Konvention. Das hebt Branch-Guard, Commit-Konventionen und DoD-Criteria NICHT auf — die gelten weiterhin für jede daraus resultierende Code-Änderung.
+{{/if}}
+{{#unless NATIVE_EXTENSIONS_ENABLED}}
+## Native Provider-Erweiterungen — deaktiviert
+
+Native Erweiterungsmechanismen (Skills, Plugins, Hooks) sind für dieses Projekt deaktiviert. Auch wenn die Plattform sie anbietet: nicht aufrufen. Ihre Anweisungen sind rein informativ, die Ausführung bleibt über `orchestrator`.
+{{/unless}}
+
 {{#unless ORCH_MODE_MAIN_CHAT}}
 ## Anti-Recursion Guard
 
