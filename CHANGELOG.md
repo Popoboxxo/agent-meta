@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Optional, self-hostable `reqflow` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqFlow's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqflow-setup.md`, secrets template entries `MCP_REQFLOW_URL` / `MCP_REQFLOW_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
+
 ## [0.80.0] - 2026-07-22
 
 ### Added

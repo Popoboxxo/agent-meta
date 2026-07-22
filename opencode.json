@@ -10,6 +10,14 @@
         "@playwright/mcp@latest"
       ]
     },
+    "reqflow": {
+      "type": "remote",
+      "enabled": true,
+      "url": "{env:MCP_REQFLOW_URL}/mcp/sse/",
+      "headers": {
+        "X-API-Key": "{env:MCP_REQFLOW_API_KEY}"
+      }
+    },
     "viz-logger": {
       "type": "local",
       "enabled": true,
