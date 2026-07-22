@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-07-22
+
+### Added
+- Configurable native-extensions orchestrator-gate exemption: native provider extensions (plugins, hooks, skills — e.g. Claude "Superpowers") can now bypass the orchestrator gate when explicitly enabled via `.meta-config/project.yaml` (`scripts/lib/config.py`, `rules/1-generic/use-orchestrator.md`, `config/project-config.schema.json`, `docs/guides/project.yaml.example`).
+
 ## [0.79.1] - 2026-07-22
 
 ### Fixed
