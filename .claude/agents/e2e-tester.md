@@ -14,6 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+generated-from: 1-generic-modern/e2e-tester.md@1.0.0
 model: claude-sonnet-5
 ---
 

@@ -211,11 +211,15 @@ def build_frontmatter(content: str, name: str, description: str,
     """Replace name and description in YAML frontmatter.
 
     Preserves existing version/based-on fields.
-    The generated_from parameter is kept for API compatibility but is no longer
-    emitted as a frontmatter field because opencode rejects it.
+    Emits generated-from field for template traceability.
     """
     if _YAML_AVAILABLE:
-        removes = ["generated-from", "generated_from"]
+        removes = []
+        updates = {"name": name, "description": description}
+        if generated_from:
+            updates["generated-from"] = generated_from
+        else:
+            removes.extend(["generated-from", "generated_from"])
         # D15: drop a redundant `hint` when it is identical to the description.
         # `hint` and `description` come from different template fields but often
         # carry the same text, wasting tokens in every generated agent file. The
@@ -226,7 +230,7 @@ def build_frontmatter(content: str, name: str, description: str,
             removes.append("hint")
         return _update_frontmatter_dict(
             content,
-            updates={"name": name, "description": description},
+            updates=updates,
             removes=removes,
         )
 
@@ -240,12 +244,26 @@ def build_frontmatter(content: str, name: str, description: str,
         lambda m: f'{m.group(1)}{description}{m.group(3)}',
         content, count=1, flags=re.MULTILINE,
     )
-    # Remove any legacy generated-from field that might exist in templates
-    content = re.sub(
-        r'^generated-from:.*\n',
-        '',
-        content, count=1, flags=re.MULTILINE,
-    )
+    # Update or remove generated-from field
+    if generated_from:
+        if re.search(r'^generated-from:', content, flags=re.MULTILINE):
+            content = re.sub(
+                r'^generated-from:.*$',
+                f'generated-from: {generated_from}',
+                content, count=1, flags=re.MULTILINE,
+            )
+        else:
+            content = re.sub(
+                r'(^name:.*\n)',
+                rf'\1generated-from: {generated_from}\n',
+                content, count=1, flags=re.MULTILINE,
+            )
+    else:
+        content = re.sub(
+            r'^generated-from:.*\n',
+            '',
+            content, flags=re.MULTILINE,
+        )
     return content
 
 
@@ -1061,7 +1079,8 @@ def sync_agents(
         if layer == MODERN_DIR:
             rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
-        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run):
+        allow_secrets = config.get("allow-committed-secrets", False) if config else False
+        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
             log.action("WRITE", rel_out, rel_label)
         else:
             log.skip(rel_out, "unchanged")
@@ -1497,7 +1516,8 @@ def sync_agents_for_provider(
         if layer == MODERN_DIR:
             rel_label = f"{rel_label} [modern]"
         rel_out = str(target_path.relative_to(project_root))
-        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run):
+        allow_secrets = config.get("allow-committed-secrets", False) if config else False
+        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
             log.action('WRITE', rel_out, rel_label)
         else:
             log.skip(rel_out, 'unchanged')

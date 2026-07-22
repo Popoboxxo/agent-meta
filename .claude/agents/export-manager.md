@@ -12,6 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
+generated-from: 1-generic-modern/export-manager.md@1.1.3
 model: claude-haiku-4-5-20251001
 ---
 

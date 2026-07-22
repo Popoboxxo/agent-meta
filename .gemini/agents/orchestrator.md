@@ -6,6 +6,7 @@ description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, pa
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
   in parallel
 prompt_mode: modern
+generated-from: 1-generic-modern/orchestrator.md@7.6.1
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

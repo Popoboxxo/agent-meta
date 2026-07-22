@@ -12,6 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
+generated-from: 1-generic-modern/documenter.md@1.4.3
 model: claude-haiku-4-5-20251001
 memory: project
 ---

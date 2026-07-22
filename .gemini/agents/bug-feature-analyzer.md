@@ -8,6 +8,7 @@ hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope â€
 prompt_mode: modern
 tools:
 - code_execution
+generated-from: 1-generic-modern/bug-feature-analyzer.md@1.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert â€” er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).

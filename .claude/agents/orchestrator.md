@@ -11,6 +11,7 @@ tools:
 - Agent
 - Read
 - Write
+generated-from: 1-generic-modern/orchestrator.md@7.6.1
 model: claude-sonnet-5
 ---
 

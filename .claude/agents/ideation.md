@@ -13,6 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
+generated-from: 1-generic-modern/ideation.md@1.6.2
 model: claude-sonnet-5
 ---
 

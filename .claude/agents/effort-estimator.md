@@ -8,6 +8,7 @@ tools:
 - Read
 - Glob
 - Grep
+generated-from: 1-generic-modern/effort-estimator.md@1.0.2
 model: claude-haiku-4-5-20251001
 ---
 

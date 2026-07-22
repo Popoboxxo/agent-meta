@@ -8,6 +8,7 @@ prompt_mode: modern
 tools:
 - code_execution
 - url_context
+generated-from: 1-generic-modern/meta-feedback.md@2.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
