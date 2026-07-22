@@ -5,7 +5,8 @@ __pycache__/
 .local/
 CLAUDE.personal.md
 sync.log
-package-lock.json
+package-lock.
+graphify-out/
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/
