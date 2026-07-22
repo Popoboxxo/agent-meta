@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.79.1] - 2026-07-22
+
+### Fixed
+- Dead/non-functional registry-refresh button in the Admin UI now works.
+- Opencode was incorrectly classified as `registry-only` in the model routing logic.
+- Opencode's `models.dev` mode now returns raw model IDs without the namespace prefix (previously incorrectly prefixed).
+
 ## [0.79.0] - 2026-07-22
 
 ### Added
