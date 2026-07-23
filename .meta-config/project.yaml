@@ -9,6 +9,10 @@ dod-preset: rapid-prototyping
 rules-preset: silent
 systems-engineering:
   enabled: false
+knowledge-engine:
+  enabled: false
+  domain: research
+  bundle-path: knowledge
 platforms:
 - agent-meta
 mcp-servers:

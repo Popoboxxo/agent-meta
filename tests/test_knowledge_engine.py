@@ -1,5 +1,6 @@
 """Tests for scripts/lib/knowledge.py — Knowledge Engine Phase A scaffolding helpers."""
 from pathlib import Path
+import json
 
 import pytest
 
@@ -139,3 +140,28 @@ def test_build_variables_knowledge_enabled_true():
     assert variables["KNOWLEDGE_ENGINE_ENABLED"] == "true"
     assert variables["KNOWLEDGE_DOMAIN"] == "personal"
     assert variables["KNOWLEDGE_BUNDLE_PATH"] == "kb"
+
+
+# ---------------------------------------------------------------------------
+# config/project-config.schema.json — knowledge-engine property
+# ---------------------------------------------------------------------------
+
+def test_schema_has_knowledge_engine_property():
+    schema_path = _AGENT_META_ROOT / "config" / "project-config.schema.json"
+    with schema_path.open(encoding="utf-8") as f:
+        schema = json.load(f)
+    ke_schema = schema["properties"]["knowledge-engine"]
+    assert ke_schema["type"] == "object"
+    assert ke_schema["properties"]["enabled"]["type"] == "boolean"
+    assert ke_schema["properties"]["enabled"]["default"] is False
+    assert set(ke_schema["properties"]["domain"]["enum"]) == set(DOMAIN_CONCEPT_TYPES.keys())
+    assert ke_schema["properties"]["bundle-path"]["type"] == "string"
+
+
+def test_self_hosting_project_yaml_has_knowledge_engine_block():
+    import yaml
+    project_yaml_path = _AGENT_META_ROOT / ".meta-config" / "project.yaml"
+    with project_yaml_path.open(encoding="utf-8") as f:
+        project_config = yaml.safe_load(f)
+    assert project_config["knowledge-engine"]["enabled"] is False
+    assert project_config["knowledge-engine"]["domain"] in DOMAIN_CONCEPT_TYPES

@@ -851,6 +851,29 @@
       },
       "additionalProperties": false
     },
+    "knowledge-engine": {
+      "type": "object",
+      "description": "Knowledge Engine — opt-in bundle for structured, queryable project/domain knowledge (Phase A: activation + scaffolding only, no agents yet).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the Knowledge Engine. When true, sync.py scaffolds the bundle-path directory on first run."
+        },
+        "domain": {
+          "type": "string",
+          "enum": ["research", "personal", "business", "book", "custom"],
+          "default": "research",
+          "description": "Concept-type preset for schema.md generation. See scripts/lib/knowledge.py DOMAIN_CONCEPT_TYPES."
+        },
+        "bundle-path": {
+          "type": "string",
+          "default": "knowledge",
+          "description": "Root directory of the knowledge bundle, relative to the project root."
+        }
+      },
+      "additionalProperties": false
+    },
     "viz": {
       "type": "object",
       "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",
