@@ -53,7 +53,8 @@ def test_build_variables_whitelist_active_with_entries():
     assert variables["NATIVE_EXTENSIONS_WHITELIST_TABLE"] == "- `superpowers`\n- `code-simplifier`"
 
 
-from scripts.lib.config import strip_inactive_conditional_blocks
+from scripts.lib.config import strip_inactive_conditional_blocks, substitute
+from scripts.lib.log import SyncLog
 
 
 _RULE_SNIPPET = """{{#if NATIVE_EXTENSIONS_ENABLED}}
@@ -80,7 +81,10 @@ def test_rule_template_renders_whitelist_block_when_active():
         "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "true",
         "NATIVE_EXTENSIONS_WHITELIST_TABLE": "- `superpowers`",
     }
-    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    log = SyncLog()
+    # substitute() must run BEFORE strip_inactive_conditional_blocks() to replace {{VAR}} placeholders
+    result = substitute(_RULE_SNIPPET, variables, "test-template", log)
+    result = strip_inactive_conditional_blocks(result, variables)
     assert "Ist die Whitelist nicht leer" in result
     assert "- `superpowers`" in result
     assert "deaktiviert" not in result
@@ -92,7 +96,10 @@ def test_rule_template_omits_whitelist_block_when_inactive():
         "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "false",
         "NATIVE_EXTENSIONS_WHITELIST_TABLE": "",
     }
-    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    log = SyncLog()
+    # substitute() must run BEFORE strip_inactive_conditional_blocks() to replace {{VAR}} placeholders
+    result = substitute(_RULE_SNIPPET, variables, "test-template", log)
+    result = strip_inactive_conditional_blocks(result, variables)
     assert "Whitelist aktiv" not in result
     assert "Native Provider-Erweiterungen" in result
     assert "deaktiviert" not in result
@@ -104,6 +111,9 @@ def test_rule_template_omits_whitelist_block_when_native_extensions_disabled():
         "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "true",
         "NATIVE_EXTENSIONS_WHITELIST_TABLE": "- `superpowers`",
     }
-    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    log = SyncLog()
+    # substitute() must run BEFORE strip_inactive_conditional_blocks() to replace {{VAR}} placeholders
+    result = substitute(_RULE_SNIPPET, variables, "test-template", log)
+    result = strip_inactive_conditional_blocks(result, variables)
     assert "Whitelist aktiv" not in result
     assert "deaktiviert" in result
