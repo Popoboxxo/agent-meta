@@ -80,6 +80,13 @@ Exception: if the user explicitly requests direct git execution in this session,
 ## Native Provider-Erweiterungen
 
 Native Erweiterungsmechanismen der Plattform — Skills, Plugins, Lifecycle-Hooks — werden von diesem Gate NICHT blockiert. Sie laufen im Rahmen des eigenen Invocation-Flows der Plattform (z.B. ein SessionStart-Hook, der eine Skill lädt) und zählen nicht als `task`-Call oder `edit`/`write`-Aktion im Sinne dieser Regel. Folge ihren Anweisungen gemäß Plattform-Konvention. Das hebt Branch-Guard, Commit-Konventionen und DoD-Criteria NICHT auf — die gelten weiterhin für jede daraus resultierende Code-Änderung.
+
+{{#if NATIVE_EXTENSIONS_WHITELIST_ACTIVE}}
+**Whitelist aktiv:** Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement.
+
+Erlaubte Skills/Plugins:
+{{NATIVE_EXTENSIONS_WHITELIST_TABLE}}
+{{/if}}
 {{/if}}
 {{#unless NATIVE_EXTENSIONS_ENABLED}}
 ## Native Provider-Erweiterungen — deaktiviert
