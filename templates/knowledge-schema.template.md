@@ -15,7 +15,7 @@
 
 ## Usage
 
-Each concept type above maps to a Markdown file under `wiki/concepts/<type>/`.
-Entities, topics and sources are tracked separately under `wiki/entities/`,
-`wiki/topics/` and `wiki/sources/`. `wiki/index.md` is the entry point;
-`wiki/log.md` is the append-only change log.
+Each concept type above maps to a Markdown file under `{{KNOWLEDGE_BUNDLE_PATH}}/wiki/concepts/<type>/`.
+Entities, topics and sources are tracked separately under `{{KNOWLEDGE_BUNDLE_PATH}}/wiki/entities/`,
+`{{KNOWLEDGE_BUNDLE_PATH}}/wiki/topics/` and `{{KNOWLEDGE_BUNDLE_PATH}}/wiki/sources/`. `{{KNOWLEDGE_BUNDLE_PATH}}/wiki/index.md` is the entry point;
+`{{KNOWLEDGE_BUNDLE_PATH}}/wiki/log.md` is the append-only change log.

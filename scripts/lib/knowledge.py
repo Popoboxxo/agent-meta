@@ -37,6 +37,7 @@ def generate_schema(domain: str, bundle_path: str, agent_meta_root: Path) -> str
         template
         .replace("{{KNOWLEDGE_DOMAIN}}", domain)
         .replace("{{KNOWLEDGE_CONCEPT_TYPES}}", concept_list)
+        .replace("{{KNOWLEDGE_BUNDLE_PATH}}", bundle_path)
     )
 
 

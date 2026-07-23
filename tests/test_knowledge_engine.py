@@ -37,12 +37,14 @@ def test_domain_concept_types_values_are_nonempty_lists():
 
 @pytest.mark.parametrize("domain", ["research", "personal", "business", "book", "custom"])
 def test_generate_schema_renders_domain_and_concept_types(domain):
-    rendered = generate_schema(domain, "knowledge", _AGENT_META_ROOT)
+    rendered = generate_schema(domain, "my-bundle", _AGENT_META_ROOT)
     assert domain in rendered
     for concept_type in DOMAIN_CONCEPT_TYPES[domain]:
         assert f"- {concept_type}" in rendered
     assert "{{KNOWLEDGE_DOMAIN}}" not in rendered
     assert "{{KNOWLEDGE_CONCEPT_TYPES}}" not in rendered
+    assert "my-bundle" in rendered
+    assert "{{KNOWLEDGE_BUNDLE_PATH}}" not in rendered
 
 
 def test_generate_schema_unknown_domain_raises_value_error():
