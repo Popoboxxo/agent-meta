@@ -944,12 +944,13 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "Orchestrator operating mode. Takes precedence over legacy enabled/strict booleans. 'strict' = orchestrator mandatory, no user override. 'advisory' = orchestrator recommended, user-override allowed. 'main-chat' = no orchestrator subagent, main chat acts as router + worker.",
+          "description": "Orchestrator operating mode. Takes precedence over legacy enabled/strict booleans. 'strict' = orchestrator mandatory, no user override. 'advisory' = orchestrator recommended, user-override allowed. 'main-chat' = no orchestrator subagent, main chat acts as router + worker. Default: 'strict' (matches the legacy enabled=true/strict=true fallback derivation in sync.py when mode is unset).",
           "enum": [
             "strict",
             "advisory",
             "main-chat"
-          ]
+          ],
+          "default": "strict"
         },
         "enabled": {
           "type": "boolean",
@@ -1067,6 +1068,26 @@
             }
           },
           "additionalProperties": false
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override orchestrator.mode per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without 'mode' set) inherit the global orchestrator.mode default.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Per-provider orchestrator overrides.",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "description": "Orchestrator operating mode for this provider only. Same semantics as orchestrator.mode. When unset, inherits the global orchestrator.mode.",
+                "enum": [
+                  "strict",
+                  "advisory",
+                  "main-chat"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": true

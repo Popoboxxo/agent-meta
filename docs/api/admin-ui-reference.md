@@ -118,6 +118,12 @@ Toggle whether this specific sub-agent is active in your project. You can comple
 <!-- author: Agent Meta Admin -->
 The Orchestrator is the apex agent (`orchestrator.md`) responsible for interpreting the user's initial prompt and dynamically delegating work to specialized sub-agents. These settings define its cognitive boundaries.
 
+#### Field: Routing mode
+<!-- help-id: field-routing_mode -->
+<!-- last-updated: 2026-07-23 -->
+<!-- author: Agent Meta Admin -->
+Selects the Orchestrator's routing behavior (`orchestrator.mode` in `project.yaml`). `strict` (default) makes the orchestrator mandatory — every dev task is routed through it, no user override. `advisory` still recommends the orchestrator but allows the user to bypass it. `main-chat` removes the orchestrator subagent entirely — the main chat acts as router and worker itself. This field takes precedence over the deprecated `enabled`/`strict` booleans; if left unset, `sync.py` derives it from those legacy fields (`enabled=true` + `strict=true` → `strict`), which matches the framework default.
+
 #### Field: Maximum delegation depth
 <!-- help-id: field-maximum_delegation_depth -->
 <!-- last-updated: 2026-07-19 -->

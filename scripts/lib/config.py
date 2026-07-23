@@ -265,6 +265,65 @@ def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
         return {}
 
 
+_VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
+
+
+def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None) -> str:
+    """Compute the effective orchestrator mode ('strict'|'advisory'|'main-chat').
+
+    Precedence: provider_override['mode'] > orch_config['mode'] > legacy
+    enabled/strict booleans (matching the schema default enabled=true/strict=true
+    → 'strict'). provider_override is typically
+    orchestrator.provider-overrides.<Provider> from project.yaml; pass None (or a
+    dict without 'mode') to fall back to the global orchestrator.mode.
+    """
+    _mode = None
+    if provider_override and provider_override.get("mode") is not None:
+        _mode = provider_override.get("mode")
+    else:
+        _mode = orch_config.get("mode")
+
+    if _mode is not None:
+        _normalized_mode = str(_mode).strip().lower()
+        if _normalized_mode not in _VALID_ORCH_MODES:
+            print(
+                f"ERROR: Invalid orchestrator.mode value: {_mode!r}. "
+                f"Valid values are: {sorted(_VALID_ORCH_MODES)}. "
+                "Hint: use 'main-chat' instead of 'disabled'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return _normalized_mode
+
+    _orch_enabled = orch_config.get("enabled", True)
+    _orch_strict = orch_config.get("strict", True)
+    if not _orch_enabled:
+        return "main-chat"
+    elif _orch_strict:
+        return "strict"
+    else:
+        return "advisory"
+
+
+def _orch_mode_flags(orch_mode: str) -> dict:
+    """Return the mutually-exclusive, flat ORCH_MODE_* flags for a resolved mode.
+
+    Exactly one of ORCH_MODE_STRICT/ORCH_MODE_ADVISORY/ORCH_MODE_MAIN_CHAT is
+    "true". Used both for the global variables dict and for per-provider
+    overrides (see scripts/sync.py per-provider loop).
+    """
+    _is_main_chat = orch_mode == "main-chat"
+    return {
+        # ORCH_MODE_DISABLED is a deprecated alias kept for backward compat — it
+        # mirrors ORCH_MODE_MAIN_CHAT so legacy templates keep rendering. New
+        # templates use ORCH_MODE_MAIN_CHAT.
+        "ORCH_MODE_MAIN_CHAT": "true" if _is_main_chat else "false",
+        "ORCH_MODE_DISABLED": "true" if _is_main_chat else "false",
+        "ORCH_MODE_STRICT": "true" if orch_mode == "strict" else "false",
+        "ORCH_MODE_ADVISORY": "true" if orch_mode == "advisory" else "false",
+    }
+
+
 def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str]]:
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
@@ -374,40 +433,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # ORCH_MODE_*: mutually-exclusive, flat mode flags for the use-orchestrator rule.
     # Exactly one is "true". These replace nested {{#if}}/{{else}} in the rule
     # template so the conditional stripper can never render two modes at once.
-    # orchestrator.mode (enum: strict|advisory|main-chat) takes precedence over
-    # the legacy enabled/strict booleans. Missing mode → derive from legacy fields.
-    _orch_mode = orch_config.get("mode")
-    if _orch_mode is not None:
-        _valid_orch_modes = {"strict", "advisory", "main-chat"}
-        _normalized_mode = str(_orch_mode).strip().lower()
-        if _normalized_mode not in _valid_orch_modes:
-            import sys
-            print(
-                f"ERROR: Invalid orchestrator.mode value: {_orch_mode!r}. "
-                f"Valid values are: {sorted(_valid_orch_modes)}. "
-                "Hint: use 'main-chat' instead of 'disabled'.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        _orch_mode = _normalized_mode
-    else:
-        _orch_enabled = orch_config.get("enabled", True)
-        _orch_strict = orch_config.get("strict", True)
-        if not _orch_enabled:
-            _orch_mode = "main-chat"
-        elif _orch_strict:
-            _orch_mode = "strict"
-        else:
-            _orch_mode = "advisory"
-    _orch_mode = str(_orch_mode).strip().lower()
-    _is_main_chat = _orch_mode == "main-chat"
-    # ORCH_MODE_DISABLED is a deprecated alias kept for backward compat — it mirrors
-    # ORCH_MODE_MAIN_CHAT so legacy templates keep rendering. New templates use
-    # ORCH_MODE_MAIN_CHAT.
-    variables["ORCH_MODE_MAIN_CHAT"] = "true" if _is_main_chat else "false"
-    variables["ORCH_MODE_DISABLED"]  = "true" if _is_main_chat else "false"
-    variables["ORCH_MODE_STRICT"]    = "true" if _orch_mode == "strict" else "false"
-    variables["ORCH_MODE_ADVISORY"]  = "true" if _orch_mode == "advisory" else "false"
+    # Resolution (mode precedence + legacy fallback) lives in _resolve_orch_mode()
+    # so per-provider overrides (orchestrator.provider-overrides.<Provider>.mode)
+    # can reuse the same logic in scripts/sync.py.
+    _orch_mode = _resolve_orch_mode(orch_config)
+    variables.update(_orch_mode_flags(_orch_mode))
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.

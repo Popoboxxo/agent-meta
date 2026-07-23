@@ -531,6 +531,22 @@ orchestrator:
   mode: main-chat           # direct execution, no subagent overhead
 ```
 
+#### Per-Provider Overrides
+
+The `orchestrator.mode` above is the framework default, applied to every provider. Override it
+for a single provider via `orchestrator.provider-overrides`:
+
+```yaml
+orchestrator:
+  mode: main-chat                  # framework default for all providers
+  provider-overrides:
+    Gemini:
+      mode: strict                 # Gemini gets a dedicated orchestrator subagent
+```
+
+Providers without an entry (or without `mode` set) inherit the global `orchestrator.mode`.
+Configurable via the Admin UI under Orchestrator → Provider Overrides.
+
 ### Synchronization Variables
 
 Custom project variables for conditional feature activation:

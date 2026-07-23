@@ -237,6 +237,10 @@ orchestrator:
       session_budget: 200000
       max_overhead_pct: 10
       on_exceed: compact
+  mode: strict
+  provider-overrides:
+    Claude:
+      mode: main-chat
 viz:
   enabled: false
   mode: 'off'
