@@ -69,3 +69,38 @@ def test_generate_initial_log_has_expected_sections():
     assert "# Knowledge Log" in content
     assert "## Format" in content
     assert "## Entries" in content
+
+
+# ---------------------------------------------------------------------------
+# _is_role_enabled() — knowledge- prefix branch
+# ---------------------------------------------------------------------------
+
+from scripts.lib.agents import _is_role_enabled
+
+
+def test_knowledge_role_enabled_when_config_true():
+    config = {"knowledge-engine": {"enabled": True}}
+    assert _is_role_enabled("knowledge-curator", config) is True
+
+
+def test_knowledge_role_disabled_when_config_false():
+    config = {"knowledge-engine": {"enabled": False}}
+    assert _is_role_enabled("knowledge-curator", config) is False
+
+
+def test_knowledge_role_disabled_when_config_missing():
+    assert _is_role_enabled("knowledge-curator", {}) is False
+
+
+def test_knowledge_role_disabled_when_block_present_but_empty():
+    assert _is_role_enabled("knowledge-curator", {"knowledge-engine": {}}) is False
+
+
+def test_se_role_still_defaults_to_enabled_unaffected():
+    """Regression: existing se- behavior must not change."""
+    assert _is_role_enabled("se-architect", {}) is True
+
+
+def test_non_prefixed_role_always_enabled():
+    """Regression: roles without se-/knowledge- prefix are unaffected."""
+    assert _is_role_enabled("developer", {"knowledge-engine": {"enabled": False}}) is True

@@ -395,6 +395,9 @@ def _is_role_enabled(role: str, config: dict) -> bool:
     if role.startswith("se-"):
         se_config = config.get("systems-engineering") or {}
         return se_config.get("enabled", True)
+    if role.startswith("knowledge-"):
+        ke_config = config.get("knowledge-engine") or {}
+        return ke_config.get("enabled", False)
     return True
 
 
