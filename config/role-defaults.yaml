@@ -1095,6 +1095,148 @@ roles:
       - Mammouth Code
       parallel: false
       orchestrator_only: false
+  knowledge-curator:
+    group: knowledge
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: >-
+      Strategische Knowledge-Engine-Steuerung: Schema-Evolution,
+      Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance.
+    routing:
+      intent_keywords:
+      - Knowledge
+      - Wiki
+      - Wissen
+      - Schema
+      - Knowledge-Engine
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: knowledge-spec-v1
+  knowledge-ingestor:
+    group: knowledge
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: >-
+      Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
+      aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.
+    routing:
+      intent_keywords:
+      - Ingest
+      - Source verarbeiten
+      - einlesen
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - knowledge-spec-v1
+      output_contract: knowledge-ingest-v1
+      timeout_sec: 300
+  knowledge-querier:
+    group: knowledge
+    model: fast
+    memory: ''
+    workflow_tier: optional
+    description: >-
+      Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
+      Drill-in, Synthese mit Citations. File-Back guter Antworten.
+    routing:
+      intent_keywords:
+      - Wiki-Frage
+      - Was wissen wir
+      - Knowledge Query
+      - Recherche im Wiki
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: dev-result-v1
+      timeout_sec: 120
+  knowledge-linter:
+    group: knowledge
+    model: fast
+    memory: ''
+    workflow_tier: optional
+    description: >-
+      Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
+      kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.
+    routing:
+      intent_keywords:
+      - Wiki-Lint
+      - Wiki-Check
+      - Knowledge Lint
+      - Wiki-Gesundheit
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: knowledge-lint-v1
+  knowledge-indexer:
+    group: knowledge
+    model: nano
+    memory: ''
+    workflow_tier: optional
+    description: >-
+      Pflegt index.md (Content-Katalog, OKF §6) und log.md
+      (Chronologisches Event-Log, OKF §7) im Knowledge Wiki.
+    routing:
+      parallel: true
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - knowledge-ingest-v1
+      output_contract: dev-result-v1
+  knowledge-gardener:
+    group: knowledge
+    model: nano
+    memory: ''
+    workflow_tier: optional
+    description: >-
+      Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
+      Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.
+    routing:
+      intent_keywords:
+      - Wiki-Pflege
+      - Links reparieren
+      - Tags aufräumen
+      - Wiki aufräumen
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - knowledge-lint-v1
+      - task-spec-v1
+      output_contract: dev-result-v1
+  knowledge-migrator:
+    group: knowledge
+    model: balanced
+    memory: ''
+    workflow_tier: optional
+    description: >-
+      Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
+      Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
+      Schützt documenter- und requirements-eigene Dateien.
+    routing:
+      intent_keywords:
+      - Migrieren
+      - Aufräumen
+      - Wiki-Migration
+      - Docs migrieren
+      - Vorhandene Docs ins Wiki
+      parallel: false
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: knowledge-migration-v1
+      timeout_sec: 600
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

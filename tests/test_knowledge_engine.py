@@ -182,3 +182,40 @@ def test_build_variables_knowledge_derived_paths_default_bundle():
     assert variables["KNOWLEDGE_SCHEMA_PATH"] == "knowledge/schema.md"
     assert variables["KNOWLEDGE_WIKI_DIR"] == "knowledge/wiki"
     assert variables["KNOWLEDGE_SOURCES_DIR"] == "knowledge/sources"
+
+
+# ---------------------------------------------------------------------------
+# config/role-defaults.yaml — 7 knowledge-* roles
+# ---------------------------------------------------------------------------
+
+from scripts.lib.roles import load_roles_config
+
+
+def test_role_defaults_has_seven_knowledge_roles():
+    roles_cfg = load_roles_config(_AGENT_META_ROOT)
+    roles = roles_cfg["roles"]
+    expected = {
+        "knowledge-curator", "knowledge-ingestor", "knowledge-querier",
+        "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator",
+    }
+    assert expected.issubset(roles.keys())
+    for name in expected:
+        assert roles[name]["group"] == "knowledge"
+        assert roles[name]["workflow_tier"] == "optional"
+        assert "conditional" not in roles[name]
+
+
+def test_knowledge_indexer_has_no_intent_keywords():
+    roles_cfg = load_roles_config(_AGENT_META_ROOT)
+    routing = roles_cfg["roles"]["knowledge-indexer"]["routing"]
+    assert "intent_keywords" not in routing
+    assert routing["orchestrator_only"] is True
+
+
+def test_knowledge_roles_pass_schema_validation():
+    import subprocess
+    result = subprocess.run(
+        ["python", str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
+        cwd=_AGENT_META_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
