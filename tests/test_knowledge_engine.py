@@ -104,3 +104,38 @@ def test_se_role_still_defaults_to_enabled_unaffected():
 def test_non_prefixed_role_always_enabled():
     """Regression: roles without se-/knowledge- prefix are unaffected."""
     assert _is_role_enabled("developer", {"knowledge-engine": {"enabled": False}}) is True
+
+
+# ---------------------------------------------------------------------------
+# build_variables() — KNOWLEDGE_* injection
+# ---------------------------------------------------------------------------
+
+from scripts.lib.config import build_variables
+
+_TEST_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _minimal_config(**overrides) -> dict:
+    config = {
+        "project": {"name": "test-proj", "prefix": "tp", "short": "test-proj"},
+        "ai-providers": ["Claude"],
+    }
+    config.update(overrides)
+    return config
+
+
+def test_build_variables_knowledge_defaults_when_block_absent():
+    variables, _ = build_variables(_minimal_config(), _AGENT_META_ROOT)
+    assert variables["KNOWLEDGE_ENGINE_ENABLED"] == "false"
+    assert variables["KNOWLEDGE_DOMAIN"] == "research"
+    assert variables["KNOWLEDGE_BUNDLE_PATH"] == "knowledge"
+
+
+def test_build_variables_knowledge_enabled_true():
+    config = _minimal_config(**{
+        "knowledge-engine": {"enabled": True, "domain": "personal", "bundle-path": "kb"},
+    })
+    variables, _ = build_variables(config, _AGENT_META_ROOT)
+    assert variables["KNOWLEDGE_ENGINE_ENABLED"] == "true"
+    assert variables["KNOWLEDGE_DOMAIN"] == "personal"
+    assert variables["KNOWLEDGE_BUNDLE_PATH"] == "kb"
