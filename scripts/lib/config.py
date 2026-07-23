@@ -516,6 +516,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["KNOWLEDGE_ENGINE_ENABLED"] = "true" if ke_config.get("enabled", False) else "false"
     variables["KNOWLEDGE_DOMAIN"] = ke_config.get("domain", "research")
     variables["KNOWLEDGE_BUNDLE_PATH"] = ke_config.get("bundle-path", "knowledge")
+    variables["KNOWLEDGE_SCHEMA_PATH"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/schema.md"
+    variables["KNOWLEDGE_WIKI_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/wiki"
+    variables["KNOWLEDGE_SOURCES_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/sources"
     # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
     t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
     variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
@@ -690,7 +693,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     (e.g. DOD_REQ_TRACEABILITY accidentally matching the ORCHESTRATOR_ENABLED
     block's {{else}} token).
     """
-    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED", "WEB_PROJECT_ENABLED")) and k != "DOD_PRESET"}
+    conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED", "WEB_PROJECT_ENABLED", "KNOWLEDGE_ENGINE_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})

@@ -165,3 +165,20 @@ def test_self_hosting_project_yaml_has_knowledge_engine_block():
         project_config = yaml.safe_load(f)
     assert project_config["knowledge-engine"]["enabled"] is False
     assert project_config["knowledge-engine"]["domain"] in DOMAIN_CONCEPT_TYPES
+
+
+def test_build_variables_knowledge_derived_paths():
+    config = _minimal_config(**{
+        "knowledge-engine": {"enabled": True, "domain": "research", "bundle-path": "kb"},
+    })
+    variables, _ = build_variables(config, _AGENT_META_ROOT)
+    assert variables["KNOWLEDGE_SCHEMA_PATH"] == "kb/schema.md"
+    assert variables["KNOWLEDGE_WIKI_DIR"] == "kb/wiki"
+    assert variables["KNOWLEDGE_SOURCES_DIR"] == "kb/sources"
+
+
+def test_build_variables_knowledge_derived_paths_default_bundle():
+    variables, _ = build_variables(_minimal_config(), _AGENT_META_ROOT)
+    assert variables["KNOWLEDGE_SCHEMA_PATH"] == "knowledge/schema.md"
+    assert variables["KNOWLEDGE_WIKI_DIR"] == "knowledge/wiki"
+    assert variables["KNOWLEDGE_SOURCES_DIR"] == "knowledge/sources"
