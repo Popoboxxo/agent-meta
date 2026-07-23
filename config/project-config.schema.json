@@ -1068,6 +1068,26 @@
             }
           },
           "additionalProperties": false
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override orchestrator.mode per provider. Keys are provider names (Claude, Gemini, Opencode, Continue, Copilot, Mammouth). Providers without an entry (or without 'mode' set) inherit the global orchestrator.mode default.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Per-provider orchestrator overrides.",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "description": "Orchestrator operating mode for this provider only. Same semantics as orchestrator.mode. When unset, inherits the global orchestrator.mode.",
+                "enum": [
+                  "strict",
+                  "advisory",
+                  "main-chat"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": true

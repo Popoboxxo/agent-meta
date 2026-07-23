@@ -4646,6 +4646,43 @@ async function viewProjectOrchestrator() {
 
   wrap.appendChild(delPanel);
 
+  // ── Provider Overrides ──────────────────────────────────────────────────────
+  // Per-provider override of orchestrator.mode. Providers without an entry (or
+  // with "(inherit default)" selected) fall back to the global "mode" set above.
+  const provOverrides = (orch["provider-overrides"] && typeof orch["provider-overrides"] === "object")
+    ? clone(orch["provider-overrides"]) : {};
+  const activeProviders = Array.isArray(data["ai-providers"]) ? data["ai-providers"] : [];
+  const povPanel = el("div", { class: "panel" });
+  povPanel.appendChild(el("h2", {}, ["Provider Overrides"]));
+  povPanel.appendChild(el("p", { class: "muted" }, [
+    "Override the orchestrator mode for a single provider. Leave at “(inherit default)” to use the General mode above.",
+  ]));
+  const MODE_OPTIONS = ["", "strict", "advisory", "main-chat"];
+  for (const prov of activeProviders) {
+    const provEntry = (provOverrides[prov] && typeof provOverrides[prov] === "object") ? provOverrides[prov] : {};
+    const row = el("div", { class: "field-row" });
+    row.appendChild(el("label", { class: "field-label" }, [prov]));
+    const sel = el("select", { class: "select" });
+    for (const opt of MODE_OPTIONS) {
+      const o = el("option", { value: opt }, [opt || "(inherit default)"]);
+      if ((provEntry.mode || "") === opt) o.setAttribute("selected", "");
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => {
+      if (sel.value) {
+        provOverrides[prov] = { ...provEntry, mode: sel.value };
+      } else {
+        delete provOverrides[prov];
+      }
+    });
+    row.appendChild(sel);
+    povPanel.appendChild(row);
+  }
+  if (activeProviders.length === 0) {
+    povPanel.appendChild(el("p", { class: "muted" }, ["No active providers configured — set ai-providers first."]));
+  }
+  wrap.appendChild(povPanel);
+
   // ── Token Budget ──────────────────────────────────────────────────────────
   const tb = (hf["token-budget"] && typeof hf["token-budget"] === "object") ? hf["token-budget"] : {};
   const tbPanel = el("div", { class: "panel" });
@@ -4709,6 +4746,11 @@ async function viewProjectOrchestrator() {
       }
       if (Object.keys(del).length > 0 || orch.delegation !== undefined) {
         orch.delegation = del;
+      }
+      if (Object.keys(provOverrides).length > 0) {
+        orch["provider-overrides"] = provOverrides;
+      } else {
+        delete orch["provider-overrides"];
       }
       try { await saveProjectSection("orchestrator", orch, status); } catch { /* toast shown */ }
     } }, ["Save"]),

@@ -1,19 +1,76 @@
-# CRITICAL GATE — VERIFY BEFORE EVERY ACTION
+# Main-Chat Mode — Router + Worker
 
-YOU ARE THE MAIN CHAT. Do not perform code changes directly.
-- No `edit`, `write`, or mutating `bash` calls
-- No `task` calls — delegate only to `orchestrator`
-- Read-only bash allowed: `git status`, `git log`, `git diff`, `git branch --show-current`, `git branch -l`
-- All git mutations → `git` agent
-- Every dev task → `orchestrator` first
+The main chat acts as both router and worker. No separate orchestrator subagent is spawned.
 
-Violation: PreToolUse hook blocks these changes.
+**Responsibilities:**
+- Classify the task (Feature, Bugfix, Refactoring, Docs, ...)
+- Select execution tier (junior / developer / senior) or execute directly
+- Apply HITL gates before risky operations (branch delete, force-push, schema migration, DELETE, release)
+- Delegate to specialist agents for isolated work — one level deep, sequential
 
-# Orchestrator — Universal Router
+**Intent-Routing:**
+| Intent | Ziel | Tier | Parallel |
+|--------|------|------|----------|
+| accessibility / a11y / WCAG / ARIA | `accessibility-specialist` | balanced | Ja |
+| Meta-Fragen / agent-meta / Agenten verwalten | `agent-meta-manager` | fast | Nein |
+| Scout / neue Skills / Ökosystem | `agent-meta-scout` | fast | Ja |
+| API / OpenAPI / Contract-First | `api-specialist` | balanced | Nein |
+| Triage / Bug/Feature / klassifizieren | `bug-feature-analyzer` | fast | Ja |
+| Claude / Claude Code | `claude-expert` | powerful | Nein |
+| Code Review / Code-Qualität / Audit | `code-reviewer` | powerful | Ja |
+| Konzept Review / Design Review | `concept-reviewer` | powerful | Ja |
+| Continue | `continue-expert` | powerful | Nein |
+| Copilot / GitHub Copilot | `copilot-expert` | powerful | Nein |
+| ETL / ELT / data pipeline / data quality | `data-engineer` | balanced | Ja |
+| database / schema / migration / query optimization | `database-engineer` | powerful | Nein |
+| dependency / license / SBOM / package audit | `dependency-auditor` | balanced | Ja |
+| Feature / Bugfix / Refactoring / Implementierung | `developer` | balanced | Ja |
+| CI/CD / Kubernetes / Infrastruktur | `devops-engineer` | fast | Ja |
+| Docker / Dev-Stack / Container | `docker` | fast | Nein |
+| Dokumentation / README / Docs / Doku | `documenter` | fast | Ja |
+| E2E / End-to-End / Browser-Test / visuelle Regression | `e2e-tester` | balanced | Ja |
+| Aufwand / Schätzung / Kosten | `effort-estimator` | fast | Nein |
+| Codebase / Dependencies / Impact / Recherche | `explorer` | fast | Ja |
+| Export / Routing / Target | `export-manager` | fast | Nein |
+| Feature Lifecycle / komplexes Feature / Feature Pipeline | `feature` | balanced | Ja |
+| Feedback / Issue / Bug melden | `feedback` | nano | Nein |
+| Gemini / Antigravity | `gemini-expert` | balanced | Nein |
+| Git / Commit / Branch / Push | `git` | nano | Nein |
+| Design / Konzept / Architektur / Idee | `ideation` | balanced | Ja |
+| incident / outage / RCA / root cause | `incident-responder` | balanced | Nein |
+| [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
+| Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
+| Log / Logs / Fehleranalyse | `log-analyzer` | fast | Ja |
+| Mammouth / Mammouth Code | `mammouth-expert` | balanced | Nein |
+| Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |
+| Opencode | `opencode-expert` | balanced | Nein |
+| Performance / Bottleneck / Optimierung | `performance-optimizer` | powerful | Nein |
+| Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten. | `principal-developer` | max | Nein |
+| backlog / user story / sprint planning / prioritization | `product-manager` | balanced | Nein |
+| Prompt / Prompt Engineering / Agenten-Definition | `prompt-engineer` | balanced | Nein |
+| refactoring / strangler fig / legacy modernization / code smell | `refactoring-specialist` | balanced | Nein |
+| Release / Version / Changelog | `release` | fast | Nein |
+| Anforderungen / REQ-ID / Requirements | `requirements` | fast | Nein |
+| Security / Audit / OWASP | `security-auditor` | powerful | Nein |
+| Komplex / Architektur / schwieriger Bug / Cross-Cutting | `senior-developer` | powerful | Nein |
+| SLO / SLI / error budget / reliability | `sre-engineer` | balanced | Ja |
+| API reference / getting started / tutorial / SDK docs | `technical-writer` | fast | Ja |
+| UI / UX / Mockup / Design | `ui-ux-designer` | balanced | Ja |
+| Validierung / DoD / Traceability | `validator` | balanced | Nein |
+| Reflection-Loop | self (REPEAT_UNTIL) | balanced→powerful | Nein |
+| Nicht in Tabelle | User fragen | — | — |
 
-**STRICT MODE — no exceptions.** Every dev task goes through `orchestrator`. No user override, no direct dispatch.
+**Reduced overhead (no multi-agent protocol):**
+- No BARRIER / FANOUT
+- No A2A envelope protocol
+- No orchestrator checkpointing or session-state management
+- Delegation depth: main_chat (0) → worker (1)
 
-Auto-handoff: the main chat always delegates to `orchestrator` via a native tool call — no `@orchestrator` mention in output.
+**Still active (modusunabhängige Rules):**
+- `branch-guard` — feature-branch rule always applies
+- `commit-conventions` — Conventional Commits format always applies
+- `dod-criteria` — Definition of Done always applies
+- `issue-lifecycle` — GitHub Issue close always applies
 
 ## Git Delegation — Hard Rule
 
@@ -25,11 +82,9 @@ Allowed read-only: `git status`, `git log`, `git diff`, `git branch --show-curre
 
 All other git operations → `git` agent.
 
+Exception: if the user explicitly requests direct git execution in this session, the main chat may run git commands directly.
 
 ## Native Provider-Erweiterungen
 
 Native Erweiterungsmechanismen der Plattform — Skills, Plugins, Lifecycle-Hooks — werden von diesem Gate NICHT blockiert. Sie laufen im Rahmen des eigenen Invocation-Flows der Plattform (z.B. ein SessionStart-Hook, der eine Skill lädt) und zählen nicht als `task`-Call oder `edit`/`write`-Aktion im Sinne dieser Regel. Folge ihren Anweisungen gemäß Plattform-Konvention. Das hebt Branch-Guard, Commit-Konventionen und DoD-Criteria NICHT auf — die gelten weiterhin für jede daraus resultierende Code-Änderung.
 
-## Anti-Recursion Guard
-
-Workers must not re-delegate to `orchestrator`. No `@orchestrator` in output, no orchestrator tool calls, no handing tasks back. Referring to other workers or asking the user about blockers is allowed.

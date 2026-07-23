@@ -55,6 +55,7 @@ from lib.io import _load_yaml_or_json, _write_yaml
 from lib.config import (
     load_config, find_agent_meta_root, build_variables,
     fill_defaults, read_version, read_git_version, substitute,
+    _resolve_orch_mode, _orch_mode_flags,
 )
 from lib.roles import build_role_map
 from lib.schema import update_roles_enum
@@ -816,19 +817,32 @@ def main():
             if not is_provider_active(config, provider):
                 log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")
                 continue
-            sync_context_for_provider(agent_meta_root, project_root, config, variables,
+            # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
+            # takes precedence over the global orchestrator.mode for this provider's
+            # generated agents/rules only. Build a shallow copy of `variables` with the
+            # recomputed ORCH_MODE_* flags — the shared `variables` dict is never mutated.
+            _orch_config = config.get("orchestrator", {})
+            _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+            if _provider_override and _provider_override.get("mode") is not None:
+                provider_variables = dict(variables)
+                provider_variables.update(
+                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
+                )
+            else:
+                provider_variables = variables
+            sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                       log, args.dry_run, provider, provider_config)
-            sync_agents_for_provider(agent_meta_root, project_root, config, variables,
+            sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                      log, args.dry_run, provider, provider_config,
                                      platform_vars=platform_vars,
                                      debug_mode=debug_mode)
             if provider == "Continue":
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
-                                          variables, log, args.dry_run,
+                                          provider_variables, log, args.dry_run,
                                           provider_config=provider_config)
             if pc["has_rules"]:
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
-                           platform_vars=platform_vars, variables=variables,
+                           platform_vars=platform_vars, variables=provider_variables,
                            rules_dir=pc.get("rules_dir"), provider=provider,
                            provider_config=provider_config)
                 sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
