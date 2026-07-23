@@ -296,3 +296,17 @@ def test_documenter_template_has_knowledge_engine_conditional_block():
     assert "## Knowledge Engine Dokumentation" in content
     assert "{{KNOWLEDGE_SCHEMA_PATH}}" in content
     assert "NICHT bearbeiten — gehört dem knowledge-curator" in content
+
+
+def test_knowledge_curator_template_exists_and_has_required_frontmatter():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-curator.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-curator")
+    assert "tools:" in content
+    assert "- Read" in content
+    assert "- Write" in content
+    assert "- Agent" in content
+    assert "- TodoWrite" in content
+    assert "{{KNOWLEDGE_SCHEMA_PATH}}" in content
+    assert "{{#if KNOWLEDGE_ENGINE_ENABLED}}" in content
