@@ -51,6 +51,13 @@ _PARALLEL_LABELS: dict[str, str] = {
     "opencode-expert": "❌ (sequentiell)",
     "continue-expert": "❌ (sequentiell)",
     "copilot-expert": "❌ (sequentiell)",
+    "knowledge-curator": "❌ (sequentiell)",
+    "knowledge-ingestor": "✅ (Multi-Sources)",
+    "knowledge-querier": "✅ (Multi-Queries)",
+    "knowledge-linter": "✅ (Multi-Prüfungen)",
+    "knowledge-indexer": "❌ (zentral)",
+    "knowledge-gardener": "✅ (Multi-Fixes)",
+    "knowledge-migrator": "❌ (sequentiell)",
 }
 
 
@@ -74,6 +81,7 @@ def generate_agent_delegation_table(agent_meta_root: Path, config: dict, variabl
 
     se_enabled = variables.get("SE_ENABLED", "false") == "true"
     validator_enabled = variables.get("VALIDATOR_ENABLED", "false") == "true"
+    knowledge_enabled = variables.get("KNOWLEDGE_ENGINE_ENABLED", "false") == "true"
 
     lines: list[str] = []
     for role_name in sorted(roles.keys()):
@@ -82,6 +90,9 @@ def generate_agent_delegation_table(agent_meta_root: Path, config: dict, variabl
             continue
         # Skip validator if not enabled
         if role_name == "validator" and not validator_enabled:
+            continue
+        # Skip knowledge roles if not enabled
+        if role_name.startswith("knowledge-") and not knowledge_enabled:
             continue
 
         role_info = roles[role_name]
@@ -113,6 +124,7 @@ def generate_intent_routing_table(agent_meta_root: Path, config: dict, variables
 
     se_enabled = variables.get("SE_ENABLED", "false") == "true"
     validator_enabled = variables.get("VALIDATOR_ENABLED", "false") == "true"
+    knowledge_enabled = variables.get("KNOWLEDGE_ENGINE_ENABLED", "false") == "true"
     developer_tiers = variables.get("DEVELOPER_TIERS_ENABLED", "false") == "true"
     effort_estimator = variables.get("EFFORT_ESTIMATOR_ENABLED", "false") == "true"
     tests_required = variables.get("DOD_TESTS_REQUIRED", "false") == "true"
@@ -124,6 +136,8 @@ def generate_intent_routing_table(agent_meta_root: Path, config: dict, variables
         if role_name.startswith("se-") and not se_enabled:
             continue
         if role_name == "validator" and not validator_enabled:
+            continue
+        if role_name.startswith("knowledge-") and not knowledge_enabled:
             continue
         if role_name in ("junior-developer", "senior-developer") and not developer_tiers:
             continue

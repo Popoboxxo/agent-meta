@@ -10,6 +10,7 @@ from scripts.lib.knowledge import (
     generate_initial_index,
     generate_initial_log,
 )
+from scripts.lib.delegation_table import generate_agent_delegation_table, generate_intent_routing_table
 
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
@@ -219,3 +220,48 @@ def test_knowledge_roles_pass_schema_validation():
         cwd=_AGENT_META_ROOT, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+# ---------------------------------------------------------------------------
+# delegation_table.py — knowledge-* gating in routing tables
+# ---------------------------------------------------------------------------
+
+def test_delegation_table_omits_knowledge_roles_when_disabled():
+    variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "false"}
+    table = generate_agent_delegation_table(_AGENT_META_ROOT, {}, variables)
+    assert "knowledge-curator" not in table
+    assert "knowledge-migrator" not in table
+
+
+def test_intent_routing_table_omits_knowledge_roles_when_disabled():
+    variables = {
+        "SE_ENABLED": "false", "VALIDATOR_ENABLED": "false",
+        "DEVELOPER_TIERS_ENABLED": "false", "EFFORT_ESTIMATOR_ENABLED": "false",
+        "DOD_TESTS_REQUIRED": "false", "WEB_PROJECT_ENABLED": "false",
+        "KNOWLEDGE_ENGINE_ENABLED": "false",
+    }
+    table = generate_intent_routing_table(_AGENT_META_ROOT, {}, variables)
+    assert "knowledge-curator" not in table
+    assert "knowledge-migrator" not in table
+
+
+def test_delegation_table_includes_knowledge_roles_when_enabled():
+    variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "true"}
+    table = generate_agent_delegation_table(_AGENT_META_ROOT, {}, variables)
+    for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
+                 "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
+        assert role in table
+
+
+def test_intent_routing_table_includes_knowledge_roles_when_enabled():
+    variables = {
+        "SE_ENABLED": "false", "VALIDATOR_ENABLED": "false",
+        "DEVELOPER_TIERS_ENABLED": "false", "EFFORT_ESTIMATOR_ENABLED": "false",
+        "DOD_TESTS_REQUIRED": "false", "WEB_PROJECT_ENABLED": "false",
+        "KNOWLEDGE_ENGINE_ENABLED": "true",
+    }
+    table = generate_intent_routing_table(_AGENT_META_ROOT, {}, variables)
+    # knowledge-indexer has no intent_keywords -> excluded from intent routing table (routing.get() check)
+    for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
+                 "knowledge-linter", "knowledge-gardener", "knowledge-migrator"]:
+        assert f"`{role}`" in table
