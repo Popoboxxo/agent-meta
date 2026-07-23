@@ -1939,6 +1939,35 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
             or ""
         lines.append(f"| `{role}` | {hint} |")
 
+    # Knowledge Engine hints (only when enabled)
+    ke_config = config.get("knowledge-engine", {})
+    if ke_config.get("enabled", False):
+        bundle = ke_config.get("bundle-path", "knowledge")
+        domain = ke_config.get("domain", "research")
+        wiki = f"{bundle}/wiki"
+        sources = f"{bundle}/sources"
+
+        lines.append("")
+        lines.append("## Knowledge Engine")
+        lines.append("")
+        lines.append(f"Die Knowledge Engine ist aktiviert. Domäne: **{domain}**.")
+        lines.append("")
+        lines.append(f"**Bundle-Pfad:** `{bundle}/`")
+        lines.append("| Pfad | Zweck |")
+        lines.append("|------|-------|")
+        lines.append(f"| `{bundle}/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |")
+        lines.append(f"| `{sources}/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |")
+        lines.append(f"| `{wiki}/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |")
+        lines.append(f"| `{wiki}/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |")
+        lines.append(f"| `{wiki}/log.md` | Chronologisches Event-Log (OKF §7) |")
+        lines.append("")
+        lines.append("### Knowledge-Workflows")
+        lines.append(f"- **Ingest:** Source in `{sources}/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert")
+        lines.append("- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort")
+        lines.append("- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)")
+        lines.append("- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format")
+        lines.append("- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps")
+
     return "\n".join(lines)
 
 

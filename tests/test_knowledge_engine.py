@@ -265,3 +265,26 @@ def test_intent_routing_table_includes_knowledge_roles_when_enabled():
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-gardener", "knowledge-migrator"]:
         assert f"`{role}`" in table
+
+
+# ---------------------------------------------------------------------------
+# build_agent_hints() — Knowledge Engine section
+# ---------------------------------------------------------------------------
+
+from scripts.lib.agents import build_agent_hints
+
+
+def test_build_agent_hints_omits_knowledge_section_when_disabled():
+    config = {"knowledge-engine": {"enabled": False}}
+    hints = build_agent_hints(config, _AGENT_META_ROOT, include_table=True)
+    assert "## Knowledge Engine" not in hints
+
+
+def test_build_agent_hints_includes_knowledge_section_when_enabled_direct():
+    config = {"knowledge-engine": {"enabled": True, "domain": "personal", "bundle-path": "kb"}}
+    hints = build_agent_hints(config, _AGENT_META_ROOT, include_table=True)
+    assert "## Knowledge Engine" in hints
+    assert "personal" in hints
+    assert "kb/schema.md" in hints
+    assert "kb/wiki/index.md" in hints
+    assert "knowledge-ingestor" in hints
