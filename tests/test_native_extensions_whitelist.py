@@ -51,3 +51,59 @@ def test_build_variables_whitelist_active_with_entries():
     variables, _ = build_variables(config, _AGENT_META_ROOT)
     assert variables["NATIVE_EXTENSIONS_WHITELIST_ACTIVE"] == "true"
     assert variables["NATIVE_EXTENSIONS_WHITELIST_TABLE"] == "- `superpowers`\n- `code-simplifier`"
+
+
+from scripts.lib.config import strip_inactive_conditional_blocks
+
+
+_RULE_SNIPPET = """{{#if NATIVE_EXTENSIONS_ENABLED}}
+## Native Provider-Erweiterungen
+
+Native Erweiterungsmechanismen erlaubt.
+
+{{#if NATIVE_EXTENSIONS_WHITELIST_ACTIVE}}
+**Whitelist aktiv:** Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement.
+
+Erlaubte Skills/Plugins:
+{{NATIVE_EXTENSIONS_WHITELIST_TABLE}}
+{{/if}}
+{{/if}}
+{{#unless NATIVE_EXTENSIONS_ENABLED}}
+## Native Provider-Erweiterungen — deaktiviert
+{{/unless}}
+"""
+
+
+def test_rule_template_renders_whitelist_block_when_active():
+    variables = {
+        "NATIVE_EXTENSIONS_ENABLED": "true",
+        "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "true",
+        "NATIVE_EXTENSIONS_WHITELIST_TABLE": "- `superpowers`",
+    }
+    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    assert "Ist die Whitelist nicht leer" in result
+    assert "- `superpowers`" in result
+    assert "deaktiviert" not in result
+
+
+def test_rule_template_omits_whitelist_block_when_inactive():
+    variables = {
+        "NATIVE_EXTENSIONS_ENABLED": "true",
+        "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "false",
+        "NATIVE_EXTENSIONS_WHITELIST_TABLE": "",
+    }
+    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    assert "Whitelist aktiv" not in result
+    assert "Native Provider-Erweiterungen" in result
+    assert "deaktiviert" not in result
+
+
+def test_rule_template_omits_whitelist_block_when_native_extensions_disabled():
+    variables = {
+        "NATIVE_EXTENSIONS_ENABLED": "false",
+        "NATIVE_EXTENSIONS_WHITELIST_ACTIVE": "true",
+        "NATIVE_EXTENSIONS_WHITELIST_TABLE": "- `superpowers`",
+    }
+    result = strip_inactive_conditional_blocks(_RULE_SNIPPET, variables)
+    assert "Whitelist aktiv" not in result
+    assert "deaktiviert" in result
