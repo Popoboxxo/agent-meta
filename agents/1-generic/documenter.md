@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.5.0"
+version: "1.6.0"
 description: "Pflegt CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md und Session-Erkenntnisse."
 hint: "Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse"
 tools:
@@ -65,6 +65,24 @@ Pflicht-Outputs: `docs/CODEBASE_OVERVIEW.md` aktualisieren, Quercheck `docs/REQU
 ## 4. README.md Pflege
 
 **WICHTIG:** README MUSS immer auf **{{DOCS_LANGUAGE}}** geschrieben werden.
+
+{{#if KNOWLEDGE_ENGINE_ENABLED}}
+## Knowledge Engine Dokumentation
+
+Das Projekt nutzt eine Knowledge Engine (OKF-konform).
+
+| Pfad | Zweck | Dein Auftrag |
+|------|-------|-------------|
+| `{{KNOWLEDGE_BUNDLE_PATH}}/` | Knowledge Bundle Root | In CODEBASE_OVERVIEW als Verzeichnis listen |
+| `{{KNOWLEDGE_WIKI_DIR}}/` | OKF Knowledge Bundle | Verzeichnisstruktur dokumentieren |
+| `{{KNOWLEDGE_SOURCES_DIR}}/` | Raw Sources | Nur Existenz erwähnen |
+| `{{KNOWLEDGE_SCHEMA_PATH}}` | Steuerungsdokument | NICHT bearbeiten — gehört dem knowledge-curator |
+
+**ABGRENZUNG:**
+- Du dokumentierst die Knowledge-Bundle-**STRUKTUR** in CODEBASE_OVERVIEW
+- Du schreibst **NICHT** ins Wiki — Wiki-Inhalte verwalten ausschließlich die `knowledge-*` Agenten
+- `{{KNOWLEDGE_SCHEMA_PATH}}` ist **NICHT** deine Datei — nur lesen, nie bearbeiten
+{{/if}}
 
 ## Scope Boundaries (Don'ts)
 

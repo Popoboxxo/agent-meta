@@ -288,3 +288,11 @@ def test_build_agent_hints_includes_knowledge_section_when_enabled_direct():
     assert "kb/schema.md" in hints
     assert "kb/wiki/index.md" in hints
     assert "knowledge-ingestor" in hints
+
+
+def test_documenter_template_has_knowledge_engine_conditional_block():
+    content = (_AGENT_META_ROOT / "agents" / "1-generic" / "documenter.md").read_text(encoding="utf-8")
+    assert "{{#if KNOWLEDGE_ENGINE_ENABLED}}" in content
+    assert "## Knowledge Engine Dokumentation" in content
+    assert "{{KNOWLEDGE_SCHEMA_PATH}}" in content
+    assert "NICHT bearbeiten — gehört dem knowledge-curator" in content
