@@ -374,8 +374,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # ORCH_MODE_*: mutually-exclusive, flat mode flags for the use-orchestrator rule.
     # Exactly one is "true". These replace nested {{#if}}/{{else}} in the rule
     # template so the conditional stripper can never render two modes at once.
-    # orchestrator.mode (enum: strict|advisory|main-chat) takes precedence over
-    # the legacy enabled/strict booleans. Missing mode → derive from legacy fields.
+    # orchestrator.mode (enum: strict|advisory|main-chat, schema default: "strict")
+    # takes precedence over the legacy enabled/strict booleans. Missing mode →
+    # derive from legacy fields (enabled=true/strict=true → "strict", matching
+    # the schema default).
     _orch_mode = orch_config.get("mode")
     if _orch_mode is not None:
         _valid_orch_modes = {"strict", "advisory", "main-chat"}
