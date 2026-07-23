@@ -85,7 +85,7 @@ from lib.backup import (
     create_backup, restore_backup, list_backups,
     delete_backup, prune_backups,
 )
-from lib.io import SyncError
+from lib.io import SyncError, safe_path, write_checked
 from lib.context import (
     sync_context_for_provider, init_claude_personal, init_opencode_personal,
     init_settings_json, init_settings_local_json, ensure_gitignore_entries,
@@ -95,6 +95,7 @@ from lib.viz import (
     generate_viz, get_gitignore_entries as viz_gitignore_entries,
     cleanup_old_sessions,
 )
+from lib.knowledge import generate_schema, generate_initial_index, generate_initial_log
 
 # ---------------------------------------------------------------------------
 # Entrypoint-only constants
@@ -145,6 +146,91 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
             if skills_dir:
                 entries.append(f"{skills_dir}/{skill_name}/")
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Engine — Phase A scaffolding (sync Phase 2.5)
+# ---------------------------------------------------------------------------
+
+_KNOWLEDGE_GITKEEP_SUBDIRS = [
+    Path("sources", "assets"),
+    Path("wiki", "concepts"),
+    Path("wiki", "entities"),
+    Path("wiki", "topics"),
+    Path("wiki", "sources"),
+    Path("wiki", "queries"),
+]
+
+
+def sync_knowledge_engine(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Phase 2.5 — scaffold the knowledge/ bundle when knowledge-engine.enabled is true.
+
+    No-op (zero-overhead) when disabled or absent. Idempotent: never
+    overwrites existing schema.md/wiki/index.md/wiki/log.md, only fills in
+    missing .gitkeep markers in empty subdirectories on subsequent runs.
+    """
+    ke_config = config.get("knowledge-engine") or {}
+    if not ke_config.get("enabled", False):
+        log.skip("knowledge-engine", "disabled in project.yaml")
+        return
+
+    domain = ke_config.get("domain", "research")
+    bundle_rel = ke_config.get("bundle-path", "knowledge")
+    bundle_dir = safe_path(project_root, bundle_rel)
+
+    if bundle_dir.exists() and not bundle_dir.is_dir():
+        raise SyncError(
+            f"knowledge-engine.bundle-path '{bundle_rel}' points to an existing "
+            f"file, not a directory: {bundle_dir}"
+        )
+
+    bundle_exists = bundle_dir.is_dir()
+
+    if not bundle_exists:
+        try:
+            schema_content = generate_schema(domain, bundle_rel, agent_meta_root)
+        except ValueError as exc:
+            raise SyncError(f"knowledge-engine: {exc}") from exc
+
+        if not dry_run:
+            (bundle_dir / "wiki").mkdir(parents=True, exist_ok=True)
+
+        schema_path = bundle_dir / "schema.md"
+        rel_schema = f"{bundle_rel}/schema.md"
+        if write_checked(schema_path, schema_content, log, rel_schema, dry_run=dry_run):
+            log.action("CREATE", rel_schema, "knowledge-engine scaffolding")
+
+        index_path = bundle_dir / "wiki" / "index.md"
+        rel_index = f"{bundle_rel}/wiki/index.md"
+        if write_checked(index_path, generate_initial_index(), log, rel_index, dry_run=dry_run):
+            log.action("CREATE", rel_index, "knowledge-engine scaffolding")
+
+        log_path = bundle_dir / "wiki" / "log.md"
+        rel_log = f"{bundle_rel}/wiki/log.md"
+        if write_checked(log_path, generate_initial_log(), log, rel_log, dry_run=dry_run):
+            log.action("CREATE", rel_log, "knowledge-engine scaffolding")
+    else:
+        log.info(
+            "knowledge-engine",
+            f"{bundle_rel}/ already exists — schema.md/index.md/log.md not "
+            "regenerated. If domain changed, verify schema.md manually "
+            "(not auto-migrated in Phase A)."
+        )
+
+    for rel_subdir in _KNOWLEDGE_GITKEEP_SUBDIRS:
+        target_dir = bundle_dir / rel_subdir
+        gitkeep_path = target_dir / ".gitkeep"
+        rel_gitkeep = f"{bundle_rel}/{rel_subdir.as_posix()}/.gitkeep"
+        if not dry_run:
+            target_dir.mkdir(parents=True, exist_ok=True)
+        if write_checked(gitkeep_path, "", log, rel_gitkeep, dry_run=dry_run):
+            log.action("CREATE", rel_gitkeep, "knowledge-engine scaffolding")
 
 
 # ---------------------------------------------------------------------------
@@ -875,6 +961,12 @@ def main():
                                        provider, provider_config)
             sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
                                               log, args.dry_run, provider, provider_config)
+        # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
+        try:
+            sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)
+        except SyncError as exc:
+            print(f"\n  !!  Knowledge Engine sync aborted: {exc}", file=sys.stderr)
+            sys.exit(1)
         # Provider isolation: hard-block cross-provider directory access
         isolation_mode = config.get("provider-isolation")
         if isolation_mode != "disabled":
