@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.82.0] - 2026-07-23
+
+### Added
+- **Main-Chat Orchestrator Mode**: Main chat now acts as router and worker instead of spawning a separate orchestrator subagent. Simplifies multi-agent orchestration, eliminates singleton-rule violations, and reduces protocol overhead (no BARRIER/FANOUT, no A2A envelope).
+- Intent-routing table in `rules/use-orchestrator.md` with 50+ agent classifications and routing guidance for the main chat.
+- Explicit `orchestrator.mode: strict` default in `config/project-config.schema.json` with schema documentation.
+- Admin UI updates to reflect orchestrator configuration structure and main-chat mode routing.
+
+### Removed
+- Standalone `orchestrator` subagent (`.claude/agents/orchestrator.md`) — no longer needed under main-chat mode.
+
+### Changed
+- `rules/use-orchestrator.md` restructured to support main-chat router+worker delegation pattern (one level deep, sequential).
+- `scripts/sync.py` and `scripts/lib/config.py` updated to generate provider-specific agent configurations for main-chat mode.
+- All provider-specific AGENTS/CLAUDE/GEMINI context files updated to document main-chat routing instead of separate orchestrator.
+
 ## [0.81.0] - 2026-07-22
 
 ### Added
