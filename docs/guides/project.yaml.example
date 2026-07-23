@@ -32,6 +32,10 @@ orchestrator:
   #   Note: branch-guard, commit-conventions and DoD still apply to resulting changes.
   native-extensions:
     enabled: true
+    # whitelist: empty = no filter. Non-empty = allow-only:
+    #   only listed Skills/Plugins may run, everything else is blocked
+    #   regardless of `enabled`. Example: ["superpowers", "code-simplifier"]
+    # whitelist: []
 
 # ============================================================
 # PARALLEL EXECUTION
