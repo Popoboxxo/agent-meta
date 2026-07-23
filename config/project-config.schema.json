@@ -975,6 +975,13 @@
               "type": "boolean",
               "default": true,
               "description": "Allow native extension mechanisms to run without going through the orchestrator gate. Branch-guard, commit-conventions and DoD still apply to resulting code changes. Default: true."
+            },
+            "whitelist": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": [],
+              "uniqueItems": true,
+              "description": "Whitelist of allowed native Skill/Plugin identifiers. Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement. Empty (default) = no filter."
             }
           },
           "additionalProperties": false
