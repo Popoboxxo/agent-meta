@@ -1361,6 +1361,7 @@ function buildSidebar() {
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "⌨" },
+        { route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" },
       ],
     },
     {
@@ -7401,6 +7402,7 @@ async function init() {
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/environments",   viewProjectEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
+  router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/role-defaults",     viewRoleDefaults);
@@ -7489,6 +7491,7 @@ init();
     "project/dod-overrides": "project_instance-dod_overrides",
     "project/rules-overrides": "project_instance-rules_overrides",
     "project/advanced": "project_instance-advanced",
+    "project/knowledge-engine": "project_instance-knowledge_engine",
     "models": "framework_defaults-models",
     "provider-tiers": "framework_defaults-tier_mappings",
     "tier-presets": "framework_defaults-tier_presets",

@@ -456,3 +456,15 @@ def test_admin_server_allows_knowledge_engine_section_write():
             found = "knowledge-engine" in ast.dump(node)
             break
     assert found, "'knowledge-engine' not found in _write_project_section's allowed set"
+
+
+# ---------------------------------------------------------------------------
+# admin-ui.html — routing for /project/knowledge-engine
+# ---------------------------------------------------------------------------
+
+def test_admin_ui_has_knowledge_engine_route():
+    from pathlib import Path
+    html = (Path(__file__).parent.parent / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
+    assert '{ route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" }' in html
+    assert 'router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);' in html
+    assert '"project/knowledge-engine": "project_instance-knowledge_engine",' in html
