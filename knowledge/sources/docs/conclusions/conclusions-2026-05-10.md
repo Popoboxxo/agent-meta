@@ -1,0 +1,201 @@
+# Erkenntnisse — 10. Mai 2026
+
+## Session-Zusammenfassung
+
+Framework Health-Check + Visualisierungs-System Fix. Das Viz-Event-Logging war konfiguriert (`viz: enabled: true, mode: full`), aber `.agent-meta/viz/events.jsonl` blieb leer. Ursache und Lösung identifiziert, implementiert und verifiziert.
+
+---
+
+## 1. Root Cause: Agenten loggen nicht freiwillig
+
+### Problem
+- `inject_viz_prompt_block()` in `scripts/lib/viz.py` formulierte die Event-Logging-Anweisung als **"Optional — nur wenn dynamischer Modus aktiv"**
+- LLMs interpretieren "optional" wörtlich → sie loggen praktisch nie
+- Ergebnis: Viz-Dashboard blieb leer trotz aktivierter Konfiguration
+
+### Lösung
+- Überschrift geändert: `Optional` → `Pflicht-Anweisung`
+- Einleitung geändert: `Wenn der Visualisierungsmodus aktiviert ist, berichte...` → `Der Visualisierungsmodus ist aktiv. Du MUSST deinen Status protokollieren.`
+- Abschluss geändert: `Dies ist optional` → `Dies ist eine Pflicht-Anweisung. Jeder Agenten-Aufruf MUSS protokolliert werden.`
+
+### Erkenntnis
+LLMs folgen wörtlichen Instruktionen. "Optional" in Prompt-Blöcken bedeutet für das Modell: "Darf ich weglassen" — nicht "Wenn du Lust hast". Pflicht-Anweisungen müssen explizit als solche formuliert sein.
+
+---
+
+## 2. System-Hook als Backup-Lösung
+
+### Problem
+Selbst mit Pflicht-Prompt bleibt die Zuverlässigkeit LLM-abhängig. Agenten können den Prompt "vergessen" oder priorisieren anderes.
+
+### Lösung: `viz-log.sh` PreToolUse Hook
+- **Neue Datei:** `hooks/1-generic/viz-log.sh`
+- Intercepted JEDEN Tool-Aufruf auf System-Ebene (vor Ausführung)
+- Extrahiert aus dem Hook-Kontext: `tool_name`, `tool_input` (Preview), `agent_name`, `provider`
+- Schreibt automatisch `tool_call`-Event in `.agent-meta/viz/events.jsonl`
+- Exit 0 — blockiert den Tool-Aufruf nicht
+
+### Provider-Abdeckung
+| Provider | Hook-Infrastruktur | Logging |
+|----------|-------------------|---------|
+| Claude Code | ✅ PreToolUse | Hook + Prompt |
+| Gemini CLI | ✅ PreToolUse | Hook + Prompt |
+| Opencode | ❌ Keine Hooks | Nur Prompt |
+| Continue | ❌ Keine Hooks | Nur Prompt |
+
+---
+
+## 3. Conditional Hook-Management in sync.py
+
+### Neue Logik in `scripts/lib/hooks.py` (Zeile ~225-265)
+
+Der `viz-log` Hook ist der erste **conditional Hook** im Framework:
+
+- **viz.mode == `dynamic` oder `full`:** Hook wird kopiert + in `settings.json` als PreToolUse registriert (auto-enabled)
+- **viz.mode == `off` oder `static`:** Hook wird übersprungen, als stale markiert, automatisch gelöscht aus `.claude/hooks/` UND aus `settings.json`
+
+### Stale-Clean-up funktioniert vollautomatisch
+Kein manuelles Eingreifen nötig. Beim nächsten `sync.py`-Lauf erkennt das System:
+1. Hook war vorher in `.agent-meta-managed` → aber nicht mehr in `now_managed`
+2. → DELETE Hook-Datei
+3. → `_update_settings_hooks()` entfernt den Eintrag aus `settings.json`
+
+### Verifikation
+- `--viz-mode static` Dry-Run: Hook verschwindet wie erwartet ✅
+- Live-Sync mit `mode: full`: Hook existiert + registriert ✅
+
+---
+
+## 4. Dokumentation-Updates
+
+### `howto/agent-visualization.md`
+- Neuer Abschnitt: "Wie es funktioniert" mit zweistufigem Ansatz (Prompt + Hook)
+- Provider-Unterstützungstabelle
+- Conditional Hook-Management Tabelle
+- Architektur-Diagramm der Event-Logging Pipeline
+- Alte Formulierungen ("freiwillig") durch korrekte ("Pflicht-Prompt-Block") ersetzt
+
+### `docs/architecture/01-layer-model.md`
+- Hooks-Sektion erweitert um conditional viz-log Logik
+- Implementierungs-Referenz (hooks.py Zeilen)
+
+### `README.md`
+- Version korrigiert: `0.36.0` → `0.37.0-beta.1`
+
+---
+
+## 5. Offene Punkte
+
+### Continue und Opencode
+Beide Provider haben keine native Hook-Infrastruktur. Dort ist der Pflicht-Prompt-Block die einzige Option. Verbesserungsideen:
+- Provider-spezifische Hook-Adapter (wenn Provider später Hooks unterstützen)
+- Externe File-Watcher als Workaround (beobachtet events.jsonl auf Änderungen)
+
+### Viz-Block in Agent-Templates
+Der Viz-Prompt-Block wurde geändert (optional → Pflicht), aber kein Major/Minor Version-Bump durchgeführt. Begründung: Keine inhaltliche Änderung der Agenten-Logik, nur Präzisierung der Formulierung. Bei nächstem Template-Review sollte dies evaluiert werden.
+
+---
+
+## 6. Branch
+
+`feat/agent-visualization-dashboard`
+
+---
+
+## 7. Live-Dashboard für Agenten-Orchestrierung (Session 2)
+
+### Session-Zusammenfassung
+Das statische Mermaid-basierte Dashboard wurde durch ein vollständiges Live-Dashboard mit Cytoscape.js ersetzt. Zusätzlich wurde `viz-server.py` als neues Wrapper-Tool eingeführt und `viz-report.py` grundlegend überarbeitet. Flask als Dependency wurde komplett entfernt.
+
+---
+
+### 7.1 Live-Dashboard (`docs/live-dashboard.html`)
+
+**Vorher:** Statische HTML-Datei mit Mermaid-Diagrammen, manuelles Refresh nötig.
+**Nachher:** Echtzeit-Dashboard mit Cytoscape.js, automatisches Polling.
+
+| Feature | Alt | Neu |
+|---------|-----|-----|
+| Rendering | Mermaid (statisch) | Cytoscape.js (dynamisch) |
+| Aktualisierung | Page-Reload | JavaScript-Polling `/api/state` alle 2s |
+| Agenten-Nodes | Keine | Farbcodiert: running=gelb(pulsierend), success=grün, error=rot |
+| Delegationen | Keine | Animierte Kanten zwischen Agenten |
+| Agent-Cards | Keine | Status + Dauer pro Agent |
+| Event-Timeline | Statisch | Fade-In für neue Events |
+
+---
+
+### 7.2 viz-server.py — NEU (`scripts/viz-server.py`)
+
+Wrapper-Skript für den Viz-Server mit folgenden Kommandos:
+
+| Kommando | Funktion |
+|----------|----------|
+| `start` | Server starten |
+| `stop` | Server stoppen (via PID-File) |
+| `toggle` | Start ODER Stop mit einem Befehl |
+| `status` | Server-Status anzeigen |
+| `restart` | Server neu starten |
+| `open` | Dashboard im Browser öffnen |
+
+**Technische Details:**
+- PID-Tracking via `.agent-meta/viz/.server-pid`
+- Auto-Shutdown nach 300s Inaktivität (konfigurierbar)
+- Keine externen Dependencies (Python wsgiref)
+
+---
+
+### 7.3 viz-report.py — Überarbeitet (`scripts/viz-report.py`)
+
+**Wesentliche Änderungen:**
+
+1. **Flask → wsgiref:** Flask als externe Dependency entfernt. Nutzt jetzt `wsgiref.simple_server` aus der Python-Standardbibliothek.
+
+2. **Neue API-Endpunkte:**
+   - `GET /api/state` — Liefert aktuellen Session-State als JSON
+   - `GET /api/events` — Liefert Event-Log als JSON
+
+3. **`--watch --format html` Verhalten:** Startet jetzt den Live-Server statt eine statische Datei zu generieren.
+
+4. **Session-Trennung-Fix:** `_extract_latest_session()` isoliert korrekt nur die letzte Session. Bisheriger Bug: Mixed-Session-Daten wurden vermischt.
+
+5. **JSON-Serialisierung:** `_state_to_json()` konvertiert `datetime`-Objekte korrekt für JSON.
+
+6. **Auto-Shutdown:** `inactivity_watcher` Thread beendet den Server nach konfigurierter Inaktivitätszeit.
+
+---
+
+### 7.4 Dokumentation-Updates
+
+| Datei | Änderung |
+|-------|----------|
+| `howto/agent-visualization.md` | Live-Dashboard Sektion hinzugefügt |
+| `README.md` | Neue Session-Reports Befehle |
+| `CHANGELOG.md` | Unreleased Eintrag |
+| `docs/concepts/agent-visualization-v2.md` | Architektur, Tools, Dateistruktur |
+| `commands/1-generic/viz-watch.md` | Neue Pfade aktualisiert |
+| `commands/1-generic/viz-report.md` | Neue Pfade aktualisiert |
+
+---
+
+### 7.5 Aufräumen
+
+- `viz-server.py` von Repository-Root nach `scripts/` verschoben
+- Temp-Dateien gelöscht: `inject_live.py`, `live-dashboard.html` (Root)
+- Provider-Commands via `sync.py` regeneriert
+
+---
+
+### 7.6 Architektur-Entscheidungen
+
+1. **Flask entfernt → wsgiref:** Keine externen Dependencies mehr. Das Framework bleibt leichtgewichtig und installierbar ohne `pip install`.
+
+2. **Statisches HTML-Refresh entfernt → JavaScript-Polling:**用户体验 verbessert, kein manueller Reload mehr nötig.
+
+3. **Mixed-Session-Bug behoben:** `_extract_latest_session()` stellt sicher dass nur die aktuelle Session angezeigt wird.
+
+---
+
+### 7.7 Offene Punkte
+
+Keine offenen Punkte. Session vollständig abgeschlossen.
