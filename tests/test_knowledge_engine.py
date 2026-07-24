@@ -351,3 +351,12 @@ def test_knowledge_indexer_template_exists_and_documents_log_format():
     assert content.startswith("---\nname: template-knowledge-indexer")
     assert "## \\[YYYY-MM-DD\\]" in content or "## [YYYY-MM-DD]" in content
     assert "Append-only" in content
+
+
+def test_knowledge_gardener_template_exists_and_forbids_content_changes():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-gardener.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-gardener")
+    assert "KEINE inhaltliche Substanz" in content or "keine inhaltliche Substanz" in content
+    assert "Tag-Harmonisierung" in content
