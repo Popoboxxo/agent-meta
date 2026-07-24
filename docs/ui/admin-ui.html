@@ -2876,7 +2876,7 @@ async function viewProjectKnowledgeEngine() {
         if (!preset) return;
         Object.assign(ke, clone(preset));
         ke.enabled = true;
-        router.navigate("/project/knowledge-engine");
+        render();
       },
       { "": "(select to apply — overwrites all fields below)" },
     ));
