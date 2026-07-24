@@ -360,3 +360,19 @@ def test_knowledge_gardener_template_exists_and_forbids_content_changes():
     assert content.startswith("---\nname: template-knowledge-gardener")
     assert "KEINE inhaltliche Substanz" in content or "keine inhaltliche Substanz" in content
     assert "Tag-Harmonisierung" in content
+
+
+def test_knowledge_migrator_template_exists_and_has_hard_constraints():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-migrator.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-migrator")
+    for protected in [
+        "docs/CODEBASE_OVERVIEW.md", "docs/REQUIREMENTS.md",
+        "CLAUDE.md", "AGENTS.md", ".claude/", ".gemini/", ".opencode/",
+        "VERSION", "LICENSE", "CHANGELOG.md",
+    ]:
+        assert protected in content, f"missing protected-file reference: {protected}"
+    assert "NIEMALS migrieren" in content or "NIEMALS anfassen" in content
+    assert "kopiert immer, verschiebt nie" in content or "KOPIERE (nicht verschiebe" in content
+    assert "expliziten Freigabe" in content or "expliziter Freigabe" in content or "User-Freigabe" in content
