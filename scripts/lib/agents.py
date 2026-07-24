@@ -1919,27 +1919,28 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
             "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
         )
 
-    if not include_table:
-        return "\n".join(lines)
+    if include_table:
+        if has_orchestrator:
+            lines.append("")
+        lines.append("| Agent | Zuständigkeit |")
+        lines.append("|-------|--------------|")
+        for role, source_path in sorted(overrides.items()):
+            if allowed_roles is not None and role not in allowed_roles:
+                continue
+            if not _is_role_enabled(role, config):
+                continue
+            if not target_filename(role, role_map):
+                continue
+            content = source_path.read_text(encoding="utf-8")
+            hint = extract_frontmatter_field(content, "hint") \
+                or extract_frontmatter_field(content, "description") \
+                or ""
+            lines.append(f"| `{role}` | {hint} |")
 
-    if has_orchestrator:
-        lines.append("")
-    lines.append("| Agent | Zuständigkeit |")
-    lines.append("|-------|--------------|")
-    for role, source_path in sorted(overrides.items()):
-        if allowed_roles is not None and role not in allowed_roles:
-            continue
-        if not _is_role_enabled(role, config):
-            continue
-        if not target_filename(role, role_map):
-            continue
-        content = source_path.read_text(encoding="utf-8")
-        hint = extract_frontmatter_field(content, "hint") \
-            or extract_frontmatter_field(content, "description") \
-            or ""
-        lines.append(f"| `{role}` | {hint} |")
-
-    # Knowledge Engine hints (only when enabled)
+    # Knowledge Engine hints (only when enabled). Emitted regardless of
+    # include_table — this section is not a per-agent table duplication, it's
+    # entry-point orientation that every provider (including Claude, which
+    # gets AGENT_HINTS_CLAUDE with include_table=False) needs to see.
     ke_config = config.get("knowledge-engine", {})
     if ke_config.get("enabled", False):
         bundle = ke_config.get("bundle-path", "knowledge")
@@ -1960,6 +1961,9 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
         lines.append(f"| `{wiki}/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |")
         lines.append(f"| `{wiki}/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |")
         lines.append(f"| `{wiki}/log.md` | Chronologisches Event-Log (OKF §7) |")
+        lines.append("")
+        lines.append("### Knowledge-Agenten")
+        lines.append(f"- **Schema-Owner:** `knowledge-curator` verwaltet `{bundle}/schema.md` und Concept-Type-Konventionen")
         lines.append("")
         lines.append("### Knowledge-Workflows")
         lines.append(f"- **Ingest:** Source in `{sources}/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert")

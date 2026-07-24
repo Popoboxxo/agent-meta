@@ -61,6 +61,13 @@ roles:
 - data-engineer
 - docker
 - mammouth-expert
+- knowledge-curator
+- knowledge-ingestor
+- knowledge-querier
+- knowledge-linter
+- knowledge-indexer
+- knowledge-gardener
+- knowledge-migrator
 project:
   name: agent-meta
   prefix: am

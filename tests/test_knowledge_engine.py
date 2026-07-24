@@ -376,3 +376,46 @@ def test_knowledge_migrator_template_exists_and_has_hard_constraints():
     assert "NIEMALS migrieren" in content or "NIEMALS anfassen" in content
     assert "kopiert immer, verschiebt nie" in content or "KOPIERE (nicht verschiebe" in content
     assert "expliziten Freigabe" in content or "expliziter Freigabe" in content or "User-Freigabe" in content
+
+
+# ---------------------------------------------------------------------------
+# Full self-hosting integration — sync.py end-to-end with knowledge-engine on
+# ---------------------------------------------------------------------------
+
+def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
+    import shutil
+    import subprocess
+    import yaml
+
+    # Copy the whole repo into a temp dir so we don't mutate the real working tree.
+    dest = tmp_path / "agent-meta-copy"
+    shutil.copytree(
+        _AGENT_META_ROOT, dest,
+        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers"),
+    )
+
+    project_yaml_path = dest / ".meta-config" / "project.yaml"
+    with project_yaml_path.open(encoding="utf-8") as f:
+        project_config = yaml.safe_load(f)
+    project_config["knowledge-engine"]["enabled"] = True
+    with project_yaml_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(project_config, f, allow_unicode=True, sort_keys=False)
+
+    # No importable top-level entry point exists in scripts/sync.py (main() reads
+    # sys.argv via argparse) — run the real CLI as a subprocess, per the fallback
+    # described in the task brief.
+    result = subprocess.run(
+        ["python", str(dest / "scripts" / "sync.py")],
+        cwd=dest, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    claude_md = (dest / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "## Knowledge Engine" in claude_md
+    for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
+                 "knowledge-linter", "knowledge-gardener", "knowledge-migrator"]:
+        assert f"`{role}`" in claude_md
+
+    for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
+                 "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
+        assert (dest / ".claude" / "agents" / f"{role}.md").exists(), f"{role} not generated"
