@@ -342,3 +342,12 @@ def test_knowledge_linter_template_exists_and_has_ten_checks():
         "Fehlende recommended Frontmatter", "veraltet", "Inkonsistenzen",
     ]:
         assert check in content, f"missing check reference: {check}"
+
+
+def test_knowledge_indexer_template_exists_and_documents_log_format():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-indexer.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-indexer")
+    assert "## \\[YYYY-MM-DD\\]" in content or "## [YYYY-MM-DD]" in content
+    assert "Append-only" in content
