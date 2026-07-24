@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-querier
-version: "1.0.0"
+version: "1.0.1"
 description: "Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten."
 hint: "Wiki-Fragen beantworten, Index-First, Synthese mit Citations"
 tools:
@@ -65,4 +65,5 @@ Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `
 Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Antworten → {{DOCS_LANGUAGE}}
+- File-Back Query-Result-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}

@@ -61,6 +61,7 @@ roles:
 - data-engineer
 - docker
 - mammouth-expert
+# Knowledge Engine roles: pre-wired for feature activation, currently inert (knowledge-engine.enabled: false)
 - knowledge-curator
 - knowledge-ingestor
 - knowledge-querier

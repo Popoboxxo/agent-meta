@@ -1196,7 +1196,10 @@ def sync_agents_for_provider(
                 rel = (str(target_dir / filename)
                        .replace(str(project_root) + '/', '')
                        .replace(str(project_root) + chr(92), ""))
-                log.skip(rel, "systems-engineering is disabled")
+                if role.startswith("knowledge-"):
+                    log.skip(rel, "knowledge-engine is disabled")
+                else:
+                    log.skip(rel, "systems-engineering is disabled")
             continue
 
         # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
