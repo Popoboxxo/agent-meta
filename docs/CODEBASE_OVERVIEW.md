@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-07-16 (v0.74.0: 5 neue Agenten-Rollen, ultra-Tier, principal-developer-Eskalation)
+> Letzte Aktualisierung: 2026-07-24 (v0.82.0: Knowledge Engine implementiert, Phase A-C abgeschlossen)
 
 ---
 
@@ -19,6 +19,7 @@
 11. [A2A-Handoff-Protokoll](#11-a2a-handoff-protokoll)
 12. [Prompt-Modernisierung (Legacy / Hybrid / Modern)](#12-prompt-modernisierung-legacy--hybrid--modern)
 13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
+14. [Knowledge Engine](#14-knowledge-engine)
 
 ---
 
@@ -1505,6 +1506,273 @@ Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
 - `agents/1-generic-modern/orchestrator.md` v7.2.0 (Modern): "<persona>"-Block nennt main_chat explizit
 
 Konzept: `docs/concepts/active/singleton-orchestrator-architecture.md`
+
+---
+
+## 14. Knowledge Engine
+
+**Eingeführt:** v0.82.0 (2026-07-24) — Branch `main` (gemergt aus `feat/knowledge-engine-phase-abc`)
+**Status:** Vollständig implementiert, Phase A (Scaffolding) + B (Agenten + Routing) + C (AdminUI) abgeschlossen.
+
+Die Knowledge Engine ist ein **optional per Schalter aktivierbares Wissensmanagement-System**, das Karpathys LLM-Wiki-Pattern und Googles Open Knowledge Format (OKF v0.1) fusioniert. Die Engine liefert **7 spezialisierte Agenten** aus, die von der Erstmigration bis zur täglichen Wissens-Pflege spezialisierte Arbeiten übernehmen.
+
+**Designprinzipien:**
+- **Zero-Overhead-Garantie:** Agenten werden nur generiert wenn der Schalter aktiv ist (analog SE-Kaskade)
+- **Zwei bewusste Abweichungen vom Konzept-Dokument:**
+  - Templates `knowledge-index.template.md`/`knowledge-log.template.md` existieren NICHT als Dateien — Inhalte werden zur Laufzeit in `scripts/lib/knowledge.py` generiert (Funktionen `generate_initial_index()` / `generate_initial_log()`)
+  - `config/knowledge-presets.yaml` existiert NICHT — 5 Domain-Presets liegen **inline** als JavaScript-Objekt `const PRESETS = {...}` in `docs/ui/admin-ui.html`
+- **Framework-Integration:** Realisiert in allen 22 bestehenden Framework-Mechanismen (DoD, Orchestrator-Routing, Hooks, MCP, Lifecycle-Tasks, etc.)
+
+### 14.1 Die 7 Agenten
+
+**Agenten-Rollen (neu in `agents/1-generic/`):**
+
+| Datei | Version | Tier | Beschreibung |
+|-------|---------|------|-------------|
+| `knowledge-curator.md` | 1.0.0 | balanced | Überwacht Knowledge-Bundle-Gesundheit: Findung von Widersprüchen, veralteten Claims, Orphan-Seiten, fehlenden Concepts. Integration in Lint-Workflows. |
+| `knowledge-ingestor.md` | 1.0.0 | balanced | Migriert externe Quellen (Artikel, Papiere, Bilder, Daten) in Bundle-Struktur: Summary schreiben, Entity-/Concept-/Topic-Seiten aktualisieren, Index/Log pflegen. |
+| `knowledge-querier.md` | 1.0.0 | balanced | Antwortet auf Fragen durch Index-Navigieren, Seiten-Drilling, Synthese mit Citations. **File-Back:** Gute Antworten werden als neue Wiki-Seiten abgelegt (Wissen compoundiert). |
+| `knowledge-linter.md` | 1.0.0 | fast | Automatisierte Formatkontrolle: Frontmatter-Validierung, Dead Links, Markdown-Syntax, OKF-Konformität. Schnelle asynchrone Checks, kein LLM-Reasoning. |
+| `knowledge-indexer.md` | 1.0.0 | fast | Generiert/aktualisiert `index.md` und `log.md` in OKF-Format. Parsinglogik via `grep "^## \["` für chronologische Einträge. |
+| `knowledge-gardener.md` | 1.0.0 | balanced | Proaktive Wartung: Obsolete Seiten archivieren, Konzept-Verzeichnung erweitern, Verlinkung optimieren, periodische Knowledge-Kompression. |
+| `knowledge-migrator.md` | 1.0.0 | balanced | Basis-Initialisierer: Neue Bundle-Struktur scaffolden, Bestands-Wikis migrieren (z.B. Obsidian → OKF), Domänen-Concept-Types definieren. |
+
+**Routing im Orchestrator (per `{{#if KNOWLEDGE_ENGINE_ENABLED}}`):**
+- `query` über Knowledge-Bundle → `knowledge-querier`
+- `lint` Knowledge-Bundle → `knowledge-linter`
+- `ingest` externe Quelle → `knowledge-ingestor`
+- `curate` oder `health-check` → `knowledge-curator`
+- Komplexe Domain-Setup-Anfrage → `knowledge-migrator`
+- Archivieren/Kompression → `knowledge-gardener`
+- Index/Log aktualisieren → `knowledge-indexer`
+
+### 14.2 Aktivierungsmechanismus
+
+**Konfiguration in `.meta-config/project.yaml`:**
+
+```yaml
+knowledge-engine:
+  enabled: true                      # Aktiviert Agenten-Generierung + Routing
+  domain: research                   # Domain aus DOMAIN_CONCEPT_TYPES
+  bundle_path: docs/knowledge        # Wo soll Bundle liegen?
+  bundle_init_template: default      # Aus PRESETS: default, minimal, advanced, research, business
+```
+
+**Konfigurierbare Domänen (in `scripts/lib/knowledge.py:DOMAIN_CONCEPT_TYPES`):**
+
+| Domain | Concept Types | Anwendungsfall |
+|--------|---------------|----------------|
+| `research` | paper, finding, method, dataset | Wissenschaftliche Literatur, Papers, Forschungsergebnisse |
+| `personal` | person, event, place, memory | Persönliches Tagebuch, Ziele, Selbstverbesserung |
+| `business` | customer, deal, product, decision | Geschäftsmodelle, Kunden, Projekte, Geschäftsentscheidungen |
+| `book` | character, location, theme, chapter | Buchanalyse, Roman-Handlung, Charakterentwicklung |
+| `custom` | concept | Generische Fallback-Domain |
+
+**Auswirkungen bei Aktivierung:**
+1. `sync.py` generiert 7 Knowledge-Agenten-Dateien in `.claude/agents/`
+2. `scripts/lib/delegation_table.py:generate_intent_routing_table()` injiziert Knowledge-Intent-Routen (gated per `KNOWLEDGE_ENGINE_ENABLED`)
+3. `admin-server.py` allowlisted Knowledge-Engine-Config-Writes
+4. `docs/ui/admin-ui.html` rendert `/project/knowledge-engine` Route mit Preset-Picker
+
+**Bei Deaktivierung (`enabled: false`):**
+- Agenten NICHT generiert
+- No Intent-Routing-Pollution
+- `knowledge-*.md` Zeilen in `.claude/agents/` existieren nicht
+- Zero Runtime-Overhead
+
+### 14.3 Bundle-Struktur (OKF v0.1 Format)
+
+```
+docs/knowledge/                      # Konfigurierbar via bundle_path
+├── schema.md                        # Steuerungsdokument (generiert via knowledge.py)
+├── index.md                         # Content-Katalog (generiert via knowledge.py)
+├── log.md                           # Chronologisches Event-Log (generiert via knowledge.py)
+├── papers/                          # Subdirectories gruppieren Concepts
+│   ├── index.md
+│   ├── transformer-attention.md     # Concept-Dokumente (Frontmatter + Body)
+│   └── bert-pretraining.md
+├── entities/
+│   ├── index.md
+│   ├── author-yoshua-bengio.md
+│   └── dataset-imagenet.md
+└── topics/
+    ├── index.md
+    └── self-attention-mechanisms.md
+```
+
+**Spezial-Dateien (generiert von `knowledge.py`):**
+
+| Datei | Generierungspunkt | Mutable | Beschreibung |
+|-------|-----------------|--------|-------------|
+| `schema.md` | `knowledge_migrator` → `sync_knowledge_engine()` | Co-evolved | Steuerungsdokument: Bundle-Domäne, Concept-Types, Konventionen, Workflows (ähnlich CLAUDE.md) |
+| `index.md` | `knowledge_indexer` + `generate_initial_index()` | Append-only | Directory Listing nach Konzept-Kategorie; LLM navigiert zuerst hier hin |
+| `log.md` | `knowledge_indexer` + `generate_initial_log()` | Append-only | Chronologisches Change-Log, Format: `YYYY-MM-DD HH:MM — <op> — <summary>`, parsebar |
+
+**Frontmatter pro Concept-Dokument (OKF §4):**
+```yaml
+---
+concept_id: papers/transformer-attention     # Dateipfad ohne .md
+created: 2026-07-24
+updated: 2026-07-24
+category: paper                              # Aus DOMAIN_CONCEPT_TYPES
+tags: [attention, nlp, neural-networks]
+links: [papers/bert-pretraining]             # Inbound/Outbound Cross-Links
+citations:
+  - url: https://arxiv.org/abs/1706.03762
+    title: "Attention Is All You Need"
+---
+```
+
+### 14.4 Runtime-Generierung (scripts/lib/knowledge.py)
+
+**Exportierte Funktionen:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `generate_schema` | `(domain: str, bundle_path: str, agent_meta_root: Path) → str` | Rendert `schema.md` aus Template mit Domain-Concept-Types |
+| `generate_initial_index` | `() → str` | Leeres `index.md` Skeleton |
+| `generate_initial_log` | `() → str` | Leeres `log.md` Skeleton mit Format-Dokumentation |
+| `DOMAIN_CONCEPT_TYPES` | dict | Mapping Domain → Concept-Type-Liste (Quelle der Wahrheit) |
+
+**Caller:** `scripts/sync.py:sync_knowledge_engine()` (Phase A Scaffolding)
+
+**Keine Dateien-Persistence in knowledge.py** — `sync.py` besitzt alle I/O- und Idempotenz-Entscheidungen.
+
+### 14.5 Admin-UI-Integration
+
+**Route:** `/project/knowledge-engine` (neu in `docs/ui/admin-ui.html`)
+
+**Komponenten:**
+
+| Komponente | Datei | Zweck |
+|-----------|-------|-------|
+| Preset-Picker | `admin-ui.html:const PRESETS` | 5 Domain-Presets inline als JS-Objekt: `default`, `minimal`, `advanced`, `research`, `business` |
+| Toggle-Switch | `admin-ui.html` | Enable/Disable Schalter für `knowledge-engine.enabled` |
+| Domain-Selector | `admin-ui.html` | Dropdown aus `DOMAIN_CONCEPT_TYPES` |
+| Bundle-Path-Input | `admin-ui.html` | Text-Input für `bundle_path` |
+| Config-Save-Button | `admin-ui.html` → `POST /api/project/config` | Speichert zu `.meta-config/project.yaml` |
+| Status-Panel | `admin-ui.html` | Zeigt Anzahl Generierter Agenten, Bundle-Größe, Last-Index-Update |
+
+**Presets inline in HTML (Abweichung vom Konzept):**
+
+```javascript
+const PRESETS = {
+  default: {
+    domain: "custom",
+    bundle_path: "docs/knowledge",
+    bundle_init_template: "default"
+  },
+  minimal: {
+    domain: "custom",
+    bundle_path: "docs/kb",
+    bundle_init_template: "minimal"
+  },
+  research: {
+    domain: "research",
+    bundle_path: "docs/knowledge/research",
+    bundle_init_template: "research"
+  },
+  // ... weitere Presets
+};
+```
+
+**Admin-Server Allowlist (`scripts/admin-server.py`):**
+- Schreibzugriffe auf `knowledge-engine.*` in `.meta-config/project.yaml` erlaubt
+- GET `/project/knowledge-engine` → gibt aktuellen Config zurück
+- POST `/project/knowledge-engine` → validated gegen Schema und speichert
+
+### 14.6 Role-Defaults-Einträge
+
+**In `config/role-defaults.yaml` (neu):**
+
+```yaml
+# Knowledge Engine Agents (v0.82.0+)
+knowledge-curator:
+  model: balanced
+  memory: project
+  workflow_tier: optional
+  description: "Monitors knowledge bundle health — finds contradictions, stale claims, orphans."
+
+knowledge-ingestor:
+  model: balanced
+  memory: project
+  workflow_tier: optional
+  description: "Migrates external sources into bundle structure with summaries and link updates."
+
+knowledge-querier:
+  model: balanced
+  memory: project
+  workflow_tier: optional
+  description: "Answers questions by navigating index and synthesizing with citations."
+
+knowledge-linter:
+  model: fast
+  memory: —
+  workflow_tier: optional
+  description: "Automated format validation (YAML, Dead Links, OKF Compliance)."
+
+knowledge-indexer:
+  model: fast
+  memory: —
+  workflow_tier: optional
+  description: "Generates/updates index.md and log.md in OKF format."
+
+knowledge-gardener:
+  model: balanced
+  memory: project
+  workflow_tier: optional
+  description: "Proactive maintenance — archive obsolete pages, optimize linking."
+
+knowledge-migrator:
+  model: balanced
+  memory: project
+  workflow_tier: optional
+  description: "Base initializer — scaffold new bundles, migrate from existing wikis."
+```
+
+### 14.7 Intent-Routing-Integration
+
+**In `scripts/lib/delegation_table.py:generate_intent_routing_table()`:**
+
+```python
+if config.get("knowledge-engine", {}).get("enabled"):
+    routes.extend([
+        ("query", "knowledge-querier"),
+        ("lint.*knowledge", "knowledge-linter"),
+        ("ingest.*knowledge", "knowledge-ingestor"),
+        ("knowledge.*health", "knowledge-curator"),
+        ("migrate.*wiki", "knowledge-migrator"),
+        ("archive.*knowledge", "knowledge-gardener"),
+        ("index.*knowledge", "knowledge-indexer"),
+    ])
+```
+
+**Skip-Logik:** `role_name.startswith("knowledge-")` → übersprungen wenn `KNOWLEDGE_ENGINE_ENABLED == false`.
+
+### 14.8 Testing
+
+**Test-Datei:** `tests/test_knowledge_engine.py` (44 Tests, alle grün)
+
+| Test-Kategorie | Anzahl | Fokus |
+|---|---|---|
+| Domain Validation | 8 | Gültige/ungültige Domänen, Concept-Types |
+| Template Generation | 10 | `generate_schema()`, `generate_initial_index()`, `generate_initial_log()` |
+| OKF Compliance | 12 | Frontmatter-Parsing, Concept-ID-Validierung, Link-Format |
+| Bundle Scaffolding | 8 | Verzeichnisstruktur, Datei-Erstellen, Fallback-Verhalten |
+| Sync Integration | 6 | `sync_knowledge_engine()` in sync.py, Idempotenz |
+
+**Integration-Tests:** `tests/test_knowledge_sync_integration.py`
+- E2E Bundle-Scaffolding
+- Orchestrator-Routing bei aktiviertem Knowledge Engine
+- Config-Fallback bei deaktiviertem Feature
+
+### 14.9 Dokumentation & Referenzen
+
+| Datei | Zweck |
+|-------|-------|
+| `docs/concepts/knowledge-engine-concept.md` | Detailliertes Designdokument mit OKF/Karpathy Fusion, 42 Abschnitte |
+| `docs/howto/knowledge-engine-quickstart.md` | Quick-Start für Endnutzer (falls vorhanden) |
+| `templates/knowledge-schema.template.md` | Domain-spezifisches Steuerungsdokument-Template |
 
 ---
 
