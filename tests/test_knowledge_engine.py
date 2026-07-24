@@ -320,3 +320,12 @@ def test_knowledge_ingestor_template_exists_and_documents_okf_frontmatter():
     assert "type: <Entity|Concept|Topic|Source Summary" in content
     assert "10-15 Dateien" in content
     assert "knowledge-indexer" in content
+
+
+def test_knowledge_querier_template_exists_and_forbids_rewriting_pages():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-querier.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-querier")
+    assert "Index-First" in content
+    assert "schreibt KEINE bestehenden Wiki-Seiten um" in content or "KEINE bestehenden Wiki-Seiten" in content
