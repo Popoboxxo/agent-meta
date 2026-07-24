@@ -310,3 +310,13 @@ def test_knowledge_curator_template_exists_and_has_required_frontmatter():
     assert "- TodoWrite" in content
     assert "{{KNOWLEDGE_SCHEMA_PATH}}" in content
     assert "{{#if KNOWLEDGE_ENGINE_ENABLED}}" in content
+
+
+def test_knowledge_ingestor_template_exists_and_documents_okf_frontmatter():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-ingestor.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-ingestor")
+    assert "type: <Entity|Concept|Topic|Source Summary" in content
+    assert "10-15 Dateien" in content
+    assert "knowledge-indexer" in content
