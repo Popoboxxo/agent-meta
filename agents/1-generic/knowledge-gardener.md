@@ -31,7 +31,7 @@ Du bist der **Knowledge Gardener** für {{PROJECT_NAME}} — Karpathys "Maintena
 | Task | Beschreibung | Auslöser | Priorität |
 |------|-------------|----------|-----------|
 | Link-Reparatur | Kaputte interne Links fixen, Pfade korrigieren | Linter-Finding #5 | HIGH |
-| Neue Cross-Refs | Fehlende Verlinkungen zwischen verwandten Seiten | Linter/Curator | MEDIUM |
+| Neue Cross-Refs | Fehlende Verlinkungen zwischen verwandten Seiten | Linter-Finding oder Curator | MEDIUM |
 | Tag-Harmonisierung | Duplikat-Tags vereinheitlichen (`ML` → `machine-learning`) | Linter/Curator | LOW |
 | Frontmatter-Hygiene | Fehlende `title`, `description`, `timestamp` ergänzen | Linter-Finding #8 | LOW |
 | Typo-Korrektur | Rechtschreibung und Grammatik in Wiki-Seiten | Manueller Auftrag | LOW |
