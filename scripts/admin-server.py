@@ -3298,7 +3298,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
-            "provider-isolation", "environments", "model-source-preference",
+            "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")

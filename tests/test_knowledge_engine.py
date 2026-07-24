@@ -439,3 +439,20 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
         assert (dest / ".claude" / "agents" / f"{role}.md").exists(), f"{role} not generated"
+
+
+# ---------------------------------------------------------------------------
+# admin-server.py — allowed section set includes knowledge-engine
+# ---------------------------------------------------------------------------
+
+def test_admin_server_allows_knowledge_engine_section_write():
+    import ast
+    from pathlib import Path
+    source = Path(__file__).parent.parent / "scripts" / "admin-server.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    found = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_write_project_section":
+            found = "knowledge-engine" in ast.dump(node)
+            break
+    assert found, "'knowledge-engine' not found in _write_project_section's allowed set"
