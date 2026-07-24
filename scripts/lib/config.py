@@ -515,8 +515,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         if _sv_key not in variables:
             variables[_sv_key] = str(_sv_val)
     # KNOWLEDGE_ENGINE_ENABLED / KNOWLEDGE_DOMAIN / KNOWLEDGE_BUNDLE_PATH —
-    # Phase A of the Knowledge Engine. Mirrors the SE block above; consumed by
-    # Phase B knowledge-* agent templates once they exist.
+    # Mirrors the SE block above; consumed by the knowledge-* agent templates
+    # and the intent-routing table generator (delegation_table.py).
     ke_config = config.get("knowledge-engine", {})
     variables["KNOWLEDGE_ENGINE_ENABLED"] = "true" if ke_config.get("enabled", False) else "false"
     variables["KNOWLEDGE_DOMAIN"] = ke_config.get("domain", "research")

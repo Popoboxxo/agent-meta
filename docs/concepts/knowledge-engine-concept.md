@@ -7,8 +7,10 @@
 > - Google OKF v0.1: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 > - Google Cloud Blog: https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/
 >
-> **Erstellt:** 2026-07-22 | **Aktualisiert:** 2026-07-22
-> **Status:** Konzept (nicht implementiert)
+> **Erstellt:** 2026-07-22 | **Aktualisiert:** 2026-07-24
+> **Status:** Implementiert (Phase A-C abgeschlossen, main gemerged). Zwei bewusste Abweichungen vom Konzept:
+> - §8 Templates `knowledge-index.template.md`/`knowledge-log.template.md` existieren nicht als Dateien — Inhalt wird stattdessen in `scripts/lib/knowledge.py` (`generate_initial_index()`/`generate_initial_log()`) generiert.
+> - §20.6 `config/knowledge-presets.yaml` existiert nicht — Presets liegen inline in `docs/ui/admin-ui.html` als `const PRESETS = {...}`.
 
 ---
 
