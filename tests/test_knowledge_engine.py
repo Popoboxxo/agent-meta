@@ -329,3 +329,16 @@ def test_knowledge_querier_template_exists_and_forbids_rewriting_pages():
     assert content.startswith("---\nname: template-knowledge-querier")
     assert "Index-First" in content
     assert "schreibt KEINE bestehenden Wiki-Seiten um" in content or "KEINE bestehenden Wiki-Seiten" in content
+
+
+def test_knowledge_linter_template_exists_and_has_ten_checks():
+    path = _AGENT_META_ROOT / "agents" / "1-generic" / "knowledge-linter.md"
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert content.startswith("---\nname: template-knowledge-linter")
+    for check in [
+        "Widersprüche", "Veraltete Claims", "Orphan-Seiten", "Fehlende Concepts",
+        "Kaputte Cross-References", "Datenlücken", "Fehlendes `type`-Frontmatter",
+        "Fehlende recommended Frontmatter", "veraltet", "Inkonsistenzen",
+    ]:
+        assert check in content, f"missing check reference: {check}"
