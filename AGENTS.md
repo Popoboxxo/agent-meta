@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode -> AGENTS.md | Gemini -> .gemini/GEMINI.md
 
-Generiert von agent-meta v0.82.0 — `2026-07-23`
+Generiert von agent-meta v0.82.0 — `2026-07-24`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
@@ -40,6 +40,13 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
 | `junior-developer` | Low-Tier-Developer: triviale Fixes, Typos, kleine klar umrissene Änderungen — eskaliert bei Scope-Überschreitung |
+| `knowledge-curator` | Wiki-Strategie, Schema-Evolution, OKF-Compliance |
+| `knowledge-gardener` | Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps |
+| `knowledge-indexer` | index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten |
+| `knowledge-ingestor` | Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen |
+| `knowledge-linter` | Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF) |
+| `knowledge-migrator` | Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe) |
+| `knowledge-querier` | Wiki-Fragen beantworten, Index-First, Synthese mit Citations |
 | `log-analyzer` | Log-Analyse: Fehler clustern, Severity klassifizieren (RFC 5424), Findings als Issues oder Tasks delegieren |
 | `mammouth-expert` | Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
@@ -56,6 +63,29 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `tester` | Tests schreiben (TDD), Test-Suite ausführen, Coverage sicherstellen |
 | `ui-ux-designer` | UI-Spezifikation, Mockup-Erstellung und Design-System-Definition — implementiert nicht, spezifiziert. |
 | `validator` | Interner Qualitäts-Checker: DoD-Checkliste, Traceability-Audit. Wird vom Orchestrator nach der Implementierung aufgerufen. Nicht für direkte User-Fragen oder Setup-Hilfe. |
+
+## Knowledge Engine
+
+Die Knowledge Engine ist aktiviert. Domäne: **personal**.
+
+**Bundle-Pfad:** `knowledge/`
+| Pfad | Zweck |
+|------|-------|
+| `knowledge/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |
+| `knowledge/sources/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |
+| `knowledge/wiki/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |
+| `knowledge/wiki/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |
+| `knowledge/wiki/log.md` | Chronologisches Event-Log (OKF §7) |
+
+### Knowledge-Agenten
+- **Schema-Owner:** `knowledge-curator` verwaltet `knowledge/schema.md` und Concept-Type-Konventionen
+
+### Knowledge-Workflows
+- **Ingest:** Source in `knowledge/sources/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert
+- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort
+- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)
+- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format
+- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 
 ## Agents
 

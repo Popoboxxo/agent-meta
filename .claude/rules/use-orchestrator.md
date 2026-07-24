@@ -40,6 +40,13 @@ The main chat acts as both router and worker. No separate orchestrator subagent 
 | incident / outage / RCA / root cause | `incident-responder` | balanced | Nein |
 | [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
 | Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
+| Knowledge / Wiki / Wissen / Schema | `knowledge-curator` | balanced | Nein |
+| Wiki-Pflege / Links reparieren / Tags aufräumen / Wiki aufräumen | `knowledge-gardener` | nano | Ja |
+| Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki. | `knowledge-indexer` | nano | Ja |
+| Ingest / Source verarbeiten / einlesen | `knowledge-ingestor` | balanced | Ja |
+| Wiki-Lint / Wiki-Check / Knowledge Lint / Wiki-Gesundheit | `knowledge-linter` | fast | Ja |
+| Migrieren / Aufräumen / Wiki-Migration / Docs migrieren | `knowledge-migrator` | balanced | Nein |
+| Wiki-Frage / Was wissen wir / Knowledge Query / Recherche im Wiki | `knowledge-querier` | fast | Ja |
 | Log / Logs / Fehleranalyse | `log-analyzer` | fast | Ja |
 | Mammouth / Mammouth Code | `mammouth-expert` | balanced | Nein |
 | Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |

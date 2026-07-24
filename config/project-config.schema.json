@@ -89,6 +89,13 @@
           "incident-responder",
           "intern-developer",
           "junior-developer",
+          "knowledge-curator",
+          "knowledge-gardener",
+          "knowledge-indexer",
+          "knowledge-ingestor",
+          "knowledge-linter",
+          "knowledge-migrator",
+          "knowledge-querier",
           "log-analyzer",
           "mammouth-expert",
           "meta-feedback",
@@ -862,7 +869,13 @@
         },
         "domain": {
           "type": "string",
-          "enum": ["research", "personal", "business", "book", "custom"],
+          "enum": [
+            "research",
+            "personal",
+            "business",
+            "book",
+            "custom"
+          ],
           "default": "research",
           "description": "Concept-type preset for schema.md generation. See scripts/lib/knowledge.py DOMAIN_CONCEPT_TYPES."
         },
@@ -890,14 +903,25 @@
           "type": "object",
           "description": "Open Knowledge Format enforcement rules for ingested/curated pages.",
           "properties": {
-            "enforce-frontmatter": { "type": "boolean", "default": true },
+            "enforce-frontmatter": {
+              "type": "boolean",
+              "default": true
+            },
             "allowed-types": {
               "type": "array",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "default": []
             },
-            "auto-index": { "type": "boolean", "default": true },
-            "auto-log": { "type": "boolean", "default": true }
+            "auto-index": {
+              "type": "boolean",
+              "default": true
+            },
+            "auto-log": {
+              "type": "boolean",
+              "default": true
+            }
           },
           "additionalProperties": false
         },
@@ -908,16 +932,28 @@
             "ingest": {
               "type": "object",
               "properties": {
-                "auto-cross-reference": { "type": "boolean", "default": true },
-                "auto-index-update": { "type": "boolean", "default": true },
-                "batch-mode": { "type": "boolean", "default": false }
+                "auto-cross-reference": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "auto-index-update": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "batch-mode": {
+                  "type": "boolean",
+                  "default": false
+                }
               },
               "additionalProperties": false
             },
             "query": {
               "type": "object",
               "properties": {
-                "file-back-results": { "type": "boolean", "default": true }
+                "file-back-results": {
+                  "type": "boolean",
+                  "default": true
+                }
               },
               "additionalProperties": false
             },
@@ -926,7 +962,11 @@
               "properties": {
                 "schedule": {
                   "type": "string",
-                  "enum": ["on-demand", "post-ingest", "periodic"],
+                  "enum": [
+                    "on-demand",
+                    "post-ingest",
+                    "periodic"
+                  ],
                   "default": "on-demand"
                 },
                 "checks": {
@@ -944,7 +984,10 @@
                       "unresolved-todos"
                     ]
                   },
-                  "default": ["broken-links", "missing-frontmatter"]
+                  "default": [
+                    "broken-links",
+                    "missing-frontmatter"
+                  ]
                 }
               },
               "additionalProperties": false
@@ -956,9 +999,18 @@
           "type": "object",
           "description": "Safety toggles for the knowledge-migrator agent. Migration copies, never moves.",
           "properties": {
-            "auto-detect-sources": { "type": "boolean", "default": false },
-            "clean-duplicates": { "type": "boolean", "default": false },
-            "preserve-originals": { "type": "boolean", "default": true }
+            "auto-detect-sources": {
+              "type": "boolean",
+              "default": false
+            },
+            "clean-duplicates": {
+              "type": "boolean",
+              "default": false
+            },
+            "preserve-originals": {
+              "type": "boolean",
+              "default": true
+            }
           },
           "additionalProperties": false
         },
@@ -967,10 +1019,17 @@
           "properties": {
             "engine": {
               "type": "string",
-              "enum": ["index-only", "mcp-qmd", "custom"],
+              "enum": [
+                "index-only",
+                "mcp-qmd",
+                "custom"
+              ],
               "default": "index-only"
             },
-            "mcp-server": { "type": "string", "default": "" }
+            "mcp-server": {
+              "type": "string",
+              "default": ""
+            }
           },
           "additionalProperties": false
         }
@@ -1104,7 +1163,9 @@
             },
             "whitelist": {
               "type": "array",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "default": [],
               "uniqueItems": true,
               "description": "Whitelist of allowed native Skill/Plugin identifiers. Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement. Empty (default) = no filter."

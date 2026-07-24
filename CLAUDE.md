@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.82.0 — `2026-07-23`
+> Generiert von agent-meta v0.82.0 — `2026-07-24`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -113,10 +113,33 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode -> AGENTS.md | Gemini -> .gemini/GEMINI.md
 
-Generiert von agent-meta v0.82.0 — `2026-07-23`
+Generiert von agent-meta v0.82.0 — `2026-07-24`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
+
+## Knowledge Engine
+
+Die Knowledge Engine ist aktiviert. Domäne: **personal**.
+
+**Bundle-Pfad:** `knowledge/`
+| Pfad | Zweck |
+|------|-------|
+| `knowledge/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |
+| `knowledge/sources/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |
+| `knowledge/wiki/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |
+| `knowledge/wiki/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |
+| `knowledge/wiki/log.md` | Chronologisches Event-Log (OKF §7) |
+
+### Knowledge-Agenten
+- **Schema-Owner:** `knowledge-curator` verwaltet `knowledge/schema.md` und Concept-Type-Konventionen
+
+### Knowledge-Workflows
+- **Ingest:** Source in `knowledge/sources/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert
+- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort
+- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)
+- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format
+- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 <!-- agent-meta:managed-end -->
 
 **Singleton-Regel:** Es existiert genau EIN `orchestrator` pro Session — der vom `main_chat` gespawnte. Worker-Agents dürfen niemals `task(subagent_type="orchestrator", ...)` aufrufen. Verstoß = Deadlock / Routing-Konflikt.

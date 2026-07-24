@@ -73,6 +73,13 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | incident / outage / RCA / root cause | `incident-responder` | balanced | Nein |
 | [EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen. | `intern-developer` | nano | Ja |
 | Trivialer Fix / kleiner Fix / ≤2 Dateien | `junior-developer` | fast | Ja |
+| Knowledge / Wiki / Wissen / Schema | `knowledge-curator` | balanced | Nein |
+| Wiki-Pflege / Links reparieren / Tags aufräumen / Wiki aufräumen | `knowledge-gardener` | nano | Ja |
+| Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki. | `knowledge-indexer` | nano | Ja |
+| Ingest / Source verarbeiten / einlesen | `knowledge-ingestor` | balanced | Ja |
+| Wiki-Lint / Wiki-Check / Knowledge Lint / Wiki-Gesundheit | `knowledge-linter` | fast | Ja |
+| Migrieren / Aufräumen / Wiki-Migration / Docs migrieren | `knowledge-migrator` | balanced | Nein |
+| Wiki-Frage / Was wissen wir / Knowledge Query / Recherche im Wiki | `knowledge-querier` | fast | Ja |
 | Log / Logs / Fehleranalyse | `log-analyzer` | fast | Ja |
 | Mammouth / Mammouth Code | `mammouth-expert` | balanced | Nein |
 | Meta-Feedback / Verbesserung | `meta-feedback` | fast | Nein |
@@ -219,6 +226,13 @@ SE mode: optional
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen | nano | ❌ (atomar) |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements | balanced | ✅ (Multi-Aspekte) |
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert | fast | ✅ (Multi-Tasks) |
+| `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance. | balanced | ❌ (sequentiell) |
+| `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren. | nano | ✅ (Multi-Fixes) |
+| `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki. | nano | ❌ (zentral) |
+| `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest. | balanced | ✅ (Multi-Sources) |
+| `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links, fehlende OKF-Frontmatter, Index-Staleness. | fast | ✅ (Multi-Prüfungen) |
+| `knowledge-migrator` | Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung. Schützt documenter- und requirements-eigene Dateien. | balanced | ❌ (sequentiell) |
+| `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten. | fast | ✅ (Multi-Queries) |
 | `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor | fast | ✅ (Multi-Quellen) |
 | `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta. | balanced | ✅ (Multi-Tasks) |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen | fast | ❌ (atomar) |

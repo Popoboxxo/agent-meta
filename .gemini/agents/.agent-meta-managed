@@ -23,6 +23,13 @@ gemini-expert.md
 git.md
 ideation.md
 junior-developer.md
+knowledge-curator.md
+knowledge-gardener.md
+knowledge-indexer.md
+knowledge-ingestor.md
+knowledge-linter.md
+knowledge-migrator.md
+knowledge-querier.md
 log-analyzer.md
 mammouth-expert.md
 meta-feedback.md

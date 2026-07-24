@@ -10,9 +10,38 @@ rules-preset: silent
 systems-engineering:
   enabled: false
 knowledge-engine:
-  enabled: false
-  domain: research
+  enabled: true
+  domain: personal
   bundle-path: knowledge
+  okf:
+    enforce-frontmatter: true
+    allowed-types:
+    - note
+    - journal
+    auto-index: true
+    auto-log: true
+  operations:
+    ingest:
+      auto-cross-reference: false
+      auto-index-update: true
+      batch-mode: false
+    query:
+      file-back-results: true
+    lint:
+      schedule: on-demand
+      checks:
+      - broken-links
+      - missing-frontmatter
+  migration:
+    auto-detect-sources: false
+    clean-duplicates: false
+    preserve-originals: true
+  search:
+    engine: index-only
+    mcp-server: ''
+  sources-dir: sources
+  wiki-dir: wiki
+  schema-language: auto
 platforms:
 - agent-meta
 mcp-servers:
@@ -61,7 +90,6 @@ roles:
 - data-engineer
 - docker
 - mammouth-expert
-# Knowledge Engine roles: pre-wired for feature activation, currently inert (knowledge-engine.enabled: false)
 - knowledge-curator
 - knowledge-ingestor
 - knowledge-querier
