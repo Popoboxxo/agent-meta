@@ -2769,6 +2769,218 @@ async function viewProjectRulesOverrides() {
 }
 
 /* =========================================================================
+ * Views — Project Knowledge Engine
+ * ========================================================================= */
+const KNOWLEDGE_ALL_LINT_CHECKS = [
+  "broken-links", "missing-frontmatter", "orphaned-pages", "duplicate-concepts",
+  "stale-index", "inconsistent-naming", "missing-citations", "unresolved-todos",
+];
+
+const PRESETS = {
+  research: {
+    domain: "research", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": ["paper", "note", "citation"], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": true },
+      query: { "file-back-results": true },
+      lint: { schedule: "post-ingest", checks: ["broken-links", "missing-frontmatter", "missing-citations", "duplicate-concepts"] },
+    },
+    migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
+  personal: {
+    domain: "personal", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": ["note", "journal"], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": false, "auto-index-update": true, "batch-mode": false },
+      query: { "file-back-results": true },
+      lint: { schedule: "on-demand", checks: ["broken-links", "missing-frontmatter"] },
+    },
+    migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
+  business: {
+    domain: "business", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": ["process", "decision", "policy"], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": false },
+      query: { "file-back-results": true },
+      lint: { schedule: "periodic", checks: ["broken-links", "missing-frontmatter", "stale-index", "orphaned-pages"] },
+    },
+    migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
+  book: {
+    domain: "book", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": ["chapter", "character", "worldbuilding"], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": false },
+      query: { "file-back-results": true },
+      lint: { schedule: "on-demand", checks: ["broken-links", "missing-frontmatter", "inconsistent-naming"] },
+    },
+    migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
+  custom: {
+    domain: "custom", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": [], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": false },
+      query: { "file-back-results": true },
+      lint: { schedule: "on-demand", checks: ["broken-links", "missing-frontmatter"] },
+    },
+    migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
+};
+const KNOWLEDGE_PRESETS = PRESETS;
+
+async function viewProjectKnowledgeEngine() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Knowledge Engine"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Configure the opt-in Knowledge Engine bundle: schema, OKF frontmatter rules, ingest/query/lint behavior, migration safety and search.",
+  ]));
+
+  const data = await loadProject();
+  const ke = (data["knowledge-engine"] && typeof data["knowledge-engine"] === "object") ? clone(data["knowledge-engine"]) : {};
+  ke.okf = (ke.okf && typeof ke.okf === "object") ? ke.okf : {};
+  ke.operations = (ke.operations && typeof ke.operations === "object") ? ke.operations : {};
+  ke.operations.ingest = (ke.operations.ingest && typeof ke.operations.ingest === "object") ? ke.operations.ingest : {};
+  ke.operations.query = (ke.operations.query && typeof ke.operations.query === "object") ? ke.operations.query : {};
+  ke.operations.lint = (ke.operations.lint && typeof ke.operations.lint === "object") ? ke.operations.lint : {};
+  ke.migration = (ke.migration && typeof ke.migration === "object") ? ke.migration : {};
+  ke.search = (ke.search && typeof ke.search === "object") ? ke.search : {};
+
+  const status = el("div", { class: "muted" });
+  const contentWrap = el("div");
+
+  const render = () => {
+    contentWrap.replaceChildren();
+
+    // Panel 0 — Preset Selector
+    const presetPanel = el("div", { class: "panel" });
+    presetPanel.appendChild(el("h2", {}, ["Domain Preset"]));
+    presetPanel.appendChild(dropdownField(
+      "Apply preset",
+      ["", "research", "personal", "business", "book", "custom"],
+      "",
+      (val) => {
+        if (!val) return;
+        const preset = KNOWLEDGE_PRESETS[val];
+        if (!preset) return;
+        Object.assign(ke, clone(preset));
+        ke.enabled = true;
+        router.navigate("/project/knowledge-engine");
+      },
+      { "": "(select to apply — overwrites all fields below)" },
+    ));
+    contentWrap.appendChild(presetPanel);
+
+    // Panel 1 — General
+    const generalPanel = el("div", { class: "panel" });
+    generalPanel.appendChild(el("h2", {}, ["General"]));
+    generalPanel.appendChild(checkboxField("Enabled", !!ke.enabled, (v) => { ke.enabled = v; render(); }));
+    generalPanel.appendChild(dropdownField(
+      "Domain",
+      ["research", "personal", "business", "book", "custom"],
+      ke.domain || "custom",
+      (v) => { ke.domain = v; },
+    ));
+    generalPanel.appendChild(labeledTextField("Bundle path", ke["bundle-path"] || "knowledge", (v) => { ke["bundle-path"] = v; }));
+    generalPanel.appendChild(labeledTextField("Sources dir", ke["sources-dir"] || "sources", (v) => { ke["sources-dir"] = v; }));
+    generalPanel.appendChild(labeledTextField("Wiki dir", ke["wiki-dir"] || "wiki", (v) => { ke["wiki-dir"] = v; }));
+    generalPanel.appendChild(labeledTextField("Schema language", ke["schema-language"] || "auto", (v) => { ke["schema-language"] = v; }));
+    contentWrap.appendChild(generalPanel);
+
+    // Panel 2 — OKF
+    const okfPanel = el("div", { class: "panel" });
+    okfPanel.appendChild(el("h2", {}, ["OKF (Open Knowledge Format)"]));
+    okfPanel.appendChild(checkboxField("Enforce frontmatter", ke.okf["enforce-frontmatter"] !== false, (v) => { ke.okf["enforce-frontmatter"] = v; }));
+    okfPanel.appendChild(checkboxField("Auto-index", ke.okf["auto-index"] !== false, (v) => { ke.okf["auto-index"] = v; }));
+    okfPanel.appendChild(checkboxField("Auto-log", ke.okf["auto-log"] !== false, (v) => { ke.okf["auto-log"] = v; }));
+    okfPanel.appendChild(labeledTextField(
+      "Allowed types (comma-separated)",
+      (ke.okf["allowed-types"] || []).join(", "),
+      (v) => { ke.okf["allowed-types"] = v.split(",").map(s => s.trim()).filter(Boolean); },
+      "Leave empty to allow any concept type.",
+    ));
+    contentWrap.appendChild(okfPanel);
+
+    // Panel 3 — Operations
+    const opsPanel = el("div", { class: "panel" });
+    opsPanel.appendChild(el("h2", {}, ["Operations"]));
+
+    opsPanel.appendChild(el("h3", {}, ["Ingest"]));
+    opsPanel.appendChild(checkboxField("Auto cross-reference", ke.operations.ingest["auto-cross-reference"] !== false, (v) => { ke.operations.ingest["auto-cross-reference"] = v; }));
+    opsPanel.appendChild(checkboxField("Auto index update", ke.operations.ingest["auto-index-update"] !== false, (v) => { ke.operations.ingest["auto-index-update"] = v; }));
+    opsPanel.appendChild(checkboxField("Batch mode", !!ke.operations.ingest["batch-mode"], (v) => { ke.operations.ingest["batch-mode"] = v; }));
+
+    opsPanel.appendChild(el("h3", {}, ["Query"]));
+    opsPanel.appendChild(checkboxField("File-back results", ke.operations.query["file-back-results"] !== false, (v) => { ke.operations.query["file-back-results"] = v; }));
+
+    opsPanel.appendChild(el("h3", {}, ["Lint"]));
+    opsPanel.appendChild(dropdownField(
+      "Schedule",
+      ["on-demand", "post-ingest", "periodic"],
+      ke.operations.lint.schedule || "on-demand",
+      (v) => { ke.operations.lint.schedule = v; },
+    ));
+    const lintChecks = new Set(ke.operations.lint.checks || ["broken-links", "missing-frontmatter"]);
+    const checksWrap = el("div");
+    for (const check of KNOWLEDGE_ALL_LINT_CHECKS) {
+      checksWrap.appendChild(checkboxField(check, lintChecks.has(check), (v) => {
+        if (v) { lintChecks.add(check); } else { lintChecks.delete(check); }
+        ke.operations.lint.checks = [...lintChecks];
+      }));
+    }
+    opsPanel.appendChild(checksWrap);
+    contentWrap.appendChild(opsPanel);
+
+    // Panel 4 — Migration
+    const migrationPanel = el("div", { class: "panel" });
+    migrationPanel.appendChild(el("h2", {}, ["Migration"]));
+    migrationPanel.appendChild(el("p", { class: "muted" }, ["Migration always copies, never moves. These toggles do not start a migration by themselves."]));
+    migrationPanel.appendChild(checkboxField("Auto-detect sources", !!ke.migration["auto-detect-sources"], (v) => { ke.migration["auto-detect-sources"] = v; }));
+    migrationPanel.appendChild(checkboxField("Clean duplicates", !!ke.migration["clean-duplicates"], (v) => { ke.migration["clean-duplicates"] = v; }));
+    migrationPanel.appendChild(checkboxField("Preserve originals", ke.migration["preserve-originals"] !== false, (v) => { ke.migration["preserve-originals"] = v; }));
+    contentWrap.appendChild(migrationPanel);
+
+    // Panel 5 — Search
+    const searchPanel = el("div", { class: "panel" });
+    searchPanel.appendChild(el("h2", {}, ["Search"]));
+    searchPanel.appendChild(dropdownField(
+      "Engine",
+      ["index-only", "mcp-qmd", "custom"],
+      ke.search.engine || "index-only",
+      (v) => { ke.search.engine = v; render(); },
+    ));
+    if (ke.search.engine !== "index-only") {
+      searchPanel.appendChild(labeledTextField("MCP server", ke.search["mcp-server"] || "", (v) => { ke.search["mcp-server"] = v; }));
+    }
+    contentWrap.appendChild(searchPanel);
+  };
+  render();
+
+  wrap.appendChild(status);
+  wrap.appendChild(contentWrap);
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        await saveProjectSection("knowledge-engine", ke, status);
+      } catch { /* toast shown */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Export config (Phase 3f)
  * ========================================================================= */
 async function viewExport() {

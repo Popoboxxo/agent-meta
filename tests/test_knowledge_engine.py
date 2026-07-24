@@ -467,4 +467,18 @@ def test_admin_ui_has_knowledge_engine_route():
     html = (Path(__file__).parent.parent / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
     assert '{ route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" }' in html
     assert 'router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);' in html
+
+
+# ---------------------------------------------------------------------------
+# admin-ui.html — viewProjectKnowledgeEngine() view function (Task 4)
+# ---------------------------------------------------------------------------
+
+def test_admin_ui_has_view_project_knowledge_engine_function():
+    from pathlib import Path
+    html = (Path(__file__).parent.parent / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
+    assert "async function viewProjectKnowledgeEngine()" in html
+    assert 'const PRESETS = {' in html
+    for preset_name in ("research", "personal", "business", "book", "custom"):
+        assert f'{preset_name}: {{' in html or f'"{preset_name}": {{' in html
+    assert 'saveProjectSection("knowledge-engine", ke, status)' in html
     assert '"project/knowledge-engine": "project_instance-knowledge_engine",' in html
