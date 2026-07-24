@@ -870,6 +870,109 @@
           "type": "string",
           "default": "knowledge",
           "description": "Root directory of the knowledge bundle, relative to the project root."
+        },
+        "sources-dir": {
+          "type": "string",
+          "default": "sources",
+          "description": "Relative path (inside the bundle) where raw source documents live before ingestion."
+        },
+        "wiki-dir": {
+          "type": "string",
+          "default": "wiki",
+          "description": "Relative path (inside the bundle) where curated wiki pages are written."
+        },
+        "schema-language": {
+          "type": "string",
+          "default": "auto",
+          "description": "Language used for schema.md and generated wiki page headers ('auto' = follow project language rules)."
+        },
+        "okf": {
+          "type": "object",
+          "description": "Open Knowledge Format enforcement rules for ingested/curated pages.",
+          "properties": {
+            "enforce-frontmatter": { "type": "boolean", "default": true },
+            "allowed-types": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            },
+            "auto-index": { "type": "boolean", "default": true },
+            "auto-log": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
+        },
+        "operations": {
+          "type": "object",
+          "description": "Behavior toggles for the ingest, query and lint pipelines.",
+          "properties": {
+            "ingest": {
+              "type": "object",
+              "properties": {
+                "auto-cross-reference": { "type": "boolean", "default": true },
+                "auto-index-update": { "type": "boolean", "default": true },
+                "batch-mode": { "type": "boolean", "default": false }
+              },
+              "additionalProperties": false
+            },
+            "query": {
+              "type": "object",
+              "properties": {
+                "file-back-results": { "type": "boolean", "default": true }
+              },
+              "additionalProperties": false
+            },
+            "lint": {
+              "type": "object",
+              "properties": {
+                "schedule": {
+                  "type": "string",
+                  "enum": ["on-demand", "post-ingest", "periodic"],
+                  "default": "on-demand"
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "broken-links",
+                      "missing-frontmatter",
+                      "orphaned-pages",
+                      "duplicate-concepts",
+                      "stale-index",
+                      "inconsistent-naming",
+                      "missing-citations",
+                      "unresolved-todos"
+                    ]
+                  },
+                  "default": ["broken-links", "missing-frontmatter"]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "migration": {
+          "type": "object",
+          "description": "Safety toggles for the knowledge-migrator agent. Migration copies, never moves.",
+          "properties": {
+            "auto-detect-sources": { "type": "boolean", "default": false },
+            "clean-duplicates": { "type": "boolean", "default": false },
+            "preserve-originals": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
+        },
+        "search": {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "type": "string",
+              "enum": ["index-only", "mcp-qmd", "custom"],
+              "default": "index-only"
+            },
+            "mcp-server": { "type": "string", "default": "" }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

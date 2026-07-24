@@ -382,6 +382,26 @@ def test_knowledge_migrator_template_exists_and_has_hard_constraints():
 # Full self-hosting integration — sync.py end-to-end with knowledge-engine on
 # ---------------------------------------------------------------------------
 
+def test_schema_knowledge_engine_has_phase_c_properties():
+    import json
+    from pathlib import Path
+    schema_path = Path(__file__).parent.parent / "config" / "project-config.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    ke_props = schema["properties"]["knowledge-engine"]["properties"]
+    for field in ("sources-dir", "wiki-dir", "schema-language", "okf", "operations", "migration", "search"):
+        assert field in ke_props, f"missing knowledge-engine.{field}"
+    assert ke_props["okf"]["additionalProperties"] is False
+    assert ke_props["operations"]["additionalProperties"] is False
+    assert ke_props["operations"]["properties"]["ingest"]["additionalProperties"] is False
+    assert ke_props["operations"]["properties"]["query"]["additionalProperties"] is False
+    assert ke_props["operations"]["properties"]["lint"]["additionalProperties"] is False
+    assert ke_props["migration"]["additionalProperties"] is False
+    assert ke_props["migration"]["properties"]["preserve-originals"]["default"] is True
+    assert ke_props["migration"]["properties"]["auto-detect-sources"]["default"] is False
+    assert ke_props["migration"]["properties"]["clean-duplicates"]["default"] is False
+    assert ke_props["search"]["additionalProperties"] is False
+
+
 def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     import shutil
     import subprocess
