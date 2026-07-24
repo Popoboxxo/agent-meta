@@ -4050,6 +4050,35 @@ function checkboxField(label, value, onChange) {
   return field;
 }
 
+function tagEditorField(label, values, onChange, helpText) {
+  const field = el("div", { class: "field" });
+  field.appendChild(el("label", { class: "field-label" }, [label]));
+  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px; flex-wrap:wrap;" });
+  const tags = Array.isArray(values) ? [...values] : [];
+  const refresh = () => {
+    wrap.innerHTML = "";
+    tags.forEach((t, i) => {
+      const tag = el("span", { class: "badge" }, [String(t)]);
+      const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "remove" }, ["×"]);
+      rm.addEventListener("click", () => { tags.splice(i, 1); onChange([...tags]); refresh(); });
+      tag.appendChild(rm);
+      wrap.appendChild(tag);
+    });
+    const inp = el("input", { type: "text", placeholder: "add…", style: "max-width:160px;" });
+    inp.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && inp.value.trim()) {
+        ev.preventDefault();
+        tags.push(inp.value.trim()); onChange([...tags]); inp.value = ""; refresh();
+      }
+    });
+    wrap.appendChild(inp);
+  };
+  refresh();
+  field.appendChild(wrap);
+  if (helpText) field.appendChild(el("div", { class: "field-help" }, [helpText]));
+  return field;
+}
+
 /* ----------------------------------- General ----------------------------- */
 async function viewProjectGeneral() {
   const wrap = el("div");
@@ -4556,6 +4585,19 @@ async function viewProjectOrchestrator() {
   genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
   genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
   wrap.appendChild(genPanel);
+
+  // ── Native Extensions ────────────────────────────────────────────────────
+  const nativeExt = (orch["native-extensions"] && typeof orch["native-extensions"] === "object") ? orch["native-extensions"] : {};
+  const nePanel = el("div", { class: "panel" });
+  nePanel.appendChild(el("h2", {}, ["Native Extensions"]));
+  nePanel.appendChild(checkboxField("enabled", nativeExt.enabled !== false, v => { nativeExt.enabled = v; orch["native-extensions"] = nativeExt; }));
+  nePanel.appendChild(tagEditorField(
+    "whitelist",
+    nativeExt.whitelist,
+    v => { nativeExt.whitelist = v; orch["native-extensions"] = nativeExt; },
+    "Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement. Leer = kein Filter."
+  ));
+  wrap.appendChild(nePanel);
 
   // ── Unknown Fallback ──────────────────────────────────────────────────────
   const uf = (orch["unknown-fallback"] && typeof orch["unknown-fallback"] === "object") ? orch["unknown-fallback"] : {};

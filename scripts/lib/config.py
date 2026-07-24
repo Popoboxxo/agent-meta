@@ -469,6 +469,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     _native_ext_cfg = orch_config.get("native-extensions", {})
     _native_ext_enabled = _native_ext_cfg.get("enabled", True) if isinstance(_native_ext_cfg, dict) else bool(_native_ext_cfg)
     variables["NATIVE_EXTENSIONS_ENABLED"] = "true" if _native_ext_enabled else "false"
+    _native_ext_whitelist = _native_ext_cfg.get("whitelist", []) if isinstance(_native_ext_cfg, dict) else []
+    variables["NATIVE_EXTENSIONS_WHITELIST_ACTIVE"] = "true" if _native_ext_whitelist else "false"
+    variables["NATIVE_EXTENSIONS_WHITELIST_TABLE"] = (
+        "\n".join(f"- `{s}`" for s in _native_ext_whitelist) if _native_ext_whitelist else ""
+    )
     # ANALYSIS_ENABLED: AST-based file affinity analysis for parallelization hints.
     # Activate via: analysis: enabled: true in project.yaml (default: false).
     # When enabled, FILE_AFFINITY_HINT is populated with a Markdown dependency table.
@@ -695,7 +700,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED", "WEB_PROJECT_ENABLED", "KNOWLEDGE_ENGINE_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
-    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
 
     if not conditional_vars:

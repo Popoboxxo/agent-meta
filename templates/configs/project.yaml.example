@@ -189,3 +189,10 @@ variables:
   GH_ASSETS: ""
   BUILD_SYSTEM_NOTES: ""
   VERSION_DIST_BEHAVIOUR: ""
+
+# orchestrator:
+#   native-extensions:
+#     enabled: true          # allow platform-native Skills/Plugins (default: true)
+#     whitelist: []          # empty = no filter. Non-empty = allow-only:
+#                            # only listed Skills/Plugins may run, everything else is blocked
+#                            # regardless of `enabled`. Example: ["superpowers", "code-simplifier"]
