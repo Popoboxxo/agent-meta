@@ -30,7 +30,7 @@ Neuer Top-Level-Block in `.meta-config/project.yaml`:
 ```yaml
 knowledge-engine:
   enabled: false          # Default OFF — opt-in wie systems-engineering
-  domain: research        # enum: research | personal | business | book | custom
+  domain: research        # enum: research | personal | business | book | internal-docs | custom
   bundle-path: knowledge  # Root-Verzeichnis des Knowledge Bundle
 ```
 

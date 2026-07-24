@@ -229,7 +229,7 @@ Das genügt. Alle anderen Werte haben vernünftige Defaults.
 ```yaml
 knowledge-engine:
   enabled: true                     # Master-Schalter
-  domain: "research"                # research | personal | business | book | custom
+  domain: "research"                # research | personal | business | book | internal-docs | custom
   bundle-path: "knowledge"          # Pfad relativ zu project-root
   sources-dir: "sources"            # Unterverzeichnis für Raw Sources
   wiki-dir: "wiki"                  # Unterverzeichnis für OKF Bundle
@@ -284,7 +284,7 @@ knowledge-engine:
     },
     "domain": {
       "type": "string",
-      "enum": ["research", "personal", "business", "book", "custom"],
+      "enum": ["research", "personal", "business", "book", "internal-docs", "custom"],
       "description": "Domäne bestimmt vorgeschlagene OKF Concept Types und Schema-Defaults.",
       "default": "research"
     },
@@ -427,6 +427,7 @@ if ke_enabled:
         "personal": "Persönliches Wiki: Ziele, Gesundheit, Gewohnheiten, Reflexionen, Erkenntnisse",
         "business": "Business-Wiki: Meetings, Entscheidungen, Metriken, Strategien, Wettbewerb",
         "book": "Buch-Wiki: Kapitel, Figuren, Themen, Handlungsstränge, Settings, Zitate",
+        "internal-docs": "Projekt-Doku-Wiki: Architektur, Guides, API-Referenzen, Session-Zusammenfassungen",
         "custom": "Freies Wiki: Konzepte, Entitäten, Themen, Source-Summaries, Query-Ergebnisse",
     }
     variables["KNOWLEDGE_DOMAIN_DESCRIPTION"] = _domain_descriptions.get(_domain, _domain_descriptions["custom"])
@@ -437,6 +438,7 @@ if ke_enabled:
         "personal": "Goal, Journal Entry, Health Record, Insight, Resource, Habit, Reflection, Book Note",
         "business": "Meeting, Decision, Process, Metric, Customer Insight, Competitor, Strategy, OKR",
         "book": "Chapter, Character, Theme, Plot Thread, Setting, Quote, Timeline Event, Relationship",
+        "internal-docs": "Concept, Architecture, API Reference, Guide, Session Conclusion",
         "custom": "Concept, Entity, Topic, Source Summary, Query Result",
     }
     variables["KNOWLEDGE_CONCEPT_TYPES"] = _domain_types.get(_domain, _domain_types["custom"])
@@ -1434,6 +1436,7 @@ DOMAIN_CONCEPT_TYPES = {
                  "Customer Insight", "Competitor", "Strategy", "OKR"],
     "book":     ["Chapter", "Character", "Theme", "Plot Thread",
                  "Setting", "Quote", "Timeline Event", "Relationship"],
+    "internal-docs": ["Concept", "Architecture", "API Reference", "Guide", "Session Conclusion"],
     "custom":   ["Concept", "Entity", "Topic", "Source Summary", "Query Result"],
 }
 
@@ -1583,7 +1586,7 @@ def detect_target_repo(project_root, config):
 | **CLI-Tools (qmd)** | MCP-Registry optional | qmd (optional) |
 | **Widersprüche flaggen** | Lint-Check #1 | Linter |
 | **Orphan-Seiten finden** | Lint-Check #3 | Linter |
-| **Domänen-Anpassung** | 5 Presets + Zielrepo-Detection | Curator + sync.py |
+| **Domänen-Anpassung** | 6 Presets + Zielrepo-Detection | Curator + sync.py |
 | **Obsidian Web Clipper** | Source-Import: Markdown-Konvertierung via Clipper → sources/ | User (Tipp in schema.md) |
 | **Download Images Locally** | `sources/assets/` für lokale Bilder | Ingestor (referenziert assets) |
 | **Marp Slide Decks** | Query-Output als Marp-Markdown möglich | Querier (output-format) |
@@ -1755,11 +1758,23 @@ async function viewProjectKnowledgeEngine() {
       },
       migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
       search: { engine: "index-only", "mcp-server": "" }
+    },
+    "internal-docs": {
+      domain: "internal-docs", "bundle-path": "knowledge", "sources-dir": "sources",
+      "wiki-dir": "wiki", "schema-language": "auto",
+      okf: { "enforce-frontmatter": true, "allowed-types": ["Concept", "Architecture", "API Reference", "Guide", "Session Conclusion"], "auto-index": true, "auto-log": true },
+      operations: {
+        ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": true },
+        query: { "file-back-results": true },
+        lint: { schedule: "post-ingest", checks: ["broken-links", "missing-frontmatter", "stale-index", "orphaned-pages", "duplicate-concepts"] }
+      },
+      migration: { "auto-detect-sources": true, "clean-duplicates": false, "preserve-originals": true },
+      search: { engine: "index-only", "mcp-server": "" }
     }
   };
 
   const presetSelect = el("select");
-  ["— Preset wählen —", "research", "personal", "business", "book", "custom"].forEach(p => {
+  ["— Preset wählen —", "research", "personal", "business", "book", "internal-docs", "custom"].forEach(p => {
     const opt = el("option", { value: p === "— Preset wählen —" ? "" : p }, [p]);
     presetSelect.appendChild(opt);
   });
@@ -1785,7 +1800,7 @@ async function viewProjectKnowledgeEngine() {
   generalPanel.appendChild(el("h2", {}, ["General"]));
   generalPanel.appendChild(checkboxField("enabled", ke.enabled, v => ke.enabled = v));
   generalPanel.appendChild(dropdownField("domain", ke.domain,
-    ["research", "personal", "business", "book", "custom"],
+    ["research", "personal", "business", "book", "internal-docs", "custom"],
     v => ke.domain = v
   ));
   generalPanel.appendChild(labeledTextField("bundle-path", ke["bundle-path"] ?? "knowledge",
@@ -2042,7 +2057,17 @@ async function viewProjectKnowledgeEngine() {
 | lint.checks | 2 (Links, FM) | Minimal |
 | migration.auto-detect-sources | `false` | Manuell |
 
-### 20.6 Presets in `config/knowledge-presets.yaml`
+### 20.6 Preset: `internal-docs`
+
+| Unterschied zu `research` | Wert | Begründung |
+|--------------------------|------|------------|
+| okf.allowed-types | `[Concept, Architecture, API Reference, Guide, Session Conclusion]` | Feste Typen statt frei — deckt gängige Software-Projekt-Doku ab |
+| lint.schedule | `post-ingest` | Docs driften schnell mit dem Code — früh erkennen |
+| lint.checks | 5 (Broken-Links, Missing-FM, Stale-Index, Orphaned-Pages, Duplicate-Concepts) | Fokus auf Doku-Drift, keine Widerspruchs-/Data-Gap-Checks wie bei Research |
+| migration.auto-detect-sources | `true` | Kleine Software-Projekte haben fast immer ein bestehendes `docs/`-Verzeichnis |
+| migration.clean-duplicates | `false` | Bestehende Docs nicht ungefragt zusammenführen |
+
+### 20.7 Presets in `config/knowledge-presets.yaml`
 
 ```yaml
 # Knowledge Engine Domain Presets
@@ -2167,6 +2192,27 @@ custom:
   file-back-results: true
   auto-detect-sources: false
   clean-duplicates: false
+
+internal-docs:
+  label: "Internal Docs"
+  description: "Architektur, Guides, API-Referenzen, Session-Notizen — für kleine Software-Projekte"
+  concept-types:
+    - Concept
+    - Architecture
+    - API Reference
+    - Guide
+    - Session Conclusion
+  lint-schedule: post-ingest
+  lint-checks:
+    - broken-links
+    - missing-frontmatter
+    - stale-index
+    - orphaned-pages
+    - duplicate-concepts
+  batch-mode: true
+  file-back-results: true
+  auto-detect-sources: true
+  clean-duplicates: false
 ```
 
 ---
@@ -2217,8 +2263,8 @@ custom:
 | 36 | **Marp:** "markdown-based slide deck format" | ⚡ | Als Output-Hint im Querier-Template | |
 | 37 | **Dataview:** "runs queries over page frontmatter" | ✅ | OKF YAML-Frontmatter = Dataview-kompatibel | |
 | 38 | **"wiki is just a git repo of markdown files"** | ✅ | Bundle = Teil des Git-Repos | |
-| 39 | **"This document is intentionally abstract"** | ✅ | 5 Domänen-Presets + Zielrepo-Detection als Konkretisierung | |
-| 40 | **Personal/Research/Book/Business/Competitive Analysis** | ✅ | 5 Domänen-Presets (+ custom) | |
+| 39 | **"This document is intentionally abstract"** | ✅ | 6 Domänen-Presets + Zielrepo-Detection als Konkretisierung | |
+| 40 | **Personal/Research/Book/Business/Competitive Analysis** | ✅ | 6 Domänen-Presets (research, personal, business, book, internal-docs, custom) | |
 
 ### 21.2 Compliance-Score: **39/40** (97.5%)
 

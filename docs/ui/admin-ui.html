@@ -2776,6 +2776,17 @@ const KNOWLEDGE_ALL_LINT_CHECKS = [
   "stale-index", "inconsistent-naming", "missing-citations", "unresolved-todos",
 ];
 
+const KNOWLEDGE_LINT_CHECK_HELP = {
+  "broken-links": "Wiki-internal links (e.g. [[concept-name]]) that point to a page which doesn't exist.",
+  "missing-frontmatter": "Pages without valid OKF YAML frontmatter (concept type, title, tags).",
+  "orphaned-pages": "Pages with no inbound links from any other wiki page — likely forgotten or never cross-referenced.",
+  "duplicate-concepts": "Multiple pages that appear to describe the same entity/concept and should probably be merged.",
+  "stale-index": "index.md entries that no longer match the current wiki pages (renamed, deleted, or new pages missing from it).",
+  "inconsistent-naming": "Same entity referred to with different spellings/casings across pages (e.g. a character or product name).",
+  "missing-citations": "Claims or facts on a page with no source reference back to knowledge/sources/.",
+  "unresolved-todos": "Open TODO/FIXME-style markers left in wiki pages that were never followed up on.",
+};
+
 const PRESETS = {
   research: {
     domain: "research", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
@@ -2825,6 +2836,18 @@ const PRESETS = {
     migration: { "auto-detect-sources": false, "clean-duplicates": false, "preserve-originals": true },
     search: { engine: "index-only", "mcp-server": "" },
   },
+  "internal-docs": {
+    domain: "internal-docs", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
+    "schema-language": "auto",
+    okf: { "enforce-frontmatter": true, "allowed-types": ["Concept", "Architecture", "API Reference", "Guide", "Session Conclusion"], "auto-index": true, "auto-log": true },
+    operations: {
+      ingest: { "auto-cross-reference": true, "auto-index-update": true, "batch-mode": true },
+      query: { "file-back-results": true },
+      lint: { schedule: "post-ingest", checks: ["broken-links", "missing-frontmatter", "stale-index", "orphaned-pages", "duplicate-concepts"] },
+    },
+    migration: { "auto-detect-sources": true, "clean-duplicates": false, "preserve-originals": true },
+    search: { engine: "index-only", "mcp-server": "" },
+  },
   custom: {
     domain: "custom", "bundle-path": "knowledge", "sources-dir": "sources", "wiki-dir": "wiki",
     "schema-language": "auto",
@@ -2840,11 +2863,37 @@ const PRESETS = {
 };
 const KNOWLEDGE_PRESETS = PRESETS;
 
+const KNOWLEDGE_PRESET_LABELS = {
+  research: "Research — papers, articles, citation-heavy notes",
+  personal: "Personal — goals, journal, self-improvement",
+  business: "Business — meeting notes, decisions, process docs",
+  book: "Book — chapters, characters, worldbuilding",
+  "internal-docs": "Internal Docs — architecture, guides, API references, session notes",
+  custom: "Custom — no domain-specific defaults",
+};
+
+const KNOWLEDGE_PRESET_DESCRIPTIONS = {
+  research: "Tuned for volume: batch ingest, cross-referencing on, lint runs after every ingest and checks citations/duplicates too.",
+  personal: "Tuned for a single user's low-volume notes: no cross-referencing overhead, lint only on demand.",
+  business: "Tuned for shared knowledge: cross-referencing on, periodic lint that also flags orphaned pages and a stale index.",
+  book: "Tuned for a single connected narrative: cross-referencing on, lint checks naming consistency (character/place names).",
+  "internal-docs": "Tuned for small software projects: allowed types match common project docs (architecture, guides, API references, session conclusions), cross-referencing on so docs link to each other, lint runs after every ingest since docs drift fast alongside code (catches broken links, orphaned pages, stale index early), migration auto-detects existing docs/ folders.",
+  custom: "No domain assumptions. Start here if your use case doesn't match one of the other presets, then adjust every field yourself.",
+};
+
 async function viewProjectKnowledgeEngine() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — Knowledge Engine"]));
   wrap.appendChild(el("p", { class: "muted" }, [
-    "Configure the opt-in Knowledge Engine bundle: schema, OKF frontmatter rules, ingest/query/lint behavior, migration safety and search.",
+    "The Knowledge Engine is an opt-in system that turns raw sources (articles, transcripts, notes) into a persistent, self-maintaining wiki instead of re-deriving answers from scratch every time (RAG-style). It combines Karpathy's LLM-Wiki workflow (Ingest → Query → Lint) with Google's Open Knowledge Format (OKF) for structure.",
+  ]));
+  wrap.appendChild(el("ul", { class: "muted", style: "margin: 0 0 12px 18px; line-height: 1.6;" }, [
+    el("li", {}, [el("b", {}, ["Ingest"]), ": drop a source file into ", el("code", {}, ["knowledge/sources/"]), " — an agent reads it, writes/updates wiki pages, and logs the change. Sources are never modified afterwards."]),
+    el("li", {}, [el("b", {}, ["Query"]), ": ask a question — an agent reads the index first, drills into relevant pages, and answers with citations. Good answers can be filed back as new wiki pages."]),
+    el("li", {}, [el("b", {}, ["Lint"]), ": a health check for the wiki — finds broken links, orphaned pages, stale claims and missing frontmatter."]),
+  ]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "When enabled, 7 specialist agents (knowledge-curator, -ingestor, -querier, -linter, -gardener, -indexer, -migrator) are generated for this project and wired into orchestrator routing. Disabling it again removes them on the next sync — no code is deleted, only regenerated agent files.",
   ]));
 
   const data = await loadProject();
@@ -2866,6 +2915,9 @@ async function viewProjectKnowledgeEngine() {
     // Panel 0 — Preset Selector
     const presetPanel = el("div", { class: "panel" });
     presetPanel.appendChild(el("h2", {}, ["Domain Preset"]));
+    presetPanel.appendChild(el("p", { class: "muted" }, [
+      "Presets are a starting point, not a lock-in: applying one fills in sensible defaults for a domain (which concept types are allowed, how aggressively to lint, whether ingest cross-references automatically). You can change every field below afterwards — the preset is not re-applied automatically.",
+    ]));
     presetPanel.appendChild(dropdownField(
       "Apply preset",
       ["", "research", "personal", "business", "book", "custom"],
@@ -2878,66 +2930,125 @@ async function viewProjectKnowledgeEngine() {
         ke.enabled = true;
         render();
       },
-      { "": "(select to apply — overwrites all fields below)" },
+      { "": "(select to apply — overwrites all fields below)", ...KNOWLEDGE_PRESET_LABELS },
+      "Overwrites General, OKF, Operations, Migration and Search below with the preset's values. Does not touch Enabled state of the sync itself — you still need to Save.",
     ));
+    if (ke.domain && KNOWLEDGE_PRESET_DESCRIPTIONS[ke.domain]) {
+      presetPanel.appendChild(el("p", { class: "field-help" }, [
+        el("b", {}, ["Current domain (", ke.domain, "): "]), KNOWLEDGE_PRESET_DESCRIPTIONS[ke.domain],
+      ]));
+    }
     contentWrap.appendChild(presetPanel);
 
     // Panel 1 — General
     const generalPanel = el("div", { class: "panel" });
     generalPanel.appendChild(el("h2", {}, ["General"]));
-    generalPanel.appendChild(checkboxField("Enabled", !!ke.enabled, (v) => { ke.enabled = v; render(); }));
+    generalPanel.appendChild(checkboxField(
+      "Enabled", !!ke.enabled, (v) => { ke.enabled = v; render(); },
+      "Master switch. Off: no knowledge-* agents are generated and no knowledge/ routing is added on the next sync — zero overhead. On: sync.py scaffolds knowledge/schema.md, knowledge/sources/, knowledge/wiki/ (with index.md and log.md) if they don't exist yet, and generates the 7 knowledge-* agents.",
+    ));
     generalPanel.appendChild(dropdownField(
       "Domain",
       ["research", "personal", "business", "book", "custom"],
       ke.domain || "custom",
-      (v) => { ke.domain = v; },
+      (v) => { ke.domain = v; render(); },
+      KNOWLEDGE_PRESET_LABELS,
+      "Documents the intended use case in schema.md so agents know what kind of source material and concept types to expect. Applying a preset above sets this automatically; changing it manually here does NOT change the OKF/Operations/Migration settings — use the preset selector for that.",
     ));
-    generalPanel.appendChild(labeledTextField("Bundle path", ke["bundle-path"] || "knowledge", (v) => { ke["bundle-path"] = v; }));
-    generalPanel.appendChild(labeledTextField("Sources dir", ke["sources-dir"] || "sources", (v) => { ke["sources-dir"] = v; }));
-    generalPanel.appendChild(labeledTextField("Wiki dir", ke["wiki-dir"] || "wiki", (v) => { ke["wiki-dir"] = v; }));
-    generalPanel.appendChild(labeledTextField("Schema language", ke["schema-language"] || "auto", (v) => { ke["schema-language"] = v; }));
+    generalPanel.appendChild(labeledTextField(
+      "Bundle path", ke["bundle-path"] || "knowledge", (v) => { ke["bundle-path"] = v; },
+      "Root folder of the Knowledge Bundle, relative to the project root. Contains schema.md plus the Sources and Wiki directories below. Default: knowledge/",
+    ));
+    generalPanel.appendChild(labeledTextField(
+      "Sources dir", ke["sources-dir"] || "sources", (v) => { ke["sources-dir"] = v; },
+      "Where you drop raw, unmodified source material (articles, transcripts, PDFs-as-text, notes). Agents only ever READ from here — never write or edit. Relative to Bundle path.",
+    ));
+    generalPanel.appendChild(labeledTextField(
+      "Wiki dir", ke["wiki-dir"] || "wiki", (v) => { ke["wiki-dir"] = v; },
+      "Where agents write the structured, LLM-owned wiki: entity/concept/topic pages plus index.md and log.md. You can read and edit these too, but agents are the primary maintainer. Relative to Bundle path.",
+    ));
+    generalPanel.appendChild(labeledTextField(
+      "Schema language", ke["schema-language"] || "auto", (v) => { ke["schema-language"] = v; },
+      "Language the knowledge-* agents write wiki pages in. \"auto\" follows this project's existing language convention (see Language rules); set an explicit code (e.g. \"en\", \"de\") to override.",
+    ));
     contentWrap.appendChild(generalPanel);
 
     // Panel 2 — OKF
     const okfPanel = el("div", { class: "panel" });
     okfPanel.appendChild(el("h2", {}, ["OKF (Open Knowledge Format)"]));
-    okfPanel.appendChild(checkboxField("Enforce frontmatter", ke.okf["enforce-frontmatter"] !== false, (v) => { ke.okf["enforce-frontmatter"] = v; }));
-    okfPanel.appendChild(checkboxField("Auto-index", ke.okf["auto-index"] !== false, (v) => { ke.okf["auto-index"] = v; }));
-    okfPanel.appendChild(checkboxField("Auto-log", ke.okf["auto-log"] !== false, (v) => { ke.okf["auto-log"] = v; }));
+    okfPanel.appendChild(el("p", { class: "muted" }, [
+      "Google's Open Knowledge Format defines how wiki pages are structured — YAML frontmatter with a concept type, plus the index.md/log.md convention. These toggles control how strictly it's enforced.",
+    ]));
+    okfPanel.appendChild(checkboxField(
+      "Enforce frontmatter", ke.okf["enforce-frontmatter"] !== false, (v) => { ke.okf["enforce-frontmatter"] = v; },
+      "Requires every wiki page to carry OKF-compliant YAML frontmatter (concept type, title, tags). knowledge-linter flags pages missing it. Turn off only for quick, informal wikis.",
+    ));
+    okfPanel.appendChild(checkboxField(
+      "Auto-index", ke.okf["auto-index"] !== false, (v) => { ke.okf["auto-index"] = v; },
+      "knowledge-indexer keeps index.md (the content catalog every query starts from) in sync automatically after each ingest. Off: index.md must be updated manually or via knowledge-gardener.",
+    ));
+    okfPanel.appendChild(checkboxField(
+      "Auto-log", ke.okf["auto-log"] !== false, (v) => { ke.okf["auto-log"] = v; },
+      "Appends a dated entry to log.md (the chronological event log, OKF §7) on every ingest/migration. Useful for auditing what changed and when; safe to leave on.",
+    ));
     okfPanel.appendChild(labeledTextField(
       "Allowed types (comma-separated)",
       (ke.okf["allowed-types"] || []).join(", "),
       (v) => { ke.okf["allowed-types"] = v.split(",").map(s => s.trim()).filter(Boolean); },
-      "Leave empty to allow any concept type.",
+      "Restricts which OKF concept types (e.g. \"paper\", \"decision\", \"character\") knowledge-curator/ingestor may create — enforced by knowledge-linter as a lint check. Leave empty to allow any concept type.",
     ));
     contentWrap.appendChild(okfPanel);
 
     // Panel 3 — Operations
     const opsPanel = el("div", { class: "panel" });
     opsPanel.appendChild(el("h2", {}, ["Operations"]));
+    opsPanel.appendChild(el("p", { class: "muted" }, [
+      "Fine-tunes the behavior of the three core workflows: Ingest (source → wiki), Query (question → wiki → answer) and Lint (wiki health check).",
+    ]));
 
-    opsPanel.appendChild(el("h3", {}, ["Ingest"]));
-    opsPanel.appendChild(checkboxField("Auto cross-reference", ke.operations.ingest["auto-cross-reference"] !== false, (v) => { ke.operations.ingest["auto-cross-reference"] = v; }));
-    opsPanel.appendChild(checkboxField("Auto index update", ke.operations.ingest["auto-index-update"] !== false, (v) => { ke.operations.ingest["auto-index-update"] = v; }));
-    opsPanel.appendChild(checkboxField("Batch mode", !!ke.operations.ingest["batch-mode"], (v) => { ke.operations.ingest["batch-mode"] = v; }));
+    opsPanel.appendChild(el("h3", {}, ["Ingest — turning a new source into wiki pages"]));
+    opsPanel.appendChild(checkboxField(
+      "Auto cross-reference", ke.operations.ingest["auto-cross-reference"] !== false, (v) => { ke.operations.ingest["auto-cross-reference"] = v; },
+      "knowledge-ingestor automatically links new/updated pages to related existing pages (backlinks). More thorough but slower per ingest — worth it once the wiki has real cross-links to find (research/business/book domains).",
+    ));
+    opsPanel.appendChild(checkboxField(
+      "Auto index update", ke.operations.ingest["auto-index-update"] !== false, (v) => { ke.operations.ingest["auto-index-update"] = v; },
+      "Updates index.md as part of every ingest run, not just via a separate step. Keep on unless you're batching many sources and prefer a single index rebuild at the end.",
+    ));
+    opsPanel.appendChild(checkboxField(
+      "Batch mode", !!ke.operations.ingest["batch-mode"], (v) => { ke.operations.ingest["batch-mode"] = v; },
+      "Optimized for ingesting many sources in one sitting (e.g. a paper backlog): defers per-source index/log writes and does one consolidated update at the end. Off: each source is fully processed (and indexed/logged) before the next one starts.",
+    ));
 
-    opsPanel.appendChild(el("h3", {}, ["Query"]));
-    opsPanel.appendChild(checkboxField("File-back results", ke.operations.query["file-back-results"] !== false, (v) => { ke.operations.query["file-back-results"] = v; }));
+    opsPanel.appendChild(el("h3", {}, ["Query — answering questions from the wiki"]));
+    opsPanel.appendChild(checkboxField(
+      "File-back results", ke.operations.query["file-back-results"] !== false, (v) => { ke.operations.query["file-back-results"] = v; },
+      "Good synthesized answers are saved back into the wiki as new pages, so the same question doesn't need to be re-derived next time (\"compounding knowledge\"). Off: queries are read-only and never write to wiki/.",
+    ));
 
-    opsPanel.appendChild(el("h3", {}, ["Lint"]));
+    opsPanel.appendChild(el("h3", {}, ["Lint — wiki health checks"]));
     opsPanel.appendChild(dropdownField(
       "Schedule",
       ["on-demand", "post-ingest", "periodic"],
       ke.operations.lint.schedule || "on-demand",
       (v) => { ke.operations.lint.schedule = v; },
+      {
+        "on-demand": "On-demand — only when you ask for it",
+        "post-ingest": "Post-ingest — after every ingest run",
+        "periodic": "Periodic — on a recurring schedule",
+      },
+      "When knowledge-linter runs automatically. \"on-demand\" has zero background cost; \"post-ingest\" catches problems immediately but adds latency to every ingest; \"periodic\" needs a scheduler/cron hook configured separately.",
     ));
+    opsPanel.appendChild(el("p", { class: "field-help" }, [
+      "Which checks knowledge-linter performs. Each maps to a concrete wiki problem:",
+    ]));
     const lintChecks = new Set(ke.operations.lint.checks || ["broken-links", "missing-frontmatter"]);
     const checksWrap = el("div");
     for (const check of KNOWLEDGE_ALL_LINT_CHECKS) {
       checksWrap.appendChild(checkboxField(check, lintChecks.has(check), (v) => {
         if (v) { lintChecks.add(check); } else { lintChecks.delete(check); }
         ke.operations.lint.checks = [...lintChecks];
-      }));
+      }, KNOWLEDGE_LINT_CHECK_HELP[check]));
     }
     opsPanel.appendChild(checksWrap);
     contentWrap.appendChild(opsPanel);
@@ -2945,23 +3056,47 @@ async function viewProjectKnowledgeEngine() {
     // Panel 4 — Migration
     const migrationPanel = el("div", { class: "panel" });
     migrationPanel.appendChild(el("h2", {}, ["Migration"]));
+    migrationPanel.appendChild(el("p", { class: "muted" }, [
+      "Controls knowledge-migrator, used once when adopting the Knowledge Engine on a project that already has scattered docs/notes. Workflow is always Discovery → Plan → your explicit approval → Migration → Validation — these toggles configure that flow, they never start it by themselves.",
+    ]));
     migrationPanel.appendChild(el("p", { class: "muted" }, ["Migration always copies, never moves. These toggles do not start a migration by themselves."]));
-    migrationPanel.appendChild(checkboxField("Auto-detect sources", !!ke.migration["auto-detect-sources"], (v) => { ke.migration["auto-detect-sources"] = v; }));
-    migrationPanel.appendChild(checkboxField("Clean duplicates", !!ke.migration["clean-duplicates"], (v) => { ke.migration["clean-duplicates"] = v; }));
-    migrationPanel.appendChild(checkboxField("Preserve originals", ke.migration["preserve-originals"] !== false, (v) => { ke.migration["preserve-originals"] = v; }));
+    migrationPanel.appendChild(checkboxField(
+      "Auto-detect sources", !!ke.migration["auto-detect-sources"], (v) => { ke.migration["auto-detect-sources"] = v; },
+      "During Discovery, let knowledge-migrator scan the repo for candidate documents (e.g. docs/, notes/) instead of you pointing it at specific files/folders. Convenient but produces a longer plan to review — check it carefully before approving.",
+    ));
+    migrationPanel.appendChild(checkboxField(
+      "Clean duplicates", !!ke.migration["clean-duplicates"], (v) => { ke.migration["clean-duplicates"] = v; },
+      "Detects near-duplicate content across source documents during migration and merges/skips it instead of creating redundant wiki pages. Off: everything is migrated as-is, even if duplicated.",
+    ));
+    migrationPanel.appendChild(checkboxField(
+      "Preserve originals", ke.migration["preserve-originals"] !== false, (v) => { ke.migration["preserve-originals"] = v; },
+      "Leaves the original documents in place after migration (copy, not move — see note above). Turning this off is not recommended; it only affects whether the migrator additionally deletes originals after a validated migration.",
+    ));
     contentWrap.appendChild(migrationPanel);
 
     // Panel 5 — Search
     const searchPanel = el("div", { class: "panel" });
     searchPanel.appendChild(el("h2", {}, ["Search"]));
+    searchPanel.appendChild(el("p", { class: "muted" }, [
+      "How knowledge-querier finds relevant wiki pages before answering a question.",
+    ]));
     searchPanel.appendChild(dropdownField(
       "Engine",
       ["index-only", "mcp-qmd", "custom"],
       ke.search.engine || "index-only",
       (v) => { ke.search.engine = v; render(); },
+      {
+        "index-only": "Index-only — read index.md, no extra tooling (default, zero setup)",
+        "mcp-qmd": "MCP: qmd — delegate search to a qmd MCP server",
+        "custom": "Custom — delegate search to another configured MCP server",
+      },
+      "\"index-only\" scales fine for wikis up to a few hundred pages and needs no setup. Switch to an MCP-backed engine only once index.md alone becomes too large to scan efficiently.",
     ));
     if (ke.search.engine !== "index-only") {
-      searchPanel.appendChild(labeledTextField("MCP server", ke.search["mcp-server"] || "", (v) => { ke.search["mcp-server"] = v; }));
+      searchPanel.appendChild(labeledTextField(
+        "MCP server", ke.search["mcp-server"] || "", (v) => { ke.search["mcp-server"] = v; },
+        "Name of the MCP server (as registered in config/mcp-registry.yaml) that knowledge-querier should call for semantic/full-text search instead of scanning index.md directly.",
+      ));
     }
     contentWrap.appendChild(searchPanel);
   };
@@ -4233,7 +4368,7 @@ function envField(label, inputEl, help) {
   return field;
 }
 
-function dropdownField(label, options, value, onChange, labels) {
+function dropdownField(label, options, value, onChange, labels, help) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
   const sel = el("select");
@@ -4248,10 +4383,11 @@ function dropdownField(label, options, value, onChange, labels) {
   }
   sel.addEventListener("change", () => onChange(sel.value));
   field.appendChild(sel);
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
   return field;
 }
 
-function checkboxField(label, value, onChange) {
+function checkboxField(label, value, onChange, help) {
   const field = el("div", { class: "field" });
   const wrapL = el("label", { class: "toggle", style: "margin-right:8px;" });
   const cb = el("input", { type: "checkbox" });
@@ -4260,6 +4396,7 @@ function checkboxField(label, value, onChange) {
   wrapL.appendChild(cb); wrapL.appendChild(el("span", { class: "slider" }));
   field.appendChild(el("label", { class: "field-label" }, [label]));
   field.appendChild(wrapL);
+  if (help) field.appendChild(el("div", { class: "field-help" }, [help]));
   return field;
 }
 

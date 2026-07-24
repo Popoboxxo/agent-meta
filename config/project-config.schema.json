@@ -874,6 +874,7 @@
             "personal",
             "business",
             "book",
+            "internal-docs",
             "custom"
           ],
           "default": "research",

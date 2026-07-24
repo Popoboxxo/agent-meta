@@ -346,7 +346,7 @@ def test_admin_ui_has_view_project_knowledge_engine_function():
     html = (Path(__file__).parent.parent / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
     assert "async function viewProjectKnowledgeEngine()" in html
     assert 'const PRESETS = {' in html
-    for preset_name in ("research", "personal", "business", "book", "custom"):
+    for preset_name in ("research", "personal", "business", "book", "internal-docs", "custom"):
         assert f'{preset_name}: {{' in html or f'"{preset_name}": {{' in html
     assert 'saveProjectSection("knowledge-engine", ke, status)' in html
 ```
@@ -461,7 +461,7 @@ async function viewProjectKnowledgeEngine() {
     presetPanel.appendChild(el("h2", {}, ["Domain Preset"]));
     presetPanel.appendChild(dropdownField(
       "Apply preset",
-      ["", "research", "personal", "business", "book", "custom"],
+      ["", "research", "personal", "business", "book", "internal-docs", "custom"],
       "",
       (val) => {
         if (!val) return;
@@ -481,7 +481,7 @@ async function viewProjectKnowledgeEngine() {
     generalPanel.appendChild(checkboxField("Enabled", !!ke.enabled, (v) => { ke.enabled = v; render(); }));
     generalPanel.appendChild(dropdownField(
       "Domain",
-      ["research", "personal", "business", "book", "custom"],
+      ["research", "personal", "business", "book", "internal-docs", "custom"],
       ke.domain || "custom",
       (v) => { ke.domain = v; },
     ));
@@ -607,12 +607,12 @@ git commit -m "feat: add Knowledge Engine AdminUI view with 5 domain presets"
 Run: `pytest tests/ -v`
 Expected: all tests PASS, no regressions in unrelated test modules.
 
-- [ ] **Step 2: Run schema validation against a project.yaml containing each of the 5 presets**
+- [ ] **Step 2: Run schema validation against a project.yaml containing each of the 6 presets**
 
 Create a temporary test project.yaml (or extend an existing fixture in `tests/`) with `knowledge-engine` set to each preset's full field set in turn, and run:
 
 Run: `python scripts/sync.py --dry-run --validate`
-Expected: exits 0 for all 5 presets, no schema violations.
+Expected: exits 0 for all 6 presets, no schema violations.
 
 If this requires a throwaway fixture file, create it under the test's own tmp_path (pytest `tmp_path` fixture) rather than a committed file — no new fixture file should be added to the repo for this verification step.
 

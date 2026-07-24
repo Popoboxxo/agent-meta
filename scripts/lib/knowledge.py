@@ -12,6 +12,7 @@ DOMAIN_CONCEPT_TYPES: dict[str, list[str]] = {
     "personal": ["person", "event", "place", "memory"],
     "business": ["customer", "deal", "product", "decision"],
     "book": ["character", "location", "theme", "chapter"],
+    "internal-docs": ["concept", "architecture", "guide", "reference"],
     "custom": ["concept"],
 }
 

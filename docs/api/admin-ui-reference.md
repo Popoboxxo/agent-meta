@@ -270,7 +270,7 @@ The Advanced view provides a raw text editor directly exposing the `.meta-config
 <!-- help-id: project_instance-knowledge_engine -->
 <!-- last-updated: 2026-07-24 -->
 <!-- author: Agent Meta Admin -->
-The Knowledge Engine view configures the opt-in knowledge-base bundle for this project. A preset selector applies domain-specific defaults for research, personal, business or book domains (or custom), and five panels let you fine-tune sources, the OKF frontmatter schema, ingest/query/lint operations, migration safety settings, and search behavior.
+The Knowledge Engine view configures the opt-in knowledge-base bundle for this project. A preset selector applies domain-specific defaults for research, personal, business, book or internal-docs domains (or custom), and five panels let you fine-tune sources, the OKF frontmatter schema, ingest/query/lint operations, migration safety settings, and search behavior.
 
 ### Skills
 <!-- help-id: framework_defaults-skills -->

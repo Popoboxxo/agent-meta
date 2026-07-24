@@ -297,7 +297,7 @@ async function viewProjectKnowledgeEngine() {
     "Preset wählen, um alle Felder mit bewährten Voreinstellungen zu füllen. " +
     "Danach einzelne Werte anpassen und speichern."
   ]));
-  const presetOptions = ["", "research", "personal", "business", "book", "custom"];
+  const presetOptions = ["", "research", "personal", "business", "book", "internal-docs", "custom"];
   const presetLabels = { "": "— Preset wählen —" };
   const presetField = dropdownField("Domänen-Preset", presetOptions, "", (value) => {
     const preset = PRESETS[value];
@@ -314,7 +314,7 @@ async function viewProjectKnowledgeEngine() {
   generalPanel.appendChild(el("h2", {}, ["General"]));
   generalPanel.appendChild(checkboxField("enabled", ke.enabled ?? false, v => ke.enabled = v));
   generalPanel.appendChild(dropdownField("domain",
-    ["research", "personal", "business", "book", "custom"],
+    ["research", "personal", "business", "book", "internal-docs", "custom"],
     ke.domain ?? "research",
     v => ke.domain = v
   ));
@@ -449,7 +449,7 @@ async function viewProjectKnowledgeEngine() {
 
 ## Testing
 
-- Schema-Test: `python scripts/sync.py --dry-run --validate` mit allen 5 Presets als
+- Schema-Test: `python scripts/sync.py --dry-run --validate` mit allen 6 Presets als
   `knowledge-engine`-Sektion in einer Test-`project.yaml` → keine Validierungsfehler.
 - `admin-server.py`-Test: `PUT /api/config/project/section` mit `section: "knowledge-engine"` wird
   akzeptiert (vorher: `ValueError: section not allowed`).

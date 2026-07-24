@@ -1520,7 +1520,7 @@ Die Knowledge Engine ist ein **optional per Schalter aktivierbares Wissensmanage
 - **Zero-Overhead-Garantie:** Agenten werden nur generiert wenn der Schalter aktiv ist (analog SE-Kaskade)
 - **Zwei bewusste Abweichungen vom Konzept-Dokument:**
   - Templates `knowledge-index.template.md`/`knowledge-log.template.md` existieren NICHT als Dateien — Inhalte werden zur Laufzeit in `scripts/lib/knowledge.py` generiert (Funktionen `generate_initial_index()` / `generate_initial_log()`)
-  - `config/knowledge-presets.yaml` existiert NICHT — 5 Domain-Presets liegen **inline** als JavaScript-Objekt `const PRESETS = {...}` in `docs/ui/admin-ui.html`
+  - `config/knowledge-presets.yaml` existiert NICHT — 6 Domain-Presets liegen **inline** als JavaScript-Objekt `const PRESETS = {...}` in `docs/ui/admin-ui.html`
 - **Framework-Integration:** Realisiert in allen 22 bestehenden Framework-Mechanismen (DoD, Orchestrator-Routing, Hooks, MCP, Lifecycle-Tasks, etc.)
 
 ### 14.1 Die 7 Agenten
@@ -1646,7 +1646,7 @@ citations:
 
 | Komponente | Datei | Zweck |
 |-----------|-------|-------|
-| Preset-Picker | `admin-ui.html:const PRESETS` | 5 Domain-Presets inline als JS-Objekt: `default`, `minimal`, `advanced`, `research`, `business` |
+| Preset-Picker | `admin-ui.html:const PRESETS` | 6 Domain-Presets inline als JS-Objekt: `research`, `personal`, `business`, `book`, `internal-docs`, `custom` |
 | Toggle-Switch | `admin-ui.html` | Enable/Disable Schalter für `knowledge-engine.enabled` |
 | Domain-Selector | `admin-ui.html` | Dropdown aus `DOMAIN_CONCEPT_TYPES` |
 | Bundle-Path-Input | `admin-ui.html` | Text-Input für `bundle_path` |
@@ -1657,22 +1657,12 @@ citations:
 
 ```javascript
 const PRESETS = {
-  default: {
-    domain: "custom",
-    bundle_path: "docs/knowledge",
-    bundle_init_template: "default"
-  },
-  minimal: {
-    domain: "custom",
-    bundle_path: "docs/kb",
-    bundle_init_template: "minimal"
-  },
-  research: {
-    domain: "research",
-    bundle_path: "docs/knowledge/research",
-    bundle_init_template: "research"
-  },
-  // ... weitere Presets
+  research: { domain: "research", "bundle-path": "knowledge", ... },
+  personal: { domain: "personal", "bundle-path": "knowledge", ... },
+  business: { domain: "business", "bundle-path": "knowledge", ... },
+  book: { domain: "book", "bundle-path": "knowledge", ... },
+  "internal-docs": { domain: "internal-docs", "bundle-path": "knowledge", ... },
+  custom: { domain: "custom", "bundle-path": "knowledge", ... },
 };
 ```
 

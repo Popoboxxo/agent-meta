@@ -19,9 +19,9 @@ _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 # DOMAIN_CONCEPT_TYPES
 # ---------------------------------------------------------------------------
 
-def test_domain_concept_types_has_all_five_domains():
+def test_domain_concept_types_has_all_six_domains():
     assert set(DOMAIN_CONCEPT_TYPES.keys()) == {
-        "research", "personal", "business", "book", "custom",
+        "research", "personal", "business", "book", "internal-docs", "custom",
     }
 
 
@@ -37,7 +37,7 @@ def test_domain_concept_types_values_are_nonempty_lists():
 # generate_schema() — one case per domain
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("domain", ["research", "personal", "business", "book", "custom"])
+@pytest.mark.parametrize("domain", ["research", "personal", "business", "book", "internal-docs", "custom"])
 def test_generate_schema_renders_domain_and_concept_types(domain):
     rendered = generate_schema(domain, "my-bundle", _AGENT_META_ROOT)
     assert domain in rendered
@@ -478,7 +478,7 @@ def test_admin_ui_has_view_project_knowledge_engine_function():
     html = (Path(__file__).parent.parent / "docs" / "ui" / "admin-ui.html").read_text(encoding="utf-8")
     assert "async function viewProjectKnowledgeEngine()" in html
     assert 'const PRESETS = {' in html
-    for preset_name in ("research", "personal", "business", "book", "custom"):
+    for preset_name in ("research", "personal", "business", "book", "internal-docs", "custom"):
         assert f'{preset_name}: {{' in html or f'"{preset_name}": {{' in html
     assert 'saveProjectSection("knowledge-engine", ke, status)' in html
     assert '"project/knowledge-engine": "project_instance-knowledge_engine",' in html
