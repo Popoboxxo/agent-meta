@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.83.0] - 2026-07-24
+
+### Added
+- **Knowledge Engine Framework**: Complete multi-phase implementation enabling structured knowledge capture, organization, and retrieval across projects.
+  - Phase A: Activation mechanism, `knowledge.py` bundle manager, schema/index/log generators, path variables injection.
+  - Phase B: 7 knowledge-worker agent templates (`knowledge-curator`, `knowledge-gardener`, `knowledge-indexer`, `knowledge-ingestor`, `knowledge-linter`, `knowledge-migrator`, `knowledge-querier`), conditional gating in delegation routing and intent tables, role-defaults entries.
+  - Phase C: AdminUI integration with domain presets (`general`, `technical`, `business`, `personal`, `internal-docs`), knowledge-engine section writes support.
+- **Native Extensions Whitelist**: Schema, validation, and Admin UI editor for managing provider-native extensions (plugins, hooks, skills) with explicit approval gates.
+- Knowledge wiki bundle scaffolding with OKF-compliant structure (schema.md, sources/, wiki/, index.md, log.md).
+
+### Fixed
+- Test suite corrections for conditional block substitution.
+- Knowledge schema rendering for bundle path variables.
+
+### Changed
+- `config/project-config.schema.json`: added `knowledge-engine` and `orchestrator.native-extensions` schema sections.
+- `scripts/sync.py` and `scripts/lib/config.py`: Knowledge Engine activation and variables injection.
+- Admin UI: new `/api/knowledge/*` endpoints for Knowledge Engine domain presets and content management.
+- `rules/use-orchestrator.md`: gated knowledge-* agent roles behind knowledge-engine.enabled flag.
+
 ## [0.82.0] - 2026-07-23
 
 ### Added
