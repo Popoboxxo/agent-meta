@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.0] - 2026-07-25
+
+### Added
+- Added ReqogniLoom & Honcho MCP registry project-config support.
+
 ## [0.84.0] - 2026-07-25
 
 ### Added
