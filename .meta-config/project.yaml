@@ -3,7 +3,6 @@ provider-isolation: disabled
 ai-providers:
 - Claude
 - Opencode
-- Mammouth
 - Gemini
 dod-preset: rapid-prototyping
 rules-preset: silent
@@ -317,7 +316,6 @@ reflection-pairs:
       max_iterations: 5
       enabled: true
 tier-preset: Normal
-
 provider-deactivation:
   enabled: false
   mode: all

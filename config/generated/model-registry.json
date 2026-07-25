@@ -10,8 +10,8 @@
       "tier": "Standard"
     },
     {
-      "id": "claude-opus-4-8",
-      "name": "Claude Opus 4.8",
+      "id": "claude-opus-5",
+      "name": "Claude Opus 5",
       "provider": "anthropic",
       "input_cost_api": 5.0,
       "output_cost_api": 25.0,
@@ -43,6 +43,15 @@
       "input_cost_api": 1.0,
       "output_cost_api": 5.0,
       "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Claude Opus 4.8",
+      "provider": "anthropic",
+      "input_cost_api": 5.0,
+      "output_cost_api": 25.0,
+      "context_length": 1000000,
       "tier": "Standard"
     },
     {
@@ -124,6 +133,15 @@
       "input_cost_api": 15.0,
       "output_cost_api": 75.0,
       "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-5-fast",
+      "name": "Claude Opus 5 (Fast)",
+      "provider": "anthropic",
+      "input_cost_api": 10.0,
+      "output_cost_api": 50.0,
+      "context_length": 1000000,
       "tier": "Standard"
     },
     {
@@ -345,6 +363,15 @@
     {
       "id": "opencode-go/mimo-v2.5",
       "name": "Mimo V2.5",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode-go/hy3",
+      "name": "Hy3",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
