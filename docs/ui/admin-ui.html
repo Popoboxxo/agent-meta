@@ -6248,20 +6248,33 @@ async function viewModels() {
     const filterState = { provider: "", model: "", category: "" };
 
     const controls = el("div", { class: "btn-row", style: "margin-bottom:12px;align-items:center;display:flex;gap:8px;" });
-    const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
+    const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py (or GitHub override)"]);
     refreshBtn.onclick = async () => {
       refreshBtn.disabled = true;
-      refreshBtn.textContent = "Running sync.py...";
+      refreshBtn.textContent = "Updating...";
       try {
         const r = await api.post("/api/models/update");
         if (r && r.success) { toast("Models updated", "success"); await loadRegistry(); render(); }
         else toast((r && r.error) || "Failed", "error");
       } finally {
         refreshBtn.disabled = false;
-        refreshBtn.textContent = "Refresh via sync.py";
+        refreshBtn.textContent = "Refresh via sync.py (or GitHub override)";
       }
     };
     controls.appendChild(refreshBtn);
+
+    const clearBtn = el("button", { class: "btn" }, ["Clear Override"]);
+    clearBtn.onclick = async () => {
+      try {
+        const r = await api.post("/api/models/clear-override");
+        if (r && r.success) { toast("Override cleared", "success"); await loadRegistry(); render(); }
+        else toast((r && r.error) || "Failed to clear override", "error");
+      } catch (e) {
+        toast("Failed to clear override", "error");
+      }
+    };
+    controls.appendChild(clearBtn);
+
     parent.appendChild(controls);
 
     const QUICK = [...new Set(["", ...state.configuredProviders])];
@@ -6290,7 +6303,7 @@ async function viewModels() {
         const m = (tr.children[2]?.textContent || "").toLowerCase();
         const c = (tr.children[3]?.textContent || "").toLowerCase();
         tr.style.display = (
-          (!filterState.provider || p.includes(filterState.provider)) &&
+          (!filterState.provider || p.includes(filterState.provider.toLowerCase())) &&
           (!filterState.model || m.includes(filterState.model)) &&
           (!filterState.category || c === filterState.category)
         ) ? "" : "none";

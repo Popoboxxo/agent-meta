@@ -360,6 +360,6 @@ def test_legacy_models_page(browser_ctx, admin_server):
         expect(page.locator("thead")).to_contain_text("Actions")
 
         # Has Refresh button
-        expect(page.get_by_role("button", name="Refresh via sync.py")).to_be_visible()
+        expect(page.get_by_role("button", name="Refresh via sync.py (or GitHub override)")).to_be_visible()
     finally:
         page.close()

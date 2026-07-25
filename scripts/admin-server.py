@@ -1361,6 +1361,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/models/update":
             return self._handle_post_models_update()
 
+        if path == "/api/models/clear-override":
+            return self._handle_post_models_clear_override()
+
         if path == "/api/models-dev/refresh":
             return self._handle_post_models_dev_refresh()
 
@@ -1518,8 +1521,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         registry_path = config_dir / "generated" / "model-registry.json"
         pricing_path = config_dir / "pricing-overlay.yaml"
 
+        override_registry = Path(self.__class__.root) / ".meta-config" / "generated" / "model-registry.json"
+        
         models: list[dict] = []
-        if registry_path.exists():
+        if override_registry.exists():
+            models = json.loads(override_registry.read_text(encoding="utf-8")).get("models", [])
+        elif registry_path.exists():
             models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
 
         pricing: dict = {}
@@ -1852,10 +1859,39 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_update(self) -> None:
-        """Trigger sync.py --update-models"""
+        """Trigger sync.py --update-models or download from GitHub if submodule override."""
         try:
-            res = self.__class__.sync_executor._run(["--update-models"])
-            return self._send_json(res)
+            agent_meta_root = self._agent_meta_root()
+            project_root = Path(self.__class__.root)
+            is_submodule = agent_meta_root != project_root
+
+            if is_submodule:
+                import urllib.request
+                import json
+                url = "https://raw.githubusercontent.com/Popoboxxo/agent-meta/main/config/generated/model-registry.json"
+                req = urllib.request.Request(url, headers={"User-Agent": "agent-meta-admin"})
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                
+                target_file = project_root / ".meta-config" / "generated" / "model-registry.json"
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(target_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                return self._send_json({"success": True, "override": True})
+            else:
+                res = self.__class__.sync_executor._run(["--update-models"])
+                return self._send_json(res)
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_models_clear_override(self) -> None:
+        """Clear the downloaded override model registry."""
+        try:
+            project_root = Path(self.__class__.root)
+            target_file = project_root / ".meta-config" / "generated" / "model-registry.json"
+            if target_file.exists():
+                target_file.unlink()
+            return self._send_json({"success": True})
         except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 
