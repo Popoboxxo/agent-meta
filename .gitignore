@@ -19,7 +19,6 @@ graphify-out/
 .meta-config/env.unset.ps1
 .meta-config/env.unset.sh
 .meta-config/secrets.local.yaml
-.opencode/mcp.local.json
 .opencode/settings.local.json
 AGENTS.personal.md
 CLAUDE.personal.md
