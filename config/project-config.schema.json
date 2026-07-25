@@ -847,6 +847,7 @@
             "business",
             "book",
             "internal-docs",
+            "technical",
             "custom"
           ],
           "default": "research",

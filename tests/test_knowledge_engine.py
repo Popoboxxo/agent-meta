@@ -19,9 +19,9 @@ _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 # DOMAIN_CONCEPT_TYPES
 # ---------------------------------------------------------------------------
 
-def test_domain_concept_types_has_all_six_domains():
+def test_domain_concept_types_has_all_domains():
     assert set(DOMAIN_CONCEPT_TYPES.keys()) == {
-        "research", "personal", "business", "book", "internal-docs", "custom",
+        "research", "personal", "business", "book", "internal-docs", "technical", "custom",
     }
 
 
