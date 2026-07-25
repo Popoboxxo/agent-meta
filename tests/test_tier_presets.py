@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).parent.parent
 CLAUDE_MODEL_POWERFUL = "claude-opus-4-8"
 CLAUDE_MODEL_FAST = "claude-haiku-4-5-20251001"
 CLAUDE_MODEL_MAX = "claude-fable-5"
-CLAUDE_MODEL_BALANCED = "claude-sonnet-4-6"
+CLAUDE_MODEL_BALANCED = "claude-sonnet-5"
 
 # Provider config is loaded by resolve_model from ai-providers.yaml.
 # We must pass it to avoid hitting disk twice; load it once here.
@@ -59,8 +59,8 @@ def test_cheap_vs_expensive_differ() -> None:
 # ---------------------------------------------------------------------------
 
 def test_normal_is_passthrough() -> None:
-    """Normal preset maps developer (powerful) to the powerful model — no remapping."""
-    model = _resolve("developer", "Normal")
+    """Normal preset maps senior-developer (powerful) to the powerful model — no remapping."""
+    model = _resolve("senior-developer", "Normal")
     assert model == CLAUDE_MODEL_POWERFUL, (
         f"Normal preset should pass through 'powerful' → {CLAUDE_MODEL_POWERFUL!r}, got {model!r}"
     )
@@ -90,8 +90,8 @@ def test_se_focus_does_not_upgrade_non_se_role() -> None:
     """se-focus: true must NOT affect non-se roles."""
     # developer has model: powerful
     # With se-focus=true + Normal preset: should still be powerful (no upgrade)
-    model_with_focus = _resolve("developer", "Normal", extra={"se-focus": True})
-    model_without_focus = _resolve("developer", "Normal")
+    model_with_focus = _resolve("senior-developer", "Normal", extra={"se-focus": True})
+    model_without_focus = _resolve("senior-developer", "Normal")
     assert model_with_focus == model_without_focus, (
         f"se-focus must not change non-SE role: {model_with_focus!r} vs {model_without_focus!r}"
     )
@@ -113,8 +113,8 @@ def test_backward_compat_se_suffix() -> None:
         f"suffix={model_suffix!r}, flag={model_flag!r}"
     )
     # Also verify non-SE role is unchanged by the suffix
-    dev_suffix = _resolve("developer", "Normal (SE)")
-    dev_flag = _resolve("developer", "Normal", extra={"se-focus": True})
+    dev_suffix = _resolve("senior-developer", "Normal (SE)")
+    dev_flag = _resolve("senior-developer", "Normal", extra={"se-focus": True})
     assert dev_suffix == dev_flag, (
         f"Suffix compat must match flag for non-SE role: {dev_suffix!r} vs {dev_flag!r}"
     )
@@ -152,7 +152,7 @@ def test_new_format_direct_model_resolution() -> None:
     """Preset with tiers: format resolves tier directly to model id — no provider lookup."""
     # developer has model: powerful; preset tiers maps balanced only
     model = _resolve_with_project_preset(
-        role="developer",
+        role="senior-developer",
         preset_name="DirectTest",
         preset_tiers={"powerful": CLAUDE_MODEL_BALANCED},
     )
@@ -173,7 +173,7 @@ def test_old_format_mapping_still_works() -> None:
         },
     }
     model = resolve_model(
-        role="developer",
+        role="senior-developer",
         project_config=project_config,
         agent_meta_root=REPO_ROOT,
         provider="Claude",
@@ -189,7 +189,7 @@ def test_provider_tier_override_beats_preset_tiers() -> None:
     """provider-tier-overrides must win over preset tiers: direct model assignment."""
     override_model = CLAUDE_MODEL_FAST  # claude-haiku — deliberately "cheap"
     model = _resolve_with_project_preset(
-        role="developer",
+        role="senior-developer",
         preset_name="OverrideTest",
         preset_tiers={"powerful": CLAUDE_MODEL_MAX},  # would return max without override
         extra={"provider-tier-overrides": {"Claude": {"powerful": override_model}}},

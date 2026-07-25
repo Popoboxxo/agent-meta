@@ -4145,7 +4145,7 @@ async function viewModelMapping() {
  * ========================================================================= */
 async function buildConfigAudit() {
   const wrap = el("div");
-  wrap.appendChild(el("h2", {}, ["Config Audit"]));
+  wrap.appendChild(el("h1", {}, ["Config Audit"]));
   wrap.appendChild(el("p", { class: "muted" }, [
     "Compares .meta-config/project.yaml against role-defaults.yaml and the ",
     "generic agent templates. Deprecated roles can be auto-disabled (a ",
@@ -7762,6 +7762,7 @@ async function init() {
   router.register("/config/rules-presets",     viewRulesPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
+  router.register("/config-audit",             buildConfigAudit);
   router.register("/system-audit",             viewSystemAudit);
   router.register("/roles",     viewRoles);
   router.register("/pipelines", viewPipelines);

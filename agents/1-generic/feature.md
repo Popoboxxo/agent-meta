@@ -76,14 +76,15 @@ Pflicht: `TASK` + `EXPECTED_OUTPUT`.
 | 1 | Branch anlegen | `git` | immer |
 | 2 ? | Anforderung aufnehmen | `requirements` | `req-traceability` |
 | 3 ? | Tests schreiben | `tester` | `tests-required` |
-| 4 | Implementierung | `developer` | immer |
-| 5 ? | Tests verifizieren | `tester` | `tests-required` |
-| 6∥7 | Validierung ∥ Dokumentation | `validator` ∥ `documenter` | `codebase-overview` |
-| 8 | Commit + PR | `git` | immer |
+| 4 | Plan-Execute Loop (Planung) | `orchestrator` / `self` | immer (zwingend) |
+| 5 | Implementierung | `developer` | immer |
+| 6 ? | Tests verifizieren | `tester` | `tests-required` |
+| 7∥8 | Validierung ∥ Dokumentation | `validator` ∥ `documenter` | `codebase-overview` |
+| 9 | Commit + PR | `git` | immer |
 
 **Fehlerbehandlung:**
-- Schritt 5 fehlschlägt → zurück zu Schritt 4 mit Ergebnis
-- Validierung (6) fehlschlägt → zurück zum betroffenen Schritt
+- Schritt 6 fehlschlägt → zurück zu Schritt 5 mit Ergebnis
+- Validierung (7) fehlschlägt → zurück zum betroffenen Schritt
 - Kein REQ-ID → abbrechen
 - git fehlschlägt → User informieren
 

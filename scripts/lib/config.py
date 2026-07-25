@@ -328,10 +328,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
-    from .delegation_table import (
-        generate_agent_delegation_table,
-        generate_intent_routing_table,
-    )
+    from .delegation_table import get_active_agents_data
+    from .context_templates.builder import TemplateBuilder
+
     from .dod import resolve_dod
     from .providers import load_providers_config, resolve_providers
 
@@ -553,7 +552,13 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     #   developer/senior-developer/performance-optimizer templates.
     variables["WEB_PROJECT_ENABLED"] = "true" if "e2e-tester" in _roles else "false"
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
-    variables["AGENT_DELEGATION_TABLE"] = generate_agent_delegation_table(agent_meta_root, config, variables)
+    variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
+    
+    variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
+    _tb = TemplateBuilder(agent_meta_root / "templates" / "context")
+    _table_tpl = _tb.resolve_partials("{{> agents-table }}")
+    variables["AGENT_DELEGATION_TABLE"] = _tb.resolve_loops(_table_tpl, variables).strip()
+
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
@@ -572,7 +577,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
     # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
-    variables["INTENT_ROUTING_TABLE"] = generate_intent_routing_table(agent_meta_root, config, variables)
+    variables["INTENT_ROUTING_TABLE"] = ""
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops

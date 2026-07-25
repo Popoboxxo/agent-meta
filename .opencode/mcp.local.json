@@ -1,0 +1,29 @@
+{
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ]
+    },
+    "reqflow": {
+      "type": "remote",
+      "enabled": true,
+      "url": "http://172.20.5.108:5173/mcp/sse/",
+      "headers": {
+        "X-API-Key": "rf_xtvVVBKgVumfO7o6pJ7UtxPxdJNlDk04tSwcQLll"
+      }
+    },
+    "viz-logger": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "python",
+        "scripts/viz-logger.py",
+        "--mcp"
+      ]
+    }
+  }
+}

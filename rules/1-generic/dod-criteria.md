@@ -1,37 +1,7 @@
 # Definition of Done (DoD)
 
-Aufgabe abgeschlossen wenn alle **aktiven** Kriterien erfüllt sind.
-
-## Immer Pflicht
-
-- [ ] Code implementiert die Aufgabe vollständig
-- [ ] Code-Konventionen eingehalten
-- [ ] Commit-Message im Conventional-Commits-Format
-- [ ] Keine Regressions
-
-{{#if DOD_REQ_TRACEABILITY}}
-## REQ-Traceability
-
-- [ ] REQ-ID existiert in `docs/REQUIREMENTS.md`
-- [ ] Commit-Format: `<type>(REQ-xxx): <beschreibung>`
-{{/if}}
-
-{{#if DOD_TESTS_REQUIRED}}
-## Tests
-
-- [ ] Test vorhanden und grün
-{{/if}}
-
-{{#if DOD_CODEBASE_OVERVIEW}}
-## Dokumentation
-
-- [ ] `CODEBASE_OVERVIEW.md` aktualisiert
-{{/if}}
-
-{{#if DOD_SECURITY_AUDIT}}
-## Security
-
-- [ ] Security-Audit vor Release durchgeführt
-{{/if}}
-
-**Keine finale Antwort und keine Commit-Empfehlung** ohne Prüfung aller aktiven Kriterien.
+Pflicht: Code komplett, Konventionen & Conv. Commits eingehalten, keine Regressions.
+{{#if DOD_REQ_TRACEABILITY}}REQ-Traceability: REQ-ID in `docs/REQUIREMENTS.md` & Commit (`<type>(REQ-xxx): ...`){{/if}}
+{{#if DOD_TESTS_REQUIRED}}Tests: Test vorhanden & grün{{/if}}
+{{#if DOD_CODEBASE_OVERVIEW}}Doku: `CODEBASE_OVERVIEW.md` aktualisiert{{/if}}
+{{#if DOD_SECURITY_AUDIT}}Security: Audit vor Release{{/if}}

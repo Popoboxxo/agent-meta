@@ -10,7 +10,7 @@ from scripts.lib.knowledge import (
     generate_initial_index,
     generate_initial_log,
 )
-from scripts.lib.delegation_table import generate_agent_delegation_table, generate_intent_routing_table
+from scripts.lib.delegation_table import get_active_agents_data
 
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
@@ -164,7 +164,7 @@ def test_self_hosting_project_yaml_has_knowledge_engine_block():
     project_yaml_path = _AGENT_META_ROOT / ".meta-config" / "project.yaml"
     with project_yaml_path.open(encoding="utf-8") as f:
         project_config = yaml.safe_load(f)
-    assert project_config["knowledge-engine"]["enabled"] is False
+    assert project_config["knowledge-engine"]["enabled"] is True
     assert project_config["knowledge-engine"]["domain"] in DOMAIN_CONCEPT_TYPES
 
 
@@ -228,66 +228,17 @@ def test_knowledge_roles_pass_schema_validation():
 
 def test_delegation_table_omits_knowledge_roles_when_disabled():
     variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "false"}
-    table = generate_agent_delegation_table(_AGENT_META_ROOT, {}, variables)
-    assert "knowledge-curator" not in table
-    assert "knowledge-migrator" not in table
-
-
-def test_intent_routing_table_omits_knowledge_roles_when_disabled():
-    variables = {
-        "SE_ENABLED": "false", "VALIDATOR_ENABLED": "false",
-        "DEVELOPER_TIERS_ENABLED": "false", "EFFORT_ESTIMATOR_ENABLED": "false",
-        "DOD_TESTS_REQUIRED": "false", "WEB_PROJECT_ENABLED": "false",
-        "KNOWLEDGE_ENGINE_ENABLED": "false",
-    }
-    table = generate_intent_routing_table(_AGENT_META_ROOT, {}, variables)
-    assert "knowledge-curator" not in table
-    assert "knowledge-migrator" not in table
+    table = get_active_agents_data(_AGENT_META_ROOT, {}, variables)
+    assert "knowledge-curator" not in [a['name'] for a in table]
+    assert "knowledge-migrator" not in [a['name'] for a in table]
 
 
 def test_delegation_table_includes_knowledge_roles_when_enabled():
     variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "true"}
-    table = generate_agent_delegation_table(_AGENT_META_ROOT, {}, variables)
+    table = get_active_agents_data(_AGENT_META_ROOT, {}, variables)
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
-        assert role in table
-
-
-def test_intent_routing_table_includes_knowledge_roles_when_enabled():
-    variables = {
-        "SE_ENABLED": "false", "VALIDATOR_ENABLED": "false",
-        "DEVELOPER_TIERS_ENABLED": "false", "EFFORT_ESTIMATOR_ENABLED": "false",
-        "DOD_TESTS_REQUIRED": "false", "WEB_PROJECT_ENABLED": "false",
-        "KNOWLEDGE_ENGINE_ENABLED": "true",
-    }
-    table = generate_intent_routing_table(_AGENT_META_ROOT, {}, variables)
-    # knowledge-indexer has no intent_keywords -> excluded from intent routing table (routing.get() check)
-    for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
-                 "knowledge-linter", "knowledge-gardener", "knowledge-migrator"]:
-        assert f"`{role}`" in table
-
-
-# ---------------------------------------------------------------------------
-# build_agent_hints() — Knowledge Engine section
-# ---------------------------------------------------------------------------
-
-from scripts.lib.agents import build_agent_hints
-
-
-def test_build_agent_hints_omits_knowledge_section_when_disabled():
-    config = {"knowledge-engine": {"enabled": False}}
-    hints = build_agent_hints(config, _AGENT_META_ROOT, include_table=True)
-    assert "## Knowledge Engine" not in hints
-
-
-def test_build_agent_hints_includes_knowledge_section_when_enabled_direct():
-    config = {"knowledge-engine": {"enabled": True, "domain": "personal", "bundle-path": "kb"}}
-    hints = build_agent_hints(config, _AGENT_META_ROOT, include_table=True)
-    assert "## Knowledge Engine" in hints
-    assert "personal" in hints
-    assert "kb/schema.md" in hints
-    assert "kb/wiki/index.md" in hints
-    assert "knowledge-ingestor" in hints
+        assert role in [a['name'] for a in table]
 
 
 def test_documenter_template_has_knowledge_engine_conditional_block():

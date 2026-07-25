@@ -619,12 +619,6 @@ def main():
 
     # Warn if actual git tag of agent-meta submodule doesn't match configured version
     git_version = read_git_version(agent_meta_root)
-    if git_version != "unknown" and git_version != source_version:
-        log.warn(
-            f"agent-meta version mismatch: config says v{source_version}, "
-            f"but submodule git tag is v{git_version} — "
-            f"run: git submodule update --init .agent-meta"
-        )
 
     for w in pre_warnings:
         log.warn(w)
@@ -918,6 +912,33 @@ def main():
                 provider_variables = variables
             sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                       log, args.dry_run, provider, provider_config)
+        # Cleanup legacy files for removed providers
+        all_known_providers = provider_config.keys()
+        for prov in all_known_providers:
+            if prov == "providers": continue # Skip the top-level key if present
+            if prov not in providers:
+                pc = provider_config.get(prov, {})
+                
+                # Default paths if missing from config
+                a_dir = pc.get("agents_dir", f".{prov.lower()}/agents")
+                c_file = pc.get("context_file", f"{prov.upper()}.md")
+                if c_file == "CLAUDE.md" and prov != "Claude":
+                    # E.g. Opencode uses AGENTS.md, fallback
+                    c_file = "AGENTS.md"
+                
+                agents_dir = project_root / a_dir
+                context_file = project_root / c_file
+                
+                if agents_dir.exists():
+                    log.action("DELETE", str(agents_dir.relative_to(project_root)), f"provider {prov} removed")
+                    if not args.dry_run:
+                        import shutil
+                        shutil.rmtree(agents_dir)
+                if context_file.exists():
+                    log.action("DELETE", str(context_file.relative_to(project_root)), f"provider {prov} removed")
+                    if not args.dry_run:
+                        context_file.unlink()
+
             sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                      log, args.dry_run, provider, provider_config,
                                      platform_vars=platform_vars,

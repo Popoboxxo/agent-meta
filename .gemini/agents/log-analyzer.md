@@ -14,7 +14,7 @@ tools:
 generated-from: 1-generic-modern/log-analyzer.md@1.1.3
 model: gemini-3.5-flash-high
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-log-analyzer-ext.md` exists → read and apply immediately.
 

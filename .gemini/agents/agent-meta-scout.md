@@ -12,7 +12,7 @@ tools:
 generated-from: 1-generic-modern/agent-meta-scout.md@1.1.3
 model: gemini-3.5-flash-high
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-agent-meta-scout-ext.md` exists → read and apply immediately.
 
@@ -70,7 +70,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.82.0)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.83.0)
 
 **Existing skills:** see `.agent-meta/config/skills-registry.yaml`
 </context>

@@ -511,7 +511,7 @@ def _sync_opencode_context(
         log.action("UPDATE", context_file, "managed block (agent hints + rules)")
     else:
         existing = target_path.read_text(encoding="utf-8")
-        new_managed = _build_opencode_managed_block(
+        new_managed = _build_managed_block(
             agent_meta_root, config, variables, log,
             provider=provider, provider_config=provider_config
         )
@@ -861,205 +861,26 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
     return f"### {title}\n{summary}\n{details}"
 
 
-def _condense_rule_content(content: str, provider: str) -> str:
-    """Remove verbose/explanatory sections from rule content.
-
-    Keeps all actionable rules (headings, lists, tables, code blocks, bold)
-    while stripping:
-    - ``## Warum`` sections (purely explanatory)
-    - ``> **Warum:**`` and ``> Hintergrund:`` blockquotes
-    - ``## Propagation`` sections (sync admin, irrelevant for agents)
-    - Lines mentioning other providers' rule paths (``.claude/rules/``, etc.)
-    - Lines starting with "Auf Claude Code" (Claude-specific)
-    - Multiple consecutive blank lines
-
-    Purpose: embed full quality rules into provider context files (AGENTS.md)
-    without the bloat of provider-specific content for other runtimes.
-    """
-    lines = content.split('\n')
-    result: list[str] = []
-    skip_section_depth = 0
-    skip_blockquote = False
-
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.strip()
-
-        # Track section boundaries for sections to strip entirely
-        if stripped.startswith('## '):
-            section_name = stripped[3:].strip().lower()
-            if section_name == 'warum' or section_name.startswith('warum'):
-                # Skip entire ## Warum section until next ## or end
-                skip_section_depth = 1
-                i += 1
-                continue
-            if section_name == 'propagation':
-                # Skip entire ## Propagation section until next ## or end
-                skip_section_depth = 1
-                i += 1
-                continue
-
-        if skip_section_depth > 0:
-            if stripped.startswith('## '):
-                skip_section_depth = 0
-                # Process this line (don't skip it)
-            elif stripped.startswith('# '):
-                skip_section_depth = 0
-            else:
-                i += 1
-                continue
-
-        # Strip > **Warum:** and > Hintergrund: blockquotes
-        if stripped.startswith('> **Warum') or stripped.startswith('> Hintergrund'):
-            skip_blockquote = True
-            i += 1
-            continue
-
-        if skip_blockquote:
-            if stripped.startswith('>'):
-                i += 1
-                continue
-            else:
-                skip_blockquote = False
-
-        # Strip Claude-only table rows in provider-limits tables
-        if stripped.startswith('| ') and 'Claude Code' in stripped:
-            i += 1
-            continue
-
-        # Strip inline Claude Code mentions from numbered list items,
-        # but keep the general rule content before it.
-        # e.g. "2. **Tiefenlimit:** ... **Claude Code:** ..." -> keep only before "Claude Code"
-        if '**Claude Code:' in line:
-            before = line[:line.index('**Claude Code:')].rstrip('. \t')
-            if before.strip():
-                result.append(before)
-            i += 1
-            continue
-
-        # Strip standalone "Auf Claude Code" lines
-        if stripped.startswith('Auf Claude Code'):
-            i += 1
-            continue
-
-        # Strip propagation paths for other providers
-        if stripped.startswith('- `.'):
-            path_match = stripped[3:].strip('`').strip()
-            if path_match.startswith('.claude/') or path_match.startswith('.gemini/') or path_match.startswith('.continue/') or path_match.startswith('.github/'):
-                i += 1
-                continue
-
-        # Collapse multiple blank lines
-        if stripped == '':
-            if result and result[-1] == '':
-                i += 1
-                continue
-
-        result.append(line)
-        i += 1
-
-    return '\n'.join(result).strip()
-
-
-def _collect_embedded_rules_md(
+def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
     variables: dict,
     log: SyncLog,
-    provider: str = "Claude",
-    provider_config: dict | None = None,
-    compact: bool = False,
-) -> str:
-    """Collect all active rules and return them as concatenated markdown.
-
-    Used to embed rules into AGENTS.md for providers without a native rules directory
-    (e.g. opencode). Respects ``opencode: skip`` rule option and speech-mode config.
-
-    When compact=True, each rule is condensed via ``_condense_rule_content`` to keep
-    all actionable content (lists, tables, code blocks, headings) while stripping
-    verbose sections (Warum, Propagation, Hintergrund) and provider-specific lines.
-    """
-    from .config import substitute, strip_inactive_conditional_blocks
-    from .rules import collect_rule_sources, resolve_rules, SPEECH_DIR
-
-    pc = (provider_config or {}).get(provider, {})
-    provider_vars = {
-        'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
-        'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
-        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
-        'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
-        'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
-        'AGENTS_DIR': pc.get('agents_dir', '.claude/agents'),
-    }
-    merged_vars = {**variables, **provider_vars}
-
-    platforms = config.get('platforms', [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
-    rule_options = resolve_rules(config, agent_meta_root)
-
-    sections: list[str] = []
-
-    embedded_count = 0
-    skipped_count = 0
-
-    provider_has_native_rules = pc.get('has_rules', False)
-    for source_path, output_name in sources:
-        rule_stem = Path(output_name).stem
-        opts = rule_options.get(rule_stem, {})
-        if opts.get('opencode') == 'skip':
-            continue
-        # Selective Rule Embedding:
-        # embed: false → Rule wird nicht in den Managed Block eingebettet
-        # (nur als separate Datei verfügbar, z.B. .claude/rules/)
-        # Fallback B: Provider ohne native rules dir (has_rules: false) müssen
-        # die Rule trotzdem embedden, sonst geht sie verloren.
-        if opts.get('embed') == False and provider_has_native_rules:
-            skipped_count += 1
-            continue
-        rel_source = f'rules/{source_path.parts[-2]}/{source_path.name}'
-        content = source_path.read_text(encoding='utf-8')
-        content = substitute(content, merged_vars, rel_source, log)
-        content = strip_inactive_conditional_blocks(content, merged_vars)
-        body = _strip_rule_frontmatter(content).strip()
-        if compact:
-            body = _condense_rule_content(body, provider)
-        if body:
-            sections.append(body)
-            embedded_count += 1
-
-    if skipped_count > 0:
-        log.info(f"Selective Embedding: {skipped_count} rules with embed:false skipped, {embedded_count} rules embedded", "embed filter")
-
-    # Include speech-mode rule if configured (not handled by collect_rule_sources)
-    mode = config.get('speech-mode', 'full')
-    if mode != 'full':
-        speech_path = agent_meta_root / SPEECH_DIR / f'{mode}.md'
-        if speech_path.exists():
-            speech_content = speech_path.read_text(encoding='utf-8')
-            speech_content = substitute(speech_content, merged_vars, f"speech/{mode}.md", log)
-            speech_content = strip_inactive_conditional_blocks(speech_content, merged_vars)
-            body = _strip_rule_frontmatter(speech_content).strip()
-            if compact:
-                body = _condense_rule_content(body, provider)
-            if body:
-                sections.append(body)
-
-    return '\n\n---\n\n'.join(sections)
-
-
-def _build_opencode_managed_block(
-    agent_meta_root: Path,
-    config: dict,
-    variables: dict,
-    log: SyncLog,
-    provider: str = "Claude",
+    provider: str,
     provider_config: dict | None = None,
 ) -> str:
-    """Build the managed block for AGENTS.md: agent hints + all embedded rules."""
-    from .config import substitute
-
+    from .context_templates.builder import TemplateBuilder
+    from .delegation_table import get_active_agents_data
+    from .rules import collect_rule_sources, resolve_rules
+    
     pc = (provider_config or {}).get(provider, {})
+    has_native_rules = pc.get("has_rules", False)
+    
+    if provider_config and pc.get("context_file"):
+        shared_users = [p for p, cfg in provider_config.items() if cfg.get("context_file") == pc.get("context_file")]
+        if not all(provider_config[p].get("has_rules", False) for p in shared_users):
+            has_native_rules = False
+    
     provider_dirs = {
         "Claude": ".claude/agents",
         "Opencode": ".opencode/agents",
@@ -1068,46 +889,46 @@ def _build_opencode_managed_block(
         "Copilot": ".github/copilot/agents",
         "Mammouth": ".mammouth/agents",
     }
+    
     local_vars = dict(variables)
-    if provider in provider_dirs:
-        local_vars["AGENTS_DIR"] = provider_dirs[provider]
-
-    template = _load_claude_md_managed_template(agent_meta_root)
-    managed = substitute(template, local_vars, 'AGENTS.md managed block', log)
-
-    # Phase 2: Inject dynamic provider agent locations (AGENTS.md users see
-    # which agent directories belong to which provider).
-    agent_locations = variables.get("AGENT_LOCATIONS", "")
-    if agent_locations:
-        managed = managed.replace(
-            '<!-- agent-meta:managed-end -->',
-            f'\n## Agents\n\n{agent_locations}\n\n<!-- agent-meta:managed-end -->',
-        )
-
-    # Phase 3: Embedded rules block.
-    # For providers without a native rules directory (context-embedded-rules
-    # capability, e.g. Opencode), literally embed the rules content into the
-    # managed block. Providers WITH native rules get a simple pointer text.
-    has_native_rules = pc.get("has_rules", False)
-    if has_native_rules:
-        rules_block = '> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.'
-    else:
-        rules_md = _collect_embedded_rules_md(
-            agent_meta_root, config, variables, log,
-            provider=provider, provider_config=provider_config,
-            compact=True,
-        )
-        if rules_md:
-            rules_block = rules_md
+    if provider_config and pc.get("context_file"):
+        shared_users = [p for p, cfg in provider_config.items() if cfg.get("context_file") == pc.get("context_file")]
+        if len(shared_users) > 1:
+            dirs = [provider_config[p].get("agents_dir", f".{p.lower()}/agents") for p in shared_users]
+            local_vars["AGENTS_DIR"] = " bzw. ".join(dirs)
         else:
-            rules_block = '> **Regeln:** Keine aktiven Regeln konfiguriert.'
-    managed = managed.replace(
-        '<!-- agent-meta:managed-end -->',
-        f'\n## Regeln\n\n{rules_block}\n\n<!-- agent-meta:managed-end -->',
-    )
+            local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
+    else:
+        local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
+        
+    local_vars["HAS_NATIVE_RULES"] = has_native_rules
+    local_vars[f"PLATFORM_{provider.upper()}"] = True
+    local_vars["PENDING_TASKS_FILE"] = pc.get("pending_tasks_file", f".{provider.lower()}/pending-tasks.md")
+    
+    local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
+    
+    if not has_native_rules:
+        rule_options = resolve_rules(config, agent_meta_root)
+        platforms = config.get("platforms", [])
+        rule_sources = collect_rule_sources(agent_meta_root, platforms)
+        
+        embedded_rules = []
+        for src_path, _ in rule_sources:
+            rule_stem = src_path.stem
+            opts = rule_options.get(rule_stem, {})
+            prov_opt = opts.get(provider.lower())
+            if prov_opt == "skip" or prov_opt is False:
+                continue
+            if opts.get("embed") is False:
+                continue
+                
+            rule_content = src_path.read_text(encoding="utf-8")
+            embedded_rules.append({"content": rule_content})
+            
+        local_vars["embedded_rules"] = embedded_rules
 
-    return managed
-
+    builder = TemplateBuilder(agent_meta_root / "templates" / "context")
+    return builder.build("agents-managed", local_vars)
 
 def init_claude_personal(
     agent_meta_root: Path,

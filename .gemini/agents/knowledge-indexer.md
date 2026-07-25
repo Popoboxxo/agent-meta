@@ -7,7 +7,7 @@ hint: index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-
 generated-from: 1-generic/knowledge-indexer.md@1.0.0
 model: gemini-3.5-flash-medium
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 # Knowledge Indexer — agent-meta
 

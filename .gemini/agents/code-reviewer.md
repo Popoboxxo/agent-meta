@@ -11,7 +11,7 @@ tools:
 generated-from: 1-generic-modern/code-reviewer.md@1.2.2
 model: gemini-3.1-pro-high
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-code-reviewer-ext.md` exists → read and apply immediately.
 

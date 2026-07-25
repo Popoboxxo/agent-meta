@@ -47,9 +47,8 @@ CODEBASE_OVERVIEW aktiv — Dokumentations-Kriterium ist Pflicht.
 
 ## Deine Zuständigkeiten
 
-### 1. Anforderungs-Validierung (Code ↔ REQ) — `req-traceability`
-
-> **Nur wenn `req-traceability` aktiv.** Sonst überspringen und Aufgabenerfüllung anhand der Aufgabenbeschreibung prüfen statt gegen REQ-IDs.
+{{#if DOD_REQ_TRACEABILITY}}
+### 1. Anforderungs-Validierung (Code ↔ REQ)
 
 Prüfe ob Implementierung die zugehörige Anforderung korrekt umsetzt:
 
@@ -71,15 +70,19 @@ Prüfe ob Implementierung die zugehörige Anforderung korrekt umsetzt:
 **Fehlende Aspekte:** [Liste]
 **Empfehlungen:** [Liste]
 ```
+{{else}}
+### 1. Anforderungs-Validierung
+
+Prüfe die Aufgabenerfüllung direkt anhand der Aufgabenbeschreibung aus dem Orchestrator/User-Input.
+{{/if}}
 
 ### 2. Definition of Done (DoD) Checkliste
 
 Vollständige DoD-Checkliste in der Rule `dod-criteria.md` (automatisch geladen).
 Prüfe nur **aktive** Kriterien gemäß DoD-Konfiguration in `.meta-config/project.yaml`.
 
-### 3. Traceability-Audit — `req-traceability`
-
-> **Nur wenn `req-traceability` aktiv.** Sonst überspringen.
+{{#if DOD_REQ_TRACEABILITY}}
+### 3. Traceability-Audit
 
 Vollständiger Abgleich aller REQs gegen Code und Tests:
 ```
@@ -103,6 +106,7 @@ Rückwärts-Traceability: Code → REQ; Test → REQ
 ```
 
 5. **Berichte:** Lücken (REQ ohne Code/Test), verwaiste Tests, verwaister Code (Funktionen ohne REQ-Bezug).
+{{/if}}
 
 ### 4. Code-Qualitäts-Prüfung — DELEGATION
 

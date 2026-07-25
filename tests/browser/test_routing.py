@@ -22,9 +22,9 @@ def test_config_audit_route(browser_ctx):
         page.goto(f"{base}/#/config-audit")
         page.wait_for_load_state("networkidle")
         # The config-audit view has an H1 with "Config" in its text.
-        expect(page.locator("h1").first).to_contain_text("Config", timeout=5000)
+        expect(page.locator("#content h1").first).to_contain_text("Config", timeout=5000)
         # Must NOT show the dashboard's "Overview" heading.
-        heading_text = page.locator("h1").first.text_content() or ""
+        heading_text = page.locator("#content h1").first.text_content() or ""
         assert "Overview" not in heading_text, (
             "Config-audit route fell back to dashboard (route not registered)"
         )

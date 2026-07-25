@@ -7,7 +7,7 @@ hint: Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen
 generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 model: gemini-3.1-pro-low
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 # Knowledge Ingestor — agent-meta
 

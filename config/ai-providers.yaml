@@ -68,8 +68,8 @@ providers:
   Gemini:
     agents_dir: .gemini/agents
     agent_ext: .md
-    context_file: .gemini/GEMINI.md
-    context_template: howto/configs/GEMINI.project-template.md
+    context_file: AGENTS.md
+    context_template: howto/configs/OPENCODE.project-template.md
     has_rules: true
     rules_dir: .gemini/rules
     has_hooks: false
@@ -84,7 +84,7 @@ providers:
       - settings
       - snippets
       - skills
-      - context-managed-block
+      - context-embedded-rules
       - mcp
     artifact_dir: .gemini/artifacts
     checkpoint_dir: .meta-viz
@@ -95,6 +95,7 @@ providers:
       - .gemini/
     gitignore_entries:
       - .gemini/settings.local.json
+      - .gemini/pending-tasks.md
     mcp-config:
       committed-file: .gemini/settings.json
       secrets-file: .gemini/settings.local.json
@@ -146,6 +147,7 @@ providers:
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
+      - .opencode/pending-tasks.md
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
@@ -198,6 +200,7 @@ providers:
       - .continue/
     gitignore_entries:
       - .continue/settings.local.yaml
+      - .continue/pending-tasks.md
     mcp-config:
       committed-file: .continue/config.yaml
       secrets-file: .continue/config.local.yaml

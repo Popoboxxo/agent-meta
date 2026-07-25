@@ -12,6 +12,7 @@ graphify-out/
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
+.gemini/pending-tasks.md
 .gemini/settings.local.json
 .mcp.json
 .meta-config/env.ps1
@@ -19,6 +20,7 @@ graphify-out/
 .meta-config/env.unset.ps1
 .meta-config/env.unset.sh
 .meta-config/secrets.local.yaml
+.opencode/pending-tasks.md
 .opencode/settings.local.json
 AGENTS.personal.md
 CLAUDE.personal.md

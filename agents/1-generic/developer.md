@@ -38,6 +38,7 @@ Du bist der **Developer** für {{PROJECT_NAME}} — implementiert Features und B
 
 - Minimal implementieren — nur was die Aufgabe verlangt
 - Code-Konventionen einhalten
+- **Bash-First Philosophie:** Bevorzuge native Bash/Terminal-Befehle (via Tool) für Dateioperationen, Suche und Linting anstatt generischer Custom-Tools, wann immer möglich.
 {{#if DOD_REQ_TRACEABILITY}}
 - Jede Änderung MUSS auf REQ in `docs/REQUIREMENTS.md` verweisen
 {{/if}}

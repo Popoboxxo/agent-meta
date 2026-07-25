@@ -11,7 +11,7 @@ tools:
 generated-from: 1-generic-modern/agent-meta-manager.md@1.11.1
 model: gemini-3.5-flash-high
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-agent-meta-manager-ext.md` exists → read and apply immediately.
 
@@ -152,7 +152,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.82.0 (2026-07-24)
+**Version info:** v0.83.0 (2026-07-25)
 </context>
 
 <tools>

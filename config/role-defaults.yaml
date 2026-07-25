@@ -9,6 +9,7 @@ roles:
     handoff:
       output_contract: task-spec-v1
       handoff_routing: static
+    short_desc: Einstiegspunkt für alle Entwicklungsaufgaben
   developer:
     model: balanced
     memory: ''
@@ -40,6 +41,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
+    short_desc: Feature-Implementierung und Bugfixes
   junior-developer:
     model: fast
     memory: ''
@@ -70,6 +72,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 120
+    short_desc: Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact)
   intern-developer:
     model: nano
     memory: ''
@@ -80,6 +83,7 @@ roles:
     routing:
       parallel: true
       orchestrator_only: false
+    short_desc: '[EASTER EGG / GAG] Der übereifrige Praktikant'
   senior-developer:
     model: powerful
     memory: project
@@ -110,6 +114,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
+    short_desc: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting...
   principal-developer:
     model: max
     memory: project
@@ -130,6 +135,7 @@ roles:
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 900
       target_roles: []
+    short_desc: Last-Resort-Eskalationsstufe
   requirements:
     model: fast
     memory: project
@@ -151,6 +157,7 @@ roles:
       target_roles:
       - developer
       - tester
+    short_desc: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
   ideation:
     model: balanced
     memory: ''
@@ -169,6 +176,7 @@ roles:
       output_schema: schemas/handoffs/ext/ideation-extension.schema.json
       target_roles:
       - requirements
+    short_desc: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
   feature:
     model: balanced
     memory: ''
@@ -186,6 +194,8 @@ roles:
       input_contracts:
       - task-spec-v1
       output_contract: feature-result-v1
+    short_desc: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate →
+      PR'
   tester:
     model: fast
     memory: ''
@@ -203,6 +213,7 @@ roles:
       - task-spec-v1
       - req-output-v1
       output_contract: test-result-v1
+    short_desc: TDD, Test-Suite ausführen, Testabdeckung sichern
   e2e-tester:
     model: balanced
     memory: ''
@@ -226,6 +237,7 @@ roles:
       output_contract: e2e-result-v1
       target_roles:
       - developer
+    short_desc: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   validator:
     model: balanced
     memory: project
@@ -245,6 +257,7 @@ roles:
       - dev-result-v1
       validate_handoff: true
       output_schema: schemas/a2a-handoff.schema.json
+    short_desc: Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit
   documenter:
     model: fast
     memory: project
@@ -262,6 +275,7 @@ roles:
       input_contracts:
       - slo-report-v1
       - refactoring-plan-v1
+    short_desc: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen
   security-auditor:
     model: powerful
     memory: project
@@ -276,6 +290,7 @@ roles:
       - OWASP
       parallel: false
       orchestrator_only: false
+    short_desc: 'Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain'
   dependency-auditor:
     model: balanced
     memory: ''
@@ -297,6 +312,8 @@ roles:
       output_contract: dependency-audit-v1
       target_roles:
       - feedback
+    short_desc: 'Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift
+      und ...'
   agent-meta-scout:
     model: fast
     memory: local
@@ -310,6 +327,8 @@ roles:
       - Ökosystem
       parallel: true
       orchestrator_only: false
+    short_desc: 'Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns
+      entdecken'
   prompt-engineer:
     model: balanced
     memory: project
@@ -323,6 +342,7 @@ roles:
       - Agenten-Definition
       parallel: false
       orchestrator_only: false
+    short_desc: Der ultimative Experte für Prompt-Engineering
   agent-meta-manager:
     model: fast
     memory: ''
@@ -336,6 +356,8 @@ roles:
       - Agenten verwalten
       parallel: false
       orchestrator_only: false
+    short_desc: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische
+      Agenten anl...'
   release:
     model: fast
     memory: ''
@@ -348,6 +370,7 @@ roles:
       - Changelog
       parallel: false
       orchestrator_only: false
+    short_desc: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
   git:
     model: nano
     memory: ''
@@ -362,6 +385,7 @@ roles:
       - Pull
       parallel: false
       orchestrator_only: false
+    short_desc: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
   meta-feedback:
     model: fast
     memory: ''
@@ -373,6 +397,7 @@ roles:
       - Verbesserung
       parallel: false
       orchestrator_only: false
+    short_desc: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
   docker:
     model: fast
     memory: ''
@@ -386,6 +411,8 @@ roles:
       - Container
       parallel: false
       orchestrator_only: false
+    short_desc: Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles
+      erste...
   log-analyzer:
     model: fast
     memory: ''
@@ -403,6 +430,8 @@ roles:
       output_contract: log-analysis-v1
       target_roles:
       - incident-responder
+    short_desc: 'System- und Applikations-Logs analysieren: Frequency-Clustering,
+      Severity-Kla...'
   incident-responder:
     model: balanced
     memory: project
@@ -429,6 +458,7 @@ roles:
       target_roles:
       - developer
       - documenter
+    short_desc: 'Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schri...'
   feedback:
     model: nano
     memory: ''
@@ -445,6 +475,8 @@ roles:
     handoff:
       input_contracts:
       - dependency-audit-v1
+    short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
+      als GitHub I...'
   bug-feature-analyzer:
     model: fast
     memory: ''
@@ -458,12 +490,16 @@ roles:
       - klassifizieren
       parallel: true
       orchestrator_only: true
+    short_desc: 'Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren
+      und k...'
   openscad-developer:
     model: balanced
     memory: local
     workflow_tier: optional
     description: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
       via MCP, Druck-Optimierung
+    short_desc: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
+      via MC...
   se-requirements:
     group: se
     model: balanced
@@ -483,6 +519,7 @@ roles:
       output_contract: se-req-output-v1
       target_roles:
       - se-critic
+    short_desc: Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requir...
   se-architect:
     group: se
     model: powerful
@@ -504,6 +541,8 @@ roles:
       output_schema: schemas/se-decomposition.schema.json
       target_roles:
       - se-critic
+    short_desc: Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen
+      (CQRS, Ort...
   se-critic:
     group: se
     model: powerful
@@ -526,6 +565,8 @@ roles:
       - se-architect
       - se-requirements
       - se-interface-mgr
+    short_desc: Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz
+      und ...
   se-interface-mgr:
     group: se
     model: fast
@@ -544,6 +585,7 @@ roles:
       output_contract: interface-result-v1
       target_roles:
       - se-termination
+    short_desc: Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend.
   se-termination:
     group: se
     model: fast
@@ -560,6 +602,8 @@ roles:
       input_contracts:
       - interface-result-v1
       output_contract: termination-result-v1
+    short_desc: Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht
+      wurde.
   se-junior-developer:
     group: se
     model: fast
@@ -591,6 +635,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 120
+    short_desc: Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting)
   se-developer:
     group: se
     model: balanced
@@ -621,6 +666,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
+    short_desc: Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disz...
   se-senior-developer:
     group: se
     model: powerful
@@ -652,6 +698,7 @@ roles:
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
+    short_desc: Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-leve...
   se-test-engineer:
     group: se
     model: balanced
@@ -665,6 +712,8 @@ roles:
       - MBSE Tests
       parallel: true
       orchestrator_only: false
+    short_desc: Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den
+      rechten V-...
   se-testreviewer:
     group: se
     model: powerful
@@ -678,6 +727,8 @@ roles:
       - SE Test Review
       parallel: true
       orchestrator_only: false
+    short_desc: Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen
+      u...
   se-verifier:
     group: se
     model: balanced
@@ -690,6 +741,8 @@ roles:
       - SE Verification
       parallel: true
       orchestrator_only: false
+    short_desc: 'Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen
+      Architektur...'
   se-validator:
     group: se
     model: powerful
@@ -701,6 +754,7 @@ roles:
       - SE Validation
       parallel: false
       orchestrator_only: false
+    short_desc: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse.'
   se-integration-and-test-manager:
     group: se
     model: balanced
@@ -714,6 +768,8 @@ roles:
       - V&V
       parallel: false
       orchestrator_only: false
+    short_desc: 'V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert
+      Test-Ebenen.'
   code-reviewer:
     model: powerful
     memory: project
@@ -735,6 +791,7 @@ roles:
       output_schema: schemas/handoffs/ext/review-extension.schema.json
       target_roles:
       - developer
+    short_desc: 'Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität...'
   concept-reviewer:
     model: powerful
     memory: ''
@@ -753,6 +810,8 @@ roles:
       input_contracts:
       - ideation-output-v1
       output_contract: concept-review-v1
+    short_desc: 'Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit,
+      Logik, ...'
   ui-ux-designer:
     model: balanced
     memory: project
@@ -771,6 +830,7 @@ roles:
       output_schema: schemas/handoffs/ext/design-extension.schema.json
       target_roles:
       - developer
+    short_desc: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
   api-specialist:
     model: balanced
     memory: project
@@ -788,6 +848,7 @@ roles:
       output_schema: schemas/handoffs/ext/api-extension.schema.json
       target_roles:
       - developer
+    short_desc: OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen.
   database-engineer:
     model: powerful
     memory: project
@@ -813,6 +874,8 @@ roles:
       output_contract: db-schema-v1
       target_roles:
       - developer
+    short_desc: Relationales Schema-Design, Datenbank-Migrationen, Query-Optimierung
+      und Inde...
   devops-engineer:
     model: fast
     memory: ''
@@ -825,6 +888,7 @@ roles:
       - Infrastruktur
       parallel: true
       orchestrator_only: false
+    short_desc: CI/CD, Infrastructure as Code, Kubernetes, Observability.
   sre-engineer:
     model: balanced
     memory: project
@@ -848,6 +912,8 @@ roles:
       target_roles:
       - developer
       - documenter
+    short_desc: 'Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets,
+      Capacity-...'
   technical-writer:
     model: fast
     memory: project
@@ -868,6 +934,7 @@ roles:
       orchestrator_only: false
     handoff:
       output_contract: external-doc-v1
+    short_desc: 'Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte...'
   data-engineer:
     model: balanced
     memory: project
@@ -890,6 +957,8 @@ roles:
       output_contract: data-pipeline-v1
       target_roles:
       - developer
+    short_desc: ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks,
+      Lineag...
   accessibility-specialist:
     model: balanced
     memory: ''
@@ -912,6 +981,7 @@ roles:
       output_contract: a11y-audit-v1
       target_roles:
       - developer
+    short_desc: WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader...
   refactoring-specialist:
     model: balanced
     memory: project
@@ -937,6 +1007,8 @@ roles:
       target_roles:
       - developer
       - documenter
+    short_desc: 'Systematische großflächige Code-Transformation mit Sicherheitsnetz:
+      Strangler...'
   product-manager:
     model: balanced
     memory: project
@@ -959,6 +1031,8 @@ roles:
       output_contract: backlog-v1
       target_roles:
       - requirements
+    short_desc: 'Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung,
+      Prio...'
   performance-optimizer:
     model: powerful
     memory: ''
@@ -971,6 +1045,7 @@ roles:
       - Optimierung
       parallel: false
       orchestrator_only: false
+    short_desc: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
   export-manager:
     model: fast
     memory: ''
@@ -984,6 +1059,8 @@ roles:
       - Target
       parallel: false
       orchestrator_only: false
+    short_desc: 'Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray,
+      Notion.'
   effort-estimator:
     model: fast
     memory: ''
@@ -997,6 +1074,8 @@ roles:
       - Kosten
       parallel: false
       orchestrator_only: false
+    short_desc: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und
+      LLM-Kali...
   explorer:
     model: fast
     memory: ''
@@ -1019,6 +1098,8 @@ roles:
       - developer
       - ideation
       - code-reviewer
+    short_desc: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
+      und Symb...
   claude-expert:
     model: powerful
     memory: project
@@ -1032,6 +1113,8 @@ roles:
       - Claude Code
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise,
+      Konf...'
   gemini-expert:
     model: balanced
     memory: project
@@ -1045,6 +1128,8 @@ roles:
       - Antigravity
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
+      Funktionswe...'
   opencode-expert:
     model: balanced
     memory: project
@@ -1057,6 +1142,8 @@ roles:
       - Opencode
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise,
+      Konfigu...'
   continue-expert:
     model: powerful
     memory: project
@@ -1069,6 +1156,8 @@ roles:
       - Continue
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise,
+      Konfigu...'
   copilot-expert:
     model: powerful
     memory: project
@@ -1082,6 +1171,8 @@ roles:
       - GitHub Copilot
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise,
+      K...'
   mammouth-expert:
     model: balanced
     memory: project
@@ -1095,14 +1186,15 @@ roles:
       - Mammouth Code
       parallel: false
       orchestrator_only: false
+    short_desc: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
+      Ko...'
   knowledge-curator:
     group: knowledge
     model: balanced
     memory: project
     workflow_tier: optional
-    description: >-
-      Strategische Knowledge-Engine-Steuerung: Schema-Evolution,
-      Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance.
+    description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
+      Domänen-Anpassung, Ingest-Planung, OKF-Compliance.'
     routing:
       intent_keywords:
       - Knowledge
@@ -1116,14 +1208,14 @@ roles:
       input_contracts:
       - task-spec-v1
       output_contract: knowledge-spec-v1
+    short_desc: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun...'
   knowledge-ingestor:
     group: knowledge
     model: balanced
     memory: project
     workflow_tier: optional
-    description: >-
-      Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
-      aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.
+    description: 'Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
+      aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.'
     routing:
       intent_keywords:
       - Ingest
@@ -1137,13 +1229,14 @@ roles:
       - knowledge-spec-v1
       output_contract: knowledge-ingest-v1
       timeout_sec: 300
+    short_desc: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
+      aktuali...
   knowledge-querier:
     group: knowledge
     model: fast
     memory: ''
     workflow_tier: optional
-    description: >-
-      Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
+    description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
       Drill-in, Synthese mit Citations. File-Back guter Antworten.
     routing:
       intent_keywords:
@@ -1158,14 +1251,14 @@ roles:
       - task-spec-v1
       output_contract: dev-result-v1
       timeout_sec: 120
+    short_desc: Fragen gegen das Knowledge Wiki beantworten
   knowledge-linter:
     group: knowledge
     model: fast
     memory: ''
     workflow_tier: optional
-    description: >-
-      Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
-      kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.
+    description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
+      kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.'
     routing:
       intent_keywords:
       - Wiki-Lint
@@ -1178,14 +1271,15 @@ roles:
       input_contracts:
       - task-spec-v1
       output_contract: knowledge-lint-v1
+    short_desc: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte
+      Links...'
   knowledge-indexer:
     group: knowledge
     model: nano
     memory: ''
     workflow_tier: optional
-    description: >-
-      Pflegt index.md (Content-Katalog, OKF §6) und log.md
-      (Chronologisches Event-Log, OKF §7) im Knowledge Wiki.
+    description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
+      Event-Log, OKF §7) im Knowledge Wiki.
     routing:
       parallel: true
       orchestrator_only: true
@@ -1193,14 +1287,15 @@ roles:
       input_contracts:
       - knowledge-ingest-v1
       output_contract: dev-result-v1
+    short_desc: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
+      Event-L...
   knowledge-gardener:
     group: knowledge
     model: nano
     memory: ''
     workflow_tier: optional
-    description: >-
-      Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
-      Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.
+    description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
+      Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.'
     routing:
       intent_keywords:
       - Wiki-Pflege
@@ -1214,13 +1309,14 @@ roles:
       - knowledge-lint-v1
       - task-spec-v1
       output_contract: dev-result-v1
+    short_desc: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
+      e...'
   knowledge-migrator:
     group: knowledge
     model: balanced
     memory: ''
     workflow_tier: optional
-    description: >-
-      Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
+    description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
       Schützt documenter- und requirements-eigene Dateien.
     routing:
@@ -1237,6 +1333,8 @@ roles:
       - task-spec-v1
       output_contract: knowledge-migration-v1
       timeout_sec: 600
+    short_desc: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
+      Wiki migrieren
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

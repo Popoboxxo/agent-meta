@@ -11,7 +11,7 @@ tools:
 generated-from: 1-generic-modern/ui-ux-designer.md@1.1.3
 model: gemini-3.1-pro-low
 ---
-> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `.gemini/GEMINI.md` (Block `agent-meta:bootstrap`).
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 > **Extension:** If `.gemini/3-project/am-ui-ux-designer-ext.md` exists → read and apply immediately.
 
