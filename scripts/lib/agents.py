@@ -911,7 +911,7 @@ def sync_agents(
     # Track which filenames will be written in this sync
     expected_filenames: set[str] = set()
 
-    project_name = config["project"]["name"]
+    project_name = config.get("project", {}).get("name", "unknown")
     for role, source_path in overrides.items():
         filename = target_filename(role, role_map)
         if not filename:
@@ -1129,7 +1129,7 @@ def sync_agents_for_provider(
         target_dir.mkdir(parents=True, exist_ok=True)
 
     expected_filenames: set = set()
-    project_name = config['project']['name']
+    project_name = config.get('project', {}).get('name', 'unknown')
 
     for role, source_path in overrides.items():
         filename = target_filename(role, role_map)
