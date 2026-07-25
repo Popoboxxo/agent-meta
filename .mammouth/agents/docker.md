@@ -5,6 +5,7 @@ description: 'Docker operations: Compose stacks, binary management, test environ
   and diagnostics — platform-independent.'
 hint: Start/stop dev stack, Dockerfiles, binary management
 prompt_mode: modern
+generated-from: 1-generic/docker.md@1.4.3
 ---
 > **Extension:** If `.mammouth/3-project/am-docker-ext.md` exists → read and apply immediately.
 

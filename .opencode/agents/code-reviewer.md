@@ -1,8 +1,10 @@
 ---
 name: code-reviewer
+version: 1.2.2
 description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis,
   and REQ traceability in code paths.'
 prompt_mode: modern
+generated-from: 1-generic/code-reviewer.md@1.2.2
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:

@@ -8,6 +8,11 @@
 #   Projekte aktivieren via 'external-skills' in agent-meta.config.yaml.
 
 repos:
+  reqogniloom:
+    repo: https://github.com/Popoboxxo/ReqogniLoom
+    local_path: external/ReqogniLoom
+    pinned_commit: main
+
   neat-little-package:
     repo: https://github.com/racurry/neat-little-package
     local_path: external/neat-little-package
@@ -21,6 +26,51 @@ repos:
     # wird vom agent-meta-scout Agenten (1-generic) direkt per Read-Tool referenziert.
 
 skills:
+  reqogniloom-change-manager:
+    approved: true
+    repo: reqogniloom
+    source: docs/agent-templates
+    entry: change-manager.md
+    role: change-manager
+    name: Change Manager
+    description: ReqogniLoom Change Manager Agent
+
+  reqogniloom-quality-auditor:
+    approved: true
+    repo: reqogniloom
+    source: docs/agent-templates
+    entry: quality-auditor.md
+    role: quality-auditor
+    name: Quality Auditor
+    description: ReqogniLoom Quality Auditor Agent
+
+  reqogniloom-requirements-architect:
+    approved: true
+    repo: reqogniloom
+    source: docs/agent-templates
+    entry: requirements-architect.md
+    role: requirements-architect
+    name: Requirements Architect
+    description: ReqogniLoom Requirements Architect Agent
+
+  reqogniloom-risk-analyst:
+    approved: true
+    repo: reqogniloom
+    source: docs/agent-templates
+    entry: risk-analyst.md
+    role: risk-analyst
+    name: Risk Analyst
+    description: ReqogniLoom Risk Analyst Agent
+
+  reqogniloom-test-engineer:
+    approved: true
+    repo: reqogniloom
+    source: docs/agent-templates
+    entry: test-engineer.md
+    role: test-engineer
+    name: Test Engineer
+    description: ReqogniLoom Test Engineer Agent
+
 
   # -----------------------------------------------------------------------
   # SE Framework Extension Skills (Platzhalter — zukünftige Integrationen)

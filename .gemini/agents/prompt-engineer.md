@@ -6,9 +6,14 @@ description: The ultimate expert for prompt engineering. Designs, reviews, and o
 hint: Design or review prompts and agents
 prompt_mode: modern
 tools:
-- code_execution
-- url_context
-generated-from: 1-generic-modern/prompt-engineer.md@1.3.1
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+generated-from: 1-generic/prompt-engineer.md@1.3.1
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

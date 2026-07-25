@@ -8,6 +8,7 @@ hint: 'Last-resort developer: only after senior-developer failed multiple times 
   root-cause analysis, systemic reasoning, no symptom fixes. The most expensive call
   in the system.'
 prompt_mode: modern
+generated-from: 1-generic/principal-developer.md@1.0.0
 ---
 > **Extension:** If `.mammouth/3-project/am-principal-developer-ext.md` exists → read and apply immediately.
 

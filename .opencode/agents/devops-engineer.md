@@ -1,8 +1,10 @@
 ---
 name: devops-engineer
+version: 1.1.3
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   and security best practices.
 prompt_mode: modern
+generated-from: 1-generic/devops-engineer.md@1.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

@@ -1,10 +1,12 @@
 ---
 name: opencode-expert
+version: 1.0.0
 description: 'Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise,
   Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
+generated-from: 2-platform/agent-meta-opencode-expert.md@1.0.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

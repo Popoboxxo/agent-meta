@@ -1,10 +1,12 @@
 ---
 name: e2e-tester
+version: 1.0.0
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 prompt_mode: modern
+generated-from: 1-generic/e2e-tester.md@1.0.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

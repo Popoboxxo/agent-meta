@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/git.md@1.3.1
+generated-from: 1-generic/git.md@1.3.1
 model: claude-haiku-4-5-20251001
 ---
 

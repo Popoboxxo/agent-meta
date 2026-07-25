@@ -1,9 +1,11 @@
 ---
 name: technical-writer
+version: 0.1.0
 description: 'External developer- and user-facing documentation: API references, getting-started
   guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy.
   Distinct from internal team docs owned by documenter.'
 prompt_mode: modern
+generated-from: 1-generic/technical-writer.md@0.1.0
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

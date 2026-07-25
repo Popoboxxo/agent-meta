@@ -1,9 +1,11 @@
 ---
 name: log-analyzer
+version: 1.1.3
 description: 'Analyzes system and application logs: frequency clustering, severity
   classification (RFC 5424), root-cause hypotheses, and structured findings with delegation
   routing.'
 prompt_mode: modern
+generated-from: 1-generic/log-analyzer.md@1.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

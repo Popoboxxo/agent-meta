@@ -1,8 +1,10 @@
 ---
 name: agent-meta-manager
+version: 1.11.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 prompt_mode: modern
+generated-from: 1-generic/agent-meta-manager.md@1.11.1
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
@@ -154,7 +156,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.82.0 (2026-07-24)
+**Version info:** v0.84.0 (2026-07-25)
 </context>
 
 <tools>

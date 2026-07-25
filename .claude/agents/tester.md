@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/tester.md@2.1.3
+generated-from: 1-generic/tester.md@2.1.3
 model: claude-haiku-4-5-20251001
 ---
 

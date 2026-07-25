@@ -6,6 +6,7 @@ description: Creates UI specifications, mockups, and design systems. Maps REQ-ID
 hint: UI specification, mockup creation, and design-system definition — specifies,
   does not implement.
 prompt_mode: modern
+generated-from: 1-generic/ui-ux-designer.md@1.1.3
 ---
 > **Extension:** If `.mammouth/3-project/am-ui-ux-designer-ext.md` exists → read and apply immediately.
 

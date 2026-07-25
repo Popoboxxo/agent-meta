@@ -11,7 +11,7 @@ tools:
 - Read
 - Agent
 - TodoWrite
-generated-from: 1-generic-modern/feature.md@1.10.1
+generated-from: 1-generic/feature.md@1.10.1
 model: claude-sonnet-5
 ---
 

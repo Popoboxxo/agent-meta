@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/data-engineer.md@0.1.0
+generated-from: 1-generic/data-engineer.md@0.1.0
 model: claude-sonnet-5
 memory: project
 ---

@@ -8,10 +8,14 @@ hint: 'Log analysis: cluster errors, classify severity (RFC 5424), delegate find
   as issues or tasks'
 prompt_mode: modern
 tools:
-- code_execution
-- google_search
-- url_context
-generated-from: 1-generic-modern/log-analyzer.md@1.1.3
+- Bash
+- Read
+- Glob
+- Grep
+- WebSearch
+- WebFetch
+- TodoWrite
+generated-from: 1-generic/log-analyzer.md@1.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

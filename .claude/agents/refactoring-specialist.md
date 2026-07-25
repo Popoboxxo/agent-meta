@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/refactoring-specialist.md@0.1.0
+generated-from: 1-generic/refactoring-specialist.md@0.1.0
 model: claude-sonnet-5
 memory: project
 ---

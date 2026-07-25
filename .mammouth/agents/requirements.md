@@ -5,6 +5,7 @@ description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and 
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
 prompt_mode: modern
+generated-from: 1-generic/requirements.md@1.4.3
 ---
 > **Extension:** If `.mammouth/3-project/am-requirements-ext.md` exists → read and apply immediately.
 

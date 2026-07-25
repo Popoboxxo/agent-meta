@@ -4,6 +4,7 @@ version: 1.4.3
 description: Manage versioning, changelogs, build processes and GitHub releases.
 hint: Versioning, changelog, build artifact, create GitHub release
 prompt_mode: modern
+generated-from: 1-generic/release.md@1.4.3
 ---
 > **Extension:** If `.mammouth/3-project/am-release-ext.md` exists → read and apply immediately.
 

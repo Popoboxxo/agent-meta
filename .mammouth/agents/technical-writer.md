@@ -7,6 +7,7 @@ description: 'External developer- and user-facing documentation: API references,
 hint: 'Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help,
   User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer'
 prompt_mode: modern
+generated-from: 1-generic/technical-writer.md@0.1.0
 ---
 > **Extension:** If `.mammouth/3-project/am-technical-writer-ext.md` exists → read and apply immediately.
 

@@ -1,7 +1,9 @@
 ---
 name: knowledge-gardener
+version: 1.0.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
+generated-from: 1-generic/knowledge-gardener.md@1.0.0
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

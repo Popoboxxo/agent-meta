@@ -1,9 +1,11 @@
 ---
 name: knowledge-ingestor
+version: 1.0.0
 description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren,
   Cross-References pflegen.
+generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

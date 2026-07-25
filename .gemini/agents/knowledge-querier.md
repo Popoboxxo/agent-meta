@@ -4,6 +4,11 @@ version: 1.0.1
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
 hint: Wiki-Fragen beantworten, Index-First, Synthese mit Citations
+tools:
+- Read
+- Write
+- Glob
+- Grep
 generated-from: 1-generic/knowledge-querier.md@1.0.1
 model: gemini-3.5-flash-high
 ---

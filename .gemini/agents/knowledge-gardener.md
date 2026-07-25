@@ -4,6 +4,11 @@ version: 1.0.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 hint: 'Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps'
+tools:
+- Read
+- Write
+- Edit
+- Glob
 generated-from: 1-generic/knowledge-gardener.md@1.0.0
 model: gemini-3.5-flash-medium
 ---

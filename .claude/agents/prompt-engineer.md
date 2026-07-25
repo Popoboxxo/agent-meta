@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - WebFetch
-generated-from: 1-generic-modern/prompt-engineer.md@1.3.1
+generated-from: 1-generic/prompt-engineer.md@1.3.1
 model: claude-sonnet-5
 memory: project
 ---

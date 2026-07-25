@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/code-reviewer.md@1.2.2
+generated-from: 1-generic/code-reviewer.md@1.2.2
 model: claude-opus-4-8
 memory: project
 permissionMode: plan

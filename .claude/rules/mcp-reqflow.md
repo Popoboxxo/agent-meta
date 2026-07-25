@@ -84,17 +84,9 @@
 
 ## Agent-Hinweise
 
-ReqFlow verwaltet Requirements, Architektur, Tests und Traceability für dieses Projekt.
-requirement.query/get: bestehende Requirements durchsuchen.
-requirement.create/update/decompose/validate/derive: Requirements anlegen und pflegen (Editor- oder Admin-Rolle nötig).
-architecture.*, test.*: Architektur-Elemente und Testfälle anlegen, verknüpfen und Testläufe protokollieren (analoge RBAC-Regeln).
-traceability.query/suggest_links: Rückverfolgbarkeit zwischen Requirement/Architecture/Test prüfen bzw. Link-Vorschläge holen.
-artifact.search/get_tree: Volltextsuche und Artefakt-Baum.
-adr/risk/issue/glossary.*: ADRs, Risiken, Issues und Glossar-Einträge verwalten.
-ai_derivation.*: KI-gestützte Ableitung von Requirements und Architektur-Vorschlägen.
-prompt_template.get: aktuellen Prompt-Slot-Inhalt abrufen.
-Schreibende Tools erfordern Editor- oder Admin-Rolle (RBAC) im ReqFlow-Workspace — sonst PERMISSION_DENIED.
-Administrative/destruktive Namespaces (admin.*, user.*, permissions.*, audit.*, events.*, workspace.close/reactivate/delete) sind gesperrt.
+ReqFlow ist die Single-Source-of-Truth für Requirements, Architektur und Test-Traceability. Verwende es immer, wenn du Features validieren oder Architekturentscheidungen nachvollziehen musst.
+requirement.query/get: Wann nutzen? Zu Beginn jeder Aufgabe, um Anforderungen und deren Kontext zu verstehen. requirement.create/update/decompose/derive: Wann nutzen? Während der Planungsphase, um große Features in überprüfbare Requirements zu zerlegen. architecture.*, test.*: Wann nutzen? Beim Systemdesign (Architecture) und TDD-Prozess (Tests) zur Verknüpfung mit Code. traceability.query/suggest_links: Wann nutzen? Beim Code-Review oder Validator-Gate, um die REQ-Abdeckung zu validieren. artifact.search/get_tree: Wann nutzen? Für tiefgreifende Recherchen über den gesamten Artefakt-Baum. ai_derivation.*: Wann nutzen? Wenn du komplexe, abstrakte Requirements systematisch in technische Sub-Tasks aufschlüsseln musst.
+Schreibende Tools erfordern Editor- oder Admin-Rolle. Administrative/destruktive Namespaces (admin.*, user.*, etc.) sind aus Sicherheitsgründen hart blockiert.
 
 ## Verbindungstyp
 

@@ -28,19 +28,44 @@ DEFAULT_RULES_DIR = ".claude/rules"
 # Registry loading
 # ---------------------------------------------------------------------------
 
-def load_mcp_registry(agent_meta_root: Path) -> dict:
-    """Load config/mcp-registry.yaml. Returns empty dict if file is absent."""
+def _deep_merge(dict1: dict, dict2: dict) -> dict:
+    """Recursively merges dict2 into dict1."""
+    for k, v in dict2.items():
+        if isinstance(v, dict) and k in dict1 and isinstance(dict1[k], dict):
+            _deep_merge(dict1[k], v)
+        else:
+            dict1[k] = v
+    return dict1
+
+def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project_root: Path | None = None) -> dict:
+    """Load config/mcp-registry.yaml and deep-merge with project-specific mcp-registry (if provided)."""
     data, _ = _load_yaml_or_json(agent_meta_root / MCP_REGISTRY_YAML)
-    if not data:
-        return {}
-    return data.get("mcp-servers", {})
+    registry = {}
+    if data and isinstance(data, dict):
+        registry = data.get("mcp-servers", {})
+        if not isinstance(registry, dict):
+            registry = {}
+            
+    if project_root:
+        proj_data, _ = _load_yaml_or_json(project_root / ".meta-config" / "mcp-registry.yaml")
+        if proj_data and isinstance(proj_data, dict):
+            proj_servers = proj_data.get("mcp-servers", proj_data)
+            if isinstance(proj_servers, dict):
+                _deep_merge(registry, proj_servers)
+                
+    if config:
+        project_registry = config.get("mcp-registry", {})
+        if isinstance(project_registry, dict):
+            _deep_merge(registry, project_registry)
+            
+    return registry
 
 
 # ---------------------------------------------------------------------------
 # Server resolution
 # ---------------------------------------------------------------------------
 
-def resolve_active_mcp_servers(config: dict, agent_meta_root: Path) -> list[str]:
+def resolve_active_mcp_servers(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> list[str]:
     """Determine which MCP servers are active for this project.
 
     Sources (merged, preserving order, no duplicates):
@@ -51,7 +76,7 @@ def resolve_active_mcp_servers(config: dict, agent_meta_root: Path) -> list[str]
     Servers from bundles not in the explicit list are skipped when
     enabled-by-default: false in mcp-registry.yaml.
     """
-    registry = load_mcp_registry(agent_meta_root)
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
     explicit: set[str] = set(config.get("mcp-servers", []))
     active: list[str] = list(config.get("mcp-servers", []))
 
@@ -379,11 +404,11 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
-    registry = load_mcp_registry(agent_meta_root)
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root)
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
     if not active_servers:
         return
 
@@ -476,11 +501,11 @@ def init_secrets_template(
         log.skip(SECRETS_LOCAL_FILE, "already exists — not overwritten")
         return
 
-    registry = load_mcp_registry(agent_meta_root)
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root)
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
     if not active_servers:
         return
 
@@ -543,11 +568,11 @@ def generate_mcp_artifacts(
       - Provider-specific secrets-file (from ai-providers.yaml mcp-config)
       - .meta-config/secrets.local.yaml (central secret store)
     """
-    registry = load_mcp_registry(agent_meta_root)
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return []
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root)
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
     if not active_servers:
         return []
 

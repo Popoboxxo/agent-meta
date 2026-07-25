@@ -5,6 +5,7 @@ description: The ultimate expert for prompt engineering. Designs, reviews, and o
   agent definitions based on best practices (OpenAI, Lakera).
 hint: Design or review prompts and agents
 prompt_mode: modern
+generated-from: 1-generic/prompt-engineer.md@1.3.1
 ---
 > **Extension:** If `.mammouth/3-project/am-prompt-engineer-ext.md` exists → read and apply immediately.
 

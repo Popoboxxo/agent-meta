@@ -1,12 +1,14 @@
 ---
 name: refactoring-specialist
+version: 0.1.0
 description: 'Systematic large-scale code transformation with safety nets: Strangler
   Fig pattern, incremental refactoring, code smell detection, legacy modernization
   and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces
   refactoring plan, transformation sequence, rollback strategy and compatibility matrix.'
 prompt_mode: modern
+generated-from: 1-generic/refactoring-specialist.md@0.1.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

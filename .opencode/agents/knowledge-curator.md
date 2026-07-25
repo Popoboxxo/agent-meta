@@ -1,9 +1,11 @@
 ---
 name: knowledge-curator
+version: 1.0.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
+generated-from: 1-generic/knowledge-curator.md@1.0.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

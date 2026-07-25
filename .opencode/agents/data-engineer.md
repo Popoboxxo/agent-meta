@@ -1,12 +1,14 @@
 ---
 name: data-engineer
+version: 0.1.0
 description: ETL/ELT pipeline design, data-layer schema migration, data quality checks,
   lineage analysis, pipeline monitoring and streaming/batch design. Produces pipeline
   specs, data quality reports, lineage diagrams and migration scripts. Distinct from
   database-engineer query/index work.
 prompt_mode: modern
+generated-from: 1-generic/data-engineer.md@0.1.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

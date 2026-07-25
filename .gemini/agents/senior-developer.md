@@ -7,10 +7,16 @@ hint: 'High-tier developer: architecture impact, complex/risky changes, hard bug
   — analyzes first, then implements'
 prompt_mode: modern
 tools:
-- code_execution
-- google_search
-- url_context
-generated-from: 1-generic-modern/senior-developer.md@1.2.0
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- TodoWrite
+generated-from: 1-generic/senior-developer.md@1.2.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

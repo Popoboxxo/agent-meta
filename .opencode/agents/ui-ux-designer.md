@@ -1,10 +1,12 @@
 ---
 name: ui-ux-designer
+version: 1.1.3
 description: Creates UI specifications, mockups, and design systems. Maps REQ-IDs
   to UI elements.
 prompt_mode: modern
+generated-from: 1-generic/ui-ux-designer.md@1.1.3
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

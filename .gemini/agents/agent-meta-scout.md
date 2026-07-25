@@ -7,9 +7,10 @@ hint: 'Scout the AI ecosystem: discover new skills, roles, rules, and patterns f
   agent-meta'
 prompt_mode: modern
 tools:
-- google_search
-- url_context
-generated-from: 1-generic-modern/agent-meta-scout.md@1.1.3
+- Read
+- WebFetch
+- WebSearch
+generated-from: 1-generic/agent-meta-scout.md@1.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -70,7 +71,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.83.0)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.84.0)
 
 **Existing skills:** see `.agent-meta/config/skills-registry.yaml`
 </context>

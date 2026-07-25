@@ -6,6 +6,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionswe
   Anpassung von agent-meta.'
 hint: 'Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices'
 based-on: 1-generic/provider-expert.md@1.0.0
+generated-from: 2-platform/agent-meta-continue-expert.md@1.0.0
 ---
 # Role: Continue Expert
 

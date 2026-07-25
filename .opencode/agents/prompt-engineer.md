@@ -1,10 +1,12 @@
 ---
 name: prompt-engineer
+version: 1.3.1
 description: The ultimate expert for prompt engineering. Designs, reviews, and optimizes
   agent definitions based on best practices (OpenAI, Lakera).
 prompt_mode: modern
+generated-from: 1-generic/prompt-engineer.md@1.3.1
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

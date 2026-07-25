@@ -1,10 +1,12 @@
 ---
 name: feature
+version: 1.10.1
 description: 'Full feature lifecycle: Branch → Requirements → TDD → Implementation
   → Validation → Commit → PR.'
 prompt_mode: modern
+generated-from: 1-generic/feature.md@1.10.1
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

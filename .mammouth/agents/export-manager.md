@@ -5,6 +5,7 @@ description: Reads .meta-config/export.yaml and routes structured JSON payloads 
   specialist agents to the configured target (markdown, confluence, jira-xray, etc.).
 hint: Use this agent for export routing of structured data to configured targets.
 prompt_mode: modern
+generated-from: 1-generic/export-manager.md@1.1.3
 ---
 > **Extension:** If `.mammouth/3-project/am-export-manager-ext.md` exists → read and apply immediately.
 

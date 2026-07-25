@@ -6,6 +6,7 @@ description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact.
 hint: 'Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates
   on scope overrun'
 prompt_mode: modern
+generated-from: 1-generic/junior-developer.md@1.2.0
 ---
 > **Extension:** If `.mammouth/3-project/am-junior-developer-ext.md` exists → read and apply immediately.
 

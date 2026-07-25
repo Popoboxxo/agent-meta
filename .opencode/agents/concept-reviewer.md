@@ -1,8 +1,10 @@
 ---
 name: concept-reviewer
+version: 1.0.2
 description: 'Generic concept critic: reviews design docs and concepts for completeness,
   logic gaps, assumptions, alternatives, risks, feasibility, and consistency.'
 prompt_mode: modern
+generated-from: 1-generic/concept-reviewer.md@1.0.2
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:

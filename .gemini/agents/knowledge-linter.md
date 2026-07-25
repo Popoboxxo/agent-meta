@@ -4,6 +4,11 @@ version: 1.0.0
 description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte
   Links, fehlende OKF-Frontmatter, Index-Staleness.'
 hint: 'Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)'
+tools:
+- Read
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/knowledge-linter.md@1.0.0
 model: gemini-3.5-flash-high
 ---

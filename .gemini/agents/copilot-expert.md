@@ -7,8 +7,14 @@ description: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funkt
 hint: 'GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best
   Practices'
 tools:
-- code_execution
-- url_context
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
 generated-from: 2-platform/agent-meta-copilot-expert.md@1.0.0
 model: gemini-3.1-pro-high

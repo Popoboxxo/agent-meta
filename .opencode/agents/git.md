@@ -1,7 +1,9 @@
 ---
 name: git
+version: 1.3.1
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
+generated-from: 1-generic/git.md@1.3.1
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

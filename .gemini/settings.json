@@ -7,7 +7,10 @@
       "type": "sse",
       "url": "${MCP_HONCHO_URL}",
       "headers": {
-        "X-API-Key": "${MCP_HONCHO_API_KEY}"
+        "Authorization": "Bearer ${MCP_HONCHO_API_KEY}",
+        "X-Honcho-User-Name": "${MCP_HONCHO_USER_NAME}",
+        "X-Honcho-Assistant-Name": "${MCP_HONCHO_ASSISTANT_NAME}",
+        "X-Honcho-Workspace-ID": "${MCP_HONCHO_WORKSPACE_ID}"
       }
     },
     "playwright": {
@@ -17,11 +20,14 @@
         "@playwright/mcp@latest"
       ]
     },
-    "reqflow": {
+    "reqogniloom": {
       "type": "sse",
-      "url": "${MCP_REQFLOW_URL}/mcp/sse/",
+      "url": "${MCP_REQOGNILOOM_URL}/mcp/sse/",
       "headers": {
-        "X-API-Key": "${MCP_REQFLOW_API_KEY}"
+        "Authorization": "Bearer ${MCP_REQOGNILOOM_API_KEY}",
+        "X-Project-ID": "${MCP_REQOGNILOOM_PROJECT_ID}",
+        "X-User-ID": "${MCP_REQOGNILOOM_USER_ID}",
+        "X-Workspace-ID": "${MCP_REQOGNILOOM_WORKSPACE_ID}"
       }
     },
     "viz-logger": {

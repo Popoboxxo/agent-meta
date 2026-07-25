@@ -1,9 +1,11 @@
 ---
 name: knowledge-migrator
+version: 1.0.0
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
+generated-from: 1-generic/knowledge-migrator.md@1.0.0
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

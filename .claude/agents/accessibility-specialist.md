@@ -15,7 +15,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/accessibility-specialist.md@0.1.0
+generated-from: 1-generic/accessibility-specialist.md@0.1.0
 model: claude-sonnet-5
 ---
 

@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.83.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.84.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 ## Agent Directory
 > ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
@@ -38,6 +38,8 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 | `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineag... |
 
+| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
+
 | `developer` | Feature-Implementierung und Bugfixes |
 
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
@@ -63,6 +65,10 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 | `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
 
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
+
+| `incident-responder` | Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schri... |
+
+| `intern-developer` | [EASTER EGG / GAG] Der übereifrige Praktikant |
 
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
 
@@ -197,7 +203,6 @@ MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
 
 
 
-
 ## Git Delegation
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
 
@@ -205,13 +210,12 @@ Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) i
 
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 
-{{#unless NATIVE_EXTENSIONS_ENABLED}}
-Native Extensions deaktiviert.
-{{/unless}}
 
-{{#unless ORCH_MODE_MAIN_CHAT}}
+
+
+
 Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
-{{/unless}}
+
 
 
 
@@ -462,8 +466,20 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 
-{{/if}}
+
 <!-- agent-meta:managed-end -->
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -501,6 +517,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `continue-expert.md` → registriere als `continue-expert`
    - `copilot-expert.md` → registriere als `copilot-expert`
    - `data-engineer.md` → registriere als `data-engineer`
+   - `dependency-auditor.md` → registriere als `dependency-auditor`
    - `developer.md` → registriere als `developer`
    - `devops-engineer.md` → registriere als `devops-engineer`
    - `docker.md` → registriere als `docker`
@@ -514,6 +531,8 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `gemini-expert.md` → registriere als `gemini-expert`
    - `git.md` → registriere als `git`
    - `ideation.md` → registriere als `ideation`
+   - `incident-responder.md` → registriere als `incident-responder`
+   - `intern-developer.md` → registriere als `intern-developer`
    - `junior-developer.md` → registriere als `junior-developer`
    - `knowledge-curator.md` → registriere als `knowledge-curator`
    - `knowledge-gardener.md` → registriere als `knowledge-gardener`
@@ -552,6 +571,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="continue-expert", ...)
    define_subagent(name="copilot-expert", ...)
    define_subagent(name="data-engineer", ...)
+   define_subagent(name="dependency-auditor", ...)
    define_subagent(name="developer", ...)
    define_subagent(name="devops-engineer", ...)
    define_subagent(name="docker", ...)
@@ -565,6 +585,8 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="gemini-expert", ...)
    define_subagent(name="git", ...)
    define_subagent(name="ideation", ...)
+   define_subagent(name="incident-responder", ...)
+   define_subagent(name="intern-developer", ...)
    define_subagent(name="junior-developer", ...)
    define_subagent(name="knowledge-curator", ...)
    define_subagent(name="knowledge-gardener", ...)

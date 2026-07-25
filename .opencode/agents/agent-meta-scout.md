@@ -1,8 +1,10 @@
 ---
 name: agent-meta-scout
+version: 1.1.3
 description: Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows.
   Evaluates candidates and makes concrete extension proposals for agent-meta.
 prompt_mode: modern
+generated-from: 1-generic/agent-meta-scout.md@1.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
@@ -68,7 +70,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.82.0)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.84.0)
 
 **Existing skills:** see `.agent-meta/config/skills-registry.yaml`
 </context>

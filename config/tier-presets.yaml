@@ -44,6 +44,7 @@ Normal:
         balanced: claude-sonnet-5
         powerful: claude-opus-4-8
         max: claude-opus-4-8
+        ultra: claude-opus-5
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -51,13 +52,15 @@ Normal:
         balanced: gemini-3.1-pro-low
         powerful: gemini-3.1-pro-high
         max: gemini-3.1-pro-high
+        ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4-flash
         fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/qwen3.7-plus
+        balanced: deepseek-v4-pro
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
+        ultra: kimi-k3
 Advanced:
   description: Shifft alles eine Stufe nach oben.
   tiers:

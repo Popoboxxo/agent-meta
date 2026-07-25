@@ -274,7 +274,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | `sync-on-config-change.sh` | PostToolUse | Triggers sync.py re-run when `.meta-config/project.yaml` changes (detects via Write/Edit tools) |
 | `viz-log.sh` | Events | Logs agent events to viz event file for dashboard tracking |
 
-## MCP Servers (4 servers)
+## MCP Servers (7 servers)
 
 | Server | Transport | Description |
 |--------|-----------|-------------|
@@ -282,6 +282,9 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **influxdb** | stdio | Time-series queries (Flux, write blocked) |
 | **viz-logger** | stdio | Agent event logging (log_viz_event) |
 | **a2a-handoff** | stdio | A2A schema validation (validate_handoff, resolve_handoff) |
+| **honcho** | SSE | Persistent memory and context storage across sessions |
+| **reqogniloom** | SSE | Requirements, architecture, tests, and traceability platform |
+| **playwright** | stdio | E2E browser automation, snapshots, and accessibility audits |
 
 ## Admin UI Features
 
@@ -403,7 +406,7 @@ config/
   dod-presets.yaml           # 6 DoD presets
   tier-presets.yaml          # 5 tier presets (cheap, normal, advanced, expensive)
   ai-providers.yaml          # 6 provider configs (Claude, Gemini, Opencode, Continue, Copilot, Mammouth)
-  mcp-registry.yaml          # 4 MCP server configs
+  mcp-registry.yaml          # 7 MCP server configs
   generated/
     model-registry.json      # Cached real models (338+ models from APIs)
   model-curation.yaml        # Model visibility: blacklist and disabled lists
@@ -421,6 +424,7 @@ scripts/
     curation.py              # Model visibility management
     delegation_syntax.py     # PAL engine (placeholder substitution)
     bootstrap.py             # Provider bootstrap (Gemini API, Continue config)
+    mcp.py                   # MCP rules and config injection
 snippets/                    # Language-specific code snippets
   developer/, tester/, orchestrator/
 external/                    # Git submodules for external skills

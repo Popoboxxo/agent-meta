@@ -6,6 +6,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funkti
   Anpassung von agent-meta.'
 hint: 'Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices'
 based-on: 1-generic/provider-expert.md@1.0.0
+generated-from: 2-platform/agent-meta-mammouth-expert.md@1.0.0
 ---
 # Role: Mammouth Code Expert
 

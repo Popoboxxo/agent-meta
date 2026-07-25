@@ -10,7 +10,7 @@ tools:
 - Read
 - WebFetch
 - TodoWrite
-generated-from: 1-generic-modern/meta-feedback.md@2.1.3
+generated-from: 1-generic/meta-feedback.md@2.1.3
 model: claude-haiku-4-5-20251001
 ---
 
@@ -67,7 +67,7 @@ Full body templates: `.claude/snippets/meta-feedback-templates.md`.
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.82.0)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.84.0)
 
 **Scope split:**
 

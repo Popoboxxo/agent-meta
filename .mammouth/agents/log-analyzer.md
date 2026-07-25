@@ -7,6 +7,7 @@ description: 'Analyzes system and application logs: frequency clustering, severi
 hint: 'Log analysis: cluster errors, classify severity (RFC 5424), delegate findings
   as issues or tasks'
 prompt_mode: modern
+generated-from: 1-generic/log-analyzer.md@1.1.3
 ---
 > **Extension:** If `.mammouth/3-project/am-log-analyzer-ext.md` exists → read and apply immediately.
 

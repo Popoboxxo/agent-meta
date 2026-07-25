@@ -6,6 +6,7 @@ description: Complex features, architecture decisions, hard bugs and cross-cutti
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
   — analyzes first, then implements'
 prompt_mode: modern
+generated-from: 1-generic/senior-developer.md@1.2.0
 ---
 > **Extension:** If `.mammouth/3-project/am-senior-developer-ext.md` exists → read and apply immediately.
 

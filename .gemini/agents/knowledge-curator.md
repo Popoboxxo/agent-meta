@@ -4,6 +4,10 @@ version: 1.0.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 hint: Wiki-Strategie, Schema-Evolution, OKF-Compliance
+tools:
+- Read
+- Write
+- TodoWrite
 generated-from: 1-generic/knowledge-curator.md@1.0.0
 model: gemini-3.1-pro-low
 ---

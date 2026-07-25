@@ -1,4 +1,2 @@
-dod-push-check.sh
-lifecycle-check.sh
 orchestrator-guard.sh
-sync-on-config-change.sh
+viz-log.sh

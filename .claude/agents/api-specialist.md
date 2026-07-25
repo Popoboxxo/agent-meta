@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic-modern/api-specialist.md@1.1.3
+generated-from: 1-generic/api-specialist.md@1.1.3
 model: claude-sonnet-5
 memory: project
 ---

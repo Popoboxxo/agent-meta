@@ -4,8 +4,12 @@ version: 1.3.1
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/git.md@1.3.1
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/git.md@1.3.1
 model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

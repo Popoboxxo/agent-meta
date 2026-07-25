@@ -9,8 +9,14 @@ hint: 'Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lin
   Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/data-engineer.md@0.1.0
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/data-engineer.md@0.1.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

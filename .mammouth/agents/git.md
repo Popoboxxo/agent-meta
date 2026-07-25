@@ -3,6 +3,7 @@ name: git
 version: 1.3.1
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
+generated-from: 1-generic/git.md@1.3.1
 ---
 > **Extension:** If `.mammouth/3-project/am-git-ext.md` exists → read and apply immediately.
 

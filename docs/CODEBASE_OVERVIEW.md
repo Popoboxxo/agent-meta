@@ -865,7 +865,7 @@ disabled: []                         # hidden in UI, aber in registry
 
 ---
 
-## 8. Scripts (überarbeitet)
+## 9. Scripts
 
 ### `scripts/sync.py`
 
@@ -986,6 +986,24 @@ Die Auflösungslogik ist identisch mit der in `scripts/lib/agents.py` (`_compose
 - Höhere Zuverlässigkeit durch MCP-Tools (keine Bash-Bestätigungs-Popups bei Copilot, Continue, Claude Code)
 - Robustes Cross-Process File-Locking mit Exponential Backoff gegen Windows `PermissionError`
 - Explizites Handshake-Tracking via `task_id`/`caller`/`target` für lückenlose Delegationspfade
+
+### `scripts/lib/mcp.py`
+
+**Zweck:** Zentrale Verwaltung und Generierung der MCP-Server-Integrationen aus der `config/mcp-registry.yaml`.
+
+**Hauptfunktionen:**
+- `load_mcp_registry()`: Lädt und mergt globale und projektspezifische MCP-Registries.
+- `resolve_active_mcp_servers()`: Bestimmt aktive Server (explizit aus `project.yaml` und implizit über Provider-Defaults).
+- `generate_mcp_artifacts()`: Generiert Markdown-Regeldateien (`mcp-<server>.md`) pro Provider und fügt Provider-Konfigurationen (wie `mcpServers` in `settings.json`) ein.
+- `init_secrets_template()`: Erstellt die lokale, gitignorierte `.meta-config/secrets.local.yaml` für MCP-bezogene Secrets (z.B. API-Keys).
+
+**Integrierte MCP-Server (Registry):**
+- **ReqogniLoom:** Plattform für Requirements-Engineering, Architektur, Tests und Traceability (via SSE).
+- **Honcho:** Lokaler Memory- und Kontext-Server für persistente Cross-Session-Speicherung (via SSE).
+- **Home Assistant:** Smart Home Integration (Read-only).
+- **InfluxDB:** Zeitreihendaten-Analyse (Read-only via Flux).
+- **Playwright:** E2E-Tests und Browser-Automatisierung.
+- Weitere System-MCPs wie `viz-logger` und `a2a-handoff`.
 
 ### `scripts/lib/pipelines.py`
 

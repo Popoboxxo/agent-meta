@@ -1,10 +1,12 @@
 ---
 name: validator
+version: 4.1.1
 description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions.
   Does NOT judge code quality — that''s code-reviewer.'
 prompt_mode: modern
+generated-from: 1-generic/validator.md@4.1.1
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   bash: allow
   read: allow

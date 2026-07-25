@@ -1,8 +1,10 @@
 ---
 name: junior-developer
+version: 1.2.0
 description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates
   in a structured way as soon as scope grows.'
 prompt_mode: modern
+generated-from: 1-generic/junior-developer.md@1.2.0
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

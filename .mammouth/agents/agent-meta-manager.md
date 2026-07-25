@@ -5,6 +5,7 @@ description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-sp
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
 prompt_mode: modern
+generated-from: 1-generic/agent-meta-manager.md@1.11.1
 ---
 > **Extension:** If `.mammouth/3-project/am-agent-meta-manager-ext.md` exists → read and apply immediately.
 
@@ -145,7 +146,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.80.0 (2026-07-22)
+**Version info:** v0.84.0 (2026-07-25)
 </context>
 
 <tools>

@@ -6,9 +6,15 @@ description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-sp
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
 prompt_mode: modern
 tools:
-- code_execution
-- url_context
-generated-from: 1-generic-modern/agent-meta-manager.md@1.11.1
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
+generated-from: 1-generic/agent-meta-manager.md@1.11.1
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -152,7 +158,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.83.0 (2026-07-25)
+**Version info:** v0.84.0 (2026-07-25)
 </context>
 
 <tools>

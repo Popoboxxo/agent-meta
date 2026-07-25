@@ -1,8 +1,10 @@
 ---
 name: export-manager
+version: 1.1.3
 description: Reads .meta-config/export.yaml and routes structured JSON payloads from
   specialist agents to the configured target (markdown, confluence, jira-xray, etc.).
 prompt_mode: modern
+generated-from: 1-generic/export-manager.md@1.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

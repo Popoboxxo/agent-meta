@@ -1,10 +1,12 @@
 ---
 name: ideation
+version: 1.6.2
 description: Idea generation, vision sharpening and concept concretization — asks
   questions, thinks around corners, hands mature ideas to Requirements.
 prompt_mode: modern
+generated-from: 1-generic/ideation.md@1.6.2
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

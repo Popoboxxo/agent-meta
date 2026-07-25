@@ -8,8 +8,14 @@ hint: 'Accessibility-Audit: WCAG 2.1/2.2, ARIA, Keyboard-Nav, Screenreader-Guide
   Kontrast, Focus-Management, A11y-Tree — Findings mit A/AA/AAA-Severity'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/accessibility-specialist.md@0.1.0
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/accessibility-specialist.md@0.1.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

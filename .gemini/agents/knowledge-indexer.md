@@ -4,6 +4,10 @@ version: 1.0.0
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
 hint: index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten
+tools:
+- Read
+- Write
+- Edit
 generated-from: 1-generic/knowledge-indexer.md@1.0.0
 model: gemini-3.5-flash-medium
 ---

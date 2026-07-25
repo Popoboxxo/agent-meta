@@ -5,7 +5,12 @@ description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge 
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 hint: Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)
 tools:
-- code_execution
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
 generated-from: 1-generic/knowledge-migrator.md@1.0.0
 model: gemini-3.1-pro-low
 ---

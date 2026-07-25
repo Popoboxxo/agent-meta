@@ -47,7 +47,7 @@ platforms:
 mcp-servers:
 - honcho
 - playwright
-- reqflow
+- reqogniloom
 roles:
 - orchestrator
 - developer
@@ -97,6 +97,9 @@ roles:
 - knowledge-indexer
 - knowledge-gardener
 - knowledge-migrator
+- dependency-auditor
+- incident-responder
+- intern-developer
 project:
   name: agent-meta
   prefix: am

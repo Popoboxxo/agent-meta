@@ -1,8 +1,10 @@
 ---
 name: senior-developer
+version: 1.2.0
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 prompt_mode: modern
+generated-from: 1-generic/senior-developer.md@1.2.0
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:

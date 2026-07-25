@@ -6,8 +6,13 @@ description: Reads .meta-config/export.yaml and routes structured JSON payloads 
 hint: Use this agent for export routing of structured data to configured targets.
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/export-manager.md@1.1.3
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
+generated-from: 1-generic/export-manager.md@1.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

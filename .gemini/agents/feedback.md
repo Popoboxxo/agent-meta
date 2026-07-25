@@ -8,8 +8,12 @@ hint: 'Project feedback: submit bugs, features, improvements as standardized Git
   issues — always before git'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/feedback.md@1.2.3
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/feedback.md@1.2.3
 model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

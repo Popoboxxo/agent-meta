@@ -6,6 +6,7 @@ description: 'Full feature lifecycle: Branch → Requirements → TDD → Implem
 hint: 'Feature lifecycle subagent: Branch → REQ → TDD → Dev → Validate → PR. Started
   by the orchestrator, not directly by the user.'
 prompt_mode: modern
+generated-from: 1-generic/feature.md@1.10.1
 ---
 > **Extension:** If `.mammouth/3-project/am-feature-ext.md` exists → read and apply immediately.
 

@@ -6,6 +6,7 @@ description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwri
 hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit
   — nicht für Unit-Tests'
 prompt_mode: modern
+generated-from: 1-generic/e2e-tester.md@1.0.0
 ---
 > **Extension:** If `.mammouth/3-project/am-e2e-tester-ext.md` exists → read and apply immediately.
 

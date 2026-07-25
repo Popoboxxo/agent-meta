@@ -8,6 +8,7 @@ description: ETL/ELT pipeline design, data-layer schema migration, data quality 
 hint: 'Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage,
   Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer'
 prompt_mode: modern
+generated-from: 1-generic/data-engineer.md@0.1.0
 ---
 > **Extension:** If `.mammouth/3-project/am-data-engineer-ext.md` exists → read and apply immediately.
 

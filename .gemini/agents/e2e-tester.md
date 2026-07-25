@@ -7,8 +7,14 @@ hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audi
   — nicht für Unit-Tests'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/e2e-tester.md@1.0.0
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/e2e-tester.md@1.0.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

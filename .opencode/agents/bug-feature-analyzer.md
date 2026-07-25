@@ -1,8 +1,10 @@
 ---
 name: bug-feature-analyzer
+version: 1.1.3
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 prompt_mode: modern
+generated-from: 1-generic/bug-feature-analyzer.md@1.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

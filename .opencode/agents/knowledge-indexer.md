@@ -1,7 +1,9 @@
 ---
 name: knowledge-indexer
+version: 1.0.0
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
+generated-from: 1-generic/knowledge-indexer.md@1.0.0
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

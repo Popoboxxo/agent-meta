@@ -10,7 +10,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/explorer.md@1.0.1
+generated-from: 1-generic/explorer.md@1.0.1
 model: claude-haiku-4-5-20251001
 ---
 

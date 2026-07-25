@@ -7,8 +7,12 @@ hint: 'Internal quality checker: DoD checklist, traceability audit. Invoked by t
   orchestrator after implementation. Not for direct user questions or setup help.'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/validator.md@4.1.1
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/validator.md@4.1.1
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

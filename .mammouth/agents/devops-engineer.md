@@ -5,6 +5,7 @@ description: CI/CD pipelines, Infrastructure as Code, container orchestration, o
   and security best practices.
 hint: Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks.
 prompt_mode: modern
+generated-from: 1-generic/devops-engineer.md@1.1.3
 ---
 > **Extension:** If `.mammouth/3-project/am-devops-engineer-ext.md` exists → read and apply immediately.
 

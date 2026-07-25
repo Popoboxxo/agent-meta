@@ -1,10 +1,12 @@
 ---
 name: api-specialist
+version: 1.1.3
 description: API design, OpenAPI specifications, contract-first development. Creates
   and maintains API contracts.
 prompt_mode: modern
+generated-from: 1-generic/api-specialist.md@1.1.3
 mode: subagent
-model: opencode-go/qwen3.7-plus
+model: deepseek-v4-pro
 permission:
   read: allow
   edit: allow

@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic-modern/validator.md@4.1.1
+generated-from: 1-generic/validator.md@4.1.1
 model: claude-sonnet-5
 memory: project
 permissionMode: plan

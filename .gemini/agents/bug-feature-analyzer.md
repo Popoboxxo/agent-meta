@@ -7,8 +7,12 @@ hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope â€
   developer/feature delegation'
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/bug-feature-analyzer.md@1.1.3
+- Read
+- Glob
+- Grep
+- Bash
+- TodoWrite
+generated-from: 1-generic/bug-feature-analyzer.md@1.1.3
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert â€” er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

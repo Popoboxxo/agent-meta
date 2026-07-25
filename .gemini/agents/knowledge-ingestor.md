@@ -4,6 +4,12 @@ version: 1.0.0
 description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren,
   Cross-References pflegen.
 hint: Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
 generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 model: gemini-3.1-pro-low
 ---

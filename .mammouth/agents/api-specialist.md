@@ -5,6 +5,7 @@ description: API design, OpenAPI specifications, contract-first development. Cre
   and maintains API contracts.
 hint: Use this agent for API design, OpenAPI specifications, and contract-first development.
 prompt_mode: modern
+generated-from: 1-generic/api-specialist.md@1.1.3
 ---
 > **Extension:** If `.mammouth/3-project/am-api-specialist-ext.md` exists → read and apply immediately.
 

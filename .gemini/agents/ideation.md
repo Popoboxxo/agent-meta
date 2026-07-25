@@ -6,9 +6,14 @@ description: Idea generation, vision sharpening and concept concretization — a
 hint: Explore new ideas, sharpen vision, hand off to requirements
 prompt_mode: modern
 tools:
-- google_search
-- url_context
-generated-from: 1-generic-modern/ideation.md@1.6.2
+- Read
+- Write
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- TodoWrite
+generated-from: 1-generic/ideation.md@1.6.2
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

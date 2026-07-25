@@ -1,7 +1,9 @@
 ---
 name: release
+version: 1.4.3
 description: Manage versioning, changelogs, build processes and GitHub releases.
 prompt_mode: modern
+generated-from: 1-generic/release.md@1.4.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

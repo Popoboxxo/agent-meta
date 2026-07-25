@@ -1,9 +1,11 @@
 ---
 name: feedback
+version: 1.2.3
 description: Standardizes bug reports, feature requests, and improvement suggestions
   for the deployed project — categorized, prepared, and submitted directly as a GitHub
   issue.
 prompt_mode: modern
+generated-from: 1-generic/feedback.md@1.2.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

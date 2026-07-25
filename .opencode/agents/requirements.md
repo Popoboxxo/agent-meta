@@ -1,8 +1,10 @@
 ---
 name: requirements
+version: 1.4.3
 description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check
   traceability.
 prompt_mode: modern
+generated-from: 1-generic/requirements.md@1.4.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

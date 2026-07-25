@@ -1,8 +1,10 @@
 ---
 name: performance-optimizer
+version: 1.2.0
 description: Data-driven identification and resolution of Big-O bottlenecks using
   profiling data, without functional changes.
 prompt_mode: modern
+generated-from: 1-generic/performance-optimizer.md@1.2.0
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:

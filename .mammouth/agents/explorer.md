@@ -5,6 +5,7 @@ description: Read-only codebase research, dependency and impact mapping, file an
   symbol search.
 hint: Analyze codebase / dependencies / impact — read-only, delegates findings
 prompt_mode: modern
+generated-from: 1-generic/explorer.md@1.0.1
 ---
 > **Extension:** If `.mammouth/3-project/am-explorer-ext.md` exists → read and apply immediately.
 

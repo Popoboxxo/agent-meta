@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic-modern/agent-meta-manager.md@1.11.1
+generated-from: 1-generic/agent-meta-manager.md@1.11.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -158,7 +158,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.82.0 (2026-07-24)
+**Version info:** v0.84.0 (2026-07-25)
 </context>
 
 <tools>

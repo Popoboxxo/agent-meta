@@ -1,8 +1,10 @@
 ---
 name: continue-expert
+version: 1.0.0
 description: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise,
   Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
+generated-from: 2-platform/agent-meta-continue-expert.md@1.0.0
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:

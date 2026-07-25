@@ -7,6 +7,7 @@ description: Standardizes bug reports, feature requests, and improvement suggest
 hint: 'Project feedback: submit bugs, features, improvements as standardized GitHub
   issues — always before git'
 prompt_mode: modern
+generated-from: 1-generic/feedback.md@1.2.3
 ---
 > **Extension:** If `.mammouth/3-project/am-feedback-ext.md` exists → read and apply immediately.
 

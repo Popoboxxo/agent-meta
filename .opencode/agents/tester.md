@@ -1,8 +1,10 @@
 ---
 name: tester
+version: 2.1.3
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 prompt_mode: modern
+generated-from: 1-generic/tester.md@2.1.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

@@ -7,8 +7,13 @@ hint: Use this agent for performance analysis, Big-O optimization, and bottlenec
   elimination.
 prompt_mode: modern
 tools:
-- code_execution
-generated-from: 1-generic-modern/performance-optimizer.md@1.2.0
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
+generated-from: 1-generic/performance-optimizer.md@1.2.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

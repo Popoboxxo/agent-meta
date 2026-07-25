@@ -7,7 +7,14 @@ description: 'External developer- and user-facing documentation: API references,
 hint: 'Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help,
   User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer'
 prompt_mode: modern
-generated-from: 1-generic-modern/technical-writer.md@0.1.0
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+generated-from: 1-generic/technical-writer.md@0.1.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

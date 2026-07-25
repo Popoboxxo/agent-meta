@@ -149,14 +149,20 @@ mcp-servers:
       type: sse
       url: '{{MCP_HONCHO_URL}}'
       headers:
-        X-API-Key: '{{MCP_HONCHO_API_KEY}}'
+        Authorization: 'Bearer {{MCP_HONCHO_API_KEY}}'
+        X-Honcho-User-Name: '{{MCP_HONCHO_USER_NAME}}'
+        X-Honcho-Assistant-Name: '{{MCP_HONCHO_ASSISTANT_NAME}}'
+        X-Honcho-Workspace-ID: '{{MCP_HONCHO_WORKSPACE_ID}}'
     secrets:
     - MCP_HONCHO_URL
     - MCP_HONCHO_API_KEY
+    - MCP_HONCHO_USER_NAME
+    - MCP_HONCHO_ASSISTANT_NAME
+    - MCP_HONCHO_WORKSPACE_ID
     provider-skip:
     - Opencode  # @honcho-ai/opencode-honcho plugin handles this provider natively
-  reqflow:
-    description: ReqFlow requirements-engineering platform — requirements, architecture,
+  reqogniloom:
+    description: ReqogniLoom requirements-engineering platform — requirements, architecture,
       tests, traceability and AI-assisted derivation
     category: requirements
     enabled-by-default: false
@@ -235,7 +241,7 @@ mcp-servers:
       - user.assign_role
       - user.list
       - user.deactivate
-    agent-hint: 'ReqFlow ist die Single-Source-of-Truth für Requirements, Architektur und Test-Traceability. Verwende es immer, wenn du Features validieren oder Architekturentscheidungen nachvollziehen musst.
+    agent-hint: 'ReqogniLoom ist die Single-Source-of-Truth für Requirements, Architektur und Test-Traceability. Verwende es immer, wenn du Features validieren oder Architekturentscheidungen nachvollziehen musst.
 
       requirement.query/get: Wann nutzen? Zu Beginn jeder Aufgabe, um Anforderungen und deren Kontext zu verstehen.
       requirement.create/update/decompose/derive: Wann nutzen? Während der Planungsphase, um große Features in überprüfbare Requirements zu zerlegen.
@@ -248,12 +254,18 @@ mcp-servers:
       '
     connection:
       type: sse
-      url: '{{MCP_REQFLOW_URL}}/mcp/sse/'
+      url: '{{MCP_REQOGNILOOM_URL}}/mcp/sse/'
       headers:
-        X-API-Key: '{{MCP_REQFLOW_API_KEY}}'
+        Authorization: 'Bearer {{MCP_REQOGNILOOM_API_KEY}}'
+        X-Project-ID: '{{MCP_REQOGNILOOM_PROJECT_ID}}'
+        X-User-ID: '{{MCP_REQOGNILOOM_USER_ID}}'
+        X-Workspace-ID: '{{MCP_REQOGNILOOM_WORKSPACE_ID}}'
     secrets:
-    - MCP_REQFLOW_URL
-    - MCP_REQFLOW_API_KEY
+    - MCP_REQOGNILOOM_URL
+    - MCP_REQOGNILOOM_API_KEY
+    - MCP_REQOGNILOOM_PROJECT_ID
+    - MCP_REQOGNILOOM_USER_ID
+    - MCP_REQOGNILOOM_WORKSPACE_ID
   playwright:
     description: Playwright MCP Server für Browser-Automation und E2E-Tests
     category: testing

@@ -52,7 +52,7 @@
 ## [0.81.0] - 2026-07-22
 
 ### Added
-- Optional, self-hostable `reqflow` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqFlow's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqflow-setup.md`, secrets template entries `MCP_REQFLOW_URL` / `MCP_REQFLOW_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
+- Optional, self-hostable `reqogniloom` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqogniLoom's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqogniloom-setup.md`, secrets template entries `MCP_REQOGNILOOM_URL` / `MCP_REQOGNILOOM_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
 - Optional `role-group` field on agent roles, with a corresponding filter control in the Admin UI (`config/role-defaults.yaml`, `docs/ui/admin-ui.html`).
 - Codeberg added as a supported Git platform (`config/project-config.schema.json`, `howto/setup/first-steps.md`, `scripts/lib/setup.py`).
 

@@ -6,9 +6,13 @@ description: 'Generic concept critic: reviews design docs and concepts for compl
 hint: 'Review concept/design doc: completeness, logic, risks, Approve/Iterate'
 prompt_mode: modern
 tools:
-- google_search
-- url_context
-generated-from: 1-generic-modern/concept-reviewer.md@1.0.2
+- Read
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- TodoWrite
+generated-from: 1-generic/concept-reviewer.md@1.0.2
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

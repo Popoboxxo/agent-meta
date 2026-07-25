@@ -10,12 +10,15 @@
         "@playwright/mcp@latest"
       ]
     },
-    "reqflow": {
+    "reqogniloom": {
       "type": "remote",
       "enabled": true,
-      "url": "{env:MCP_REQFLOW_URL}/mcp/sse/",
+      "url": "{env:MCP_REQOGNILOOM_URL}/mcp/sse/",
       "headers": {
-        "X-API-Key": "{env:MCP_REQFLOW_API_KEY}"
+        "Authorization": "Bearer {env:MCP_REQOGNILOOM_API_KEY}",
+        "X-Project-ID": "{env:MCP_REQOGNILOOM_PROJECT_ID}",
+        "X-User-ID": "{env:MCP_REQOGNILOOM_USER_ID}",
+        "X-Workspace-ID": "{env:MCP_REQOGNILOOM_WORKSPACE_ID}"
       }
     },
     "viz-logger": {
