@@ -1131,6 +1131,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 payload["project_admin_available"] = project_yaml.exists()
             return self._send_json(payload)
 
+        if path == "/api/project":
+            project_data = self.__class__.config_manager.read("project").get("project", {})
+            return self._send_json({"project": {
+                "name": project_data.get("name", ""),
+                "version": project_data.get("version", ""),
+                "id-prefix": project_data.get("id-prefix", project_data.get("prefix", ""))
+            }})
+
         if path.startswith("/api/config/"):
             key = path[len("/api/config/"):]
             data = self.__class__.config_manager.read(key)
@@ -1282,7 +1290,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             body = self._read_body()
             if body is None:
                 raise ValueError("empty body")
-            result = self.__class__.config_manager.write(key, body)
+            if key == "project":
+                existing = self.__class__.config_manager.read("project")
+                self._deep_merge(existing, body)
+                result = self.__class__.config_manager.write("project", existing)
+            else:
+                result = self.__class__.config_manager.write(key, body)
             return self._send_json(result)
 
         if path.startswith("/api/agent-template/"):

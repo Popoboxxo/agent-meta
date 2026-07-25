@@ -1272,6 +1272,11 @@ def sync_agents_for_provider(
             content = _remove_frontmatter_fields(content, ['tools'])
             body = _strip_frontmatter(content)
             body = _strip_claude_specific_lines(body)
+            
+            # Sanitize standalone --- in the body to avoid breaking Continue's YAML parsing
+            import re as _re
+            body = _re.sub(r'(?m)^---$', '___', body)
+            
             fm_end = content.find('\n---', 3)
             if fm_end != -1:
                 content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
@@ -1331,11 +1336,7 @@ def sync_agents_for_provider(
                     _gemini_valid_tools = _validate_tools_against_whitelist(
                         _gemini_tools, provider, agent_meta_root, log, role,
                     )
-                    _mapped_gemini_tools = _map_claude_tools_to_gemini_tools(_gemini_valid_tools)
-                    if _mapped_gemini_tools:
-                        content = _update_frontmatter_dict(content, {'tools': _mapped_gemini_tools})
-                    else:
-                        content = _remove_frontmatter_fields(content, ['tools'])
+                    content = _update_frontmatter_dict(content, {'tools': _gemini_valid_tools})
                 content = _remove_frontmatter_fields(
                     content,
                     [
@@ -1411,6 +1412,8 @@ def sync_agents_for_provider(
                 fm_end = content.find('\n---', 3)
                 if fm_end != -1:
                     content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+                else:
+                    content = body.lstrip('\n')
 
             elif provider == 'Mammouth':
                 # Mammouth Code: terminal-based agent, similar to Copilot.
@@ -1426,6 +1429,8 @@ def sync_agents_for_provider(
                 fm_end = content.find('\n---', 3)
                 if fm_end != -1:
                     content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+                else:
+                    content = body.lstrip('\n')
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         # Applies to ALL providers — every generated agent gets the viz reporting block
@@ -1721,6 +1726,10 @@ def _transform_frontmatter_for_opencode(
         "description": description,
         "mode": template_fm.get("mode") or "subagent",
     }
+    if template_fm.get("version"):
+        updates["version"] = template_fm.get("version")
+    if generated_from:
+        updates["generated-from"] = generated_from
     if model:
         updates["model"] = model
     if steps:
@@ -1751,10 +1760,8 @@ def _transform_frontmatter_for_opencode(
     if "max_tokens" in template_fm:
         updates["max_tokens"] = template_fm["max_tokens"]
 
-    # Remove fields not used by opencode
     removes = [
         "tools",
-        "generated-from",
         "generated_from",
         "permissionMode",
         "alwaysApply",
@@ -1762,7 +1769,6 @@ def _transform_frontmatter_for_opencode(
         "top_k",
         "stop_sequences",
         "max_output_tokens",
-        "version",
         "hint",
         "based-on",
         "based_on",

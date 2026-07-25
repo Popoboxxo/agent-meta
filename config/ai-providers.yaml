@@ -243,3 +243,38 @@ providers:
     orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
     model-tiers: {}
     model-aliases: {}
+
+  Mammouth:
+    agents_dir: .mammouth/agents
+    agent_ext: .md
+    context_file: MAMMOUTH.md
+    context_template: howto/configs/MAMMOUTH.project-template.md
+    has_rules: true
+    rules_dir: .mammouth/rules
+    has_hooks: true
+    has_commands: true
+    has_settings: true
+    capabilities:
+      - agents
+      - rules
+      - hooks
+      - commands
+      - settings
+      - snippets
+      - skills
+      - context-managed-block
+    artifact_dir: .mammouth/artifacts
+    checkpoint_dir: .meta-viz
+    isolation-dirs:
+      - .mammouth/
+      - MAMMOUTH.md
+    gitignore_entries:
+      - .mammouth/pending-tasks.md
+    mcp-config: {}
+    skills_dir: .mammouth/skills
+    snippets_dir: .mammouth/snippets
+    pending_tasks_file: .mammouth/pending-tasks.md
+    extension_dir: .mammouth/3-project
+    orchestrator_hint: "- **In Mammouth:** Nutzt den Orchestrator-Agenten."
+    model-tiers: {}
+    model-aliases: {}

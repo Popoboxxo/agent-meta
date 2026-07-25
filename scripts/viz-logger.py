@@ -31,7 +31,15 @@ from pathlib import Path
 # the submodule directory instead of the host project root. In that case the
 # caller (e.g. admin-server.py's VizManager) must pass ``--root <project_root>``
 # so events land in the host project's ``.meta-viz/events.jsonl``.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+def _find_project_root(start_dir: Path) -> Path:
+    current = start_dir.resolve()
+    while current.parent != current:
+        if (current / ".meta-config").is_dir() or (current / ".meta-viz").is_dir() or (current / "project.yaml").exists():
+            return current
+        current = current.parent
+    return start_dir.parent.parent
+
+PROJECT_ROOT = _find_project_root(Path(__file__).parent)
 VIZ_DIR = PROJECT_ROOT / ".meta-viz"
 EVENT_LOG = VIZ_DIR / "events.jsonl"
 

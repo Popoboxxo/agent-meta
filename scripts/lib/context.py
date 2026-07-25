@@ -145,9 +145,9 @@ def _regenerate_static_context(
         log.info(rel_label, "no static template — skipping static regeneration")
         return
 
-    rendered = substitute(
-        template_path.read_text(encoding="utf-8"), variables, source_label, log
-    )
+    from .context_templates.builder import TemplateBuilder
+    builder = TemplateBuilder(template_path.parent)
+    rendered = builder.build(template_path.stem, variables)
     new_header, _tmpl_managed, new_footer = _split_context_file(rendered)
 
     existing = target_path.read_text(encoding="utf-8")
@@ -295,9 +295,10 @@ def _ensure_context_file(
         return
 
     if template_path and template_path.exists():
-        content = template_path.read_text(encoding="utf-8")
+        from .context_templates.builder import TemplateBuilder
+        builder = TemplateBuilder(template_path.parent)
+        content = builder.build(template_path.stem, variables)
         source_label = str(template_path.relative_to(agent_meta_root))
-        content = substitute(content, variables, source_label, log)
     else:
         project_name = config["project"]["name"]
         content = (
@@ -478,8 +479,9 @@ def _sync_opencode_context(
 
     if not target_path.exists():
         if template_path and template_path.exists():
-            ocontent = template_path.read_text(encoding="utf-8")
-            ocontent = substitute(ocontent, variables, template_name, log)
+            from .context_templates.builder import TemplateBuilder
+            builder = TemplateBuilder(template_path.parent)
+            ocontent = builder.build(template_path.stem, variables)
         else:
             project_name = config["project"]["name"]
             ocontent = (
@@ -617,10 +619,9 @@ def _sync_continue_context(
         template_path = agent_meta_root / pc["context_template"]
         if not ctx_path.exists():
             if template_path.exists():
-                ccontent = substitute(
-                    template_path.read_text(encoding="utf-8"),
-                    variables, pc["context_template"], log,
-                )
+                from .context_templates.builder import TemplateBuilder
+                builder = TemplateBuilder(template_path.parent)
+                ccontent = builder.build(template_path.stem, variables)
             else:
                 ccontent = (
                     f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"

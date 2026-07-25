@@ -21,15 +21,20 @@ class TemplateBuilder:
         return re.sub(r'\{\{>\s*(.+?)\s*\}\}', replace_partial, template_str)
 
     def resolve_conditionals(self, template_str: str, variables: dict) -> str:
-        pattern = r'\{\{#if\s+([A-Za-z0-9_]+)\}\}(.*?)(?:\{\{else\}\}(.*?))?\{\{/if\}\}'
+        pattern = r'\{\{#(if|unless)\s+([A-Za-z0-9_]+)\}\}((?:(?!\{\{#(?:if|unless)|\{\{/(?:if|unless)\}\}).)*?)(?:\{\{else\}\}((?:(?!\{\{#(?:if|unless)|\{\{/(?:if|unless)\}\}).)*?))?\{\{/(?:if|unless)\}\}'
         
         def repl(match):
-            var_name = match.group(1)
-            if_content = match.group(2)
-            else_content = match.group(3) or ""
+            cond_type = match.group(1)
+            var_name = match.group(2)
+            if_content = match.group(3)
+            else_content = match.group(4) or ""
             
             val = variables.get(var_name)
-            if val and str(val).lower() != 'false':
+            is_truthy = bool(val and str(val).lower() != 'false')
+            if cond_type == 'unless':
+                is_truthy = not is_truthy
+                
+            if is_truthy:
                 return if_content
             return else_content
             

@@ -929,8 +929,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Agent-Session Report und Visualisierung"
     )
-    parser.add_argument("--project-root", default=".",
+    parser.add_argument("--project-root", default=None,
                         help="Projekt-Root-Verzeichnis (default: current directory)")
+    parser.add_argument("--event-log", default=None,
+                        help="Alias/Fallback für Projekt-Root (default: None)")
     parser.add_argument("--session", default=None,
                         help="Session-ID (default: aktuellste)")
     parser.add_argument("--format", choices=["terminal", "html", "json"], default="terminal",
@@ -957,7 +959,17 @@ def main():
                         help="Debug-Logging aktivieren (ausfuehrliche Server-Logs)")
 
     args = parser.parse_args()
-    project_root = Path(args.project_root).resolve()
+    
+    root_path = args.project_root or args.event_log or "."
+    p = Path(root_path).resolve()
+    if p.is_file():
+        # If user passed path to events.jsonl, resolve to its parent's parent (.meta-viz -> root)
+        if p.parent.name == ".meta-viz":
+            project_root = p.parent.parent
+        else:
+            project_root = p.parent
+    else:
+        project_root = p
 
     if args.serve:
         serve_web(project_root, port=args.port, timeout_sec=args.timeout, debug=args.debug)

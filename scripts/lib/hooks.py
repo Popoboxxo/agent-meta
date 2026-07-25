@@ -250,10 +250,6 @@ def sync_hooks(
         layer = source_path.parts[-2]
         hook_stem = Path(output_name).stem
 
-        # Conditional hook: viz-log is only managed when viz mode is dynamic/full
-        if hook_stem == "viz-log" and not viz_active:
-            # Skip copying — do NOT add to now_managed so it gets deleted if stale
-            continue
 
         # Provider filter: skip hook if it declares a specific provider that doesn't match
         hook_provider = meta.get("provider", "")
