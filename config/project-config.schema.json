@@ -723,35 +723,7 @@
     "outcome-caching": {
       "$ref": "#/$defs/outcome-caching"
     },
-    "agent-prompts": {
-      "description": "Prompt-Mode-Konfiguration: legacy (Markdown), hybrid (auto-wrapped XML), modern (native 6-block XML).",
-      "type": "object",
-      "properties": {
-        "default": {
-          "type": "string",
-          "enum": [
-            "legacy",
-            "hybrid",
-            "modern"
-          ],
-          "default": "legacy",
-          "description": "Standard-Modus für alle Agenten ohne expliziten Override."
-        },
-        "modes": {
-          "type": "object",
-          "description": "Rollen-spezifische Overrides. Key = Rollenname, Value = Modus.",
-          "additionalProperties": {
-            "type": "string",
-            "enum": [
-              "legacy",
-              "hybrid",
-              "modern"
-            ]
-          }
-        }
-      },
-      "additionalProperties": false
-    },
+
     "cascades": {
       "description": "SE-Kaskaden-Definitionen (Phase 3+). First-Class neben quality-pipelines.",
       "type": "object",

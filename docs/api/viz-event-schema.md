@@ -120,26 +120,7 @@ Ein Agent delegiert an einen anderen Agenten (ausgehende Delegation).
 {"event":"delegate_out","ts":"2026-05-11T14:33:00+00:00","agent":"orchestrator","target":"developer","task_id":"550e8400-e29b-41d4-a716-446655440000","task":"Bugfix implementieren"}
 ```
 
----
 
-### `delegate` (Legacy Alias)
-
-Veraltertes Event-Format für Delegationen. Wird noch akzeptiert für Rückwärtskompatibilität, sollte aber durch `delegate_out` ersetzt werden.
-
-| Feld    | Typ    | Beschreibung                        |
-|---------|--------|-------------------------------------|
-| `event` | string | `delegate`                          |
-| `ts`    | string | ISO8601 Timestamp                   |
-| `from`  | string | Delegierender Agent.                |
-| `to`    | string | Ziel-Agent.                         |
-| `task`  | string | Optional. Aufgabenbeschreibung.     |
-
-**Beispiel (nicht empfohlen):**
-```json
-{"event":"delegate","ts":"2026-05-11T14:33:00+00:00","from":"orchestrator","to":"developer","task":"Bugfix implementieren"}
-```
-
----
 
 ### `tool_call`
 

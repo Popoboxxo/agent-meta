@@ -914,9 +914,19 @@ def main():
                                       log, args.dry_run, provider, provider_config)
         # Cleanup legacy files for removed providers
         all_known_providers = provider_config.keys()
+        active_context_files = set()
+        for prov in providers:
+            if prov == "providers": continue
+            if is_provider_active(config, prov):
+                pc = provider_config.get(prov, {})
+                c_file = pc.get("context_file", f"{prov.upper()}.md")
+                if c_file == "CLAUDE.md" and prov != "Claude":
+                    c_file = "AGENTS.md"
+                active_context_files.add(c_file)
+
         for prov in all_known_providers:
             if prov == "providers": continue # Skip the top-level key if present
-            if prov not in providers:
+            if prov not in providers or not is_provider_active(config, prov):
                 pc = provider_config.get(prov, {})
                 
                 # Default paths if missing from config
@@ -934,10 +944,25 @@ def main():
                     if not args.dry_run:
                         import shutil
                         shutil.rmtree(agents_dir)
-                if context_file.exists():
+                if context_file.exists() and c_file not in active_context_files:
                     log.action("DELETE", str(context_file.relative_to(project_root)), f"provider {prov} removed")
                     if not args.dry_run:
                         context_file.unlink()
+
+        for provider in providers:
+            pc = provider_config[provider]
+            if not is_provider_active(config, provider):
+                continue
+            
+            _orch_config = config.get("orchestrator", {})
+            _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+            if _provider_override and _provider_override.get("mode") is not None:
+                provider_variables = dict(variables)
+                provider_variables.update(
+                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
+                )
+            else:
+                provider_variables = variables
 
             sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                      log, args.dry_run, provider, provider_config,
@@ -947,7 +972,7 @@ def main():
                 sync_prompts_for_continue(agent_meta_root, project_root, config,
                                           provider_variables, log, args.dry_run,
                                           provider_config=provider_config)
-            if pc["has_rules"]:
+            if pc.get("has_rules", False):
                 sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                            platform_vars=platform_vars, variables=provider_variables,
                            rules_dir=pc.get("rules_dir"), provider=provider,
@@ -967,7 +992,7 @@ def main():
             for entry in mcp_extras:
                 if entry not in mcp_gitignore_extras:
                     mcp_gitignore_extras.append(entry)
-            if pc["has_hooks"]:
+            if pc.get("has_hooks", False):
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)
             else:

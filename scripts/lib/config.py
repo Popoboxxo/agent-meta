@@ -643,14 +643,6 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[enabled_key] = "false"
     except Exception:
         pass
-    # AGENT_PROMPTS: mode config for Modern/Hybrid/Legacy prompt rendering.
-    # Reads agent-prompts block: {default: legacy, modes: {developer: modern, ...}}
-    _ap = config.get("agent-prompts", {}) or {}
-    _ap_default = _ap.get("default", "legacy") if isinstance(_ap, dict) else "legacy"
-    _ap_modes = _ap.get("modes", {}) or {} if isinstance(_ap, dict) else {}
-    variables["AGENT_PROMPTS_DEFAULT"] = _ap_default
-    for _role, _mode in (_ap_modes.items() if isinstance(_ap_modes, dict) else {}.items()):
-        variables[f"AGENT_PROMPTS_MODE_{_role.upper().replace('-', '_')}"] = str(_mode)
 
     # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
     # Each block is either the real content or an empty string when the flag is off.

@@ -1370,98 +1370,6 @@ Die `input_schema`- und `output_schema`-Felder referenzieren JSON-Schemas für o
 
 ---
 
-## 12. Prompt-Modernisierung (Legacy / Hybrid / Modern)
-
-**Eingeführt:** v0.65.1 (2026-06-30) — Branch `feat/prompt-modernization-poc`
-**Session-Fixes:** 2026-07-01 (4 Commits: Template-Guard-Port, HITL-Deadlock-Fix, BARRIER-Refactor, Modern-Syntax-Fixes)
-
-Drei Rendering-Modi für Agenten-Templates, pro Rolle konfigurierbar in `.meta-config/project.yaml`:
-
-| Modus | Template-Quelle | Format | Aktive Rollen |
-|-------|----------------|--------|---------------|
-| `legacy` | `agents/1-generic/` | Markdown (unverändert) | alle (Default) |
-| `hybrid` | `agents/1-generic/` | Auto-XML-Wrap | geplant |
-| `modern` | `agents/1-generic-modern/` | natives 6-Block-XML | `developer`, `orchestrator` |
-
-### 12.1 6-Block-XML-Struktur
-
-Feste Reihenfolge (Recency-Bias-optimiert — `<constraints>` zuletzt):
-
-```
-<persona> → <workflow> → <context> → <tools> → <output_contract> → <constraints>
-```
-
-### 12.2 Implementierte Artefakte
-
-| Datei | Zweck |
-|-------|-------|
-| `agents/1-generic-modern/developer.md` | Modern-Template Developer (v3.0.0, −37% Tokens) |
-| `agents/1-generic-modern/orchestrator.md` | Modern-Template Orchestrator (v7.2.0, −61% Tokens) |
-| `agents/1-generic-modern/_reference-agent.md` | Referenz-Agent (v1.0.0, alle Features, didaktisch, nicht generiert) |
-| `config/prompt-modes.yaml` | Framework-Defaults |
-| `scripts/validate-modern-templates.py` | 6-Block-Validator (exit 0/1/2) |
-| `scripts/token-counter.py` | Token-Vergleich Legacy vs. Modern |
-| `scripts/lib/agents.py` | `_resolve_agent_source()`, `MODERN_DIR`, `[modern]`-Annotation |
-| `scripts/lib/log.py` | `N modern-mode template(s)` im SUMMARY |
-| `scripts/admin-server.py` | `/api/prompt-modes` Endpoint, `prompt_mode` in Hierarchy |
-| `docs/admin-ui.html` | Badges (modern/hybrid/legacy) + `/project/prompt-modes` Seite |
-| `scripts/lib/consistency/crossrefs.py` | `check_prompt_mode_consistency()` |
-| `docs/architecture/prompt-modernization.md` | Architektur-Dokumentation |
-
-### 12.3 Konfiguration
-
-```yaml
-# .meta-config/project.yaml
-agent-prompts:
-  default: legacy
-  modes:
-    developer: modern
-    orchestrator: modern
-```
-
-### 12.4 Tools
-
-```bash
-python scripts/validate-modern-templates.py --all --strict
-python scripts/token-counter.py --role orchestrator
-python scripts/consistency-check.py  # prüft prompt_mode vs. config
-```
-
-### 12.5 Session-Erkenntnisse: Template-Migration-Bugs (2026-07-01)
-
-**Root-Cause:** Beim Port von `agents/1-generic/orchestrator.md` (v6.0.0 legacy) nach `agents/1-generic-modern/orchestrator.md` (v7.x modern) gingen kritische `{{#if}}`-Conditional-Guards verloren.
-
-**Bugs behoben (4 Commits):**
-
-| Bug | Commit | Root-Cause | Fix |
-|-----|--------|-----------|-----|
-| SE-Flags konkateniert ("truefalsefalse" statt Blöcke) | 42963fe | Fehlende `{{#if CONDITION}}`-Guards um SE-Flag-Blöcke | Guards wiederhergestellt; DoD-Flags nun konditional statt statisch |
-| DoD-Flags statisch ("Pflicht" trotz `false`) | 42963fe | Guards gelöst + Seksektion "Template-Migration-Checkliste" in agent-meta-manager |  Checkliste verhindert Wiederholung |
-| HITL-Gate-Deadlock (endlos "bestätigen") | 139eab7 | Satz "zerstörerisch IMMER bestätigen" machte main_chat User-Freigabe ungültig | main_chat als legitimer User-Proxy etabliert; relayte Freigabe zählt |
-| A2A requires_human_approval missing | 3e19c9b | Regression ggü. Legacy v6.0.0 | In Modern v7.x portiert |
-| FANOUT-Threshold hardcoded >2 | 3e19c9b | Sollte `{{MAX_PARALLEL_AGENTS}}` sein | Platzhalter substituiert |
-| HITL-Gates in <workflow> statt <constraints> | 3e19c9b | Recency-Bias: wichtige Constraints sollen zuletzt | Gates in <constraints> umgezogen |
-| BARRIER-Protokoll passiv (warten) | 837587b | Sollte aktiv einsammeln | "Vorliegende Subagent-Ergebnisse SOFORT einsammeln" |
-
-**Prävention — neue Checkliste in `agents/1-generic/agent-meta-manager.md`:**
-
-Beim Port von Classic → Modern Templates:
-1. **{{#if}}-Guards erhalten** — nie Platzhalter direkt konkatenieren
-2. **Dry-Run Diff gegen Classic** — nach Port `git diff agents/1-generic/orchestrator.md agents/1-generic-modern/orchestrator.md`
-3. **6-Block-Struktur validieren** — `validate-modern-templates.py --strict`
-
-**Dokumentation:**
-
-Neuer Referenz-Agent `agents/1-generic-modern/_reference-agent.md` (v1.0.0, Underscore = nicht generiert) demonstriert:
-- Alle 6 Blöcke korrekt strukturiert
-- {{#if}}-Guards für conditional Sections
-- A2A-Envelope-Integration
-- HITL-Gates in <constraints>
-- BARRIER-Protokoll aktiv
-
-Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
-
----
 
 ## 13. Singleton-Orchestrator-Guard
 
@@ -1482,9 +1390,9 @@ Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
 |---------|-------|-------------|
 | Gate #5 (Doku) | `rules/1-generic/a2a-delegation-gates.md` | HARD REJECT bei `subagent_type="orchestrator"` durch Worker |
 | Body-Constraint | `scripts/lib/agents.py` (sync) | `SINGLETON_CONSTRAINT_BLOCK` wird in alle Worker-Agenten injiziert |
-| Orchestrator-Doku | `agents/1-generic/orchestrator.md` + `agents/1-generic-modern/orchestrator.md` | Singleton-Regel in `<persona>` + Bullet in Anti-Recursion-Sektion |
+| Orchestrator-Doku | `agents/1-generic/orchestrator.md` | Singleton-Regel in `<persona>` + Bullet in Anti-Recursion-Sektion |
 | Projekt-Hinweis | `CLAUDE.md` | Singleton-Regel nach Rollen-Tabelle |
-| HITL-Gate-Fix | `agents/1-generic/orchestrator.md` v6.2.0 + `agents/1-generic-modern/orchestrator.md` v7.2.0 | main_chat als User-Proxy: "seine Anweisungen und relayten Freigaben tragen User-Autorität" |
+| HITL-Gate-Fix | `agents/1-generic/orchestrator.md` | main_chat als User-Proxy: "seine Anweisungen und relayten Freigaben tragen User-Autorität" |
 
 ### 13.2 Singleton-Regel
 
@@ -1501,9 +1409,7 @@ Versionen aktuell: orchestrator.md v6.2.0 (legacy) + v7.2.0 (modern).
 - Orchestrator warnt für destruktive Ops TROTZDEM, respektiert aber main_chat-Freigabe
 - Schutzwirkung bleibt (Agenten-to-Agenten Freigaben sind weiter ungültig)
 
-**Betroffene Templates:** 
-- `agents/1-generic/orchestrator.md` v6.2.0 (Legacy): Schnittstellendokumentation
-- `agents/1-generic-modern/orchestrator.md` v7.2.0 (Modern): "<persona>"-Block nennt main_chat explizit
+- `agents/1-generic/orchestrator.md`: "<persona>"-Block nennt main_chat explizit
 
 Konzept: `docs/concepts/active/singleton-orchestrator-architecture.md`
 

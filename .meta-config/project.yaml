@@ -317,9 +317,7 @@ reflection-pairs:
       max_iterations: 5
       enabled: true
 tier-preset: Normal
-agent-prompts:
-  default: modern
-  modes: {}
+
 provider-deactivation:
   enabled: false
   mode: all

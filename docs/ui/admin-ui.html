@@ -1352,7 +1352,7 @@ function buildSidebar() {
         { route: "/project/backups", label: "Backups", icon: "💾" },
         { route: "/project/roles",     label: "Roles", icon: "⍟" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
-        { route: "/project/prompt-modes", label: "Prompt Modes", icon: "✍" },
+
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
         { route: "/project/model-overrides", label: "Model Overrides", icon: "★" },
         { route: "/project/provider-tier-overrides", label: "Provider Tier Overrides", icon: "❖" },
@@ -5152,169 +5152,7 @@ async function viewProjectOrchestrator() {
 }
 
 /* ------------------------------- Prompt Modes ----------------------------- */
-async function viewProjectPromptModes() {
-  const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Project — Prompt Modes"]));
-  wrap.appendChild(el("p", { class: "muted" }, [
-    "Configure which rendering mode each agent role uses. ",
-    el("strong", {}, ["legacy"]), " = unchanged Markdown (default). ",
-    el("strong", {}, ["hybrid"]), " = auto-wrapped XML sections. ",
-    el("strong", {}, ["modern"]), " = native 6-block XML (requires template in agents/1-generic-modern/).",
-  ]));
 
-  const data = await loadProject();
-  const ap = (data["agent-prompts"] && typeof data["agent-prompts"] === "object")
-    ? clone(data["agent-prompts"])
-    : {};
-  if (!ap.modes || typeof ap.modes !== "object") ap.modes = {};
-
-  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
-  wrap.appendChild(status);
-
-  const MODES = ["legacy", "hybrid", "modern"];
-
-  // ── Default Mode ──────────────────────────────────────────────────────────
-  const defaultPanel = el("div", { class: "panel" });
-  defaultPanel.appendChild(el("h2", {}, ["Default Mode"]));
-  defaultPanel.appendChild(el("p", { class: "muted" }, [
-    "Applied to all roles that have no explicit override below."
-  ]));
-  defaultPanel.appendChild(dropdownField(
-    "default",
-    MODES,
-    ap.default || "legacy",
-    v => { ap.default = v; },
-    { legacy: "legacy — unchanged Markdown", hybrid: "hybrid — auto-wrapped XML", modern: "modern — native 6-block XML" }
-  ));
-  wrap.appendChild(defaultPanel);
-
-  // ── Per-Role Overrides ────────────────────────────────────────────────────
-  const rolesPanel = el("div", { class: "panel" });
-  rolesPanel.appendChild(el("h2", {}, ["Per-Role Overrides"]));
-  rolesPanel.appendChild(el("p", { class: "muted" }, [
-    "Override the default for individual roles. Roles with a modern template available are marked with ★."
-  ]));
-
-  // Load available roles and modern templates in parallel
-  let activeRoles = [], modernTemplates = [];
-  try {
-    const [proj, templates] = await Promise.all([
-      api.get("/api/config/project").catch(() => ({})),
-      api.get("/api/agents/templates").catch(() => ({ templates: [] })),
-    ]);
-    activeRoles = Array.isArray(proj.roles) ? proj.roles.sort() : [];
-    // Modern templates come from 1-generic-modern/ — fetched via /api/prompt-modes
-    const pm = await api.get("/api/prompt-modes").catch(() => ({ modes: {} }));
-    // Build set of roles that have a modern template by checking hierarchy prompt_mode
-    const hier = await api.get("/api/agents/hierarchy").catch(() => ({ roles: [] }));
-    modernTemplates = (hier.roles || [])
-      .filter(r => {
-        // A modern template exists if the role can be set to modern
-        // (we detect by checking if 1-generic-modern dir has it — proxy: name in templates)
-        return true; // show all; mark with ★ if mode is "modern" anywhere
-      })
-      .map(r => r.name);
-  } catch { /* degraded */ }
-
-  // Check which roles actually have a modern template (via templates list from super-admin)
-  let modernAvailable = new Set();
-  try {
-    const tmplData = await api.get("/api/agents/templates").catch(() => ({ templates: [] }));
-    // templates lists 1-generic/ stems — we can't distinguish modern from legacy here
-    // Use the prompt_mode from hierarchy as proxy: if a role ever had modern set, mark it
-    const hier = await api.get("/api/agents/hierarchy").catch(() => ({ roles: [] }));
-    for (const r of (hier.roles || [])) {
-      // roles that have a modern template in 1-generic-modern/ will be settable
-      modernAvailable.add(r.name);
-    }
-  } catch { /* ok */ }
-
-  // Roles to show: union of active project roles + any already in ap.modes
-  const modesKeys = Object.keys(ap.modes);
-  const allRoles = [...new Set([...activeRoles, ...modesKeys])].sort();
-
-  if (allRoles.length === 0) {
-    rolesPanel.appendChild(el("div", { class: "muted" }, [
-      "No roles found. Add roles in Project → Roles first."
-    ]));
-  } else {
-    const table = el("table", { class: "data" });
-    const thead = el("thead");
-    thead.appendChild(el("tr", {}, [
-      el("th", {}, ["Role"]),
-      el("th", {}, ["Mode"]),
-      el("th", {}, ["Clear"]),
-    ]));
-    table.appendChild(thead);
-    const tbody = el("tbody");
-
-    for (const role of allRoles) {
-      const tr = el("tr");
-
-      // Role name + ★ if modern template known to exist (heuristic)
-      const hasModernTemplate = (ap.modes[role] === "modern") ||
-        (role === "orchestrator") || (role === "developer"); // known modern templates
-      const nameTd = el("td", {}, [
-        role,
-        hasModernTemplate ? el("span", { style: "color:var(--accent-yellow);margin-left:4px;", title: "Modern template available" }, [" ★"]) : "",
-      ]);
-      tr.appendChild(nameTd);
-
-      // Mode dropdown — blank = "use default"
-      const modeTd = el("td");
-      const sel = el("select", { class: "select" });
-      const currentMode = ap.modes[role] || "";
-      for (const [val, label] of [
-        ["", `(default: ${ap.default || "legacy"})`],
-        ["legacy", "legacy"],
-        ["hybrid", "hybrid"],
-        ["modern", "modern ★"],
-      ]) {
-        const o = el("option", { value: val }, [label]);
-        if (currentMode === val) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener("change", () => {
-        if (sel.value === "") {
-          delete ap.modes[role];
-        } else {
-          ap.modes[role] = sel.value;
-        }
-      });
-      modeTd.appendChild(sel);
-      tr.appendChild(modeTd);
-
-      // Clear button
-      const clearTd = el("td");
-      const clearBtn = el("button", { class: "btn btn-ghost", style: "padding:2px 8px;font-size:11px;", title: "Clear override" }, ["✕"]);
-      clearBtn.addEventListener("click", () => {
-        delete ap.modes[role];
-        sel.value = "";
-        toast(`Cleared override for ${role}`, "info", 1500);
-      });
-      clearTd.appendChild(clearBtn);
-      tr.appendChild(clearTd);
-
-      tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
-    rolesPanel.appendChild(table);
-  }
-  wrap.appendChild(rolesPanel);
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-  wrap.appendChild(el("div", { class: "btn-row" }, [
-    el("button", { class: "btn btn-primary", onclick: async () => {
-      // Strip empty modes object if nothing set
-      const payload = { default: ap.default || "legacy", modes: ap.modes };
-      if (Object.keys(payload.modes).length === 0) delete payload.modes;
-      try { await saveProjectSection("agent-prompts", payload, status); } catch { /* toast shown */ }
-    }}, ["Save"]),
-    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
-  ]));
-
-  return wrap;
-}
 
 /* ------------------------------- Viz & Admin ----------------------------- */
 async function viewProjectVizAdmin() {
@@ -7743,7 +7581,7 @@ async function init() {
   router.register("/project/backups", viewBackups);
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
-  router.register("/project/prompt-modes",    viewProjectPromptModes);
+
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/model-overrides", viewProjectModelOverrides);
   router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
@@ -7833,7 +7671,7 @@ init();
     "project/backups": "project_instance-backups",
     "project/roles": "project_instance-roles",
     "project/orchestrator": "project_instance-orchestrator",
-    "project/prompt-modes": "project_instance-prompt_modes",
+
     "project/viz-admin": "project_instance-viz_admin",
     "project/model-overrides": "project_instance-model_overrides",
     "project/provider-tier-overrides": "project_instance-tier_overrides",

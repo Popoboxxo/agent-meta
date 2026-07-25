@@ -1190,9 +1190,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/roles":
             return self._send_json(self._list_roles())
 
-        if path == "/api/prompt-modes":
-            return self._send_json(self._read_prompt_modes())
-
         if path == "/api/config-audit":
             return self._send_json(self._run_config_audit())
             
@@ -1255,10 +1252,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/reflection-pairs/"):
             pair_id = path[len("/api/reflection-pairs/"):]
             return self._send_json(self._delete_reflection_pair(pair_id))
-
-        if path.startswith("/api/prompt-modes/roles/"):
-            role = path[len("/api/prompt-modes/roles/"):]
-            return self._send_json(self._delete_role_prompt_mode(role))
 
         if path.startswith("/api/backups/"):
             archive_name = path[len("/api/backups/"):]
@@ -1332,20 +1325,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             result = self._write_reflection_pair(pair_id, body)
             return self._send_json(result)
 
-        if path == "/api/prompt-modes":
-            body = self._read_body()
-            if not isinstance(body, dict) or "default" not in body:
-                raise ValueError("expected JSON body with 'default' field")
-            result = self._write_agent_prompts(body)
-            return self._send_json(result)
-
-        if path.startswith("/api/prompt-modes/roles/"):
-            role = path[len("/api/prompt-modes/roles/"):]
-            body = self._read_body()
-            if not isinstance(body, dict) or "mode" not in body:
-                raise ValueError("expected JSON body with 'mode' field")
-            result = self._set_role_prompt_mode(role, body["mode"])
-            return self._send_json(result)
 
         raise FileNotFoundError(path)
 
@@ -1414,13 +1393,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             result = self._write_reflection_pair(pair_id, body)
             return self._send_json(result)
 
-        if path.startswith("/api/prompt-modes/roles/"):
-            role = path[len("/api/prompt-modes/roles/"):]
-            body = self._read_body()
-            if not isinstance(body, dict) or "mode" not in body:
-                raise ValueError("expected JSON body with 'mode' field")
-            result = self._set_role_prompt_mode(role, body["mode"])
-            return self._send_json(result)
 
         # Individual subserver control: /api/subserver/{name}/{action}
         # name in {viz, mcp}, action in {start, stop, restart}.
@@ -2570,7 +2542,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         Each role entry includes:
           * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
-            ``permission_mode``, ``prompt_mode``
+            ``permission_mode``
           * ``description`` — never empty (falls back to template frontmatter
             ``description`` field if the role-defaults entry is missing/empty)
           * ``targets`` — list of delegation target role names from
@@ -2578,10 +2550,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         role_defaults_path = self._role_defaults_path()
         roles: list[dict] = []
-
-        # Read agent-prompts config for prompt_mode annotation per role
-        prompt_modes = self._read_prompt_modes()
-        prompt_default = prompt_modes.get("default", "legacy")
 
         if role_defaults_path.exists():
             with role_defaults_path.open("r", encoding="utf-8") as fh:
@@ -2603,9 +2571,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if not description:
                         description = f"{name} agent (no description)"
 
-                    # Resolve effective prompt_mode: role override > default
-                    effective_mode = prompt_modes.get("modes", {}).get(name) or prompt_default
-
                     roles.append({
                         "name": name,
                         "tier": (attrs.get("workflow_tier")
@@ -2618,30 +2583,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
                         "description": description,
                         "targets": targets,
-                        "prompt_mode": effective_mode,
                     })
         return {"roles": roles, "count": len(roles)}
-
-    def _read_prompt_modes(self) -> dict:
-        """Return the agent-prompts block from project.yaml.
-
-        Shape: ``{"default": "legacy", "modes": {"developer": "modern", ...}}``
-        Falls back to ``{"default": "legacy", "modes": {}}`` when absent.
-        """
-        try:
-            project_config = self.__class__.root / ".meta-config" / "project.yaml"
-            if project_config.exists():
-                with project_config.open("r", encoding="utf-8") as fh:
-                    cfg = yaml.safe_load(fh) or {}
-                ap = cfg.get("agent-prompts") or {}
-                if isinstance(ap, dict):
-                    return {
-                        "default": ap.get("default", "legacy"),
-                        "modes": ap.get("modes") or {},
-                    }
-        except Exception:
-            pass
-        return {"default": "legacy", "modes": {}}
 
     def _role_defaults_path(self) -> Path:
         """Resolve the path to ``role-defaults.yaml`` for either layout."""
@@ -3231,47 +3174,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         result["deleted"] = pair_id
         return result
 
-    def _read_agent_prompts(self) -> dict:
-        """Return the ``agent-prompts`` block from ``project.yaml``.
-
-        Shape: ``{"default": "legacy", "modes": {...}}``.
-        """
-        existing = self.__class__.config_manager.read("project")
-        if not isinstance(existing, dict):
-            existing = {}
-        ap = existing.get("agent-prompts") or {}
-        if not isinstance(ap, dict):
-            ap = {}
-        return {
-            "default": ap.get("default", "legacy"),
-            "modes": ap.get("modes") or {},
-        }
-
-    def _write_agent_prompts(self, ap: dict) -> dict:
-        """Replace ONLY the ``agent-prompts`` top-level section."""
-        existing = self.__class__.config_manager.read("project")
-        if not isinstance(existing, dict):
-            existing = {}
-        existing["agent-prompts"] = ap
-        return self.__class__.config_manager.write("project", existing)
-
-    def _set_role_prompt_mode(self, role: str, mode: str) -> dict:
-        """Set the prompt mode for a single role."""
-        ap = self._read_agent_prompts()
-        modes = ap.get("modes") or {}
-        modes[role] = mode
-        ap["modes"] = modes
-        return self._write_agent_prompts(ap)
-
-    def _delete_role_prompt_mode(self, role: str) -> dict:
-        """Remove a role-level prompt mode override."""
-        ap = self._read_agent_prompts()
-        modes = ap.get("modes") or {}
-        if role not in modes:
-            raise FileNotFoundError(f"role prompt mode not found: {role}")
-        del modes[role]
-        ap["modes"] = modes
-        return self._write_agent_prompts(ap)
 
     def _deep_merge(self, base: Any, override: Any) -> Any:
         """Recursively merge ``override`` into ``base``."""
@@ -3569,11 +3471,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
         if safe != role:
             raise SecurityError(f"invalid role name: {role!r}")
-        prompt_modes = self._read_prompt_modes()
-        modern_override = self._agent_meta_root() / "agents" / "1-generic-modern" / f"{role}.md"
-        if prompt_modes.get("modes", {}).get(role) == "modern" or prompt_modes.get("default") == "modern":
-            if modern_override.exists():
-                return modern_override
         candidate = self._agent_meta_root() / "agents" / "1-generic" / f"{role}.md"
         # Also check 2-platform for platform-specific overrides.
         for entry in (self._agent_meta_root() / "agents" / "2-platform").glob("*.md"):

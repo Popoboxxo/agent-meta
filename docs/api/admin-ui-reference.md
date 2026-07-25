@@ -142,18 +142,6 @@ Defines whether the Orchestrator runs sub-agents `synchronously` (one after anot
 <!-- author: Agent Meta Admin -->
 Defines what the Orchestrator should do if a user requests a task but no specialized sub-agent is available (or they are all disabled). `graceful_decline` forces the Orchestrator to reject the task. `generic_attempt` allows the Orchestrator to try and solve the problem itself using its baseline coding tools.
 
-### Prompt Modes
-<!-- help-id: project_instance-prompt_modes -->
-<!-- last-updated: 2026-07-19 -->
-<!-- author: Agent Meta Admin -->
-Prompt Modes act as global personality modifiers for all agents in the project. Modes like `concise`, `verbose`, or `socratic` are defined in the framework defaults.
-
-#### Field: Active mode
-<!-- help-id: field-active_mode -->
-<!-- last-updated: 2026-07-19 -->
-<!-- author: Agent Meta Admin -->
-Select the global conversational style for your AI team. When you select a mode here, the `sync.py` engine injects a specific block of instructional constraints at the very top of every agent's system prompt. For example, selecting `concise` strictly forbids agents from apologizing, explaining trivial code, or using filler words, which massively reduces output latency.
-
 ### Viz & Admin
 <!-- help-id: project_instance-viz_admin -->
 <!-- last-updated: 2026-07-19 -->
@@ -354,4 +342,4 @@ Pipelines define rigid, linear sequences of agent execution designed for standar
 <!-- help-id: workflows-consistency_check -->
 <!-- last-updated: 2026-07-19 -->
 <!-- author: Agent Meta Admin -->
-The Consistency Check is a powerful architectural validation tool. It executes the core `consistency-check.py` script to rigorously scan the entire framework for discrepancies. It verifies that all CLI arguments are documented, that UI routes match their help blocks, that the README.md is up-to-date, and that the dual-tree `1-generic` vs `1-generic-modern` parity is maintained. Always run this check before committing changes to ensure the framework's integrity.
+The Consistency Check is a powerful architectural validation tool. It executes the core `consistency-check.py` script to rigorously scan the entire framework for discrepancies. It verifies that all CLI arguments are documented, that UI routes match their help blocks, that the README.md is up-to-date, and that the XML structures are strictly maintained. Always run this check before committing changes to ensure the framework's integrity.
