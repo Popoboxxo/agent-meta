@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.84.0] - 2026-07-25
+
+### Added
+- **Context Compaction V2 (Single-Tree XML Architecture)**: Replaced the dual-tree legacy (Markdown) vs modern (XML) structures with a single unified XML standard (`<project>`, `<roles>`, `<providers>`).
+- Live override capability: Submodule targets can now directly download updated model registries (`model-registry.json`) from GitHub via Admin UI ("Refresh via sync.py or GitHub override").
+
+### Fixed
+- Fixed case-sensitive filtering bug for providers in the models.dev live catalog.
+- Fixed models.dev test assertions to dynamically support removed `ai-providers` entries.
+
+### Removed
+- Removed legacy `1-generic-modern` dual-tree architecture and `scripts/validate-modern-templates.py`.
+
 ## [0.83.0] - 2026-07-24
 
 ### Added
