@@ -15,16 +15,12 @@ _EXTERNAL_SKILLS_CONFIG_JSON = "external-skills.config.json"  # legacy fallback
 def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
     """Return True if a skill should be generated for the current project.
 
-    Two-gate check:
-    1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
-    2. enabled:  true in .meta-config/project.yaml        (project opt-in)
-
-    If project has no "external-skills" block at all, no skill is generated.
+    Project explicitly enables/disables? -> Use project setting (Override)
+    Else -> Use approved flag from skills-registry.yaml (Default)
     """
-    return (
-        skill_cfg.get("approved", False)
-        and project_skills.get(skill_name, {}).get("enabled", False)
-    )
+    if skill_name in project_skills and "enabled" in project_skills[skill_name]:
+        return project_skills[skill_name]["enabled"]
+    return skill_cfg.get("approved", False)
 
 
 def load_external_skills_config(agent_meta_root: Path) -> dict:
@@ -44,17 +40,21 @@ def load_external_skills_config(agent_meta_root: Path) -> dict:
 
 
 def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) -> None:
-    """Warn if any repo submodule is not at its pinned_commit."""
+    """Warn if any dynamically cloned skill repo is not at its pinned_commit."""
     for repo_name, repo_cfg in ext_config.get("repos", {}).items():
         pinned = repo_cfg.get("pinned_commit", "")
         if not pinned:
             continue
         local_path = repo_cfg.get("local_path", f"external/{repo_name}")
+        repo_dir = agent_meta_root / local_path
+        if not repo_dir.exists():
+            continue  # Not cloned, which is fine if not enabled
+
         actual = get_skill_commit(agent_meta_root, local_path)
         # get_skill_commit returns short hash — compare prefix
         if actual != "unknown" and not pinned.startswith(actual):
             log.warning(
-                f"repo '{repo_name}': submodule is at {actual}, "
+                f"repo '{repo_name}': dynamic clone is at {actual}, "
                 f"expected pinned_commit {pinned[:8]} — "
                 f"run: git -C {local_path} checkout {pinned[:8]}"
             )
@@ -111,6 +111,27 @@ def normalize_skill_paths(content: str, skill_base_path: str) -> str:
     return content
 
 
+def ensure_skill_repo(agent_meta_root: Path, repo_name: str, repo_cfg: dict, log: SyncLog) -> None:
+    """Dynamically clone a skill repository if it doesn't exist."""
+    repo_url = repo_cfg.get("repo", "")
+    if not repo_url:
+        return
+        
+    local_path = repo_cfg.get("local_path", f"external/{repo_name}")
+    pinned = repo_cfg.get("pinned_commit", "")
+    target_dir = agent_meta_root / local_path
+    
+    if not target_dir.exists():
+        log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
+        result = subprocess.run(["git", "clone", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
+        if result.returncode != 0:
+            log.warning(f"Failed to clone {repo_url} into {local_path}")
+            return
+            
+        if pinned:
+            subprocess.run(["git", "checkout", pinned], cwd=str(target_dir), capture_output=True)
+
+
 def sync_external_skills_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -144,6 +165,21 @@ def sync_external_skills_for_provider(
     repos = ext_config.get("repos", {})
     project_skills = config.get("external-skills", {})
 
+    # Collect active repos for dynamic cloning
+    active_repos = set()
+    for skill_name, skill_cfg in skills.items():
+        if _skill_is_active(skill_name, skill_cfg, project_skills):
+            active_repos.add(skill_cfg.get("repo"))
+            
+    # agent-meta-scout implicitly requires awesome-claude-code
+    if "awesome-claude-code" in repos:
+        active_repos.add("awesome-claude-code")
+        
+    # Ensure all active repos are cloned locally
+    for repo_name in active_repos:
+        if repo_name and repo_name in repos:
+            ensure_skill_repo(agent_meta_root, repo_name, repos[repo_name], log)
+
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
         log.warning(f"Skill wrapper template not found: {wrapper_path}")
@@ -154,12 +190,8 @@ def sync_external_skills_for_provider(
     for skill_name, skill_cfg in skills.items():
         role = skill_cfg.get('role', skill_name)
         role_label = f"{agents_dir_rel}/{role}.md"
-        if not skill_cfg.get("approved", False):
-            log.info(role_label, f"skill '{skill_name}' not approved — skipping")
-            continue
-        project_skill_cfg = project_skills.get(skill_name, {})
-        if not project_skill_cfg.get("enabled", False):
-            log.info(role_label, f"skill '{skill_name}' not enabled in .meta-config/project.yaml — skipping")
+        if not _skill_is_active(skill_name, skill_cfg, project_skills):
+            log.info(role_label, f"skill '{skill_name}' is not active — skipping")
             continue
 
         repo_key   = skill_cfg.get("repo", "")
@@ -174,13 +206,10 @@ def sync_external_skills_for_provider(
         skill_source_dir = agent_meta_root / local_path / source_rel
         entry_path = skill_source_dir / entry_file
 
-        # Detect uninitialized submodule (directory exists but is empty)
-        submodule_dir = agent_meta_root / local_path
-        if submodule_dir.exists() and not any(submodule_dir.iterdir()):
-            log.warning(
-                f"Submodule '{local_path}' is not initialized (empty directory) — "
-                f"please run: git submodule update --init {local_path}"
-            )
+        # Ensure repo directory is valid
+        repo_dir = agent_meta_root / local_path
+        if not repo_dir.exists() or not any(repo_dir.iterdir()):
+            log.warning(f"Dynamic skill repo '{local_path}' is missing or empty.")
             continue
 
         if not entry_path.exists():
@@ -268,20 +297,20 @@ def add_skill(
     submodule_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
     local_path = f"external/{submodule_name}"
 
-    # Run git submodule add (skip if already exists)
+    # Run git clone (skip if already exists)
     submodule_target = agent_meta_root / local_path
     if submodule_target.exists():
-        print(f"  i  Submodule already exists: {local_path}")
+        print(f"  i  Repo clone already exists: {local_path}")
     else:
-        print(f"  >  git submodule add {repo_url} {local_path}")
+        print(f"  >  git clone {repo_url} {local_path}")
         if not dry_run:
             result = subprocess.run(  # noqa: PLW1510
-                ["git", "submodule", "add", repo_url, local_path],
+                ["git", "clone", repo_url, local_path],
                 cwd=str(agent_meta_root),
                 capture_output=False,
             )
             if result.returncode != 0:
-                print("  !  git submodule add failed", file=sys.stderr)
+                print("  !  git clone failed", file=sys.stderr)
                 return
 
     # Update config/skills-registry.yaml (or legacy fallback)
@@ -341,5 +370,4 @@ def add_skill(
         print(f"  +  {config_path.name} updated")
         print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
         print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
-        print(f"  i  To activate: set approved: true in {config_path.name},")
-        print(f"     then add to .meta-config/project.yaml: external-skills: {skill_name}: enabled: true")
+        print(f"  i  To activate: set enabled: true in .meta-config/project.yaml (or approved: true in registry)")

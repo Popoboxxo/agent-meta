@@ -8,6 +8,7 @@ sync.log
 package-lock.
 graphify-out/
 .ship-safe/
+/external/*
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/

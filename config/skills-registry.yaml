@@ -72,53 +72,6 @@ skills:
     description: ReqogniLoom Test Engineer Agent
 
 
-  # -----------------------------------------------------------------------
-  # SE Framework Extension Skills (Platzhalter — zukünftige Integrationen)
-  # Diese Skills werden vom Orchestrator zur Laufzeit an die neuen
-  # SWE-Agenten injected. Siehe docs/agent-framework-extensions.md §6.9.
-  # -----------------------------------------------------------------------
-
-  # UI/UX Designer — Mermaid Renderer (geplant)
-  mermaid-renderer:
-    approved: false
-    planned: true
-    repo: ""
-    source: ""
-    entry: ""
-    role: ""
-    name: "Mermaid Renderer (Planned)"
-    description: >-
-      Geplanter Skill für den ui-ux-designer zur Rendering von Mermaid-Diagrammen
-      in UI-Spezifikationen. Wird als 0-external Skill registriert sobald ein
-      geeignetes Repo verfügbar ist.
-
-  # UI/UX Designer — Figma Reader (geplant)
-  figma-reader:
-    approved: false
-    planned: true
-    repo: ""
-    source: ""
-    entry: ""
-    role: ""
-    name: "Figma Reader (Planned)"
-    description: >-
-      Geplanter Skill für den ui-ux-designer zum Lesen von Figma-Design-Dateien
-      und Extrahieren von Design-Tokens, Komponenten-Bibliotheken und Style-Guides.
-
-  # API Specialist — Postman Collection Generator (geplant)
-  postman-collection-generator:
-    approved: false
-    planned: true
-    repo: ""
-    source: ""
-    entry: ""
-    role: ""
-    name: "Postman Collection Generator (Planned)"
-    description: >-
-      Geplanter Skill für den api-specialist zur automatischen Generierung von
-      Postman-Collections aus OpenAPI-Spezifikationen.
-
-  # -----------------------------------------------------------------------
 
   home-organization:
     approved: true

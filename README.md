@@ -202,7 +202,7 @@ Overrides provide platform-specific customizations. Two modes:
 
 ## External Skills (0-external/)
 
-External skills are registered in `config/skills-registry.yaml` and pulled as Git submodules.
+External skills are registered in `config/skills-registry.yaml` and are dynamically cloned by `sync.py` when enabled via `.meta-config/project.yaml`.
 
 **Active Skills:**
 - `home-organization` — Home Organization Specialist (Gridfinity, OpenGrid, NeoGrid, French Cleat, Underware, Deskware)
@@ -481,7 +481,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 
 ```
 agents/
-  0-external/                # External skill wrappers (git submodules)
+  0-external/                # External skill wrappers (dynamically cloned)
   1-generic/                 # Universal provider-agnostic templates (44 + 13 SE agents)
   2-platform/                # Platform-specific overrides (extends + patches)
 config/
@@ -511,7 +511,7 @@ scripts/
     mcp.py                   # MCP rules and config injection
 snippets/                    # Language-specific code snippets
   developer/, tester/, orchestrator/
-external/                    # Git submodules for external skills
+external/                    # Dynamically cloned skill repositories (gitignored)
 schemas/                     # A2A handoff JSON schemas
 speech/                      # Speech mode rule files
 howto/
