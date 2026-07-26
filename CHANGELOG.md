@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.4] — 2026-07-26
+
+### Fixed
+- resolve remaining ruff linter warnings using noqa
+
 ## [0.85.3] — 2026-07-26
 
 ### Fixed
