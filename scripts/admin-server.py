@@ -3831,10 +3831,29 @@ class AdminServer:
         self.httpd = _DaemonThreadingHTTPServer((self.host, self.port), AdminRequestHandler)
 
     def _read_version(self) -> str:
-        # resolve_asset falls back to the ``.agent-meta/`` submodule layout.
-        version_file = resolve_asset(self.root, "VERSION")
+        # First try to read agent-meta-version from .meta-config/project.yaml
+        config_path = self.root / ".meta-config" / "project.yaml"
+        if config_path.exists():
+            try:
+                sys.path.insert(0, str(self.root / "scripts"))
+                sys.path.insert(0, str(self.root / ".agent-meta" / "scripts"))
+                from lib.config import load_config  # type: ignore[import]
+                config = load_config(config_path)
+                if "agent-meta-version" in config:
+                    return str(config["agent-meta-version"])
+            except Exception:
+                pass
+
+        # Fallback 1: .agent-meta/VERSION (if used as submodule)
+        fallback_file = self.root / ".agent-meta" / "VERSION"
+        if fallback_file.exists():
+            return fallback_file.read_text(encoding="utf-8").strip()
+
+        # Fallback 2: VERSION in root (if used standalone)
+        version_file = self.root / "VERSION"
         if version_file.exists():
             return version_file.read_text(encoding="utf-8").strip()
+            
         return "unknown"
 
     def start(self) -> None:
