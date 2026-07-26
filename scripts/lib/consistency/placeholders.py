@@ -151,7 +151,7 @@ def load_project_vars(agent_meta_root: Path) -> set[str]:
     try:
         import yaml
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):
+    except (ImportError, Exception):  # noqa: BLE001
         return set()
     return set((data.get("variables") or {}).keys())
 

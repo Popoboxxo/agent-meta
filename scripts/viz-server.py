@@ -25,8 +25,6 @@ Migration note:
 """
 
 import sys
-import os
-import subprocess
 import time
 import webbrowser
 from pathlib import Path
@@ -67,7 +65,7 @@ try:
     VIZ_PID_FILE = _admin_module.VIZ_PID_FILE
     MCP_PID_FILE = _admin_module.MCP_PID_FILE
     _IMPORT_OK = True
-except Exception:
+except Exception:  # noqa: BLE001
     _IMPORT_OK = False
 
 
@@ -100,7 +98,7 @@ def cmd_start(mcp_only: bool = False) -> None:
     if not mcp_only:
         print(f"  Viz dashboard:  http://localhost:{cfg['viz_port']}/")
     print(f"  MCP SSE:        http://127.0.0.1:{cfg['mcp_port']}/sse")
-    print(f"  Admin UI:       http://127.0.0.1:7420/")
+    print("  Admin UI:       http://127.0.0.1:7420/")
     print(f"  Logs:           {PROJECT_ROOT / '.meta-viz'}")
 
 

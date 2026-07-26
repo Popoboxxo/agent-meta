@@ -6,17 +6,14 @@ Covers:
 - GitHubIssuesAdapter: correct gh CLI arguments via monkeypatched subprocess.run
 """
 
-import json
 import subprocess
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from scripts.lib.se_export import get_adapter, MarkdownAdapter, GitHubIssuesAdapter
-from scripts.lib.se_export.base import SEAdapter
-
+from scripts.lib.se_export import GitHubIssuesAdapter, MarkdownAdapter, get_adapter
 
 # ---------------------------------------------------------------------------
 # Minimal SE graph fixture (conforms to se-decomposition.schema.json)
@@ -215,7 +212,7 @@ def _make_fake_run(issue_url: str = "https://github.com/test-org/test-repo/issue
 class TestGitHubIssuesAdapter:
     """Tests use dry_run=False but monkeypatch subprocess.run."""
 
-    _CONFIG = {
+    _CONFIG = {  # noqa: RUF012
         "type": "github_issues",
         "repo": "test-org/test-repo",
         "milestone": "v1.0",

@@ -6,11 +6,12 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .log import SyncLog
-from .io import write_checked
 from .agents import collect_sources, extract_frontmatter_field
-from .roles import resolve_model
+from .io import write_checked
+from .log import SyncLog
 from .providers import load_providers_config
+from .roles import resolve_model
+
 # Delegation graph: role -> roles it may hand off to.
 # TODO: Derive dynamically from agent templates (agents/1-generic/*.md).
 # NOTE: The edges below are NOT in the frontmatter — 'name' + 'hint' only give a
@@ -70,7 +71,7 @@ def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dic
             continue
         try:
             content = path.read_text(encoding="utf-8")
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             continue
 
         description = extract_frontmatter_field(content, "description") or ""
@@ -88,7 +89,7 @@ def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dic
         # If all providers resolve to the same model, collapse to a single value
         unique_models = set(models_by_provider.values())
         if len(unique_models) == 1:
-            model = list(unique_models)[0]
+            model = next(iter(unique_models))
         else:
             model = ""
 
@@ -118,7 +119,7 @@ def _infer_tier(role: str, config: dict) -> str:
             roles = data.get("roles", {})
             role_cfg = roles.get(role, {})
             return role_cfg.get("workflow_tier", "optional")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     return "optional"
 
@@ -171,7 +172,7 @@ def render_mermaid_mindmap(agents: dict, config: dict) -> str:
         if models_by_provider:
             unique = set(models_by_provider.values())
             if len(unique) == 1:
-                lines.append(f"- **Model:** {list(unique)[0]}")
+                lines.append(f"- **Model:** {next(iter(unique))}")
             else:
                 parts = [f"{p}: {m}" for p, m in models_by_provider.items()]
                 lines.append(f"- **Model:** {', '.join(parts)}")
@@ -245,7 +246,7 @@ def render_interactive_html(agents: dict, config: dict) -> str:
         if models_by_provider:
             unique = set(models_by_provider.values())
             if len(unique) == 1:
-                model_display = list(unique)[0]
+                model_display = next(iter(unique))
             else:
                 model_display = "<br>".join(
                     f"<span>{p}: {m}</span>" for p, m in models_by_provider.items()
@@ -460,12 +461,12 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not viz_cfg.get("enabled", False):
         return
 
-    log.info("viz", "generiere Agenten-Visualisierung...")
+    log.info("viz", "generiere Agenten-Visualisierung...")  # noqa: PLE1205
 
     # 1. Hierarchie aufbauen (mit Provider-Config für korrekte Model-Auflösung)
     provider_config = load_providers_config(agent_meta_root)
     agents = build_agent_hierarchy(agent_meta_root, project_root, config, provider_config)
-    log.info("viz", f"{len(agents)} Agenten gefunden")
+    log.info("viz", f"{len(agents)} Agenten gefunden")  # noqa: PLE1205
 
     # 2. Output-Pfade bestimmen
     output_dir = project_root / viz_cfg.get("output_dir", "docs")
@@ -477,7 +478,7 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not dry_run:
         write_checked(md_path, mermaid_md, log=log, rel_label="agent-mindmap.md")
     else:
-        log.info("viz", f"would write: {md_path}")
+        log.info("viz", f"would write: {md_path}")  # noqa: PLE1205
 
     # 4. Interaktives HTML
     html_path = output_dir / "agent-graph.html"
@@ -485,9 +486,9 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not dry_run:
         write_checked(html_path, html, log=log, rel_label="agent-graph.html")
     else:
-        log.info("viz", f"would write: {html_path}")
+        log.info("viz", f"would write: {html_path}")  # noqa: PLE1205
 
-    log.info("viz", f"generiert: {md_path.name}, {html_path.name}")
+    log.info("viz", f"generiert: {md_path.name}, {html_path.name}")  # noqa: PLE1205
 
 
 # ---------------------------------------------------------------------------
@@ -527,12 +528,11 @@ def write_event(project_root: Path, event: dict, session_id: str | None = None, 
     path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with viz_lock:
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event, ensure_ascii=False) + "\n")
-    except Exception as exc:
+        with viz_lock, open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    except Exception as exc:  # noqa: BLE001
         if log:
-            log.warn(f"viz-event: konnte nicht schreiben: {exc}")
+            log.warning(f"viz-event: konnte nicht schreiben: {exc}")
 
 
 def _tail_read_lines(path: Path, max_lines: int) -> list[str]:
@@ -612,7 +612,7 @@ def read_events(project_root: Path, session_id: str | None = None, since: dateti
                             events.append(ev)
                         except (json.JSONDecodeError, ValueError):
                             continue
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     return events
 
@@ -651,13 +651,13 @@ def cleanup_old_sessions(project_root: Path, retention_days: int = 7, log: SyncL
                     f.unlink()
                 removed += 1
                 if log:
-                    log.info("viz-cleanup", f"gelöscht: {f.name}")
-        except Exception as exc:
+                    log.info("viz-cleanup", f"gelöscht: {f.name}")  # noqa: PLE1205
+        except Exception as exc:  # noqa: BLE001
             if log:
-                log.warn(f"viz-cleanup: {exc}")
+                log.warning(f"viz-cleanup: {exc}")
 
     if log and removed:
-        log.info("viz-cleanup", f"{removed} alte Session(s) entfernt")
+        log.info("viz-cleanup", f"{removed} alte Session(s) entfernt")  # noqa: PLE1205
 
 
 def get_gitignore_entries() -> list[str]:
@@ -691,7 +691,7 @@ def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> st
             terminal_map = cfg.get("terminal_tool", {})
             if provider in terminal_map:
                 return terminal_map[provider]
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
     return _PROVIDER_TERMINAL_TOOL.get(provider)
 
@@ -791,7 +791,7 @@ Der Visualisierungsmodus ist aktiv. Du MUSST deine Aufrufe und Delegationen prot
 
     # A2A Debug Events — nur bei viz.debug:true injizieren (Null-Token-Kosten sonst)
     if viz_debug:
-        a2a_block = f"""
+        a2a_block = """
 ## A2A Handoff Debug Events (Debug-Mode)
 
 Der A2A-Debug-Modus ist aktiv. Protokolliere zusätzlich zu den viz-Handshake-Events die folgenden A2A-Events:
@@ -800,23 +800,23 @@ Der A2A-Debug-Modus ist aktiv. Protokolliere zusätzlich zu den viz-Handshake-Ev
 
 **4. Wenn ein A2A-Envelope erstellt wird:**
 - Event: `a2a_handoff_start`
-- Parameter: `--event a2a_handoff_start --task_id <uuid> --caller <source_agent> --target <target_agent> --payload '{{"handoff_id":"HOFF-...","contract":"..."}}'`
+- Parameter: `--event a2a_handoff_start --task_id <uuid> --caller <source_agent> --target <target_agent> --payload '{"handoff_id":"HOFF-...","contract":"..."}'`
 
 **5. Wenn ein A2A-Envelope validiert wurde:**
 - Event: `a2a_handoff_validated`
-- Parameter: `--event a2a_handoff_validated --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","valid":true}}'`
+- Parameter: `--event a2a_handoff_validated --task_id <uuid> --payload '{"handoff_id":"HOFF-...","valid":true}'`
 
 **6. Wenn ein A2A-Envelope delivered wurde:**
 - Event: `a2a_handoff_delivered`
-- Parameter: `--event a2a_handoff_delivered --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","status":"accepted"}}'`
+- Parameter: `--event a2a_handoff_delivered --task_id <uuid> --payload '{"handoff_id":"HOFF-...","status":"accepted"}'`
 
 **7. Wenn ein A2A-Handoff fehlschlägt:**
 - Event: `a2a_handoff_failed`
-- Parameter: `--event a2a_handoff_failed --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","errors":["..."]}}'`
+- Parameter: `--event a2a_handoff_failed --task_id <uuid> --payload '{"handoff_id":"HOFF-...","errors":["..."]}'`
 
 **8. Wenn eine Supersession erstellt wird:**
 - Event: `a2a_supersession`
-- Parameter: `--event a2a_supersession --task_id <uuid> --payload '{{"handoff_id":"HOFF-...","supersedes":"HOFF-...","reason":"..."}}'`
+- Parameter: `--event a2a_supersession --task_id <uuid> --payload '{"handoff_id":"HOFF-...","supersedes":"HOFF-...","reason":"..."}'`
 
 ### Regeln
 - Diese Events sind ZUSÄTZLICH zu den viz-Handshake-Events (agent_start, delegate_out, agent_end).

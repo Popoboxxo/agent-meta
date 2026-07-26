@@ -1,5 +1,6 @@
-import os
 import glob
+import os
+import sys
 from pathlib import Path
 
 # To use this script, install: pip install google-generativeai
@@ -8,7 +9,7 @@ try:
     import google.generativeai as genai
 except ImportError:
     print("Please install google-generativeai: pip install google-generativeai")
-    exit(1)
+    sys.exit(1)
 
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
@@ -33,7 +34,7 @@ def translate_markdown(file_path):
         translated_content = response.text
         Path(file_path).write_text(translated_content, encoding='utf-8')
         print(f"✅ Success: {file_path}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Failed to translate {file_path}: {e}")
 
 if __name__ == "__main__":

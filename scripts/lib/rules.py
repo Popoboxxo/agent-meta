@@ -139,8 +139,13 @@ def sync_rules(
     Project rules in .claude/rules/ that are NOT from agent-meta are never touched.
     Stale agent-meta-managed rules (tracked in <rules_dir>/.agent-meta-managed) are removed.
     """
+    from .config import (
+        _orch_mode_flags,
+        _resolve_orch_mode,
+        strip_inactive_conditional_blocks,
+        substitute,
+    )
     from .platform import substitute_platform
-    from .config import substitute, strip_inactive_conditional_blocks, _resolve_orch_mode, _orch_mode_flags
 
     pc = (provider_config or {}).get(provider, {})
     provider_vars = {
@@ -274,7 +279,7 @@ def sync_speech_mode(
 
     source_path = agent_meta_root / SPEECH_DIR / f"{mode}.md"
     if not source_path.exists():
-        log.warn(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
+        log.warning(f"speech-mode '{mode}': source file not found at {source_path} — skipping")
         return
 
     source_content = source_path.read_text(encoding="utf-8")

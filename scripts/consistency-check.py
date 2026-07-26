@@ -38,24 +38,23 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 _AGENT_META_ROOT = _SCRIPTS_DIR.parent
 
-from lib.consistency.report import Finding, Severity, print_report, print_json_report
-from lib.consistency.frontmatter import check_agent_frontmatter
+from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
 from lib.consistency.crossrefs import (
+    check_changelog_mentions_new_files,
+    check_orchestrator_table,
     check_role_defaults_coverage,
     check_role_defaults_has_generic_source,
-    check_orchestrator_table,
-    check_changelog_mentions_new_files,
     check_schema_refs,
 )
-from lib.consistency.placeholders import check_placeholders, load_project_vars
-from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
-from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.docs import (
+    check_readme_docs_index,
     check_sync_cli_docs,
     check_ui_help_mappings,
-    check_readme_docs_index,
 )
-
+from lib.consistency.frontmatter import check_agent_frontmatter
+from lib.consistency.handoff_contracts import check_handoff_contracts
+from lib.consistency.placeholders import check_placeholders, load_project_vars
+from lib.consistency.report import Finding, Severity, print_json_report, print_report
 
 # ── git helpers ───────────────────────────────────────────────────────────────
 
@@ -66,11 +65,11 @@ def get_changed_files(root: Path) -> set[str]:
         # Tracked changes vs HEAD
         for flag in [["git", "diff", "--name-only", "HEAD"],
                      ["git", "diff", "--name-only", "--cached"]]:
-            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, timeout=10)
+            r = subprocess.run(flag, cwd=str(root), capture_output=True, text=True, timeout=10)  # noqa: PLW1510
             if r.returncode == 0:
                 changed.update(l.strip() for l in r.stdout.splitlines() if l.strip())
         # Untracked new files (agents + commands only)
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: PLW1510
             ["git", "ls-files", "--others", "--exclude-standard", "agents/", "commands/"],
             cwd=str(root), capture_output=True, text=True, timeout=10,
         )
@@ -85,7 +84,7 @@ def get_new_files_vs_main(root: Path) -> list[str]:
     """Return files added in this branch vs main/master (for changelog check)."""
     for base in ("main", "master"):
         try:
-            r = subprocess.run(
+            r = subprocess.run(  # noqa: PLW1510
                 ["git", "diff", "--name-only", "--diff-filter=A", f"{base}...HEAD"],
                 cwd=str(root), capture_output=True, text=True, timeout=10,
             )

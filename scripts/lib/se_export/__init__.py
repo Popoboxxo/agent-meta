@@ -12,10 +12,10 @@ Usage::
 """
 
 from .base import SEAdapter
-from .markdown_adapter import MarkdownAdapter
 from .github_issues_adapter import GitHubIssuesAdapter
+from .markdown_adapter import MarkdownAdapter
 
-__all__ = ["get_adapter", "SEAdapter", "MarkdownAdapter", "GitHubIssuesAdapter"]
+__all__ = ["GitHubIssuesAdapter", "MarkdownAdapter", "SEAdapter", "get_adapter"]
 
 _ADAPTER_MAP = {
     "markdown": MarkdownAdapter,

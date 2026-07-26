@@ -23,13 +23,13 @@ Config in .meta-config/project.yaml:
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
-import os
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -46,8 +46,12 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from lib.log import SyncLog
 from lib.viz import (
-    read_events, list_sessions, get_viz_dir, get_event_log_path,
-    cleanup_old_sessions, _TIER_ICONS, _TIER_COLORS, viz_lock,
+    cleanup_old_sessions,
+    get_event_log_path,
+    get_viz_dir,
+    list_sessions,
+    read_events,
+    viz_lock,
 )
 
 
@@ -225,7 +229,7 @@ def render_terminal(events: list[dict], agent_filter: str | None = None) -> str:
     name = state.get("session_name", "Unnamed Session")
     name = name[:50] + "..." if len(name) > 50 else name
     lines.append("┌" + "─" * 77 + "┐")
-    lines.append(f"│  🤖 AGENT SESSION REPORT                                               │")
+    lines.append("│  🤖 AGENT SESSION REPORT                                               │")
     lines.append(f"│  {name:<72}│")
     lines.append(f"│  {start_str} — Dauer: {_format_duration(state['duration_sec']):<52}│")
     lines.append("├" + "─" * 77 + "┤")
@@ -594,14 +598,14 @@ class _ServerLog:
         self._counts: dict[str, int] = {}
 
     def _write(self, level: str, msg: str):
-        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]  # noqa: DTZ005
         line = f"[{ts}] {level:5s} {msg}"
         print(line, file=sys.stderr, flush=True)
         if self.log_file:
             try:
                 with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(line + "\n")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
     def info(self, msg: str):
@@ -651,9 +655,9 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
     import mimetypes
     import threading
     import traceback
-    from wsgiref.simple_server import WSGIServer, WSGIRequestHandler
     from socketserver import ThreadingMixIn
     from urllib.parse import parse_qs
+    from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
 
     class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
         """Threaded WSGI server — handles concurrent requests (browser polling + UI actions)."""
@@ -697,8 +701,8 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
         try:
             n = sum(1 for ln in event_log.read_text(encoding="utf-8-sig").splitlines() if ln.strip())
             log.info(f"events in log: {n}")
-        except Exception as e:
-            log.warn(f"cannot count events: {e}")
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"cannot count events: {e}")
 
     class _SilentHandler(WSGIRequestHandler):
         """Suppress wsgiref's default stderr access log — we do our own."""
@@ -716,7 +720,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
             cl = int(environ.get("CONTENT_LENGTH") or 0)
             if cl > 0:
                 environ["wsgi.input"].read(cl)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         try:
@@ -728,7 +732,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                     log.req(method, path, 200, extra=f"{len(body)//1024}KB  src={html_path}")
                     start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
                     return [body]
-                log.warn(f"live-dashboard.html not found at {html_path}")
+                log.warning(f"live-dashboard.html not found at {html_path}")
                 start_response("404 Not Found", json_hdr)
                 return [b'{"error":"live-dashboard.html not found"}']
 
@@ -738,7 +742,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                     start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
                     log.req(method, path, 200, extra=f"src={html_path}")
                     return [html_path.read_bytes()]
-                log.warn(f"agent-graph.html not found at {html_path}")
+                log.warning(f"agent-graph.html not found at {html_path}")
                 start_response("404 Not Found", json_hdr)
                 return [b'{"error":"agent-graph.html not found"}']
 
@@ -748,7 +752,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                 user_window = window is not None
                 since       = _parse_window_param(window) if user_window else None
                 if user_window and window != "all" and since is None:
-                    log.warn(f"unbekanntes window-Format: {window}")
+                    log.warning(f"unbekanntes window-Format: {window}")
                 events      = read_events(project_root, since=since)
 
                 by_type: dict[str, int] = {}
@@ -767,7 +771,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                               f"types={by_type}  "
                               f"by_agent={by_agent}")
                 if not state["agents"]:
-                    log.warn("state has no agents — check if session_start/agent_start events exist in log")
+                    log.warning("state has no agents — check if session_start/agent_start events exist in log")
                 start_response("200 OK", json_hdr)
                 return [body]
 
@@ -776,7 +780,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                 window = qs_params.get("window", [None])[0]
                 since  = _parse_window_param(window) if window else None
                 if window and window != "all" and since is None:
-                    log.warn(f"unbekanntes window-Format: {window}")
+                    log.warning(f"unbekanntes window-Format: {window}")
                 events = read_events(project_root, since=since)
                 body   = json.dumps(events, ensure_ascii=False, default=str).encode("utf-8")
                 log.req(method, path, 200, events=len(events), extra=f"window={window or 'all'}")
@@ -792,13 +796,13 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
                         if log_path.exists():
                             prev_lines = sum(1 for _ in log_path.read_text(encoding="utf-8-sig").splitlines() if _)
                         # Atomic truncate via 'w' mode
-                        with open(log_path, "w", encoding="utf-8") as f:
+                        with open(log_path, "w", encoding="utf-8"):
                             pass
                     log.info(f"log cleared — removed {prev_lines} events")
                     log.req(method, path, 200, extra=f"cleared {prev_lines} events")
                     start_response("200 OK", json_hdr)
                     return [json.dumps({"ok": True, "cleared": prev_lines}).encode("utf-8")]
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     log.err("clear-log failed", exc)
                     body = json.dumps({"ok": False, "error": str(exc)}).encode("utf-8")
                     start_response("500 Internal Server Error", json_hdr)
@@ -857,7 +861,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
             start_response("404 Not Found", json_hdr)
             return [b'{"error":"not found"}']
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             log.err(f"unhandled exception for {method} {path}", exc)
             if debug:
                 log.err(traceback.format_exc())
@@ -897,7 +901,7 @@ def serve_web(project_root: Path, port: int = 8765, open_browser: bool = False,
     print(f"  i  Live-Dashboard: http://localhost:{port}/")
     if timeout_sec > 0:
         print(f"  i  Auto-Shutdown nach {timeout_sec}s Inaktivitaet")
-    print(f"  i  Drücke Ctrl+C zum Beenden")
+    print("  i  Drücke Ctrl+C zum Beenden")
 
     if open_browser:
         import webbrowser
@@ -978,7 +982,7 @@ def main():
     if args.cleanup:
         log = SyncLog()
         cleanup_old_sessions(project_root, retention_days=args.days, log=log)
-        print(f"  i  Cleanup abgeschlossen")
+        print("  i  Cleanup abgeschlossen")
         return
 
     # Session-ID bestimmen
@@ -1015,7 +1019,7 @@ def main():
             serve_web(project_root, port=args.port, open_browser=True, debug=args.debug)
             return
         else:
-            print(f"  i  Live-Monitoring gestartet (Ctrl+C zum Beenden)")
+            print("  i  Live-Monitoring gestartet (Ctrl+C zum Beenden)")
 
         last_len = 0
         try:

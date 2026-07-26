@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import safe_path, content_hash
+from .io import content_hash, safe_path
 from .log import SyncLog
 
 SNIPPETS_DIR = "snippets"
@@ -99,9 +99,9 @@ def _backup_context_file(
     """Write a timestamped backup before overwriting a user-modified static part."""
     from datetime import datetime
 
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")  # noqa: DTZ005
     backup = target_path.with_name(f"{target_path.name}.sync-backup-{ts}")
-    log.warn(
+    log.warning(
         f"{rel_label}: static part differs from the last generated version "
         f"(manual edit or first-time migration). Backup written to {backup.name} — "
         f"review and merge any wanted changes."
@@ -137,7 +137,6 @@ def _regenerate_static_context(
     verbatim, exactly like the managed block. The static signature used for
     drift detection then covers header + template footer instead of header only.
     """
-    from .config import substitute
 
     if not target_path.exists():
         return
@@ -247,7 +246,7 @@ def sync_claude_md_managed(
         re.DOTALL,
     )
     if not pattern.search(existing):
-        log.warn(
+        log.warning(
             "CLAUDE.md exists but has no managed block — "
             "AGENT_TABLE will not be updated. "
             "Add the following block at the desired location in CLAUDE.md:\n"
@@ -289,7 +288,6 @@ def _ensure_context_file(
     fallback_agent_dir: str,
 ) -> None:
     """Create a provider context file from template or minimal fallback."""
-    from .config import substitute
 
     if target_path.exists():
         return
@@ -370,7 +368,7 @@ def _update_managed_html_block(
 
     if not managed_pattern.search(existing):
         if not new_managed.strip():
-            log.warn(
+            log.warning(
                 f"{rel}: exists but has no agent-meta marker, and the managed "
                 "block could not be rendered — leaving the file untouched. "
                 "Add the following block manually at the desired location:\n"
@@ -424,7 +422,6 @@ def _sync_managed_block_context(
     provider_config: dict,
 ) -> None:
     """Strategy for providers with a context file using HTML managed blocks."""
-    from .config import substitute
 
     pc = provider_config[provider]
     context_file = pc.get("context_file")
@@ -487,7 +484,6 @@ def _sync_opencode_context(
     provider_config: dict,
 ) -> None:
     """Strategy for Opencode: rules embedded into AGENTS.md managed block."""
-    from .config import substitute
 
     pc = provider_config[provider]
     context_file = pc["context_file"]  # AGENTS.md
@@ -544,7 +540,7 @@ def _sync_opencode_context(
             else:
                 log.skip(context_file, "managed block unchanged")
         elif not new_managed.strip():
-            log.warn(
+            log.warning(
                 f"{context_file}: exists but has no agent-meta marker, and the "
                 "managed block could not be rendered — leaving the file untouched. "
                 "Add the following block manually at the desired location:\n"
@@ -627,7 +623,6 @@ def _sync_continue_context(
     provider_config: dict,
 ) -> None:
     """Strategy for Continue: project-context.md + config.yaml comment block."""
-    from .config import substitute
     from .extensions import render_managed_block, update_managed_block
 
     pc = provider_config[provider]
@@ -694,7 +689,7 @@ def _sync_continue_context(
                 )
                 source_label = "minimal fallback"
                 if settings_template_rel:
-                    log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+                    log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
             log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
             if not dry_run:
                 settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -774,7 +769,7 @@ def _init_provider_settings_json(
         content = '{\n  "//": "Provider settings managed by agent-meta"\n}\n'
         source_label = "minimal fallback"
         if settings_template_rel:
-            log.warn(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+            log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -799,7 +794,7 @@ def _update_continue_config_managed_block(
     """
     from datetime import date
     version = variables.get("AGENT_META_VERSION", "?")
-    today = date.today().isoformat()
+    today = date.today().isoformat()  # noqa: DTZ011
     new_block = (
         f"{_CONTINUE_MANAGED_BEGIN}\n"
         f"# Managed by agent-meta v{version} — {today}\n"
@@ -865,7 +860,7 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
     summary = ""
     for line in lines:
         stripped = line.strip()
-        if not stripped or stripped.startswith('#') or stripped.startswith('```'):
+        if not stripped or stripped.startswith(('#', '```')):
             continue
         summary = stripped
         if len(summary) > 200:
@@ -964,7 +959,7 @@ def init_claude_personal(
         return
 
     if not template_path.exists():
-        log.warn("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
+        log.warning("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
         return
 
     content = template_path.read_text(encoding="utf-8")
@@ -992,7 +987,7 @@ def init_opencode_personal(
         return
 
     if not template_path.exists():
-        log.warn("AGENTS.personal-template.md not found — skipping AGENTS.personal.md creation")
+        log.warning("AGENTS.personal-template.md not found — skipping AGENTS.personal.md creation")
         return
 
     content = template_path.read_text(encoding="utf-8")
@@ -1188,7 +1183,7 @@ def sync_claude_md_static(
     rel = "CLAUDE.md"
 
     if not template_path.exists():
-        log.warn(f"CLAUDE.project-template.md not found at {template_path}")
+        log.warning(f"CLAUDE.project-template.md not found at {template_path}")
         return
 
     if not target_path.exists():
@@ -1266,10 +1261,17 @@ def sync_prompts_for_continue(
     Works with any local LLM — no tool calling required.
     Slash-commands: /developer, /git, /orchestrator, ...
     """
-    from .agents import (collect_sources, extract_frontmatter_field, compose_agent,
-                          target_filename, _strip_frontmatter, _strip_claude_specific_lines,
-                          _make_slim_body, AGENTS_DIR)
-    from .config import substitute, strip_inactive_conditional_blocks
+    from .agents import (
+        AGENTS_DIR,
+        _make_slim_body,
+        _strip_claude_specific_lines,
+        _strip_frontmatter,
+        collect_sources,
+        compose_agent,
+        extract_frontmatter_field,
+        target_filename,
+    )
+    from .config import strip_inactive_conditional_blocks, substitute
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
@@ -1359,7 +1361,7 @@ def sync_prompts_for_continue(
 
     if prompts_dir.exists():
         for existing_file in sorted(prompts_dir.glob("*.md")):
-            if existing_file.name not in expected:
+            if existing_file.name not in expected:  # noqa: SIM102
                 if not managed_index.exists() or existing_file.name in previously_managed:
                     log.action("DELETE", str(existing_file.relative_to(project_root)),
                                "role removed from config")
@@ -1390,7 +1392,7 @@ def sync_snippets_for_provider(
     pc = provider_config.get(provider, {})
     snippets_dir_rel = pc.get('snippets_dir')
     if not snippets_dir_rel:
-        log.info("snippets", f"skipped for {provider} — no snippets_dir configured")
+        log.info("snippets", f"skipped for {provider} — no snippets_dir configured")  # noqa: PLE1205
         return
 
     variables = config.get("variables", {})
@@ -1422,7 +1424,7 @@ def sync_snippets_for_provider(
     for rel_path in snippet_paths:
         source_path = snippets_root / rel_path
         if not source_path.exists():
-            log.warn(f"Snippet not found: snippets/{rel_path}")
+            log.warning(f"Snippet not found: snippets/{rel_path}")
             continue
 
         target_path = target_root / rel_path

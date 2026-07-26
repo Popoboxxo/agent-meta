@@ -14,7 +14,7 @@ class SyncLog:
         self.infos: list[str] = []
         self.debugs: list[str] = []
         self._seen_warnings: set[str] = set()
-        self.start_time = datetime.now()
+        self.start_time = datetime.now()  # noqa: DTZ005
 
     def action(self, tag: str, target: str, source: str):
         self.actions.append(f"[{tag:<8}]  {target:<50}  ({source})")

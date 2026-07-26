@@ -101,7 +101,7 @@ def migrate_json_to_yaml(src: Path, dry_run: bool, keep_json: bool) -> None:
     dest = src.with_suffix(".yaml")
     if dest.exists() and not dry_run:
         print(f"  !  {dest.name} already exists — aborting to avoid overwrite.")
-        print(f"     Delete or rename it first, then re-run.")
+        print("     Delete or rename it first, then re-run.")
         sys.exit(1)
 
     with src.open(encoding="utf-8") as f:
@@ -137,8 +137,8 @@ def migrate_json_to_yaml(src: Path, dry_run: bool, keep_json: bool) -> None:
         print(f"  i  Original renamed to: {bak.name}")
 
     print()
-    print(f"Next step — move to standard layout:")
-    print(f"  py .agent-meta/scripts/migrate-config.py --to-meta-config")
+    print("Next step — move to standard layout:")
+    print("  py .agent-meta/scripts/migrate-config.py --to-meta-config")
 
 
 # ---------------------------------------------------------------------------
@@ -167,8 +167,8 @@ def migrate_to_meta_config(project_root: Path, dry_run: bool) -> None:
         # Already migrated?
         already = project_root / ".meta-config" / "project.yaml"
         if already.exists():
-            print(f"  i  Already migrated: .meta-config/project.yaml exists.")
-            print(f"     Nothing to do.")
+            print("  i  Already migrated: .meta-config/project.yaml exists.")
+            print("     Nothing to do.")
             return
         print(f"  !  No legacy config found in {project_root}", file=sys.stderr)
         print(f"     Expected one of: {', '.join(_LEGACY_CONFIG_CANDIDATES)}", file=sys.stderr)
@@ -180,8 +180,8 @@ def migrate_to_meta_config(project_root: Path, dry_run: bool) -> None:
     print(f"  >  Migrate: {src.name} -> .meta-config/project.yaml")
 
     if dest.exists():
-        print(f"  !  .meta-config/project.yaml already exists — aborting.")
-        print(f"     Delete it first if you want to re-run the migration.")
+        print("  !  .meta-config/project.yaml already exists — aborting.")
+        print("     Delete it first if you want to re-run the migration.")
         sys.exit(1)
 
     if dry_run:
@@ -194,7 +194,7 @@ def migrate_to_meta_config(project_root: Path, dry_run: bool) -> None:
 
     dest_dir.mkdir(exist_ok=True)
     shutil.move(str(src), str(dest))
-    print(f"  +  Created: .meta-config/")
+    print("  +  Created: .meta-config/")
     print(f"  +  Moved:   {src.name} -> .meta-config/project.yaml")
 
     # Create placeholder .meta-config/skills.yaml if project had external-skills block
@@ -212,10 +212,10 @@ def _maybe_create_skills_placeholder(project_yaml: Path, dest_dir: Path) -> None
         with project_yaml.open(encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         if "external-skills" in data:
-            print(f"  i  external-skills block found in project.yaml.")
-            print(f"     You can optionally move it to .meta-config/skills.yaml")
-            print(f"     (not required — keeping it in project.yaml works fine)")
-    except Exception:
+            print("  i  external-skills block found in project.yaml.")
+            print("     You can optionally move it to .meta-config/skills.yaml")
+            print("     (not required — keeping it in project.yaml works fine)")
+    except Exception:  # noqa: BLE001, S110
         pass
 
 

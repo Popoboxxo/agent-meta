@@ -3,7 +3,7 @@ import yaml
 with open('config/role-defaults.yaml', 'r', encoding='utf-8') as f:
     data = yaml.safe_load(f)
 
-for role_name, role_data in data.get('roles', {}).items():
+for role_data in data.get('roles', {}).values():
     if 'description' in role_data and 'short_desc' not in role_data:
         desc = role_data['description']
         parts = desc.split('—')

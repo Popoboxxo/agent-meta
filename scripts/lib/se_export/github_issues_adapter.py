@@ -3,7 +3,6 @@
 import json
 import re
 import subprocess
-from typing import Optional
 
 from .base import SEAdapter
 
@@ -42,7 +41,7 @@ class GitHubIssuesAdapter(SEAdapter):
                 ``labels`` (optional dict overriding defaults).
         """
         self._repo: str = config.get("repo", "")
-        self._milestone: Optional[str] = config.get("milestone")
+        self._milestone: str | None = config.get("milestone")
         raw_labels: dict = config.get("labels", {})
         self._labels: dict[str, str] = {**_DEFAULT_LABELS, **raw_labels}
         self._dry_run: bool = config.get("dry_run", False)
@@ -58,7 +57,7 @@ class GitHubIssuesAdapter(SEAdapter):
         req_id: str,
         title: str,
         description: str,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
     ) -> str:
         """Create a GitHub Issue for the requirement.
 
@@ -197,7 +196,7 @@ class GitHubIssuesAdapter(SEAdapter):
             return
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 ["gh", "auth", "status"],
                 capture_output=True,
                 text=True,
@@ -262,7 +261,7 @@ class GitHubIssuesAdapter(SEAdapter):
         Raises:
             RuntimeError: If the command exits with a non-zero status.
         """
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: PLW1510
         if result.returncode != 0:
             raise RuntimeError(
                 f"gh command failed (exit {result.returncode}):\n"
@@ -276,7 +275,7 @@ class GitHubIssuesAdapter(SEAdapter):
 # Module-level helpers
 # ------------------------------------------------------------------
 
-def _extract_issue_number(issue_url: str) -> Optional[int]:
+def _extract_issue_number(issue_url: str) -> int | None:
     """Extract the numeric issue number from a GitHub issue URL or bare number.
 
     Args:

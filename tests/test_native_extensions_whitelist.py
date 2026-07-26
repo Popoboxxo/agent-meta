@@ -1,8 +1,6 @@
 """Tests for the orchestrator.native-extensions.whitelist config path."""
-from pathlib import Path
 import json
-
-import pytest
+from pathlib import Path
 
 from scripts.lib.config import build_variables
 
@@ -55,7 +53,6 @@ def test_build_variables_whitelist_active_with_entries():
 
 from scripts.lib.config import strip_inactive_conditional_blocks, substitute
 from scripts.lib.log import SyncLog
-
 
 _RULE_SNIPPET = """{{#if NATIVE_EXTENSIONS_ENABLED}}
 ## Native Provider-Erweiterungen

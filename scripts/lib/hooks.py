@@ -123,7 +123,7 @@ def _update_settings_hooks(
             with settings_path.open(encoding="utf-8") as f:
                 settings = json.load(f)
         except (json.JSONDecodeError, OSError):
-            log.warn("settings.json could not be parsed — hooks section not updated")
+            log.warning("settings.json could not be parsed — hooks section not updated")
             return
     else:
         if not active_entries:

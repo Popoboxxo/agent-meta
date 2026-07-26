@@ -17,7 +17,6 @@ from scripts.lib.config_audit import (
     audit_config,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixture: a minimal agent-meta root with templates + role-defaults + config
 # ---------------------------------------------------------------------------
@@ -276,5 +275,5 @@ def test_report_severity_properties() -> None:
 
 def test_audit_issue_is_frozen() -> None:
     issue = AuditIssue("cat", "info", "role", "msg")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         issue.role = "other"  # type: ignore[misc]

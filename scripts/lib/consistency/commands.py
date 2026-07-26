@@ -110,7 +110,7 @@ def _parse_frontmatter(raw: str) -> dict:
     try:
         import yaml
         return yaml.safe_load(raw) or {}
-    except (ImportError, Exception):
+    except (ImportError, Exception):  # noqa: BLE001
         result = {}
         for line in raw.splitlines():
             m = re.match(r'^([\w-]+):\s*(.*)$', line)
@@ -122,7 +122,7 @@ def _parse_frontmatter(raw: str) -> dict:
                         import json
                         result[key] = json.loads(val)
                         continue
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110
                         pass
                 result[key] = val.strip('"').strip("'")
         return result

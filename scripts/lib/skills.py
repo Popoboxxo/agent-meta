@@ -53,7 +53,7 @@ def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) 
         actual = get_skill_commit(agent_meta_root, local_path)
         # get_skill_commit returns short hash — compare prefix
         if actual != "unknown" and not pinned.startswith(actual):
-            log.warn(
+            log.warning(
                 f"repo '{repo_name}': submodule is at {actual}, "
                 f"expected pinned_commit {pinned[:8]} — "
                 f"run: git -C {local_path} checkout {pinned[:8]}"
@@ -63,7 +63,7 @@ def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) 
 def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
     """Return short commit hash of a submodule. Falls back to 'unknown'."""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=str(agent_meta_root / submodule_path),
             capture_output=True, text=True, timeout=5,
@@ -146,7 +146,7 @@ def sync_external_skills_for_provider(
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
-        log.warn(f"Skill wrapper template not found: {wrapper_path}")
+        log.warning(f"Skill wrapper template not found: {wrapper_path}")
         return
 
     wrapper_template = wrapper_path.read_text(encoding="utf-8")
@@ -177,14 +177,14 @@ def sync_external_skills_for_provider(
         # Detect uninitialized submodule (directory exists but is empty)
         submodule_dir = agent_meta_root / local_path
         if submodule_dir.exists() and not any(submodule_dir.iterdir()):
-            log.warn(
+            log.warning(
                 f"Submodule '{local_path}' is not initialized (empty directory) — "
                 f"please run: git submodule update --init {local_path}"
             )
             continue
 
         if not entry_path.exists():
-            log.warn(f"Skill entry not found: {entry_path}")
+            log.warning(f"Skill entry not found: {entry_path}")
             continue
 
         commit = get_skill_commit(agent_meta_root, local_path)
@@ -226,7 +226,7 @@ def sync_external_skills_for_provider(
                 log.action("COPY", str((skill_target_dir / af).relative_to(project_root)),
                            f"{local_path}/{source_rel}/{af}")
             else:
-                log.warn(f"additional_file not found: {af_source}")
+                log.warning(f"additional_file not found: {af_source}")
 
         if not dry_run:
             agents_dir.mkdir(parents=True, exist_ok=True)
@@ -275,13 +275,13 @@ def add_skill(
     else:
         print(f"  >  git submodule add {repo_url} {local_path}")
         if not dry_run:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: PLW1510
                 ["git", "submodule", "add", repo_url, local_path],
                 cwd=str(agent_meta_root),
                 capture_output=False,
             )
             if result.returncode != 0:
-                print(f"  !  git submodule add failed", file=sys.stderr)
+                print("  !  git submodule add failed", file=sys.stderr)
                 return
 
     # Update config/skills-registry.yaml (or legacy fallback)

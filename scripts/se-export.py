@@ -28,7 +28,7 @@ try:
 except ImportError:
     _YAML_AVAILABLE = False
 
-from scripts.lib.se_export import get_adapter  # noqa: E402
+from scripts.lib.se_export import get_adapter
 
 
 def _load_project_yaml(config_path: Path) -> dict:
@@ -46,7 +46,7 @@ def _load_project_yaml(config_path: Path) -> dict:
         SystemExit: If the file cannot be found or parsed.
     """
     if not config_path.exists():
-        logging.error("Config file not found: %s", config_path)
+        logging.error("Config file not found: %s", config_path)  # noqa: LOG015
         sys.exit(1)
 
     text = config_path.read_text(encoding="utf-8")
@@ -55,7 +55,7 @@ def _load_project_yaml(config_path: Path) -> dict:
             return yaml.safe_load(text) or {}
         return json.loads(text)
     except Exception as exc:  # noqa: BLE001
-        logging.error("Failed to parse config file %s: %s", config_path, exc)
+        logging.error("Failed to parse config file %s: %s", config_path, exc)  # noqa: LOG015
         sys.exit(1)
 
 
@@ -72,13 +72,13 @@ def _load_graph(graph_path: Path) -> dict:
         SystemExit: On file-not-found or JSON parse error.
     """
     if not graph_path.exists():
-        logging.error("Graph file not found: %s", graph_path)
+        logging.error("Graph file not found: %s", graph_path)  # noqa: LOG015
         sys.exit(1)
 
     try:
         return json.loads(graph_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        logging.error("Failed to parse graph JSON %s: %s", graph_path, exc)
+        logging.error("Failed to parse graph JSON %s: %s", graph_path, exc)  # noqa: LOG015
         sys.exit(1)
 
 
@@ -130,7 +130,7 @@ def main() -> None:
     se_export_config: dict = project_config.get("se-export", {})
 
     if not se_export_config:
-        logging.error(
+        logging.error(  # noqa: LOG015
             "No 'se-export' section found in %s. Add one and retry.", config_path
         )
         sys.exit(1)
@@ -141,29 +141,29 @@ def main() -> None:
 
     graph = _load_graph(graph_path)
 
-    logging.info(
+    logging.info(  # noqa: LOG015
         "Using adapter: %s", se_export_config.get("type", "(unknown)")
     )
 
     if args.dry_run:
-        logging.info("[dry-run] No writes or API calls will be made.")
+        logging.info("[dry-run] No writes or API calls will be made.")  # noqa: LOG015
 
     try:
         adapter = get_adapter(se_export_config)
     except ValueError as exc:
-        logging.error("Adapter configuration error: %s", exc)
+        logging.error("Adapter configuration error: %s", exc)  # noqa: LOG015
         sys.exit(1)
 
     try:
         id_map = adapter.export_graph(graph)
     except RuntimeError as exc:
-        logging.error("Export failed: %s", exc)
+        logging.error("Export failed: %s", exc)  # noqa: LOG015
         sys.exit(1)
 
-    logging.info("Export complete. %d requirements exported.", len(id_map))
+    logging.info("Export complete. %d requirements exported.", len(id_map))  # noqa: LOG015
     if args.verbose:
         for req_id, ext_id in id_map.items():
-            logging.debug("  %s -> %s", req_id, ext_id)
+            logging.debug("  %s -> %s", req_id, ext_id)  # noqa: LOG015
 
 
 if __name__ == "__main__":

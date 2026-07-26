@@ -98,7 +98,6 @@ def resolve_model(
     log: Optional["SyncLog"] = None,
 ) -> str:
     """Resolve the model ID for a role and provider using tier presets and registry."""
-    pc = provider_config or {}
 
     tier_or_id = ""
     explicit_override = False
@@ -113,7 +112,7 @@ def resolve_model(
             log.debug(f"{provider}/{role}", f"Model explicitly overriden for provider '{provider}': {tier_or_id}")
     elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
-        if not isinstance(flat_value, dict):
+        if not isinstance(flat_value, dict):  # noqa: SIM102
             if provider == "Claude":
                 tier_or_id = str(flat_value)
                 explicit_override = True

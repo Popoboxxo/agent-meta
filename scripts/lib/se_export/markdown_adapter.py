@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from .base import SEAdapter
 
@@ -34,7 +33,7 @@ class MarkdownAdapter(SEAdapter):
         req_id: str,
         title: str,
         description: str,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
     ) -> str:
         """Write a Markdown file for the requirement and record it in the registry.
 
@@ -227,7 +226,7 @@ def _mermaid_id(req_id: str) -> str:
     return "".join(c if c.isalnum() else "_" for c in req_id)
 
 
-def _find_req_by_file(registry: dict, file_path: str) -> Optional[str]:
+def _find_req_by_file(registry: dict, file_path: str) -> str | None:
     """Reverse-lookup: find req_id whose file equals *file_path*."""
     for req_id, meta in registry.items():
         if meta["file"] == file_path:

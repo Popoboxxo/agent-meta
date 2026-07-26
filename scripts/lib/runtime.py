@@ -1,10 +1,12 @@
 """Parallel subagent execution barrier runtime."""
 
-from dataclasses import dataclass, field
-from typing import List, Callable, Dict, Any, Optional
 import time
 import traceback
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass, field
+from typing import Any
+
 
 @dataclass
 class SubagentTask:
@@ -13,7 +15,7 @@ class SubagentTask:
     prompt: str
     func: Callable[[], Any]  # The function to execute the subagent task
     description: str = ""
-    timeout: Optional[float] = None
+    timeout: float | None = None
 
 
 @dataclass
@@ -23,13 +25,13 @@ class SubagentResult:
     prompt: str
     status: str  # "success", "failed", "timeout"
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     duration: float = 0.0
 
 
 @dataclass
 class BarrierResult:
-    results: List[SubagentResult] = field(default_factory=list)
+    results: list[SubagentResult] = field(default_factory=list)
     total_duration: float = 0.0
     status: str = "success"  # "success", "failed", "timeout"
 
@@ -40,14 +42,14 @@ class SubagentBarrierRuntime:
     def __init__(self, max_workers: int = 5):
         self.max_workers = max_workers
 
-    def execute(self, tasks: List[SubagentTask], global_timeout: Optional[float] = None) -> BarrierResult:
+    def execute(self, tasks: list[SubagentTask], global_timeout: float | None = None) -> BarrierResult:
         """Executes a list of SubagentTask instances in parallel using a thread pool.
 
         Maintains barrier synchronization, aggregates outcomes, handles timeouts (both individual and global),
         captures exceptions, and records durations.
         """
         start_time = time.perf_counter()
-        results: Dict[str, SubagentResult] = {}
+        results: dict[str, SubagentResult] = {}
         futures = {}
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -66,7 +68,7 @@ class SubagentBarrierRuntime:
                             output=res,
                             duration=t_duration
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         t_duration = time.perf_counter() - t_start
                         tb = traceback.format_exc()
                         return SubagentResult(
@@ -74,7 +76,7 @@ class SubagentBarrierRuntime:
                             subagent_type=t.subagent_type,
                             prompt=t.prompt,
                             status="failed",
-                            error=f"{str(e)}\n{tb}",
+                            error=f"{e!s}\n{tb}",
                             duration=t_duration
                         )
 
@@ -92,7 +94,7 @@ class SubagentBarrierRuntime:
                 # Determine the actual timeout to use for this specific future
                 # It is the minimum of its individual timeout and the remaining global timeout
                 current_timeout = task.timeout
-                if time_left is not None:
+                if time_left is not None:  # noqa: SIM102
                     if current_timeout is None or current_timeout > time_left:
                         current_timeout = time_left
 
@@ -109,7 +111,7 @@ class SubagentBarrierRuntime:
                         status="timeout",
                         error="Task timeout exceeded" if (task.timeout is not None and current_timeout == task.timeout) else "Global timeout exceeded"
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     # In case of internal ThreadPoolExecutor exceptions
                     tb = traceback.format_exc()
                     results[task.task_id] = SubagentResult(
@@ -117,7 +119,7 @@ class SubagentBarrierRuntime:
                         subagent_type=task.subagent_type,
                         prompt=task.prompt,
                         status="failed",
-                        error=f"{str(e)}\n{tb}"
+                        error=f"{e!s}\n{tb}"
                     )
 
         # Ensure all tasks have a result (e.g. if ThreadPoolExecutor exited otherwise)

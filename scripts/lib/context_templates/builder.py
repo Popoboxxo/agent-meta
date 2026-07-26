@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+
 class TemplateBuilder:
     def __init__(self, templates_dir: Path):
         self.templates_dir = templates_dir

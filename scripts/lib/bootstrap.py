@@ -14,7 +14,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 try:
     import yaml
 except ImportError:
@@ -40,7 +39,7 @@ class BootstrapEngine:
                         self._bootstrap_registry = yaml.safe_load(f)
                     else:
                         self._bootstrap_registry = {}
-            except (FileNotFoundError, yaml.YAMLError) as e:
+            except (FileNotFoundError, yaml.YAMLError):
                 self._bootstrap_registry = {}
         return self._bootstrap_registry or {}
 

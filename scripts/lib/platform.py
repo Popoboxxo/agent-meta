@@ -51,7 +51,7 @@ def load_platform_config(
     try:
         import yaml as _yaml
     except ImportError:
-        log.warn(
+        log.warning(
             'PyYAML not available — platform-config substitution skipped. '
             'Install it with: pip install pyyaml'
         )
@@ -67,7 +67,7 @@ def load_platform_config(
             with project_config_path.open(encoding='utf-8') as f:
                 overrides_flat = _flatten_yaml_dict(_yaml.safe_load(f) or {})
         except (OSError, _yaml.YAMLError) as e:
-            log.warn(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
+            log.warning(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
 
     for platform in platforms:
         defaults_path = agent_meta_root / PLATFORM_CONFIGS_DIR / f'{platform}.defaults.yaml'
@@ -79,7 +79,7 @@ def load_platform_config(
             with defaults_path.open(encoding='utf-8') as f:
                 defaults_raw = _yaml.safe_load(f) or {}
         except (OSError, _yaml.YAMLError) as e:
-            log.warn(f'platform-config: failed to load {defaults_path.name}: {e}')
+            log.warning(f'platform-config: failed to load {defaults_path.name}: {e}')
             continue
 
         # Merge: defaults first, then overrides win
@@ -88,7 +88,7 @@ def load_platform_config(
         # Warn for required fields (empty-string default) that are still empty
         for key, val in platform_flat.items():
             if key.startswith(f'platform.{platform}.') and val == '':
-                log.warn(
+                log.warning(
                     f'platform-config: required field {{{{platform.{key[len("platform."):]}}}}}'
                     f' is empty -- add it to .claude/platform-config.yaml'
                 )
@@ -116,7 +116,7 @@ def substitute_platform(
         raw_key = match.group(1)   # e.g. 'platform.homeassistant.notify_group'
         if raw_key in platform_vars:
             return str(platform_vars[raw_key])
-        log.warn(
+        log.warning(
             f'platform-config: placeholder {{{{{raw_key}}}}} not found in platform defaults '
             f'or project overrides — placeholder remains in: {source_label}'
         )

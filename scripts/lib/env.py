@@ -53,7 +53,7 @@ def _generate_powershell_set(envs: dict) -> str:
             lines.append(f'    Write-Host "  !  {name}=<not set> (set in project.yaml or env)"')
             lines.append(f'    $env:{name} = ""')
         lines.append("} else {")
-        display_default = _mask(f"$env:{name}") if secret else f"$env:{name}"
+        _mask(f"$env:{name}") if secret else f"$env:{name}"
         lines.append(f'    Write-Host "  i  {name} already set"')
         lines.append("}")
         lines.append("")

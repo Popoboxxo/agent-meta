@@ -35,14 +35,15 @@ import argparse
 import json
 import os
 import queue
-import sys
 import subprocess
+import sys
 import threading
 import time
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 try:
@@ -217,11 +218,11 @@ def _load_viz_config(root: Path) -> dict:
             "retention_days":      int(report_cfg.get("retention_days", _DEFAULT_VIZ_RETENTION)),
             "session_timeout_min": int(report_cfg.get("session_timeout_min", _DEFAULT_VIZ_SESSION_TIMEOUT)),
         }
-    except Exception:
+    except Exception:  # noqa: BLE001
         return _viz_defaults()
 
 
-def _is_pid_running(pid: Optional[int]) -> bool:
+def _is_pid_running(pid: int | None) -> bool:
     if not pid:
         return False
     try:
@@ -240,7 +241,7 @@ def _is_pid_running(pid: Optional[int]) -> bool:
         return False
 
 
-def _read_pid(pid_file: Path) -> Optional[int]:
+def _read_pid(pid_file: Path) -> int | None:
     if pid_file.exists():
         try:
             return int(pid_file.read_text(encoding="utf-8").strip())
@@ -294,7 +295,7 @@ class VizManager:
             si.wShowWindow = 0
             proc = subprocess.Popen(
                 args,
-                stdout=open(log_file, "a", encoding="utf-8"),
+                stdout=open(log_file, "a", encoding="utf-8"),  # noqa: SIM115
                 stderr=subprocess.STDOUT,
                 startupinfo=si,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
@@ -303,7 +304,7 @@ class VizManager:
         else:
             proc = subprocess.Popen(
                 args,
-                stdout=open(log_file, "a", encoding="utf-8"),
+                stdout=open(log_file, "a", encoding="utf-8"),  # noqa: SIM115
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
                 cwd=str(self.root),
@@ -337,7 +338,7 @@ class VizManager:
                 if _is_pid_running(pid):
                     os.kill(pid, 9)
             print(f"  -  {label} stopped (PID: {pid})")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             print(f"  !  Error stopping {label}: {exc}")
         finally:
             pid_file.unlink(missing_ok=True)
@@ -629,11 +630,11 @@ class ConfigManager:
         # (e.g. PUT /api/config/role-defaults with body "just a string").
         # A valid config document is always a mapping or a sequence.
         if not isinstance(data, (dict, list)):
-            raise ValueError("Invalid payload type: expected object")
+            raise ValueError("Invalid payload type: expected object")  # noqa: TRY004
         path = self.resolve_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        backup_info: Optional[str] = None
+        backup_info: str | None = None
         if path.exists():
             backup_info = self._backup(path)
             self._prune_backups(path)
@@ -668,7 +669,7 @@ class ConfigManager:
     @staticmethod
     def _backup(path: Path) -> str:
         """Create a timestamped backup copy of ``path`` next to the original."""
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # noqa: DTZ005
         backup_path = path.with_suffix(path.suffix + f".bak.{stamp}")
         backup_path.write_bytes(path.read_bytes())
         return str(backup_path.name)
@@ -714,7 +715,7 @@ class SyncExecutor:
             }
         cmd = [sys.executable, str(self.sync_script), *extra_args]
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: PLW1510
                 cmd,
                 cwd=str(self.root),
                 capture_output=True,
@@ -732,13 +733,13 @@ class SyncExecutor:
             }
         except subprocess.TimeoutExpired:
             result = {"success": False, "output": "sync.py timed out (300s)", "returncode": -1}
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             result = {"success": False, "output": f"sync.py failed: {exc}", "returncode": -1}
         self._record_run(result)
         return result
 
     @staticmethod
-    def _extract_summary(output: str) -> Optional[str]:
+    def _extract_summary(output: str) -> str | None:
         """Return the sync SUMMARY line (e.g. ``61 action(s) | 89 skipped | ...``)."""
         for line in output.splitlines():
             stripped = line.strip()
@@ -832,13 +833,13 @@ class ConfigWatcher(threading.Thread):
         self._stop_event = threading.Event()
         self._mtimes: dict[Path, float] = {}
         self._events_path = self.root / ".meta-viz" / "events.jsonl"
-        self._subscribers: list["queue.Queue"] = []
+        self._subscribers: list[queue.Queue] = []
         self._subscribers_lock = threading.Lock()
 
     def stop(self) -> None:
         self._stop_event.set()
 
-    def subscribe(self) -> "queue.Queue":
+    def subscribe(self) -> queue.Queue:
         """Register a listener for config change events.
 
         Returns a fresh :class:`queue.Queue`. Emitted event dicts are pushed to
@@ -846,12 +847,12 @@ class ConfigWatcher(threading.Thread):
         :class:`queue.Empty` for heartbeats. The SSE handler owns one queue per
         open connection.
         """
-        q: "queue.Queue" = queue.Queue()
+        q: queue.Queue = queue.Queue()
         with self._subscribers_lock:
             self._subscribers.append(q)
         return q
 
-    def unsubscribe(self, q: "queue.Queue") -> None:
+    def unsubscribe(self, q: queue.Queue) -> None:
         """Remove a previously registered listener queue."""
         with self._subscribers_lock:
             try:
@@ -865,7 +866,7 @@ class ConfigWatcher(threading.Thread):
             if path.exists():
                 yield path
 
-    def run(self) -> None:  # noqa: D401 - thread entry point
+    def run(self) -> None:
         # Initial snapshot — do not fire events for already-present files.
         for path in self._tracked_files():
             try:
@@ -929,8 +930,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     config_manager: ConfigManager
     sync_executor: SyncExecutor
-    viz_manager: "VizManager"
-    config_watcher: "ConfigWatcher"
+    viz_manager: VizManager
+    config_watcher: ConfigWatcher
     mode: str
     root: Path
     version: str
@@ -941,7 +942,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Logging                                                            #
     # ------------------------------------------------------------------ #
 
-    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: Any) -> None:
         # Suppress default request-log line; keep stderr clean.
         return
 
@@ -1032,7 +1033,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Routing                                                            #
     # ------------------------------------------------------------------ #
 
-    def do_OPTIONS(self) -> None:  # noqa: N802 - http verb
+    def do_OPTIONS(self) -> None:
         # No cross-origin access is permitted; respond with a minimal 204 and
         # no CORS headers so the browser will not consider this an allowed
         # cross-site preflight.
@@ -1040,7 +1041,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Allow", "GET, PUT, POST, DELETE, OPTIONS")
         self.end_headers()
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         try:
             self._dispatch_get()
         except SecurityError as exc:
@@ -1053,10 +1054,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # response on a dead socket would raise another exception and cause
             # a confusing double traceback — bail out silently.
             return
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
-    def do_PUT(self) -> None:  # noqa: N802
+    def do_PUT(self) -> None:
         try:
             self._check_origin()
             self._dispatch_put()
@@ -1069,10 +1070,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         try:
             self._check_origin()
             self._dispatch_post()
@@ -1083,10 +1084,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
-    def do_DELETE(self) -> None:  # noqa: N802
+    def do_DELETE(self) -> None:
         try:
             self._check_origin()
             self._dispatch_delete()
@@ -1096,7 +1097,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "not_found", "detail": str(exc)}, status=404)
         except ConnectionError:
             return
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             self._send_json({"error": "internal", "detail": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
@@ -1432,7 +1433,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         raise FileNotFoundError(path)
 
     @staticmethod
-    def _match_subserver_route(path: str) -> Optional[tuple[str, str]]:
+    def _match_subserver_route(path: str) -> tuple[str, str] | None:
         """Return ``(name, action)`` if ``path`` matches the subserver control
         route ``/api/subserver/{name}/{action}`` with a whitelisted name and
         action, otherwise ``None``."""
@@ -1579,7 +1580,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             models = self._collect_models()
             return self._send_json({"models": models})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_models_active(self) -> None:
@@ -1593,7 +1594,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             models = [m for m in self._collect_models() if m.get("enabled")]
             return self._send_json({"models": models})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
@@ -1673,7 +1674,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "providers": data.get("providers", {}),
                 "models": data.get("models", {}),
             }
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def _load_from_models_dev_api(self) -> dict | None:
@@ -1691,7 +1692,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "providers": data.get("providers", {}),
                 "models": data.get("models", {}),
             }
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     # Provider keys in ``config/pricing-overlay.yaml`` that never have a real
@@ -1701,7 +1702,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # key that doesn't match a live models.dev provider id is treated as
     # inert legacy data and ignored here (e.g. a naming mismatch), so we
     # never fabricate a phantom provider for real catalog entries.
-    CURATED_ONLY_PROVIDER_KEYS = {"mammouth", "continue"}
+    CURATED_ONLY_PROVIDER_KEYS = {"mammouth", "continue"}  # noqa: RUF012
 
     def _apply_pricing_overlay(self, providers: dict) -> dict:
         """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
@@ -1732,7 +1733,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         try:
             pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
-        except Exception:
+        except Exception:  # noqa: BLE001
             return providers
         prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
         if not isinstance(prices, dict):
@@ -1800,13 +1801,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             qs = parse_qs(parsed.query)
             provider_filter = qs.get('providers', [None])[0]
             if provider_filter:
-                requested = set(p.strip() for p in provider_filter.split(',') if p.strip())
+                requested = {p.strip() for p in provider_filter.split(',') if p.strip()}
                 if requested:
                     providers = {k: v for k, v in providers.items() if k in requested}
                     data['_filtered'] = True
             data['providers'] = providers
             return self._send_json(data)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_dev_refresh(self) -> None:
@@ -1815,7 +1816,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 if hasattr(self.__class__, attr):
                     delattr(self.__class__, attr)
             return self._send_json(self._load_models_dev_data())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_dev_import(self) -> None:
@@ -1823,7 +1824,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             body = self._read_body()
             if not isinstance(body, dict):
-                raise ValueError("expected JSON body")
+                raise ValueError("expected JSON body")  # noqa: TRY004
             provider_id = body.get("provider", "").strip()
             model_id = body.get("model_id", "").strip()
             input_cost = body.get("input_cost")
@@ -1855,7 +1856,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             pricing_path.write_text(yaml.dump(pricing, default_flow_style=False, allow_unicode=True, sort_keys=False),
                                     encoding="utf-8")
             return self._send_json({"success": True, "provider": provider_id, "model_id": model_id})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_update(self) -> None:
@@ -1866,8 +1867,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             is_submodule = agent_meta_root != project_root
 
             if is_submodule:
-                import urllib.request
                 import json
+                import urllib.request
                 url = "https://raw.githubusercontent.com/Popoboxxo/agent-meta/main/config/generated/model-registry.json"
                 req = urllib.request.Request(url, headers={"User-Agent": "agent-meta-admin"})
                 with urllib.request.urlopen(req, timeout=15) as response:
@@ -1881,7 +1882,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             else:
                 res = self.__class__.sync_executor._run(["--update-models"])
                 return self._send_json(res)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_clear_override(self) -> None:
@@ -1892,7 +1893,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if target_file.exists():
                 target_file.unlink()
             return self._send_json({"success": True})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _read_id_list(self) -> list[str]:
@@ -1910,10 +1911,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError as exc:
             raise ValueError(f"invalid JSON body: {exc}") from exc
         if not isinstance(data, dict):
-            raise ValueError("body must be a JSON object with 'ids' field")
+            raise ValueError("body must be a JSON object with 'ids' field")  # noqa: TRY004
         ids = data.get("ids")
         if not isinstance(ids, list):
-            raise ValueError("'ids' must be a list of strings")
+            raise ValueError("'ids' must be a list of strings")  # noqa: TRY004
         seen: set[str] = set()
         result: list[str] = []
         for item in ids:
@@ -1958,7 +1959,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "blacklisted_count": added,
                 "total": len(blacklist),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_disable(self) -> None:
@@ -1991,7 +1992,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "disabled_count": added,
                 "total": len(disabled),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_models_enable(self) -> None:
@@ -2024,7 +2025,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "enabled_count": removed,
                 "total": len(new_disabled),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_pricing_update(self) -> None:
@@ -2068,7 +2069,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
                 
             return self._send_json({"success": True})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_pricing_reset(self) -> None:
@@ -2095,7 +2096,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                             yaml.dump(pricing, fh, default_flow_style=False, sort_keys=False)
                             
             return self._send_json({"success": True})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
@@ -2137,7 +2138,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if isinstance(value, str) and value in VALID_MODEL_SOURCES:
                 return value
             return _FALLBACK_MODEL_SOURCE
-        except Exception:
+        except Exception:  # noqa: BLE001
             return _FALLBACK_MODEL_SOURCE
 
     def _resolve_model_source(self, provider_name: str) -> str:
@@ -2221,7 +2222,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "preferences": self._read_model_source_prefs(),
                 "default": self._default_model_source(),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_model_source(self) -> None:
@@ -2233,7 +2234,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             body = self._read_body()
             if not isinstance(body, dict):
-                raise ValueError("expected JSON body")
+                raise ValueError("expected JSON body")  # noqa: TRY004
             provider = str(body.get("provider", "")).strip()
             source = str(body.get("source", "")).strip()
             if not provider:
@@ -2259,7 +2260,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if isinstance(v, str) and v in VALID_MODEL_SOURCES
                 },
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_model_source_batch(self) -> None:
@@ -2274,7 +2275,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             body = self._read_body()
             if not isinstance(body, dict):
-                raise ValueError("expected JSON body")
+                raise ValueError("expected JSON body")  # noqa: TRY004
             incoming = body.get("preferences")
             if not isinstance(incoming, dict) or not incoming:
                 return self._send_json({"error": "preferences object required"}, status=400)
@@ -2305,7 +2306,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if isinstance(v, str) and v in VALID_MODEL_SOURCES
                 },
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_model_suggestions(self) -> None:
@@ -2337,7 +2338,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 source = "registry"
                 models = self._suggestions_from_registry(provider)
             return self._send_json({"provider": provider, "source": source, "models": models})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_ai_providers(self) -> None:
@@ -2347,7 +2348,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             return self._send_json(data)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_ai_providers_update(self) -> None:
@@ -2359,7 +2360,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             with path.open("w", encoding="utf-8") as fh:
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
             return self._send_json({"success": True})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_tier_presets(self) -> None:
@@ -2369,7 +2370,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             return self._send_json(data)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_tier_presets_merged(self) -> None:
@@ -2396,7 +2397,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     raw = project_cfg.get("tier-presets") or {}
                     if isinstance(raw, dict):
                         project_data = raw
-            except Exception:
+            except Exception:  # noqa: BLE001
                 project_data = {}
 
             # 3. Merge — global first, project overrides per-key with source tag.
@@ -2415,7 +2416,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 merged[key] = entry
 
             return self._send_json(merged)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_post_tier_presets_update(self) -> None:
@@ -2444,7 +2445,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             with path.open("w", encoding="utf-8") as fh:
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
             return self._send_json({"success": True})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _agent_meta_root(self) -> Path:
@@ -2568,7 +2569,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 rows.append(row)
 
             return self._send_json({"providers": provider_names, "roles": rows})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
@@ -2723,13 +2724,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return lines[last + 1 :]
 
     @staticmethod
-    def _extract_list_item_id(lines: list[str]) -> Optional[str]:
+    def _extract_list_item_id(lines: list[str]) -> str | None:
         """Parse a single YAML list item and return its ``id`` field, if any."""
         try:
             data = yaml.safe_load("".join(lines))
             if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
                 return data[0].get("id")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         return None
 
@@ -2847,7 +2848,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         def _scalar_dump(v: Any) -> str:
             return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
 
-        def _build_dict_child(k: str, v: Any, child: Optional[dict]) -> list[str]:
+        def _build_dict_child(k: str, v: Any, child: dict | None) -> list[str]:
             if child:
                 trailing = self._trailing_blank_lines(
                     body_lines[child["start"] : child["end"]]
@@ -2874,7 +2875,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         "\n",
                     ]
 
-        def _build_list_child(item: dict, child: Optional[dict]) -> list[str]:
+        def _build_list_child(item: dict, child: dict | None) -> list[str]:
             if child:
                 trailing = self._trailing_blank_lines(
                     body_lines[child["start"] : child["end"]]
@@ -2915,7 +2916,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     try:
                         parsed = yaml.safe_load("".join(old_block))
                         old_value = parsed.get(k) if isinstance(parsed, dict) else None
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         old_value = None
                     if old_value == v:
                         new_lines.extend(old_block)
@@ -2956,7 +2957,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     try:
                         parsed = yaml.safe_load("".join(old_block))
                         old_value = parsed[0] if isinstance(parsed, list) and parsed else None
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         old_value = None
                     if old_value == item:
                         new_lines.extend(old_block)
@@ -2998,7 +2999,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         # Skip the actual write if the parsed content is unchanged.
         try:
             parsed_original = yaml.safe_load(original_text) or {}
-        except Exception:
+        except Exception:  # noqa: BLE001
             parsed_original = {}
         if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
             return {
@@ -3180,7 +3181,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 return {"reflection_pair": pair}
         raise FileNotFoundError(f"reflection pair not found: {pair_id}")
 
-    def _ensure_pair_id(self, pair: dict, pair_id: Optional[str] = None) -> str:
+    def _ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
         """Return a valid id for a reflection pair, generating one if missing."""
         if pair_id:
             pair["id"] = pair_id
@@ -3277,7 +3278,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             desc = front_data.get("description")
             if isinstance(desc, str):
                 return desc.strip()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         return ""
 
@@ -3402,7 +3403,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     help_map[current_id] = "\n".join(current_text).strip()
                 current_id = line.replace("<!-- help-id: ", "").replace(" -->", "").strip()
                 current_text = []
-            elif line.startswith("### ") or line.startswith("## "):
+            elif line.startswith(("### ", "## ")):
                 # A new heading stops the current block parsing until the next help-id
                 if current_id:
                     help_map[current_id] = "\n".join(current_text).strip()
@@ -3421,11 +3422,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _run_consistency_check(self) -> dict:
         """Run the overall repository consistency check and return JSON."""
+        import json
         import subprocess
         import sys
-        import json
         try:
-            r = subprocess.run(
+            r = subprocess.run(  # noqa: PLW1510
                 [sys.executable, "scripts/consistency-check.py", "--json"], 
                 cwd=str(self.__class__.root), 
                 capture_output=True, 
@@ -3440,7 +3441,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "findings": [],
                 "summary": {"total": 0, "errors": 0, "warnings": 0}
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "error": str(e),
                 "findings": [],
@@ -3450,8 +3451,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _run_config_audit(self) -> dict:
         """Run the consistency audit over the current configuration."""
         self._ensure_lib_on_path()
-        from lib.config_audit import audit_config
         import dataclasses
+
+        from lib.config_audit import audit_config
         project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
         report = audit_config(self.__class__.root, project_config_path)
         return {
@@ -3464,7 +3466,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _apply_config_audit(self) -> dict:
         """Apply safe fixes reported by the consistency audit."""
         self._ensure_lib_on_path()
-        from lib.config_audit import audit_config, apply_audit
+        from lib.config_audit import apply_audit, audit_config
         project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
         report = audit_config(self.__class__.root, project_config_path)
         count = apply_audit(report, project_config_path)
@@ -3492,7 +3494,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         else:
             content = None
         if not isinstance(content, str):
-            raise ValueError("expected 'content' field with template text")
+            raise ValueError("expected 'content' field with template text")  # noqa: TRY004
         path = self._template_path(role)
         if not path:
             raise FileNotFoundError(f"template not found: {role}")
@@ -3513,7 +3515,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "bytes": len(content.encode("utf-8")),
         })
 
-    def _template_path(self, role: str) -> Optional[Path]:
+    def _template_path(self, role: str) -> Path | None:
         """Resolve the platform-specific template path for a role."""
         if not role or any(c in role for c in ("/", "\\", "..")):
             raise SecurityError(f"invalid role name: {role!r}")
@@ -3547,7 +3549,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 if event is None:
                     self.wfile.write(b"data: heartbeat\n\n")
                 else:
-                    self.wfile.write(f"data: {json.dumps(event)}\n\n".encode("utf-8"))
+                    self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             # Client disconnected — end the stream quietly.
@@ -3565,13 +3567,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-            from lib.providers import load_providers_config  # type: ignore[import]
             from lib.deactivation import get_deactivation_status  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
             return get_deactivation_status(root, project_config, provider_config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return {"error": str(exc)}
 
     def _read_environments(self) -> dict:
@@ -3618,8 +3620,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.deactivation import (  # type: ignore[import]
+                deactivate_providers,
+                get_deactivation_status,
+            )
             from lib.providers import load_providers_config  # type: ignore[import]
-            from lib.deactivation import deactivate_providers, get_deactivation_status  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
@@ -3639,7 +3644,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "results": results,
                 "status": get_deactivation_status(root, project_config, provider_config),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_activate_providers(self) -> None:
@@ -3653,8 +3658,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.deactivation import (  # type: ignore[import]
+                activate_providers,
+                get_deactivation_status,
+            )
             from lib.providers import load_providers_config  # type: ignore[import]
-            from lib.deactivation import activate_providers, get_deactivation_status  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
@@ -3674,7 +3682,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "results": results,
                 "status": get_deactivation_status(root, project_config, provider_config),
             })
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     # ------------------------------------------------------------------ #
@@ -3686,13 +3694,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-            from lib.providers import load_providers_config  # type: ignore[import]
             from lib.backup import list_backups  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
             return self._send_json(list_backups(root, project_config, provider_config))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_create_backup(self) -> None:
@@ -3704,8 +3712,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-            from lib.providers import load_providers_config  # type: ignore[import]
             from lib.backup import create_backup  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
@@ -3721,7 +3729,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 label=label, source_version=self.__class__.version
             )
             return self._send_json(result)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_restore_backup(self) -> None:
@@ -3737,8 +3745,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             sys.path.insert(0, str(root / "scripts"))
             sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-            from lib.providers import load_providers_config  # type: ignore[import]
             from lib.backup import restore_backup  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
@@ -3754,7 +3762,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 providers=providers, force=force
             )
             return self._send_json(result)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_delete_backup(self, archive_name: str) -> None:
@@ -3777,7 +3785,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             log = _Log()
             result = delete_backup(root, archive_name, project_config, log)
             return self._send_json(result)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
 
@@ -3841,7 +3849,7 @@ class AdminServer:
                 config = load_config(config_path)
                 if "agent-meta-version" in config:
                     return str(config["agent-meta-version"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # Fallback 1: .agent-meta/VERSION (if used as submodule)
@@ -3865,16 +3873,16 @@ class AdminServer:
         if self.enable_viz:
             self.viz_manager.start_all()
 
-        print(f"  i  agent-meta Admin UI")
+        print("  i  agent-meta Admin UI")
         print(f"  i  Mode:    {self.mode}")
         print(f"  i  Version: {AdminRequestHandler.version}")
         print(f"  i  URL:     http://{self.host}:{self.port}")
         print(f"  i  Root:    {self.root}")
         if self.enable_watcher:
-            print(f"  i  Watcher: enabled (.meta-viz/events.jsonl)")
+            print("  i  Watcher: enabled (.meta-viz/events.jsonl)")
         if not self.enable_viz:
-            print(f"  i  Viz/MCP: disabled (--no-viz)")
-        print(f"  i  Press Ctrl+C to stop")
+            print("  i  Viz/MCP: disabled (--no-viz)")
+        print("  i  Press Ctrl+C to stop")
         print()
 
         try:

@@ -224,7 +224,7 @@ def test_capability_filter_toggles(browser_ctx, admin_server):
 
         # Capability badges should be visible
         for label in ["🧠", "🔧", "📎", "👁", "📋"]:
-            badge_btn = page.locator(f"button.badge", has_text=label)
+            badge_btn = page.locator("button.badge", has_text=label)
             try:
                 expect(badge_btn.first).to_be_visible(timeout=2000)
                 break  # at least one is visible — OK

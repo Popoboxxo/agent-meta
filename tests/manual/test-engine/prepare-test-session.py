@@ -17,7 +17,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent.parent  # tests/manual/test-engine/ → tests/manual/ → tests/ → repo-root
@@ -67,7 +66,7 @@ def clear_viz_log(viz_log_path: Path):
         print(f"  [OK] Viz-Log geleert: {viz_log_path}")
     else:
         print(f"  [!] Viz-Log nicht gefunden: {viz_log_path}")
-        print(f"      Erstelle Verzeichnis...")
+        print("      Erstelle Verzeichnis...")
         viz_log_path.parent.mkdir(parents=True, exist_ok=True)
         viz_log_path.write_text("", encoding="utf-8")
         print(f"  [OK] Viz-Log erstellt: {viz_log_path}")
@@ -181,7 +180,7 @@ def main():
     scenario = find_scenario(args.scenario)
     if not scenario:
         print(f"  [!] Szenario '{args.scenario}' nicht gefunden")
-        print(f"      Nutze --list für verfügbare Szenarien")
+        print("      Nutze --list für verfügbare Szenarien")
         sys.exit(1)
 
     # Determine viz log path
@@ -199,8 +198,8 @@ def main():
 
     if args.start_server:
         print("  [i] Starte Viz-Server auf Port 8765...")
-        print(f"      Führe aus: python scripts/viz-server.py start")
-        print(f"      Dashboard: http://localhost:8765/")
+        print("      Führe aus: python scripts/viz-server.py start")
+        print("      Dashboard: http://localhost:8765/")
 
 
 if __name__ == "__main__":

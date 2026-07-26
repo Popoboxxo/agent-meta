@@ -27,15 +27,12 @@ The deactivation module delegates zip/restore to this module for consistency.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
 
 from .log import SyncLog
-from .providers import load_providers_config
 
 DEFAULT_BACKUP_DIR = ".backup/agent-meta"
 DEFAULT_MAX_BACKUPS = 10
@@ -119,7 +116,7 @@ def _build_manifest(
 
 def _archive_name(prefix: str = "agent-meta-backup") -> str:
     """Generate a timestamped archive name."""
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")  # noqa: DTZ005
     return f"{prefix}_{ts}"
 
 
@@ -189,7 +186,7 @@ def list_backups(
                         info["label"] = manifest_data.get("label", "")
                         info["providers"] = list(manifest_data.get("providers", {}).keys())
                         info["agent_meta_version"] = manifest_data.get("agent_meta_version", "")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 info["label"] = ""
                 info["providers"] = []
 
@@ -256,11 +253,11 @@ def create_backup(
     )
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would create backup '{archive_name}.zip'")
-        log.info("backup", f"  providers: {', '.join(targets)}")
-        log.info("backup", f"  config: {'yes' if extra_files else 'no'}")
+        log.info("backup", f"DRY-RUN: would create backup '{archive_name}.zip'")  # noqa: PLE1205
+        log.info("backup", f"  providers: {', '.join(targets)}")  # noqa: PLE1205
+        log.info("backup", f"  config: {'yes' if extra_files else 'no'}")  # noqa: PLE1205
         if label:
-            log.info("backup", f"  label: {label}")
+            log.info("backup", f"  label: {label}")  # noqa: PLE1205
         return {
             "success": True,
             "archive": _relative_path(zip_path, project_root),
@@ -296,11 +293,11 @@ def create_backup(
         for provider in targets:
             root_dir = _get_provider_root_dir(provider, provider_config)
             if not root_dir:
-                log.warn(f"backup: cannot determine root directory for '{provider}'")
+                log.warning(f"backup: cannot determine root directory for '{provider}'")
                 continue
             src_dir = project_root / root_dir
             if not src_dir.exists():
-                log.info("backup", f"provider directory not found, skipping: {root_dir}")
+                log.info("backup", f"provider directory not found, skipping: {root_dir}")  # noqa: PLE1205
                 manifest["providers"][provider]["backed_up"] = False
                 continue
 
@@ -326,7 +323,7 @@ def create_backup(
 
     zip_file = Path(created)
     size_mb = zip_file.stat().st_size / (1024 * 1024)
-    log.info("backup", f"created '{_relative_path(zip_file, project_root)}' "
+    log.info("backup", f"created '{_relative_path(zip_file, project_root)}' "  # noqa: PLE1205
              f"({round(size_mb, 2)} MB, {len(included)} providers)")
 
     # Apply retention
@@ -396,7 +393,7 @@ def restore_backup(
             names = zf.namelist()
             if MANIFEST_FILENAME in names:
                 manifest = json.loads(zf.read(MANIFEST_FILENAME).decode("utf-8"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"success": False, "error": f"failed to read archive: {exc}"}
 
     archive_providers = list(manifest.get("providers", {}).keys()) if manifest else []
@@ -413,8 +410,8 @@ def restore_backup(
                         candidate = parts[0] + "/"
                         if candidate not in archive_providers:
                             archive_providers.append(candidate)
-                log.info("backup", f"inferred providers from archive: {archive_providers}")
-        except Exception:
+                log.info("backup", f"inferred providers from archive: {archive_providers}")  # noqa: PLE1205
+        except Exception:  # noqa: BLE001, S110
             pass
 
     restore_targets = providers if providers else archive_providers
@@ -461,7 +458,7 @@ def restore_backup(
             continue
 
         if dry_run:
-            log.info("backup", f"DRY-RUN: would restore '{matching}' from archive")
+            log.info("backup", f"DRY-RUN: would restore '{matching}' from archive")  # noqa: PLE1205
             prov_result["restored"] = True
             result["provider_results"][target] = prov_result
             continue
@@ -477,10 +474,10 @@ def restore_backup(
                         continue
                     if member_parts[0].rstrip("/") == matching.rstrip("/"):
                         zf.extract(member, str(target_dir.parent))
-                log.info("backup", f"restored '{matching}' for provider '{target}'")
+                log.info("backup", f"restored '{matching}' for provider '{target}'")  # noqa: PLE1205
                 prov_result["restored"] = True
             result["provider_results"][target] = prov_result
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             prov_result["error"] = str(exc)
             result["provider_results"][target] = prov_result
 
@@ -491,14 +488,14 @@ def restore_backup(
             import zipfile
             target_yaml = project_root / ".meta-config" / "project.yaml"
             with zipfile.ZipFile(archive_path, "r") as zf:
-                if project_yaml_in_archive in zf.namelist():
+                if project_yaml_in_archive in zf.namelist():  # noqa: SIM102
                     if force or not target_yaml.exists():
                         target_yaml.parent.mkdir(parents=True, exist_ok=True)
                         with zf.open(project_yaml_in_archive) as src:
                             target_yaml.write_bytes(src.read())
                         result["config_restored"] = True
-                        log.info("backup", "restored project.yaml from backup")
-        except Exception:
+                        log.info("backup", "restored project.yaml from backup")  # noqa: PLE1205
+        except Exception:  # noqa: BLE001, S110
             pass
 
     return result
@@ -534,17 +531,17 @@ def delete_backup(
             return {"success": False, "error": f"archive not found: {archive_name}"}
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would delete '{_relative_path(archive_path, project_root)}'")
+        log.info("backup", f"DRY-RUN: would delete '{_relative_path(archive_path, project_root)}'")  # noqa: PLE1205
         return {"success": True, "deleted": _relative_path(archive_path, project_root), "dry_run": True}
 
     try:
         size_mb = archive_path.stat().st_size / (1024 * 1024)
         archive_path.unlink()
-        log.info("backup", f"deleted '{_relative_path(archive_path, project_root)}' "
+        log.info("backup", f"deleted '{_relative_path(archive_path, project_root)}' "  # noqa: PLE1205
                  f"({round(size_mb, 2)} MB)")
         return {"success": True, "deleted": _relative_path(archive_path, project_root),
                 "size_mb": round(size_mb, 2)}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"success": False, "error": str(exc)}
 
 
@@ -578,20 +575,20 @@ def prune_backups(
     )
 
     to_delete: list[Path] = []
-    cutoff = datetime.now() - timedelta(days=max_age_days)
+    cutoff = datetime.now() - timedelta(days=max_age_days)  # noqa: DTZ005
 
     for i, archive in enumerate(archives):
         try:
-            mtime = datetime.fromtimestamp(archive.stat().st_mtime)
+            mtime = datetime.fromtimestamp(archive.stat().st_mtime)  # noqa: DTZ006
         except OSError:
             continue
         if i >= max_backups or mtime < cutoff:
             to_delete.append(archive)
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would prune {len(to_delete)} backup(s)")
+        log.info("backup", f"DRY-RUN: would prune {len(to_delete)} backup(s)")  # noqa: PLE1205
         for a in to_delete:
-            log.info("backup", f"  would delete: {a.name}")
+            log.info("backup", f"  would delete: {a.name}")  # noqa: PLE1205
         return {"success": True, "pruned": len(to_delete), "dry_run": True,
                 "files": [a.name for a in to_delete]}
 
@@ -600,11 +597,11 @@ def prune_backups(
     age_deleted = 0
     for archive in list(backup_dir.glob("*.zip")):
         try:
-            mtime = datetime.fromtimestamp(archive.stat().st_mtime)
+            mtime = datetime.fromtimestamp(archive.stat().st_mtime)  # noqa: DTZ006
             if mtime < cutoff:
                 archive.unlink()
                 age_deleted += 1
-                log.info("backup", f"pruned (age): {archive.name}")
+                log.info("backup", f"pruned (age): {archive.name}")  # noqa: PLE1205
         except OSError:
             continue
 
@@ -623,7 +620,7 @@ def _prune_backups(backup_dir: Path, max_backups: int, log: SyncLog) -> int:
         try:
             old.unlink()
             deleted += 1
-            log.info("backup", f"pruned (count): {old.name}")
+            log.info("backup", f"pruned (count): {old.name}")  # noqa: PLE1205
         except OSError:
             continue
     return deleted

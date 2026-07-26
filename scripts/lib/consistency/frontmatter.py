@@ -197,7 +197,7 @@ def _get_head_version(path: Path, agent_meta_root: Path) -> str | None:
     """Get the version field from the HEAD version of this file via git show."""
     try:
         rel = path.relative_to(agent_meta_root)
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510
             ["git", "show", f"HEAD:{rel.as_posix()}"],
             cwd=str(agent_meta_root),
             capture_output=True, text=True, timeout=5,

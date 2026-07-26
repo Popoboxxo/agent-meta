@@ -1,4 +1,3 @@
-import re
 
 with open('tests/test_tier_presets.py', 'r', encoding='utf-8') as f:
     content = f.read()

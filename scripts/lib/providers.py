@@ -1,6 +1,5 @@
 """Provider configuration loading and resolution."""
 
-import sys
 from pathlib import Path
 
 from .io import _load_yaml_or_json

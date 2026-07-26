@@ -13,7 +13,12 @@ import json
 import re
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, read_json_lenient, safe_path, write_checked
+from .io import (
+    _load_yaml_or_json,
+    read_json_lenient,
+    safe_path,
+    write_checked,
+)
 from .log import SyncLog
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
@@ -287,7 +292,7 @@ def _update_json_config(
     if path.exists():
         parsed = _read_json_lenient(path)
         if parsed is None:
-            log.warn(
+            log.warning(
                 f"mcp: could not parse '{rel}' as JSON/JSONC — "
                 "MCP config not injected. Add mcpServers manually."
             )
@@ -296,7 +301,7 @@ def _update_json_config(
 
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
-    rel_out = str(path.relative_to(path.parent.parent)) if path.parent.name else rel
+    str(path.relative_to(path.parent.parent)) if path.parent.name else rel
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -322,7 +327,7 @@ def _update_continue_yaml_config(
     try:
         import yaml as _yaml
     except ImportError:
-        log.warn("mcp: PyYAML not installed — skipping Continue MCP config generation")
+        log.warning("mcp: PyYAML not installed — skipping Continue MCP config generation")
         return
 
     BLOCK_BEGIN = "# agent-meta:mcp-begin"
@@ -331,7 +336,7 @@ def _update_continue_yaml_config(
     rel = str(path.name)
 
     # Build the managed block content
-    servers_yaml = _yaml.dump(
+    _yaml.dump(
         {"mcpServers": list(mcp_entries.values())},
         allow_unicode=True, default_flow_style=False, sort_keys=False,
     )
@@ -477,7 +482,7 @@ def _write_provider_config(
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config)
     else:
-        log.warn(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
+        log.warning(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +595,7 @@ def generate_mcp_artifacts(
         for server_name in active_servers:
             server_def = registry.get(server_name)
             if not server_def:
-                log.warn(f"mcp: server '{server_name}' not in registry — skipping rule generation")
+                log.warning(f"mcp: server '{server_name}' not in registry — skipping rule generation")
                 continue
 
             filename = f"{MCP_RULE_PREFIX}{server_name}.md"

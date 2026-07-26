@@ -3,8 +3,8 @@
 import re
 from pathlib import Path
 
-from .log import SyncLog
 from .io import safe_path, write_checked
+from .log import SyncLog
 
 try:
     import yaml as _yaml
@@ -40,7 +40,7 @@ def load_provider_tools_config(agent_meta_root: Path) -> dict:
                 _provider_tools_cache = {}
         else:
             _provider_tools_cache = {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         _provider_tools_cache = {}
     return _provider_tools_cache
 
@@ -79,12 +79,12 @@ def _validate_tools_against_whitelist(
                 f"tool '{t}' not supported by {provider} — dropped by design",
             )
         else:
-            log.warn(
+            log.warning(
                 f"{provider}/{role}: tool '{t}' not supported by {provider} — skipping (see config/provider-tools.yaml)",
             )
     return valid
 
-def _update_frontmatter_dict(content: str, updates: dict, removes: list = None) -> str:
+def _update_frontmatter_dict(content: str, updates: dict, removes: list | None = None) -> str:
     """Update YAML frontmatter fields in content using PyYAML.
 
     If PyYAML is available, splits content into frontmatter and body,
@@ -442,7 +442,7 @@ def wrap_sections_in_xml(content: str) -> str:
         if stripped.startswith('## ') and not stripped.startswith('###'):
             # Close previous section if open
             if current_section is not None:
-                result.append(f'</section>\n')
+                result.append('</section>\n')
 
             # Derive XML-safe tag name from heading
             heading_text = stripped[3:].strip()  # Remove '## '
@@ -459,7 +459,7 @@ def wrap_sections_in_xml(content: str) -> str:
 
     # Close last section
     if current_section is not None:
-        result.append(f'</section>\n')
+        result.append('</section>\n')
 
     return ''.join(result)
 
@@ -595,7 +595,7 @@ def apply_path_rules(
 
         source_path = source_map.get(rule_name)
         if not source_path or not source_path.exists():
-            log.warn(f"pathRules: rule file '{rule_name}' not found (pattern: '{path_pattern}')")
+            log.warning(f"pathRules: rule file '{rule_name}' not found (pattern: '{path_pattern}')")
             continue
 
         opts = rule_options.get(rule_name, {})
@@ -700,7 +700,7 @@ def _patch_append_after(content: str, anchor: str, patch_content: str,
     lines = content.splitlines(keepends=True)
     bounds = _find_section_bounds(lines, anchor)
     if bounds is None:
-        log.warn(f"Composition patch 'append-after': anchor '{anchor}' not found in {source_label}")
+        log.warning(f"Composition patch 'append-after': anchor '{anchor}' not found in {source_label}")
         return content
     _, end_idx = bounds
     patch_lines = ("\n\n" + patch_content.rstrip("\n") + "\n\n").splitlines(keepends=True)
@@ -714,7 +714,7 @@ def _patch_replace(content: str, anchor: str, patch_content: str,
     lines = content.splitlines(keepends=True)
     bounds = _find_section_bounds(lines, anchor)
     if bounds is None:
-        log.warn(f"Composition patch 'replace': anchor '{anchor}' not found in {source_label}")
+        log.warning(f"Composition patch 'replace': anchor '{anchor}' not found in {source_label}")
         return content
     start_idx, end_idx = bounds
     patch_lines = (patch_content.rstrip("\n") + "\n").splitlines(keepends=True)
@@ -727,7 +727,7 @@ def _patch_delete(content: str, anchor: str, log: SyncLog, source_label: str) ->
     lines = content.splitlines(keepends=True)
     bounds = _find_section_bounds(lines, anchor)
     if bounds is None:
-        log.warn(f"Composition patch 'delete': anchor '{anchor}' not found in {source_label}")
+        log.warning(f"Composition patch 'delete': anchor '{anchor}' not found in {source_label}")
         return content
     start_idx, end_idx = bounds
     # Also remove leading blank line before section if present
@@ -753,7 +753,7 @@ def apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) -> s
     elif op == "delete":
         return _patch_delete(content, anchor, log, source_label)
     else:
-        log.warn(f"Composition: unknown patch op '{op}' in {source_label}")
+        log.warning(f"Composition: unknown patch op '{op}' in {source_label}")
         return content
 
 
@@ -798,14 +798,14 @@ def compose_agent(
     Returns the composed document ready for variable substitution.
     """
     if not _YAML_AVAILABLE:
-        log.warn(
+        log.warning(
             "PyYAML not available — composition skipped. "
             "Install it with: pip install pyyaml"
         )
         return override_content
 
     if not base_path.exists():
-        log.warn(f"Composition: base template not found: {base_path}")
+        log.warning(f"Composition: base template not found: {base_path}")
         return override_content
 
     base_content = base_path.read_text(encoding="utf-8")
@@ -888,10 +888,17 @@ def sync_agents(
     dry_run: bool,
 ):
     """Generate all .claude/agents/*.md files (legacy Claude-only path)."""
-    from .config import substitute, strip_inactive_conditional_blocks
+    from .config import strip_inactive_conditional_blocks, substitute
     from .providers import load_providers_config
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_permission_mode, resolve_temperature, resolve_max_tokens
-    from .skills import load_external_skills_config, _skill_is_active
+    from .roles import (
+        build_role_map,
+        resolve_max_tokens,
+        resolve_memory,
+        resolve_model,
+        resolve_permission_mode,
+        resolve_temperature,
+    )
+    from .skills import _skill_is_active, load_external_skills_config
 
     provider_config = load_providers_config(agent_meta_root)
     CLAUDE_AGENTS_DIR = ".claude/agents"
@@ -1107,15 +1114,28 @@ def sync_agents_for_provider(
     Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
     Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
     """
-    from .config import substitute, strip_inactive_conditional_blocks
-    from .pipelines import inject_pipeline_blocks, load_quality_pipelines, apply_overrides
+    from .config import strip_inactive_conditional_blocks, substitute
+    from .pipelines import (
+        apply_overrides,
+        inject_pipeline_blocks,
+        load_quality_pipelines,
+    )
     from .platform import substitute_platform
-    from .roles import build_role_map, resolve_model, resolve_memory, resolve_temperature, resolve_max_tokens, resolve_steps, resolve_permission_mode, load_roles_config
-    from .skills import load_external_skills_config, _skill_is_active
+    from .roles import (
+        build_role_map,
+        load_roles_config,
+        resolve_max_tokens,
+        resolve_memory,
+        resolve_model,
+        resolve_permission_mode,
+        resolve_steps,
+        resolve_temperature,
+    )
+    from .skills import _skill_is_active, load_external_skills_config
 
     pc = provider_config.get(provider)
     if not pc:
-        log.warn(f"Unknown provider '{provider}' — skipping agent sync")
+        log.warning(f"Unknown provider '{provider}' — skipping agent sync")
         return
 
     role_map = build_role_map(agent_meta_root)
@@ -1504,7 +1524,7 @@ def sync_agents_for_provider(
                     previously_managed.add(line.strip())
 
         for existing_file in sorted(target_dir.glob('*.md')):
-            if existing_file.name not in expected_filenames:
+            if existing_file.name not in expected_filenames:  # noqa: SIM102
                 if not managed_index.exists() or existing_file.name in previously_managed:
                     log.action('DELETE', str(existing_file.relative_to(project_root)),
                                'role removed from config')
@@ -1557,12 +1577,12 @@ def _inject_gemini_bootstrap(
     # Validate context_file does not escape project_root (path traversal guard)
     resolved = (project_root / context_file).resolve()
     if project_root.resolve() not in resolved.parents and resolved != project_root.resolve():
-        log.warn(f"{context_file} path escapes project root — skipping bootstrap injection")
+        log.warning(f"{context_file} path escapes project root — skipping bootstrap injection")
         return
 
     gemini_md_path = project_root / context_file
     if not gemini_md_path.exists():
-        log.warn(f"{str(gemini_md_path.relative_to(project_root))} does not exist — cannot inject bootstrap instructions")
+        log.warning(f"{gemini_md_path.relative_to(project_root)!s} does not exist — cannot inject bootstrap instructions")
         return
 
     existing = gemini_md_path.read_text(encoding="utf-8")

@@ -9,7 +9,6 @@ import time and shared across test cases.
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import sys
 import tempfile
@@ -219,7 +218,7 @@ class TestAtomicWriteCleanup(unittest.TestCase):
             mgr = admin_server.ConfigManager(root, mode="project_admin")
 
             # Force yaml.dump to fail mid-write.
-            with mock.patch.object(admin_server.yaml, "dump",
+            with mock.patch.object(admin_server.yaml, "dump",  # noqa: SIM117
                                    side_effect=RuntimeError("boom")):
                 with self.assertRaises(RuntimeError):
                     mgr.write("project", {"x": 1})
@@ -235,7 +234,7 @@ class TestAtomicWriteCleanup(unittest.TestCase):
             (root / ".meta-config").mkdir()
             mgr = admin_server.ConfigManager(root, mode="project_admin")
 
-            with mock.patch.object(admin_server.os, "replace",
+            with mock.patch.object(admin_server.os, "replace",  # noqa: SIM117
                                    side_effect=OSError("locked")):
                 with self.assertRaises(OSError):
                     mgr.write("project", {"x": 1})

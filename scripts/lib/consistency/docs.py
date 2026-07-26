@@ -1,10 +1,10 @@
 """Documentation and UI cross-reference consistency checks."""
 
-import json
 import re
 from pathlib import Path
 
 from .report import Finding, Severity
+
 
 def check_sync_cli_docs(root: Path) -> list[Finding]:
     """Check that all argparse arguments in sync.py are documented in cli-reference.md."""

@@ -20,7 +20,7 @@ def _parse_frontmatter_yaml(path: Path) -> dict:
         return {}
     try:
         return yaml.safe_load(parts[1]) or {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
@@ -273,7 +273,7 @@ def _load_role_names(roles_path: Path) -> set[str]:
     try:
         import yaml
         data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):
+    except (ImportError, Exception):  # noqa: BLE001
         data = _parse_role_names_regex(roles_path)
     return set(data.get("roles", {}).keys())
 
@@ -282,7 +282,7 @@ def _load_roles_with_tiers(roles_path: Path) -> dict[str, str]:
     try:
         import yaml
         data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):
+    except (ImportError, Exception):  # noqa: BLE001
         return {}
     return {
         name: (cfg or {}).get("workflow_tier", "")

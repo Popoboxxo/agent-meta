@@ -33,7 +33,7 @@ import json
 import logging
 import os
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ HTTP_TIMEOUT = 20
 # We use the canonical (dated for pre-4.6, dateless for 4.6+) IDs as primary
 # and expose the pre-4.6 aliases as additional entries with ``name`` prefixed
 # ``(alias)`` so they surface in the UI but are visually distinct.
-ANTHROPIC_FALLBACK_MODELS: List[Dict[str, Any]] = [
+ANTHROPIC_FALLBACK_MODELS: list[dict[str, Any]] = [
     {
         "id": "claude-haiku-4-5-20251001",
         "name": "Claude Haiku 4.5",
@@ -199,8 +199,8 @@ HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (agent-meta model-discovery)"}
 
 
 def fetch_openrouter_models(
-    blacklist: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    blacklist: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Fetch models from the keyless OpenRouter API.
 
     The provider attribution is the exact prefix before the first ``/`` in the
@@ -216,7 +216,7 @@ def fetch_openrouter_models(
     if blacklist is None:
         blacklist = []
     blacklist_set = set(blacklist)
-    models: List[Dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
     try:
         req = urllib.request.Request(OPENROUTER_URL, headers=HTTP_HEADERS)
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
@@ -253,15 +253,15 @@ def fetch_openrouter_models(
                 "context_length": context_length,
                 "tier": "Standard",  # Fallback if needed by UI
             })
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"fetch_openrouter_models failed: {e}")
         return []
     return models
 
 
 def fetch_opencode_zen_models(
-    blacklist: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    blacklist: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Fetch models from the OpenCode Zen endpoint.
 
     The endpoint is keyless and returns a ``data[]`` array of model objects.
@@ -277,7 +277,7 @@ def fetch_opencode_zen_models(
     if blacklist is None:
         blacklist = []
     blacklist_set = set(blacklist)
-    models: List[Dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
     try:
         req = urllib.request.Request(OPENCODE_ZEN_URL, headers=HTTP_HEADERS)
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
@@ -303,15 +303,15 @@ def fetch_opencode_zen_models(
                 "context_length": context_length,
                 "tier": "Standard",
             })
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"fetch_opencode_zen_models failed: {e}")
         return []
     return models
 
 
 def fetch_opencode_go_models(
-    blacklist: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    blacklist: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Fetch models from the OpenCode Go endpoint.
 
     The endpoint is keyless and returns a ``data[]`` array of model objects.
@@ -327,7 +327,7 @@ def fetch_opencode_go_models(
     if blacklist is None:
         blacklist = []
     blacklist_set = set(blacklist)
-    models: List[Dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
     try:
         req = urllib.request.Request(OPENCODE_GO_URL, headers=HTTP_HEADERS)
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
@@ -353,13 +353,13 @@ def fetch_opencode_go_models(
                 "context_length": context_length,
                 "tier": "Standard",
             })
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"fetch_opencode_go_models failed: {e}")
         return []
     return models
 
 
-def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
+def _parse_anthropic_markdown(md_text: str) -> list[dict[str, Any]]:
     """Parse the platform.claude.com ``overview.md`` table set.
 
     The page contains up to three GFM-style tables that list Claude models:
@@ -384,14 +384,14 @@ def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
     """
     import re
 
-    models: List[Dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
     if not md_text or "claude-" not in md_text:
         return models
 
     # Pre-pass: extract retirement dates for deprecated models from
     # <Warning> blocks. The model id's trailing YYYYMMDD is the *release*
     # date, not the retirement date, so the warning text is authoritative.
-    retirement_dates: Dict[str, str] = {}
+    retirement_dates: dict[str, str] = {}
     for warn_match in re.finditer(
         r"<Warning[^>]*>(.*?)</Warning>", md_text, re.DOTALL
     ):
@@ -404,15 +404,15 @@ def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
             continue
         try:
             from datetime import datetime
-            dt = datetime.strptime(date_match.group(1), "%B %d, %Y")
+            dt = datetime.strptime(date_match.group(1), "%B %d, %Y")  # noqa: DTZ007
             retirement_dates[id_match.group(1)] = dt.strftime("%Y-%m-%d")
         except ValueError:
             continue
 
     # Group consecutive "|..." lines into tables. Each table is a list of
     # raw pipe-delimited lines (header, separator, body rows).
-    tables: List[List[str]] = []
-    current: List[str] = []
+    tables: list[list[str]] = []
+    current: list[str] = []
     for line in md_text.splitlines():
         if line.lstrip().startswith("|"):
             current.append(line)
@@ -429,7 +429,7 @@ def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
         header_cells = [c.strip() for c in table[0].split("|")[1:-1]]
         if len(header_cells) < 2 or header_cells[0].lower() != "feature":
             continue
-        rows_by_label: Dict[str, List[str]] = {}
+        rows_by_label: dict[str, list[str]] = {}
         for row in table[2:]:
             cells = [c.strip() for c in row.split("|")[1:-1]]
             if not cells:
@@ -487,7 +487,7 @@ def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
             if input_cost <= 0 or output_cost <= 0:
                 continue
 
-            context_length: Optional[int] = None
+            context_length: int | None = None
             if i < len(context_cells):
                 ccell = context_cells[i]
                 m = re.search(r"(\d+)([kKmM]?)\s*tokens", ccell)
@@ -535,8 +535,8 @@ def _parse_anthropic_markdown(md_text: str) -> List[Dict[str, Any]]:
 
 
 def fetch_anthropic_models(
-    blacklist: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    blacklist: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Fetch the canonical Anthropic model catalog from the Claude Code platform docs.
 
     The source is
@@ -573,7 +573,7 @@ def fetch_anthropic_models(
         blacklist = []
     blacklist_set = set(blacklist)
 
-    live_models: List[Dict[str, Any]] = []
+    live_models: list[dict[str, Any]] = []
     try:
         req = urllib.request.Request(ANTHROPIC_DOCS_URL, headers=HTTP_HEADERS)
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
@@ -591,13 +591,13 @@ def fetch_anthropic_models(
                     "fetch_anthropic_models: markdown parser yielded 0 models "
                     "— using curated fallback"
                 )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.info(
             f"fetch_anthropic_models: live fetch failed ({e}) — using curated fallback"
         )
 
     source_models = live_models if live_models else list(ANTHROPIC_FALLBACK_MODELS)
-    models: List[Dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
     for m in source_models:
         if m["id"] in blacklist_set:
             continue
@@ -616,7 +616,7 @@ def fetch_anthropic_models(
     return models
 
 
-def _load_blacklist(project_root: str) -> List[str]:
+def _load_blacklist(project_root: str) -> list[str]:
     """Load the model blacklist from ``config/model-curation.yaml``.
 
     Falls back to an empty list if the file is missing or unreadable. The
@@ -638,12 +638,12 @@ def _load_blacklist(project_root: str) -> List[str]:
             logger.warning("model-curation.yaml: 'blacklist' is not a list — ignoring")
             return []
         return [str(x) for x in blacklist]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to load model-curation.yaml: {e}")
         return []
 
 
-def discover_models(_project_root: Optional[str] = None) -> Dict[str, Any]:
+def discover_models(_project_root: str | None = None) -> dict[str, Any]:
     """Fetch all upstream models, merge, deduplicate and persist the registry.
 
     OpenRouter results are filtered to ``ALLOWED_OPENROUTER_PROVIDER_PREFIXES``
@@ -704,7 +704,7 @@ def discover_models(_project_root: Optional[str] = None) -> Dict[str, Any]:
 
     # Deduplicate by id, keep first occurrence.
     seen: set = set()
-    deduped: List[Dict[str, Any]] = []
+    deduped: list[dict[str, Any]] = []
     for m in all_models:
         mid = m.get("id")
         if not mid or mid in seen:

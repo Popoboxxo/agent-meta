@@ -10,9 +10,9 @@ Usage:
     print(report.to_markdown())
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
 import json
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -21,13 +21,13 @@ class SubTask:
     name: str
     agent_type: str
     description: str
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
 
 
 @dataclass
 class DispatchPlan:
     """Execution plan with FANOUT, PARALLEL_GROUP, or sequential steps."""
-    operations: List[Dict[str, Any]] = field(default_factory=list)
+    operations: list[dict[str, Any]] = field(default_factory=list)
     
     def to_dict(self) -> dict:
         return {"operations": self.operations}
@@ -41,7 +41,7 @@ class SyntaxReport:
     parallel_supported: bool
     operation: str
     agent_count: int
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -49,18 +49,18 @@ class DryRunEvent:
     """A single event in the dry-run timeline."""
     timestamp: str
     type: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
 
 @dataclass
 class DryRunReport:
     """Complete dry-run report."""
     intent: str
-    subtasks: List[SubTask]
+    subtasks: list[SubTask]
     plan: DispatchPlan
     syntax: SyntaxReport
     provider: str
-    events: List[DryRunEvent]
+    events: list[DryRunEvent]
     
     def to_dict(self) -> dict:
         return {
@@ -106,7 +106,7 @@ class OrchestratorDryRun:
     # Known intents mapping: keyword -> agent
     # Order matters: longer keywords should be checked first to avoid partial matches
     # e.g. "login" should not match "log"
-    INTENT_MAP = {
+    INTENT_MAP = {  # noqa: RUF012
         # German keywords (longer first)
         "implementieren": "developer",
         "hinzufügen": "developer",
@@ -161,14 +161,14 @@ class OrchestratorDryRun:
         self.provider = provider
         self.config = config
         self.max_parallel = config.get("max-parallel-agents", 4)
-        self.events: List[DryRunEvent] = []
+        self.events: list[DryRunEvent] = []
         self._parallel_supported = provider in ["Claude", "Opencode", "Gemini"]
 
     def log_event(self, event_type: str, data: dict):
         """Log an event for Viz-Log integration."""
         from datetime import datetime
         self.events.append(DryRunEvent(
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now().isoformat(),  # noqa: DTZ005
             type=event_type,
             data=data,
         ))
@@ -206,7 +206,7 @@ class OrchestratorDryRun:
         self.log_event("intent_classified", {"input": user_input, "intent": "UNKNOWN"})
         return "UNKNOWN"
 
-    def decompose_task(self, user_input: str, intent: str) -> List[SubTask]:
+    def decompose_task(self, user_input: str, intent: str) -> list[SubTask]:
         """Decompose multi-tasks into sub-tasks."""
         import re
         
@@ -271,7 +271,7 @@ class OrchestratorDryRun:
         self.log_event("task_decomposed", {"subtasks": 1, "decomposition": "DIRECT"})
         return [SubTask(name="task_1", agent_type=intent, description=user_input)]
 
-    def generate_dispatch_plan(self, subtasks: List[SubTask]) -> DispatchPlan:
+    def generate_dispatch_plan(self, subtasks: list[SubTask]) -> DispatchPlan:
         """Generate dispatch plan based on sub-tasks and provider capabilities."""
         plan = DispatchPlan()
         
@@ -336,11 +336,8 @@ class OrchestratorDryRun:
         
         # Basic validation
         for op in plan.operations:
-            if op["type"] == "FANOUT":
-                if self.provider == "Claude":
-                    if len(op.get("agents", [])) > self.max_parallel:
-                        errors.append(f"FANOUT exceeds MAX_PARALLEL_AGENTS ({self.max_parallel})")
-                elif self.provider == "Opencode":
+            if op["type"] == "FANOUT":  # noqa: SIM102
+                if self.provider == "Claude" or self.provider == "Opencode":  # noqa: SIM102
                     if len(op.get("agents", [])) > self.max_parallel:
                         errors.append(f"FANOUT exceeds MAX_PARALLEL_AGENTS ({self.max_parallel})")
         

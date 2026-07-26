@@ -75,7 +75,7 @@ class DelegationSyntaxEngine:
     See also: docs/concepts/a2a-handoff-protocol.md for architecture rationale.
     """
 
-    PLACEHOLDERS: dict[str, str] = {
+    PLACEHOLDERS: dict[str, str] = {  # noqa: RUF012
         "PAL_DELEGATE": "delegate",
         "PAL_FANOUT": "fanout",
         "PAL_PARALLEL_GROUP": "parallel_group",
@@ -106,7 +106,7 @@ class DelegationSyntaxEngine:
                         self._syntax_registry = yaml.safe_load(f)
                     else:
                         self._syntax_registry = {}
-            except (FileNotFoundError, yaml.YAMLError) as e:
+            except (FileNotFoundError, yaml.YAMLError):
                 self._syntax_registry = {}
         return self._syntax_registry or {}
 
@@ -120,7 +120,7 @@ class DelegationSyntaxEngine:
                         self._capabilities_registry = yaml.safe_load(f)
                     else:
                         self._capabilities_registry = {}
-            except (FileNotFoundError, yaml.YAMLError) as e:
+            except (FileNotFoundError, yaml.YAMLError):
                 self._capabilities_registry = {}
         return self._capabilities_registry or {}
 
@@ -260,17 +260,17 @@ class DelegationSyntaxEngine:
             if not isinstance(replacement, str):
                 replacement = ""
             if log is not None and not replacement and re.search(pattern, content):
-                log.warn(
+                log.warning(
                     f"PAL: '{placeholder}' has no definition for provider "
                     f"'{provider}' — placeholder removed (check config/delegation-syntax.yaml)"
                 )
-            content = re.sub(pattern, lambda _m: replacement, content)
+            content = re.sub(pattern, lambda _m: replacement, content)  # noqa: B023
 
         # Remove any remaining {{PAL_*}} placeholders (no-ops for this provider)
         leftover = set(re.findall(r"\{\{(PAL_[A-Z_]+)\}\}", content))
         if log is not None:
             for name in sorted(leftover):
-                log.warn(
+                log.warning(
                     f"PAL: unknown placeholder '{{{{{name}}}}}' for provider "
                     f"'{provider}' — removed (not in DelegationSyntaxEngine.PLACEHOLDERS)"
                 )

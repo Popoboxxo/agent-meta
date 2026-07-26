@@ -151,8 +151,7 @@ def _parse_frontmatter(template_path: Path) -> dict:
     if len(parts) < 2:
         return {}
     block = parts[0]
-    if block.startswith("---"):
-        block = block[3:]
+    block = block.removeprefix("---")
     if not _YAML_AVAILABLE:
         return {}
     try:
@@ -420,7 +419,7 @@ def apply_audit(report: AuditReport, project_config_path: Path) -> int:
     text = project_config_path.read_text(encoding="utf-8")
     # Preserve the original line endings split; keepends=True retains "\n".
     lines = text.splitlines(keepends=True)
-    today = date.today().isoformat()
+    today = date.today().isoformat()  # noqa: DTZ011
     changed = 0
 
     for index, line in enumerate(lines):

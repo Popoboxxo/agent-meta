@@ -50,7 +50,7 @@ def run_prepare(args):
         cmd.append("--dry-run")
 
     print(f"  [i] Starte Vorbereitung: {args.scenario}")
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    result = subprocess.run(cmd, capture_output=False, text=True)  # noqa: PLW1510
     return result.returncode
 
 
@@ -72,8 +72,8 @@ def run_validate(args):
     if args.log:
         cmd.extend(["--log", args.log])
 
-    print(f"  [i] Starte Validierung...")
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    print("  [i] Starte Validierung...")
+    result = subprocess.run(cmd, capture_output=False, text=True)  # noqa: PLW1510
     return result.returncode
 
 
@@ -92,7 +92,6 @@ def run_list():
 
 def run_clean():
     """Clean test artifacts"""
-    import shutil
 
     # Clean bug reports
     bugs_dir = REPO_ROOT / "docs" / "bugs"

@@ -1,5 +1,3 @@
-import os
-import pytest
 from pathlib import Path
 
 RULES_DIR = Path("rules/1-generic")

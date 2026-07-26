@@ -14,7 +14,7 @@ can rely on ``load_curation()`` returning a usable dict in all environments.
 
 import os
 import tempfile
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     import yaml as _yaml
@@ -24,15 +24,15 @@ except ImportError:  # pragma: no cover - exercised in environments without PyYA
 
 CURATION_FILE = os.path.join("config", "model-curation.yaml")
 
-_DEFAULT: Dict[str, List[str]] = {"blacklist": [], "disabled": []}
+_DEFAULT: dict[str, list[str]] = {"blacklist": [], "disabled": []}
 
 
-def _default() -> Dict[str, List[str]]:
+def _default() -> dict[str, list[str]]:
     """Return a fresh copy of the default curation document."""
     return {"blacklist": [], "disabled": []}
 
 
-def _normalize(data: Any) -> Dict[str, List[str]]:
+def _normalize(data: Any) -> dict[str, list[str]]:
     """Coerce a parsed YAML document into the canonical curation shape."""
     if not isinstance(data, dict):
         return _default()
@@ -44,7 +44,7 @@ def _normalize(data: Any) -> Dict[str, List[str]]:
     return result
 
 
-def load_curation(root: str) -> Dict[str, List[str]]:
+def load_curation(root: str) -> dict[str, list[str]]:
     """Load ``config/model-curation.yaml`` from ``root``.
 
     Args:
@@ -68,7 +68,7 @@ def load_curation(root: str) -> Dict[str, List[str]]:
     return _normalize(raw)
 
 
-def save_curation(root: str, data: Dict[str, List[str]]) -> None:
+def save_curation(root: str, data: dict[str, list[str]]) -> None:
     """Write ``data`` to ``config/model-curation.yaml`` atomically.
 
     The file is first written to a sibling temp file in the same directory and

@@ -7,16 +7,15 @@ active (backward-compatible default).
 Run: python tests/test_deprecated_filter.py
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.agents import is_deprecated_template, collect_sources  # noqa: E402
-
+from lib.agents import is_deprecated_template
 
 # ---------------------------------------------------------------------------
 # is_deprecated_template — unit checks

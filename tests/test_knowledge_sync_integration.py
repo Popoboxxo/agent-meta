@@ -1,6 +1,6 @@
 """Integration tests for scripts/sync.py::sync_knowledge_engine() (Phase 2.5)."""
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -9,9 +9,9 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.log import SyncLog  # noqa: E402
-from lib.io import SyncError  # noqa: E402
-import sync as sync_module  # noqa: E402
+import sync as sync_module
+from lib.io import SyncError
+from lib.log import SyncLog
 
 sync_knowledge_engine = sync_module.sync_knowledge_engine
 

@@ -18,7 +18,6 @@ from scripts.lib.model_discovery import (
     fetch_openrouter_models,
 )
 
-
 # -- Helpers ------------------------------------------------------------------
 
 
@@ -485,6 +484,7 @@ def test_discover_models_falls_back_to_openrouter_when_platform_empty(tmp_path, 
 def test_discover_models_does_not_overwrite_on_empty_result(tmp_path, monkeypatch):
     """If all fetchers return [] but a populated registry exists, it must be preserved."""
     import os
+
     from scripts.lib import model_discovery as md
 
     # Create a pre-existing registry with enough models

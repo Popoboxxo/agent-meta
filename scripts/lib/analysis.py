@@ -17,9 +17,7 @@ Usage:
 """
 
 import ast
-import sys
 from pathlib import Path
-from typing import Optional
 
 
 class FileAffinityAnalyzer:
@@ -28,7 +26,7 @@ class FileAffinityAnalyzer:
     Only uses Python stdlib — no external dependencies required.
     """
 
-    def __init__(self, project_root: Optional[Path | str] = None) -> None:
+    def __init__(self, project_root: Path | str | None = None) -> None:
         self.project_root = Path(project_root) if project_root else Path.cwd()
         # Cache: module_name -> relative_path
         self._module_index: dict[str, str] = {}
@@ -67,12 +65,11 @@ class FileAffinityAnalyzer:
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    imports.append(node.module)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
         return imports
 
-    def _resolve_import(self, import_name: str, relative_to: Path) -> Optional[str]:
+    def _resolve_import(self, import_name: str, relative_to: Path) -> str | None:
         """Try to resolve an import name to a project-relative file path.
 
         Returns the relative path string if found within the project, else None.
@@ -115,7 +112,7 @@ class FileAffinityAnalyzer:
             deps: list[str] = []
             for imp in imports:
                 resolved = self._resolve_import(imp, abs_path)
-                if resolved and resolved in file_set and resolved != rel_path_str:
+                if resolved and resolved in file_set and resolved != rel_path_str:  # noqa: SIM102
                     if resolved not in deps:
                         deps.append(resolved)
             result[rel_path_str] = deps

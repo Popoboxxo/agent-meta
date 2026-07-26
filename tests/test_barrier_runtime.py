@@ -1,6 +1,10 @@
 import time
-import pytest
-from scripts.lib.runtime import SubagentBarrierRuntime, SubagentTask, SubagentResult, BarrierResult
+
+from scripts.lib.runtime import (
+    SubagentBarrierRuntime,
+    SubagentTask,
+)
+
 
 def test_basic_parallel_execution():
     runtime = SubagentBarrierRuntime(max_workers=3)

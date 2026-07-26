@@ -1,10 +1,9 @@
 """Outcome-Cache für Orchestrator-Delegationen."""
 import hashlib
 import json
-import os
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 CACHE_FILE = ".meta-viz/delegation-cache.json"
 
@@ -15,7 +14,7 @@ def cache_key(agent: str, prompt: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def read(cache_path: str, key: str, ttl: int = 3600) -> Optional[Any]:
+def read(cache_path: str, key: str, ttl: int = 3600) -> Any | None:
     """Liest cached result oder None wenn expired/missing."""
     path = Path(cache_path)
     if not path.exists():

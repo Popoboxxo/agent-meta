@@ -6,9 +6,9 @@ especially the `task` permission required for subagent delegation.
 Run: python tests/test_opencode_agents.py
 """
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 
 def _split_frontmatter(content: str) -> tuple[str, str]:

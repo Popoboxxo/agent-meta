@@ -17,10 +17,10 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .log import SyncLog
-from .backup import backup_provider_dir as _backup_single, restore_provider_dir as _restore_single
+from .backup import backup_provider_dir as _backup_single
+from .backup import restore_provider_dir as _restore_single
 from .io import _write_yaml
-
+from .log import SyncLog
 
 DEFAULT_BACKUP_DIR = ".backup/provider-deactivation"
 
@@ -195,11 +195,11 @@ def update_deactivation_config(
         }
 
     if dry_run:
-        log.info("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")
+        log.info("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")  # noqa: PLE1205
         return
 
     _write_yaml(config_path, config)
-    log.info("deactivation-config", f"updated provider-deactivation in {config_path.name}: "
+    log.info("deactivation-config", f"updated provider-deactivation in {config_path.name}: "  # noqa: PLE1205
              f"{', '.join(sorted(updated)) if updated else 'none (all active)'}")
 
 
@@ -231,23 +231,23 @@ def remove_provider_dir(
     """
     provider_root = _get_provider_root_dir(provider, provider_config)
     if not provider_root:
-        log.warn(f"deactivation: cannot determine root directory for provider '{provider}'")
+        log.warning(f"deactivation: cannot determine root directory for provider '{provider}'")
         return False
 
     target_dir = project_root / provider_root
     if not target_dir.exists():
-        log.info("deactivation", f"provider directory already removed: {provider_root}")
+        log.info("deactivation", f"provider directory already removed: {provider_root}")  # noqa: PLE1205
         return False
 
     if dry_run:
-        log.info("deactivation", f"DRY-RUN: would remove '{provider_root}'")
+        log.info("deactivation", f"DRY-RUN: would remove '{provider_root}'")  # noqa: PLE1205
         return True
 
     try:
         shutil.rmtree(target_dir)
-        log.info("deactivation", f"removed provider directory: {provider_root}")
+        log.info("deactivation", f"removed provider directory: {provider_root}")  # noqa: PLE1205
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.error(f"deactivation: failed to remove '{provider_root}': {exc}")
         return False
 

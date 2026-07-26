@@ -12,15 +12,12 @@ Exit codes:
 """
 
 import json
-import os
 import re
 import sys
-import glob
-from pathlib import Path
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Tuple, Any, Optional
-from dataclasses import dataclass, field, asdict
-
+from pathlib import Path
+from typing import Any
 
 # ============================================================================
 # Base Directories
@@ -46,7 +43,7 @@ class TestResult:
     name: str
     passed: bool
     details: str = ""
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -56,7 +53,7 @@ class TestReport:
     total_tests: int = 0
     passed: int = 0
     failed: int = 0
-    results: List[TestResult] = field(default_factory=list)
+    results: list[TestResult] = field(default_factory=list)
 
     def add(self, result: TestResult):
         self.results.append(result)
@@ -121,7 +118,7 @@ class TestReport:
 # Simple YAML Parser (No PyYAML dependency)
 # ============================================================================
 
-def parse_simple_yaml(text: str) -> Dict[str, Any]:
+def parse_simple_yaml(text: str) -> dict[str, Any]:
     """
     Einfacher YAML-Parser fur verschachtelte Key-Value Strukturen.
     Unterstutzt:
@@ -131,9 +128,9 @@ def parse_simple_yaml(text: str) -> Dict[str, Any]:
       - Kommentare (#)
       - Strings in Quotes und ohne
     """
-    result: Dict[str, Any] = {}
-    current_key: Optional[str] = None
-    current_list: Optional[List[str]] = None
+    result: dict[str, Any] = {}
+    current_key: str | None = None
+    current_list: list[str] | None = None
 
     for line in text.split("\n"):
         stripped = line.strip()
@@ -206,7 +203,7 @@ def parse_simple_yaml(text: str) -> Dict[str, Any]:
     return result
 
 
-def parse_role_defaults(filepath: Path) -> Dict[str, Any]:
+def parse_role_defaults(filepath: Path) -> dict[str, Any]:
     """Parses role-defaults.yaml and returns structured dict."""
     if not filepath.exists():
         return {}
@@ -228,7 +225,7 @@ def parse_role_defaults(filepath: Path) -> Dict[str, Any]:
 # Frontmatter Parser
 # ============================================================================
 
-def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
+def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     """
     Parses YAML frontmatter from a Markdown file.
     Returns (frontmatter_dict, body_text).
@@ -243,7 +240,7 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
     fm_text = parts[1].strip()
     body = parts[2].strip() if len(parts) > 2 else ""
 
-    fm: Dict[str, str] = {}
+    fm: dict[str, str] = {}
     for line in fm_text.split("\n"):
         line = line.strip()
         if not line or line.startswith("#"):
@@ -318,11 +315,11 @@ def run_template_existence_tests(report: TestReport):
                 passed=size_ok,
                 details=f"Size: {len(content)} chars" if size_ok else f"Too small: {len(content)} chars (min 100)",
             ))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             report.add(TestResult(
                 name=f"Template-Size: {base_name}",
                 passed=False,
-                errors=[f"Read error: {str(e)}"],
+                errors=[f"Read error: {e!s}"],
             ))
             content = ""
 
@@ -346,11 +343,11 @@ def run_template_existence_tests(report: TestReport):
                     details="All required fields present" if fm_ok
                     else f"Missing fields: {', '.join(missing)}",
                 ))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 report.add(TestResult(
                     name=f"Template-Frontmatter-Fields: {base_name}",
                     passed=False,
-                    errors=[f"Frontmatter parse error: {str(e)}"],
+                    errors=[f"Frontmatter parse error: {e!s}"],
                 ))
 
 
@@ -393,11 +390,11 @@ def run_role_defaults_tests(report: TestReport):
 
     try:
         config = parse_role_defaults(CONFIG_FILE)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="role-defaults: Parseable",
             passed=False,
-            errors=[f"Parse error: {str(e)}"],
+            errors=[f"Parse error: {e!s}"],
         ))
         return
 
@@ -450,7 +447,7 @@ def run_orchestrator_routing_tests(report: TestReport):
 
     try:
         content = ORCHESTRATOR_FILE.read_text(encoding="utf-8")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Orchestrator: Readable",
             passed=False,
@@ -463,7 +460,7 @@ def run_orchestrator_routing_tests(report: TestReport):
         passed=True,
     ))
 
-    content_lower = content.lower()
+    content.lower()
 
     # Intent-Routing and Agent table are auto-generated from role-defaults.yaml.
     # Verify the placeholders are present in the source template.
@@ -497,7 +494,7 @@ def run_orchestrator_routing_tests(report: TestReport):
 # Test Category 4: JSON Schema Validation
 # ============================================================================
 
-def validate_json_file(filepath: Path) -> Tuple[bool, Any, str]:
+def validate_json_file(filepath: Path) -> tuple[bool, Any, str]:
     """Loads and validates a JSON file. Returns (success, data, error_msg)."""
     if not filepath.exists():
         return False, None, f"File not found: {filepath}"
@@ -507,9 +504,9 @@ def validate_json_file(filepath: Path) -> Tuple[bool, Any, str]:
         data = json.loads(text)
         return True, data, ""
     except json.JSONDecodeError as e:
-        return False, None, f"Invalid JSON: {str(e)}"
-    except Exception as e:
-        return False, None, f"Read error: {str(e)}"
+        return False, None, f"Invalid JSON: {e!s}"
+    except Exception as e:  # noqa: BLE001
+        return False, None, f"Read error: {e!s}"
 
 
 def run_json_schema_tests(report: TestReport):
@@ -798,7 +795,7 @@ def run_cross_validation_tests(report: TestReport):
         coverage_matrix = test_data.get("coverage_matrix", {})
         covered_reqs = set()
         if isinstance(coverage_matrix, dict):
-            for req_id, status in coverage_matrix.items():
+            for req_id in coverage_matrix:
                 covered_reqs.add(req_id)
 
         # Also check from test_cases
@@ -850,7 +847,7 @@ def run_cross_validation_tests(report: TestReport):
                         elif isinstance(val, str):
                             referenced_components.add(val)
 
-        missing_components = component_ids - referenced_components
+        component_ids - referenced_components
         # Only fail if there are components defined but none referenced at all
         if component_ids and not referenced_components:
             report.add(TestResult(
@@ -897,7 +894,7 @@ def run_stakeholder_consistency_tests(report: TestReport):
 
     try:
         content = stakeholder_file.read_text(encoding="utf-8")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Stakeholder-Needs: Readable",
             passed=False,
@@ -959,9 +956,9 @@ def run_stakeholder_consistency_tests(report: TestReport):
 # ============================================================================
 
 def main():
-    report = TestReport(timestamp=datetime.now().isoformat())
+    report = TestReport(timestamp=datetime.now().isoformat())  # noqa: DTZ005
 
-    print(f"SE Framework Test Runner")
+    print("SE Framework Test Runner")
     print(f"Base directory: {BASE_DIR}")
     print(f"Timestamp: {report.timestamp}")
     print(f"{'=' * 60}")
@@ -970,11 +967,11 @@ def main():
     print("\n[1/6] Template Existence Tests...")
     try:
         run_template_existence_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Template-Existenz: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -982,11 +979,11 @@ def main():
     print("[2/6] Role Defaults Tests...")
     try:
         run_role_defaults_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="role-defaults: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -994,11 +991,11 @@ def main():
     print("[3/6] Orchestrator Routing Tests...")
     try:
         run_orchestrator_routing_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Orchestrator: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -1006,11 +1003,11 @@ def main():
     print("[4/6] JSON Schema Tests...")
     try:
         run_json_schema_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="JSON-Schema: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -1018,11 +1015,11 @@ def main():
     print("[5/6] Cross-Validation Tests...")
     try:
         run_cross_validation_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Cross-Validation: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -1030,11 +1027,11 @@ def main():
     print("[6/6] Stakeholder Consistency Tests...")
     try:
         run_stakeholder_consistency_tests(report)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         report.add(TestResult(
             name="Stakeholder-Consistency: Category failed",
             passed=False,
-            errors=[f"Unexpected error: {str(e)}"],
+            errors=[f"Unexpected error: {e!s}"],
         ))
     print(f"  -> {report.passed}/{report.total_tests} passed so far")
 
@@ -1046,7 +1043,7 @@ def main():
 
     # Console output
     print(f"\n{'=' * 60}")
-    print(f"SE Framework Test Report")
+    print("SE Framework Test Report")
     print(f"{'=' * 60}")
     print(f"Timestamp: {report.timestamp}")
     print(f"Total: {report.total_tests} | Passed: {report.passed} | Failed: {report.failed}")

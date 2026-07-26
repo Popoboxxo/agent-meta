@@ -1,16 +1,16 @@
 """Tests for scripts/lib/knowledge.py — Knowledge Engine Phase A scaffolding helpers."""
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pytest
 
+from scripts.lib.delegation_table import get_active_agents_data
 from scripts.lib.knowledge import (
     DOMAIN_CONCEPT_TYPES,
-    generate_schema,
     generate_initial_index,
     generate_initial_log,
+    generate_schema,
 )
-from scripts.lib.delegation_table import get_active_agents_data
 
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
@@ -26,7 +26,7 @@ def test_domain_concept_types_has_all_domains():
 
 
 def test_domain_concept_types_values_are_nonempty_lists():
-    for domain, types in DOMAIN_CONCEPT_TYPES.items():
+    for types in DOMAIN_CONCEPT_TYPES.values():
         assert isinstance(types, list)
         assert len(types) >= 1
         for t in types:
@@ -215,7 +215,7 @@ def test_knowledge_indexer_has_no_intent_keywords():
 
 def test_knowledge_roles_pass_schema_validation():
     import subprocess
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510
         ["python", str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
         cwd=_AGENT_META_ROOT, capture_output=True, text=True,
     )
@@ -356,6 +356,7 @@ def test_schema_knowledge_engine_has_phase_c_properties():
 def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     import shutil
     import subprocess
+
     import yaml
 
     # Copy the whole repo into a temp dir so we don't mutate the real working tree.
@@ -375,7 +376,7 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     # No importable top-level entry point exists in scripts/sync.py (main() reads
     # sys.argv via argparse) — run the real CLI as a subprocess, per the fallback
     # described in the task brief.
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510
         ["python", str(dest / "scripts" / "sync.py")],
         cwd=dest, capture_output=True, text=True,
     )

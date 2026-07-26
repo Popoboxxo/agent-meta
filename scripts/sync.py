@@ -50,52 +50,79 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.log import SyncLog
-from lib.io import _load_yaml_or_json, _write_yaml
-from lib.config import (
-    load_config, find_agent_meta_root, build_variables,
-    fill_defaults, read_version, read_git_version, substitute,
-    _resolve_orch_mode, _orch_mode_flags,
-)
-from lib.roles import build_role_map
-from lib.schema import update_roles_enum
-from lib.dod import resolve_dod
-from lib.providers import load_providers_config, resolve_providers, resolve_provider_options
-from lib.platform import load_platform_config
 from lib.agents import (
-    collect_sources, sync_agents_for_provider,
-    build_agent_hints, build_agent_table,
-    extract_frontmatter_field,
-)
-from lib.config_audit import audit_config, apply_audit, format_report
-from lib.rules import sync_rules, sync_speech_mode, create_rule, resolve_rules
-from lib.hooks import sync_hooks, create_hook
-from lib.commands import sync_commands_for_provider, create_command
-from lib.skills import (
-    load_external_skills_config, check_pinned_commits, sync_external_skills_for_provider, add_skill,
-)
-from lib.extensions import create_extension, update_extensions
-from lib.mcp import generate_mcp_artifacts, resolve_active_mcp_servers, init_secrets_template
-from lib.isolation import sync_provider_isolation
-from lib.deactivation import (
-    deactivate_providers, activate_providers, get_deactivation_status,
-    is_provider_active, update_deactivation_config, resolve_deactivation_targets,
+    sync_agents_for_provider,
 )
 from lib.backup import (
-    create_backup, restore_backup, list_backups,
-    delete_backup, prune_backups,
+    create_backup,
+    delete_backup,
+    list_backups,
+    prune_backups,
+    restore_backup,
 )
-from lib.io import SyncError, safe_path, write_checked
+from lib.commands import create_command, sync_commands_for_provider
+from lib.config import (
+    _orch_mode_flags,
+    _resolve_orch_mode,
+    build_variables,
+    fill_defaults,
+    find_agent_meta_root,
+    load_config,
+    read_git_version,
+    read_version,
+)
+from lib.config_audit import apply_audit, audit_config, format_report
 from lib.context import (
-    sync_context_for_provider, init_claude_personal, init_opencode_personal,
-    init_settings_json, init_settings_local_json, ensure_gitignore_entries,
-    sync_claude_md_static, only_variables, sync_prompts_for_continue, sync_snippets_for_provider,
+    ensure_gitignore_entries,
+    init_claude_personal,
+    init_settings_json,
+    init_settings_local_json,
+    only_variables,
+    sync_claude_md_static,
+    sync_context_for_provider,
+    sync_prompts_for_continue,
+    sync_snippets_for_provider,
+)
+from lib.deactivation import (
+    activate_providers,
+    deactivate_providers,
+    get_deactivation_status,
+    is_provider_active,
+    resolve_deactivation_targets,
+    update_deactivation_config,
+)
+from lib.dod import resolve_dod
+from lib.extensions import create_extension, update_extensions
+from lib.hooks import create_hook, sync_hooks
+from lib.io import SyncError, safe_path, write_checked
+from lib.isolation import sync_provider_isolation
+from lib.knowledge import generate_initial_index, generate_initial_log, generate_schema
+from lib.log import SyncLog
+from lib.mcp import (
+    generate_mcp_artifacts,
+    init_secrets_template,
+)
+from lib.platform import load_platform_config
+from lib.providers import (
+    load_providers_config,
+    resolve_providers,
+)
+from lib.roles import build_role_map
+from lib.rules import create_rule, resolve_rules, sync_rules, sync_speech_mode
+from lib.schema import update_roles_enum
+from lib.skills import (
+    add_skill,
+    check_pinned_commits,
+    load_external_skills_config,
+    sync_external_skills_for_provider,
 )
 from lib.viz import (
-    generate_viz, get_gitignore_entries as viz_gitignore_entries,
     cleanup_old_sessions,
+    generate_viz,
 )
-from lib.knowledge import generate_schema, generate_initial_index, generate_initial_log
+from lib.viz import (
+    get_gitignore_entries as viz_gitignore_entries,
+)
 
 # ---------------------------------------------------------------------------
 # Entrypoint-only constants
@@ -216,7 +243,7 @@ def sync_knowledge_engine(
         if write_checked(log_path, generate_initial_log(), log, rel_log, dry_run=dry_run):
             log.action("CREATE", rel_log, "knowledge-engine scaffolding")
     else:
-        log.info(
+        log.info(  # noqa: PLE1205
             "knowledge-engine",
             f"{bundle_rel}/ already exists — schema.md/index.md/log.md not "
             "regenerated. If domain changed, verify schema.md manually "
@@ -250,18 +277,18 @@ def resolve_test_repo_path(config: dict, project_root: Path, log: SyncLog) -> Pa
     env_path = os.environ.get(env_var_name)
     if env_path:
         resolved = Path(env_path).resolve()
-        log.info("test-repo", f"resolved from env var {env_var_name}: {resolved}")
+        log.info("test-repo", f"resolved from env var {env_var_name}: {resolved}")  # noqa: PLE1205
         return resolved
 
     # 2. Config path (relative or absolute)
     test_cfg = config.get("test-repo", {})
     if not test_cfg:
-        log.info("test-repo", "not configured in project.yaml")
+        log.info("test-repo", "not configured in project.yaml")  # noqa: PLE1205
         return None
 
     raw_path = test_cfg.get("path")
     if not raw_path:
-        log.warn("test-repo.path is not set in project.yaml")
+        log.warning("test-repo.path is not set in project.yaml")
         return None
 
     path_obj = Path(raw_path)
@@ -271,7 +298,7 @@ def resolve_test_repo_path(config: dict, project_root: Path, log: SyncLog) -> Pa
         # Relative to project_root (workspace)
         resolved = (project_root / path_obj).resolve()
 
-    log.info("test-repo", f"resolved from config: {resolved}")
+    log.info("test-repo", f"resolved from config: {resolved}")  # noqa: PLE1205
     return resolved
 
 
@@ -309,30 +336,29 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     Returns True if validation passed, False otherwise.
     """
     if not test_repo_path.exists():
-        log.warn(
+        log.warning(
             f"Test repository not found at: {test_repo_path}\n"
             f"  Set AGENT_META_TEST_REPO environment variable or\n"
             f"  configure test-repo.path in .meta-config/project.yaml")
         return False
 
     if not test_repo_path.is_dir():
-        log.warn(f"Path exists but is not a directory: {test_repo_path}")
+        log.warning(f"Path exists but is not a directory: {test_repo_path}")
         return False
 
-    log.info("test-repo", f"validating against: {test_repo_path}")
+    log.info("test-repo", f"validating against: {test_repo_path}")  # noqa: PLE1205
 
     # Perform a sync into the test repository
-    from lib.agents import collect_sources, sync_agents_for_provider
-    from lib.config import build_variables, substitute
-    from lib.providers import load_providers_config, resolve_providers
-    from lib.dod import resolve_dod
-    from lib.context import sync_context_for_provider, sync_snippets_for_provider
-    from lib.rules import sync_rules, sync_speech_mode
-    from lib.hooks import sync_hooks
+    from lib.agents import sync_agents_for_provider
     from lib.commands import sync_commands_for_provider
+    from lib.config import build_variables
+    from lib.context import sync_context_for_provider, sync_snippets_for_provider
+    from lib.hooks import sync_hooks
+    from lib.providers import load_providers_config, resolve_providers
+    from lib.rules import sync_rules, sync_speech_mode
     from lib.skills import sync_external_skills_for_provider
 
-    test_variables, pre_warnings = build_variables(config, agent_meta_root)
+    test_variables, _pre_warnings = build_variables(config, agent_meta_root)
     # Override AGENT_META_REPO to point to test repo for validation context
     test_variables["PROJECT_NAME"] = test_variables.get("PROJECT_NAME", "agent-meta-test")
 
@@ -342,7 +368,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     validation_errors = 0
     for provider in providers:
         pc = provider_config[provider]
-        log.info("test-repo", f"syncing agents for provider: {provider}")
+        log.info("test-repo", f"syncing agents for provider: {provider}")  # noqa: PLE1205
         sync_agents_for_provider(agent_meta_root, test_repo_path, config, test_variables,
                                  log, dry_run, provider, provider_config)
         sync_context_for_provider(agent_meta_root, test_repo_path, config, test_variables,
@@ -372,14 +398,14 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         error_lines = [line.strip() for line in content.splitlines()
                        if "[ERROR]" in line or "[FAIL]" in line]
         if error_lines:
-            log.warn(f"test-repo: Found {len(error_lines)} error(s) in sync.log:")
+            log.warning(f"test-repo: Found {len(error_lines)} error(s) in sync.log:")
             for el in error_lines:
-                log.warn(f"test-repo:   {el}")
+                log.warning(f"test-repo:   {el}")
             validation_errors += len(error_lines)
         else:
-            log.info("test-repo", "sync.log contains no errors")
+            log.info("test-repo", "sync.log contains no errors")  # noqa: PLE1205
     else:
-        log.info("test-repo", "sync.log not found in test repository (first validation run)")
+        log.info("test-repo", "sync.log not found in test repository (first validation run)")  # noqa: PLE1205
 
     return validation_errors == 0
 
@@ -522,7 +548,7 @@ def main():
     log = SyncLog()
 
     if args.clear_cache:
-        from lib.cache import invalidate, CACHE_FILE
+        from lib.cache import CACHE_FILE, invalidate
         invalidate(CACHE_FILE)
         print("Outcome cache cleared.")
         return
@@ -618,10 +644,10 @@ def main():
     viz_cfg = config.get("viz", {})
 
     # Warn if actual git tag of agent-meta submodule doesn't match configured version
-    git_version = read_git_version(agent_meta_root)
+    read_git_version(agent_meta_root)
 
     for w in pre_warnings:
-        log.warn(w)
+        log.warning(w)
 
     if args.fill_defaults:
         mode = "fill-defaults"
@@ -633,17 +659,17 @@ def main():
         print(format_report(report))
         if args.apply:
             if args.dry_run:
-                log.info("audit-config",
+                log.info("audit-config",  # noqa: PLE1205
                          f"--apply skipped (dry-run): would disable "
                          f"{len(report.deprecated_roles)} deprecated role(s)")
             else:
                 changed = apply_audit(report, config_path)
                 if changed:
-                    log.info("audit-config",
+                    log.info("audit-config",  # noqa: PLE1205
                              f"commented out {changed} deprecated role line(s) in "
                              f"{config_path}")
                 else:
-                    log.info("audit-config",
+                    log.info("audit-config",  # noqa: PLE1205
                              "no changes applied (nothing to disable)")
 
     elif args.only_variables:
@@ -808,7 +834,7 @@ def main():
                       if test_repo_path else
                       "not configured (set test-repo.path in .meta-config/project.yaml "
                       "or AGENT_META_TEST_REPO)")
-            log.info("test-repo",
+            log.info("test-repo",  # noqa: PLE1205
                      f"Skipping test-repo sync validation — {reason}. "
                      "Consistency checks still ran.")
             sys.exit(1 if consistency_errors else 0)
@@ -820,12 +846,12 @@ def main():
         provider_config = load_providers_config(agent_meta_root)
         providers = resolve_providers(config, provider_config)
         mode = "init" if args.init else "sync"
-        log.info("providers", "active: " + ", ".join(providers))
+        log.info("providers", "active: " + ", ".join(providers))  # noqa: PLE1205
         # Log resolved DoD
         preset_name = config.get("dod-preset", "full")
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
-        log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")
+        log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")  # noqa: PLE1205
         # Log resolved rules-preset
         rules_preset_name = config.get("rules-preset", "default")
         rules_resolved = resolve_rules(config, agent_meta_root)
@@ -834,13 +860,13 @@ def main():
                 f"{r}: {'+'.join(k for k, v in opts.items() if v is not False and v != 'skip') or 'alwaysApply=false'}"
                 for r, opts in rules_resolved.items()
             )
-            log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")
+            log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")  # noqa: PLE1205
         else:
-            log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")
+            log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")  # noqa: PLE1205
         # Load platform-config variables ({{platform.*}} placeholders)
         platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
         if platform_vars is not None:
-            log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
+            log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")  # noqa: PLE1205
         is_claude = "Claude" in providers
         claude_pc = provider_config.get("Claude", {})
         gitignore_cfg = config.get("gitignore", {})
@@ -888,14 +914,14 @@ def main():
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:
-            log.info("debug-mode", "active — injecting debug block into all agents")
+            log.info("debug-mode", "active — injecting debug block into all agents")  # noqa: PLE1205
         allow_committed_secrets = config.get("allow-committed-secrets", False)
         mcp_gitignore_extras: list[str] = []
         for provider in providers:
             pc = provider_config[provider]
             log.provider_header(provider)
             if not is_provider_active(config, provider):
-                log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")
+                log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")  # noqa: PLE1205
                 continue
             # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
             # takes precedence over the global orchestrator.mode for this provider's
@@ -996,7 +1022,7 @@ def main():
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)
             else:
-                log.info("hooks", f"skipped for {provider} — not supported")
+                log.info("hooks", f"skipped for {provider} — not supported")  # noqa: PLE1205
             if pc.get("has_commands", False):
                 sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                            args.dry_run, provider,
@@ -1026,9 +1052,9 @@ def main():
             known_skills = set(ext_config.get("skills", {}).keys())
             for skill_name in config["external-skills"]:
                 if skill_name not in known_skills:
-                    log.warn(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
+                    log.warning(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
-                    log.warn(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
+                    log.warning(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         # Update .gitignore managed block: base entries + per-provider entries + skill entries
         # Collect gitignore_entries from all active non-Claude providers
         extra_provider_entries: list[str] = []
@@ -1037,7 +1063,7 @@ def main():
                 continue  # already in base_gitignore_entries
             _pc = provider_config.get(_p, {})
             if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
-                log.warn(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
+                log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
             extra_provider_entries.extend(_pc.get("gitignore_entries", []))
         # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
         viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
@@ -1076,7 +1102,7 @@ def main():
                 _names = ", ".join(sorted({i.role for i in _missing if i.role}))
                 # SyncLog has no .error() level — emit as WARN with explicit
                 # [ERROR] severity tag to keep parity with --audit-config output.
-                log.warn(
+                log.warning(
                     "config-audit [ERROR]: "
                     f"{len(_missing)} role(s) without generic template: {_names}. "
                     "Run: python scripts/sync.py --audit-config"
@@ -1085,14 +1111,14 @@ def main():
             _templ_noref = _audit_report.by_category("templates_without_default")
             if _templ_noref:
                 _names = ", ".join(sorted({i.role for i in _templ_noref if i.role}))
-                log.info(
+                log.info(  # noqa: PLE1205
                     "config-audit",
                     f"{len(_templ_noref)} template(s) without role-defaults entry: {_names}."
                 )
 
             _depr = _audit_report.deprecated_roles
             if _depr:
-                log.warn(
+                log.warning(
                     "config-audit: "
                     f"{len(_depr)} deprecated role(s) still in project.yaml: "
                     f"{', '.join(_depr)}. "
@@ -1102,14 +1128,14 @@ def main():
             _orphans = _audit_report.by_category("orphaned_pipelines")
             if _orphans:
                 _names = ", ".join(sorted({i.role for i in _orphans if i.role}))
-                log.warn(
+                log.warning(
                     "config-audit: "
                     f"{len(_orphans)} orphaned pipeline reference(s): {_names}. "
                     "Run: python scripts/sync.py --audit-config"
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Audit must never break a sync — degrade gracefully.
-            log.info("config-audit", f"skipped (error: {exc})")
+            log.info("config-audit", f"skipped (error: {exc})")  # noqa: PLE1205
 
     # Environment script generation: produce platform-specific setup scripts
     # (.ps1 / .sh) from the environments: section in project.yaml.
@@ -1140,7 +1166,7 @@ def main():
                     f"{_files_with_deps} with dependencies, "
                     f"{_dep_count} total import edges in scripts/lib/"
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     log_path = project_root / LOGFILE

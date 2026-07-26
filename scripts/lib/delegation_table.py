@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from .roles import load_roles_config
+
 
 def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict) -> list[dict]:
     """Return a list of dictionaries with agent data.

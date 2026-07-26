@@ -6,8 +6,6 @@ All tests target the Claude provider for deterministic model IDs.
 
 from pathlib import Path
 
-import pytest
-
 from scripts.lib.roles import resolve_model
 
 # Root of the agent-meta repo (parent of tests/)

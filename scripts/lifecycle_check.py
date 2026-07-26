@@ -11,10 +11,10 @@ Reads lifecycle-triggers from .meta-config/project.yaml and appends pending
 tasks to .claude/pending-tasks.md.
 """
 
-import sys
 import json
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 try:
     import yaml
@@ -105,7 +105,7 @@ def write_pending_tasks(project_root: Path, event: str, tasks: list[dict], pendi
 
     existing = _read_existing_tasks(pending_path)
     label = TRIGGER_LABELS.get(event, event)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")  # noqa: DTZ005
 
     new_items = []
     for t in tasks:
@@ -159,7 +159,7 @@ def main() -> None:
 
     try:
         config = _load_config(config_path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"lifecycle-check: could not load config: {e}", file=sys.stderr)
         sys.exit(0)
 

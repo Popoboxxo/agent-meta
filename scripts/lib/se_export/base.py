@@ -1,7 +1,6 @@
 """Abstract base class for SE export adapters."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class SEAdapter(ABC):
@@ -17,7 +16,7 @@ class SEAdapter(ABC):
         req_id: str,
         title: str,
         description: str,
-        parent_id: Optional[str] = None,
+        parent_id: str | None = None,
     ) -> str:
         """Create a requirement in the target system.
 
@@ -125,7 +124,7 @@ class SEAdapter(ABC):
             if not comp_id:
                 continue
             comp_desc = component.get("description", "")
-            parent_sub_id: Optional[str] = component.get("refines")
+            parent_sub_id: str | None = component.get("refines")
             parent_ext_id = id_map.get(parent_sub_id) if parent_sub_id else l1_ext_id
             comp_ext_id = self.create_requirement(
                 req_id=comp_id,

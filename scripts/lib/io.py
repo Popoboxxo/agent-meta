@@ -9,7 +9,6 @@ from pathlib import Path
 
 class SyncError(Exception):
     """Fatal sync error — sync cannot continue safely."""
-    pass
 
 try:
     import yaml as _yaml
@@ -81,7 +80,7 @@ def is_unchanged(path: Path, new_content: str) -> bool:
 def write_checked(
     path: Path,
     content: str,
-    log: "SyncLog",
+    log: "SyncLog",  # noqa: F821
     rel_label: str,
     force: bool = False,
     allow_secrets: bool = False,
@@ -125,7 +124,7 @@ def write_checked(
                 + "\n  Use allow-committed-secrets: true in project.yaml to bypass (not recommended)."
             )
         for finding in findings:
-            log.warn(f"potential secret in {rel_label}: {finding} — verify before committing")
+            log.warning(f"potential secret in {rel_label}: {finding} — verify before committing")
     path.write_text(content, encoding="utf-8")
     return True
 

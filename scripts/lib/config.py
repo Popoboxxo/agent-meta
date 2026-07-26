@@ -10,12 +10,11 @@ from pathlib import Path
 from .io import _load_yaml_or_json, _write_yaml
 from .log import SyncLog
 from .pipelines import (
-    load_quality_pipelines,
-    load_pipeline_overrides,
     apply_overrides,
-    validate_pipelines,
     build_pipeline_variables,
     generate_pipeline_match_table,
+    load_quality_pipelines,
+    validate_pipelines,
 )
 
 try:
@@ -128,7 +127,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       {path}: {err.message}", file=sys.stderr)
             if len(errors) > 5:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
-    except (ImportError, TypeError, ValueError) as e:
+    except (ImportError, TypeError, ValueError):
         pass  # jsonschema not installed or validation error — best-effort
 
 
@@ -195,7 +194,7 @@ def fill_defaults(
             config["dod"] = dod_block
             added.extend(dod_additions)
     else:
-        log.info("fill-defaults", f"dod.* skipped — preset '{active_preset}' defines its own defaults")
+        log.info("fill-defaults", f"dod.* skipped — preset '{active_preset}' defines its own defaults")  # noqa: PLE1205
 
     # --- Write back if changed ---
     if changed and not dry_run:
@@ -211,14 +210,14 @@ def fill_defaults(
         log.action(action, str(config_path.name), entry)
 
     if not changed:
-        log.info("fill-defaults", "all structural fields already set — nothing to write")
+        log.info("fill-defaults", "all structural fields already set — nothing to write")  # noqa: PLE1205
 
     # --- Warn about missing variable keys ---
     known_vars = _load_schema_variable_keys(agent_meta_root)
     set_vars = set(config.get("variables", {}).keys())
     missing_vars = [v for v in known_vars if v not in set_vars]
     for var in missing_vars:
-        log.warn(f"Variable not set in config: variables.{var}")
+        log.warning(f"Variable not set in config: variables.{var}")
 
 
 def read_version(agent_meta_root: Path) -> str:
@@ -234,7 +233,7 @@ def read_git_version(agent_meta_root: Path) -> str:
     Falls back to 'unknown' if git is unavailable or no tags exist.
     """
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510
             ["git", "describe", "--tags", "--exact-match"],
             cwd=str(agent_meta_root),
             capture_output=True, text=True, timeout=5,
@@ -261,7 +260,7 @@ def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
         if not isinstance(se_vars, dict):
             return {}
         return {str(k): v for k, v in se_vars.items()}
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
@@ -328,9 +327,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     """Returns (variables_dict, pre_warnings)."""
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
-    from .delegation_table import get_active_agents_data
     from .context_templates.builder import TemplateBuilder
-
+    from .delegation_table import get_active_agents_data
     from .dod import resolve_dod
     from .providers import load_providers_config, resolve_providers
 
@@ -340,7 +338,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["PROJECT_SHORT"] = project.get("short", "")
     variables["PROJECT_NAME"]  = project.get("name", "")
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
-    variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")
+    variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
@@ -485,7 +483,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             _deps = analyze_project(agent_meta_root)
             _analyzer = FileAffinityAnalyzer(agent_meta_root)
             variables["FILE_AFFINITY_HINT"] = _analyzer.format_hint(_deps)
-        except Exception:
+        except Exception:  # noqa: BLE001
             variables["FILE_AFFINITY_HINT"] = ""
     else:
         variables["FILE_AFFINITY_HINT"] = ""
@@ -587,9 +585,9 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
     try:
         from .reflection import (
-            load_reflection_pairs,
-            load_project_overrides,
             apply_project_overrides,
+            load_project_overrides,
+            load_reflection_pairs,
         )
         _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
         _refl_overrides = load_project_overrides(
@@ -603,7 +601,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 _effective_pairs[0],
             )
             variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Fallback: keep existing behavior (check role-defaults.yaml directly)
         try:
             roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
@@ -612,7 +610,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                     roles_defaults = _yaml.safe_load(f) or {}
                 if roles_defaults.get("reflection_pairs"):
                     variables["REFLECTION_PAIRS_ENABLED"] = "true"
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["QUALITY_PIPELINES_ENABLED"] = "false"
@@ -645,7 +643,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[block_key] = ""
             if enabled_key not in variables:
                 variables[enabled_key] = "false"
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
     # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
@@ -766,7 +764,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
                 is_true = variables.get(_var, "true") == "true"
                 result = true_branch if is_true else false_branch
                 # Preserve trailing newline if original match ended with one
-                if m.group(0).endswith("\n"):
+                if m.group(0).endswith("\n"):  # noqa: SIM102
                     if not result.endswith("\n"):
                         result = result + "\n"
                 return result
@@ -820,7 +818,7 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
             return match.group(0)
         if key in variables:
             return str(variables[key])
-        log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
+        log.warning(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
 
     text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)

@@ -54,11 +54,11 @@ def sync_provider_isolation(
         log.skip("provider-isolation", f"only {len(providers)} provider active — skipping")
         return
 
-    log.info("provider-isolation", f"generating isolation for: {', '.join(providers)}")
+    log.info("provider-isolation", f"generating isolation for: {', '.join(providers)}")  # noqa: PLE1205
 
     for provider in providers:
         pc = provider_config.get(provider, {})
-        own_dirs: list[str] = pc.get("isolation-dirs", [])
+        pc.get("isolation-dirs", [])
 
         # foreign_dirs = isolation-dirs of all OTHER active providers
         foreign_dirs: list[str] = []
@@ -101,7 +101,7 @@ def _read_json_safe(path: Path, log: SyncLog | None = None) -> dict | None:
         return None
     parsed = read_json_lenient(path)
     if parsed is None and log:
-        log.warn(f"{path.name}: could not parse JSON — skipping isolation update to avoid data loss")
+        log.warning(f"{path.name}: could not parse JSON — skipping isolation update to avoid data loss")
     return parsed
 
 

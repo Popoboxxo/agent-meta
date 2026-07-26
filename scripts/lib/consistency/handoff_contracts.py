@@ -37,7 +37,7 @@ def _load_roles(agent_meta_root: Path) -> dict | None:
         return None
     try:
         data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     roles = data.get("roles", {})
     return roles if isinstance(roles, dict) else {}

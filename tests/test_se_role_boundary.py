@@ -1,6 +1,4 @@
 """Test SE Role Boundary: se-critic detects forbidden terms in requirements output."""
-import json
-from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -9,7 +7,7 @@ from pathlib import Path
 
 def _make_req(req_id: str, statement: str, domain: str = "system",
               arch_impact: bool = False, arch_trigger: str = "",
-              acceptance_criteria: list = None) -> dict:
+              acceptance_criteria: list | None = None) -> dict:
     """Helper to build a single requirement dict."""
     req = {
         "req_id": req_id,

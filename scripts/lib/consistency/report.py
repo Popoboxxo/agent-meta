@@ -2,7 +2,7 @@
 
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -13,10 +13,10 @@ _ICON = {
     "WARNING": "!!" if not _UNICODE else "WRN",
     "INFO":    "--" if not _UNICODE else "INF",
 }
-_OK   = "[OK]"   if not _UNICODE else "[OK]"
-_FILE = ">>>" if not _UNICODE else ">>>"
-_PASS = "[PASS]" if not _UNICODE else "[PASS]"
-_FAIL = "[FAIL]" if not _UNICODE else "[FAIL]"
+_OK   = "[OK]"   if not _UNICODE else "[OK]"  # noqa: RUF034
+_FILE = ">>>" if not _UNICODE else ">>>"  # noqa: RUF034
+_PASS = "[PASS]" if not _UNICODE else "[PASS]"  # noqa: RUF034
+_FAIL = "[FAIL]" if not _UNICODE else "[FAIL]"  # noqa: RUF034
 
 
 class Severity(str, Enum):

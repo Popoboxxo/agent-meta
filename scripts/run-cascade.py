@@ -21,7 +21,7 @@ import sys
 import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # SE Cascade Stage Definitions
@@ -166,7 +166,7 @@ def save_stage_output(stage: dict[str, Any], output_content: str, session_dir: P
     return out_path
 
 
-def load_stage_output(stage_id: str, session_dir: Path) -> Optional[str]:
+def load_stage_output(stage_id: str, session_dir: Path) -> str | None:
     """Load the output of a completed stage, if present."""
     idx = _STAGE_INDEX.get(stage_id)
     if idx is None:
@@ -231,7 +231,7 @@ def generate_prompt_file(stage: dict[str, Any], initial_input: str, session_dir:
             """
         ).strip(),
         "",
-        f"### Stage Objective",
+        "### Stage Objective",
         f"{stage['description']}",
         "",
     ]
@@ -266,7 +266,7 @@ def generate_prompt_file(stage: dict[str, Any], initial_input: str, session_dir:
     lines.extend([
         "## Expected Output",
         "",
-        f"Save your complete result to the file:",
+        "Save your complete result to the file:",
         f"`{stage['output_file']}`",
         f"in the session directory `.se-cascade/{session_dir.name}/`",
         "",
@@ -397,7 +397,7 @@ def _list_sessions() -> None:
             try:
                 meta = _read_session_meta(session_dir)
                 created = meta.get("created_at", "unknown")[:19].replace("T", " ")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
         print(f"{session_dir.name:<50s} {completed}/{total:<5d} {created:>20s}")
 
@@ -478,7 +478,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point for the SE-Cascade Runner."""
     parser = _build_arg_parser()
     args = parser.parse_args(argv)

@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+
 # Try to find the project root (where .meta-viz lives).
 #
 # Default assumption: ``scripts/viz-logger.py`` → project root is the parent of
@@ -370,7 +371,7 @@ def _handle_tools_call(request_id, params):
             "isError": False,
         }
         return _make_response(request_id, result=result)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         result = {
             "content": [
                 {
@@ -432,12 +433,12 @@ def run_mcp_server():
 
         except KeyboardInterrupt:
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Try to send error response if we have an id
             if msg and "id" in msg:
                 response = _make_response(
                     msg["id"],
-                    error={"code": -32603, "message": f"Internal error: {str(e)}"}
+                    error={"code": -32603, "message": f"Internal error: {e!s}"}
                 )
                 _send_message(response)
             break
