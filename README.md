@@ -13,7 +13,7 @@
 >
 > In short: this is a practical lab setup to evaluate VibeCoding methods, compare approaches, and develop agent frameworks while keeping limitations visible.
 
-[![Version](https://img.shields.io/badge/version-0.86.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.86.2-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 | **Date:** 2026-07-26

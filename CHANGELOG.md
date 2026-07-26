@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.86.2] — 2026-07-26
+
+### Fixed
+- Fix: properly skip all browser test modules if playwright is absent.
+
 ## [0.86.1] — 2026-07-26
 
 ### Fixed

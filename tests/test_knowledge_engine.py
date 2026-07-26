@@ -363,7 +363,7 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     dest = tmp_path / "agent-meta-copy"
     shutil.copytree(
         _AGENT_META_ROOT, dest,
-        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers"),
+        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external"),
     )
 
     project_yaml_path = dest / ".meta-config" / "project.yaml"
