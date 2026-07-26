@@ -7,6 +7,7 @@ CLAUDE.personal.md
 sync.log
 package-lock.
 graphify-out/
+.ship-safe/
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/

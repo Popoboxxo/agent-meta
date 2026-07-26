@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.5] — 2026-07-26
+
+### Fixed
+- add shipsafe ignore files for false positive security warnings
+
 ## [0.85.4] — 2026-07-26
 
 ### Fixed
