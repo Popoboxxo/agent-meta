@@ -1,0 +1,17 @@
+# ShipSafe Ignore File
+# Ignoriert Dateien mit bekannten False-Positives (siehe Audit vom 26.07.2026)
+
+# SSRF_INTERNAL_IP & AGENT_NO_AUDIT_LOG - Interne Test-Scripts & Reporting (lokal)
+scripts/viz-report.py
+tests/test_admin_server.py
+tests/browser/conftest.py
+
+# AGENT_NO_OUTPUT_SCHEMA - JSON Parsing mit Fallback, Schema-Validierung hier nicht zwingend
+scripts/lib/model_discovery.py
+
+# MEMORY_HIDDEN_COMMENT - Dokumentationsdateien, keine aktiven Agent-Prompts
+docs/concepts/active/se-und-prompt-modernisierung.md
+docs/concepts/planned/se-und-prompt-modernisierung.md
+
+# VIBE_PLACEHOLDER_URL - Externe Test-Dateien
+external/awesome-claude-code/tests/test_generate_readme.py
