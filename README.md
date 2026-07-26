@@ -477,7 +477,7 @@ docs/
   admin-ui.html              # Web frontend for Admin UI
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
-VERSION                      # Current version (v0.84.0)
+VERSION                      # Current version (v0.85.1)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```

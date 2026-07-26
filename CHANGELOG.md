@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.1] - 2026-07-26
+
+### Fixed
+- Add internal-docs to UI dropdown and update README architecture
+
 ## [0.85.0] - 2026-07-25
 
 ### Added
