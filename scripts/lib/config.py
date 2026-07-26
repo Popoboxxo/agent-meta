@@ -555,6 +555,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
     
     variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
+    
+    from .delegation_table import get_intent_routing_table
+    variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(agent_meta_root, config, variables)
+    
     _tb = TemplateBuilder(agent_meta_root / "templates" / "context")
     _table_tpl = _tb.resolve_partials("{{> agents-table }}")
     variables["AGENT_DELEGATION_TABLE"] = _tb.resolve_loops(_table_tpl, variables).strip()
@@ -576,8 +580,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["DOD_SE_OPTIONAL"]    = "true" if se_required == "false" else "false"
     variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
-    # INTENT_ROUTING_TABLE: generate after all gating flags are resolved
-    variables["INTENT_ROUTING_TABLE"] = ""
+    # INTENT_ROUTING_TABLE is generated earlier
+    # variables["INTENT_ROUTING_TABLE"] = ""
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops

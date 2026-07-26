@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.84.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.85.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 ## Agent Directory
 > ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
@@ -468,6 +468,14 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 <!-- agent-meta:managed-end -->
+
+
+
+
+
+
+
+
 
 
 

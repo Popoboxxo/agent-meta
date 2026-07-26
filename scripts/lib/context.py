@@ -433,6 +433,24 @@ def _sync_managed_block_context(
     target_path = safe_path(project_root, context_file)
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
+    
+    from .agents import build_agent_hints
+    from .config import _resolve_orch_mode
+    orch_config = config.get("orchestrator", {})
+    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
+    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
+    
+    local_config = config.copy()
+    if "orchestrator" in local_config:
+        local_orch = local_config["orchestrator"].copy()
+        local_orch["mode"] = _orch_mode
+        local_config["orchestrator"] = local_orch
+
+    variables = variables.copy()
+    if provider == "Claude":
+        variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(local_config, agent_meta_root, include_table=False)
+    else:
+        variables["AGENT_HINTS"] = build_agent_hints(local_config, agent_meta_root, include_table=True)
 
     # Claude's CLAUDE.md static part is handled by sync_claude_md_static() in the
     # main sync loop; this strategy only refreshes the managed block for Claude.
