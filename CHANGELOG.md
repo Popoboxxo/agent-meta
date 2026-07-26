@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.2] — 2026-07-26
+
+### Fixed
+- Main-chat orchestrator bugfix merged to main
+
 ## [0.85.1] - 2026-07-26
 
 ### Fixed

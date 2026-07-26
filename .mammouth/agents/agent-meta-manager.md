@@ -146,7 +146,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.85.1 (2026-07-26)
+**Version info:** v0.85.2 (2026-07-26)
 </context>
 
 <tools>
