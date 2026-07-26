@@ -11,8 +11,13 @@ Jeder Dev-Task -> `orchestrator`. Ausnahme: User Override oder 1-Step (falls erl
 {{/if}}
 {{#if ORCH_MODE_MAIN_CHAT}}
 # Main-Chat Mode
-Main Chat ist Router + Worker. Kein Orchestrator-Subagent.
+Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestrator!
+
+## Intent Routing
 {{INTENT_ROUTING_TABLE}}
+
+## A2A Delegation
+{{A2A_HANDOFF_BLOCK}}
 {{/if}}
 
 ## Git Delegation

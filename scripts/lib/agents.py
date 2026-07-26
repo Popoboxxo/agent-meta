@@ -1879,6 +1879,10 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
         lines.append(
             "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
         )
+    elif _is_main_chat_mode:
+        lines.append(
+            "> **Einstiegspunkt:** Du bist im `main-chat` Modus. Du agierst direkt als Router und Worker (siehe `use-orchestrator.md`)."
+        )
 
     if include_table:
         if has_orchestrator:

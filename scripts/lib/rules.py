@@ -140,7 +140,7 @@ def sync_rules(
     Stale agent-meta-managed rules (tracked in <rules_dir>/.agent-meta-managed) are removed.
     """
     from .platform import substitute_platform
-    from .config import substitute, strip_inactive_conditional_blocks
+    from .config import substitute, strip_inactive_conditional_blocks, _resolve_orch_mode, _orch_mode_flags
 
     pc = (provider_config or {}).get(provider, {})
     provider_vars = {
@@ -150,6 +150,17 @@ def sync_rules(
         'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
         'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
     }
+    
+    # Provider-specific orchestrator mode override
+    orch_config = config.get("orchestrator", {})
+    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
+    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
+    provider_vars.update(_orch_mode_flags(_orch_mode))
+    
+    # Override hint if main-chat mode is active
+    if _orch_mode == "main-chat":
+        provider_vars["ORCHESTRATOR_INVOCATION_HINT"] = "- Du bist der Orchestrator! Befolge die Regeln in use-orchestrator.md."
+        
     merged_vars = {**variables, **provider_vars} if variables is not None else provider_vars
 
     platforms = config.get("platforms", [])
