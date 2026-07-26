@@ -1096,6 +1096,229 @@ def _remove_frontmatter_fields(content: str, fields: list) -> str:
     return content
 
 
+def transform_agent_content_for_provider(
+    content: str,
+    provider: str,
+    role: str,
+    name: str,
+    description: str,
+    generated_from: str,
+    config: dict,
+    agent_meta_root: Path,
+    project_root: Path,
+    target_path: Path,
+    provider_config: dict,
+    log: SyncLog,
+) -> str:
+    from .roles import (        load_roles_config,        resolve_max_tokens,        resolve_memory,        resolve_model,        resolve_permission_mode,        resolve_steps,        resolve_temperature,    )
+    if provider == 'Continue':
+        # Continue agents: preserve original frontmatter, inject model/memory, add alwaysApply
+        content = build_frontmatter(content, name, description, generated_from=generated_from)
+        model = resolve_model(role, config, agent_meta_root,
+                              provider=provider, provider_config=provider_config, log=log)
+        if not model:
+            # Continue has no model-tiers mapping; fall back to raw role-defaults value
+            roles_cfg = load_roles_config(agent_meta_root)
+            raw = roles_cfg["roles"].get(role, {}).get("model", "")
+            if raw:
+                model = raw
+        content = inject_model_field(content, model)
+        if model:
+            po = config.get('model-overrides', {})
+            is_override = (role in po.get('Continue', {})) or (
+                role in po and not isinstance(po.get(role), dict)
+            )
+            src = 'project override' if is_override else 'meta default'
+            log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+        memory = resolve_memory(role, config, agent_meta_root)
+        content = inject_memory_field(content, memory)
+        if memory:
+            src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+            log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+        permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+        content = inject_permission_mode_field(content, permission_mode)
+        if permission_mode:
+            src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+            log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+        content = _update_frontmatter_dict(content, {"alwaysApply": False})
+        # Continue has no frontmatter tools model — validate and remove template tools
+        _continue_fm = _parse_frontmatter_yaml(content)
+        _continue_tools = _continue_fm.get('tools')
+        if isinstance(_continue_tools, list):
+            _validate_tools_against_whitelist(
+                _continue_tools, provider, agent_meta_root, log, role,
+            )
+        content = _remove_frontmatter_fields(content, ['tools'])
+        body = _strip_frontmatter(content)
+        body = _strip_claude_specific_lines(body)
+        
+        # Sanitize standalone --- in the body to avoid breaking Continue's YAML parsing
+        import re as _re
+        body = _re.sub(r'(?m)^---$', '___', body)
+        
+        fm_end = content.find('\n---', 3)
+        if fm_end != -1:
+            content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+    else:
+        content = build_frontmatter(content, name, description, generated_from=generated_from)
+
+        if provider == 'Claude':
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config, log=log)
+            content = inject_model_field(content, model)
+            if model:
+                po = config.get('model-overrides', {})
+                is_override = (role in po.get('Claude', {})) or (
+                    role in po and not isinstance(po.get(role), dict)
+                )
+                src = 'project override' if is_override else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+
+            memory = resolve_memory(role, config, agent_meta_root)
+            content = inject_memory_field(content, memory)
+            if memory:
+                src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+
+            permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+            content = inject_permission_mode_field(content, permission_mode)
+            if permission_mode:
+                src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+
+            # Validate tools against whitelist — log warnings but keep tools (Claude supports them natively)
+            _claude_fm = _parse_frontmatter_yaml(content)
+            _claude_tools = _claude_fm.get('tools')
+            if isinstance(_claude_tools, list):
+                _validate_tools_against_whitelist(
+                    _claude_tools, provider, agent_meta_root, log, role,
+                )
+
+        elif provider == 'Gemini':
+            # Gemini: provider-mapped model only; strip unsupported sampling
+            # parameters (temperature, top_p, top_k, stop_sequences,
+            # max_output_tokens) plus memory and permissionMode, then
+            # strip Claude-specific lines.
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config, log=log)
+            content = inject_model_field(content, model)
+            if model:
+                po = config.get('model-overrides', {})
+                is_override = role in po.get('Gemini', {})
+                src = 'project override' if is_override else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+            # Map generic tool names to Gemini-native tools
+            _gemini_fm = _parse_frontmatter_yaml(content)
+            _gemini_tools = _gemini_fm.get('tools')
+            if isinstance(_gemini_tools, list):
+                # Validate against provider whitelist first
+                _gemini_valid_tools = _validate_tools_against_whitelist(
+                    _gemini_tools, provider, agent_meta_root, log, role,
+                )
+                content = _update_frontmatter_dict(content, {'tools': _gemini_valid_tools})
+            content = _remove_frontmatter_fields(
+                content,
+                [
+                    'memory',
+                    'permissionMode',
+                    'temperature',
+                    'top_p',
+                    'top_k',
+                    'stop_sequences',
+                    'max_output_tokens',
+                ]
+            )
+            body = _strip_frontmatter(content)
+            body = _strip_claude_specific_lines(body)
+            fm_end = content.find('\n---', 3)
+            if fm_end != -1:
+                # Gemini agents are API-registered, not file-discovered —
+                # without the session bootstrap this file has no effect.
+                registration_note = (
+                    "> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit "
+                    "via `define_subagent` registriert — er ist NICHT automatisch aktiv. "
+                    f"Bootstrap-Instruktionen: `{provider_config.get(provider, {}).get('context_file', '.gemini/GEMINI.md')}` "
+                    "(Block `agent-meta:bootstrap`).\n"
+                )
+                content = (content[:fm_end + 4] + '\n' + registration_note
+                           + '\n' + body.lstrip('\n'))
+
+        elif provider == 'Opencode':
+            # Opencode: native frontmatter (description + mode: subagent + model)
+            # Model IDs use "provider/model-id" format (e.g. anthropic/claude-sonnet-4-6)
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config, log=log)
+            if model:
+                po = config.get('model-overrides', {})
+                is_override = role in po.get('Opencode', {})
+                src = 'project override' if is_override else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+            temperature = resolve_temperature(role, config, agent_meta_root)
+            if temperature:
+                src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
+            max_tokens = resolve_max_tokens(role, config, agent_meta_root)
+            if max_tokens:
+                mt_src = 'project override' if role in config.get('max-tokens-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'max_tokens: {max_tokens} (from {mt_src})')
+            steps = resolve_steps(role, config, agent_meta_root)
+            if steps:
+                src = 'project override' if role in config.get('steps-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'steps: {steps} (from {src})')
+            # Validate tools against provider whitelist before transformation
+            _opencode_fm = _parse_frontmatter_yaml(content)
+            _opencode_raw_tools = _opencode_fm.get('tools')
+            if isinstance(_opencode_raw_tools, list):
+                _opencode_valid_tools = _validate_tools_against_whitelist(
+                    _opencode_raw_tools, provider, agent_meta_root, log, role,
+                )
+                # Replace tools with validated subset before transformation
+                content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
+            content = _transform_frontmatter_for_opencode(
+                content, name, description, model, steps, generated_from, agent_meta_root, temperature
+            )
+
+        elif provider == 'Copilot':
+            # Copilot: frontmatter without model/memory/permissionMode/tools
+            # Uses IDE-configured models — no per-agent model field
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            content = _remove_frontmatter_fields(content, [
+                'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
+                'stop_sequences', 'max_output_tokens', 'tools',
+            ])
+            body = _strip_frontmatter(content)
+            body = _strip_claude_specific_lines(body)
+            fm_end = content.find('\n---', 3)
+            if fm_end != -1:
+                content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+            else:
+                content = body.lstrip('\n')
+
+        elif provider == 'Mammouth':
+            # Mammouth Code: terminal-based agent, similar to Copilot.
+            # Frontmatter without model/memory/permissionMode/tools — Mammouth
+            # uses session-level model selection, not per-agent config.
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            content = _remove_frontmatter_fields(content, [
+                'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
+                'stop_sequences', 'max_output_tokens', 'tools',
+            ])
+            body = _strip_frontmatter(content)
+            body = _strip_claude_specific_lines(body)
+            fm_end = content.find('\n---', 3)
+            if fm_end != -1:
+                content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+            else:
+                content = body.lstrip('\n')
+
+    # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
+    # Applies to ALL providers — every generated agent gets the viz reporting block
+    viz_cfg = config.get('viz', {})
+    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
+        from .viz import inject_viz_prompt_block
+    return content
+
+
 def sync_agents_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -1252,205 +1475,20 @@ def sync_agents_for_provider(
         source_label = f'{layer}/{source_path.name}'
         generated_from = f'{source_label}@{source_version}' if source_version else source_label
 
-        if provider == 'Continue':
-            # Continue agents: preserve original frontmatter, inject model/memory, add alwaysApply
-            content = build_frontmatter(content, name, description, generated_from=generated_from)
-            model = resolve_model(role, config, agent_meta_root,
-                                  provider=provider, provider_config=provider_config, log=log)
-            if not model:
-                # Continue has no model-tiers mapping; fall back to raw role-defaults value
-                roles_cfg = load_roles_config(agent_meta_root)
-                raw = roles_cfg["roles"].get(role, {}).get("model", "")
-                if raw:
-                    model = raw
-            content = inject_model_field(content, model)
-            if model:
-                po = config.get('model-overrides', {})
-                is_override = (role in po.get('Continue', {})) or (
-                    role in po and not isinstance(po.get(role), dict)
-                )
-                src = 'project override' if is_override else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-            memory = resolve_memory(role, config, agent_meta_root)
-            content = inject_memory_field(content, memory)
-            if memory:
-                src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
-            permission_mode = resolve_permission_mode(role, config, agent_meta_root)
-            content = inject_permission_mode_field(content, permission_mode)
-            if permission_mode:
-                src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
-            content = _update_frontmatter_dict(content, {"alwaysApply": False})
-            # Continue has no frontmatter tools model — validate and remove template tools
-            _continue_fm = _parse_frontmatter_yaml(content)
-            _continue_tools = _continue_fm.get('tools')
-            if isinstance(_continue_tools, list):
-                _validate_tools_against_whitelist(
-                    _continue_tools, provider, agent_meta_root, log, role,
-                )
-            content = _remove_frontmatter_fields(content, ['tools'])
-            body = _strip_frontmatter(content)
-            body = _strip_claude_specific_lines(body)
-            
-            # Sanitize standalone --- in the body to avoid breaking Continue's YAML parsing
-            import re as _re
-            body = _re.sub(r'(?m)^---$', '___', body)
-            
-            fm_end = content.find('\n---', 3)
-            if fm_end != -1:
-                content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
-        else:
-            content = build_frontmatter(content, name, description, generated_from=generated_from)
-
-            if provider == 'Claude':
-                model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config, log=log)
-                content = inject_model_field(content, model)
-                if model:
-                    po = config.get('model-overrides', {})
-                    is_override = (role in po.get('Claude', {})) or (
-                        role in po and not isinstance(po.get(role), dict)
-                    )
-                    src = 'project override' if is_override else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-
-                memory = resolve_memory(role, config, agent_meta_root)
-                content = inject_memory_field(content, memory)
-                if memory:
-                    src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
-
-                permission_mode = resolve_permission_mode(role, config, agent_meta_root)
-                content = inject_permission_mode_field(content, permission_mode)
-                if permission_mode:
-                    src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
-
-                # Validate tools against whitelist — log warnings but keep tools (Claude supports them natively)
-                _claude_fm = _parse_frontmatter_yaml(content)
-                _claude_tools = _claude_fm.get('tools')
-                if isinstance(_claude_tools, list):
-                    _validate_tools_against_whitelist(
-                        _claude_tools, provider, agent_meta_root, log, role,
-                    )
-
-            elif provider == 'Gemini':
-                # Gemini: provider-mapped model only; strip unsupported sampling
-                # parameters (temperature, top_p, top_k, stop_sequences,
-                # max_output_tokens) plus memory and permissionMode, then
-                # strip Claude-specific lines.
-                model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config, log=log)
-                content = inject_model_field(content, model)
-                if model:
-                    po = config.get('model-overrides', {})
-                    is_override = role in po.get('Gemini', {})
-                    src = 'project override' if is_override else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-                # Map generic tool names to Gemini-native tools
-                _gemini_fm = _parse_frontmatter_yaml(content)
-                _gemini_tools = _gemini_fm.get('tools')
-                if isinstance(_gemini_tools, list):
-                    # Validate against provider whitelist first
-                    _gemini_valid_tools = _validate_tools_against_whitelist(
-                        _gemini_tools, provider, agent_meta_root, log, role,
-                    )
-                    content = _update_frontmatter_dict(content, {'tools': _gemini_valid_tools})
-                content = _remove_frontmatter_fields(
-                    content,
-                    [
-                        'memory',
-                        'permissionMode',
-                        'temperature',
-                        'top_p',
-                        'top_k',
-                        'stop_sequences',
-                        'max_output_tokens',
-                    ]
-                )
-                body = _strip_frontmatter(content)
-                body = _strip_claude_specific_lines(body)
-                fm_end = content.find('\n---', 3)
-                if fm_end != -1:
-                    # Gemini agents are API-registered, not file-discovered —
-                    # without the session bootstrap this file has no effect.
-                    registration_note = (
-                        "> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit "
-                        "via `define_subagent` registriert — er ist NICHT automatisch aktiv. "
-                        f"Bootstrap-Instruktionen: `{pc.get('context_file', '.gemini/GEMINI.md')}` "
-                        "(Block `agent-meta:bootstrap`).\n"
-                    )
-                    content = (content[:fm_end + 4] + '\n' + registration_note
-                               + '\n' + body.lstrip('\n'))
-
-            elif provider == 'Opencode':
-                # Opencode: native frontmatter (description + mode: subagent + model)
-                # Model IDs use "provider/model-id" format (e.g. anthropic/claude-sonnet-4-6)
-                model = resolve_model(role, config, agent_meta_root,
-                                      provider=provider, provider_config=provider_config, log=log)
-                if model:
-                    po = config.get('model-overrides', {})
-                    is_override = role in po.get('Opencode', {})
-                    src = 'project override' if is_override else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
-                temperature = resolve_temperature(role, config, agent_meta_root)
-                if temperature:
-                    src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
-                max_tokens = resolve_max_tokens(role, config, agent_meta_root)
-                if max_tokens:
-                    mt_src = 'project override' if role in config.get('max-tokens-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'max_tokens: {max_tokens} (from {mt_src})')
-                steps = resolve_steps(role, config, agent_meta_root)
-                if steps:
-                    src = 'project override' if role in config.get('steps-overrides', {}) else 'meta default'
-                    log.info(str(target_path.relative_to(project_root)), f'steps: {steps} (from {src})')
-                # Validate tools against provider whitelist before transformation
-                _opencode_fm = _parse_frontmatter_yaml(content)
-                _opencode_raw_tools = _opencode_fm.get('tools')
-                if isinstance(_opencode_raw_tools, list):
-                    _opencode_valid_tools = _validate_tools_against_whitelist(
-                        _opencode_raw_tools, provider, agent_meta_root, log, role,
-                    )
-                    # Replace tools with validated subset before transformation
-                    content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
-                content = _transform_frontmatter_for_opencode(
-                    content, name, description, model, steps, generated_from, agent_meta_root, temperature
-                )
-
-            elif provider == 'Copilot':
-                # Copilot: frontmatter without model/memory/permissionMode/tools
-                # Uses IDE-configured models — no per-agent model field
-                content = build_frontmatter(content, name, description, generated_from=generated_from)
-                content = _remove_frontmatter_fields(content, [
-                    'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
-                    'stop_sequences', 'max_output_tokens', 'tools',
-                ])
-                body = _strip_frontmatter(content)
-                body = _strip_claude_specific_lines(body)
-                fm_end = content.find('\n---', 3)
-                if fm_end != -1:
-                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
-                else:
-                    content = body.lstrip('\n')
-
-            elif provider == 'Mammouth':
-                # Mammouth Code: terminal-based agent, similar to Copilot.
-                # Frontmatter without model/memory/permissionMode/tools — Mammouth
-                # uses session-level model selection, not per-agent config.
-                content = build_frontmatter(content, name, description, generated_from=generated_from)
-                content = _remove_frontmatter_fields(content, [
-                    'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
-                    'stop_sequences', 'max_output_tokens', 'tools',
-                ])
-                body = _strip_frontmatter(content)
-                body = _strip_claude_specific_lines(body)
-                fm_end = content.find('\n---', 3)
-                if fm_end != -1:
-                    content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
-                else:
-                    content = body.lstrip('\n')
+        content = transform_agent_content_for_provider(
+            content=content,
+            provider=provider,
+            role=role,
+            name=name,
+            description=description,
+            generated_from=generated_from,
+            config=config,
+            agent_meta_root=agent_meta_root,
+            project_root=project_root,
+            target_path=target_path,
+            provider_config=provider_config,
+            log=log,
+        )
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         # Applies to ALL providers — every generated agent gets the viz reporting block

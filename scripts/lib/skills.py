@@ -240,6 +240,23 @@ def sync_external_skills_for_provider(
                                    f"0-external/{skill_name}", log)
 
         agent_target = safe_path(agents_dir, f"{role}.md")
+
+        # Apply provider-specific transformations (Opencode, Continue, etc.)
+        from .agents import transform_agent_content_for_provider
+        agent_content = transform_agent_content_for_provider(
+            content=agent_content,
+            provider=provider,
+            role=role,
+            name=role,
+            description=description,
+            generated_from=f"0-external/{skill_name}@{commit}",
+            config=config,
+            agent_meta_root=agent_meta_root,
+            project_root=project_root,
+            target_path=agent_target,
+            provider_config=provider_config,
+            log=log,
+        )
         log.action("WRITE", str(agent_target.relative_to(project_root)),
                    f"0-external/{skill_name}@{commit}")
 
