@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.85.3] — 2026-07-26
+
+### Fixed
+- read agent-meta-version from project.yaml in admin ui
+
 ## [0.85.2] — 2026-07-26
 
 ### Fixed
