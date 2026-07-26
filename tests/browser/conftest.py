@@ -17,12 +17,10 @@ import pytest
 
 try:
     from playwright.sync_api import sync_playwright
-except ImportError as exc:  # pragma: no cover - import-time error path
-    raise ImportError(
-        "playwright is required for browser tests. Install with:\n"
-        "  pip install playwright\n"
-        "  playwright install chromium"
-    ) from exc
+    has_playwright = True
+except ImportError:
+    has_playwright = False
+
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -76,6 +74,8 @@ def admin_server():
 @pytest.fixture(scope="session")
 def browser_ctx(admin_server):
     """Yield a (BrowserContext, base_url) tuple shared across the session."""
+    if not has_playwright:
+        pytest.skip("playwright is required for browser tests. Install with pip install playwright")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context()
