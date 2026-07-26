@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.86.0] — 2026-07-26
+
+### Added
+- Feat: dynamic external skills fetching with project overrides.
+
+### Fixed
+- Fix: make playwright import lazy in conftest to prevent pytest collection failures.
+
 ## [0.85.5] — 2026-07-26
 
 ### Fixed
