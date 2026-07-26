@@ -51,13 +51,37 @@ graph TD
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.77.0 && cd ..
+cd .agent-meta && git checkout v0.85.1 && cd ..
 
 # Run interactive setup
 python .agent-meta/scripts/sync.py --setup
+```
 
-# Sync agents
-python .agent-meta/scripts/sync.py
+## Core Capabilities & Features
+
+```mermaid
+mindmap
+  root((agent-meta))
+    Generation Engine
+      sync.py Template Compilation
+      Context Compaction V2
+      Single-Tree XML Architecture
+    Knowledge Engine
+      OKF-Compliant Scaffolding
+      Domain Presets
+      Bundle Manager
+    Admin UI
+      Live Configuration
+      Live Model Registry Download
+      Viz Dashboard
+    Workflow Management
+      A2A Handoff Protocol
+      DoD Presets
+      Quality Pipelines
+    Extensions
+      Native Extensions Whitelist
+      MCP Servers
+      External Skills
 ```
 
 ## Agent Roster — 51 Generic Agents
@@ -127,6 +151,12 @@ python .agent-meta/scripts/sync.py
 | **knowledge-migrator** | balanced | 1.0.0 | Cleans up and migrates existing project content into the OKF Wiki |
 | **knowledge-querier** | fast | 1.0.0 | Answers questions against the Knowledge Wiki |
 
+### Knowledge Engine Framework (Feature Overview)
+Introduced in v0.83.0, the Knowledge Engine brings semantic codebase management to the next level:
+- **Phase A (OKF-compliant Scaffolding):** Instantiates a structured `knowledge/` folder with `index.md`, `log.md`, and dedicated domain directories (Architecture, Domain, Entities, Guides).
+- **Phase B (Domain Presets):** Select pre-configured domain structures directly from the Admin UI (e.g. `technical-project`, `gamedev`, `personal-wiki`).
+- **Phase C (Bundle Manager):** The `knowledge.py` subsystem automatically aggregates wiki markdown into provider-specific context files dynamically.
+
 ### Provider Expert Agents (5 agents)
 
 | Agent | Tier | Version | Description |
@@ -156,7 +186,7 @@ python .agent-meta/scripts/sync.py
 | **se-verifier** | balanced | 1.2.0 | Multi-level verification L1-Ln |
 | **se-integration-and-test-manager** | balanced | 1.2.0 | V&V orchestrator: integration strategy, test levels |
 
-**Note:** SE roles remain in legacy format. Modern mode (29 agents in 6-block XML) available in `agents/1-generic-modern/` for all main roles.
+**Note:** SE roles remain in legacy format. Main roles operate on the newer Context Compaction V2 (Single-Tree XML Architecture).
 
 ## Platform Overrides (2-platform/)
 
@@ -369,10 +399,22 @@ Structured JSON envelopes for Agent-to-Agent communication:
 | Provider | Context File | Agents Dir | Rules | Hooks | Commands | Settings |
 |----------|-------------|-----------|-------|-------|----------|---------|
 | Claude Code | CLAUDE.md | .claude/agents/ | .claude/rules/ | .claude/hooks/ | .claude/commands/ | .claude/settings.json |
-| Gemini | .gemini/GEMINI.md | .gemini/agents/ | .gemini/rules/ | — | .gemini/commands/ | .gemini/settings.json |
+| Gemini | AGENTS.md | .gemini/agents/ | .gemini/rules/ | — | .gemini/commands/ | .gemini/settings.json |
 | Opencode | AGENTS.md | .opencode/agents/ | (in AGENTS.md) | — | .opencode/commands/ | opencode.json |
 | Continue | CONTINUE.md | .continue/agents/ | .continue/rules/ | — | .continue/prompts/ | .continue/config.yaml |
 | Copilot | .github/copilot/COPILOT.md | .github/copilot/agents/ | .github/copilot/rules/ | — | — | .github/copilot/copilot.json |
+
+## Native Extensions Whitelist
+
+Provider-native extensions (plugins, hooks, skills) require explicit approval gates to run safely.
+Configure your exemptions in `.meta-config/project.yaml`:
+```yaml
+extensions:
+  whitelist:
+    - home-assistant-mcp
+    - custom-git-hook
+```
+Extensions not listed here will be blocked during execution.
 
 ## Speech Modes (6 modes)
 
@@ -426,7 +468,14 @@ Dynamic model registry updated via `sync.py --update-models`:
 
 **Storage:** `config/generated/model-registry.json` (cached, network-outage resilient)
 
+**Live override capability:** Target configurations can now dynamically download updated model registries directly from GitHub via the Admin UI, enabling instant access to the latest models without waiting for a full `agent-meta` release!
+
 **Curation:** `config/model-curation.yaml` — blacklist (hard exclusion) and disabled (soft-hide)
+
+## CLI & Maintenance Features
+
+- **Config Audit Routine:** Run `python scripts/sync.py --audit-config` to deeply inspect and validate your project and provider configurations for inconsistencies. Add `--apply` to auto-fix issues.
+- **Environments & Secrets:** Dynamically scaffold `.meta-config/env.ps1` and `.meta-config/env.sh` based on variables defined in `project.yaml`.
 
 ## Directory Structure
 
@@ -434,7 +483,6 @@ Dynamic model registry updated via `sync.py --update-models`:
 agents/
   0-external/                # External skill wrappers (git submodules)
   1-generic/                 # Universal provider-agnostic templates (44 + 13 SE agents)
-  1-generic-modern/          # Modern mode (6-block XML, 29 main roles)
   2-platform/                # Platform-specific overrides (extends + patches)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts
