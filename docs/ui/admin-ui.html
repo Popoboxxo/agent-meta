@@ -2920,7 +2920,7 @@ async function viewProjectKnowledgeEngine() {
     ]));
     presetPanel.appendChild(dropdownField(
       "Apply preset",
-      ["", "research", "personal", "business", "book", "custom"],
+      ["", "research", "personal", "business", "book", "internal-docs", "custom"],
       "",
       (val) => {
         if (!val) return;
@@ -2949,7 +2949,7 @@ async function viewProjectKnowledgeEngine() {
     ));
     generalPanel.appendChild(dropdownField(
       "Domain",
-      ["research", "personal", "business", "book", "custom"],
+      ["research", "personal", "business", "book", "internal-docs", "custom"],
       ke.domain || "custom",
       (v) => { ke.domain = v; render(); },
       KNOWLEDGE_PRESET_LABELS,

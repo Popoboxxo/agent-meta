@@ -24,7 +24,7 @@
 - **Knowledge Engine Framework**: Complete multi-phase implementation enabling structured knowledge capture, organization, and retrieval across projects.
   - Phase A: Activation mechanism, `knowledge.py` bundle manager, schema/index/log generators, path variables injection.
   - Phase B: 7 knowledge-worker agent templates (`knowledge-curator`, `knowledge-gardener`, `knowledge-indexer`, `knowledge-ingestor`, `knowledge-linter`, `knowledge-migrator`, `knowledge-querier`), conditional gating in delegation routing and intent tables, role-defaults entries.
-  - Phase C: AdminUI integration with domain presets (`general`, `technical`, `business`, `personal`, `internal-docs`), knowledge-engine section writes support.
+  - Phase C: AdminUI integration with domain presets (`research`, `personal`, `business`, `book`, `internal-docs`, `custom`), knowledge-engine section writes support.
 - **Native Extensions Whitelist**: Schema, validation, and Admin UI editor for managing provider-native extensions (plugins, hooks, skills) with explicit approval gates.
 - Knowledge wiki bundle scaffolding with OKF-compliant structure (schema.md, sources/, wiki/, index.md, log.md).
 

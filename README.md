@@ -13,15 +13,38 @@
 >
 > In short: this is a practical lab setup to evaluate VibeCoding methods, compare approaches, and develop agent frameworks while keeping limitations visible.
 
-[![Version](https://img.shields.io/badge/version-0.84.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.85.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
-| **Date:** 2026-07-18
+| **Date:** 2026-07-26
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
 > Generates project-ready agent files in `.claude/agents/` via `sync.py`.
+
 > Supports 6 AI providers: Claude Code, Gemini, Opencode, Continue, GitHub Copilot, Mammouth Code.
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph Agent Meta Submodule
+        A[agent-meta/1-generic]
+        B[agent-meta/2-platform]
+        C[agent-meta/0-external]
+    end
+    
+    D[.meta-config/project.yaml] --> S(sync.py)
+    A --> S
+    B --> S
+    C --> S
+    
+    S -->|Scaffolds| K[Knowledge Engine Bundle]
+    S -->|Generates Agents| P1[.claude/agents]
+    S -->|Generates Agents| P2[.gemini/agents]
+    S -->|Generates Agents| P3[.opencode/agents]
+```
+
 
 ## Quick Start
 
@@ -37,7 +60,7 @@ python .agent-meta/scripts/sync.py --setup
 python .agent-meta/scripts/sync.py
 ```
 
-## Agent Roster — 44 Generic Agents
+## Agent Roster — 51 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -90,6 +113,19 @@ python .agent-meta/scripts/sync.py
 | **security-auditor** | powerful | 1.2.2 | Static security analysis: OWASP Top 10, secrets, supply-chain |
 | **ui-ux-designer** | balanced | 1.1.2 | UI specs, mockups, design systems |
 | **e2e-tester** | balanced | 1.0.0 | End-to-end browser testing via Playwright: user flows, visual regression, accessibility audits |
+
+
+### Knowledge Engine (7 agents)
+
+| Agent | Tier | Version | Description |
+|-------|------|---------|-------------|
+| **knowledge-curator** | balanced | 1.0.0 | Strategic Knowledge Engine control: schema evolution, domain adaptation |
+| **knowledge-gardener** | fast | 1.0.0 | Small-scale wiki maintenance: repair links, harmonize tags |
+| **knowledge-indexer** | fast | 1.0.0 | Maintains index.md (content catalog) and log.md (event log) |
+| **knowledge-ingestor** | powerful | 1.0.0 | Ingests sources, extracts key info, creates/updates wiki pages |
+| **knowledge-linter** | balanced | 1.0.0 | Wiki health check: contradictions, orphans, stale claims, broken links |
+| **knowledge-migrator** | balanced | 1.0.0 | Cleans up and migrates existing project content into the OKF Wiki |
+| **knowledge-querier** | fast | 1.0.0 | Answers questions against the Knowledge Wiki |
 
 ### Provider Expert Agents (5 agents)
 
