@@ -1,5 +1,7 @@
 """Routing smoke tests covering the three SPA pages affected by the bug fixes."""
 
+import pytest
+pytest.importorskip('playwright')
 from playwright.sync_api import expect
 
 

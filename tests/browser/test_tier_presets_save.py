@@ -1,5 +1,7 @@
 """Regression test for Bug 3A: tier-presets save must accept the `tiers` schema."""
 
+import pytest
+pytest.importorskip('playwright')
 from playwright.sync_api import expect
 
 
