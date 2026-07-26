@@ -1,16 +1,17 @@
 ---
 name: risk-analyst
-version: "1.1.0"
-description: "ReqogniLoom Risk Analyst Agent"
-generated-from: "0-external/reqogniloom-risk-analyst@a05f6d5"
-tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+version: 1.1.0
+description: ReqogniLoom Risk Analyst Agent
+generated-from: 0-external/reqogniloom-risk-analyst@a05f6d5
+mode: subagent
+permission:
+  read: allow
+  bash: allow
+  glob: allow
+  grep: allow
+  task: allow
+  edit: deny
 ---
-
 # Risk Analyst — agent-meta
 
 > **Spezialisierung:** ReqogniLoom Risk Analyst Agent

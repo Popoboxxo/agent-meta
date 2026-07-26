@@ -1,16 +1,9 @@
 ---
 name: quality-auditor
-version: "1.1.0"
-description: "ReqogniLoom Quality Auditor Agent"
-generated-from: "0-external/reqogniloom-quality-auditor@a05f6d5"
-tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+version: 1.1.0
+description: ReqogniLoom Quality Auditor Agent
+generated-from: 0-external/reqogniloom-quality-auditor@a05f6d5
 ---
-
 # Quality Auditor — agent-meta
 
 > **Spezialisierung:** ReqogniLoom Quality Auditor Agent

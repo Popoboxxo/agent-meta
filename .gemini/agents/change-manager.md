@@ -1,15 +1,15 @@
 ---
 name: change-manager
-version: "1.1.0"
-description: "ReqogniLoom Change Manager Agent"
-generated-from: "0-external/reqogniloom-change-manager@a05f6d5"
+version: 1.1.0
+description: ReqogniLoom Change Manager Agent
+generated-from: 0-external/reqogniloom-change-manager@a05f6d5
 tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+- Read
+- Bash
+- Glob
+- Grep
 ---
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 # Change Manager — agent-meta
 

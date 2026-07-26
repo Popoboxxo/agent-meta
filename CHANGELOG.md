@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.86.3] — 2026-07-26
+
+### Fixed
+- Fix: apply provider-specific frontmatter transformations to external skill wrappers to fix Opencode validation.
+
 ## [0.86.2] — 2026-07-26
 
 ### Fixed

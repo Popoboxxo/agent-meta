@@ -1,14 +1,14 @@
 ---
 name: test-engineer
-version: "1.1.0"
-description: "ReqogniLoom Test Engineer Agent"
-generated-from: "0-external/reqogniloom-test-engineer@a05f6d5"
+version: 1.1.0
+description: ReqogniLoom Test Engineer Agent
+generated-from: 0-external/reqogniloom-test-engineer@a05f6d5
 tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 
 # Test Engineer — agent-meta

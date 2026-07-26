@@ -1,14 +1,15 @@
 ---
 name: home-organization-specialist
-version: "1.1.0"
-description: "Spezialist für 3D-gedruckte Heimorganisationssysteme (Gridfinity, OpenGrid, NeoGrid, French Cleat, Underware, Deskware) — Auswahl, Kombination und Konfiguration."
-generated-from: "0-external/home-organization@be411f3"
+version: 1.1.0
+description: Spezialist für 3D-gedruckte Heimorganisationssysteme (Gridfinity, OpenGrid,
+  NeoGrid, French Cleat, Underware, Deskware) — Auswahl, Kombination und Konfiguration.
+generated-from: 0-external/home-organization@be411f3
 tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 
 # Home Organization Specialist — agent-meta

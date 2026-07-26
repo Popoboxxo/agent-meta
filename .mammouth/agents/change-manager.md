@@ -1,16 +1,9 @@
 ---
 name: change-manager
-version: "1.1.0"
-description: "ReqogniLoom Change Manager Agent"
-generated-from: "0-external/reqogniloom-change-manager@a05f6d5"
-tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+version: 1.1.0
+description: ReqogniLoom Change Manager Agent
+generated-from: 0-external/reqogniloom-change-manager@a05f6d5
 ---
-
 # Change Manager — agent-meta
 
 > **Spezialisierung:** ReqogniLoom Change Manager Agent

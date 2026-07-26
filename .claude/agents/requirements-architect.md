@@ -1,14 +1,14 @@
 ---
 name: requirements-architect
-version: "1.1.0"
-description: "ReqogniLoom Requirements Architect Agent"
-generated-from: "0-external/reqogniloom-requirements-architect@a05f6d5"
+version: 1.1.0
+description: ReqogniLoom Requirements Architect Agent
+generated-from: 0-external/reqogniloom-requirements-architect@a05f6d5
 tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 
 # Requirements Architect — agent-meta

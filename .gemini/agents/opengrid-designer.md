@@ -1,15 +1,16 @@
 ---
 name: opengrid-designer
-version: "1.1.0"
-description: "Spezialist für OpenSCAD-Code-Generierung für wandmontierte OpenGrid/MultiConnect-Organizer (28mm Grid, QuackWorks-Patterns)."
-generated-from: "0-external/opengrid-openscad@be411f3"
+version: 1.1.0
+description: Spezialist für OpenSCAD-Code-Generierung für wandmontierte OpenGrid/MultiConnect-Organizer
+  (28mm Grid, QuackWorks-Patterns).
+generated-from: 0-external/opengrid-openscad@be411f3
 tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-  - Agent
+- Read
+- Bash
+- Glob
+- Grep
 ---
+> **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 
 # OpenGrid OpenSCAD Designer — agent-meta
 
