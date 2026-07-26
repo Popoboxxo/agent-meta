@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.86.1] — 2026-07-26
+
+### Fixed
+- Fix: `SyncLog` attribute error in external skills script.
+
 ## [0.86.0] — 2026-07-26
 
 ### Added
