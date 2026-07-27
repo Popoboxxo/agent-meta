@@ -766,7 +766,7 @@ def _init_provider_settings_json(
         source_label = settings_template_rel
     else:
         # Minimal provider-agnostic JSON skeleton
-        content = '{\n  "//": "Provider settings managed by agent-meta"\n}\n'
+        content = '{\n}\n'
         source_label = "minimal fallback"
         if settings_template_rel:
             log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
@@ -1075,7 +1075,7 @@ def _settings_local_fallback(local_file: str) -> str:
     lower = local_file.lower()
     if lower.endswith((".yaml", ".yml")):
         return "# Local overrides — managed by agent-meta, never committed\n"
-    return '{\n  "//": "Local overrides — managed by agent-meta, never committed"\n}\n'
+    return '{\n}\n'
 
 
 def ensure_gitignore_entries(
