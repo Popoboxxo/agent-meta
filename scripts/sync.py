@@ -653,7 +653,7 @@ def main():
     read_git_version(agent_meta_root)
 
     for w in pre_warnings:
-        log.warning(w)
+        log.warn(w)
 
     if args.fill_defaults:
         mode = "fill-defaults"
