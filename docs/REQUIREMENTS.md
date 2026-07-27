@@ -77,3 +77,13 @@
 | REQ-MOD-06 | Projekte können ihr gewünschtes Preset global oder lokal über `.meta-config/project.yaml` definieren. Fehlt die Angabe, wird ein Standard-Preset (z.B. Normal) verwendet. | Must |
 | REQ-MOD-07 | Die Admin UI (`scripts/admin-server.py`) erhält ein "Model Discovery & Pricing" Dashboard mit sortierbarer Modell-Tabelle, Crawl-Button und Heatmap, sowie einen Preset-Selector mit Live-Vorschau in den Project Settings. | Should |
 
+---
+
+## Admin UI Setup-Modus
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-ADM-01 | Wenn `admin-server.py` in einem Projekt gestartet wird, in dem noch keine `.meta-config/project.yaml` existiert, bricht der Server nicht mehr ab, sondern startet in einem interaktiven Setup/Onboarding-Modus. | Must |
+| REQ-ADM-02 | Im Setup-Modus bietet die Admin UI einen geführten Assistenten (Wizard) an, mit dem die initiale `.meta-config/project.yaml` schrittweise visuell konfiguriert und anschließend `sync.py` zur Erst-Instanziierung ausgeführt werden kann. | Must |
+
+
