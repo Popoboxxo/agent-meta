@@ -68,6 +68,9 @@ graph TD
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
 cd .agent-meta && git checkout v0.86.3 && cd ..
 
+# Install dependencies
+pip install -r .agent-meta/requirements.txt
+
 # Run interactive setup
 python .agent-meta/scripts/sync.py --setup
 ```
