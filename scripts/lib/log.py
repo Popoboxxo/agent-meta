@@ -28,6 +28,9 @@ class SyncLog:
         self.warnings.append(f"[WARN]   {message}")
         print(f"  !  {message}", file=sys.stderr)
 
+    def warning(self, message: str):
+        self.warn(message)
+
     def error(self, target: str, message: str):
         line = f"[ERROR]  {target:<50}  {message}"
         self.errors.append(line)
