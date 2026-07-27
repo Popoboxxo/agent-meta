@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.89.0] — 2026-07-27
+
+### Added
+- **Partials-Konzept für Context-Files**: Die Provider Context Files (`CLAUDE.md`, `AGENTS.md`, etc.) verwenden nun einen robusten TemplateBuilder und Partials (z.B. `{{> project-metadata }}`) zur dynamischen Generierung.
+- Migration der dynamischen Projekt-Metadaten vom statischen Header in den Managed-Block zur Vermeidung von unnötigen Backup-Merge-Konflikten bei der Config-Aktualisierung.
+
+### Removed
+- Unused `_load_claude_md_managed_template` Funktion in `context.py`.
+
 ## [0.86.3] — 2026-07-26
 
 ### Fixed
