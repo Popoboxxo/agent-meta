@@ -215,9 +215,10 @@ def test_knowledge_indexer_has_intent_keywords():
 
 
 def test_knowledge_roles_pass_schema_validation():
+    import sys
     import subprocess
     result = subprocess.run(  # noqa: PLW1510
-        ["python", str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
+        [sys.executable, str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
         cwd=_AGENT_META_ROOT, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
@@ -377,8 +378,9 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     # No importable top-level entry point exists in scripts/sync.py (main() reads
     # sys.argv via argparse) — run the real CLI as a subprocess, per the fallback
     # described in the task brief.
+    import sys
     result = subprocess.run(  # noqa: PLW1510
-        ["python", str(dest / "scripts" / "sync.py")],
+        [sys.executable, str(dest / "scripts" / "sync.py")],
         cwd=dest, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
