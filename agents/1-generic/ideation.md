@@ -118,4 +118,3 @@ On confirmation: A2A envelope to `concept-specifier` (or `requirements` for stan
 
 **Language:** communication → {{COMMUNICATION_LANGUAGE}}. Concept docs → project language.
 </constraints>
-</output>

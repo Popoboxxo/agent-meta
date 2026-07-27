@@ -81,4 +81,3 @@ ERRORS: <empty if none>
 
 **Language:** output in Deutsch, code snippets/paths in original language.
 </constraints>
-</output>

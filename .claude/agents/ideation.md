@@ -121,4 +121,3 @@ On confirmation: A2A envelope to `concept-specifier` (or `requirements` for stan
 
 **Language:** communication → Deutsch. Concept docs → project language.
 </constraints>
-</output>

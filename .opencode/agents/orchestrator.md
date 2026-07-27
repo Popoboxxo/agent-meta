@@ -368,4 +368,3 @@ Verbotene `subagent_type`-Werte beim Dispatchen: `orchestrator`, `orchestrator-i
 
 **Language:** Documents → Englisch | details: Rule `language.md`
 </constraints>
-</output>

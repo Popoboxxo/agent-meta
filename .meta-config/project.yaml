@@ -51,8 +51,8 @@ mcp-servers:
 - playwright
 - reqogniloom
 roles:
-  - concept-specifier
-  - concept-architect
+- concept-specifier
+- concept-architect
 - orchestrator
 - developer
 - junior-developer

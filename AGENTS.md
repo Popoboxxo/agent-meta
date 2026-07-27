@@ -550,6 +550,8 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 
+
+
 ## Project Setup
 
 - **Build:** `python scripts/sync.py`
@@ -573,7 +575,9 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `change-manager.md` → registriere als `change-manager`
    - `claude-expert.md` → registriere als `claude-expert`
    - `code-reviewer.md` → registriere als `code-reviewer`
+   - `concept-architect.md` → registriere als `concept-architect`
    - `concept-reviewer.md` → registriere als `concept-reviewer`
+   - `concept-specifier.md` → registriere als `concept-specifier`
    - `continue-expert.md` → registriere als `continue-expert`
    - `copilot-expert.md` → registriere als `copilot-expert`
    - `data-engineer.md` → registriere als `data-engineer`
@@ -634,7 +638,9 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="change-manager", ...)
    define_subagent(name="claude-expert", ...)
    define_subagent(name="code-reviewer", ...)
+   define_subagent(name="concept-architect", ...)
    define_subagent(name="concept-reviewer", ...)
+   define_subagent(name="concept-specifier", ...)
    define_subagent(name="continue-expert", ...)
    define_subagent(name="copilot-expert", ...)
    define_subagent(name="data-engineer", ...)
