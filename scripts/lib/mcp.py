@@ -299,6 +299,14 @@ def _update_json_config(
             return
         existing = parsed
 
+    # Sanitize invalid/legacy keys to prevent schema validation errors
+    if mcp_key == "mcp":
+        existing.pop("mcp_servers", None)
+        existing.pop("mcpServers", None)
+    elif mcp_key == "mcpServers":
+        existing.pop("mcp", None)
+        existing.pop("mcp_servers", None)
+
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
     str(path.relative_to(path.parent.parent)) if path.parent.name else rel
