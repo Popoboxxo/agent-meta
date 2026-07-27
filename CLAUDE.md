@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.87.0 — `2026-07-27`
+> Generiert von agent-meta v0.88.3 — `2026-07-27`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -16,6 +16,23 @@
 
 ---
 
+## Eigene Notizen
+
+Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird von `agent-meta` nicht überschrieben!
+
+---
+
+## Agenten-Konfiguration
+
+<!-- agent-meta:managed-begin -->
+<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
+<!-- Manuelle Änderungen hier werden überschrieben. -->
+
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
+
+Generiert von agent-meta v0.88.3 — `2026-07-27`
+DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
+
 ## Projekt
 
 **Name:** agent-meta
@@ -23,15 +40,11 @@
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
----
-
 ## Tech-Stack
 
 - **Runtime:** Python 3.x
 - **Sprache:** Python 3, Markdown, YAML
 - **Key-Dependencies:** - Python: `>=3.8`
-
----
 
 ## Architektur
 
@@ -64,8 +77,6 @@ scripts/sync.py — Haupt-CLI für Agent-Generierung
 - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
 
 
----
-
 ## Code-Konventionen
 
 - Python: PEP 8, snake_case, klare Funktionsnamen
@@ -73,8 +84,6 @@ scripts/sync.py — Haupt-CLI für Agent-Generierung
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 
-
----
 
 ## Build & Development
 
@@ -92,8 +101,6 @@ python scripts/sync.py --validate
 (kein Dev-Stack)
 ```
 
----
-
 ## Anforderungs-Kategorien
 
 Kategorien für `docs/REQUIREMENTS.md`:
@@ -102,19 +109,6 @@ Kategorien für `docs/REQUIREMENTS.md`:
 - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
 - Entwickler-Experience (Howto, Beispiele, Doku)
 
-
----
-
-## Agenten-Konfiguration
-
-<!-- agent-meta:managed-begin -->
-<!-- This block is automatically updated by sync.py on every sync. -->
-<!-- Manual changes here will be overwritten. -->
-
-> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
-
-Generiert von agent-meta v0.87.0 — `2026-07-27`
-DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 > **Einstiegspunkt:** Du bist im `main-chat` Modus. Du agierst direkt als Router und Worker (siehe `use-orchestrator.md`).
 

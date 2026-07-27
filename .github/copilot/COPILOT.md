@@ -1,13 +1,92 @@
 # agent-meta
 
+agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
+
 <!-- agent-meta:managed-begin -->
-<!-- This block is automatically updated by sync.py on every sync. -->
-<!-- Manual changes here will be overwritten. -->
+<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
+<!-- Manuelle Änderungen hier werden überschrieben. -->
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
 
-Generiert von agent-meta v0.87.0 — `2026-07-27`
+Generiert von agent-meta v0.88.3 — `2026-07-27`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
+
+## Projekt
+
+**Name:** agent-meta
+**Präfix:** am
+**Plattform:** Python CLI (sync.py)
+**Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
+
+## Tech-Stack
+
+- **Runtime:** Python 3.x
+- **Sprache:** Python 3, Markdown, YAML
+- **Key-Dependencies:** - Python: `>=3.8`
+
+## Architektur
+
+```
+agents/
+  0-external/       # Wrapper-Template für externe Skills
+  1-generic/        # Universelle Agent-Templates
+  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
+scripts/
+  sync.py           # Agent-Generator
+  admin-server.py   # Lokaler Admin-UI developer/)
+external/           # Git Submodule (externe Skill-Repos)
+docs/guides/        # Anleitungen und Beispiel-Config
+docs/ui/            # UI Assets
+  architecture/     # Architektur-Diagramme (Mermaid)
+  admin-ui.html     # Admin-UI Frontend
+tests/              # Test-Suite (automated, manual, orchestration)
+
+```
+
+**Entry-Point:**
+```
+scripts/sync.py — Haupt-CLI für Agent-Generierung
+```
+
+**Besondere Patterns:**
+- Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
+- Platzhalter {{VARIABLE}} werden von sync.py substituiert
+- Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
+- Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
+
+
+## Code-Konventionen
+
+- Python: PEP 8, snake_case, klare Funktionsnamen
+- Keine externen Python-Dependencies außer Stdlib
+- Markdown-Dateien: GitHub Flavored Markdown
+- YAML Frontmatter in allen Agent-Templates
+
+
+## Build & Development
+
+```bash
+# Build
+python scripts/sync.py
+
+# Tests
+python scripts/sync.py --validate
+
+# Dev-Stack starten
+(kein Dev-Stack)
+
+# Nach Änderungen neu laden
+(kein Dev-Stack)
+```
+
+## Anforderungs-Kategorien
+
+Kategorien für `docs/REQUIREMENTS.md`:
+
+- Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
+- Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
+- Entwickler-Experience (Howto, Beispiele, Doku)
+
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
@@ -91,4 +170,11 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 
 ## Agents
 
-Agent files are in .github/copilot/agents (invoke by name).
+Agent files are in `.github/copilot/agents/`. Invoke them by name in GitHub Copilot Chat.
+
+## Project Setup
+
+- **Build:** `python scripts/sync.py`
+- **Test:** `python scripts/sync.py --validate`
+- **Platform:** Python CLI (sync.py)
+- **Runtime:** Python 3.x

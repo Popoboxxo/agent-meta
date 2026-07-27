@@ -7,6 +7,7 @@ dod-criteria.md
 issue-lifecycle.md
 language.md
 lifecycle-tasks.md
+no-worktree-isolation.md
 provider-agnostic.md
 python-conventions.md
 session-conclusion.md
