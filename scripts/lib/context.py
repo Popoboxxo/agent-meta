@@ -196,99 +196,7 @@ def _regenerate_static_context(
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
 
-# Path to the CLAUDE.md managed block template (relative to agent-meta root)
-_CLAUDE_MD_MANAGED_TEMPLATE_PATH = "templates/claude-md-managed.md"
-
-
-def _load_claude_md_managed_template(agent_meta_root: Path) -> str:
-    """Load CLAUDE.md managed block template from templates/claude-md-managed.md."""
-    template_path = agent_meta_root / _CLAUDE_MD_MANAGED_TEMPLATE_PATH
-    if template_path.exists():
-        return template_path.read_text(encoding="utf-8")
-    # Inline fallback if template file is missing
-    return (
-        "<!-- agent-meta:managed-begin -->\n"
-        "<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->\n"
-        "<!-- Manuelle Änderungen hier werden überschrieben. -->\n"
-        "\n"
-        "{{PROVIDER_ROUTING}}\n"
-        "\n"
-        "Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`\n"
-        "DoD-Preset: **{{DOD_PRESET}}** | REQ-Traceability: {{DOD_REQ_TRACEABILITY}} | "
-        "Tests: {{DOD_TESTS_REQUIRED}} | Codebase-Overview: {{DOD_CODEBASE_OVERVIEW}} | "
-        "Security-Audit: {{DOD_SECURITY_AUDIT}}\n"
-        "\n"
-        "## Projekt\n\n"
-        "**Name:** {{PROJECT_NAME}}\n"
-        "**Präfix:** {{PREFIX}}\n"
-        "**Plattform:** {{PLATFORM}}\n"
-        "**Beschreibung:** {{PROJECT_DESCRIPTION}}\n\n"
-        "## Tech-Stack\n\n"
-        "- **Runtime:** {{RUNTIME}}\n"
-        "- **Sprache:** {{LANGUAGE}}\n"
-        "- **Key-Dependencies:** {{SYSTEM_DEPENDENCIES}}\n\n"
-        "## Architektur\n\n"
-        "```\n{{PROJECT_STRUCTURE}}\n```\n\n"
-        "**Entry-Point:**\n```\n{{ENTRY_POINT_PATTERN}}\n```\n\n"
-        "**Besondere Patterns:**\n{{KEY_PATTERNS}}\n\n"
-        "## Code-Konventionen\n\n{{CODE_CONVENTIONS}}\n\n"
-        "## Build & Development\n\n"
-        "```bash\n# Build\n{{BUILD_COMMAND}}\n\n# Tests\n{{TEST_COMMAND}}\n\n"
-        "# Dev-Stack starten\n{{DEV_STACK_START}}\n\n"
-        "# Nach Änderungen neu laden\n{{DEV_STACK_RELOAD}}\n```\n\n"
-        "## Anforderungs-Kategorien\n\n"
-        "Kategorien für `docs/REQUIREMENTS.md`:\n\n{{REQ_CATEGORIES_LIST}}\n\n"
-        "{{AGENT_HINTS}}\n"
-        "<!-- agent-meta:managed-end -->"
-    )
-
-
-def sync_claude_md_managed(
-    project_root: Path,
-    variables: dict,
-    log: SyncLog,
-    dry_run: bool,
-    agent_meta_root: Path | None = None,
-):
-    """Update the managed block in CLAUDE.md if it exists and contains the marker."""
-    from .config import substitute
-
-    if agent_meta_root is None:
-        agent_meta_root = Path(__file__).resolve().parent.parent.parent
-
-    target_path = project_root / "CLAUDE.md"
-    if not target_path.exists():
-        return
-
-    existing = target_path.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
-        re.DOTALL,
-    )
-    if not pattern.search(existing):
-        log.warning(
-            "CLAUDE.md exists but has no managed block — "
-            "AGENT_TABLE will not be updated. "
-            "Add the following block at the desired location in CLAUDE.md:\n"
-            "  <!-- agent-meta:managed-begin -->\n"
-            "  <!-- agent-meta:managed-end -->"
-        )
-        return
-
-    template = _load_claude_md_managed_template(agent_meta_root)
-    # CLAUDE.md is Claude-specific: drop the per-agent table (native injection).
-    render_vars = variables
-    if "AGENT_HINTS_CLAUDE" in variables:
-        render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
-    new_managed = substitute(template, render_vars, "CLAUDE.md managed block", log)
-    new_content = pattern.sub(new_managed, existing, count=1)
-
-    if new_content == existing:
-        log.skip("CLAUDE.md", "managed block unchanged")
-    else:
-        log.action("UPDATE", "CLAUDE.md", "managed block (AGENT_TABLE + version)")
-        if not dry_run:
-            target_path.write_text(new_content, encoding="utf-8")
+# sync_claude_md_managed was removed because it is dead code.
 
 
 def _has_capability(pc: dict, capability: str) -> bool:
@@ -363,12 +271,27 @@ def _update_managed_html_block(
         r".*?<!--\s*agent-meta:managed-end\s*-->",
         re.DOTALL,
     )
-    template = _load_claude_md_managed_template(agent_meta_root)
     rel = str(target_path.relative_to(project_root))
     render_vars = variables
     if provider == "Claude" and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
-    new_managed = substitute(template, render_vars, rel, log)
+
+    from .context_templates.builder import TemplateBuilder
+    builder = TemplateBuilder(agent_meta_root / "templates" / "context")
+    try:
+        new_managed = builder.build("claude-managed", render_vars)
+    except FileNotFoundError:
+        log.warning(f"claude-managed template missing — using minimal inline fallback for {rel}.")
+        new_managed = (
+            "<!-- agent-meta:managed-begin -->\n"
+            "<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->\n"
+            "{{PROVIDER_ROUTING}}\n"
+            "Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`\n"
+            "{{AGENT_HINTS}}\n"
+            "<!-- agent-meta:managed-end -->"
+        )
+        from .config import substitute
+        new_managed = substitute(new_managed, render_vars, "inline fallback", log)
 
     # For AGENTS.md, also inject dynamic content into the managed block:
     # 1. Provider agent locations (stays in sync with deactivations)
@@ -1195,7 +1118,7 @@ def sync_claude_md_static(
     Supersedes the old write-once init_claude_md(): the static header (project
     name, tech stack, architecture — all derived from project.yaml) is now
     refreshed on every sync so it never drifts. The managed block itself stays
-    owned by sync_claude_md_managed()/_update_managed_html_block() and is
+    owned by _update_managed_html_block() and is
     preserved verbatim here. User edits to the static part are detected via the
     sidecar hash store and backed up before overwrite.
     """

@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
 
-Generiert von agent-meta v0.88.3 — `2026-07-27`
+Generiert von agent-meta v0.88.4 — `2026-07-27`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 ## Projekt
@@ -86,6 +86,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
 - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
 - Entwickler-Experience (Howto, Beispiele, Doku)
+
 
 
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
