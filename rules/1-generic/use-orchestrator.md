@@ -38,3 +38,6 @@ Native Extensions deaktiviert.
 {{#unless ORCH_MODE_MAIN_CHAT}}
 Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 {{/unless}}
+
+## Anti-Patterns
+- **Worktree Isolation:** Niemals `isolation: "worktree"` bei Subagenten verwenden (schreibt in interne Infrastruktur-Ordner, führt zu Datenverlust).

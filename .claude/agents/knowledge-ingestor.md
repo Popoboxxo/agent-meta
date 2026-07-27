@@ -12,7 +12,6 @@ tools:
 - Grep
 generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 model: claude-sonnet-5
-memory: project
 ---
 
 # Knowledge Ingestor — agent-meta

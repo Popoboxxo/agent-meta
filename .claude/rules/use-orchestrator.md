@@ -63,3 +63,6 @@ Ausnahme auf User-Wunsch erlaubt.
 
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 
+
+## Anti-Patterns
+- **Worktree Isolation:** Niemals `isolation: "worktree"` bei Subagenten verwenden (schreibt in interne Infrastruktur-Ordner, führt zu Datenverlust).
