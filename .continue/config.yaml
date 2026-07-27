@@ -19,6 +19,8 @@ agents:
     prompt: prompts/api-specialist.md
   - name: bug-feature-analyzer
     prompt: prompts/bug-feature-analyzer.md
+  - name: change-manager
+    prompt: prompts/change-manager.md
   - name: claude-expert
     prompt: prompts/claude-expert.md
   - name: code-reviewer
@@ -57,6 +59,8 @@ agents:
     prompt: prompts/gemini-expert.md
   - name: git
     prompt: prompts/git.md
+  - name: home-organization-specialist
+    prompt: prompts/home-organization-specialist.md
   - name: ideation
     prompt: prompts/ideation.md
   - name: incident-responder
@@ -87,6 +91,8 @@ agents:
     prompt: prompts/meta-feedback.md
   - name: opencode-expert
     prompt: prompts/opencode-expert.md
+  - name: opengrid-designer
+    prompt: prompts/opengrid-designer.md
   - name: orchestrator
     prompt: prompts/orchestrator.md
   - name: performance-optimizer
@@ -95,16 +101,24 @@ agents:
     prompt: prompts/principal-developer.md
   - name: prompt-engineer
     prompt: prompts/prompt-engineer.md
+  - name: quality-auditor
+    prompt: prompts/quality-auditor.md
   - name: refactoring-specialist
     prompt: prompts/refactoring-specialist.md
   - name: release
     prompt: prompts/release.md
+  - name: requirements-architect
+    prompt: prompts/requirements-architect.md
   - name: requirements
     prompt: prompts/requirements.md
+  - name: risk-analyst
+    prompt: prompts/risk-analyst.md
   - name: senior-developer
     prompt: prompts/senior-developer.md
   - name: technical-writer
     prompt: prompts/technical-writer.md
+  - name: test-engineer
+    prompt: prompts/test-engineer.md
   - name: tester
     prompt: prompts/tester.md
   - name: ui-ux-designer

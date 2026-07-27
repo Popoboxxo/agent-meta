@@ -41,6 +41,7 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 | Konzept / Design-Doc / Recherche | `concept-development` |
 | Refactoring / aufräumen / Cleanup | `refactor` |
 | Dokumentation / README / Docs | `docs-update` |
+| concept-driven / spezifikation first | `concept-driven-dev` |
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
 
@@ -54,7 +55,9 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Triage, Bug/Feature, klassifizieren | `bug-feature-analyzer` | recommended | yes |
 | Claude, Claude Code | `claude-expert` | optional | no |
 | Code Review, Code-Qualität, Audit | `code-reviewer` | recommended | yes |
+| Architektur, Systemdesign | `concept-architect` | required | yes |
 | Konzept Review, Design Review | `concept-reviewer` | optional | yes |
+| Konzept Spezifikation, Technical Spec | `concept-specifier` | required | yes |
 | Continue | `continue-expert` | optional | no |
 | Copilot, GitHub Copilot | `copilot-expert` | optional | no |
 | ETL, ELT, data pipeline, data quality, lineage, streaming, batch, schema registry | `data-engineer` | optional | yes |
@@ -97,12 +100,13 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Validierung, DoD, Traceability | `validator` | recommended | no |
 
 
-## 4. Developer tier selection
-| Tier | When |
-|------|------|
-| `junior-developer` | Solution obvious, ≤2 files |
-| `developer` | Standard, clear scope, ≤3 files |
-| `senior-developer` | Architecture impact, risk |
+## 4. Size-based Routing (Concept-Driven)
+| Size | Concept Stage | Developer Tier | When |
+|------|---------------|----------------|------|
+| **S** | *(skip)* | `junior-developer` | Trivial, obvious solution, ≤2 files |
+| **M** | `concept-specifier` | `developer` | Standard feature, 3-8 files |
+| **L** | `concept-specifier` + `concept-reviewer` | `senior-developer` | Architecture impact, 9-20 files |
+| **XL** | `concept-architect` + `concept-reviewer` | `principal-developer` | Very complex, cross-cutting, 20+ files |
 
 In doubt → higher tier. `ESCALATE` card → straight to `recommended_tier`. Max 1 escalation per task.
 
@@ -215,7 +219,11 @@ SE mode: optional
 
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität... |
 
+| `concept-architect` | Systemdesign für komplexe Änderungen |
+
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, ... |
+
+| `concept-specifier` | Erstellt technische Spezifikationen |
 
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu... |
 

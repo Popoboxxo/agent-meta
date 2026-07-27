@@ -1191,7 +1191,7 @@ roles:
   knowledge-curator:
     group: knowledge
     model: balanced
-    memory: project  # Curator needs persistent strategic memory across sessions.
+    memory: project
     workflow_tier: optional
     description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
       Domänen-Anpassung, Ingest-Planung, OKF-Compliance.'
@@ -1212,7 +1212,7 @@ roles:
   knowledge-ingestor:
     group: knowledge
     model: balanced
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: 'Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
       aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.'
@@ -1234,7 +1234,7 @@ roles:
   knowledge-querier:
     group: knowledge
     model: fast
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
       Drill-in, Synthese mit Citations. File-Back guter Antworten.
@@ -1255,7 +1255,7 @@ roles:
   knowledge-linter:
     group: knowledge
     model: fast
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
       kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.'
@@ -1276,7 +1276,7 @@ roles:
   knowledge-indexer:
     group: knowledge
     model: nano
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
       Event-Log, OKF §7) im Knowledge Wiki.
@@ -1296,7 +1296,7 @@ roles:
   knowledge-gardener:
     group: knowledge
     model: nano
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
       Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.'
@@ -1318,7 +1318,7 @@ roles:
   knowledge-migrator:
     group: knowledge
     model: balanced
-    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    memory: ''
     workflow_tier: optional
     description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
@@ -1336,9 +1336,45 @@ roles:
       input_contracts:
       - task-spec-v1
       output_contract: knowledge-migration-v1
-      timeout_sec: 600  # Migration processes can be long-running across large codebases.
+      timeout_sec: 600
     short_desc: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren
+  concept-specifier:
+    model: balanced
+    memory: ''
+    workflow_tier: required
+    description: Erstellt technische Spezifikationen aus Anforderungen und Codebase-Kontext.
+      Liefert Interface-Contracts, Datenfluss, Akzeptanzkriterien. Implementiert nicht.
+    routing:
+      intent_keywords:
+      - Konzept Spezifikation
+      - Technical Spec
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - ideation-output-v1
+      - explorer-output-v1
+      output_contract: concept-spec-v1
+    short_desc: Erstellt technische Spezifikationen
+  concept-architect:
+    model: powerful
+    memory: project
+    workflow_tier: required
+    description: Systemdesign für komplexe Änderungen (Komponenten, Schnittstellen,
+      Trade-off-Analyse).
+    routing:
+      intent_keywords:
+      - Architektur
+      - Systemdesign
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - ideation-output-v1
+      - explorer-output-v1
+      output_contract: concept-arch-v1
+    short_desc: Systemdesign für komplexe Änderungen
 outcome-caching:
   enabled: false
   ttl_seconds: 3600
@@ -1631,6 +1667,38 @@ quality_pipelines:
         task: Multi-Level verification
       - agent: se-integration-and-test-manager
         task: V&V orchestration
+  concept-driven-dev:
+    description: 'Concept-Driven Pipeline: explore → specify/architect → review →
+      implement → validate'
+    signal_keywords:
+    - concept-driven
+    - spezifikation first
+    stages:
+    - id: explore
+      agent: explorer
+      task: Codebase/Kontext analysieren
+      mode: sequential
+    - id: specify
+      agent: concept-specifier
+      task: Spezifikation schreiben
+      mode: sequential
+    - id: review
+      agent: concept-reviewer
+      task: Review der Spezifikation (max 3 Iterationen)
+      mode: loop
+      loop:
+        generator: concept-specifier
+        critic: concept-reviewer
+        max_iterations: 3
+    - id: implement
+      agent: developer
+      task: Gegen Spezifikation implementieren
+      mode: sequential
+    - id: validate
+      agent: validator
+      task: DoD-Check + Traceability
+      mode: sequential
+    on_error: escalate_to_orchestrator
 se_variables:
   SE_BASE_DIR: SE
   SE_MIN_DEPTH: 2

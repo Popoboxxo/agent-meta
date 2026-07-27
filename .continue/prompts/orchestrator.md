@@ -29,6 +29,7 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 | Konzept / Design-Doc / Recherche | `concept-development` |
 | Refactoring / aufräumen / Cleanup | `refactor` |
 | Dokumentation / README / Docs | `docs-update` |
+| concept-driven / spezifikation first | `concept-driven-dev` |
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
 
@@ -42,7 +43,9 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Triage, Bug/Feature, klassifizieren | `bug-feature-analyzer` | recommended | yes |
 | Claude, Claude Code | `claude-expert` | optional | no |
 | Code Review, Code-Qualität, Audit | `code-reviewer` | recommended | yes |
+| Architektur, Systemdesign | `concept-architect` | required | yes |
 | Konzept Review, Design Review | `concept-reviewer` | optional | yes |
+| Konzept Spezifikation, Technical Spec | `concept-specifier` | required | yes |
 | Continue | `continue-expert` | optional | no |
 | Copilot, GitHub Copilot | `copilot-expert` | optional | no |
 | ETL, ELT, data pipeline, data quality, lineage, streaming, batch, schema registry | `data-engineer` | optional | yes |
@@ -80,9 +83,6 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Anforderungen, REQ-ID, Requirements | `requirements` | recommended | no |
 | Komplex, Architektur, schwieriger Bug, Cross-Cutting | `senior-developer` | optional | no |
 | API reference, getting started, tutorial, SDK docs, release notes, quickstart, user guide, microcopy | `technical-writer` | optional | yes |
-| Tests, TDD, Testabdeckung | `tester` | recommended | yes |
-| UI, UX, Mockup, Design | `ui-ux-designer` | optional | yes |
-| Validierung, DoD, Traceability | `validator` | recommended | no |
 
 
 *[Prompt truncated — use agent mode for full context]*

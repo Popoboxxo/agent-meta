@@ -1,11 +1,11 @@
 ---
 name: explorer
-version: 1.0.1
+version: 1.2.0
 description: Read-only codebase research, dependency and impact mapping, file and
   symbol search.
 hint: Analyze codebase / dependencies / impact — read-only, delegates findings
 prompt_mode: modern
-generated-from: 1-generic/explorer.md@1.0.1
+generated-from: 1-generic/explorer.md@1.2.0
 model: claude-haiku-4-5-20251001
 alwaysApply: false
 ---
@@ -63,7 +63,10 @@ Reduce hits to the essentials (max 10-20 lines output). Paths with line numbers 
 ```
 STATUS: done|partial|failed
 RESULT: <findings in 2-4 sentences: what found, where, conclusion>
-ARTIFACTS: <file paths with line numbers, comma-separated>
+AFFECTED_FILES: <file paths with line numbers, comma-separated>
+PATTERNS: <identified code patterns or anti-patterns>
+RISK_ZONES: <areas with high impact or technical debt>
+RECOMMENDED_APPROACH: <short suggestion on how to proceed>
 ERRORS: <empty if none>
 ```
 </output_contract>

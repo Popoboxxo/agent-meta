@@ -41,7 +41,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | Verdict | Meaning |
 |---------|-----------|
 | **APPROVED** | Viable, hand off to `requirements` |
-| **REVISE** | Major/critical, back to author |
+| **CHANGES_REQUESTED** | Major/critical, back to author |
 | **BLOCKED** | Not viable, escalate |
 
 Per finding: dimension + description + improvement suggestion.
@@ -52,12 +52,12 @@ When acting as critic in a reflection loop (e.g. generator-critic for iterative 
 
 **Input:** `iteration`, `max_iterations`, concept draft.
 
-**Output:** `correction_hints` (max. 5, specific, referenceable, actionable) + `verdict` (`APPROVED`/`REVISE`; `BLOCKED` only on critical after `max_iterations`).
+**Output:** `correction_hints` (max. 5, specific, referenceable, actionable) + `verdict` (`APPROVED`/`CHANGES_REQUESTED`; `BLOCKED` only on critical after `max_iterations`).
 
 | Verdict | Action |
 |---------|--------|
 | `APPROVED` | End loop, released |
-| `REVISE` | Generator receives `correction_hints` |
+| `CHANGES_REQUESTED` | Generator receives `correction_hints` |
 | `BLOCKED` | Escalate to user |
 
 **Revision rules:** later iterations primarily check previous `correction_hints` · introduce no new dimensions that were irrelevant in R1 · last iteration: `APPROVED` or `BLOCKED`.

@@ -1,6 +1,6 @@
 ---
 name: knowledge-querier
-version: 1.0.1
+version: 1.1.0
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
 hint: Wiki-Fragen beantworten, Index-First, Synthese mit Citations
@@ -9,7 +9,7 @@ tools:
 - Write
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-querier.md@1.0.1
+generated-from: 1-generic/knowledge-querier.md@1.1.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -38,6 +38,11 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 5. **Delegiere an `knowledge-indexer`:** Bei File-Back `index.md` + `log.md` Update
 
 **WICHTIG:** Du schreibst KEINE bestehenden Wiki-Seiten um — du liest und synthetisierst nur. Neue Erkenntnisse werden als separate Query-Result-Seiten abgelegt. Bestehende Seiten aktualisiert ausschließlich der `knowledge-ingestor`.
+
+## Citation Format
+
+Every answer MUST cite sources using: `[<type>:<title>]` where type is one of: paper, finding, method, dataset, entity, source.
+Example: "According to [paper:Transformer Architecture], attention mechanisms..."
 
 ## Code-Konventionen
 

@@ -37,12 +37,13 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 ## 3. Intent routing
 {{INTENT_ROUTING_TABLE}}
 
-## 4. Developer tier selection
-| Tier | When |
-|------|------|
-| `junior-developer` | Solution obvious, ≤2 files |
-| `developer` | Standard, clear scope, ≤3 files |
-| `senior-developer` | Architecture impact, risk |
+## 4. Size-based Routing (Concept-Driven)
+| Size | Concept Stage | Developer Tier | When |
+|------|---------------|----------------|------|
+| **S** | *(skip)* | `junior-developer` | Trivial, obvious solution, ≤2 files |
+| **M** | `concept-specifier` | `developer` | Standard feature, 3-8 files |
+| **L** | `concept-specifier` + `concept-reviewer` | `senior-developer` | Architecture impact, 9-20 files |
+| **XL** | `concept-architect` + `concept-reviewer` | `principal-developer` | Very complex, cross-cutting, 20+ files |
 
 In doubt → higher tier. `ESCALATE` card → straight to `recommended_tier`. Max 1 escalation per task.
 

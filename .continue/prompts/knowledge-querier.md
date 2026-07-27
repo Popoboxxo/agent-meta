@@ -27,6 +27,11 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 **WICHTIG:** Du schreibst KEINE bestehenden Wiki-Seiten um — du liest und synthetisierst nur. Neue Erkenntnisse werden als separate Query-Result-Seiten abgelegt. Bestehende Seiten aktualisiert ausschließlich der `knowledge-ingestor`.
 
+## Citation Format
+
+Every answer MUST cite sources using: `[<type>:<title>]` where type is one of: paper, finding, method, dataset, entity, source.
+Example: "According to [paper:Transformer Architecture], attention mechanisms..."
+
 ## Code-Konventionen
 
 Query-Result-Seiten sind Markdown mit OKF-Frontmatter (`type: Query Result`), analog zu anderen Wiki-Seiten.

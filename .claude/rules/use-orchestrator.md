@@ -11,7 +11,9 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 | Triage, Bug/Feature, klassifizieren | `bug-feature-analyzer` | recommended | yes |
 | Claude, Claude Code | `claude-expert` | optional | no |
 | Code Review, Code-Qualität, Audit | `code-reviewer` | recommended | yes |
+| Architektur, Systemdesign | `concept-architect` | required | yes |
 | Konzept Review, Design Review | `concept-reviewer` | optional | yes |
+| Konzept Spezifikation, Technical Spec | `concept-specifier` | required | yes |
 | Continue | `continue-expert` | optional | no |
 | Copilot, GitHub Copilot | `copilot-expert` | optional | no |
 | ETL, ELT, data pipeline, data quality, lineage, streaming, batch, schema registry | `data-engineer` | optional | yes |

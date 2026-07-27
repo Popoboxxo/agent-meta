@@ -6,7 +6,6 @@ description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstelle
 hint: Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen
 generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 model: claude-sonnet-5
-memory: project
 alwaysApply: false
 ---
 # Knowledge Ingestor — agent-meta

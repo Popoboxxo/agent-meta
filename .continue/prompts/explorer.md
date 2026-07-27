@@ -56,7 +56,10 @@ Reduce hits to the essentials (max 10-20 lines output). Paths with line numbers 
 ```
 STATUS: done|partial|failed
 RESULT: <findings in 2-4 sentences: what found, where, conclusion>
-ARTIFACTS: <file paths with line numbers, comma-separated>
+AFFECTED_FILES: <file paths with line numbers, comma-separated>
+PATTERNS: <identified code patterns or anti-patterns>
+RISK_ZONES: <areas with high impact or technical debt>
+RECOMMENDED_APPROACH: <short suggestion on how to proceed>
 ERRORS: <empty if none>
 ```
 </output_contract>

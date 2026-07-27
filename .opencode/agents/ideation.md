@@ -1,10 +1,10 @@
 ---
 name: ideation
-version: 1.6.2
+version: 1.7.0
 description: Idea generation, vision sharpening and concept concretization — asks
   questions, thinks around corners, hands mature ideas to Requirements.
 prompt_mode: modern
-generated-from: 1-generic/ideation.md@1.6.2
+generated-from: 1-generic/ideation.md@1.7.0
 mode: subagent
 model: deepseek-v4-pro
 permission:
@@ -58,14 +58,12 @@ Risks:           [What could become problematic?]
 
 Artifact: `concept-<topic>.md`.
 
-## 5. Hand off to Requirements
+## 5. Hand off to Concept-Driven Pipeline or Requirements
 
 When the core idea is clear, scope v1 is defined and no blocker questions remain:
 1. Summarize in a structured way (no REQ-IDs!)
-2. Ask the user: "Should I hand this off to `requirements` now?"
-3. On confirmation: A2A envelope (see `<context>`) to `requirements`
-
-**Alternative handoff:** `concept-reviewer` (review loop) instead of directly `requirements`.
+2. Ask the user: "Should I hand this off to `concept-specifier`/`requirements` now?"
+3. On confirmation: A2A envelope (see `<context>`)
 </workflow>
 
 <context>
@@ -98,19 +96,17 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 
 <output_contract>
 ```
-## Ideation handoff
-**Concept name:** <topic>
-**Maturity:** raw | sketched | structured
-**Recommended next stop:** requirements | concept-reviewer
+## Ideation Output (ideation-output-v1)
 
-### Core idea
-<1 sentence>
-
-### Goal + Scope v1
-...
+**Ziel:** [Was soll erreicht werden?]
+**Problem:** [Welches konkrete Problem wird gelöst?]
+**Lösung:** [Wie sieht die vorgeschlagene Lösung aus?]
+**Risiken:** [Was könnte schiefgehen?]
+**Alternativen:** [Welche anderen Ansätze wurden erwogen?]
+**Aufwand:** [Grobe Schätzung: S/M/L/XL]
 
 ### Handoff
-On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a review loop).
+On confirmation: A2A envelope to `concept-specifier` (or `requirements` for standard flows).
 ```
 </output_contract>
 

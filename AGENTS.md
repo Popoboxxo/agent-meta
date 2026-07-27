@@ -30,7 +30,11 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität... |
 
+| `concept-architect` | Systemdesign für komplexe Änderungen |
+
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, ... |
+
+| `concept-specifier` | Erstellt technische Spezifikationen |
 
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu... |
 
@@ -491,6 +495,8 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 <!-- agent-meta:managed-end -->
+
+
 
 
 

@@ -43,14 +43,12 @@ Risks:           [What could become problematic?]
 
 Artifact: `concept-<topic>.md`.
 
-## 5. Hand off to Requirements
+## 5. Hand off to Concept-Driven Pipeline or Requirements
 
 When the core idea is clear, scope v1 is defined and no blocker questions remain:
 1. Summarize in a structured way (no REQ-IDs!)
-2. Ask the user: "Should I hand this off to `requirements` now?"
-3. On confirmation: A2A envelope (see `<context>`) to `requirements`
-
-**Alternative handoff:** `concept-reviewer` (review loop) instead of directly `requirements`.
+2. Ask the user: "Should I hand this off to `concept-specifier`/`requirements` now?"
+3. On confirmation: A2A envelope (see `<context>`)
 </workflow>
 
 <context>
@@ -83,6 +81,8 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 
 <output_contract>
 ```
+## Ideation Output (ideation-output-v1)
+
 
 
 *[Prompt truncated — use agent mode for full context]*
