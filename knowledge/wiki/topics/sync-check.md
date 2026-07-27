@@ -3,7 +3,7 @@ type: "Guide"
 title: "CI: Provider Context Sync Check"
 description: "Verhindert dass veraltete provider context files (CLAUDE.md, AGENTS.md, etc.) in main committed werden."
 tags: [guide]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/ci/sync-check.md"
 migrated_from: "docs/guides/ci/sync-check.md"
 ---

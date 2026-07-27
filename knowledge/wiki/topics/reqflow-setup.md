@@ -3,7 +3,7 @@ type: "Guide"
 title: "ReqFlow MCP Setup"
 description: "ReqFlow is a self-hosted requirements-engineering platform (requirements, architecture, tests, traceability, ADRs, risks, issues, glossary, AI-assisted derivation). This guide..."
 tags: [guide, mcp]
-timestamp: "2026-07-22T12:18:40Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/mcp/reqflow-setup.md"
 migrated_from: "docs/guides/mcp/reqflow-setup.md"
 ---

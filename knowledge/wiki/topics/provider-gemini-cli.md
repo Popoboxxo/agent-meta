@@ -3,7 +3,7 @@ type: "Guide"
 title: "Gemini CLI — Provider-Dokumentation"
 description: "Terminal-basierter AI-Coding-Agent von Google (TypeScript, Open-Source Apache 2.0). Vergleichbar mit Claude Code: interaktiver Chat im Terminal, liest lokale Dateien, führt..."
 tags: [guide, provider]
-timestamp: "2026-06-07T15:06:02Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/providers/gemini-cli.md"
 migrated_from: "docs/providers/gemini-cli.md"
 ---

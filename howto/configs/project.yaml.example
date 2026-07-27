@@ -1,0 +1,254 @@
+# ==============================================================================
+# .meta-config/project.yaml — Projekt-Konfiguration für agent-meta
+# project.yaml.example / project configuration template
+# ==============================================================================
+# Dieses Template enthält alle verfügbaren Konfigurationsoptionen für agent-meta.
+# Kopiere diese Datei nach `.meta-config/project.yaml` in Deinem Zielprojekt.
+#
+# Generierung / Sync ausführen:
+#   python .agent-meta/scripts/sync.py --init   (Erstmalige Initialisierung)
+#   python .agent-meta/scripts/sync.py          (Re-Sync nach Änderungen)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Version & Submodul-Schutz / Version & Submodule Protection
+# ------------------------------------------------------------------------------
+
+# Version von agent-meta mit der das Projekt synchronisiert wird.
+# Version of agent-meta that this project is synced with.
+agent-meta-version: 0.86.3
+
+# Submodul-Schutz & Drift-Erkennung / Submodule protection & drift prevention
+# Prevents accidental modification of upstream framework files and warns on drift.
+submodule-protection:
+  enabled: true
+  strict: true
+
+# ------------------------------------------------------------------------------
+# 2. AI-Provider & Plattformen / AI Providers & Platforms
+# ------------------------------------------------------------------------------
+
+# Aktive AI-Provider (Array). Unterstützte Werte: Claude, Gemini, Continue, Opencode, Copilot, Mammouth
+# Active AI providers list. Supported: Claude, Gemini, Continue, Opencode, Copilot, Mammouth
+ai-providers:
+  - Claude
+  - Gemini
+  - Opencode
+  - Continue
+
+# Aktive Plattform-Layer (Array). Für generische Projekte leer lassen `[]`.
+# Active platform layers. Leave empty `[]` for generic software projects.
+platforms: []
+
+# ------------------------------------------------------------------------------
+# 3. Qualitätsprofile & Rules-Presets / DoD Profiles & Rules Presets
+# ------------------------------------------------------------------------------
+
+# Definition-of-Done Qualitätsprofil:
+# Options: "full" (Default), "standard", "rapid-prototyping", "spec-optional", "spec-driven", "spec-certified"
+dod-preset: full
+
+# Rules-Preset steuert die Ladelogik der System-Regeln (alwaysApply & embedding):
+# Options: "default" (alle Rules geladen), "minimal" (Kernregeln), "silent" (nur auf Anforderung)
+rules-preset: default
+
+# Einzelne DoD-Kriterien überschreiben (optional / DoD overrides)
+dod:
+  req-traceability: true    # REQ-IDs in Commit-Messages & Doku erzwingen / Require REQ-IDs
+  tests-required: true      # Tests für jede Code-Änderung verlangen / Require automated tests
+  codebase-overview: true   # Aktualisierung von CODEBASE_OVERVIEW.md erzwingen / Require overview updates
+  security-audit: false     # Security-Audit vor Release verlangen / Require security audit before release
+  se-required: "false"      # SE-Kaskade Bindungsstärke / SE cascade requirement ("false", "recommended", "true")
+
+# ------------------------------------------------------------------------------
+# 4. Agenten-Rollenauswahl / Agent Role Whitelist
+# ------------------------------------------------------------------------------
+
+# Liste der zu generierenden Agenten-Rollen (Whitelist).
+# Wenn auskommentiert oder nicht vorhanden, werden ALLE bekannten Rollen generiert.
+# Whitelist of agent roles to generate. If omitted, all available roles are generated.
+roles:
+  - orchestrator
+  - developer
+  # Optionales 3-Tier-Developer-System (junior-developer + senior-developer aktivieren):
+  # - junior-developer
+  # - senior-developer
+  - requirements
+  - validator
+  - code-reviewer
+  - documenter
+  - git
+  - release
+  - meta-feedback
+  - ideation
+  - agent-meta-manager
+  - feature
+  - agent-meta-scout
+  - log-analyzer
+  - bug-feature-analyzer
+  - tester
+
+# ------------------------------------------------------------------------------
+# 5. Projekt-Identität / Project Identity
+# ------------------------------------------------------------------------------
+
+project:
+  name: mein-projekt               # Vollständiger Projektname / Full project name
+  prefix: mp                       # Kurz-Präfix (max 5 Zeichen) / Short prefix for extension files
+  short: mein-projekt               # Anzeigename / Display name without platform prefix
+
+# ------------------------------------------------------------------------------
+# 6. Interaktionsverhalten & Parallelität / Interaction & Execution Settings
+# ------------------------------------------------------------------------------
+
+# Kommunikationsstil für Agenten / Communication style:
+# Options: "full" (Default), "short", "business", "childish", "caveman", "asozial", "submissive", "bullshit-bingo", "linkedin"
+speech-mode: full
+
+# Maximale Anzahl paralleler Agenten bei run_in_background (1 = sequentiell, 2 = Default, max 5)
+# Maximum number of agents running in parallel
+max-parallel-agents: 2
+
+# Gitignore-Verhalten für generierte & persönliche Dateien / Gitignore management
+gitignore:
+  local: true       # persönliche/lokale Dateien gitignoren (.claude/settings.local.json, sync.log, etc.)
+  generated: false  # generierte Ordner (.claude/agents/, etc.) in .gitignore aufnehmen (false = im Git committen)
+  settings: false   # Provider-Settings (settings.json, GEMINI.md, etc.) gitignoren
+
+# Sicherheitsprüfungen: Abbrechen wenn Secrets in committeten Dateien erkannt werden (Default: false)
+# Allow sync to write files containing secrets to committed paths (NOT recommended)
+allow-committed-secrets: false
+
+# ------------------------------------------------------------------------------
+# 7. Orchestrator-Konfiguration / Orchestrator Architecture Configuration
+# ------------------------------------------------------------------------------
+
+orchestrator:
+  enabled: true             # Orchestrator-First Modus aktivieren / Enable Orchestrator-First mode
+  strict: true              # Strikte Delegation erzwingen / Force strict delegation via orchestrator
+  unknown-fallback:
+    meta-feedback: true     # Feedback bei unbekanntem Intent / Feedback on unknown intent
+    main-chat: true         # Fallback auf Main-Chat / Fallback to main chat
+    ask-user: false         # Rückfrage beim User / Ask user for preference
+  native-extensions:
+    enabled: true           # Platform-native Skills & Hooks erlauben / Allow platform-native extensions
+    whitelist: []           # Whitelist für zugelassene Skills/Plugins (leer = alle erlaubt)
+  delegation:
+    max_depth: 10           # Maximale Delegations-Tiefe / Maximum delegation depth (1-50)
+
+# ------------------------------------------------------------------------------
+# 8. Hooks & Externe Skills / Hooks & External Skills
+# ------------------------------------------------------------------------------
+
+# Opt-in Aktivierung von System-Hooks / System hooks configuration
+hooks:
+  sync-on-config-change:
+    enabled: true
+  dod-push-check:
+    enabled: false
+
+# Opt-in Externe Skills (aus skills-registry.yaml) / External skill extensions
+external-skills:
+  home-organization:
+    enabled: false
+    gitignore: false
+
+# ------------------------------------------------------------------------------
+# 9. Modell-Overrides & Tiers / Model Selection & Overrides
+# ------------------------------------------------------------------------------
+
+# Modell-Preset / Tier preset: "Cheap", "Normal" (Default), "Advanced", "Expensive", "Expensive as Hell"
+tier-preset: Normal
+
+# SE-Fokus für System-Engineering Rollen / Upgrade SE roles one tier
+se-focus: false
+
+# Modell-Overrides pro Rolle & Provider / Provider-specific model overrides
+# Supported Tiers: nano | fast | balanced | powerful | max
+model-overrides:
+  Claude:
+    orchestrator: powerful
+    developer: powerful
+    git: fast
+  Gemini:
+    orchestrator: balanced
+    developer: balanced
+    git: fast
+
+# ------------------------------------------------------------------------------
+# 10. Projekt-Variablen / Project Template Variables
+# ------------------------------------------------------------------------------
+# Werden in Agenten-Templates als {{VARIABLE}} eingesetzt.
+# Formatted and substituted during sync.py.
+
+variables:
+  # --- Projektidentität & Beschreibung ---
+  PROJECT_NAME: mein-projekt
+  PROJECT_DESCRIPTION: "Eine kurze Beschreibung des Projekts."
+  PROJECT_GOAL: "Das primäre Ziel und die Problemstellung des Projekts."
+
+  # --- Tech-Stack & Laufzeitumgebung ---
+  PLATFORM: "Generic Software"
+  RUNTIME: "Python 3.11"
+  PROJECT_LANGUAGES: "Python, Markdown"
+
+  # --- Sprachen / Language Conventions ---
+  COMMUNICATION_LANGUAGE: Deutsch
+  USER_INPUT_LANGUAGE: Deutsch
+  DOCS_LANGUAGE: Englisch
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  CODE_LANGUAGE: Englisch
+
+  # --- Git & Repository ---
+  GIT_PLATFORM: GitHub             # Options: GitHub, GitLab, Gitea, Codeberg
+  GIT_REMOTE_URL: https://github.com/owner/mein-projekt
+  GIT_MAIN_BRANCH: main
+
+  # --- Build-, Test- & Dev-Kommandos ---
+  BUILD_COMMAND: "python -m build"
+  TEST_COMMAND: "pytest"
+  DEV_COMMANDS: |
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+  TEST_COMMANDS: "pytest --maxfail=1"
+  BUILD_COMMANDS: "python -m build"
+
+  # --- Kontext & Architektur ---
+  PROJECT_CONTEXT: >-
+    Ausführlicher Hintergrundkontext für Agenten: Technologien, Systemarchitektur
+    und funktionale Schwerpunkte.
+  ARCHITECTURE: |
+    src/           # Quellcode
+    tests/         # Unittests & Integrationstests
+    docs/          # Dokumentation
+  CODE_CONVENTIONS: |
+    - Clean Code Principles (PEP 8 für Python)
+    - Typ-Annotationen verwenden
+    - Ausführliche Docstrings
+  EXTRA_DONTS: ""
+  CODE_QUALITY_RULES: ""
+  REQ_CATEGORIES: ""
+
+  # --- Snippet-Pfade (optional) ---
+  TESTER_SNIPPETS_PATH: ""
+  DEVELOPER_SNIPPETS_PATH: ""
+
+  # --- Meta-Feedback Integration ---
+  AGENT_META_REPO: Popoboxxo/agent-meta
+
+  # --- Infrastruktur & Container (optional) ---
+  SYSTEM_DEPENDENCIES: ""
+  SYSTEM_URLS: ""
+  SERVICE_NAME: ""
+  CONTAINER_NAME: ""
+  PRIMARY_PORT: ""
+  EXTRA_PORTS: ""
+
+  # --- Release-Artefakte (optional) ---
+  BUILD_OUTPUT: ""
+  ARTIFACT_ZIP_CMD: ""
+  ARTIFACT_TAR_CMD: ""
+  GH_ASSETS: ""
+  BUILD_SYSTEM_NOTES: ""
+  VERSION_DIST_BEHAVIOUR: ""

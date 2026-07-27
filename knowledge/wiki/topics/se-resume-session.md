@@ -3,7 +3,7 @@ type: "Guide"
 title: "SE Session Resume — Wiederaufnahme nach Token-Loss"
 description: "Lange SE-Kaskaden akkumulieren viele Token im Kontextfenster. Bei Ueberschreitung des Limits terminiert die Session — alle Zwischenergebnisse sind verloren. Eine neue Session..."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-resume-session.md"
 migrated_from: "docs/se-cascade/se-resume-session.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "agent-meta Sync-Konzept"
 description: "Dieses Dokument beschreibt das Konzept zur Einbindung von agent-meta in konkrete Projekte über ein versioniertes Python-Script und eine Konfigurationsdatei."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/sync-concept.md"
 migrated_from: "docs/guides/features/sync-concept.md"
 ---
@@ -350,7 +350,7 @@ SUMMARY
 Logfile: sync.log
 ```
 
-> **Multi-Provider Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — vollständige Beschreibung
+> **Multi-Provider Dokumentation:** [docs/providers/multi-provider.md](provider-multi-provider.md) — vollständige Beschreibung
 > aller Provider (Claude, Gemini, Continue), Frontmatter-Unterschiede, Stale-Tracking, Troubleshooting.
 
 ---

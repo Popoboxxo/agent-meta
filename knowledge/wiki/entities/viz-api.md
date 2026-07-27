@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Viz-Report API-Dokumentation"
 description: "Dieses Dokument beschreibt die HTTP-API-Endpunkte des viz-report.py WSGI-Servers."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/viz-api.md"
 migrated_from: "docs/api/viz-api.md"
 ---

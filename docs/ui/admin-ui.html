@@ -4498,6 +4498,23 @@ async function viewProjectGeneral() {
 
   wrap.appendChild(panel);
 
+  // Submodule Protection Section
+  const spResp = await api.get("/api/submodule-protection").catch(() => null);
+  if (spResp) {
+    const spStatusBadge = el("span", { class: `badge ${spResp.is_override ? "warn" : "ok"}` }, [spResp.status]);
+    const spTitle = el("div", { class: "panel-title" }, [
+      el("h3", {}, ["Submodule Protection"]),
+      spStatusBadge
+    ]);
+    const spTextPre = el("pre", { style: "max-height: 200px; overflow-y: auto;" }, [spResp.text || "No rule text defined."]);
+    const spPanel = el("div", { class: "panel", style: "margin-top: 16px;" }, [
+      spTitle,
+      el("p", { class: "muted" }, ["Enforces submodule boundaries: no direct edits to .agent-meta, no gitmodules mutation, no source code scaffolding."]),
+      spTextPre
+    ]);
+    wrap.appendChild(spPanel);
+  }
+
   wrap.appendChild(el("div", { class: "panel", style: "margin-top: 16px;" }, [
     el("h2", {}, ["Global Framework Setup"]),
     el("p", { class: "muted" }, ["Configure provider model tiers, tier mappings and other global settings."]),

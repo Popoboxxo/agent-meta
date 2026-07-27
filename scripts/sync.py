@@ -619,9 +619,15 @@ def main():
                 print(f"  i  auto-detected config: {candidate}")
                 break
         if not args.config:
-            print("  !  No config found. Pass --config or create .meta-config/project.yaml",
-                  file=sys.stderr)
-            sys.exit(1)
+            print("  i  Keine Konfiguration gefunden. Starte Setup-Wizard...\n")
+            from lib.setup import run_setup_wizard
+            target_config = cwd / ".meta-config" / "project.yaml"
+            run_setup_wizard(agent_meta_root, cwd, target_config, args.dry_run)
+            if not args.dry_run:
+                args.config = str(target_config)
+                args.init = True
+            else:
+                return
 
     config_resolved = Path(args.config).resolve()
     config_parent_name = config_resolved.parent.name
@@ -975,6 +981,21 @@ def main():
                     if not args.dry_run:
                         context_file.unlink()
 
+                # Cleanup parent provider directory if empty
+                prov_dir_name = f".{prov.lower()}"
+                if prov == "Copilot":
+                    prov_dir_name = ".github/copilot"
+                prov_dir = project_root / prov_dir_name
+                if prov_dir.exists() and not args.dry_run:
+                    import shutil
+                    try:
+                        remaining_files = [f for f in prov_dir.rglob("*") if f.is_file()]
+                        if not remaining_files:
+                            shutil.rmtree(prov_dir)
+                            log.action("DELETE", str(prov_dir.relative_to(project_root)), f"empty provider directory {prov} pruned")
+                    except Exception:
+                        pass
+
         for provider in providers:
             pc = provider_config[provider]
             if not is_provider_active(config, provider):
@@ -1200,6 +1221,14 @@ def main():
                  "--root", str(agent_meta_root)],
                 check=False,
             )
+
+    if not getattr(args, "check", False) and not getattr(args, "admin", False) and not args.dry_run:
+        print("\n" + "=" * 80)
+        print("[WICHTIG] KI-PROVIDER / IDE RESTART ERFORDERLICH")
+        print("Bitte starte deine KI-Session (IDE / CLI) JETZT neu, damit die neu generierten")
+        print("Default-Agenten in die Laufzeitumgebung geladen werden!")
+        print("Danach kann der agent-meta-manager unterstützen.")
+        print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":

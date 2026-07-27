@@ -3,7 +3,7 @@ type: "Concept"
 title: "Evaluierung der generischen Systems-Engineering-Prinzipien"
 description: "Dieses Dokument misst die etablierten, generischen Prinzipien (6-Stufen-Modell, Orthogonalität, CQRS-Kommunikation, etc.) gegen zwei Maßstäbe: Die reale Praxis des Systems..."
 tags: [concept]
-timestamp: "2026-05-23T22:22:56Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/se-principles-evaluation.md"
 migrated_from: "docs/concepts/se-principles-evaluation.md"
 ---

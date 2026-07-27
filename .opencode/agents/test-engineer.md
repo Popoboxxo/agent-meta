@@ -2,7 +2,7 @@
 name: test-engineer
 version: 1.1.0
 description: ReqogniLoom Test Engineer Agent
-generated-from: 0-external/reqogniloom-test-engineer@a05f6d5
+generated-from: 0-external/reqogniloom-test-engineer@ea13275
 mode: subagent
 permission:
   read: allow

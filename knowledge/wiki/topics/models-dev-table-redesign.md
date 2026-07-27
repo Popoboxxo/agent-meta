@@ -3,7 +3,7 @@ type: "Guide"
 title: "models-dev-table-redesign"
 description: "UI Spec — SCR-MODELS-01: \"Models & Pricing\" — models.dev-sourced table"
 tags: [ui-spec]
-timestamp: "2026-07-21T23:27:46Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/ui/specs/models-dev-table-redesign.md"
 migrated_from: "docs/ui/specs/models-dev-table-redesign.md"
 ---
@@ -17,7 +17,7 @@ UI Spec — SCR-MODELS-01: "Models & Pricing" — models.dev-sourced table
 
 ---
 
-## 1. Screen / component identity
+# 1. Screen / component identity
 
 | Field | Value |
 |---|---|

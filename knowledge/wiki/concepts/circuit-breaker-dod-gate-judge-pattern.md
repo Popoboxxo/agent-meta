@@ -3,7 +3,7 @@ type: "Concept"
 title: "Circuit-Breaker, DoD-as-Gate, and Judge/Validator Pattern"
 description: "Status: Concept (planned) Date: 2026-07-12 Source: Best Practice Audit 2026-07"
 tags: [concept, status:active]
-timestamp: "2026-07-12T19:41:02Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/active/circuit-breaker-dod-gate-judge-pattern.md"
 migrated_from: "docs/concepts/active/circuit-breaker-dod-gate-judge-pattern.md"
 ---

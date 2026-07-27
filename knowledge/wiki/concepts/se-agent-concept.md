@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Systems Engineering Agenten-Kaskade"
 description: "Umgesetzt: - 14 SE-Agenten-Templates (agents/1-generic/se-.md), in config/role-defaults.yaml registriert - Decomposition (Requirem., Architect, Critic, Interface-Mgr,..."
 tags: [concept]
-timestamp: "2026-07-10T15:51:44Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/se-agent-concept.md"
 migrated_from: "docs/concepts/se-agent-concept.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "Agent Delegation Map"
 description: "Übersicht aller Agent-zu-Agent-Verweise im Framework. Zeigt wer an wen delegiert (→) und wer an wen verweist (↗)."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/agent-delegation-map.md"
 migrated_from: "docs/guides/features/agent-delegation-map.md"
 ---

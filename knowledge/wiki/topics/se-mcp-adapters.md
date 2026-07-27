@@ -3,7 +3,7 @@ type: "Guide"
 title: "MCP-Adapter für die SE-Kaskade"
 description: "Dieses Dokument beschreibt das MCP-Adapter-Konzept für Phase 3 der SE-Kaskade. Es ermöglicht den Export von Requirements, Architektur und Traceability in externe Ticket-Systeme."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-mcp-adapters.md"
 migrated_from: "docs/se-cascade/se-mcp-adapters.md"
 ---

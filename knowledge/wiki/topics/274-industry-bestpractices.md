@@ -3,7 +3,7 @@ type: "Guide"
 title: "Industry Best Practices: Agentic Systems (#274)"
 description: "Datum: 2026-06-15 Branch: feat/framework-issues-batch-2 Quellen: Anthropic \"Building Effective Agents\" (2024), OpenAI Cookbook, LangGraph Docs, AutoGen Research, DeepMind..."
 tags: [analysis]
-timestamp: "2026-06-15T19:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/analysis/274-industry-bestpractices.md"
 migrated_from: "docs/analysis/274-industry-bestpractices.md"
 ---

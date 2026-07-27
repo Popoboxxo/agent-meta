@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: SE-Kaskaden-Standardisierung & Prompt-Modernisierung"
 description: "Das SE-Framework von agent-meta (14 Agenten, V-Modell, fraktale Decomposition) hat in der praktischen Nutzung sechs strukturelle Befunde gezeigt: fehlende ADR-Standards,..."
 tags: [concept, status:active]
-timestamp: "2026-07-10T20:59:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/active/se-und-prompt-modernisierung.md"
 migrated_from: "docs/concepts/active/se-und-prompt-modernisierung.md"
 migration_note: "Identisch mit docs/concepts/planned/se-und-prompt-modernisierung.md — planned-Kopie nicht separat migriert (Duplikat)."

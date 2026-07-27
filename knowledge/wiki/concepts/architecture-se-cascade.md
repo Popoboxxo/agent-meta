@@ -3,13 +3,13 @@ type: "Architecture"
 title: "SE-Agenten-Kaskade — Architektur-Detail"
 description: "Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit drei Floors: - Decomposition Floor — 5 aktive Agenten (se-requirements, se-architect,..."
 tags: [architecture, status:active]
-timestamp: "2026-07-10T20:59:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/architecture/07-se-cascade.md"
 migrated_from: "docs/architecture/07-se-cascade.md"
 ---
 # SE-Agenten-Kaskade — Architektur-Detail
 
-> [Back to Architecture Overview](../../ARCHITECTURE.md)
+> [Back to Architecture Overview](../../../ARCHITECTURE.md)
 
 ---
 

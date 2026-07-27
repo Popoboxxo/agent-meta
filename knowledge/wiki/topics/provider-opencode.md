@@ -3,7 +3,7 @@ type: "Guide"
 title: "opencode — Provider-Dokumentation"
 description: "Terminal-basierter AI-Coding-Agent von SST (Open Source, MIT). Vergleichbar mit Claude Code: interaktiver Chat im Terminal, Datei-Operationen, Shell-Integration, 75+..."
 tags: [guide, provider]
-timestamp: "2026-05-14T16:54:42Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/providers/opencode.md"
 migrated_from: "docs/providers/opencode.md"
 ---

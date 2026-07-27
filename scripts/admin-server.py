@@ -1238,6 +1238,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/backups":
             return self._handle_get_backups()
 
+        if path in ("/api/submodule-protection", "/api/config/submodule-protection"):
+            return self._send_json(self._get_submodule_protection_status())
+
         if path == "/api/environments":
             return self._send_json(self._read_environments())
 
@@ -3575,6 +3578,59 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return get_deactivation_status(root, project_config, provider_config)
         except Exception as exc:  # noqa: BLE001
             return {"error": str(exc)}
+
+    def _get_submodule_protection_status(self) -> dict:
+        """Return Submodule Protection status (Framework Default vs Project Override)."""
+        root = self.__class__.root
+        project_config = self.__class__.config_manager.read("project")
+
+        override_text = None
+        is_override = False
+
+        if isinstance(project_config, dict):
+            sp_cfg = project_config.get("submodule-protection") or project_config.get("submodule_protection")
+            if sp_cfg is not None:
+                is_override = True
+                if isinstance(sp_cfg, str):
+                    override_text = sp_cfg
+                elif isinstance(sp_cfg, dict):
+                    override_text = sp_cfg.get("text") or sp_cfg.get("content") or json.dumps(sp_cfg, indent=2)
+            else:
+                rules_cfg = project_config.get("rules", {})
+                if isinstance(rules_cfg, dict) and "submodule-protection" in rules_cfg:
+                    is_override = True
+                    override_text = str(rules_cfg["submodule-protection"])
+
+        if not is_override:
+            proj_rule_paths = [
+                root / ".claude" / "rules" / "submodule-protection.md",
+                root / "rules" / "3-project" / "submodule-protection.md",
+                root / ".meta-config" / "submodule-protection.md",
+            ]
+            for p in proj_rule_paths:
+                if p.exists():
+                    is_override = True
+                    override_text = p.read_text(encoding="utf-8")
+                    break
+
+        default_template = resolve_asset(root, "templates", "submodule-protection.template.md")
+        default_rule = resolve_asset(root, "rules", "1-generic", "submodule-protection.md")
+
+        default_text = ""
+        if default_template.exists():
+            default_text = default_template.read_text(encoding="utf-8")
+        elif default_rule.exists():
+            default_text = default_rule.read_text(encoding="utf-8")
+
+        status_type = "Project Override" if is_override else "Framework Default"
+        text = override_text if (is_override and override_text) else default_text
+
+        return {
+            "status": status_type,
+            "is_override": is_override,
+            "text": text,
+            "default_text": default_text
+        }
 
     def _read_environments(self) -> dict:
         """Return the environments: section from project.yaml."""

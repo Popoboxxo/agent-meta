@@ -3,13 +3,13 @@ type: "Architecture"
 title: "Agent Roles"
 description: "feature ist kein Ersatz für orchestrator, sondern ein Shortcut:"
 tags: [architecture, status:active]
-timestamp: "2026-07-18T19:57:03Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/architecture/03-agent-roles.md"
 migrated_from: "docs/architecture/03-agent-roles.md"
 ---
 # Agent Roles
 
-> [Back to Architecture Overview](../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogImdyYXBoIFREXG4gICAgT1JDW29yY2hlc3RyYXRvcl1cbiAgICBGRUFbZmVhdHVyZV1cbiAgICBPUkMgLS0-IElERVtpZGVhdGlvbl1cbiAgICBPUkMgLS0-IFJFUVtyZXF1aXJlbWVudHNdXG4gICAgT1JDIC0tPiBERVZbZGV2ZWxvcGVyXVxuICAgIE9SQyAtLT4gVFNUW3Rlc3Rlcl1cbiAgICBPUkMgLS0-IFZBTFt2YWxpZGF0b3JdXG4gICAgT1JDIC0tPiBET0NbZG9jdW1lbnRlcl1cbiAgICBPUkMgLS0-IEdJVFtnaXRdXG4gICAgT1JDIC0tPiBSRUxbcmVsZWFzZV1cbiAgICBPUkMgLS0-IERPS1tkb2NrZXJdXG4gICAgT1JDIC0tPiBNRkJbbWV0YS1mZWVkYmFja11cbiAgICBPUkMgLS0-IEVYVFSWW2FnZW50LW1ldGEtbWFuYWdlcl1cbiAgICBPUkMgLS0-IEVYVFSWW2V4dGVybmFsIHNraWxsc11cbiAgICBGRUEgLS0-IEdJVFxuICAgIEZFQSAtLT4gUkVRXG4gICAgRkVBIC0tPiBUU1RcbiAgICBGRUEgLS0-IERFVlxuICAgIEZFQSAtLT4gVkFMXG4gICAgRkVBIC0tPiBET0NcbiAgICBGRUEgLS0-IEdJVCIsICJtZXJtYWlkIjogeyJ0aGVtZSI6ICJkZWZhdWx0In19)
+> [Back to Architecture Overview](../../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogImdyYXBoIFREXG4gICAgT1JDW29yY2hlc3RyYXRvcl1cbiAgICBGRUFbZmVhdHVyZV1cbiAgICBPUkMgLS0-IElERVtpZGVhdGlvbl1cbiAgICBPUkMgLS0-IFJFUVtyZXF1aXJlbWVudHNdXG4gICAgT1JDIC0tPiBERVZbZGV2ZWxvcGVyXVxuICAgIE9SQyAtLT4gVFNUW3Rlc3Rlcl1cbiAgICBPUkMgLS0-IFZBTFt2YWxpZGF0b3JdXG4gICAgT1JDIC0tPiBET0NbZG9jdW1lbnRlcl1cbiAgICBPUkMgLS0-IEdJVFtnaXRdXG4gICAgT1JDIC0tPiBSRUxbcmVsZWFzZV1cbiAgICBPUkMgLS0-IERPS1tkb2NrZXJdXG4gICAgT1JDIC0tPiBNRkJbbWV0YS1mZWVkYmFja11cbiAgICBPUkMgLS0-IEVYVFSWW2FnZW50LW1ldGEtbWFuYWdlcl1cbiAgICBPUkMgLS0-IEVYVFSWW2V4dGVybmFsIHNraWxsc11cbiAgICBGRUEgLS0-IEdJVFxuICAgIEZFQSAtLT4gUkVRXG4gICAgRkVBIC0tPiBUU1RcbiAgICBGRUEgLS0-IERFVlxuICAgIEZFQSAtLT4gVkFMXG4gICAgRkVBIC0tPiBET0NcbiAgICBGRUEgLS0-IEdJVCIsICJtZXJtYWlkIjogeyJ0aGVtZSI6ICJkZWZhdWx0In19)
 
 ```mermaid
 graph TD

@@ -3,7 +3,7 @@ type: "Concept"
 title: "Architektur: Provider-agnostische Subagent-Spawn-Restriction (Singleton-Orchestrator)"
 description: "Der heutige sync.py-Lauf generiert für Worker-Agents Provider-Frontmatter, die Subagent-Spawns technisch erlaubt statt sie zu unterbinden. Konkret:"
 tags: [concept, status:active]
-timestamp: "2026-07-10T20:59:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/active/singleton-orchestrator-architecture.md"
 migrated_from: "docs/concepts/active/singleton-orchestrator-architecture.md"
 migration_note: "planned-Version inhaltlich abweichend — als historische Referenz in knowledge/sources/ abgelegt, keine eigene Wiki-Seite."

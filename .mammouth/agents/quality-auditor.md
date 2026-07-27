@@ -2,7 +2,7 @@
 name: quality-auditor
 version: 1.1.0
 description: ReqogniLoom Quality Auditor Agent
-generated-from: 0-external/reqogniloom-quality-auditor@a05f6d5
+generated-from: 0-external/reqogniloom-quality-auditor@ea13275
 ---
 # Quality Auditor — agent-meta
 

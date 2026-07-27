@@ -3,7 +3,7 @@ type: "Guide"
 title: "Honcho MCP Setup"
 description: "Honcho is a local memory and context server that provides persistent, cross-session memory for agents. This guide shows how to activate the honcho MCP server that ships in..."
 tags: [guide, mcp]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/mcp/honcho-setup.md"
 migrated_from: "docs/guides/mcp/honcho-setup.md"
 ---

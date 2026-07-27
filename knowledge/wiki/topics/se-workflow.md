@@ -3,7 +3,7 @@ type: "Guide"
 title: "SE-Workflow: Die rekursive Systems-Engineering-Kaskade"
 description: "Dieses Dokument beschreibt den vollständigen Ablauf des fraktalen SE-Workflows in agent-meta."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-workflow.md"
 migrated_from: "docs/se-cascade/se-workflow.md"
 ---

@@ -3,13 +3,13 @@ type: "Architecture"
 title: "Layer Model"
 description: "Rules werden von Claude Code automatisch in jeden Agenten-Kontext geladen — kein Read-Tool nötig. Ideal für Cross-Cutting-Policies (Security, Coding-Konventionen, Issue-Lifecycle)."
 tags: [architecture, status:active]
-timestamp: "2026-05-14T16:54:42Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/architecture/01-layer-model.md"
 migrated_from: "docs/architecture/01-layer-model.md"
 ---
 # Layer Model
 
-> [Back to Architecture Overview](../../ARCHITECTURE.md)
+> [Back to Architecture Overview](../../../ARCHITECTURE.md)
 
 ## Agents — Override-Priorität
 

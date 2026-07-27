@@ -3,7 +3,7 @@ type: "Concept"
 title: "A2A Best Practice Analysis"
 description: "Der aktuelle Envelope (schemas/a2a-handoff.schema.json) hat 6 Pflichtfelder + 4 optionale Felder mit deskriptiven Namen. Ein typischer vollständiger Envelope (ohne..."
 tags: [concept]
-timestamp: "2026-07-10T20:59:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/a2a-best-practice-analysis.md"
 migrated_from: "docs/concepts/a2a-best-practice-analysis.md"
 ---

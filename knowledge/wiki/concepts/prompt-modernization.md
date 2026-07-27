@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Prompt-Modernisierung durch Two-Mode-Prompt-Architektur"
 description: "Die aktuellen Agenten-Templates in agent-meta/agents/1-generic/ sind überwiegend als narrative Markdown-Dokumente verfasst. Die systematische Evaluierung aller 55 generischen..."
 tags: [concept, status:planned]
-timestamp: "2026-07-10T20:58:55Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/prompt-modernization.md"
 migrated_from: "docs/concepts/planned/prompt-modernization.md"
 migration_note: "3 Versionen gefunden (docs/architecture/, docs/concepts/active/, docs/concepts/planned/). planned-Version gewaehlt als massgebliche Seite (umfangreichste/aktuellste, 1949 Zeilen). Andere Versionen als Sources abgelegt, keine eigenen Wiki-Seiten."

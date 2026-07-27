@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Main-Chat-Orchestrator-Modus"
 description: "sync.py leitet aus orchestrator.enabled/orchestrator.strict drei sich gegenseitig ausschließende Flags ab (scripts/lib/config.py):"
 tags: [concept, status:active]
-timestamp: "2026-07-18T19:57:03Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/active/main-chat-orchestrator-mode.md"
 migrated_from: "docs/concepts/active/main-chat-orchestrator-mode.md"
 ---

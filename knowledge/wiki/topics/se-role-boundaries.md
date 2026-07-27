@@ -3,7 +3,7 @@ type: "Guide"
 title: "SE Role Boundaries — Trennung Requirements vs. Architect"
 description: "Per ISO/IEC 15288 sind Stakeholder Requirements (L1-SH) strikt von System Architecture zu trennen:"
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-role-boundaries.md"
 migrated_from: "docs/se-cascade/se-role-boundaries.md"
 ---

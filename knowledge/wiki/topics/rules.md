@@ -3,7 +3,7 @@ type: "Guide"
 title: "Rules — Projekt-globale Regeln für alle Agenten"
 description: "Claude Code lädt Dateien aus .claude/rules/ automatisch in den Kontext jedes Agenten — ohne explizites Read-Tool. Ideal für Regeln die projekt-global gelten:"
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/rules.md"
 migrated_from: "docs/guides/features/rules.md"
 ---
@@ -160,4 +160,4 @@ A01 Broken Access Control, A02 Cryptographic Failures, A03 Injection ...
 
 - [howto/features/agent-composition.md](agent-composition.md) — extends/patches System für Agenten
 - [howto/features/external-skills.md](external-skills.md) — External Skills einbinden
-- [CLAUDE.md](../CLAUDE.md) — Vollständige Konfigurations-Referenz
+- [CLAUDE.md](../../../CLAUDE.md) — Vollständige Konfigurations-Referenz

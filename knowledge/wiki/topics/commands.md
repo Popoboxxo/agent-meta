@@ -3,7 +3,7 @@ type: "Guide"
 title: "Commands — Slash Commands im agent-meta Layer-System"
 description: "Commands sind Markdown-Dateien die Claude Code (und andere Plattformen) als aufrufbare Slash-Commands bereitstellen. Agent-meta verwaltet sie im selben Schichten-Modell wie..."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/commands.md"
 migrated_from: "docs/guides/features/commands.md"
 ---

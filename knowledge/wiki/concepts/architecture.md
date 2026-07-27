@@ -3,7 +3,7 @@ type: "Architecture"
 title: "agent-meta — Architecture Overview"
 description: "Die SE-Agenten-Kaskade ist ein fraktales, rekursives System das Stakeholder-Anforderungen durch eine 6-stufige Black-Box → White-Box-Zerlegung in implementierbare Komponenten..."
 tags: [architecture, status:active]
-timestamp: "2026-07-20T12:49:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/ARCHITECTURE.full.md"
 migrated_from: "ARCHITECTURE.full.md"
 ---
@@ -17,14 +17,14 @@ migrated_from: "ARCHITECTURE.full.md"
 
 | # | Diagram | Description |
 |---|---|---------|-------------|
-| 1 | [Layer Model](docs/architecture/01-layer-model.md) | Override-Priorität der 4 Schichten (0-external → 3-project) + Rules/Hooks |
-| 2 | [Sync Flow](docs/architecture/02-sync-flow.md) | Wie `sync.py` aus agent-meta-Sources das Zielprojekt befüllt |
-| 3 | [Agent Roles](docs/architecture/03-agent-roles.md) | Alle Agenten-Rollen und Zuständigkeiten |
-| 4 | [Development Workflow](docs/architecture/04-dev-workflow.md) | Standard Feature-Workflow als Sequence Diagram |
-| 5 | [External Skills](docs/architecture/05-external-skills.md) | Submodule → Config → Wrapper → Zielprojekt |
-| 6 | [Versioning Strategy](docs/architecture/06-versioning.md) | Repo-, Agent- und Snippet-Versionen |
-| 7 | [SE-Agenten-Kaskade](docs/architecture/07-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
-| 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
+| 1 | [Layer Model](architecture-layer-model.md) | Override-Priorität der 4 Schichten (0-external → 3-project) + Rules/Hooks |
+| 2 | [Sync Flow](architecture-sync-flow.md) | Wie `sync.py` aus agent-meta-Sources das Zielprojekt befüllt |
+| 3 | [Agent Roles](architecture-agent-roles.md) | Alle Agenten-Rollen und Zuständigkeiten |
+| 4 | [Development Workflow](architecture-dev-workflow.md) | Standard Feature-Workflow als Sequence Diagram |
+| 5 | [External Skills](architecture-external-skills.md) | Submodule → Config → Wrapper → Zielprojekt |
+| 6 | [Versioning Strategy](architecture-versioning.md) | Repo-, Agent- und Snippet-Versionen |
+| 7 | [SE-Agenten-Kaskade](architecture-se-cascade.md) | Rekursive 6-stufige Black-Box → White-Box-Zerlegung |
+| 8 | [Viz-Logging MCP](viz-logging-mcp.md) | MCP-basiertes Event-Logging mit CLI-Fallback |
 | 9 | [Provider Abstraction Layer](#provider-abstraction-layer-pal--architektur) | PAL architecture: syntax registry, capability matrix, bootstrap |
 | 10 | [A2A Handoff Protocol](#a2a-handoff-protocol--architecture) | Structured JSON envelopes for Agent-to-Agent data contracts |
 

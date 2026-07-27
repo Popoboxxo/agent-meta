@@ -1295,13 +1295,34 @@ def transform_agent_content_for_provider(
                 content = body.lstrip('\n')
 
         elif provider == 'Mammouth':
-            # Mammouth Code: terminal-based agent, similar to Copilot.
-            # Frontmatter without model/memory/permissionMode/tools — Mammouth
-            # uses session-level model selection, not per-agent config.
-            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            # Mammouth Code agent: supports model, permissionMode, and tools fields.
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config, log=log)
+            content = inject_model_field(content, model)
+            if model:
+                po = config.get('model-overrides', {})
+                is_override = (role in po.get('Mammouth', {})) or (
+                    role in po and not isinstance(po.get(role), dict)
+                )
+                src = 'project override' if is_override else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+
+            permission_mode = resolve_permission_mode(role, config, agent_meta_root)
+            content = inject_permission_mode_field(content, permission_mode)
+            if permission_mode:
+                src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
+                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+
+            _mammouth_fm = _parse_frontmatter_yaml(content)
+            _mammouth_tools = _mammouth_fm.get('tools')
+            if isinstance(_mammouth_tools, list):
+                _validate_tools_against_whitelist(
+                    _mammouth_tools, provider, agent_meta_root, log, role,
+                )
+
             content = _remove_frontmatter_fields(content, [
-                'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
-                'stop_sequences', 'max_output_tokens', 'tools',
+                'memory', 'temperature', 'top_p', 'top_k',
+                'stop_sequences', 'max_output_tokens',
             ])
             body = _strip_frontmatter(content)
             body = _strip_claude_specific_lines(body)

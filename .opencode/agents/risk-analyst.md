@@ -2,7 +2,7 @@
 name: risk-analyst
 version: 1.1.0
 description: ReqogniLoom Risk Analyst Agent
-generated-from: 0-external/reqogniloom-risk-analyst@a05f6d5
+generated-from: 0-external/reqogniloom-risk-analyst@ea13275
 mode: subagent
 permission:
   read: allow

@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Orchestrator-First Architecture — Provider-agnostische Delegations-Pyramide"
 description: "Umgesetzt: - Orchestrator v3.28 (Intent-Routing, Task-Decomposition, FANOUT/PARALLELGROUP/BARRIER, Unknown-Intent) - {{PARALLELPATTERN}}-Injektion,..."
 tags: [concept]
-timestamp: "2026-06-14T15:13:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/orchestrator-first-architecture.md"
 migrated_from: "docs/concepts/orchestrator-first-architecture.md"
 ---

@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Agent-Visualisierung Dashboard v2"
 description: "Umgesetzt: - Feature 1 komplett: scripts/lib/viz.py, docs/agent-mindmap.md, docs/agent-graph.html - scripts/viz-logger.py, scripts/viz-server.py, scripts/viz-report.py,..."
 tags: [concept]
-timestamp: "2026-06-14T15:13:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/agent-visualization-v2.md"
 migrated_from: "docs/concepts/agent-visualization-v2.md"
 ---

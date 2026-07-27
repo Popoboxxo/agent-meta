@@ -3,7 +3,7 @@ type: "Guide"
 title: "Multi-Provider Support — Gemini, Continue und Claude gleichzeitig"
 description: "sync.py generiert Provider-spezifischen Output aus denselben universellen Agent-Templates. Ein einziges .meta-config/project.yaml reicht, um Agenten-Dateien für Claude Code,..."
 tags: [guide, provider]
-timestamp: "2026-05-24T20:12:48Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/providers/multi-provider.md"
 migrated_from: "docs/providers/multi-provider.md"
 ---

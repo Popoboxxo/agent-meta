@@ -3,7 +3,7 @@ type: "Guide"
 title: "Agent Memory — Persistentes Agenten-Gedächtnis"
 description: "Claude Code unterstützt das memory:-Feld im Agenten-Frontmatter. Wenn gesetzt, bekommt der Agent ein persistentes Verzeichnis das über Sessions hinweg erhalten bleibt."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/agent-memory.md"
 migrated_from: "docs/guides/features/agent-memory.md"
 ---
@@ -237,5 +237,5 @@ Damit wird kein `memory:`-Feld injiziert — der Documenter läuft ohne Gedächt
 
 - [howto/features/agent-composition.md](agent-composition.md) — extends/patches System
 - [howto/features/external-skills.md](external-skills.md) — External Skills einbinden
-- [CLAUDE.md](../CLAUDE.md) — Vollständige Konfigurations-Referenz (`model-overrides`, `memory-overrides`)
-- [config/role-defaults.yaml](../../config/role-defaults.yaml) — Aktuelle Memory-Defaults pro Rolle
+- [CLAUDE.md](../../../CLAUDE.md) — Vollständige Konfigurations-Referenz (`model-overrides`, `memory-overrides`)
+- [config/role-defaults.yaml](../../../config/role-defaults.yaml) — Aktuelle Memory-Defaults pro Rolle

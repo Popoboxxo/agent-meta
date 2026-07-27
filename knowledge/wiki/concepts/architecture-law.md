@@ -3,7 +3,7 @@ type: "Concept"
 title: "Overall Architectural Systems Engineering Breakdown Rules"
 description: "Die folgenden Regeln müssen bei jedem Anforderungs-Herunterbruch beachtet werden:"
 tags: [concept]
-timestamp: "2026-05-23T22:22:56Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/architecture_law.md"
 migrated_from: "docs/concepts/architecture_law.md"
 ---

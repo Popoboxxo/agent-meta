@@ -3,7 +3,7 @@ type: "Guide"
 title: "Howto: Consistency-Check"
 description: "Validiert Agent-Templates, Commands und Cross-References im agent-meta-Framework auf Konsistenz — deterministische Prüfungen ohne LLM-Aufruf."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/consistency-check.md"
 migrated_from: "docs/guides/features/consistency-check.md"
 ---

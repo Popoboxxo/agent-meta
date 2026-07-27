@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Viz-Event-Schema"
 description: "Dieses Dokument beschreibt alle Event-Typen die in .meta-viz/events.jsonl protokolliert werden."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/viz-event-schema.md"
 migrated_from: "docs/api/viz-event-schema.md"
 ---

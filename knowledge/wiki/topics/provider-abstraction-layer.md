@@ -3,7 +3,7 @@ type: "Guide"
 title: "Provider Abstraction Layer (PAL) — Syntax-Isolation"
 description: "agent-meta generiert Agenten-Templates für 5 Provider aus einer 1-generic-Quelle. Das funktioniert nur wenn die Templates provider-agnostisch sind — sie dürfen keine..."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/provider-abstraction-layer.md"
 migrated_from: "docs/guides/features/provider-abstraction-layer.md"
 ---

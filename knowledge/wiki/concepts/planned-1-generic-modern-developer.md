@@ -3,7 +3,7 @@ type: "Concept"
 title: "Developer — {{PROJECT_NAME}} (Modern Mode)"
 description: "<persona> Du bist der Developer für {{PROJECTNAME}}. Implementierst Features und Bugfixes — minimal-invasiv, regelkonform, testgetrieben. Sprache: Deutsch. Code-Kommentare und..."
 tags: [concept, status:planned]
-timestamp: "2026-07-10T20:58:55Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/1-generic-modern/developer.md"
 migrated_from: "docs/concepts/planned/1-generic-modern/developer.md"
 ---

@@ -19,11 +19,15 @@ except ImportError:
 
 def _ask(prompt: str, default: str = "", validator=None) -> str:
     """Prompt user for input. Returns default if user presses Enter."""
+    if not sys.stdin.isatty():
+        return default
     display = f" [{default}]" if default else ""
     while True:
         try:
             raw = input(f"  {prompt}{display}: ").strip()
         except (EOFError, KeyboardInterrupt):
+            if default:
+                return default
             print("\n  Abgebrochen.")
             sys.exit(0)
         value = raw if raw else default

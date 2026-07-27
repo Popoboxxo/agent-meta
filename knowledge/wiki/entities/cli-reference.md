@@ -3,7 +3,7 @@ type: "API Reference"
 title: "CLI Reference: `sync.py`"
 description: "The sync.py script is the central entry point of the agent-meta framework. It generates agents, manages provider configurations, and validates templates."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/cli-reference.md"
 migrated_from: "docs/api/cli-reference.md"
 ---

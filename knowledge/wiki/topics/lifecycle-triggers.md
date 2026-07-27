@@ -3,7 +3,7 @@ type: "Guide"
 title: "Lifecycle Triggers — Agenten-Tasks bei Git-Events"
 description: "Lifecycle Triggers lösen Agenten-Tasks automatisch aus wenn definierte Git-Events eintreten: Release-Tag gesetzt, Version hochgezählt, Branch gemergt."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/lifecycle-triggers.md"
 migrated_from: "docs/guides/features/lifecycle-triggers.md"
 ---

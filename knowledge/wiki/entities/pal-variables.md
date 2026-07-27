@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Provider Abstraction Layer (PAL) Variables"
 description: "The Agent-Meta Framework uses placeholders (Variables) in the agent templates, which are resolved at build-time (sync.py) based on the target provider. This allows maintaining..."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/pal-variables.md"
 migrated_from: "docs/api/pal-variables.md"
 ---

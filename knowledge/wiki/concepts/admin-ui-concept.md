@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: agent-meta Admin-UI — Config Surface & Workflow Editor"
 description: "Die agent-meta-Konfiguration lebt in .meta-config/project.yaml (264 Zeilen, ~70 Variablen, 27 Rollen, Orchestrator-Einstellungen, Viz, Quality-Pipelines, Lifecycle-Trigger)..."
 tags: [concept, status:planned]
-timestamp: "2026-06-14T15:13:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/admin-ui-concept.md"
 migrated_from: "docs/concepts/planned/admin-ui-concept.md"
 ---

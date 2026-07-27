@@ -3,7 +3,7 @@ type: "Concept"
 title: "Implementierungsplan: Systems Engineering Agenten-Kaskade (Generic Edition)"
 description: "Das rekursive Systems-Engineering-Zellenmodell aus dem Basis-Konzept wird mit einem universellen, strikten 6-Stufen-Herunterbruch (Stakeholder -> L1 -> L2 -> L3) verschmolzen...."
 tags: [concept]
-timestamp: "2026-05-23T22:22:56Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/se-agent-implementation-plan.md"
 migrated_from: "docs/concepts/se-agent-implementation-plan.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "Rules-Preset Optimierung für platform-heavy Projekte"
 description: "Jede Rule in .claude/rules/ mit alwaysApply: true (Standard) wird in jeden Agenten-Request geladen — egal ob relevant. Bei Platform-heavy Projekten (Home Assistant, Sharkord)..."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/rules-preset-optimization.md"
 migrated_from: "docs/guides/features/rules-preset-optimization.md"
 ---
@@ -132,4 +132,4 @@ Für Migration-Workflow und Troubleshooting:
 ## Verwandte Dokumente
 
 - [howto/features/rules.md](rules.md) — Rules-System Übersicht
-- [config/rules-presets.yaml](../../config/rules-presets.yaml) — Preset-Definitionen
+- [config/rules-presets.yaml](../../../config/rules-presets.yaml) — Preset-Definitionen

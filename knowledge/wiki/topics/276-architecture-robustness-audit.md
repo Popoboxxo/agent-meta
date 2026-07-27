@@ -3,7 +3,7 @@ type: "Guide"
 title: "Audit: Architecture Robustness (Issue #276)"
 description: "Branch: feat/framework-issues-batch-2 Datum: 2026-06-15 Scope: scripts/lib/config.py, scripts/lib/agents.py, scripts/lib/runtime.py, scripts/lib/viz.py"
 tags: [analysis]
-timestamp: "2026-06-15T19:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/analysis/276-architecture-robustness-audit.md"
 migrated_from: "docs/analysis/276-architecture-robustness-audit.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "Upgrade Guide — agent-meta auf neue Version aktualisieren"
 description: "Kernregel: Alles in .claude/agents/ wird bei jedem Sync neu generiert. Rollen die aus config['roles'] entfernt wurden, werden automatisch gelöscht. Alles in .claude/3-project/..."
 tags: [guide, setup]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/setup/upgrade-guide.md"
 migrated_from: "docs/guides/setup/upgrade-guide.md"
 ---
@@ -277,7 +277,7 @@ git add .claude/ .gemini/ .continue/ .meta-config/project.yaml .agent-meta
 git commit -m "chore: upgrade agent-meta to v0.21.1-beta"
 ```
 
-> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md)
+> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](provider-multi-provider.md)
 
 ---
 

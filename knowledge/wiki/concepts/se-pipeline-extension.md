@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: SE-Pipeline-Erweiterung — Teilresultat-Protokoll & Rollentrennung"
 description: "Das bestehende SE-Framework (14 Agenten, V-Modell, fraktale Decomposition) hat in der praktischen Nutzung zwei strukturelle Schwachstellen offengelegt:"
 tags: [concept]
-timestamp: "2026-06-21T07:57:42Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/se-pipeline-extension.md"
 migrated_from: "docs/concepts/se-pipeline-extension.md"
 ---
@@ -11,7 +11,7 @@ migrated_from: "docs/concepts/se-pipeline-extension.md"
 
 > Status: **Konzept-Phase** | Datum: 2026-06-21
 > Erweitert: [`se-agent-concept.md`](./se-agent-concept.md)
-> Referenziert: [`agents/1-generic/se-requirements.md`](../../agents/1-generic/se-requirements.md)
+> Referenziert: [`agents/1-generic/se-requirements.md`](../../../agents/1-generic/)
 
 ---
 

@@ -276,5 +276,14 @@ providers:
     pending_tasks_file: .mammouth/pending-tasks.md
     extension_dir: .mammouth/3-project
     orchestrator_hint: "- **In Mammouth:** Nutzt den Orchestrator-Agenten."
-    model-tiers: {}
-    model-aliases: {}
+    model-tiers:
+      nano:     claude-haiku-4-5-20251001
+      fast:     claude-haiku-4-5-20251001
+      balanced: claude-sonnet-5
+      powerful: claude-opus-4-8
+      max:      claude-fable-5
+    model-aliases:
+      haiku:  claude-haiku-4-5-20251001
+      sonnet: claude-sonnet-4-6
+      opus:   claude-opus-4-8
+      fable:  claude-fable-5

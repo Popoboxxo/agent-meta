@@ -515,6 +515,8 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 
+
+
 ## Project Setup
 
 - **Build:** `python scripts/sync.py`

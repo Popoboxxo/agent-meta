@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Agent-Meta Composition System"
 description: "The Composition System of Agent-Meta allows you to adapt generic agents to platform-specific and project-specific requirements. The execution and generation are handled through..."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/composition-system.md"
 migrated_from: "docs/api/composition-system.md"
 ---

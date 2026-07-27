@@ -3,7 +3,7 @@ type: "Concept"
 title: "Generalisiertes Integrations-Framework für agent-meta — paket-verwaltete MCP-Tools (Referenz-Implementierung: semble v0.3.4)"
 description: "- Semble (https://github.com/MinishLab/semble, v0.3.4) ist weder Git-Submodul-Skill noch rein manuell konfigurierter MCP-Server. - Es ist ein paket-verwaltetes Tool mit..."
 tags: [concept]
-timestamp: "2026-07-22T12:17:25Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/integrations-framework.md"
 migrated_from: "docs/concepts/integrations-framework.md"
 ---

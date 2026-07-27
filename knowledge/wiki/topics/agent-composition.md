@@ -3,7 +3,7 @@ type: "Guide"
 title: "Agent Composition — extends & patches"
 description: "Ohne Composition ist 2-platform/sharkord-developer.md eine vollständige Kopie von 1-generic/developer.md — plus Sharkord-spezifische Sections. Das bedeutet:"
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/agent-composition.md"
 migrated_from: "docs/guides/features/agent-composition.md"
 ---

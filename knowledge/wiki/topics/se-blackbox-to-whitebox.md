@@ -3,7 +3,7 @@ type: "Guide"
 title: "Black-Box → White-Box Transition"
 description: "Dieses Dokument erklärt die zentrale Methode der Systems-Engineering-Kaskade: den Übergang von einer Black-Box-Anforderung zu einer White-Box-Architektur."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-blackbox-to-whitebox.md"
 migrated_from: "docs/se-cascade/se-blackbox-to-whitebox.md"
 ---

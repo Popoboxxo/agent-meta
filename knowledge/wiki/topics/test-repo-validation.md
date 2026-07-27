@@ -3,7 +3,7 @@ type: "Guide"
 title: "Test-Repository Validation"
 description: "Validiert die generierten Agenten-Dateien nach einer Implementierung in einem separaten Test-Repository."
 tags: [guide]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/test-repo-validation.md"
 migrated_from: "docs/guides/test-repo-validation.md"
 ---

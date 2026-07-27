@@ -3,7 +3,7 @@ type: "Guide"
 title: "Agent-Versionierung"
 description: "Jeder generische und plattformspezifische Agent trägt eine eigene version:-Nummer im Frontmatter. Das ermöglicht:"
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/agent-versioning.md"
 migrated_from: "docs/guides/features/agent-versioning.md"
 ---

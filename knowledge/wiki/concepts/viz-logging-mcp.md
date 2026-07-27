@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Visualisierung & Logging Simplifizierung (MCP / CLI Fallback)"
 description: "Dieses Dokument beschreibt die Architektur-Überarbeitung des agent-meta Logging- und Visualisierungs-Mechanismus."
 tags: [concept]
-timestamp: "2026-06-14T15:13:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/viz-logging-mcp.md"
 migrated_from: "docs/concepts/viz-logging-mcp.md"
 ---

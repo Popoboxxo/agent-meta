@@ -3,7 +3,7 @@ type: "Guide"
 title: "Config-Layout — Drei Ebenen, klare Zuständigkeiten"
 description: "agent-meta trennt Konfiguration in drei unabhängige Ebenen. Jede Ebene hat eine klare Zuständigkeit und einen eigenen Eigentümer."
 tags: [guide, setup]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/setup/config-layout.md"
 migrated_from: "docs/guides/setup/config-layout.md"
 ---

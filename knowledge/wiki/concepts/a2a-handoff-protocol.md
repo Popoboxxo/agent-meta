@@ -3,7 +3,7 @@ type: "Concept"
 title: "A2A-Handoff-Protokoll — Implementationsnahe Konzeptschärfung"
 description: "Umgesetzt: - 6 Schemas (schemas/handoffs/, schemas/a2a-handoff.schema.json, SE-Schemas) - Orchestrator als Envelope-Fabrik (agents/1-generic/orchestrator.md → »A2A Handoff..."
 tags: [concept]
-timestamp: "2026-07-10T15:50:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/a2a-handoff-protocol.md"
 migrated_from: "docs/concepts/a2a-handoff-protocol.md"
 ---

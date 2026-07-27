@@ -3,7 +3,7 @@ type: "Guide"
 title: "Interface-Management in der SE-Kaskade"
 description: "Das Interface-Management ist die kritischste Rolle für funktionierende Rekursion. Wenn Komponente A und B in tieferen Ebenen unabhängig bearbeitet werden, müssen beide wissen,..."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/se-interface-management.md"
 migrated_from: "docs/se-cascade/se-interface-management.md"
 ---

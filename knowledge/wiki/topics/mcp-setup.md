@@ -3,7 +3,7 @@ type: "Guide"
 title: "MCP Setup — Best Practices"
 description: "agent-meta verwaltet MCP-Server als First-Class-Konzept: Registry, Regel-Generierung und sichere Secrets-Handhabung über alle Provider hinweg."
 tags: [guide]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/mcp-setup.md"
 migrated_from: "docs/guides/mcp-setup.md"
 ---

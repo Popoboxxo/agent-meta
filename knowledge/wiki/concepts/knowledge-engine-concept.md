@@ -3,7 +3,7 @@ type: "Concept"
 title: "Knowledge Engine für agent-meta — Konzept v4 (Final Deep-Dive)"
 description: "1. [Executive Summary](#1-executive-summary) 2. [Quellenanalyse: Karpathy LLM-Wiki](#2-quellenanalyse-karpathy-llm-wiki) 3. [Quellenanalyse: Google OKF..."
 tags: [concept]
-timestamp: "2026-07-24T10:05:14Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/knowledge-engine-concept.md"
 migrated_from: "docs/concepts/knowledge-engine-concept.md"
 ---
@@ -561,9 +561,9 @@ timestamp: {{AGENT_META_DATE}}
 
 2. **Concept-ID:** Dateipfad relativ zu `wiki/`, ohne `.md`. Z.B. `concepts/attention.md` → ID: `concepts/attention`
 
-3. **Cross-References:** Standard-Markdown-Links: `[Entity Name](../entities/entity-name.md)`
+3. **Cross-References:** Standard-Markdown-Links: ```[Entity Name](../entities/entity-name.md)```
 
-4. **Citations:** Links zu externen Quellen mit Kontextangabe: `[Quelle](../../sources/paper.pdf) — §3, S.42`
+4. **Citations:** Links zu externen Quellen mit Kontextangabe: ```[Quelle](../../sources/paper.pdf)`` — §3, S.42`
 
 5. **Sprache:** {{COMMUNICATION_LANGUAGE}}
 
@@ -724,7 +724,7 @@ knowledge-curator:
 
 **Phase 4: Cross-References und Meta**
 10. **Cross-References:** Pflegt Standard-Markdown-Links zwischen allen betroffenen Seiten
-11. **Citations:** Verlinkt auf die Source: `[Source Name](../../sources/<file>)`
+11. **Citations:** Verlinkt auf die Source: ```[Source Name](../../sources/<file>)```
 12. **Delegiert an `knowledge-indexer`:** `index.md` + `log.md` Update
 
 **OKF-Pflichten pro Dokument:**
@@ -734,7 +734,7 @@ type: <Entity|Concept|Topic|Source Summary|...>  # REQUIRED (OKF §4.1)
 title: "<Display Name>"                           # RECOMMENDED
 description: "<One-line summary>"                  # RECOMMENDED
 tags: [tag1, tag2]                                 # OPTIONAL
-timestamp: "2026-07-22T10:00:00Z"                  # OPTIONAL → wird GESETZT
+timestamp: "2026-07-27"                  # OPTIONAL → wird GESETZT
 resource: "<URI>"                                  # OPTIONAL → bei Assets
 sources:                                           # KARPATHY EXTENSION
   - "../sources/source-name.md"                    #   Quell-Verweise
@@ -869,12 +869,12 @@ timestamp: 2026-07-22T10:00:00Z
 ## Entities (7)
 | Seite | Beschreibung | Tags | Aktualisiert |
 |-------|-------------|------|-------------|
-| [Entity A](entities/entity-a.md) | Kurzbeschreibung | `tag1`, `tag2` | 2026-07-22 |
+| ``[Entity A](entities/entity-a.md)`` | Kurzbeschreibung | `tag1`, `tag2` | 2026-07-22 |
 
 ## Concepts (12)
 | Seite | Beschreibung | Tags | Aktualisiert |
 |-------|-------------|------|-------------|
-| [Attention](concepts/attention.md) | Attention-Mechanismus in Transformern | `ml`, `architecture` | 2026-07-21 |
+| ``[Attention](concepts/attention.md)`` | Attention-Mechanismus in Transformern | `ml`, `architecture` | 2026-07-21 |
 
 ## Topics (4)
 | ... |

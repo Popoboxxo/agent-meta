@@ -3,7 +3,7 @@ type: "Guide"
 title: "Howto: Neues Projekt mit agent-meta einrichten"
 description: "Agenten werden von sync.py generiert — nie manuell kopiert oder bearbeitet. Den Projektkontext liefert die CLAUDE.md des Projekts. Projektspezifische Erweiterungen leben in..."
 tags: [guide, setup]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/setup/instantiate-project.md"
 migrated_from: "docs/guides/setup/instantiate-project.md"
 ---
@@ -75,7 +75,7 @@ Geeignet für schnelle, wiederkehrende Einzel-Aktionen.
 agent-meta verwaltet einen Teil der Commands automatisch (generisch und plattformspezifisch,
 analog zu Agenten). Projekt-eigene Commands in `.claude/3-project/commands/` werden nie überschrieben.
 
-> Vollständige Dokumentation: [howto/features/commands.md](../features/commands.md) — Layer-System, Frontmatter-Felder, `$ARGUMENTS`, `--create-command`, Stale-Tracking.
+> Vollständige Dokumentation: [howto/features/commands.md](commands.md) — Layer-System, Frontmatter-Felder, `$ARGUMENTS`, `--create-command`, Stale-Tracking.
 
 | `.claude/agents/` | `.claude/commands/` |
 |-------------------|---------------------|
@@ -262,7 +262,7 @@ Konfiguration in `.meta-config/project.yaml`:
 
 Das Legacy-Feld `"ai-provider": "Claude"` (String) wird weiterhin unterstützt — kein Breaking Change.
 
-> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](multi-provider.md) — Provider-Details,
+> **Vollständige Dokumentation:** [docs/providers/multi-provider.md](provider-multi-provider.md) — Provider-Details,
 > Frontmatter-Unterschiede, Sync-Verhalten, Continue Best Practices, Troubleshooting.
 
 ---

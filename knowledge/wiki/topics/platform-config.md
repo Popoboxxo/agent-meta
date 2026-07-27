@@ -3,7 +3,7 @@ type: "Guide"
 title: "Platform Config Instantiation"
 description: "Platform-spezifische Rules und Agenten-Templates können Platzhalter wie {{platform.homeassistant.admingroup}} enthalten. Diese werden beim Sync gegen Werte aus einer neuen..."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/platform-config.md"
 migrated_from: "docs/guides/features/platform-config.md"
 ---

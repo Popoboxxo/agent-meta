@@ -3,7 +3,7 @@ type: "Concept"
 title: "Architektur: agent-meta Admin-UI — Technische Spezifikation"
 description: "- Admin-Server läuft nur auf localhost (127.0.0.1) - Kein Auth-Layer — physikalischer Maschinenzugriff = berechtigt - Super-Admin-Mode ist ein Dateisystem-Check, kein..."
 tags: [concept, status:planned]
-timestamp: "2026-06-14T15:13:32Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/admin-ui-architecture.md"
 migrated_from: "docs/concepts/planned/admin-ui-architecture.md"
 ---

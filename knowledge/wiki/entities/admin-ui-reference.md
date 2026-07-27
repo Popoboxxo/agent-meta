@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Admin UI & Function Reference"
 description: "This document provides an exhaustive technical reference for every configuration option and function available within the Agent Meta Manager. It serves as the definitive Single..."
 tags: [api]
-timestamp: "2026-07-24T09:31:26Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/admin-ui-reference.md"
 migrated_from: "docs/api/admin-ui-reference.md"
 ---

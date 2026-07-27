@@ -3,7 +3,7 @@ type: "Guide"
 title: "Reflection-Loops — Generische Iterative Verbesserung"
 description: "Ein Reflection-Loop besteht aus zwei Rollen: - Generator: Erzeugt Output (Code, Design, Tests, Anforderungen) - Critic: Bewertet den Output und gibt Korrekturhinweise"
 tags: [guide]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/reflection-loops.md"
 migrated_from: "docs/guides/reflection-loops.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "First Steps — agent-meta einrichten"
 description: "Du hilfst dem User dabei, agent-meta in seinem Projekt einzurichten. Die Schritte sind unten beschrieben. Führe sie nicht automatisch durch — erkläre jeden Schritt, frage nach..."
 tags: [guide, setup]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/setup/first-steps.md"
 migrated_from: "docs/guides/setup/first-steps.md"
 ---
@@ -175,7 +175,7 @@ Mehrere Provider gleichzeitig (z.B. Claude + Continue):
 | `Continue` | `.continue/agents/`, `.continue/rules/project-context.md` | Wenn Continue im Team eingesetzt wird |
 
 > Backward-Compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
-> Vollständige Dokumentation: [docs/providers/multi-provider.md](multi-provider.md)
+> Vollständige Dokumentation: [docs/providers/multi-provider.md](provider-multi-provider.md)
 
 **AI-Assistent:** Frage ob neben Claude noch weitere Provider (Gemini, Continue) genutzt werden sollen.
 

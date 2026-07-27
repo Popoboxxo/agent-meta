@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Agent-Visualisierungs-Dashboard (AVD)"
 description: "Der Nutzer öffnet einen lokalen Webserver (z.B. http://localhost:8765) und sieht in Echtzeit:"
 tags: [concept]
-timestamp: "2026-05-14T16:54:42Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/agent-visualization-dashboard.md"
 migrated_from: "docs/concepts/agent-visualization-dashboard.md"
 ---

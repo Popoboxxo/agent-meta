@@ -3,7 +3,7 @@ type: "Guide"
 title: "SE-Cascade auf Gemini / Antigravity"
 description: "Auf Gemini/Antigravity unterstützt die Umgebung kein natives Subagent-Dispatch-Tool (Agent ist unsupported). Die SE-Cascade (Systems Engineering Kaskade) kann deshalb nicht..."
 tags: [guide, se-cascade]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/se-cascade/SE_CASCADE_GEMINI.md"
 migrated_from: "docs/se-cascade/SE_CASCADE_GEMINI.md"
 ---

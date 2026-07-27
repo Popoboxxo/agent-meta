@@ -3,7 +3,7 @@ type: "Guide"
 title: "Quality Pipelines"
 description: "Quality Pipelines sind vordefinierte Multi-Agent-Ketten die wiederkehrende Workflows standardisieren. Statt jeden Workflow im Orchestrator hart zu codieren, werden sie zentral..."
 tags: [guide]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/quality-pipelines.md"
 migrated_from: "docs/guides/quality-pipelines.md"
 ---

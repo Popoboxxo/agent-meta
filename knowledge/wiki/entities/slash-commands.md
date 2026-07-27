@@ -3,7 +3,7 @@ type: "API Reference"
 title: "Slash Commands Reference"
 description: "Slash Commands are chat shortcuts that allow you to trigger specific workflows within the AI Providers (e.g., Claude, Gemini)."
 tags: [api]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/api/slash-commands.md"
 migrated_from: "docs/api/slash-commands.md"
 ---

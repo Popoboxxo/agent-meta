@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: SE-Kaskaden-Standardisierung — Issue #339"
 description: "Das SE-Framework (14 Agenten, V-Modell, fraktale Decomposition) hat in der praktischen Nutzung sechs strukturelle Befunde gezeigt: fehlende ADR-Standards (B1), uneinheitliche..."
 tags: [concept, status:planned]
-timestamp: "2026-07-10T20:58:55Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/se-cascade-optimization-339.md"
 migrated_from: "docs/concepts/planned/se-cascade-optimization-339.md"
 ---
@@ -12,7 +12,7 @@ migrated_from: "docs/concepts/planned/se-cascade-optimization-339.md"
 > Status: **Konzept-Entwurf v1.2** | Datum: 2026-06-28
 > Revision: 2026-06-28 (Review-Iteration 2: 2 Minor gefixt — final)
 > Erweitert: [`se-agent-concept.md`](./se-agent-concept.md), [`se-pipeline-extension.md`](./se-pipeline-extension.md)
-> Referenziert: [`docs/architecture/07-se-cascade.md`](../architecture/07-se-cascade.md), [`agents/1-generic/se-*.md`](../../agents/1-generic/)
+> Referenziert: [`docs/architecture/07-se-cascade.md`](architecture-se-cascade.md), [`agents/1-generic/se-*.md`](../../../agents/1-generic/)
 > Issue: **#339** (6 Befunde: B1–B6)
 > DoD-Preset: **spec-driven** (relevant für `se-required: recommended`)
 
@@ -41,7 +41,7 @@ Das SE-Framework (14 Agenten, V-Modell, fraktale Decomposition) hat in der prakt
 | `docs/se/**`-Template | ❌ **fehlt komplett** | Framework generiert keine SE-Output-Struktur |
 | `se-housekeeper` | ❌ **fehlt** | Keine Compliance-Prüfung |
 | Bottom-Up-Rückkopplung | ❌ **fehlt** | Kaskade ist L0→V&V单向 |
-| Admin-UI | ❌ **nicht im Repo** | Nur Konzept-Skizze in [`planned/admin-ui-concept.md`](./planned/admin-ui-concept.md) |
+| Admin-UI | ❌ **nicht im Repo** | Nur Konzept-Skizze in [`planned/admin-ui-concept.md`](admin-ui-concept.md) |
 
 ---
 
@@ -467,7 +467,7 @@ Diese Felder werden in `.se-state.yaml` PRO ZELLE gespeichert (cell-local), nich
 
 ## 8. viz-Logger-Integration (Anforderung D)
 
-**Aktueller Stand:** `viz-logger.py` unterstützt `trace_context.viz_task_id`, default off, aktivierbar via `viz.debug: true`. Siehe [`docs/viz-architecture.md`](../viz-architecture.md).
+**Aktueller Stand:** `viz-logger.py` unterstützt `trace_context.viz_task_id`, default off, aktivierbar via `viz.debug: true`. Siehe [`docs/viz-architecture.md`](viz-logging-mcp.md).
 
 **4 neue SE-spezifische Event-Kategorien:**
 
@@ -498,7 +498,7 @@ viz:
 
 ## 9. Admin-UI-Integration (Anforderung E)
 
-**Bestand:** Keine Admin-UI im Repo. Konzept-Skizze in [`docs/concepts/planned/admin-ui-concept.md`](./planned/admin-ui-concept.md).
+**Bestand:** Keine Admin-UI im Repo. Konzept-Skizze in [`docs/concepts/planned/admin-ui-concept.md`](admin-ui-concept.md).
 
 **Lücke:** SE-spezifische Konfiguration (`systems-engineering`, `se_output`, `se-required`) ist nicht in der geplanten UI vorgesehen.
 

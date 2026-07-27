@@ -3,7 +3,7 @@ type: "Guide"
 title: "Agent Isolation — `isolation: worktree`"
 description: "Claude Code unterstützt isolation: worktree als Aufruf-Parameter für Agenten. Der Agent arbeitet dann in einem isolierten Git-Worktree — einer separaten Arbeitskopie des..."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/agent-isolation.md"
 migrated_from: "docs/guides/features/agent-isolation.md"
 ---

@@ -3,7 +3,7 @@ type: "Guide"
 title: "Hooks — Shell-Hooks im agent-meta Layer-System"
 description: "Hooks sind Shell-Skripte die Claude Code automatisch vor oder nach bestimmten Tool-Aufrufen ausführt. Agent-meta verwaltet sie im selben Schichten-Modell wie Rules und Agents."
 tags: [guide, feature]
-timestamp: "2026-07-19T10:29:50Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/guides/features/hooks.md"
 migrated_from: "docs/guides/features/hooks.md"
 ---

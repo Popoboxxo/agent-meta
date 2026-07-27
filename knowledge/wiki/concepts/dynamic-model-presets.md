@@ -3,7 +3,7 @@ type: "Concept"
 title: "Konzept: Dynamische Modellerfassung & Tier-Presets"
 description: "Status: Umgesetzt Ziel: Abkehr von statischen Modell-Zuweisungen hin zu einem dynamischen, preisbewussten und skalierbaren Preset-System."
 tags: [concept, status:planned]
-timestamp: "2026-07-10T20:59:10Z"
+timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/dynamic-model-presets.md"
 migrated_from: "docs/concepts/planned/dynamic-model-presets.md"
 ---
