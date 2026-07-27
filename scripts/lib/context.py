@@ -886,6 +886,7 @@ def _build_managed_block(
     from .context_templates.builder import TemplateBuilder
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules
+    from .agents import build_knowledge_engine_hints
     
     pc = (provider_config or {}).get(provider, {})
     has_native_rules = pc.get("has_rules", False)
@@ -940,6 +941,8 @@ def _build_managed_block(
             embedded_rules.append({"content": rule_content})
             
         local_vars["embedded_rules"] = embedded_rules
+
+    local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(config)
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     return builder.build("agents-managed", local_vars)

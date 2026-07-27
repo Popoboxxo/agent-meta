@@ -129,6 +129,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
 # Always-available project configs.
 PROJECT_FILES: dict[str, str] = {
     "project": ".meta-config/project.yaml",
+    "project-mcp-registry": ".meta-config/mcp-registry.yaml",
 }
 
 
@@ -555,9 +556,8 @@ class ConfigManager:
     # ------------------------------------------------------------------ #
 
     def _allowed_keys(self) -> dict[str, str]:
-        if self.mode == "super_admin":
-            return {**PROJECT_FILES, **SUPER_ADMIN_FILES}
-        return dict(PROJECT_FILES)
+        # Always allow reading both so project_admin mode can view framework defaults
+        return {**PROJECT_FILES, **SUPER_ADMIN_FILES}
 
     def resolve_path(self, key: str) -> Path:
         """Translate a logical config key (e.g. ``role-defaults``) to its
@@ -623,9 +623,12 @@ class ConfigManager:
 
     def write(self, key: str, data: Any) -> dict:
         """Write a Python object back as YAML using atomic replace + backup.
-
+        
         Returns a status dict describing where the backup was stored.
         """
+        if self.mode != "super_admin" and key in SUPER_ADMIN_FILES and key not in PROJECT_FILES:
+            raise SecurityError(f"Cannot write super-admin config '{key}' in project mode.")
+
         # Guard against corrupting a YAML config file with a scalar payload
         # (e.g. PUT /api/config/role-defaults with body "just a string").
         # A valid config document is always a mapping or a sequence.
@@ -1249,6 +1252,49 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         raise FileNotFoundError(path)
 
+    def _write_submodule_protection(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body")
+            
+        root = self.__class__.root
+        project_config = self.__class__.config_manager.read("project")
+        if not isinstance(project_config, dict):
+            project_config = {}
+            
+        restore_default = body.get("restore_default", False)
+        enabled = body.get("enabled", True)
+        override_text = body.get("override_text", "")
+        
+        if restore_default:
+            # Remove from project.yaml
+            if "submodule-protection" in project_config:
+                del project_config["submodule-protection"]
+            if "submodule_protection" in project_config:
+                del project_config["submodule_protection"]
+            if "rules" in project_config and isinstance(project_config["rules"], dict) and "submodule-protection" in project_config["rules"]:
+                del project_config["rules"]["submodule-protection"]
+                
+            # Delete override files
+            for p in [
+                root / ".claude" / "rules" / "submodule-protection.md",
+                root / "rules" / "3-project" / "submodule-protection.md",
+                root / ".meta-config" / "submodule-protection.md"
+            ]:
+                p.unlink(missing_ok=True)
+                
+            self.__class__.config_manager.write("project", project_config)
+            return self._send_json({"status": "restored"})
+            
+        if not enabled:
+            project_config["submodule-protection"] = False
+        else:
+            project_config["submodule-protection"] = override_text
+            
+        self.__class__.config_manager.write("project", project_config)
+        return self._send_json({"status": "saved"})
+
+
     # ------------------------------------------------------------------ #
     # DELETE routes                                                      #
     # ------------------------------------------------------------------ #
@@ -1286,6 +1332,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         # Partial update of a single top-level section of project.yaml. Must be
         # matched BEFORE the generic /api/config/ handler (which would treat
         # "project/section" as a config key).
+        if path == "/api/submodule-protection":
+            return self._write_submodule_protection()
+
         if path == "/api/config/project/section":
             return self._write_project_section()
 
