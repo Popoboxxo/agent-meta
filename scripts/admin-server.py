@@ -1114,6 +1114,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/":
             return self._serve_ui()
 
+        if path == "/favicon.png":
+            favicon_path = resolve_asset(self.root, "docs", "ui", "favicon.png")
+            if favicon_path.exists():
+                return self._send_bytes(favicon_path.read_bytes(), "image/png")
+            self.send_response(404)
+            self.end_headers()
+            return
+
         if path == "/api/health":
             return self._send_json({
                 "status": "ok",
@@ -3303,7 +3311,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
-            "gitignore",
+            "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
