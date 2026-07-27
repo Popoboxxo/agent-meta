@@ -1191,7 +1191,7 @@ roles:
   knowledge-curator:
     group: knowledge
     model: balanced
-    memory: project
+    memory: project  # Curator needs persistent strategic memory across sessions.
     workflow_tier: optional
     description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
       Domänen-Anpassung, Ingest-Planung, OKF-Compliance.'
@@ -1212,7 +1212,7 @@ roles:
   knowledge-ingestor:
     group: knowledge
     model: balanced
-    memory: project
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: 'Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
       aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.'
@@ -1234,7 +1234,7 @@ roles:
   knowledge-querier:
     group: knowledge
     model: fast
-    memory: ''
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
       Drill-in, Synthese mit Citations. File-Back guter Antworten.
@@ -1255,7 +1255,7 @@ roles:
   knowledge-linter:
     group: knowledge
     model: fast
-    memory: ''
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
       kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.'
@@ -1276,7 +1276,7 @@ roles:
   knowledge-indexer:
     group: knowledge
     model: nano
-    memory: ''
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
       Event-Log, OKF §7) im Knowledge Wiki.
@@ -1296,7 +1296,7 @@ roles:
   knowledge-gardener:
     group: knowledge
     model: nano
-    memory: ''
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
       Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.'
@@ -1318,7 +1318,7 @@ roles:
   knowledge-migrator:
     group: knowledge
     model: balanced
-    memory: ''
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
     workflow_tier: optional
     description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
@@ -1336,7 +1336,7 @@ roles:
       input_contracts:
       - task-spec-v1
       output_contract: knowledge-migration-v1
-      timeout_sec: 600
+      timeout_sec: 600  # Migration processes can be long-running across large codebases.
     short_desc: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren
 outcome-caching:
