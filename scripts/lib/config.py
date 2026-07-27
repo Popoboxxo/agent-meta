@@ -818,7 +818,8 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
             return match.group(0)
         if key in variables:
             return str(variables[key])
-        log.warning(f"Variable {key} not in config — placeholder remains in: {source_label}")
+        if log:
+            log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)
 
     text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
