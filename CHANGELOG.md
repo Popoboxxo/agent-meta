@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.89.2] — 2026-07-27
+
+### Fixed
+- Fix: Context drift backups are no longer erroneously generated after datetime template evaluation.
+- Fix: Submodule inclusion for external skills fixed to use `git submodule add` in consumer projects instead of dynamic cloning, respecting the pinned commit natively.
+- Fix: Legacy MCP configs are preserved (user modifications like `alwaysAllow` and `env` blocks are no longer overwritten during sync).
+
 ## [0.89.0] — 2026-07-27
 
 ### Added

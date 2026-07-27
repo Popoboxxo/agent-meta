@@ -3,7 +3,6 @@ agent-meta-manager.md
 agent-meta-scout.md
 api-specialist.md
 bug-feature-analyzer.md
-change-manager.md
 claude-expert.md
 code-reviewer.md
 concept-reviewer.md
@@ -23,7 +22,6 @@ feature.md
 feedback.md
 gemini-expert.md
 git.md
-home-organization-specialist.md
 ideation.md
 incident-responder.md
 intern-developer.md
@@ -39,19 +37,14 @@ log-analyzer.md
 mammouth-expert.md
 meta-feedback.md
 opencode-expert.md
-opengrid-designer.md
 performance-optimizer.md
 principal-developer.md
 prompt-engineer.md
-quality-auditor.md
 refactoring-specialist.md
 release.md
-requirements-architect.md
 requirements.md
-risk-analyst.md
 senior-developer.md
 technical-writer.md
-test-engineer.md
 tester.md
 ui-ux-designer.md
 validator.md

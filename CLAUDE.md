@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.89.0 — `2026-07-27`
+> Generiert von agent-meta v0.89.2 — `2026-07-27`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -30,7 +30,7 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
 
-Generiert von agent-meta v0.89.0 — `2026-07-27`
+Generiert von agent-meta v0.89.2 — `2026-07-27`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 
 ## Projekt
