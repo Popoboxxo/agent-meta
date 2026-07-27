@@ -579,7 +579,10 @@ def main():
     # Regenerate derived schema fields (roles enum) from role-defaults.yaml.
     # Runs early so even short-circuit modes (--create-rule, --validate, …)
     # pick up the latest enum. Honors --dry-run.
-    update_roles_enum(agent_meta_root, log, dry_run=args.dry_run)
+    if agent_meta_root.resolve() == Path.cwd().resolve():
+        update_roles_enum(agent_meta_root, log, dry_run=args.dry_run)
+    else:
+        log.skip("schema", "skipped enum update (running as submodule)")
 
     if args.add_skill:
         mode = "add-skill"
