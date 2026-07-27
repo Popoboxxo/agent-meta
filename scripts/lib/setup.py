@@ -175,6 +175,13 @@ def run_setup_wizard(
     dry_run: bool,
 ) -> dict:
     """Run the interactive setup wizard and return the generated config dict."""
+    if not _YAML_AVAILABLE:
+        print(
+            "ERROR: PyYAML not installed but required for --setup wizard. "
+            "Run: pip install pyyaml",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     print("\n" + "=" * 60)
     print("  agent-meta Setup-Wizard")
