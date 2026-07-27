@@ -86,4 +86,13 @@
 | REQ-ADM-01 | Wenn `admin-server.py` in einem Projekt gestartet wird, in dem noch keine `.meta-config/project.yaml` existiert, bricht der Server nicht mehr ab, sondern startet in einem interaktiven Setup/Onboarding-Modus. | Must |
 | REQ-ADM-02 | Im Setup-Modus bietet die Admin UI einen geführten Assistenten (Wizard) an, mit dem die initiale `.meta-config/project.yaml` schrittweise visuell konfiguriert und anschließend `sync.py` zur Erst-Instanziierung ausgeführt werden kann. | Must |
 
+---
+
+## Provider Context — Projektspezifische Notizen & User Content Injection
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-CTX-01 | Das Konzept für manuell gepflegte projektspezifische Notizen in Provider Context Files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md` etc.) wird überarbeitet. Der bisherige starr generierte Hinweistext `## Eigene Notizen\nHier kannst du eigene, projektspezifische Notizen eintragen...` soll durch ein eleganteres, weniger invasives Konzept ersetzt werden (z.B. Einbindung externer Custom-Notiz-Dateien aus `.meta-config/notes/` via Partials oder dezenteres Handling im Template). | Should |
+
+
 
