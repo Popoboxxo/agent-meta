@@ -5860,9 +5860,15 @@ async function viewProjectEnvironments() {
       if (!newName) { toast("Name is required", "error"); return; }
       const oldName = isNew ? null : name;
       if (oldName && oldName !== newName) delete envs[oldName];
+      // Guard: never persist masked placeholder values as actual defaults.
+      const rawDefault = defInput.value.trim();
+      const MASK_PATTERNS = ["***", "••••••••", "********"];
+      const effectiveDefault = MASK_PATTERNS.includes(rawDefault)
+        ? (isNew ? "" : (envs[newName]?.default || ""))
+        : rawDefault;
       envs[newName] = {
         description: descInput.value.trim(),
-        default: defInput.value.trim(),
+        default: effectiveDefault,
         required: reqCheck.checked,
         secret: secCheck.checked,
       };
@@ -5870,6 +5876,7 @@ async function viewProjectEnvironments() {
       hideModal();
       render();
     } }, ["Save"]);
+
 
     showModal(title, body, [saveBtn, el("button", { class: "btn", onclick: hideModal }, ["Cancel"])]);
   }
