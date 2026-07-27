@@ -93,11 +93,3 @@ Generiert von agent-meta v{{AGENT_META_VERSION}} — `{{AGENT_META_DATE}}`
 
 {{AGENT_HINTS}}
 <!-- agent-meta:managed-end -->
-
----
-
-## Sprachregeln
-
-Siehe `.claude/rules/language.md` für die Sprachkonventionen (von sync.py generiert, automatisch geladen).
-
-<!-- Nur projektspezifische Abweichungen hier eintragen — sonst leer lassen. -->
