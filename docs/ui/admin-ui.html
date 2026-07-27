@@ -1361,13 +1361,17 @@ function buildSidebar() {
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "⌨" },
+        { route: "/project/gitignore", label: "Gitignore Rules", icon: "🚫" },
         { route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" },
+        { route: "/project/mcp-overrides", label: "MCP Overrides", icon: "🔌" },
+        { route: "/project/skills-overrides", label: "Skills Overrides", icon: "🧩" },
       ],
     },
     {
       title: "Framework defaults",
       items: [
         { route: "/models", label: "Models & Pricing", icon: "💲", superOnly: true },
+        { route: "/config/gitignore-defaults", label: "Gitignore Defaults", icon: "🚫" },
         { route: "/models-legacy", label: "Models & Pricing (Legacy)", icon: "💲", superOnly: true },
         { route: "/provider-tiers", label: "Provider Tier Mappings", icon: "❖", superOnly: true },
         { route: "/tier-presets", label: "Tier Presets", icon: "★", superOnly: true },
@@ -2144,6 +2148,500 @@ async function viewSkillsRegistry() {
 /* =========================================================================
  * Views — MCP registry (Phase 3c)
  * ========================================================================= */
+async function viewProjectMcpOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project MCP Configuration"]));
+  wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable Framework MCP servers for your project, or customize them specifically for this repository."]));
+
+  let projData, fwData;
+  try {
+    projData = await api.get("/api/config/project");
+    fwData = await api.get("/api/config/mcp-registry").catch(() => ({ "mcp-servers": {} }));
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+  
+  const activeServers = new Set(projData["mcp-servers"] || []);
+  const projOverrides = projData["mcp-registry"] || {};
+  const fwServers = fwData["mcp-servers"] || {};
+
+  let dirty = false;
+  const markDirty = () => { dirty = true; };
+
+  const getMerged = (id) => {
+      const fw = fwServers[id] || {};
+      const ov = projOverrides[id] || {};
+      
+      // Deep merge connection block
+      const fwConn = fw.connection || {};
+      const ovConn = ov.connection || {};
+      return { 
+          ...fw, 
+          ...ov, 
+          connection: { ...fwConn, ...ovConn } 
+      };
+  };
+
+  // UI Helpers
+  const renderDictEditor = (title, dictData, onChange) => {
+      const w = el("div", { style: "margin-top: 8px;" });
+      w.appendChild(el("label", {}, [title]));
+      const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
+      
+      const renderRows = () => {
+          list.innerHTML = "";
+          Object.entries(dictData).forEach(([k, v]) => {
+              const row = el("div", { style: "display: flex; gap: 4px;" });
+              const inpK = el("input", { class: "form-control", value: k, style: "flex: 1;", placeholder: "Key" });
+              const inpV = el("input", { class: "form-control", value: v, style: "flex: 2;", placeholder: "Value" });
+              const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
+              
+              inpK.onchange = (e) => { 
+                  delete dictData[k]; 
+                  if(e.target.value) dictData[e.target.value] = inpV.value; 
+                  onChange(); renderRows(); 
+              };
+              inpV.oninput = (e) => { dictData[inpK.value] = e.target.value; onChange(); };
+              btnDel.onclick = () => { delete dictData[k]; onChange(); renderRows(); };
+              
+              row.appendChild(inpK); row.appendChild(inpV); row.appendChild(btnDel);
+              list.appendChild(row);
+          });
+      };
+      renderRows();
+      w.appendChild(list);
+      const btnAdd = el("button", { class: "btn btn-sm" }, ["+ Add " + title]);
+      btnAdd.onclick = () => { dictData["NEW_KEY"] = ""; onChange(); renderRows(); };
+      w.appendChild(btnAdd);
+      return w;
+  };
+
+  const renderArrayEditor = (title, arrData, onChange) => {
+      const w = el("div", { style: "margin-top: 8px;" });
+      w.appendChild(el("label", {}, [title]));
+      const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
+      
+      const renderRows = () => {
+          list.innerHTML = "";
+          arrData.forEach((v, idx) => {
+              const row = el("div", { style: "display: flex; gap: 4px;" });
+              const inpV = el("input", { class: "form-control", value: v, style: "flex: 1;", placeholder: "Argument" });
+              const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
+              
+              inpV.oninput = (e) => { arrData[idx] = e.target.value; onChange(); };
+              btnDel.onclick = () => { arrData.splice(idx, 1); onChange(); renderRows(); };
+              
+              row.appendChild(inpV); row.appendChild(btnDel);
+              list.appendChild(row);
+          });
+      };
+      renderRows();
+      w.appendChild(list);
+      const btnAdd = el("button", { class: "btn btn-sm" }, ["+ Add Arg"]);
+      btnAdd.onclick = () => { arrData.push(""); onChange(); renderRows(); };
+      w.appendChild(btnAdd);
+      return w;
+  };
+
+  const renderSrvPanel = (id, isFramework) => {
+    const isOverride = projOverrides.hasOwnProperty(id);
+    const isActive = activeServers.has(id);
+    const merged = getMerged(id);
+
+    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
+    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
+
+    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
+    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Server"]));
+    if (isOverride) titleBox.appendChild(el("span", { class: "badge badge-warning" }, ["Custom Override Active"]));
+    header.appendChild(titleBox);
+
+    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+    toggleBox.appendChild(document.createTextNode("Active in Project:"));
+    const activeCb = el("input", { type: "checkbox", checked: isActive });
+    activeCb.onchange = (e) => {
+        if(e.target.checked) activeServers.add(id);
+        else activeServers.delete(id);
+        markDirty();
+    };
+    toggleBox.appendChild(activeCb);
+    header.appendChild(toggleBox);
+    p.appendChild(header);
+
+    // --- HINTS / INFO BOX ---
+    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
+        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
+        
+        if (merged.description) {
+            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
+                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
+                merged.description
+            ]));
+        }
+        
+        if (merged.secrets && merged.secrets.length > 0) {
+            const secWrap = el("div", {}, [
+                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
+                "Define these locally on your system, or overwrite their {{Placeholders}} in the Customize menu: "
+            ]);
+            merged.secrets.forEach(sec => {
+                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
+                secWrap.appendChild(code);
+            });
+            infoBox.appendChild(secWrap);
+        }
+        
+        p.appendChild(infoBox);
+    }
+    // ------------------------
+
+    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
+    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
+    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
+
+    const conn = merged.connection || {};
+    
+    // Readonly View
+    isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
+    if (conn.type === "stdio") {
+        isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
+        if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
+        if (conn.env) {
+           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
+           Object.entries(conn.env).forEach(([k,v]) => {
+              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
+           });
+        }
+    } else if (conn.type === "sse") {
+        isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
+        if (conn.headers) {
+           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
+           Object.entries(conn.headers).forEach(([k,v]) => {
+              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
+           });
+        }
+    }
+
+    // Edit View
+    const setupEditState = () => {
+        if (!projOverrides[id]) {
+            // Deep copy framework state to override
+            projOverrides[id] = JSON.parse(JSON.stringify(fwServers[id] || {}));
+            if (!projOverrides[id].connection) projOverrides[id].connection = { type: conn.type || "stdio" };
+        }
+        return projOverrides[id].connection;
+    };
+
+    if (conn.type === "stdio") {
+        const wrapCmd = el("div", {});
+        wrapCmd.appendChild(el("label", {}, ["Command"]));
+        const inpCmd = el("input", { class: "form-control", value: conn.command || "" });
+        inpCmd.oninput = (e) => { const c = setupEditState(); c.command = e.target.value; markDirty(); };
+        wrapCmd.appendChild(inpCmd);
+        isEditing.appendChild(wrapCmd);
+
+        // Args editor
+        const localArgs = conn.args ? [...conn.args] : [];
+        isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
+            const c = setupEditState();
+            c.args = localArgs;
+            markDirty();
+        }));
+
+        // Env editor
+        const localEnv = conn.env ? { ...conn.env } : {};
+        isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
+            const c = setupEditState();
+            c.env = localEnv;
+            markDirty();
+        }));
+
+    } else if (conn.type === "sse") {
+        const wrapUrl = el("div", {});
+        wrapUrl.appendChild(el("label", {}, ["URL"]));
+        const inpUrl = el("input", { class: "form-control", value: conn.url || "" });
+        inpUrl.oninput = (e) => { const c = setupEditState(); c.url = e.target.value; markDirty(); };
+        wrapUrl.appendChild(inpUrl);
+        isEditing.appendChild(wrapUrl);
+
+        // Headers editor
+        const localHeaders = conn.headers ? { ...conn.headers } : {};
+        isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
+            const c = setupEditState();
+            c.headers = localHeaders;
+            markDirty();
+        }));
+    } else {
+         isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
+    }
+
+    detailsWrap.appendChild(isReadonly);
+    detailsWrap.appendChild(isEditing);
+
+    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
+    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
+    customizeBtn.onclick = () => {
+        isReadonly.style.display = "none";
+        isEditing.style.display = "flex";
+        customizeBtn.style.display = "none";
+    };
+    actionBox.appendChild(customizeBtn);
+
+    if (isOverride) {
+        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
+        resetBtn.onclick = () => {
+            delete projOverrides[id];
+            markDirty();
+            isReadonly.style.display = "flex";
+            isEditing.style.display = "none";
+            toast("Override removed. Click save to apply.", "info");
+            p.style.borderLeft = "none";
+        };
+        actionBox.appendChild(resetBtn);
+    }
+    detailsWrap.appendChild(actionBox);
+    p.appendChild(detailsWrap);
+    return p;
+  };
+
+  const projListContainer = el("div", { style: "margin-bottom:24px" });
+  
+  const allIds = new Set([...Object.keys(fwServers), ...Object.keys(projOverrides)]);
+  
+  if (allIds.size === 0) {
+    projListContainer.appendChild(el("div", { class: "muted" }, ["No servers found."]));
+  } else {
+    Array.from(allIds).sort().forEach(id => {
+      projListContainer.appendChild(renderSrvPanel(id, fwServers.hasOwnProperty(id)));
+    });
+  }
+  
+  wrap.appendChild(projListContainer);
+
+  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Server (Not in Framework)"]);
+  addBtn.onclick = () => {
+    const id = prompt("MCP Server ID:");
+    if (id && !allIds.has(id)) {
+      projOverrides[id] = { connection: { type: "stdio", command: "", args: [] } };
+      activeServers.add(id);
+      markDirty();
+      toast("Custom server added to state. Click save below to apply.", "info");
+    }
+  };
+  wrap.appendChild(addBtn);
+
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:20px; display:block; width: 100%" }, ["Save Project MCP Configuration"]);
+  saveBtn.onclick = async () => {
+    try {
+      projData["mcp-servers"] = Array.from(activeServers);
+      projData["mcp-registry"] = projOverrides;
+      await api.put("/api/config/project", projData);
+      toast("MCP configuration saved", "success");
+      dirty = false;
+      router.navigate("/project/mcp-overrides");
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  };
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
+async function viewProjectSkillsOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project Skills Configuration"]));
+  wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable Framework Skills for your project, or customize them specifically for this repository."]));
+
+  let projData, fwData;
+  try {
+    projData = await api.get("/api/config/project");
+    fwData = await api.get("/api/config/skills-registry").catch(() => ({ skills: {}, repos: {} }));
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+  
+  const activeSkills = new Set(projData["external-skills"] || []);
+  const projOverrides = projData["skills-registry"] || {};
+  const fwSkills = fwData.skills || {};
+  const fwRepos = fwData.repos || {};
+
+  let dirty = false;
+  const markDirty = () => { dirty = true; };
+
+  const getMerged = (id) => {
+      const fw = fwSkills[id] || {};
+      const ov = projOverrides[id] || {};
+      return { ...fw, ...ov };
+  };
+
+  const renderSkillPanel = (id, isFramework) => {
+    const isOverride = projOverrides.hasOwnProperty(id);
+    const isActive = activeSkills.has(id);
+    const merged = getMerged(id);
+    
+    // Look up pinned commit from repo if not overridden
+    const repoId = merged.repo;
+    const fwRepoInfo = fwRepos[repoId] || {};
+    const recommendedVersion = fwRepoInfo.pinned_commit || "main";
+    const currentVersion = merged.version || recommendedVersion;
+
+    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
+    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
+
+    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
+    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Skill"]));
+    if (isOverride) titleBox.appendChild(el("span", { class: "badge badge-warning" }, ["Custom Override Active"]));
+    header.appendChild(titleBox);
+
+    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+    toggleBox.appendChild(document.createTextNode("Active in Project:"));
+    const activeCb = el("input", { type: "checkbox", checked: isActive });
+    activeCb.onchange = (e) => {
+        if(e.target.checked) activeSkills.add(id);
+        else activeSkills.delete(id);
+        markDirty();
+    };
+    toggleBox.appendChild(activeCb);
+    header.appendChild(toggleBox);
+    p.appendChild(header);
+
+    // --- HINTS / INFO BOX ---
+    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
+        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
+        
+        if (merged.description) {
+            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
+                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
+                merged.description
+            ]));
+        }
+        
+        if (merged.secrets && merged.secrets.length > 0) {
+            const secWrap = el("div", {}, [
+                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
+                "Define these locally on your system, or overwrite their {{Placeholders}} in the Customize menu: "
+            ]);
+            merged.secrets.forEach(sec => {
+                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
+                secWrap.appendChild(code);
+            });
+            infoBox.appendChild(secWrap);
+        }
+        
+        p.appendChild(infoBox);
+    }
+    // ------------------------
+
+    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
+    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
+    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
+
+    const repoUrl = fwRepoInfo.repo ? fwRepoInfo.repo : (merged.repo || "");
+    isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
+    
+    // Display version with Recommended badge if it matches
+    const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
+    verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
+    if (currentVersion === recommendedVersion && isFramework) {
+        verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended Tag"]));
+    } else if (isFramework) {
+        verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
+    }
+    isReadonly.appendChild(verWrap);
+    
+    // Edit View
+    const mkInput = (labelTxt, key, defaultVal) => {
+      const lbl = el("label", {}, [labelTxt]);
+      const inp = el("input", { type: "text", class: "form-control", value: merged[key] || defaultVal });
+      inp.oninput = (e) => {
+          if (!projOverrides[id]) projOverrides[id] = { ...fwSkills[id] };
+          projOverrides[id][key] = e.target.value;
+          markDirty();
+      };
+      const w = el("div", {}, [lbl, inp]);
+      isEditing.appendChild(w);
+    };
+    mkInput("Repo ID / URL", "repo", repoUrl);
+    mkInput(`Version (Branch/Tag) - Framework default: ${recommendedVersion}`, "version", currentVersion);
+
+    detailsWrap.appendChild(isReadonly);
+    detailsWrap.appendChild(isEditing);
+
+    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
+    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
+    customizeBtn.onclick = () => {
+        isReadonly.style.display = "none";
+        isEditing.style.display = "flex";
+        customizeBtn.style.display = "none";
+    };
+    actionBox.appendChild(customizeBtn);
+
+    if (isOverride) {
+        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
+        resetBtn.onclick = () => {
+            delete projOverrides[id];
+            markDirty();
+            isReadonly.style.display = "flex";
+            isEditing.style.display = "none";
+            toast("Override removed. Click save to apply.", "info");
+            p.style.borderLeft = "none";
+        };
+        actionBox.appendChild(resetBtn);
+    }
+    detailsWrap.appendChild(actionBox);
+    p.appendChild(detailsWrap);
+    return p;
+  };
+
+  const projListContainer = el("div", { style: "margin-bottom:24px" });
+  
+  const allIds = new Set([...Object.keys(fwSkills), ...Object.keys(projOverrides)]);
+  
+  if (allIds.size === 0) {
+    projListContainer.appendChild(el("div", { class: "muted" }, ["No skills found."]));
+  } else {
+    Array.from(allIds).sort().forEach(id => {
+      projListContainer.appendChild(renderSkillPanel(id, fwSkills.hasOwnProperty(id)));
+    });
+  }
+  
+  wrap.appendChild(projListContainer);
+
+  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Skill (Not in Framework)"]);
+  addBtn.onclick = () => {
+    const id = prompt("Skill ID:");
+    if (id && !allIds.has(id)) {
+      projOverrides[id] = { repo: "", version: "main" };
+      activeSkills.add(id);
+      markDirty();
+      toast("Custom skill added. Click save below to apply.", "info");
+    }
+  };
+  wrap.appendChild(addBtn);
+
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:20px; display:block; width: 100%" }, ["Save Project Skills Configuration"]);
+  saveBtn.onclick = async () => {
+    try {
+      projData["external-skills"] = Array.from(activeSkills);
+      projData["skills-registry"] = projOverrides;
+      await api.put("/api/config/project", projData);
+      toast("Skills configuration saved", "success");
+      dirty = false;
+      router.navigate("/project/skills-overrides");
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  };
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
 async function viewMcpRegistry() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["mcp-registry.yaml"]));
@@ -6154,6 +6652,310 @@ async function viewProjectEnvironments() {
   return wrap;
 }
 
+/* ------------------------------- Gitignore ------------------------------- */
+async function viewProjectGitignore() {
+  const wrap = el("div");
+  
+  const topHeader = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+  topHeader.appendChild(el("h1", {}, ["Project — Gitignore Rules"]));
+  const toggleAllBtn = el("button", { class: "btn btn-sm" }, ["Expand / Collapse All Details"]);
+  toggleAllBtn.onclick = () => {
+     const allDetails = wrap.querySelectorAll("details");
+     if(allDetails.length === 0) return;
+     const targetState = !allDetails[0].open;
+     allDetails.forEach(d => d.open = targetState);
+  };
+  topHeader.appendChild(toggleAllBtn);
+  wrap.appendChild(topHeader);
+  
+  const helpText = el("p", { class: "help-text" }, ["Configure which agent-meta files and directories should be added to your host project's .gitignore file."]);
+  wrap.appendChild(helpText);
+
+  let p;
+  try {
+    p = await api.get("/api/config/project");
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+  
+  const current = p.gitignore || {};
+  const defLocal = true;
+  const defGenerated = false;
+  const defSettings = false;
+
+  const currentLocal = current.local !== undefined ? current.local : defLocal;
+  const currentGenerated = current.generated !== undefined ? current.generated : defGenerated;
+  const currentSettings = current.settings !== undefined ? current.settings : defSettings;
+  const exceptions = current.exceptions || [];
+
+  const isIgnored = (path, catDefault) => exceptions.includes(path) ? !catDefault : catDefault;
+  
+  const activeProviders = p["ai-providers"] || ["Claude"];
+  const getProvPrefix = (name) => name === "Claude" ? ".claude" : name === "Copilot" ? ".github/copilot" : `.${name.toLowerCase()}`;
+  
+  const knownLocal = [".claude/settings.local.json", ".claude/agent-memory-local/", "CLAUDE.personal.md", "sync.log"];
+  const knownGenerated = [];
+  const knownSettings = [];
+  
+  activeProviders.forEach(prov => {
+    const pfx = getProvPrefix(prov);
+    knownGenerated.push(`${pfx}/agents/`, `${pfx}/rules/`, `${pfx}/hooks/`, `${pfx}/commands/`);
+    
+    if (prov === "Claude") knownSettings.push(`${pfx}/settings.json`);
+    else if (prov === "Gemini") knownSettings.push("GEMINI.md");
+    else if (prov === "Opencode") knownSettings.push("opencode.json");
+    else knownSettings.push(`${prov.toUpperCase()}.md`);
+  });
+
+  const makeToggle = (ignored, onChange, readonly = false) => {
+     let isIgnored = ignored;
+     const w = el("div", { style: "display:flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 11px; user-select: none;" });
+     const btnIgnore = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${isIgnored ? "background: #2563eb; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["IGNORED"]);
+     const btnTrack = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${!isIgnored ? "background: #d97706; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
+     
+     const setUI = (val) => {
+         btnIgnore.style.background = val ? "#2563eb" : "var(--bg-card)";
+         btnIgnore.style.color = val ? "white" : "var(--text-muted)";
+         btnIgnore.style.fontWeight = val ? "bold" : "normal";
+         
+         btnTrack.style.background = !val ? "#d97706" : "var(--bg-card)";
+         btnTrack.style.color = !val ? "white" : "var(--text-muted)";
+         btnTrack.style.fontWeight = !val ? "bold" : "normal";
+     };
+  
+     if (!readonly) {
+         btnIgnore.onclick = () => { if(!isIgnored) { isIgnored = true; setUI(true); onChange(true); } };
+         btnTrack.onclick = () => { if(isIgnored) { isIgnored = false; setUI(false); onChange(false); } };
+     }
+     
+     w.appendChild(btnIgnore);
+     w.appendChild(btnTrack);
+     
+     return { element: w, setValue: (val) => { isIgnored = val; setUI(val); }, getValue: () => isIgnored };
+  };
+
+  const renderCategory = (title, desc, catDefault, isChecked, paths) => {
+    const container = el("div", { class: "panel", style: "margin-bottom: 12px; padding: 12px;" });
+    
+    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+    const leftTitle = el("div", {}, [
+      el("strong", {style:"font-size:14px;"}, [title]),
+      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:4px;" }, [desc])
+    ]);
+    const rightToggleWrap = el("div", { style: "display:flex; align-items:center; gap:12px;" });
+    
+    rightToggleWrap.appendChild(el("span", { class: "badge", style: `padding:4px 8px; border-radius:4px; font-size:11px; ${catDefault ? "background-color:rgba(37,99,235,0.2); color:#60a5fa;" : "background-color:rgba(217,119,6,0.2); color:#fbbf24;"}` }, [catDefault ? "Framework: Ignored" : "Framework: Tracked"]));
+    
+    const childrenToggles = []; 
+
+    const parentToggle = makeToggle(isChecked, (newVal) => {
+        childrenToggles.forEach(ct => ct.setValue(newVal));
+    });
+
+    rightToggleWrap.appendChild(parentToggle.element);
+    header.appendChild(leftTitle);
+    header.appendChild(rightToggleWrap);
+    container.appendChild(header);
+
+    const details = document.createElement("details");
+    details.style.marginTop = "12px";
+    details.style.borderTop = "1px solid var(--border)";
+    details.style.paddingTop = "12px";
+    
+    const summary = document.createElement("summary");
+    summary.style.cursor = "pointer";
+    summary.style.fontSize = "13px";
+    summary.style.color = "var(--accent)";
+    summary.innerText = "Show detailed files...";
+    details.appendChild(summary);
+
+    const bulkActions = el("div", { style: "display:flex; justify-content:flex-end; gap:8px; padding-bottom:8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;" });
+    const bulkIgnore = el("button", { class: "btn btn-sm" }, ["Set All to IGNORED"]);
+    const bulkTrack = el("button", { class: "btn btn-sm" }, ["Set All to TRACKED"]);
+    bulkIgnore.onclick = () => { childrenToggles.forEach(ct => ct.setValue(true)); parentToggle.setValue(true); };
+    bulkTrack.onclick = () => { childrenToggles.forEach(ct => ct.setValue(false)); parentToggle.setValue(false); };
+    bulkActions.appendChild(bulkIgnore);
+    bulkActions.appendChild(bulkTrack);
+    details.appendChild(bulkActions);
+
+    const list = el("div", { style: "margin-top:12px; display:flex; flex-direction:column; gap:12px;" });
+    paths.forEach(path => {
+      const isPathIgnored = isIgnored(path, isChecked);
+      const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
+      
+      row.appendChild(el("span", {}, [path]));
+      
+      const childToggle = makeToggle(isPathIgnored, (newVal) => {
+          // No-op for exceptions, computed on save
+      });
+      childrenToggles.push(childToggle);
+      
+      row.appendChild(childToggle.element);
+      list.appendChild(row);
+    });
+    details.appendChild(list);
+    container.appendChild(details);
+
+    return { 
+        container, 
+        getGlobalValue: () => parentToggle.getValue(),
+        computeExceptions: () => {
+            const exceptionsFound = [];
+            const glob = parentToggle.getValue();
+            paths.forEach((p, idx) => {
+                if (childrenToggles[idx].getValue() !== glob) {
+                    exceptionsFound.push(p);
+                }
+            });
+            return exceptionsFound;
+        }
+    };
+  };
+
+  const localSection = renderCategory("Local Files", ".claude/settings.local.json, CLAUDE.personal.md, memory-local folders.", defLocal, currentLocal, knownLocal);
+  const genSection = renderCategory("Generated Framework", "Provider folders (.claude/agents, .gemini/rules, etc.).", defGenerated, currentGenerated, knownGenerated);
+  const setSection = renderCategory("Settings & Configs", "opencode.json, settings.json, config.yaml, etc.", defSettings, currentSettings, knownSettings);
+
+  wrap.appendChild(localSection.container);
+  wrap.appendChild(genSection.container);
+  wrap.appendChild(setSection.container);
+
+  const customEntries = current.custom_entries || [];
+  wrap.appendChild(el("h3", { style: "margin-top:24px;" }, ["Custom Paths"]));
+  wrap.appendChild(el("p", { class: "help-text" }, ["Add any other files or directories you want agent-meta to manage in your .gitignore file. One path per line."]));
+  
+  const customTextArea = el("textarea", { 
+    id: "git-custom", 
+    style: "width:100%; height:120px; font-family:var(--font-mono); font-size:13px; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text);",
+    placeholder: ".claude/my-custom-folder/\nsome-other-file.txt"
+  });
+  customTextArea.value = customEntries.join("\n");
+  wrap.appendChild(customTextArea);
+
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top: 20px;" }, ["Save Gitignore Rules"]);
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    const lines = document.getElementById("git-custom").value.split("\n");
+    const parsedCustom = lines.map(l => l.trim()).filter(l => l.length > 0);
+    
+    const finalExceptions = [
+        ...localSection.computeExceptions(),
+        ...genSection.computeExceptions(),
+        ...setSection.computeExceptions()
+    ];
+
+    const data = {
+      local: localSection.getGlobalValue(),
+      generated: genSection.getGlobalValue(),
+      settings: setSection.getGlobalValue(),
+      exceptions: finalExceptions,
+      custom_entries: parsedCustom
+    };
+
+    try {
+      await api.put("/api/config/project/section", { section: "gitignore", data });
+      toast("Gitignore rules saved! Run sync.py to apply.", "success");
+      router.navigate("/project/gitignore");
+    } catch (err) {
+      toast("Error saving: " + err.message, "error");
+    } finally {
+      saveBtn.disabled = false;
+    }
+  };
+  wrap.appendChild(saveBtn);
+  return wrap;
+}
+
+/* ------------------------------- Gitignore Defaults ------------------------------ */
+async function viewGitignoreDefaults() {
+  const wrap = el("div");
+  
+  const topHeader = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+  topHeader.appendChild(el("h1", {}, ["Framework Defaults — Gitignore Rules"]));
+  const toggleAllBtn = el("button", { class: "btn btn-sm" }, ["Expand / Collapse All Details"]);
+  toggleAllBtn.onclick = () => {
+     const allDetails = wrap.querySelectorAll("details");
+     if(allDetails.length === 0) return;
+     const targetState = !allDetails[0].open;
+     allDetails.forEach(d => d.open = targetState);
+  };
+  topHeader.appendChild(toggleAllBtn);
+  wrap.appendChild(topHeader);
+  
+  const helpText = el("p", { class: "help-text" }, ["These are the standard Gitignore rules enforced by agent-meta. You can override them in your Project instance."]);
+  wrap.appendChild(helpText);
+
+  // We use same renderer but readonly
+  const makeToggle = (ignored) => {
+     const w = el("div", { style: "display:flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 11px; user-select: none;" });
+     const btnIgnore = el("div", { style: `padding: 4px 12px; opacity:0.8; cursor:not-allowed; ${ignored ? "background: #2563eb; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["IGNORED"]);
+     const btnTrack = el("div", { style: `padding: 4px 12px; opacity:0.8; cursor:not-allowed; ${!ignored ? "background: #d97706; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
+     w.appendChild(btnIgnore);
+     w.appendChild(btnTrack);
+     return w;
+  };
+
+  const renderReadonlyCategory = (title, desc, isChecked, paths) => {
+    const container = el("div", { class: "panel", style: "margin-bottom: 12px; padding: 12px;" });
+    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+    const leftTitle = el("div", {}, [
+      el("strong", {style:"font-size:14px;"}, [title]),
+      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:4px;" }, [desc])
+    ]);
+    header.appendChild(leftTitle);
+    header.appendChild(makeToggle(isChecked));
+    container.appendChild(header);
+
+    const details = document.createElement("details");
+    details.style.marginTop = "12px";
+    details.style.borderTop = "1px solid var(--border)";
+    details.style.paddingTop = "12px";
+    
+    const summary = document.createElement("summary");
+    summary.style.cursor = "pointer";
+    summary.style.fontSize = "13px";
+    summary.style.color = "var(--accent)";
+    summary.innerText = "Show detailed files...";
+    details.appendChild(summary);
+
+    const bulkActions = el("div", { style: "display:flex; justify-content:flex-end; gap:8px; padding-bottom:8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;" });
+    const bulkIgnore = el("button", { class: "btn btn-sm" }, ["Set All to IGNORED"]);
+    const bulkTrack = el("button", { class: "btn btn-sm" }, ["Set All to TRACKED"]);
+    bulkIgnore.onclick = () => { childrenToggles.forEach(ct => ct.setValue(true)); parentToggle.setValue(true); };
+    bulkTrack.onclick = () => { childrenToggles.forEach(ct => ct.setValue(false)); parentToggle.setValue(false); };
+    bulkActions.appendChild(bulkIgnore);
+    bulkActions.appendChild(bulkTrack);
+    details.appendChild(bulkActions);
+
+    const list = el("div", { style: "margin-top:12px; display:flex; flex-direction:column; gap:12px;" });
+    paths.forEach(path => {
+      const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
+      row.appendChild(el("span", {}, [path]));
+      row.appendChild(makeToggle(isChecked));
+      list.appendChild(row);
+    });
+    details.appendChild(list);
+    container.appendChild(details);
+    return container;
+  };
+
+  const defLocal = true;
+  const defGenerated = false;
+  const defSettings = false;
+  
+  // We mock a standard set of paths for the default view
+  const knownLocal = [".claude/settings.local.json", ".claude/agent-memory-local/", "CLAUDE.personal.md", "sync.log"];
+  const knownGenerated = [".claude/agents/", ".claude/rules/", ".claude/hooks/", ".claude/commands/"];
+  const knownSettings = [".claude/settings.json"];
+
+  wrap.appendChild(renderReadonlyCategory("Local Files", ".claude/settings.local.json, CLAUDE.personal.md, memory-local folders.", defLocal, knownLocal));
+  wrap.appendChild(renderReadonlyCategory("Generated Framework", "Provider folders (.claude/agents, .gemini/rules, etc.).", defGenerated, knownGenerated));
+  wrap.appendChild(renderReadonlyCategory("Settings & Configs", "opencode.json, settings.json, config.yaml, etc.", defSettings, knownSettings));
+
+  return wrap;
+}
+
 /* ------------------------------- Advanced -------------------------------- */
 async function viewProjectAdvanced() {
   const wrap = el("div");
@@ -7857,9 +8659,13 @@ async function init() {
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/environments",   viewProjectEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
+  router.register("/project/gitignore",       viewProjectGitignore);
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
+  router.register("/project/mcp-overrides",    viewProjectMcpOverrides);
+  router.register("/project/skills-overrides", viewProjectSkillsOverrides);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
+  router.register("/config/gitignore-defaults", viewGitignoreDefaults);
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);

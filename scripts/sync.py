@@ -880,32 +880,47 @@ def main():
         claude_pc = provider_config.get("Claude", {})
         gitignore_cfg = config.get("gitignore", {})
         base_gitignore_entries: list[str] = []
+        exceptions = gitignore_cfg.get("exceptions", [])
+        def _should_ignore(path: str, category_default: bool) -> bool:
+            return not category_default if path in exceptions else category_default
+
         if is_claude:
-            if gitignore_cfg.get("local", True):
-                base_gitignore_entries = list(claude_pc.get("gitignore_entries", [
-                    ".claude/settings.local.json",
-                    ".claude/agent-memory-local/",
-                    "CLAUDE.personal.md",
-                    "sync.log",
-                ]))
-            if gitignore_cfg.get("generated", False):
-                for _prov in providers:
-                    _pc = provider_config.get(_prov, {})
-                    for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
-                        _d = _pc.get(_dir_key)
-                        if _d:
-                            base_gitignore_entries.append(_d + "/")
-                    if _pc.get("has_commands") and _pc.get("commands_dir"):
-                        base_gitignore_entries.append(_pc["commands_dir"] + "/")
-            if gitignore_cfg.get("settings", False):
-                for _prov in providers:
-                    _pc = provider_config.get(_prov, {})
-                    _sf = _pc.get("settings_file")
-                    if _sf:
-                        base_gitignore_entries.append(_sf)
-                    _ctx = _pc.get("context_file")
-                    if _ctx and _ctx != "CLAUDE.md":
-                        base_gitignore_entries.append(_ctx)
+            cat_local = gitignore_cfg.get("local", True)
+            local_candidates = claude_pc.get("gitignore_entries", [
+                ".claude/settings.local.json",
+                ".claude/agent-memory-local/",
+                "CLAUDE.personal.md",
+                "sync.log",
+            ])
+            for _p in local_candidates:
+                if _should_ignore(_p, cat_local):
+                    base_gitignore_entries.append(_p)
+
+            cat_gen = gitignore_cfg.get("generated", False)
+            for _prov in providers:
+                _pc = provider_config.get(_prov, {})
+                for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
+                    _d = _pc.get(_dir_key)
+                    if _d and _should_ignore(_d + "/", cat_gen):
+                        base_gitignore_entries.append(_d + "/")
+                if _pc.get("has_commands") and _pc.get("commands_dir"):
+                    _c = _pc["commands_dir"]
+                    if _should_ignore(_c + "/", cat_gen):
+                        base_gitignore_entries.append(_c + "/")
+
+            cat_set = gitignore_cfg.get("settings", False)
+            for _prov in providers:
+                _pc = provider_config.get(_prov, {})
+                _sf = _pc.get("settings_file")
+                if _sf and _should_ignore(_sf, cat_set):
+                    base_gitignore_entries.append(_sf)
+                _ctx = _pc.get("context_file")
+                if _ctx and _ctx != "CLAUDE.md" and _should_ignore(_ctx, cat_set):
+                    base_gitignore_entries.append(_ctx)
+            
+            custom_entries = gitignore_cfg.get("custom_entries", [])
+            if custom_entries:
+                base_gitignore_entries.extend(custom_entries)
         if is_claude:
             sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
             init_claude_personal(agent_meta_root, project_root, log, args.dry_run)

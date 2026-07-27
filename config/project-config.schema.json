@@ -668,6 +668,20 @@
           "type": "boolean",
           "default": false,
           "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
+        },
+        "custom_entries": {
+          "type": "array",
+          "description": "List of custom paths (files or directories) to add to the agent-meta managed .gitignore block.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exceptions": {
+          "type": "array",
+          "description": "List of specific paths that should bypass their category's default rule.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

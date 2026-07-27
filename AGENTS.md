@@ -592,6 +592,10 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 
+
+
+
+
 ## Eigene Notizen
 
 Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird von `agent-meta` nicht überschrieben!
@@ -609,7 +613,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `agent-meta-scout.md` → registriere als `agent-meta-scout`
    - `api-specialist.md` → registriere als `api-specialist`
    - `bug-feature-analyzer.md` → registriere als `bug-feature-analyzer`
-   - `change-manager.md` → registriere als `change-manager`
    - `claude-expert.md` → registriere als `claude-expert`
    - `code-reviewer.md` → registriere als `code-reviewer`
    - `concept-reviewer.md` → registriere als `concept-reviewer`
@@ -629,7 +632,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `feedback.md` → registriere als `feedback`
    - `gemini-expert.md` → registriere als `gemini-expert`
    - `git.md` → registriere als `git`
-   - `home-organization-specialist.md` → registriere als `home-organization-specialist`
    - `ideation.md` → registriere als `ideation`
    - `incident-responder.md` → registriere als `incident-responder`
    - `intern-developer.md` → registriere als `intern-developer`
@@ -645,20 +647,15 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `mammouth-expert.md` → registriere als `mammouth-expert`
    - `meta-feedback.md` → registriere als `meta-feedback`
    - `opencode-expert.md` → registriere als `opencode-expert`
-   - `opengrid-designer.md` → registriere als `opengrid-designer`
    - `orchestrator.md` → registriere als `orchestrator`
    - `performance-optimizer.md` → registriere als `performance-optimizer`
    - `principal-developer.md` → registriere als `principal-developer`
    - `prompt-engineer.md` → registriere als `prompt-engineer`
-   - `quality-auditor.md` → registriere als `quality-auditor`
    - `refactoring-specialist.md` → registriere als `refactoring-specialist`
    - `release.md` → registriere als `release`
-   - `requirements-architect.md` → registriere als `requirements-architect`
    - `requirements.md` → registriere als `requirements`
-   - `risk-analyst.md` → registriere als `risk-analyst`
    - `senior-developer.md` → registriere als `senior-developer`
    - `technical-writer.md` → registriere als `technical-writer`
-   - `test-engineer.md` → registriere als `test-engineer`
    - `tester.md` → registriere als `tester`
    - `ui-ux-designer.md` → registriere als `ui-ux-designer`
    - `validator.md` → registriere als `validator`
@@ -670,7 +667,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="agent-meta-scout", ...)
    define_subagent(name="api-specialist", ...)
    define_subagent(name="bug-feature-analyzer", ...)
-   define_subagent(name="change-manager", ...)
    define_subagent(name="claude-expert", ...)
    define_subagent(name="code-reviewer", ...)
    define_subagent(name="concept-reviewer", ...)
@@ -690,7 +686,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="feedback", ...)
    define_subagent(name="gemini-expert", ...)
    define_subagent(name="git", ...)
-   define_subagent(name="home-organization-specialist", ...)
    define_subagent(name="ideation", ...)
    define_subagent(name="incident-responder", ...)
    define_subagent(name="intern-developer", ...)
@@ -706,20 +701,15 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="mammouth-expert", ...)
    define_subagent(name="meta-feedback", ...)
    define_subagent(name="opencode-expert", ...)
-   define_subagent(name="opengrid-designer", ...)
    define_subagent(name="orchestrator", ...)
    define_subagent(name="performance-optimizer", ...)
    define_subagent(name="principal-developer", ...)
    define_subagent(name="prompt-engineer", ...)
-   define_subagent(name="quality-auditor", ...)
    define_subagent(name="refactoring-specialist", ...)
    define_subagent(name="release", ...)
-   define_subagent(name="requirements-architect", ...)
    define_subagent(name="requirements", ...)
-   define_subagent(name="risk-analyst", ...)
    define_subagent(name="senior-developer", ...)
    define_subagent(name="technical-writer", ...)
-   define_subagent(name="test-engineer", ...)
    define_subagent(name="tester", ...)
    define_subagent(name="ui-ux-designer", ...)
    define_subagent(name="validator", ...)
