@@ -6,9 +6,6 @@
 {{PROVIDER_ROUTING}}
 <!-- agent-meta:managed-end -->
 
-## Project Setup
+## Eigene Notizen
 
-- **Build:** `{{BUILD_COMMAND}}`
-- **Test:** `{{TEST_COMMAND}}`
-- **Platform:** {{PLATFORM}}
-- **Runtime:** {{RUNTIME}}
+Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird von `agent-meta` nicht überschrieben!

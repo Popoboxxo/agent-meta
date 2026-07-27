@@ -4,6 +4,7 @@ target_file: "AGENTS.md"
 ---
 <!-- agent-meta:managed-begin -->
 {{> header }}
+{{> project-metadata }}
 {{> agents-location }}
 {{> agents-table }}
 {{> knowledge-engine-hints }}
