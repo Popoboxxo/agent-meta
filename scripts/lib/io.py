@@ -29,9 +29,8 @@ def _load_yaml_or_json(*paths: Path) -> tuple[dict, Path]:
             continue
         if path.suffix.lower() in (".yaml", ".yml"):
             if not _YAML_AVAILABLE:
-                print(f"ERROR: PyYAML not installed but {path.name} requires it. "
-                      f"Run: pip install pyyaml", file=sys.stderr)
-                sys.exit(1)
+                print(f"WARNING: PyYAML not installed, skipping {path.name}.", file=sys.stderr)
+                continue
             with path.open(encoding="utf-8") as f:
                 return _yaml.safe_load(f) or {}, path
         else:
