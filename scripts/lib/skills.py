@@ -16,11 +16,13 @@ def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> 
     """Return True if a skill should be generated for the current project.
 
     Project explicitly enables/disables? -> Use project setting (Override)
-    Else -> Use approved flag from skills-registry.yaml (Default)
+    Else -> Use enabled-by-default flag from skills-registry.yaml (Default)
     """
     if skill_name in project_skills and "enabled" in project_skills[skill_name]:
         return project_skills[skill_name]["enabled"]
-    return skill_cfg.get("approved", False)
+    if "enabled-by-default" in skill_cfg:
+        return skill_cfg["enabled-by-default"]
+    return not skill_cfg.get("planned", True)
 
 
 def load_external_skills_config(agent_meta_root: Path) -> dict:
@@ -111,25 +113,42 @@ def normalize_skill_paths(content: str, skill_base_path: str) -> str:
     return content
 
 
-def ensure_skill_repo(agent_meta_root: Path, repo_name: str, repo_cfg: dict, log: SyncLog) -> None:
-    """Dynamically clone a skill repository if it doesn't exist."""
+def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str, repo_cfg: dict, pinned_commit: str, log: SyncLog) -> None:
+    """Dynamically clone or submodule add a skill repository if it doesn't exist."""
     repo_url = repo_cfg.get("repo", "")
     if not repo_url:
         return
         
     local_path = repo_cfg.get("local_path", f"external/{repo_name}")
-    pinned = repo_cfg.get("pinned_commit", "")
-    target_dir = agent_meta_root / local_path
+    is_project_admin = agent_meta_root != project_root
     
-    if not target_dir.exists():
-        log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
-        result = subprocess.run(["git", "clone", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
-        if result.returncode != 0:
-            log.warn(f"Failed to clone {repo_url} into {local_path}")
-            return
+    if is_project_admin:
+        target_dir = project_root / local_path
+        if target_dir.exists() and not any(target_dir.iterdir()):
+            log.info(local_path, f"Initializing existing skill submodule: {repo_url}")
+            result = subprocess.run(["git", "submodule", "update", "--init", local_path], cwd=str(project_root), capture_output=True)
+            if result.returncode != 0:
+                log.warn(f"Failed to init submodule {repo_url} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                return
+        elif not target_dir.exists():
+            log.info(local_path, f"Adding skill submodule: {repo_url}")
+            result = subprocess.run(["git", "submodule", "add", repo_url, local_path], cwd=str(project_root), capture_output=True)
+            if result.returncode != 0:
+                log.warn(f"Failed to add submodule {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                return
+    else:
+        target_dir = agent_meta_root / local_path
+        if not target_dir.exists():
+            log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
+            result = subprocess.run(["git", "clone", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
+            if result.returncode != 0:
+                log.warn(f"Failed to clone {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                return
             
-        if pinned:
-            subprocess.run(["git", "checkout", pinned], cwd=str(target_dir), capture_output=True)
+    if pinned_commit:
+        result = subprocess.run(["git", "checkout", pinned_commit], cwd=str(target_dir), capture_output=True)
+        if result.returncode != 0:
+            log.warn(f"Failed to checkout {pinned_commit} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
 
 
 def sync_external_skills_for_provider(
@@ -165,20 +184,24 @@ def sync_external_skills_for_provider(
     repos = ext_config.get("repos", {})
     project_skills = config.get("external-skills", {})
 
-    # Collect active repos for dynamic cloning
-    active_repos = set()
+    # Collect active repos for dynamic cloning/submodule
+    active_repos = {}
     for skill_name, skill_cfg in skills.items():
         if _skill_is_active(skill_name, skill_cfg, project_skills):
-            active_repos.add(skill_cfg.get("repo"))
+            repo = skill_cfg.get("repo")
+            if repo:
+                override_commit = project_skills.get(skill_name, {}).get("pinned_commit")
+                default_commit = repos.get(repo, {}).get("pinned_commit", "")
+                active_repos[repo] = override_commit or default_commit
             
     # agent-meta-scout implicitly requires awesome-claude-code
     if "awesome-claude-code" in repos:
-        active_repos.add("awesome-claude-code")
+        active_repos["awesome-claude-code"] = repos["awesome-claude-code"].get("pinned_commit", "")
         
-    # Ensure all active repos are cloned locally
-    for repo_name in active_repos:
+    # Ensure all active repos are present locally
+    for repo_name, pinned_commit in active_repos.items():
         if repo_name and repo_name in repos:
-            ensure_skill_repo(agent_meta_root, repo_name, repos[repo_name], log)
+            ensure_skill_repo(agent_meta_root, project_root, repo_name, repos[repo_name], pinned_commit, log)
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
@@ -190,8 +213,17 @@ def sync_external_skills_for_provider(
     for skill_name, skill_cfg in skills.items():
         role = skill_cfg.get('role', skill_name)
         role_label = f"{agents_dir_rel}/{role}.md"
+        agent_target = safe_path(agents_dir, f"{role}.md")
+        skill_target_dir = safe_path(skills_dir, skill_name)
+
         if not _skill_is_active(skill_name, skill_cfg, project_skills):
             log.info(role_label, f"skill '{skill_name}' is not active — skipping")
+            if not dry_run:
+                if agent_target.exists():
+                    agent_target.unlink()
+                import shutil
+                if skill_target_dir.exists():
+                    shutil.rmtree(skill_target_dir, ignore_errors=True)
             continue
 
         repo_key   = skill_cfg.get("repo", "")
@@ -203,11 +235,19 @@ def sync_external_skills_for_provider(
         description   = skill_cfg.get("description", "")
         additional    = skill_cfg.get("additional_files", [])
 
-        skill_source_dir = agent_meta_root / local_path / source_rel
-        entry_path = skill_source_dir / entry_file
+        is_project_admin = agent_meta_root != project_root
+        if is_project_admin:
+            repo_dir = project_root / local_path
+            skill_source_dir = repo_dir / source_rel
+            entry_path = skill_source_dir / entry_file
+            commit = get_skill_commit(project_root, local_path)
+        else:
+            repo_dir = agent_meta_root / local_path
+            skill_source_dir = repo_dir / source_rel
+            entry_path = skill_source_dir / entry_file
+            commit = get_skill_commit(agent_meta_root, local_path)
 
         # Ensure repo directory is valid
-        repo_dir = agent_meta_root / local_path
         if not repo_dir.exists() or not any(repo_dir.iterdir()):
             log.warn(f"Dynamic skill repo '{local_path}' is missing or empty.")
             continue
@@ -215,8 +255,6 @@ def sync_external_skills_for_provider(
         if not entry_path.exists():
             log.warn(f"Skill entry not found: {entry_path}")
             continue
-
-        commit = get_skill_commit(agent_meta_root, local_path)
 
         # Canonical paths in the target project (provider-specific)
         skill_base_path  = f"{skills_dir_rel}/{skill_name}"

@@ -1931,13 +1931,22 @@ async function viewRoles() {
 async function viewSkillsRegistry() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["skills-registry.yaml"]));
-  let data;
+  
+  let data, projData;
   try { data = await api.get("/api/config/skills-registry"); }
   catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  
+  try { projData = await api.get("/api/config/project").catch(() => ({})); }
+  catch (err) { projData = {}; }
 
-  // Defensive defaults — the file can have either top-level layout.
+  // Defensive defaults
   data.repos = data.repos || {};
   data.skills = data.skills || {};
+  projData["external-skills"] = projData["external-skills"] || {};
+  const projSkills = projData["external-skills"];
+
+  const fwTitle = el("h2", { style: "margin-top: 24px;" }, ["Framework Defaults (Global)"]);
+  wrap.appendChild(fwTitle);
 
   const status = el("div", { class: "muted" }, [
     `${Object.keys(data.repos).length} repos · ${Object.keys(data.skills).length} skills`,
@@ -1945,7 +1954,7 @@ async function viewSkillsRegistry() {
   wrap.appendChild(status);
 
   const markDirty = () => {
-    status.textContent = "Unsaved changes.";
+    status.textContent = "Unsaved changes (Framework).";
     status.style.color = "var(--accent-yellow)";
   };
   const save = async () => {
@@ -1961,12 +1970,12 @@ async function viewSkillsRegistry() {
     }
   };
   wrap.appendChild(el("div", { class: "btn-row" }, [
-    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save Framework Defaults"]),
     el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
   ]));
 
   // ----------------------------------- Repos table
-  wrap.appendChild(el("h2", {}, ["Repos"]));
+  wrap.appendChild(el("h3", {}, ["Repos"]));
   const repoTable = el("table", { class: "data" });
   repoTable.appendChild(el("thead", {}, [
     el("tr", {}, ["Name", "Repo URL", "Local path", "Pinned commit"].map(h => el("th", {}, [h]))),
@@ -1991,10 +2000,10 @@ async function viewSkillsRegistry() {
   wrap.appendChild(repoTable);
 
   // ----------------------------------- Skills table
-  wrap.appendChild(el("h2", {}, ["Skills"]));
+  wrap.appendChild(el("h3", {}, ["Skills Definition"]));
   const skillTable = el("table", { class: "data" });
   skillTable.appendChild(el("thead", {}, [
-    el("tr", {}, ["Name", "Approved", "Enabled (planned)", "Repo", "Role"].map(h => el("th", {}, [h]))),
+    el("tr", {}, ["Name", "Approved", "Enabled-by-Default", "Repo", "Role"].map(h => el("th", {}, [h]))),
   ]));
   const skillBody = el("tbody");
   Object.entries(data.skills).forEach(([name, skill]) => {
@@ -2008,11 +2017,17 @@ async function viewSkillsRegistry() {
     apprCb.addEventListener("change", () => { skill.approved = apprCb.checked; markDirty(); });
     apprWrap.appendChild(apprCb); apprWrap.appendChild(el("span", { class: "slider" }));
     tr.appendChild(el("td", {}, [apprWrap]));
-    // planned/enabled toggle
+    // enabled-by-default (was planned/enabled)
     const enWrap = el("label", { class: "toggle" });
     const enCb = el("input", { type: "checkbox" });
-    enCb.checked = !skill.planned; // "enabled" = !planned in current schema
-    enCb.addEventListener("change", () => { skill.planned = !enCb.checked; markDirty(); });
+    // Keep backward compat with 'planned' meaning disabled by default, or use 'enabled-by-default'
+    if (skill["enabled-by-default"] !== undefined) enCb.checked = !!skill["enabled-by-default"];
+    else enCb.checked = !skill.planned;
+    enCb.addEventListener("change", () => { 
+      skill["enabled-by-default"] = enCb.checked; 
+      skill.planned = !enCb.checked; 
+      markDirty(); 
+    });
     enWrap.appendChild(enCb); enWrap.appendChild(el("span", { class: "slider" }));
     tr.appendChild(el("td", {}, [enWrap]));
     // repo
@@ -2027,6 +2042,101 @@ async function viewSkillsRegistry() {
   });
   skillTable.appendChild(skillBody);
   wrap.appendChild(skillTable);
+
+  // ----------------------------------- Project Overrides
+  const projTitle = el("h2", { style: "margin-top: 32px;" }, ["Project Overrides (.meta-config/project.yaml)"]);
+  wrap.appendChild(projTitle);
+
+  const projStatus = el("div", { class: "muted" }, [`${Object.keys(projSkills).length} project overrides`]);
+  wrap.appendChild(projStatus);
+  const markProjDirty = () => {
+    projStatus.textContent = "Unsaved changes (Project).";
+    projStatus.style.color = "var(--accent-yellow)";
+  };
+
+  const saveProj = async () => {
+    try {
+      await api.put("/api/config/project", projData);
+      toast("Project overrides saved", "success");
+      projStatus.textContent = "Saved.";
+      projStatus.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      projStatus.textContent = `Save failed: ${err.message}`;
+      projStatus.style.color = "var(--accent-red)";
+    }
+  };
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: saveProj }, ["Save Project Overrides"])
+  ]));
+
+  const projTable = el("table", { class: "data", style: "margin-top: 16px;" });
+  projTable.appendChild(el("thead", {}, [
+    el("tr", {}, ["Skill Name", "Project Enabled", "Pinned Commit Override", ""].map(h => el("th", {}, [h]))),
+  ]));
+  const projBody = el("tbody");
+
+  // Render all known skills + any that might only exist in projData
+  const allSkills = new Set([...Object.keys(data.skills), ...Object.keys(projSkills)]);
+  
+  [...allSkills].sort().forEach(name => {
+    const fwSkill = data.skills[name] || {};
+    // Ensure proj config exists for active interaction, even if empty initially
+    if (!projSkills[name]) projSkills[name] = {};
+    const pSkill = projSkills[name];
+
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "mono" }, [name]));
+
+    // Project enabled toggle
+    const pEnWrap = el("label", { class: "toggle" });
+    const pEnCb = el("input", { type: "checkbox" });
+    // Determine visual state
+    let isExplicitlyEnabled = pSkill.enabled === true;
+    let isExplicitlyDisabled = pSkill.enabled === false;
+    let fwEnabled = fwSkill["enabled-by-default"] !== undefined ? !!fwSkill["enabled-by-default"] : !fwSkill.planned;
+    
+    // Checkbox is checked if explicitly enabled OR (not explicitly set AND fwEnabled)
+    pEnCb.checked = isExplicitlyEnabled || (pSkill.enabled === undefined && fwEnabled);
+    
+    pEnCb.addEventListener("change", () => { 
+      pSkill.enabled = pEnCb.checked;
+      markProjDirty(); 
+    });
+    pEnWrap.appendChild(pEnCb); pEnWrap.appendChild(el("span", { class: "slider" }));
+    const enTd = el("td", {}, [pEnWrap]);
+    if (pSkill.enabled === undefined) {
+      enTd.appendChild(el("span", { class: "muted", style: "margin-left:8px;font-size:0.85em;" }, ["(Framework Default)"]));
+    }
+    tr.appendChild(enTd);
+
+    // Commit override
+    const pCommitInp = el("input", { type: "text", value: pSkill.pinned_commit || "", placeholder: "e.g. v1.0.0 or a1b2c3d" });
+    pCommitInp.addEventListener("input", () => {
+      if (pCommitInp.value.trim() === "") delete pSkill.pinned_commit;
+      else pSkill.pinned_commit = pCommitInp.value.trim();
+      markProjDirty();
+    });
+    tr.appendChild(el("td", { class: "mono" }, [pCommitInp]));
+
+    // Reset to default button
+    const resetBtn = el("button", { class: "btn btn-ghost", style: "font-size:0.85em; padding: 2px 6px;" }, ["Reset to Default"]);
+    resetBtn.addEventListener("click", () => {
+      delete projSkills[name];
+      projSkills[name] = {}; // re-initialize empty object so UI works
+      pCommitInp.value = "";
+      pEnCb.checked = fwEnabled;
+      enTd.querySelectorAll("span.muted").forEach(e => e.remove());
+      enTd.appendChild(el("span", { class: "muted", style: "margin-left:8px;font-size:0.85em;" }, ["(Framework Default)"]));
+      markProjDirty();
+    });
+    tr.appendChild(el("td", {}, [resetBtn]));
+
+    projBody.appendChild(tr);
+  });
+  projTable.appendChild(projBody);
+  wrap.appendChild(projTable);
 
   return wrap;
 }

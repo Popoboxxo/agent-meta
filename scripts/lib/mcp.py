@@ -299,13 +299,8 @@ def _update_json_config(
             return
         existing = parsed
 
-    # Sanitize invalid/legacy keys to prevent schema validation errors
-    if mcp_key == "mcp":
-        existing.pop("mcp_servers", None)
-        existing.pop("mcpServers", None)
-    elif mcp_key == "mcpServers":
-        existing.pop("mcp", None)
-        existing.pop("mcp_servers", None)
+    # Bereinigung der Legacy-Keys wurde auf Wunsch des Users entfernt,
+    # um manuelle Einträge in den Config-Dateien zu erhalten.
 
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"

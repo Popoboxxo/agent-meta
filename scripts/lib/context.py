@@ -178,13 +178,24 @@ def _regenerate_static_context(
         new_sig = new_header
         existing_sig = existing_header
 
-    if existing_sig == new_sig:
+    def _normalize_sig(s: str) -> str:
+        import re
+        # Remove date strings like 2026-07-27
+        s = re.sub(r"\d{4}-\d{2}-\d{2}", "", s)
+        # Normalize all whitespace (including newlines) to a single space
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+
+    norm_new = _normalize_sig(new_sig)
+    norm_existing = _normalize_sig(existing_sig)
+
+    if norm_existing == norm_new:
         log.skip(rel_label, "static part unchanged")
-        _record_static_hash(project_root, rel_label, new_sig, dry_run)
+        _record_static_hash(project_root, rel_label, norm_new, dry_run)
         return
 
     stored = _load_context_hashes(project_root).get(rel_label)
-    user_modified = stored is None or content_hash(existing_sig) != stored
+    user_modified = stored is None or content_hash(norm_existing) != stored
     if user_modified:
         _backup_context_file(target_path, existing, rel_label, log, dry_run)
 
@@ -192,7 +203,7 @@ def _regenerate_static_context(
     log.action("UPDATE", rel_label, "static part regenerated from template")
     if not dry_run:
         target_path.write_text(new_content, encoding="utf-8")
-    _record_static_hash(project_root, rel_label, new_sig, dry_run)
+    _record_static_hash(project_root, rel_label, norm_new, dry_run)
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
 
