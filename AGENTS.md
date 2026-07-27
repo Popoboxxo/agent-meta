@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.86.3` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.87.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 ## Agent Directory
 > ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
@@ -193,6 +193,17 @@ PEP8 einhalten. Type Hints (typing) verwenden. Docstrings für Klassen/Methoden 
 # Session-Abschluss
 
 Delegate Session-Zusammenfassung an `documenter` am Ende großer Features, um CODEBASE_OVERVIEW.md aktuell zu halten.
+
+
+
+# Submodule-Schutzkonzept
+
+Regeln für den Umgang mit dem `.agent-meta`-Submodul und `.gitmodules`:
+
+- **Keine direkten Änderungen in `.agent-meta/`:** Dateien in `.agent-meta/` dürfen in Konsumenten-Repositories niemals direkt editiert oder committet werden.
+- **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden.
+- **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks.
+- **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden.
 
 
 
@@ -468,6 +479,8 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 <!-- agent-meta:managed-end -->
+
+
 
 
 

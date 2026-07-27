@@ -77,6 +77,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Trivialer Fix, kleiner Fix, ≤2 Dateien | `junior-developer` | optional | yes |
 | Knowledge, Wiki, Wissen, Schema, Knowledge-Engine | `knowledge-curator` | optional | no |
 | Wiki-Pflege, Links reparieren, Tags aufräumen, Wiki aufräumen | `knowledge-gardener` | optional | yes |
+| Index aktualisieren, Index pflegen, log pflegen | `knowledge-indexer` | optional | yes |
 | Ingest, Source verarbeiten, einlesen | `knowledge-ingestor` | optional | yes |
 | Wiki-Lint, Wiki-Check, Knowledge Lint, Wiki-Gesundheit | `knowledge-linter` | optional | yes |
 | Migrieren, Aufräumen, Wiki-Migration, Docs migrieren, Vorhandene Docs ins Wiki | `knowledge-migrator` | optional | no |

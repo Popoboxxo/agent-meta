@@ -3,6 +3,12 @@ name: risk-analyst
 version: 1.1.0
 description: ReqogniLoom Risk Analyst Agent
 generated-from: 0-external/reqogniloom-risk-analyst@ea13275
+tools:
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 # Risk Analyst — agent-meta
 

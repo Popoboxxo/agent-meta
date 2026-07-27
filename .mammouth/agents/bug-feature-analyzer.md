@@ -6,7 +6,14 @@ description: 'Analyzes and classifies incoming bug reports and feature requests 
 hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before
   developer/feature delegation'
 prompt_mode: modern
+tools:
+- Read
+- Glob
+- Grep
+- Bash
+- TodoWrite
 generated-from: 1-generic/bug-feature-analyzer.md@1.1.3
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-bug-feature-analyzer-ext.md` exists → read and apply immediately.
 

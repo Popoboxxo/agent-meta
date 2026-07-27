@@ -3,7 +3,14 @@ name: git
 version: 1.3.1
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/git.md@1.3.1
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-git-ext.md` exists → read and apply immediately.
 

@@ -8,7 +8,16 @@ description: 'Systematic large-scale code transformation with safety nets: Stran
 hint: 'Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung,
   Feature-Flag-Rewrites — braucht exklusiven Zugriff auf betroffene Module'
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/refactoring-specialist.md@0.1.0
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-refactoring-specialist-ext.md` exists → read and apply immediately.
 

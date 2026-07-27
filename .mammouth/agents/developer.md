@@ -8,7 +8,17 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
 hint: Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown,
   YAML)
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
+- Agent
 generated-from: 2-platform/agent-meta-developer.md@1.0.3
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-developer-ext.md` exists → read and apply immediately.
 

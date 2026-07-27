@@ -6,7 +6,15 @@ description: Data-driven identification and resolution of Big-O bottlenecks usin
 hint: Use this agent for performance analysis, Big-O optimization, and bottleneck
   elimination.
 prompt_mode: modern
+tools:
+- Read
+- Write
+- Edit
+- Bash
+- Glob
+- Grep
 generated-from: 1-generic/performance-optimizer.md@1.2.0
+model: claude-opus-4-8
 ---
 > **Extension:** If `.mammouth/3-project/am-performance-optimizer-ext.md` exists → read and apply immediately.
 

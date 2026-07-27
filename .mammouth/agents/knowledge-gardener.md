@@ -4,7 +4,13 @@ version: 1.0.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 hint: 'Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps'
+tools:
+- Read
+- Write
+- Edit
+- Glob
 generated-from: 1-generic/knowledge-gardener.md@1.0.0
+model: claude-haiku-4-5-20251001
 ---
 # Knowledge Gardener — agent-meta
 

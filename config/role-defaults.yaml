@@ -1281,6 +1281,10 @@ roles:
     description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
       Event-Log, OKF §7) im Knowledge Wiki.
     routing:
+      intent_keywords:
+      - Index aktualisieren
+      - Index pflegen
+      - log pflegen
       parallel: true
       orchestrator_only: true
     handoff:

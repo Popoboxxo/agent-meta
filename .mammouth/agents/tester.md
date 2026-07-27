@@ -5,7 +5,16 @@ description: Isolated unit tests with mocks/stubs following a TDD workflow. For 
   tests → se-test-engineer.
 hint: Write tests (TDD), run the test suite, ensure coverage
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/tester.md@2.1.3
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-tester-ext.md` exists → read and apply immediately.
 

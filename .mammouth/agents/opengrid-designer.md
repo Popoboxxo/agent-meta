@@ -4,6 +4,12 @@ version: 1.1.0
 description: Spezialist für OpenSCAD-Code-Generierung für wandmontierte OpenGrid/MultiConnect-Organizer
   (28mm Grid, QuackWorks-Patterns).
 generated-from: 0-external/opengrid-openscad@be411f3
+tools:
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 # OpenGrid OpenSCAD Designer — agent-meta
 

@@ -1296,6 +1296,7 @@ def transform_agent_content_for_provider(
 
         elif provider == 'Mammouth':
             # Mammouth Code agent: supports model, permissionMode, and tools fields.
+            content = build_frontmatter(content, name, description, generated_from=generated_from)
             model = resolve_model(role, config, agent_meta_root,
                                   provider=provider, provider_config=provider_config, log=log)
             content = inject_model_field(content, model)

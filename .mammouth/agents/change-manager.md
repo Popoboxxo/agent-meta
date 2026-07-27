@@ -3,6 +3,12 @@ name: change-manager
 version: 1.1.0
 description: ReqogniLoom Change Manager Agent
 generated-from: 0-external/reqogniloom-change-manager@ea13275
+tools:
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 # Change Manager — agent-meta
 

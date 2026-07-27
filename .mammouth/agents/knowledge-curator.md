@@ -4,7 +4,13 @@ version: 1.0.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 hint: Wiki-Strategie, Schema-Evolution, OKF-Compliance
+tools:
+- Read
+- Write
+- Agent
+- TodoWrite
 generated-from: 1-generic/knowledge-curator.md@1.0.0
+model: claude-sonnet-5
 ---
 # Knowledge Curator — agent-meta
 

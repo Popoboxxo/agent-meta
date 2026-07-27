@@ -5,8 +5,18 @@ description: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionswe
   Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
 hint: 'Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices'
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
 generated-from: 2-platform/agent-meta-continue-expert.md@1.0.0
+model: claude-opus-4-8
 ---
 # Role: Continue Expert
 

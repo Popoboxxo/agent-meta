@@ -1,0 +1,23 @@
+---
+description: Run AST dependency analysis — shows which scripts/lib modules depend on each other
+allowed-tools: ["Bash"]
+argument-hint: "[--changed <file>] [--full]"
+invokable: true
+---
+
+Analyse module dependencies in `scripts/lib/` using Python AST. $ARGUMENTS
+
+- No argument: Show full dependency graph
+- `--changed <file>`: Show which modules are affected when this file changes
+- `--full`: Include transitive dependencies
+
+Requires `analysis.ast: true` in project.yaml, or pass `--full` to run regardless.
+
+```python -c "
+import sys; sys.path.insert(0, 'scripts')
+from lib.analysis import analyze_file_dependencies, find_shared_files
+from pathlib import Path
+deps = analyze_file_dependencies(Path('.'))
+for k, v in sorted(deps.items()):
+    if v: print(f'{k}: {v}')
+"```

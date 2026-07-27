@@ -5,7 +5,13 @@ description: Collect improvement suggestions for agent-meta and submit them as G
   issues.
 hint: Submit improvement suggestions for agent-meta as GitHub issues
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- WebFetch
+- TodoWrite
 generated-from: 1-generic/meta-feedback.md@2.1.3
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-meta-feedback-ext.md` exists → read and apply immediately.
 
@@ -60,7 +66,7 @@ Full body templates: `.mammouth/snippets/meta-feedback-templates.md`.
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.86.3)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.87.0)
 
 **Scope split:**
 

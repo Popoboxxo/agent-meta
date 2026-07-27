@@ -5,6 +5,8 @@ ai-providers:
 - Opencode
 - Mammouth
 - Gemini
+- Continue
+- Copilot
 dod-preset: rapid-prototyping
 rules-preset: silent
 systems-engineering:

@@ -7,7 +7,16 @@ description: WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, s
 hint: 'Accessibility-Audit: WCAG 2.1/2.2, ARIA, Keyboard-Nav, Screenreader-Guidelines,
   Kontrast, Focus-Management, A11y-Tree — Findings mit A/AA/AAA-Severity'
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/accessibility-specialist.md@0.1.0
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-accessibility-specialist-ext.md` exists → read and apply immediately.
 

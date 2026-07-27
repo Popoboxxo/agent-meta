@@ -6,7 +6,15 @@ description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit
 hint: 'Internal quality checker: DoD checklist, traceability audit. Invoked by the
   orchestrator after implementation. Not for direct user questions or setup help.'
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/validator.md@4.1.1
+model: claude-sonnet-5
+permissionMode: plan
 ---
 > **Extension:** If `.mammouth/3-project/am-validator-ext.md` exists → read and apply immediately.
 

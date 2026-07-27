@@ -4,7 +4,12 @@ version: 1.0.2
 description: Estimates effort for development tasks based on task type and LLM capabilities.
 hint: Effort estimation for tasks — delegate here when the user asks about time/cost
 prompt_mode: modern
+tools:
+- Read
+- Glob
+- Grep
 generated-from: 1-generic/effort-estimator.md@1.0.2
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-effort-estimator-ext.md` exists → read and apply immediately.
 

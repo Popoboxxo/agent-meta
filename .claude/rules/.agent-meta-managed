@@ -11,5 +11,6 @@ provider-agnostic.md
 python-conventions.md
 session-conclusion.md
 speech-mode.md
+submodule-protection.md
 sync-interface.md
 use-orchestrator.md

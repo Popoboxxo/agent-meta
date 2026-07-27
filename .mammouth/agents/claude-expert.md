@@ -5,8 +5,18 @@ description: 'Absoluter Analyse-Experte für die Plattform Claude Code: Funktion
   Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung
   von agent-meta.'
 hint: 'Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices'
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
 generated-from: 2-platform/agent-meta-claude-expert.md@1.0.0
+model: claude-opus-4-8
 ---
 # Role: Claude Code Expert
 

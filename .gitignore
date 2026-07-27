@@ -14,6 +14,9 @@ graphify-out/
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/settings.local.json
+.continue/config.local.yaml
+.continue/pending-tasks.md
+.continue/settings.local.yaml
 .gemini/pending-tasks.md
 .gemini/settings.local.json
 .mammouth/pending-tasks.md

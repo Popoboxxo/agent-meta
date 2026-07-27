@@ -6,8 +6,18 @@ description: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funkt
   Anpassung von agent-meta.'
 hint: 'GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best
   Practices'
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
 generated-from: 2-platform/agent-meta-copilot-expert.md@1.0.0
+model: claude-opus-4-8
 ---
 # Role: GitHub Copilot Expert
 

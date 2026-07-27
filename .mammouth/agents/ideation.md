@@ -5,7 +5,16 @@ description: Idea generation, vision sharpening and concept concretization — a
   questions, thinks around corners, hands mature ideas to Requirements.
 hint: Explore new ideas, sharpen vision, hand off to requirements
 prompt_mode: modern
+tools:
+- Read
+- Write
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- TodoWrite
 generated-from: 1-generic/ideation.md@1.6.2
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-ideation-ext.md` exists → read and apply immediately.
 

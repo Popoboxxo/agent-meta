@@ -7,7 +7,15 @@ description: 'Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Ap
 hint: 'Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable
   packages — files findings via feedback as an issue'
 prompt_mode: modern
+tools:
+- Read
+- Glob
+- Grep
+- Bash
+- WebFetch
+- TodoWrite
 generated-from: 1-generic/dependency-auditor.md@1.0.0
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-dependency-auditor-ext.md` exists → read and apply immediately.
 

@@ -6,7 +6,13 @@ description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, pa
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
   in parallel
 prompt_mode: modern
+tools:
+- TodoWrite
+- Agent
+- Read
+- Write
 generated-from: 1-generic/orchestrator.md@7.6.1
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-orchestrator-ext.md` exists → read and apply immediately.
 
@@ -70,6 +76,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Trivialer Fix, kleiner Fix, ≤2 Dateien | `junior-developer` | optional | yes |
 | Knowledge, Wiki, Wissen, Schema, Knowledge-Engine | `knowledge-curator` | optional | no |
 | Wiki-Pflege, Links reparieren, Tags aufräumen, Wiki aufräumen | `knowledge-gardener` | optional | yes |
+| Index aktualisieren, Index pflegen, log pflegen | `knowledge-indexer` | optional | yes |
 | Ingest, Source verarbeiten, einlesen | `knowledge-ingestor` | optional | yes |
 | Wiki-Lint, Wiki-Check, Knowledge Lint, Wiki-Gesundheit | `knowledge-linter` | optional | yes |
 | Migrieren, Aufräumen, Wiki-Migration, Docs migrieren, Vorhandene Docs ins Wiki | `knowledge-migrator` | optional | no |

@@ -7,7 +7,16 @@ description: 'Live incident coordination: ingests logs and metrics, executes run
 hint: 'Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys),
   prioritize hotfixes — RCA to documenter, fix to developer'
 prompt_mode: modern
+tools:
+- Bash
+- Read
+- Glob
+- Grep
+- WebSearch
+- WebFetch
+- TodoWrite
 generated-from: 1-generic/incident-responder.md@1.0.0
+model: claude-sonnet-5
 ---
 > **Extension:** If `.mammouth/3-project/am-incident-responder-ext.md` exists → read and apply immediately.
 

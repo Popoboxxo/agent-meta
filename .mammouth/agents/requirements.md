@@ -5,7 +5,15 @@ description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and 
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
 prompt_mode: modern
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/requirements.md@1.4.3
+model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-requirements-ext.md` exists → read and apply immediately.
 

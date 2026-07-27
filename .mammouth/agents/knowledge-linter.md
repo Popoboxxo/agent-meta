@@ -4,7 +4,13 @@ version: 1.0.0
 description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte
   Links, fehlende OKF-Frontmatter, Index-Staleness.'
 hint: 'Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)'
+tools:
+- Read
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/knowledge-linter.md@1.0.0
+model: claude-haiku-4-5-20251001
 ---
 # Knowledge Linter — agent-meta
 

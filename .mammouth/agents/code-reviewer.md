@@ -6,7 +6,15 @@ description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analys
 hint: Checks code quality, blast radius, and Clean Code — not functional correctness
   (that's validator).
 prompt_mode: modern
+tools:
+- Read
+- Bash
+- Glob
+- Grep
+- TodoWrite
 generated-from: 1-generic/code-reviewer.md@1.2.2
+model: claude-opus-4-8
+permissionMode: plan
 ---
 > **Extension:** If `.mammouth/3-project/am-code-reviewer-ext.md` exists → read and apply immediately.
 

@@ -4,7 +4,15 @@ version: 1.0.0
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 hint: Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
 generated-from: 1-generic/knowledge-migrator.md@1.0.0
+model: claude-sonnet-5
 ---
 # Knowledge Migrator — agent-meta
 

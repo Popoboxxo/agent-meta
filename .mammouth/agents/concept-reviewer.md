@@ -5,7 +5,16 @@ description: 'Generic concept critic: reviews design docs and concepts for compl
   logic gaps, assumptions, alternatives, risks, feasibility, and consistency.'
 hint: 'Review concept/design doc: completeness, logic, risks, Approve/Iterate'
 prompt_mode: modern
+tools:
+- Read
+- Glob
+- Grep
+- WebFetch
+- WebSearch
+- TodoWrite
 generated-from: 1-generic/concept-reviewer.md@1.0.2
+model: claude-opus-4-8
+permissionMode: plan
 ---
 > **Extension:** If `.mammouth/3-project/am-concept-reviewer-ext.md` exists → read and apply immediately.
 

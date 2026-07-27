@@ -3,6 +3,12 @@ name: test-engineer
 version: 1.1.0
 description: ReqogniLoom Test Engineer Agent
 generated-from: 0-external/reqogniloom-test-engineer@ea13275
+tools:
+- Read
+- Bash
+- Glob
+- Grep
+- Agent
 ---
 # Test Engineer — agent-meta
 

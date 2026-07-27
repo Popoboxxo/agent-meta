@@ -5,8 +5,18 @@ description: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
   Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung
   von agent-meta.'
 hint: 'Gemini Experte: Funktionsweise, .gemini Konfiguration, Best Practices'
+tools:
+- Bash
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- WebFetch
+- TodoWrite
 based-on: 1-generic/provider-expert.md@1.0.0
 generated-from: 2-platform/agent-meta-gemini-expert.md@1.0.0
+model: claude-sonnet-5
 ---
 # Role: Gemini (Antigravity) Expert
 
