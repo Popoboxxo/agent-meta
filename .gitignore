@@ -9,6 +9,7 @@ package-lock.
 graphify-out/
 .ship-safe/
 /external/*
+!/external/AGENT_META_INFO.md
 
 # --- agent-meta managed (do not edit) ---
 .claude/agent-memory-local/

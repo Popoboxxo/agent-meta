@@ -202,6 +202,10 @@ def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str
                     shutil.rmtree(modules_dir)
                 except Exception as e:
                     log.warn(f"Failed to remove .git/modules/{local_path}: {e}")
+            try:
+                shutil.rmtree(target_dir, ignore_errors=True)
+            except Exception as e:
+                log.warn(f"Failed to remove working directory {local_path}: {e}")
         else:
             try:
                 shutil.rmtree(target_dir)
