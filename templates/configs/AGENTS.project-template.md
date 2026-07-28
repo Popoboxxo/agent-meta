@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-{{PROJECT_CONTEXT}}
+{{> project-metadata }}
 
 <!-- agent-meta:managed-begin -->
 {{PROVIDER_ROUTING}}

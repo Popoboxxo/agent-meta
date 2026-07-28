@@ -3,13 +3,16 @@ from pathlib import Path
 
 
 class TemplateBuilder:
-    def __init__(self, templates_dir: Path):
+    def __init__(self, templates_dir: Path, fallback_partials_dir: Path | None = None):
         self.templates_dir = templates_dir
+        self.fallback_partials_dir = fallback_partials_dir
 
     def resolve_partials(self, template_str: str) -> str:
         def replace_partial(match):
             partial_name = match.group(1).strip()
             partial_path = self.templates_dir / 'partials' / f"{partial_name}.md"
+            if not partial_path.exists() and self.fallback_partials_dir:
+                partial_path = self.fallback_partials_dir / f"{partial_name}.md"
             if not partial_path.exists():
                 return ""
             content = partial_path.read_text(encoding='utf-8')

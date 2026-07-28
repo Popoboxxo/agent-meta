@@ -12,6 +12,20 @@ _EXTERNAL_SKILLS_CONFIG_LEGACY = "external-skills.config.yaml"
 _EXTERNAL_SKILLS_CONFIG_JSON = "external-skills.config.json"  # legacy fallback
 
 
+def _normalize_project_skills(raw) -> dict:
+    """Normalize project external-skills config to dict format.
+
+    Accepts both legacy list format ['skill-a', 'skill-b'] and
+    canonical dict format {'skill-a': {'enabled': True}}.
+    Returns dict format always.
+    """
+    if isinstance(raw, list):
+        return {name: {"enabled": True} for name in raw}
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
 def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
     """Return True if a skill should be generated for the current project.
 
@@ -151,6 +165,28 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
             log.warn(f"Failed to checkout {pinned_commit} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
 
 
+def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str, log: SyncLog, dry_run: bool) -> None:
+    """Deinit a skill submodule when no active skill references its repo."""
+    is_project_admin = agent_meta_root != project_root
+    cwd = str(project_root) if is_project_admin else str(agent_meta_root)
+    target_dir = Path(cwd) / local_path
+
+    if not target_dir.exists():
+        return
+
+    log.info(local_path, f"Deinitializing unused skill repo: {local_path}")
+    if not dry_run:
+        result = subprocess.run(
+            ["git", "submodule", "deinit", "-f", local_path],
+            cwd=cwd, capture_output=True, timeout=30,
+        )
+        if result.returncode != 0:
+            log.warn(
+                f"Failed to deinit submodule {local_path}: "
+                f"{result.stderr.decode('utf-8', errors='ignore').strip()}"
+            )
+
+
 def sync_external_skills_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -182,7 +218,7 @@ def sync_external_skills_for_provider(
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
     repos = ext_config.get("repos", {})
-    project_skills = config.get("external-skills", {})
+    project_skills = _normalize_project_skills(config.get("external-skills", {}))
 
     # Collect active repos for dynamic cloning/submodule
     active_repos = {}
@@ -328,6 +364,23 @@ def sync_external_skills_for_provider(
                     (skill_target_dir / af).write_text(
                         af_source.read_text(encoding="utf-8"), encoding="utf-8"
                     )
+
+    # Deinit repos that are no longer needed by any active skill
+    is_project_admin = agent_meta_root != project_root
+    all_skill_repos: set[str] = set()
+    active_skill_repos: set[str] = set()
+    for skill_name, skill_cfg in skills.items():
+        repo = skill_cfg.get("repo")
+        if repo:
+            all_skill_repos.add(repo)
+            if _skill_is_active(skill_name, skill_cfg, project_skills):
+                active_skill_repos.add(repo)
+
+    inactive_repos = all_skill_repos - active_skill_repos
+    for repo_name in inactive_repos:
+        repo_cfg = repos.get(repo_name, {})
+        local_path = repo_cfg.get("local_path", f"external/{repo_name}")
+        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run)
 
 
 def add_skill(

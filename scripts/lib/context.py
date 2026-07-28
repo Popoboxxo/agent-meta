@@ -145,7 +145,8 @@ def _regenerate_static_context(
         return
 
     from .context_templates.builder import TemplateBuilder
-    builder = TemplateBuilder(template_path.parent)
+    fallback_partials = template_path.parent.parent / "context" / "partials"
+    builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
     rendered = builder.build(template_path.stem, variables)
     new_header, _tmpl_managed, new_footer = _split_context_file(rendered)
 
@@ -233,7 +234,8 @@ def _ensure_context_file(
 
     if template_path and template_path.exists():
         from .context_templates.builder import TemplateBuilder
-        builder = TemplateBuilder(template_path.parent)
+        fallback_partials = template_path.parent.parent / "context" / "partials"
+        builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
         content = builder.build(template_path.stem, variables)
         source_label = str(template_path.relative_to(agent_meta_root))
     else:
@@ -448,7 +450,8 @@ def _sync_opencode_context(
     if not target_path.exists():
         if template_path and template_path.exists():
             from .context_templates.builder import TemplateBuilder
-            builder = TemplateBuilder(template_path.parent)
+            fallback_partials = template_path.parent.parent / "context" / "partials"
+            builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
             ocontent = builder.build(template_path.stem, variables)
         else:
             project_name = config["project"]["name"]
@@ -587,7 +590,8 @@ def _sync_continue_context(
         if not ctx_path.exists():
             if template_path.exists():
                 from .context_templates.builder import TemplateBuilder
-                builder = TemplateBuilder(template_path.parent)
+                fallback_partials = template_path.parent.parent / "context" / "partials"
+                builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
                 ccontent = builder.build(template_path.stem, variables)
             else:
                 ccontent = (
@@ -1133,7 +1137,7 @@ def sync_claude_md_static(
     preserved verbatim here. User edits to the static part are detected via the
     sidecar hash store and backed up before overwrite.
     """
-    from .config import substitute
+
 
     template_path = agent_meta_root / "templates" / "configs" / "CLAUDE.project-template.md"
     target_path = project_root / "CLAUDE.md"
@@ -1144,10 +1148,10 @@ def sync_claude_md_static(
         return
 
     if not target_path.exists():
-        rendered = substitute(
-            template_path.read_text(encoding="utf-8"), variables,
-            "CLAUDE.project-template.md", log,
-        )
+        from .context_templates.builder import TemplateBuilder
+        fallback_partials = agent_meta_root / "templates" / "context" / "partials"
+        builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
+        rendered = builder.build(template_path.stem, variables)
         new_header, _managed, _footer = _split_context_file(rendered)
         log.action("INIT", rel, "templates/configs/CLAUDE.project-template.md")
         if not dry_run:

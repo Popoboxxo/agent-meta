@@ -2528,7 +2528,13 @@ async function viewProjectSkillsOverrides() {
     return wrap;
   }
   
-  const activeSkills = new Set(projData["external-skills"] || []);
+  // Support both legacy array format and correct dict format
+  const rawSkills = projData["external-skills"] || {};
+  const activeSkills = new Set(
+    Array.isArray(rawSkills)
+      ? rawSkills
+      : Object.entries(rawSkills).filter(([_, v]) => v && v.enabled).map(([k]) => k)
+  );
   const projOverrides = projData["skills-registry"] || {};
   const fwSkills = fwData.skills || {};
   const fwRepos = fwData.repos || {};
@@ -2703,7 +2709,12 @@ async function viewProjectSkillsOverrides() {
   const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:20px; display:block; width: 100%" }, ["Save Project Skills Configuration"]);
   saveBtn.onclick = async () => {
     try {
-      await api.put("/api/config/project/section", { section: "external-skills", data: Array.from(activeSkills) });
+      // Convert Set to dict format: { "skill-name": { "enabled": true/false }, ... }
+      const skillsDict = {};
+      for (const id of allIds) {
+        skillsDict[id] = { enabled: activeSkills.has(id) };
+      }
+      await api.put("/api/config/project/section", { section: "external-skills", data: skillsDict });
       await api.put("/api/config/project/section", { section: "skills-registry", data: projOverrides });
       toast("Skills configuration saved", "success");
       dirty = false;

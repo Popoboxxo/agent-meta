@@ -22,6 +22,8 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 
 ---
 
+{{> project-metadata }}
+
 ## Agenten-Konfiguration
 
 <!-- agent-meta:managed-begin -->

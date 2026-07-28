@@ -898,7 +898,7 @@ def sync_agents(
         resolve_permission_mode,
         resolve_temperature,
     )
-    from .skills import _skill_is_active, load_external_skills_config
+    from .skills import _skill_is_active, _normalize_project_skills, load_external_skills_config
 
     provider_config = load_providers_config(agent_meta_root)
     CLAUDE_AGENTS_DIR = ".claude/agents"
@@ -1057,7 +1057,7 @@ def sync_agents(
 
     # Also track external skill agent filenames (they are not in overrides)
     ext_config = load_external_skills_config(agent_meta_root)
-    project_skills = config.get("external-skills", {})
+    project_skills = _normalize_project_skills(config.get("external-skills", {}))
     for skill_name, skill_cfg in ext_config.get("skills", {}).items():
         if _skill_is_active(skill_name, skill_cfg, project_skills):
             role = skill_cfg.get("role", skill_name)
@@ -1376,7 +1376,7 @@ def sync_agents_for_provider(
         resolve_steps,
         resolve_temperature,
     )
-    from .skills import _skill_is_active, load_external_skills_config
+    from .skills import _skill_is_active, _normalize_project_skills, load_external_skills_config
 
     pc = provider_config.get(provider)
     if not pc:
@@ -1568,7 +1568,7 @@ def sync_agents_for_provider(
     # External skill filenames are always in .claude/agents/ (Claude only)
     if provider == 'Claude':
         ext_config = load_external_skills_config(agent_meta_root)
-        project_skills = config.get('external-skills', {})
+        project_skills = _normalize_project_skills(config.get('external-skills', {}))
         for skill_name, skill_cfg in ext_config.get('skills', {}).items():
             if _skill_is_active(skill_name, skill_cfg, project_skills):
                 ext_role = skill_cfg.get('role', skill_name)
