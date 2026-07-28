@@ -146,7 +146,7 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
                 return
         elif not target_dir.exists():
             log.info(local_path, f"Adding skill submodule: {repo_url}")
-            result = subprocess.run(["git", "submodule", "add", "--no-recursive", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
+            result = subprocess.run(["git", "submodule", "add", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
                 log.warn(f"Failed to add submodule {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
                 return
