@@ -1,15 +1,5 @@
 # agent-meta
 
-agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
-
-<!-- agent-meta:managed-begin -->
-> **ROUTING:**
-
-
- Gemini->AGENTS.md
-> **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.90.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
-
 ## Projekt
 
 **Name:** agent-meta
@@ -86,6 +76,15 @@ Kategorien für `docs/REQUIREMENTS.md`:
 - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
 - Entwickler-Experience (Howto, Beispiele, Doku)
 
+
+
+<!-- agent-meta:managed-begin -->
+> **ROUTING:**
+
+
+ Gemini->AGENTS.md
+> **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
+`agent-meta v0.90.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 ## Agent Directory
 > ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
@@ -585,9 +584,227 @@ Kein Drift? → Stille Aktualisierung der managed blocks
 
 
 
+# MCP: honcho
+
+> Honcho local memory and context server
+
+---
+
+## Erlaubte Tools
+
+- `chat`
+- `get_context`
+- `get_representation`
+- `search`
+- `list_conclusions`
+- `create_conclusion`
+
+## Verbotene Tools (ABSOLUT — keine Ausnahmen)
+
+- `delete_conclusion`
+- `set_config`
+
+## Agent-Hinweise
+
+Honcho bietet persistentes Cross-Session-Memory. Verwende diese Tools immer, wenn du Informationen über frühere Interaktionen, Architektur-Entscheidungen oder Nutzer-Präferenzen über Sessions hinweg benötigst oder speichern musst.
+get_context: Wann nutzen? Um den aktuellen Sitzungskontext zu Beginn der Aufgabe zu laden. search: Wann nutzen? Bei Recherchen zu vergangenem Code oder historischen Entscheidungen. create_conclusion: Wann nutzen? Nach Abschluss eines komplexen Tasks, um Learnings für zukünftige Sessions dauerhaft zu speichern. list_conclusions: Wann nutzen? Um bestehende Learnings vor einer Implementierung abzurufen. chat: Wann nutzen? Für direkte Konversation mit dem Honcho-Backend bei Unklarheiten im Kontext. get_representation: Wann nutzen? Um auf personalisierte Nutzer-Einstellungen zuzugreifen.
+Destruktive Tools (delete_conclusion, set_config) sind gesperrt.
+
+## Verbindungstyp
+
+- Typ: `sse`
+- URL: `{{MCP_HONCHO_URL}}` — Wert aus `secrets.local.yaml`
+
+---
+
+*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*
+
+
+
+# MCP: playwright
+
+> Playwright MCP Server für Browser-Automation und E2E-Tests
+
+---
+
+## Erlaubte Tools
+
+- `browser_navigate`
+- `browser_navigate_back`
+- `browser_snapshot`
+- `browser_take_screenshot`
+- `browser_click`
+- `browser_type`
+- `browser_hover`
+- `browser_select_option`
+- `browser_press_key`
+- `browser_fill_form`
+- `browser_wait_for`
+- `browser_resize`
+- `browser_tabs`
+- `browser_network_requests`
+- `browser_network_request`
+- `browser_console_messages`
+
+## Verbotene Tools (ABSOLUT — keine Ausnahmen)
+
+- `browser_run_code_unsafe`
+- `browser_evaluate`
+- `browser_file_upload`
+- `browser_handle_dialog`
+
+## Agent-Hinweise
+
+Browser-Automation für E2E-Flows, visuelle Regression und Accessibility-Audits.
+browser_navigate: zur Ziel-URL navigieren.
+browser_snapshot: Accessibility-Baum der Seite erfassen (Basis für a11y-Audit und stabile Selektoren).
+browser_click/browser_type/browser_fill_form: User-Interaktionen im Flow simulieren.
+browser_take_screenshot: visuelle Regression via Screenshot-Vergleich.
+browser_network_requests/browser_console_messages: Netzwerk und Konsole inspizieren.
+Arbiträre Code-Ausführung (browser_run_code_unsafe, browser_evaluate) ist gesperrt.
+
+## Verbindungstyp
+
+- Typ: `stdio`
+- Kommando: `npx @playwright/mcp@latest`
+
+---
+
+*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*
+
+
+
+# MCP: reqogniloom
+
+> ReqogniLoom requirements-engineering platform — requirements, architecture, tests, traceability and AI-assisted derivation
+
+---
+
+## Erlaubte Tools
+
+- `requirement.get`
+- `requirement.query`
+- `requirement.create`
+- `requirement.update`
+- `requirement.decompose`
+- `requirement.validate`
+- `requirement.derive`
+- `requirement.check_consistency`
+- `needs.read`
+- `needs.create`
+- `needs.update`
+- `needs.get_traces`
+- `needs.derive_requirements`
+- `architecture.get`
+- `architecture.query`
+- `architecture.create`
+- `architecture.update`
+- `architecture.link`
+- `architecture.decompose`
+- `architecture.decompose_commit`
+- `test.get`
+- `test.query`
+- `test.create`
+- `test.update`
+- `test.link`
+- `test.run_create`
+- `test.run_get`
+- `test.run_report_results`
+- `test.derive_from_requirement`
+- `traceability.query`
+- `traceability.suggest_links`
+- `artifact.search`
+- `artifact.get_tree`
+- `workspace.get_context`
+- `adr.read`
+- `adr.create`
+- `adr.update`
+- `adr.delete`
+- `risk.read`
+- `risk.create`
+- `risk.update`
+- `risk.delete`
+- `issue.read`
+- `issue.create`
+- `issue.update`
+- `issue.delete`
+- `glossary.read`
+- `glossary.create`
+- `glossary.update`
+- `glossary.delete`
+- `prompt_template.get`
+- `ai_derivation.derive_requirements_from_need`
+- `ai_derivation.suggest_architecture_for_requirement`
+- `ai_derivation.decompose_requirement_next_level`
+
+## Verbotene Tools (ABSOLUT — keine Ausnahmen)
+
+- `workspace.close`
+- `workspace.reactivate`
+- `workspace.delete`
+- `permissions.set_rule`
+- `permissions.list`
+- `permissions.revoke`
+- `permissions.check`
+- `admin.backup_create`
+- `admin.backup_list`
+- `admin.restore`
+- `audit.query`
+- `audit.ai_review`
+- `events.dlq_list`
+- `events.dlq_replay`
+- `user.create`
+- `user.assign_role`
+- `user.list`
+- `user.deactivate`
+
+## Agent-Hinweise
+
+ReqogniLoom ist die Single-Source-of-Truth für Requirements, Architektur und Test-Traceability. Verwende es immer, wenn du Features validieren oder Architekturentscheidungen nachvollziehen musst.
+requirement.query/get: Wann nutzen? Zu Beginn jeder Aufgabe, um Anforderungen und deren Kontext zu verstehen. requirement.create/update/decompose/derive: Wann nutzen? Während der Planungsphase, um große Features in überprüfbare Requirements zu zerlegen. architecture.*, test.*: Wann nutzen? Beim Systemdesign (Architecture) und TDD-Prozess (Tests) zur Verknüpfung mit Code. traceability.query/suggest_links: Wann nutzen? Beim Code-Review oder Validator-Gate, um die REQ-Abdeckung zu validieren. artifact.search/get_tree: Wann nutzen? Für tiefgreifende Recherchen über den gesamten Artefakt-Baum. ai_derivation.*: Wann nutzen? Wenn du komplexe, abstrakte Requirements systematisch in technische Sub-Tasks aufschlüsseln musst.
+Schreibende Tools erfordern Editor- oder Admin-Rolle. Administrative/destruktive Namespaces (admin.*, user.*, etc.) sind aus Sicherheitsgründen hart blockiert.
+
+## Verbindungstyp
+
+- Typ: `sse`
+- URL: `{{MCP_REQOGNILOOM_URL}}/mcp/sse/` — Wert aus `secrets.local.yaml`
+
+---
+
+*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*
+
+
+
+# MCP: viz-logger
+
+> agent-meta visualization event logger — tracks agent_start, delegate_out, agent_end for graph generation
+
+---
+
+## Erlaubte Tools
+
+- `log_viz_event`
+
+## Agent-Hinweise
+
+Nutze log_viz_event um Agenten-Starts, Delegationen und Beendigungen zu protokollieren.
+Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, target, caller, task_id, payload.
+
+## Verbindungstyp
+
+- Typ: `stdio`
+- Kommando: `python scripts/viz-logger.py --mcp`
+
+---
+
+*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*
+
+
+
 
 
 <!-- agent-meta:managed-end -->
+
 
 
 

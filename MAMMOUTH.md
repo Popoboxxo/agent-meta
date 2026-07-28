@@ -1,16 +1,5 @@
 # agent-meta
 
-agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
-
-<!-- agent-meta:managed-begin -->
-<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
-<!-- Manuelle Änderungen hier werden überschrieben. -->
-
-> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
-
-Generiert von agent-meta v0.90.1 — `2026-07-27`
-DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
-
 ## Projekt
 
 **Name:** agent-meta
@@ -89,6 +78,14 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 
 
+<!-- agent-meta:managed-begin -->
+<!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
+<!-- Manuelle Änderungen hier werden überschrieben. -->
+
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md | Continue -> .continue/rules/project-context.md | Copilot -> .github/copilot/COPILOT.md
+
+Generiert von agent-meta v0.90.2 — `2026-07-28`
+DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
 | Agent | Zuständigkeit |

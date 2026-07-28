@@ -1,11 +1,11 @@
 {
   "version": 1,
   "hashes": {
-    "CLAUDE.md": "21c66945bb5cfa1c",
+    "CLAUDE.md": "e88e1daa32e81b2a",
     ".mammouth/MAMMOUTH.md": "12f55f56f703499a",
     ".gemini/GEMINI.md": "12f55f56f703499a",
-    "AGENTS.md": "52f4a2131e88c713",
-    "MAMMOUTH.md": "52f4a2131e88c713",
+    "AGENTS.md": "a4047dabdb0eb6e6",
+    "MAMMOUTH.md": "a4047dabdb0eb6e6",
     ".github/copilot/COPILOT.md": "ad10ef4eb14f64d0"
   }
 }

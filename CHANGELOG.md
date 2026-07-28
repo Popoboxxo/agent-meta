@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.90.2] — 2026-07-28
+
+### Fixed
+- #386: Fixed Admin UI toggle inversion for Skills/MCP panels
+- #381/#383: Fixed personal template path + added MCP governance embedding for Opencode
+- #382: Fixed external skill submodule deprovisioning (git rm + cleanup)
+- #387: Fixed missing opencode-go/ prefix for model IDs
+- #385: Added --no-recursive --depth 1 for skill submodule operations
+
 ## [0.90.1] — 2026-07-27
 
 ### Fixed

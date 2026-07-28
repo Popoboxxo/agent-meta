@@ -7,7 +7,7 @@ description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den
 prompt_mode: modern
 generated-from: 2-platform/agent-meta-developer.md@1.0.3
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

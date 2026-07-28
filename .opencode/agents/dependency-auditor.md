@@ -7,7 +7,7 @@ description: 'Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Ap
 prompt_mode: modern
 generated-from: 1-generic/dependency-auditor.md@1.0.0
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   glob: allow

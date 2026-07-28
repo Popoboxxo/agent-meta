@@ -58,7 +58,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <context>
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 
-**agent-meta repo:** Popoboxxo/agent-meta (v0.90.1)
+**agent-meta repo:** Popoboxxo/agent-meta (v0.90.2)
 
 **Existing skills:** see `.agent-meta/config/skills-registry.yaml`
 </context>

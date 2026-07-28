@@ -6,7 +6,7 @@ description: The ultimate expert for prompt engineering. Designs, reviews, and o
 prompt_mode: modern
 generated-from: 1-generic/prompt-engineer.md@1.3.1
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

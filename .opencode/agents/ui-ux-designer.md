@@ -6,7 +6,7 @@ description: Creates UI specifications, mockups, and design systems. Maps REQ-ID
 prompt_mode: modern
 generated-from: 1-generic/ui-ux-designer.md@1.1.3
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

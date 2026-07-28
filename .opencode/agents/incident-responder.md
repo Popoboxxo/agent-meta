@@ -7,7 +7,7 @@ description: 'Live incident coordination: ingests logs and metrics, executes run
 prompt_mode: modern
 generated-from: 1-generic/incident-responder.md@1.0.0
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

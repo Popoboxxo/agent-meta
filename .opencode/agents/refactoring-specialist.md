@@ -8,7 +8,7 @@ description: 'Systematic large-scale code transformation with safety nets: Stran
 prompt_mode: modern
 generated-from: 1-generic/refactoring-specialist.md@0.1.0
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

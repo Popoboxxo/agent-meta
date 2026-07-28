@@ -6,7 +6,7 @@ description: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
   von agent-meta.'
 generated-from: 2-platform/agent-meta-gemini-expert.md@1.0.0
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

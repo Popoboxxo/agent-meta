@@ -6,7 +6,7 @@ description: Idea generation, vision sharpening and concept concretization — a
 prompt_mode: modern
 generated-from: 1-generic/ideation.md@1.6.2
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

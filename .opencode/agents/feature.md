@@ -6,7 +6,7 @@ description: 'Full feature lifecycle: Branch → Requirements → TDD → Implem
 prompt_mode: modern
 generated-from: 1-generic/feature.md@1.10.1
 mode: subagent
-model: deepseek-v4-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow
