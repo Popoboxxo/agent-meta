@@ -2315,9 +2315,8 @@ async function viewProjectMcpOverrides() {
     header.appendChild(titleBox);
 
     const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(!isActive, (newVal) => {
-        // newVal=true means IGNORED (inactive), false means TRACKED (active)
-        if(!newVal) activeServers.add(id);
+    const activeToggle = makeToggle(isActive, (newVal) => {
+        if(newVal) activeServers.add(id);
         else activeServers.delete(id);
         markDirty();
     });
@@ -2570,8 +2569,8 @@ async function viewProjectSkillsOverrides() {
     header.appendChild(titleBox);
 
     const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(!isActive, (newVal) => {
-        if(!newVal) activeSkills.add(id);
+    const activeToggle = makeToggle(isActive, (newVal) => {
+        if(newVal) activeSkills.add(id);
         else activeSkills.delete(id);
         markDirty();
     });
