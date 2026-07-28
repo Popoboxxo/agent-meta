@@ -57,10 +57,10 @@ Normal:
       tiers:
         nano: opencode-go/deepseek-v4-flash
         fast: opencode-go/deepseek-v4-flash
-        balanced: deepseek-v4-pro
+        balanced: opencode-go/deepseek-v4-pro
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
-        ultra: kimi-k3
+        ultra: opencode-go/kimi-k3
 Advanced:
   description: Shifft alles eine Stufe nach oben.
   tiers:
