@@ -8,7 +8,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.89.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.90.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 ## Projekt
 

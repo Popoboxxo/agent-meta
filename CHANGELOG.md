@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.89.2] — 2026-07-27
+## [0.90.1] — 2026-07-27
 
 ### Fixed
 - Fix: Context drift backups are no longer erroneously generated after datetime template evaluation.
