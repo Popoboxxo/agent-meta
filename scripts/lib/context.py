@@ -880,12 +880,12 @@ def _build_managed_block(
     
     local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
     
+    embedded_rules: list[dict] = []
     if not has_native_rules:
         rule_options = resolve_rules(config, agent_meta_root)
         platforms = config.get("platforms", [])
         rule_sources = collect_rule_sources(agent_meta_root, platforms)
         
-        embedded_rules = []
         for src_path, _ in rule_sources:
             rule_stem = src_path.stem
             opts = rule_options.get(rule_stem, {})
@@ -897,8 +897,21 @@ def _build_managed_block(
                 
             rule_content = src_path.read_text(encoding="utf-8")
             embedded_rules.append({"content": rule_content})
-            
-        local_vars["embedded_rules"] = embedded_rules
+        
+        try:
+            from .mcp import load_mcp_registry, resolve_active_mcp_servers, _generate_rule_content
+            mcp_registry = load_mcp_registry(agent_meta_root, config)
+            if mcp_registry:
+                mcp_active = resolve_active_mcp_servers(config, agent_meta_root)
+                for server_name in mcp_active:
+                    server_def = mcp_registry.get(server_name)
+                    if server_def:
+                        mcp_content = _generate_rule_content(server_name, server_def)
+                        embedded_rules.append({"content": mcp_content})
+        except ImportError:
+            pass
+
+    local_vars["embedded_rules"] = embedded_rules
 
     local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(config)
 
@@ -912,7 +925,7 @@ def init_claude_personal(
     dry_run: bool,
 ):
     """Copy CLAUDE.personal-template.md to CLAUDE.personal.md if not present yet."""
-    template_path = agent_meta_root / "howto" / "configs" / "CLAUDE.personal-template.md"
+    template_path = agent_meta_root / "templates" / "configs" / "CLAUDE.personal-template.md"
     target_path = project_root / "CLAUDE.personal.md"
 
     if target_path.exists():
@@ -940,7 +953,7 @@ def init_opencode_personal(
     Analogous to CLAUDE.personal.md — gitignored, never committed, loaded via
     the `instructions` field in opencode.json.
     """
-    template_path = agent_meta_root / "howto" / "configs" / "AGENTS.personal-template.md"
+    template_path = agent_meta_root / "templates" / "configs" / "AGENTS.personal-template.md"
     target_path = project_root / "AGENTS.personal.md"
 
     if target_path.exists():

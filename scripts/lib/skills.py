@@ -146,7 +146,7 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
                 return
         elif not target_dir.exists():
             log.info(local_path, f"Adding skill submodule: {repo_url}")
-            result = subprocess.run(["git", "submodule", "add", repo_url, local_path], cwd=str(project_root), capture_output=True)
+            result = subprocess.run(["git", "submodule", "add", "--no-recursive", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
                 log.warn(f"Failed to add submodule {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
                 return
@@ -154,7 +154,7 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
         target_dir = agent_meta_root / local_path
         if not target_dir.exists():
             log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
-            result = subprocess.run(["git", "clone", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
+            result = subprocess.run(["git", "clone", "--no-recursive", "--depth", "1", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
             if result.returncode != 0:
                 log.warn(f"Failed to clone {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
                 return
@@ -187,6 +187,21 @@ def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str
                     f"Failed to deinit submodule {local_path}: "
                     f"{result.stderr.decode('utf-8', errors='ignore').strip()}"
                 )
+            result = subprocess.run(
+                ["git", "rm", "-f", local_path],
+                cwd=cwd, capture_output=True, timeout=30,
+            )
+            if result.returncode != 0:
+                log.warn(
+                    f"Failed to rm submodule {local_path} from git index: "
+                    f"{result.stderr.decode('utf-8', errors='ignore').strip()}"
+                )
+            modules_dir = Path(cwd) / ".git" / "modules" / local_path
+            if modules_dir.exists():
+                try:
+                    shutil.rmtree(modules_dir)
+                except Exception as e:
+                    log.warn(f"Failed to remove .git/modules/{local_path}: {e}")
         else:
             try:
                 shutil.rmtree(target_dir)
@@ -387,8 +402,7 @@ def sync_external_skills_for_provider(
     for repo_name in inactive_repos:
         repo_cfg = repos.get(repo_name, {})
         local_path = repo_cfg.get("local_path", f"external/{repo_name}")
-        is_submodule = repo_cfg.get("use_submodule", False)
-        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule)
+        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
 
 
 def add_skill(
