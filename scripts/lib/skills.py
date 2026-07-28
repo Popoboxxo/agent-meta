@@ -165,8 +165,9 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
             log.warn(f"Failed to checkout {pinned_commit} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
 
 
-def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str, log: SyncLog, dry_run: bool) -> None:
+def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str, log: SyncLog, dry_run: bool, is_submodule: bool = True) -> None:
     """Deinit a skill submodule when no active skill references its repo."""
+    import shutil
     is_project_admin = agent_meta_root != project_root
     cwd = str(project_root) if is_project_admin else str(agent_meta_root)
     target_dir = Path(cwd) / local_path
@@ -176,15 +177,21 @@ def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str
 
     log.info(local_path, f"Deinitializing unused skill repo: {local_path}")
     if not dry_run:
-        result = subprocess.run(
-            ["git", "submodule", "deinit", "-f", local_path],
-            cwd=cwd, capture_output=True, timeout=30,
-        )
-        if result.returncode != 0:
-            log.warn(
-                f"Failed to deinit submodule {local_path}: "
-                f"{result.stderr.decode('utf-8', errors='ignore').strip()}"
+        if is_submodule:
+            result = subprocess.run(
+                ["git", "submodule", "deinit", "-f", local_path],
+                cwd=cwd, capture_output=True, timeout=30,
             )
+            if result.returncode != 0:
+                log.warn(
+                    f"Failed to deinit submodule {local_path}: "
+                    f"{result.stderr.decode('utf-8', errors='ignore').strip()}"
+                )
+        else:
+            try:
+                shutil.rmtree(target_dir)
+            except Exception as e:
+                log.warn(f"Failed to remove cloned repo {local_path}: {e}")
 
 
 def sync_external_skills_for_provider(
@@ -380,7 +387,8 @@ def sync_external_skills_for_provider(
     for repo_name in inactive_repos:
         repo_cfg = repos.get(repo_name, {})
         local_path = repo_cfg.get("local_path", f"external/{repo_name}")
-        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run)
+        is_submodule = repo_cfg.get("use_submodule", False)
+        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule)
 
 
 def add_skill(
