@@ -256,10 +256,11 @@ def sync_external_skills_for_provider(
                 default_commit = repos.get(repo, {}).get("pinned_commit", "")
                 active_repos[repo] = override_commit or default_commit
             
-    # agent-meta-scout implicitly requires awesome-claude-code
+    # agent-meta-scout implicitly requires awesome-claude-code (unless disabled via enabled: false)
     roles = config.get("roles", [])
-    if "awesome-claude-code" in repos and "agent-meta-scout" in roles:
-        active_repos["awesome-claude-code"] = repos["awesome-claude-code"].get("pinned_commit", "")
+    acc_cfg = repos.get("awesome-claude-code", {})
+    if acc_cfg.get("enabled", True) and "agent-meta-scout" in roles:
+        active_repos["awesome-claude-code"] = acc_cfg.get("pinned_commit", "")
         
     # Ensure all active repos are present locally
     for repo_name, pinned_commit in active_repos.items():
@@ -410,10 +411,9 @@ def sync_external_skills_for_provider(
         deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
 
     # awesome-claude-code is a reference-data repo (no skill entries), only needed by agent-meta-scout
-    if "awesome-claude-code" in repos and "agent-meta-scout" not in roles:
-        acc_cfg = repos["awesome-claude-code"]
-        local_path = acc_cfg.get("local_path", "external/awesome-claude-code")
-        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
+    if "awesome-claude-code" in repos and (not acc_cfg.get("enabled", True) or "agent-meta-scout" not in roles):
+        acc_local = acc_cfg.get("local_path", "external/awesome-claude-code")
+        deinit_skill_repo(agent_meta_root, project_root, acc_local, log, dry_run, is_submodule=is_project_admin)
 
 
 def add_skill(
