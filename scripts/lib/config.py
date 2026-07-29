@@ -255,7 +255,7 @@ def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
     if not defaults_path.exists():
         return {}
     try:
-        raw = _load_yaml_or_json(defaults_path)
+        raw, _ = _load_yaml_or_json(defaults_path)
         se_vars = raw.get("se_variables", {})
         if not isinstance(se_vars, dict):
             return {}
@@ -618,6 +618,11 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         pipelines = load_quality_pipelines(str(agent_meta_root))
         overrides = config.get("quality-pipelines", {})
         effective = apply_overrides(pipelines, overrides)
+        # Filter SE pipelines when se-focus is off
+        se_focus = bool(config.get("se-focus", False))
+        if not se_focus:
+            effective = {k: v for k, v in effective.items()
+                         if not k.startswith("se-")}
         # Validate pipeline agent references against available roles
         from .roles import build_role_map
         all_roles = list(build_role_map(agent_meta_root).keys())
