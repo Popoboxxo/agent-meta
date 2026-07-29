@@ -156,6 +156,13 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
                 stderr = result.stderr.decode('utf-8', errors='ignore').strip()
                 if "is found locally" in stderr or "already exists" in stderr:
                     log.info(local_path, f"Local git directory conflict for {local_path} — cleaning up and retrying with force")
+                    # Proper git cleanup: deinit, rm from index, remove config, then filesystem cleanup
+                    subprocess.run(["git", "submodule", "deinit", "-f", local_path],
+                                   cwd=str(project_root), capture_output=True)
+                    subprocess.run(["git", "rm", "--cached", "-f", local_path],
+                                   cwd=str(project_root), capture_output=True)
+                    subprocess.run(["git", "config", "--remove-section", f"submodule.{local_path}"],
+                                   cwd=str(project_root), capture_output=True)
                     shutil.rmtree(str(target_dir), ignore_errors=True)
                     git_modules_dir = project_root / ".git" / "modules" / local_path
                     if git_modules_dir.exists():

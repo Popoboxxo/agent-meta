@@ -1093,7 +1093,7 @@ def main():
             for skill_name in config["external-skills"]:
                 if skill_name in known_repos:
                     # It's a repo (e.g. awesome-claude-code) — implicit dependency, not a skill entry
-                    log.info(f"external-skills: '{skill_name}' is a framework repo (not a skill) — OK")
+                    log.info("external-skills", f"'{skill_name}' is a framework repo (not a skill) — OK")
                 elif skill_name not in known_skills:
                     log.warning(f"external-skills: '{skill_name}' not found in skills-registry.yaml (neither skills nor repos) -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
