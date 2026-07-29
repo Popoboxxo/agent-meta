@@ -1,6 +1,6 @@
 # SE Framework Test Report
 
-**Timestamp:** 2026-07-28T17:12:50.990826
+**Timestamp:** 2026-07-29T11:00:24.442157
 **Total Tests:** 117
 **Passed:** 117
 **Failed:** 0
@@ -12,7 +12,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-requirements | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-requirements.md |
+| se-requirements | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-requirements.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -32,7 +32,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-architect | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-architect.md |
+| se-architect | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-architect.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -52,7 +52,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-critic | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-critic.md |
+| se-critic | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-critic.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -72,7 +72,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-interface-mgr | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-interface-mgr.md |
+| se-interface-mgr | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-interface-mgr.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -92,7 +92,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-termination | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-termination.md |
+| se-termination | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-termination.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -112,7 +112,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-test-engineer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-test-engineer.md |
+| se-test-engineer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-test-engineer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -132,7 +132,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-testreviewer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-testreviewer.md |
+| se-testreviewer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-testreviewer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -152,7 +152,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-verifier | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-verifier.md |
+| se-verifier | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-verifier.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -172,7 +172,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-validator | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-validator.md |
+| se-validator | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-validator.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -192,7 +192,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| se-integration-and-test-manager | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/se-integration-and-test-manager.md |
+| se-integration-and-test-manager | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\se-integration-and-test-manager.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -212,7 +212,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| code-reviewer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/code-reviewer.md |
+| code-reviewer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\code-reviewer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -232,7 +232,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| ui-ux-designer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/ui-ux-designer.md |
+| ui-ux-designer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\ui-ux-designer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -252,7 +252,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| api-specialist | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/api-specialist.md |
+| api-specialist | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\api-specialist.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -272,7 +272,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| devops-engineer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/devops-engineer.md |
+| devops-engineer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\devops-engineer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -292,7 +292,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| performance-optimizer | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/performance-optimizer.md |
+| performance-optimizer | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\performance-optimizer.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -312,7 +312,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| export-manager | PASS | Path: /home/dduchrow/Repos/agent-meta/agents/1-generic/export-manager.md |
+| export-manager | PASS | Path: C:\Repositories\agent-meta\agents\1-generic\export-manager.md |
 ## Template-Size
 
 | Test | Status | Details |
@@ -332,7 +332,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| File exists | PASS | /home/dduchrow/Repos/agent-meta/config/role-defaults.yaml |
+| File exists | PASS | C:\Repositories\agent-meta\config\role-defaults.yaml |
 | Parseable | PASS | YAML parsed successfully |
 | Role 'se-test-engineer' exists | PASS | Role 'se-test-engineer' found in config |
 | Role 'se-test-engineer' has required fields | PASS | All fields present |
@@ -369,7 +369,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| File exists and valid JSON | PASS | /home/dduchrow/Repos/agent-meta/tests/automated/expected-l1-requirements.json |
+| File exists and valid JSON | PASS | C:\Repositories\agent-meta\tests\automated\expected-l1-requirements.json |
 | Top-level structure | PASS | All top-level keys present |
 | At least 10 requirements | PASS | Found 15 requirements |
 | Each requirement has required fields | PASS | All requirements valid |
@@ -378,7 +378,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| File exists and valid JSON | PASS | /home/dduchrow/Repos/agent-meta/tests/automated/expected-architecture.json |
+| File exists and valid JSON | PASS | C:\Repositories\agent-meta\tests\automated\expected-architecture.json |
 | Top-level structure | PASS | All top-level keys present |
 | At least 3 subsystems | PASS | Found 5 subsystems |
 | Each system has required fields | PASS | All systems valid |
@@ -388,7 +388,7 @@
 
 | Test | Status | Details |
 |------|--------|---------|
-| File exists and valid JSON | PASS | /home/dduchrow/Repos/agent-meta/tests/automated/expected-test-model.json |
+| File exists and valid JSON | PASS | C:\Repositories\agent-meta\tests\automated\expected-test-model.json |
 | Top-level structure | PASS | All top-level keys present |
 | At least 10 test cases | PASS | Found 15 test cases |
 | Each test case has required fields | PASS | All test cases valid |

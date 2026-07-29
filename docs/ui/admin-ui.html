@@ -2026,9 +2026,27 @@ async function viewSkillsRegistry() {
 
   // ----------------------------------- Repos table
   wrap.appendChild(el("h3", {}, ["Repos"]));
+  // Build repo → required-by mapping from skills definitions
+  const repoRequiredBy = {};
+  Object.entries(data.skills).forEach(([name, skill]) => {
+    if (!skill || typeof skill !== "object") return;
+    const repo = skill.repo;
+    if (repo) {
+      if (!repoRequiredBy[repo]) repoRequiredBy[repo] = [];
+      repoRequiredBy[repo].push(skill.role || name);
+    }
+  });
+  // Also note implicit deps (awesome-claude-code → agent-meta-scout)
+  Object.entries(data.repos).forEach(([name, repo]) => {
+    if (!repo || typeof repo !== "object") return;
+    if (repo["implicit-dependency"]) {
+      if (!repoRequiredBy[name]) repoRequiredBy[name] = [];
+      repoRequiredBy[name].push(repo["implicit-dependency"]);
+    }
+  });
   const repoTable = el("table", { class: "data" });
   repoTable.appendChild(el("thead", {}, [
-    el("tr", {}, ["Name", "Repo URL", "Local path", "Pinned commit"].map(h => el("th", {}, [h]))),
+    el("tr", {}, ["Name", "Repo URL", "Local path", "Pinned commit", "Required by"].map(h => el("th", {}, [h]))),
   ]));
   const repoBody = el("tbody");
   Object.entries(data.repos).forEach(([name, repo]) => {
@@ -2044,6 +2062,13 @@ async function viewSkillsRegistry() {
     const commitInp = el("input", { type: "text", value: repo.pinned_commit || "" });
     commitInp.addEventListener("input", () => { repo.pinned_commit = commitInp.value; markDirty(); });
     tr.appendChild(el("td", { class: "mono" }, [commitInp]));
+    const requiredBy = repoRequiredBy[name] || [];
+    const reqCell = el("td", { class: "muted" }, [
+      requiredBy.length > 0
+        ? requiredBy.join(", ")
+        : el("span", { style: "color: var(--accent-yellow);" }, ["none"])
+    ]);
+    tr.appendChild(reqCell);
     repoBody.appendChild(tr);
   });
   repoTable.appendChild(repoBody);

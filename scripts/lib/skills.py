@@ -142,27 +142,57 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
             log.info(local_path, f"Initializing existing skill submodule: {repo_url}")
             result = subprocess.run(["git", "submodule", "update", "--init", local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
-                log.warn(f"Failed to init submodule {repo_url} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                stderr = result.stderr.decode('utf-8', errors='ignore').strip()
+                log.warning(
+                    f"Failed to init submodule {local_path}: {stderr}\n"
+                    f"  -> Fix: cd {project_root} && git submodule update --init {local_path}"
+                )
                 return
         elif not target_dir.exists():
             log.info(local_path, f"Adding skill submodule: {repo_url}")
             result = subprocess.run(["git", "submodule", "add", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
-                log.warn(f"Failed to add submodule {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                stderr = result.stderr.decode('utf-8', errors='ignore').strip()
+                # Detect common error: local git directory already exists
+                if "is found locally" in stderr or "already exists" in stderr:
+                    log.warning(
+                        f"Failed to add submodule {local_path}: {stderr}\n"
+                        f"  -> Fix: cd {project_root} && rm -rf {local_path} && git submodule add --depth 1 {repo_url} {local_path}"
+                    )
+                else:
+                    log.warning(
+                        f"Failed to add submodule {local_path}: {stderr}\n"
+                        f"  -> Fix: cd {project_root} && git submodule add --depth 1 {repo_url} {local_path}"
+                    )
                 return
+        # Verify submodule is properly initialized after add/init
+        if target_dir.exists() and not any(target_dir.iterdir()):
+            log.warning(
+                f"Submodule directory {local_path} exists but is empty after init.\n"
+                f"  -> Fix: cd {project_root} && git submodule update --init --recursive {local_path}"
+            )
+            return
     else:
         target_dir = agent_meta_root / local_path
         if not target_dir.exists():
             log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
             result = subprocess.run(["git", "clone", "--no-recursive", "--depth", "1", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
             if result.returncode != 0:
-                log.warn(f"Failed to clone {repo_url} into {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+                stderr = result.stderr.decode('utf-8', errors='ignore').strip()
+                log.warning(
+                    f"Failed to clone {repo_url} into {local_path}: {stderr}\n"
+                    f"  -> Fix: cd {agent_meta_root} && git clone --depth 1 {repo_url} {local_path}"
+                )
                 return
             
     if pinned_commit:
         result = subprocess.run(["git", "checkout", pinned_commit], cwd=str(target_dir), capture_output=True)
         if result.returncode != 0:
-            log.warn(f"Failed to checkout {pinned_commit} in {local_path}: {result.stderr.decode('utf-8', errors='ignore').strip()}")
+            stderr = result.stderr.decode('utf-8', errors='ignore').strip()
+            log.warning(
+                f"Failed to checkout {pinned_commit} in {local_path}: {stderr}\n"
+                f"  -> Fix: cd {target_dir} && git checkout {pinned_commit}"
+            )
 
 
 def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str, log: SyncLog, dry_run: bool, is_submodule: bool = True) -> None:

@@ -1089,9 +1089,13 @@ def main():
         check_pinned_commits(ext_config, agent_meta_root, log)
         if "external-skills" in config:
             known_skills = set(ext_config.get("skills", {}).keys())
+            known_repos = set(ext_config.get("repos", {}).keys())
             for skill_name in config["external-skills"]:
-                if skill_name not in known_skills:
-                    log.warning(f"external-skills: '{skill_name}' not found in external-skills.config.json -- skipping")
+                if skill_name in known_repos:
+                    # It's a repo (e.g. awesome-claude-code) — implicit dependency, not a skill entry
+                    log.info(f"external-skills: '{skill_name}' is a framework repo (not a skill) — OK")
+                elif skill_name not in known_skills:
+                    log.warning(f"external-skills: '{skill_name}' not found in skills-registry.yaml (neither skills nor repos) -- skipping")
                 elif not ext_config["skills"][skill_name].get("approved", False):
                     log.warning(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
         # Update .gitignore managed block: base entries + per-provider entries + skill entries
