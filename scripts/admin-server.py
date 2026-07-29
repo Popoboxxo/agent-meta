@@ -2595,7 +2595,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         model_id = _resolve_tier_to_model(tier_or_id, provider, pc)
                     else:
                         base_tier = tier_or_id
-                        preset_name = project_config.get("tier-preset", "Normal")
+                        preset_name = project_config.get("tier-preset", "Normal") or "Normal"
                         se_focus = bool(project_config.get("se-focus", False))
                         if preset_name.endswith(" (SE)"):
                             se_focus = True

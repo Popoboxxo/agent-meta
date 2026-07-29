@@ -38,13 +38,14 @@ def resolve_rules(config: dict, agent_meta_root: Path) -> dict:
       3. {}                           — no options (always load, all providers)
     """
     presets = load_rules_presets(agent_meta_root)
-    preset_name = config.get("rules-preset", "default")
-    preset_values = presets.get(preset_name, {})
+    preset_name = config.get("rules-preset", "default") or "default"
 
     if preset_name not in presets and preset_name != "default":
         print(f"  !  Unknown rules-preset '{preset_name}' — falling back to 'default'",
               file=sys.stderr)
-        preset_values = {}
+        preset_name = "default"
+
+    preset_values = presets.get(preset_name, {})
 
     project_overrides = config.get("rules", {})
 
