@@ -263,10 +263,23 @@ def sync_hooks(
         rel_source = f"hooks/{layer}/{source_path.name}"
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-        if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
-            log.action("COPY", rel_out, rel_source)
-        else:
-            log.skip(rel_out, "unchanged")
+        try:
+            if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
+                log.action("COPY", rel_out, rel_source)
+            else:
+                log.skip(rel_out, "unchanged")
+        except Exception as exc:
+            log.warning(f"Failed to deploy hook {rel_out}: {exc}")
+            continue
+
+        # Post-write verification: confirm hook file exists on disk
+        if not dry_run and not target_path.exists():
+            log.warning(
+                f"Hook file {rel_out} was not created — "
+                f"check filesystem permissions. "
+                f"Registered command 'bash {hooks_dir_rel}/{output_name}' "
+                f"will fail with 'No such file or directory'."
+            )
 
         # Auto-enable viz-log when viz mode is dynamic/full
         if hook_stem == "viz-log" and viz_active:
@@ -310,6 +323,18 @@ def sync_hooks(
         settings_path_rel=settings_file_rel,
         hooks_dir=hooks_dir_rel,
     )
+
+    # Final verification: check all registered hook files exist on disk
+    if not dry_run:
+        for entry in active_entries:
+            hook_file = project_root / hooks_dir_rel / Path(entry["command"].split("/")[-1])
+            if not hook_file.exists():
+                log.warning(
+                    f"Hook '{entry['name']}' is registered in {settings_file_rel} "
+                    f"but {hooks_dir_rel}/{hook_file.name} does not exist — "
+                    f"the hook will fail at runtime. "
+                    f"Re-run sync.py to deploy the missing hook file."
+                )
 
 
 def create_hook(
