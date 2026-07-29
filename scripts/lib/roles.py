@@ -144,7 +144,7 @@ def resolve_model(
     base_tier = tier_or_id
 
     # 3. Apply SE Focus and Presets
-    preset_name = project_config.get("tier-preset", "Normal")
+    preset_name = project_config.get("tier-preset", "Normal") or "Normal"
     se_focus = bool(project_config.get("se-focus", False))
     # Backward compat: old configs may have " (SE)" suffix in tier-preset value
     if preset_name.endswith(" (SE)"):

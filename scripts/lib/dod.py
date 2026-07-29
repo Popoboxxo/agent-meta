@@ -34,15 +34,16 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
     3. "full" preset:     fallback if preset not found
     """
     presets = load_dod_presets(agent_meta_root)
-    preset_name = config.get("dod-preset", "full")
-    preset_values = presets.get(preset_name, {})
+    preset_name = config.get("dod-preset", "full") or "full"
 
     # Fallback to "full" preset when named preset not found
     if preset_name not in presets:
         if preset_name != "full":
             print(f"  !  Unknown dod-preset '{preset_name}' — falling back to 'full'",
                   file=sys.stderr)
-        preset_values = presets.get("full", {})
+        preset_name = "full"
+
+    preset_values = presets.get(preset_name, {})
 
     dod_overrides = config.get("dod", {})
 

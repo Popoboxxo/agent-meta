@@ -857,7 +857,7 @@ def main():
         mode = "init" if args.init else "sync"
         log.info("providers", "active: " + ", ".join(providers))  # noqa: PLE1205
         # Log resolved DoD
-        preset_name = config.get("dod-preset", "full")
+        preset_name = config.get("dod-preset", "full") or "full"
         dod_resolved = resolve_dod(config, agent_meta_root)
         dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
         log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")  # noqa: PLE1205
