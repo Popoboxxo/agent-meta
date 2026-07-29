@@ -129,6 +129,7 @@ def normalize_skill_paths(content: str, skill_base_path: str) -> str:
 
 def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str, repo_cfg: dict, pinned_commit: str, log: SyncLog) -> None:
     """Dynamically clone or submodule add a skill repository if it doesn't exist."""
+    import shutil
     repo_url = repo_cfg.get("repo", "")
     if not repo_url:
         return
@@ -153,18 +154,26 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
             result = subprocess.run(["git", "submodule", "add", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
                 stderr = result.stderr.decode('utf-8', errors='ignore').strip()
-                # Detect common error: local git directory already exists
                 if "is found locally" in stderr or "already exists" in stderr:
-                    log.warning(
-                        f"Failed to add submodule {local_path}: {stderr}\n"
-                        f"  -> Fix: cd {project_root} && rm -rf {local_path} && git submodule add --depth 1 {repo_url} {local_path}"
-                    )
+                    log.info(local_path, f"Local git directory conflict for {local_path} — cleaning up and retrying with force")
+                    shutil.rmtree(str(target_dir), ignore_errors=True)
+                    git_modules_dir = project_root / ".git" / "modules" / local_path
+                    if git_modules_dir.exists():
+                        shutil.rmtree(str(git_modules_dir), ignore_errors=True)
+                    result2 = subprocess.run(["git", "submodule", "add", "--force", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
+                    if result2.returncode != 0:
+                        stderr2 = result2.stderr.decode('utf-8', errors='ignore').strip()
+                        log.warning(
+                            f"Failed to add submodule {local_path} (retry with --force): {stderr2}\n"
+                            f"  -> Fix: cd {project_root} && rm -rf {local_path} && git submodule add --depth 1 {repo_url} {local_path}"
+                        )
+                        return
                 else:
                     log.warning(
                         f"Failed to add submodule {local_path}: {stderr}\n"
                         f"  -> Fix: cd {project_root} && git submodule add --depth 1 {repo_url} {local_path}"
                     )
-                return
+                    return
         # Verify submodule is properly initialized after add/init
         if target_dir.exists() and not any(target_dir.iterdir()):
             log.warning(
@@ -287,9 +296,15 @@ def sync_external_skills_for_provider(
                 active_repos[repo] = override_commit or default_commit
             
     # agent-meta-scout implicitly requires awesome-claude-code (unless disabled via enabled: false)
+    # Project can override: external-skills.awesome-claude-code.enabled: false
     roles = config.get("roles", [])
     acc_cfg = repos.get("awesome-claude-code", {})
-    if acc_cfg.get("enabled", True) and "agent-meta-scout" in roles:
+    acc_project_override = project_skills.get("awesome-claude-code", {})
+    if (
+        acc_cfg.get("enabled", True)
+        and acc_project_override.get("enabled", True)
+        and "agent-meta-scout" in roles
+    ):
         active_repos["awesome-claude-code"] = acc_cfg.get("pinned_commit", "")
         
     # Ensure all active repos are present locally
