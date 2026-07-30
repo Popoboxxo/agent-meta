@@ -351,3 +351,8 @@ environments: {}
 model-source-preference:
   Claude: modelsdev
   Opencode: modelsdev
+se-focus: false
+# When true, sync.py injects a debug block into every generated agent. Active agents announce themselves ([Agent: <name>]), log every delegation (→ Delegiere an: ...), and confirm completion (✓ [Agent: <name>] fertig). Default: false — no change to any agent file.
+debug-mode: false
+# Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.
+allow-committed-secrets: false

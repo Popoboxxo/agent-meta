@@ -852,6 +852,11 @@ def main():
             sys.exit(1)
 
     else:
+        # Auto-fill missing config fields with defaults (silent mode — only logs additions)
+        fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
+        # Reload config after auto-fill to pick up newly written defaults
+        config = load_config(config_path)
+
         provider_config = load_providers_config(agent_meta_root)
         providers = resolve_providers(config, provider_config)
         mode = "init" if args.init else "sync"

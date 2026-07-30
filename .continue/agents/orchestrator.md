@@ -8,6 +8,7 @@ hint: Entry point for ALL development tasks — decomposes complex tasks and dis
 prompt_mode: modern
 generated-from: 1-generic/orchestrator.md@7.6.1
 model: claude-sonnet-5
+permissionMode: plan
 alwaysApply: false
 ---
 > **Extension:** If `.continue/3-project/am-orchestrator-ext.md` exists → read and apply immediately.

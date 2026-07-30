@@ -841,6 +841,12 @@ def _build_managed_block(
     provider: str,
     provider_config: dict | None = None,
 ) -> str:
+    from .config import (
+        _orch_mode_flags,
+        _resolve_orch_mode,
+        strip_inactive_conditional_blocks,
+        substitute,
+    )
     from .context_templates.builder import TemplateBuilder
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules
@@ -878,6 +884,16 @@ def _build_managed_block(
     local_vars[f"PLATFORM_{provider.upper()}"] = True
     local_vars["PENDING_TASKS_FILE"] = pc.get("pending_tasks_file", f".{provider.lower()}/pending-tasks.md")
     
+    local_vars["EXTENSION_DIR"] = pc.get("extension_dir", f".{provider.lower()}/3-project")
+    local_vars["SNIPPETS_DIR"] = pc.get("snippets_dir", f".{provider.lower()}/snippets")
+    local_vars["SKILLS_DIR"] = pc.get("skills_dir", f".{provider.lower()}/skills")
+    local_vars["ORCHESTRATOR_INVOCATION_HINT"] = pc.get("orchestrator_hint", "")
+    
+    orch_config = config.get("orchestrator", {})
+    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
+    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
+    local_vars.update(_orch_mode_flags(_orch_mode))
+    
     local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
     
     embedded_rules: list[dict] = []
@@ -895,7 +911,11 @@ def _build_managed_block(
             if opts.get("embed") is False:
                 continue
                 
+            layer = src_path.parts[-2]
+            rel_source = f"rules/{layer}/{src_path.name}"
             rule_content = src_path.read_text(encoding="utf-8")
+            rule_content = substitute(rule_content, local_vars, rel_source, log)
+            rule_content = strip_inactive_conditional_blocks(rule_content, local_vars)
             embedded_rules.append({"content": rule_content})
         
         try:
