@@ -31,10 +31,27 @@ except ImportError:
 
 
 # Top-level fields with a meaningful default value.
+# Each entry: field_name -> (default_value, description)
+# Schema-driven defaults take precedence; these are fallbacks for fields
+# that don't have defaults in project-config.schema.json.
 _CONFIG_FIELD_DEFAULTS: dict = {
-    "dod-preset": "full",
-    "max-parallel-agents": 2,
+    "agent-meta-version": "0.90.10",
+    "rules-preset": "default",
+    "dod-preset": "rapid-prototyping",
     "speech-mode": "full",
+    "tier-preset": "Normal",
+    "se-focus": False,
+    "max-parallel-agents": 2,
+}
+
+_CONFIG_FIELD_DESCRIPTIONS: dict = {
+    "agent-meta-version": "Version of agent-meta used to generate this config",
+    "rules-preset": "Which rules are active: default (all), minimal (situational off), silent (only essentials)",
+    "dod-preset": "Definition of Done rigor: rapid-prototyping, standard, full, strict",
+    "speech-mode": "Agent verbosity: full, short, caveman, asozial, business, submissive, etc.",
+    "tier-preset": "Model tier budget: Cheap, Normal, Advanced, Expensive, Expensive as Hell",
+    "se-focus": "Systems Engineering mode: stricter validation, formal traceability",
+    "max-parallel-agents": "Maximum number of parallel agent spawns (1-5)",
 }
 
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
@@ -152,65 +169,117 @@ def _load_schema_variable_keys(agent_meta_root: Path) -> list[str]:
         return []
 
 
+def _load_schema_defaults(agent_meta_root: Path) -> dict:
+    """Extract all field defaults and descriptions from project-config.schema.json.
+
+    Returns dict of field_path -> (default_value, description).
+    Walks nested properties (e.g. dod.req-traceability) recursively.
+    """
+    schema_path = agent_meta_root / "config/project-config.schema.json"
+    if not schema_path.exists():
+        return {}
+
+    try:
+        with schema_path.open(encoding="utf-8") as f:
+            schema = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    result: dict = {}
+
+    def walk(props: dict, prefix: str = "") -> None:
+        if not isinstance(props, dict):
+            return
+        for key, prop in props.items():
+            if not isinstance(prop, dict) or key.startswith("$"):
+                continue
+            full_key = f"{prefix}.{key}" if prefix else key
+            if "default" in prop:
+                result[full_key] = (prop["default"], prop.get("description", ""))
+            # Recurse into nested properties
+            if "properties" in prop:
+                walk(prop["properties"], full_key)
+
+    walk(schema.get("properties", {}))
+    return result
+
+
 def fill_defaults(
     config_path: Path,
     agent_meta_root: Path,
     log: SyncLog,
     dry_run: bool,
+    silent: bool = False,
 ) -> None:
-    """Write missing config fields with their default values into .meta-config/project.yaml.
+    """Write missing config fields with their default values into project.yaml.
 
-    Structural fields (dod-preset, max-parallel-agents, speech-mode, dod.*):
-      Written into the config file when absent.
+    Structural fields (rules-preset, dod-preset, tier-preset, etc.):
+      Written into the config file when absent, with explanatory YAML comments.
 
     Variable fields (variables.*):
       Only reported as [WARN] — no empty strings written (no sensible default).
+
+    If silent=True, only the summary line is logged (for auto-fill during sync).
     """
     config = load_config(config_path)
     changed = False
-    added: list[str] = []
+    added: list[tuple[str, str]] = []  # (field_path, description)
 
-    # --- Top-level structural fields ---
-    for field, default in _CONFIG_FIELD_DEFAULTS.items():
+    # --- Load schema-driven defaults ---
+    schema_defaults = _load_schema_defaults(agent_meta_root)
+
+    # Build effective defaults: schema wins, hardcoded fallbacks for missing
+    effective_defaults: dict[str, tuple] = {}
+    effective_defaults.update(_CONFIG_FIELD_DEFAULTS)
+    effective_defaults.update({k: v[0] for k, v in schema_defaults.items()})
+    effective_descriptions: dict[str, str] = {}
+    effective_descriptions.update(_CONFIG_FIELD_DESCRIPTIONS)
+    effective_descriptions.update({k: v[1] for k, v in schema_defaults.items() if v[1]})
+
+    # --- Fill top-level fields ---
+    for field, default in effective_defaults.items():
+        if "." in field:
+            continue  # nested fields handled below
         if field not in config:
             config[field] = default
-            added.append(f"{field} = {json.dumps(default)}")
+            desc = effective_descriptions.get(field, "")
+            added.append((field, desc))
             changed = True
 
-    # --- dod sub-fields ---
-    # Only fill dod.* fields when no preset is set (or preset is "full").
-    # A non-full preset already defines its own defaults — writing "full" defaults
-    # on top would silently override the preset and create an inconsistent config.
-    active_preset = config.get("dod-preset", "full")
-    if active_preset == "full":
+    # --- Fill nested dod.* fields (schema-driven, only for "full"/"strict" preset) ---
+    active_preset = config.get("dod-preset", effective_defaults.get("dod-preset", "rapid-prototyping"))
+    if active_preset in ("full", "strict") or "dod-preset" not in config:
         dod_block = config.get("dod", {})
-        dod_additions: list[str] = []
-        for field, default in _DOD_FIELD_DEFAULTS.items():
-            if field not in dod_block:
-                dod_block[field] = default
-                dod_additions.append(f"dod.{field} = {json.dumps(default)}")
+        for field_path, (default, desc) in schema_defaults.items():
+            if not field_path.startswith("dod."):
+                continue
+            sub_key = field_path[len("dod."):]
+            if sub_key not in dod_block:
+                dod_block[sub_key] = default
+                added.append((field_path, desc))
                 changed = True
-        if dod_additions:
+        if dod_block:
             config["dod"] = dod_block
-            added.extend(dod_additions)
-    else:
-        log.info("fill-defaults", f"dod.* skipped — preset '{active_preset}' defines its own defaults")  # noqa: PLE1205
 
     # --- Write back if changed ---
     if changed and not dry_run:
         if config_path.suffix.lower() in (".yaml", ".yml"):
-            _write_yaml(config_path, config)
+            _write_yaml_with_comments(config_path, config, added)
         else:
             with config_path.open("w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
                 f.write("\n")
 
-    for entry in added:
-        action = "FILL" if not dry_run else "FILL(dry)"
-        log.action(action, str(config_path.name), entry)
+    for field_name, description in added:
+        action = "AUTO-FILL" if not dry_run else "AUTO-FILL(dry)"
+        # Resolve the actual value (supports "dod.req-traceability" nested lookups)
+        val = config
+        for part in field_name.split("."):
+            val = val.get(part, "???") if isinstance(val, dict) else "???"
+        log.action(action, str(config_path.name), f"{field_name} = {json.dumps(val)}  # {description}")
 
-    if not changed:
-        log.info("fill-defaults", "all structural fields already set — nothing to write")  # noqa: PLE1205
+    if not changed and not silent:
+        log.info("fill-defaults", "all structural fields already set — nothing to write")
 
     # --- Warn about missing variable keys ---
     known_vars = _load_schema_variable_keys(agent_meta_root)
@@ -218,6 +287,38 @@ def fill_defaults(
     missing_vars = [v for v in known_vars if v not in set_vars]
     for var in missing_vars:
         log.warning(f"Variable not set in config: variables.{var}")
+
+
+def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[str, str]]) -> None:
+    """Write YAML with auto-filled field comments.
+
+    Since PyYAML does not support comments, we dump to text and inject
+    #-style comment lines before each auto-filled top-level key.
+    """
+    import io
+    buf = io.StringIO()
+    _yaml.dump(data, buf, allow_unicode=True, default_flow_style=False,
+               sort_keys=False, indent=2)
+    text = buf.getvalue()
+
+    auto_filled_keys = {name.split(".")[0] for name, _ in auto_filled}
+    descriptions = {name: desc for name, desc in auto_filled}
+
+    lines = text.splitlines(keepends=True)
+    result: list[str] = []
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        # Detect a top-level key line: no leading spaces, contains ":" with no indentation
+        if stripped and line[0] != " " and ":" in stripped:
+            colon_pos = stripped.index(":")
+            key = stripped[:colon_pos].strip()
+            if key and not key.startswith("#"):
+                if key in auto_filled_keys and key in descriptions and descriptions[key]:
+                    result.append(f"# {descriptions[key]}\n")
+        result.append(line)
+
+    with path.open("w", encoding="utf-8") as f:
+        f.write("".join(result))
 
 
 def read_version(agent_meta_root: Path) -> str:

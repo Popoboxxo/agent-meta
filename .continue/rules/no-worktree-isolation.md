@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # No Worktree Isolation
 
 **Anti-Pattern:** Niemals das Argument `isolation: "worktree"` beim Spawnen von Subagenten verwenden.

@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # A2A Anti-Re-Delegation Gates
 
 1. Limit depth to 10, no self-handoff.

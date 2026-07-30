@@ -84,152 +84,10 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.90.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
-
-## Agent Directory
-> ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
-
-| Agent | Core Capabilities |
-|-------|-------------------|
-
-| `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader... |
-
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anl... |
-
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken |
-
-| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. |
-
-| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und k... |
-
-| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf... |
-
-| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität... |
-
-| `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, ... |
-
-| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu... |
-
-| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K... |
-
-| `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineag... |
-
-| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
-
-| `developer` | Feature-Implementierung und Bugfixes |
-
-| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
-
-| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erste... |
-
-| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen |
-
-| `e2e-tester` | E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright |
-
-| `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kali... |
-
-| `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symb... |
-
-| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
-
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR |
-
-| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
-
-| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
-
-| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
-
-| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
-
-| `incident-responder` | Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schri... |
-
-| `intern-developer` | [EASTER EGG / GAG] Der übereifrige Praktikant |
-
-| `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
-
-| `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun... |
-
-| `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e... |
-
-| `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-L... |
-
-| `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali... |
-
-| `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links... |
-
-| `knowledge-migrator` | Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren |
-
-| `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten |
-
-| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla... |
-
-| `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko... |
-
-| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
-
-| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu... |
-
-| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
-
-| `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
-
-| `principal-developer` | Last-Resort-Eskalationsstufe |
-
-| `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
-
-| `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler... |
-
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
-
-| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-
-| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting... |
-
-| `technical-writer` | Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte... |
-
-| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
-
-| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. |
-
-| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
-
-
-## Knowledge Engine
-
-Die Knowledge Engine ist aktiviert. Domäne: **personal**.
-
-**Bundle-Pfad:** `knowledge/`
-| Pfad | Zweck |
-|------|-------|
-| `knowledge/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |
-| `knowledge/sources/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |
-| `knowledge/wiki/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |
-| `knowledge/wiki/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |
-| `knowledge/wiki/log.md` | Chronologisches Event-Log (OKF §7) |
-
-### Knowledge-Agenten
-- **Schema-Owner:** `knowledge-curator` verwaltet `knowledge/schema.md` und Concept-Type-Konventionen
-
-### Knowledge-Workflows
-- **Ingest:** Source in `knowledge/sources/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert
-- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort
-- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)
-- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format
-- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
+`agent-meta v0.90.10` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
-
-# A2A Anti-Re-Delegation Gates
-
-1. Limit depth to 10, no self-handoff.
-2. Short payload: `payload.t` max 300 Zeichen.
-3. No Re-Delegation (payload starts with "Du bist...").
-4. Singleton Orchestrator: NUR der `main_chat` darf den `orchestrator` spawnen.
-5. Execution-Trace-Isolation: Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
-
-
 
 # Branch-Guard
 
@@ -242,9 +100,7 @@ Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen di
 Verwende Conventional Commits (feat, fix, chore).
 Beschreibungssprache: `Englisch`
 Max 72 Zeichen in erster Zeile. Imperativ.
-
 Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
-
 
 
 
@@ -266,75 +122,15 @@ Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #1
 
 
 
-# Lifecycle-Tasks
-
-Beim Start prüfen: existiert `.gemini/pending-tasks.md`?
-Falls ja und enthält `- [ ]`: User fragen ob delegiert werden soll.
-Nach Erledigung: löschen. Datei nicht committen.
-
-
-
-# No Worktree Isolation
-
-**Anti-Pattern:** Niemals das Argument `isolation: "worktree"` beim Spawnen von Subagenten verwenden.
-**Grund:** Agenten schreiben dann ihren Output in den internen Ordner `.claude/worktrees/agent-<id>/` anstatt in das eigentliche Projektverzeichnis. Das führt zu fehlgeleiteten Dateien und Datenverlust in der eigentlichen Codebase.
-
-Alle Agenten müssen direkt im Projektverzeichnis arbeiten (Isolation deaktivieren oder weglassen). Der `.claude/` Ordner (sowie `.gemini/`, `.continue/`, `.mammouth/` etc.) ist strikt als Infrastruktur-Ordner zu betrachten und darf nicht für Arbeitskopien missbraucht werden.
-
-
-
-# Provider-Agnostic Policy
-
-Generische Templates in `1-generic/` müssen provider-agnostisch sein. Keine spezifischen Prompts für Claude, Gemini etc., außer als Fallback/Feature-Flag.
-
-
-
-# Python Conventions
-
-PEP8 einhalten. Type Hints (typing) verwenden. Docstrings für Klassen/Methoden schreiben.
-
-
-
-# Session-Abschluss
-
-Delegate Session-Zusammenfassung an `documenter` am Ende großer Features, um CODEBASE_OVERVIEW.md aktuell zu halten.
-
-
-
-# Submodule-Schutzkonzept
-
-Regeln für den Umgang mit dem `.agent-meta`-Submodul und `.gitmodules`:
-
-- **Keine direkten Änderungen in `.agent-meta/`:** Dateien in `.agent-meta/` dürfen in Konsumenten-Repositories niemals direkt editiert oder committet werden.
-- **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden.
-- **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks.
-- **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden.
-
-
-
-
 # CRITICAL GATE
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
-
-
-
 
 ## Git Delegation
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
 
-
-
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 
-
-
-
-
 Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
-
-
-## Anti-Patterns
-- **Worktree Isolation:** Niemals `isolation: "worktree"` bei Subagenten verwenden (schreibt in interne Infrastruktur-Ordner, führt zu Datenverlust).
 
 
 
@@ -402,7 +198,7 @@ beim nächsten `sync.py`-Lauf. Daher:
 
 ## Platzhalter-Escape
 
-`{{%VAR%}}` → rendert als `{{%VAR%}}` ohne Substitution (für Dokumentation in Templates)
+`{{VAR}}` → rendert als `{{VAR}}` ohne Substitution (für Dokumentation in Templates)
 
 
 
@@ -416,7 +212,7 @@ beim nächsten `sync.py`-Lauf. Daher:
    - Minor (`x.Y.0`): new optional section, expanded scope
    - Patch (`x.y.Z`): text improvements, clarifications, config path fixes
    - Platform agents (`2-platform/`) also keep `based-on` up to date.
-3. Placeholders are always `{{%GROSS_MIT_UNTERSTRICH%}}`. Lowercase or mixed case will not match.
+3. Placeholders are always `{{GROSS_MIT_UNTERSTRICH}}`. Lowercase or mixed case will not match.
 
 ## Composition-Risiko: Instruction Bleed
 
@@ -465,6 +261,12 @@ Only `1-generic/<role>.md`, `config/role-defaults.yaml`, and `howto/setup/instan
 | `config/project-config.schema.json` | test IDE autocomplete / jsonschema |
 | `hint:` in agent template | sync projects (regenerates `AGENT_HINTS`) |
 | `rules/` or `hooks/` | sync projects (overwrites generated copies) |
+
+
+
+# Provider-Agnostic Policy
+
+Generische Templates in `1-generic/` müssen provider-agnostisch sein. Keine spezifischen Prompts für Claude, Gemini etc., außer als Fallback/Feature-Flag.
 
 
 
@@ -803,7 +605,153 @@ Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, 
 
 
 
+## Agent Directory
+> ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
+
+| Agent | Core Capabilities |
+|-------|-------------------|
+
+| `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader... |
+
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anl... |
+
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken |
+
+| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. |
+
+| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und k... |
+
+| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf... |
+
+| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität... |
+
+| `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, ... |
+
+| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu... |
+
+| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K... |
+
+| `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineag... |
+
+| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
+
+| `developer` | Feature-Implementierung und Bugfixes |
+
+| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
+
+| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erste... |
+
+| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen |
+
+| `e2e-tester` | E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright |
+
+| `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kali... |
+
+| `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symb... |
+
+| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
+
+| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR |
+
+| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
+
+| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
+
+| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
+
+| `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
+
+| `incident-responder` | Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schri... |
+
+| `intern-developer` | [EASTER EGG / GAG] Der übereifrige Praktikant |
+
+| `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
+
+| `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun... |
+
+| `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e... |
+
+| `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-L... |
+
+| `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali... |
+
+| `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links... |
+
+| `knowledge-migrator` | Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren |
+
+| `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten |
+
+| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla... |
+
+| `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko... |
+
+| `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
+
+| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu... |
+
+| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
+
+| `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
+
+| `principal-developer` | Last-Resort-Eskalationsstufe |
+
+| `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
+
+| `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler... |
+
+| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
+
+| `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+
+| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting... |
+
+| `technical-writer` | Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte... |
+
+| `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
+
+| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. |
+
+| `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
+
+
+## Knowledge Engine
+
+Die Knowledge Engine ist aktiviert. Domäne: **personal**.
+
+**Bundle-Pfad:** `knowledge/`
+| Pfad | Zweck |
+|------|-------|
+| `knowledge/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |
+| `knowledge/sources/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |
+| `knowledge/wiki/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |
+| `knowledge/wiki/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |
+| `knowledge/wiki/log.md` | Chronologisches Event-Log (OKF §7) |
+
+### Knowledge-Agenten
+- **Schema-Owner:** `knowledge-curator` verwaltet `knowledge/schema.md` und Concept-Type-Konventionen
+
+### Knowledge-Workflows
+- **Ingest:** Source in `knowledge/sources/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert
+- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort
+- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)
+- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format
+- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
+
 <!-- agent-meta:managed-end -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -981,3 +929,16 @@ rtk pip list            rtk pnpm install        rtk npm run <script>
 - For debugging, use raw command without rtk prefix
 - `rtk proxy <cmd>` runs command without filtering but tracks usage
 <!-- /headroom:rtk-instructions -->
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

@@ -18,24 +18,53 @@ presets:
   default: {}
 
   # Situative Rules auf alwaysApply: false — guter Kompromiss.
-  # Kernregeln (branch-guard, commit-conventions) bleiben immer aktiv.
+  # Kernregeln (branch-guard, commit-conventions, language) bleiben immer aktiv.
   minimal:
-    lifecycle-tasks:
-      alwaysApply: false
-    issue-lifecycle:
-      alwaysApply: false
-
-  # Maximale Token-Einsparung — nur absolut essenzielle Rules immer aktiv.
-  # Empfohlen für rapid-prototyping Projekte.
-  # Phase 2: Selective Rule Embedding — non-essential rules als separate Dateien.
-  silent:
     lifecycle-tasks:
       alwaysApply: false
     issue-lifecycle:
       alwaysApply: false
     dod-criteria:
       alwaysApply: false
+    sync-interface:
+      alwaysApply: false
+    session-conclusion:
+      alwaysApply: false
+    python-conventions:
+      alwaysApply: false
+    a2a-delegation-gates:
+      alwaysApply: false
+    submodule-protection:
+      alwaysApply: false
+
+  # Maximale Token-Einsparung — nur absolut essenzielle Rules (branch-guard,
+  # commit-conventions, language, use-orchestrator) werden in den Kontext
+  # eingebettet. Alle anderen sind nur als separate Rule-Dateien verfügbar.
+  # Empfohlen für rapid-prototyping Projekte.
+  silent:
+    lifecycle-tasks:
+      alwaysApply: false
+      embed: false
+    issue-lifecycle:
+      alwaysApply: false
+    dod-criteria:
+      alwaysApply: false
       embed: false
     sync-interface:
+      alwaysApply: false
+      embed: false
+    submodule-protection:
+      alwaysApply: false
+      embed: false
+    no-worktree-isolation:
+      alwaysApply: false
+      embed: false
+    python-conventions:
+      alwaysApply: false
+      embed: false
+    session-conclusion:
+      alwaysApply: false
+      embed: false
+    a2a-delegation-gates:
       alwaysApply: false
       embed: false

@@ -13,6 +13,7 @@ tools:
 - Write
 generated-from: 1-generic/orchestrator.md@7.6.1
 model: claude-sonnet-5
+permissionMode: plan
 ---
 > **Extension:** If `.mammouth/3-project/am-orchestrator-ext.md` exists → read and apply immediately.
 
