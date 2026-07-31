@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_SOURCE_RULE = _REPO_ROOT / "rules" / "1-generic" / "architecture.md"
+_SOURCE_RULE = _REPO_ROOT / "rules" / "2-platform" / "agent-meta-architecture.md"
 
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
