@@ -8,7 +8,6 @@ tools:
   - Bash
   - Glob
   - Grep
-  - Agent
 ---
 
 # {{SKILL_NAME_DISPLAY}} — {{PROJECT_NAME}}
