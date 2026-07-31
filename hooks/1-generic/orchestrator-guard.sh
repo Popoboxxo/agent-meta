@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 1.1.0
+# version: 1.2.1
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -46,7 +46,7 @@ esac
 # Check if we are inside the orchestrator agent (not the main chat)
 AGENT_NAME=$(echo "$INPUT" | $_PY -c "import json,sys; print(json.load(sys.stdin).get('agent_name',''))" 2>/dev/null || echo "")
 
-if echo "$AGENT_NAME" | grep -qi "orchestrator"; then
+if echo "$AGENT_NAME" | grep -qiE "orchestrator|^git$"; then
   exit 0
 fi
 

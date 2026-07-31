@@ -46,10 +46,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/orchestrator-guard.sh"
+            "command": "bash .claude/hooks/dod-push-check.sh"
           }
         ],
-        "matcher": "\"\""
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/orchestrator-guard.sh"
+          }
+        ]
       }
     ]
   }

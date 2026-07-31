@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 # --------------------------------------------------------------------------- #
@@ -320,6 +321,49 @@ class TestAdminServerVersion(unittest.TestCase):
                 server = admin_server.AdminServer(root, host="127.0.0.1", port=0)
             self.assertEqual(server.mode, "super_admin")
             self.assertEqual(admin_server.AdminRequestHandler.version, "1.2.3")
+
+
+# --------------------------------------------------------------------------- #
+# Submodule-protection save/restore                                           #
+# --------------------------------------------------------------------------- #
+
+
+class TestWriteSubmoduleProtection(unittest.TestCase):
+    """The save path must not leave a stale nested ``rules.submodule-protection``
+    key behind once the flat key has been written (config-drift regression)."""
+
+    def _make_handler(self, root: Path, body: dict) -> Any:
+        """Build a bare handler instance with a real ``ConfigManager`` and a
+        stubbed request body, without spinning up an actual HTTP connection."""
+        (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin"
+        )
+        handler._read_body = mock.Mock(return_value=body)  # type: ignore[method-assign]
+        handler._send_json = mock.Mock()  # type: ignore[method-assign]
+        return handler
+
+    def test_save_removes_stale_nested_rules_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root, {
+                "restore_default": False,
+                "enabled": True,
+                "override_text": "new override text",
+            })
+            # Seed a pre-existing stale nested override, as left over from an
+            # older save path that predates this fix.
+            admin_server.AdminRequestHandler.config_manager.write(
+                "project", {"rules": {"submodule-protection": "old nested override text"}}
+            )
+
+            handler._write_submodule_protection()
+
+            saved = admin_server.AdminRequestHandler.config_manager.read("project")
+            self.assertEqual(saved.get("submodule-protection"), "new override text")
+            self.assertNotIn("submodule-protection", saved.get("rules", {}))
 
 
 if __name__ == "__main__":

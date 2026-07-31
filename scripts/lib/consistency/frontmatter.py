@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..agents import _find_section_bounds
 
 _SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
 _VALID_WORKFLOW_TIERS = {"required", "recommended", "optional"}
@@ -146,11 +147,13 @@ def _check_patch_anchors(patches: list, extends: str, rel: str,
                     "The opening XML tag must appear in the base file.",
                 ))
             continue  # skip the plain-text anchor check below
-        if anchor not in base_content:
+        base_lines = base_content.splitlines(keepends=True)
+        if _find_section_bounds(base_lines, anchor) is None:
             findings.append(Finding(
                 Severity.ERROR, "frontmatter.patch-anchor-not-found", rel,
                 f"patches[{i}] anchor not found in base file '{extends}': {anchor!r}",
-                "The anchor string must appear verbatim in the base file.",
+                "The anchor string must appear verbatim as a heading line in the base file "
+                "(exact match, not a substring of a longer heading).",
             ))
     return findings
 

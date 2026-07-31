@@ -414,6 +414,15 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _normalize_check_dry_run(args) -> None:
+    """--check is a read-only CI gate: it must never allow real writes.
+
+    If the caller forgot --dry-run, force it rather than silently writing files.
+    """
+    if getattr(args, "check", False) and not getattr(args, "dry_run", False):
+        args.dry_run = True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Sync agent-meta agents into a project."
@@ -541,6 +550,7 @@ def main():
                         help="Entry file within the skill directory (default: SKILL.md)")
 
     args = parser.parse_args()
+    _normalize_check_dry_run(args)
 
     script_path = Path(__file__).resolve()
     agent_meta_root = find_agent_meta_root(script_path)
