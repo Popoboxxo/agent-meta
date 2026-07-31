@@ -69,3 +69,14 @@ def test_validator_rejects_anchor_that_is_only_a_substring(tmp_path):
     )
     check_ids = [f.check for f in findings]
     assert "frontmatter.patch-anchor-not-found" in check_ids
+
+
+def test_patch_replace_preserves_base_file_crlf_line_endings():
+    base = "## Section\r\n\r\nOld content.\r\n\r\n## Next\r\n\r\nOther.\r\n"
+    patch = {"op": "replace", "anchor": "## Section", "content": "## Section\n\nNew content.\n"}
+    log = SyncLog()
+    result = apply_patch(base, patch, log, "test-source")
+    # Every line in the result must end with \r\n, matching the CRLF base file.
+    for line in result.splitlines(keepends=True):
+        if line.strip("\r\n"):
+            assert line.endswith("\r\n"), f"expected CRLF line ending, got {line!r}"

@@ -701,6 +701,13 @@ def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | Non
     return (start_idx, len(lines))
 
 
+def _dominant_newline(lines: list[str]) -> str:
+    """Return the majority line-ending style ('\\r\\n' or '\\n') of a splitlines(keepends=True) list."""
+    crlf_count = sum(1 for line in lines if line.endswith("\r\n"))
+    lf_count = sum(1 for line in lines if line.endswith("\n") and not line.endswith("\r\n"))
+    return "\r\n" if crlf_count > lf_count else "\n"
+
+
 def _patch_append_after(content: str, anchor: str, patch_content: str,
                         log: SyncLog, source_label: str) -> str:
     """Insert patch_content after the section identified by anchor."""
@@ -710,7 +717,9 @@ def _patch_append_after(content: str, anchor: str, patch_content: str,
         log.warning(f"Composition patch 'append-after': anchor '{anchor}' not found in {source_label}")
         return content
     _, end_idx = bounds
-    patch_lines = ("\n\n" + patch_content.rstrip("\n") + "\n\n").splitlines(keepends=True)
+    nl = _dominant_newline(lines)
+    normalized_patch = patch_content.replace("\r\n", "\n").rstrip("\n").replace("\n", nl)
+    patch_lines = (nl + nl + normalized_patch + nl + nl).splitlines(keepends=True)
     result_lines = lines[:end_idx] + patch_lines + lines[end_idx:]
     return "".join(result_lines)
 
@@ -724,7 +733,9 @@ def _patch_replace(content: str, anchor: str, patch_content: str,
         log.warning(f"Composition patch 'replace': anchor '{anchor}' not found in {source_label}")
         return content
     start_idx, end_idx = bounds
-    patch_lines = (patch_content.rstrip("\n") + "\n").splitlines(keepends=True)
+    nl = _dominant_newline(lines)
+    normalized_patch = patch_content.replace("\r\n", "\n").rstrip("\n").replace("\n", nl)
+    patch_lines = (normalized_patch + nl).splitlines(keepends=True)
     result_lines = lines[:start_idx] + patch_lines + lines[end_idx:]
     return "".join(result_lines)
 
@@ -752,7 +763,10 @@ def apply_patch(content: str, patch: dict, log: SyncLog, source_label: str) -> s
     patch_content = patch.get("content", "")
 
     if op == "append":
-        return content.rstrip("\n") + "\n\n" + patch_content.rstrip("\n") + "\n"
+        lines = content.splitlines(keepends=True)
+        nl = _dominant_newline(lines)
+        normalized_patch = patch_content.replace("\r\n", "\n").rstrip("\n").replace("\n", nl)
+        return content.rstrip("\n").rstrip("\r") + nl + nl + normalized_patch + nl
     elif op == "append-after":
         return _patch_append_after(content, anchor, patch_content, log, source_label)
     elif op == "replace":
