@@ -252,8 +252,10 @@ providers:
     has_rules: true
     rules_dir: .mammouth/rules
     has_hooks: true
+    hooks_dir: .mammouth/hooks
     has_commands: true
     has_settings: true
+    settings_file: .mammouth/settings.json
     capabilities:
       - agents
       - rules
