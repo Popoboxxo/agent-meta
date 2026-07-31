@@ -62,4 +62,17 @@ beim nächsten `sync.py`-Lauf. Daher:
 
 ## Platzhalter-Escape
 
-`{{%VAR%}}` → rendert als `{{VAR}}` ohne Substitution (für Dokumentation in Templates)
+Für Dokumentation in Templates: Ein Platzhalter kann escaped werden, indem sein
+Variablenname zusätzlich in Prozentzeichen eingeschlossen wird, direkt innerhalb
+der doppelten geschweiften Klammern (Reihenfolge: zwei öffnende geschweifte
+Klammern, Prozentzeichen, VARIABLENNAME, Prozentzeichen, zwei schließende
+geschweifte Klammern). `sync.py` erkennt diese Schreibweise, entfernt beim
+Rendern die beiden Prozentzeichen wieder und lässt den reinen Platzhalter
+unverändert und unsubstituiert im generierten Output stehen — so kann ein
+Platzhalter-Beispiel literal in Doku-Templates erscheinen, ohne selbst ersetzt
+zu werden. Exakte Implementierung: `scripts/lib/config.py::substitute()`.
+
+**Hinweis für Doku-Autoren:** Der escapte Token selbst darf hier in dieser
+Quelldatei nicht als roher, verarbeitbarer Text auftauchen — jedes Vorkommen
+würde von `substitute()` beim nächsten Sync genauso entschärft wie ein echter
+Platzhalter, wodurch die Doku ihr eigenes Beispiel unsichtbar macht.
