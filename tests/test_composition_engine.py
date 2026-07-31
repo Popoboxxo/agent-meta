@@ -12,6 +12,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from lib.agents import _find_section_bounds, apply_patch
+from lib.consistency.frontmatter import _check_patch_anchors
 from lib.log import SyncLog
 
 
@@ -55,3 +56,16 @@ def test_patch_replace_does_not_truncate_at_code_block_comment():
     # Old code-block remnants must be fully gone, not just the heading.
     assert "python scripts/sync.py --validate" not in result
     assert "## Next Section" in result
+
+
+def test_validator_rejects_anchor_that_is_only_a_substring(tmp_path):
+    base_path = tmp_path / "agents" / "1-generic" / "example.md"
+    base_path.parent.mkdir(parents=True)
+    base_path.write_text("## Configuration\n\nSome text.\n", encoding="utf-8")
+
+    patches = [{"op": "replace", "anchor": "## Config", "content": "## Config\n\nNew.\n"}]
+    findings = _check_patch_anchors(
+        patches, "1-generic/example.md", "some/override.md", tmp_path,
+    )
+    check_ids = [f.check for f in findings]
+    assert "frontmatter.patch-anchor-not-found" in check_ids
