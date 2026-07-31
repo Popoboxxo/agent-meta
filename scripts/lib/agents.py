@@ -684,8 +684,15 @@ def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | Non
     if start_idx is None:
         return None
 
+    in_fence = False
     for i in range(start_idx + 1, len(lines)):
         line = lines[i]
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         if line.startswith("#"):
             level = len(line) - len(line.lstrip("#"))
             if level <= anchor_level:
