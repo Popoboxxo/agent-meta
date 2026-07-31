@@ -84,55 +84,10 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.90.10` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.91.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
-
-# Branch-Guard
-
-Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
-
-
-
-# Commit-Konventionen
-
-Verwende Conventional Commits (feat, fix, chore).
-Beschreibungssprache: `Englisch`
-Max 72 Zeichen in erster Zeile. Imperativ.
-Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
-
-
-
-# GitHub Issue Lifecycle
-
-Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
-
-
-
-# Sprachregeln
-
-| Kontext | Sprache |
-|---|---|
-| User-Kommunikation | **Deutsch** |
-| User-Input | **Deutsch** |
-| Externe Doku | **Englisch** |
-| Interne Doku | **Deutsch** |
-| Code/Commits | **Englisch** |
-
-
-
-# CRITICAL GATE
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
-
-## Git Delegation
-Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
-
-Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
-
-Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
-
-
 
 # agent-meta — Schichten-Architektur
 
@@ -198,7 +153,65 @@ beim nächsten `sync.py`-Lauf. Daher:
 
 ## Platzhalter-Escape
 
-`{{VAR}}` → rendert als `{{VAR}}` ohne Substitution (für Dokumentation in Templates)
+Für Dokumentation in Templates: Ein Platzhalter kann escaped werden, indem sein
+Variablenname zusätzlich in Prozentzeichen eingeschlossen wird, direkt innerhalb
+der doppelten geschweiften Klammern (Reihenfolge: zwei öffnende geschweifte
+Klammern, Prozentzeichen, VARIABLENNAME, Prozentzeichen, zwei schließende
+geschweifte Klammern). `sync.py` erkennt diese Schreibweise, entfernt beim
+Rendern die beiden Prozentzeichen wieder und lässt den reinen Platzhalter
+unverändert und unsubstituiert im generierten Output stehen — so kann ein
+Platzhalter-Beispiel literal in Doku-Templates erscheinen, ohne selbst ersetzt
+zu werden. Exakte Implementierung: `scripts/lib/config.py::substitute()`.
+
+**Hinweis für Doku-Autoren:** Der escapte Token selbst darf hier in dieser
+Quelldatei nicht als roher, verarbeitbarer Text auftauchen — jedes Vorkommen
+würde von `substitute()` beim nächsten Sync genauso entschärft wie ein echter
+Platzhalter, wodurch die Doku ihr eigenes Beispiel unsichtbar macht.
+
+
+
+# Branch-Guard
+
+Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
+
+
+
+# Commit-Konventionen
+
+Verwende Conventional Commits (feat, fix, chore).
+Beschreibungssprache: `Englisch`
+Max 72 Zeichen in erster Zeile. Imperativ.
+Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
+
+
+
+# GitHub Issue Lifecycle
+
+Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
+
+
+
+# Sprachregeln
+
+| Kontext | Sprache |
+|---|---|
+| User-Kommunikation | **Deutsch** |
+| User-Input | **Deutsch** |
+| Externe Doku | **Englisch** |
+| Interne Doku | **Deutsch** |
+| Code/Commits | **Englisch** |
+
+
+
+# CRITICAL GATE
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+
+## Git Delegation
+Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
+
+Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
+
+Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 
 
 
@@ -738,6 +751,16 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 - **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 
 <!-- agent-meta:managed-end -->
+
+
+
+
+
+
+
+
+
+
 
 
 
