@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 1.2.0
+# version: 1.2.1
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -47,12 +47,6 @@ esac
 AGENT_NAME=$(echo "$INPUT" | $_PY -c "import json,sys; print(json.load(sys.stdin).get('agent_name',''))" 2>/dev/null || echo "")
 
 if echo "$AGENT_NAME" | grep -qiE "orchestrator|^git$"; then
-  exit 0
-fi
-
-# Main-chat-as-orchestrator mode: no subagent name is set at all when the
-# main session itself performs the mutation directly (direct-dispatch-enabled).
-if [ -z "$AGENT_NAME" ]; then
   exit 0
 fi
 
