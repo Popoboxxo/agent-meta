@@ -1298,7 +1298,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             project_config["submodule-protection"] = False
         else:
             project_config["submodule-protection"] = override_text
-            
+
+        # Clean up a stale nested override so only one representation exists.
+        if "rules" in project_config and isinstance(project_config["rules"], dict):
+            project_config["rules"].pop("submodule-protection", None)
+
         self.__class__.config_manager.write("project", project_config)
         return self._send_json({"status": "saved"})
 
