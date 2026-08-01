@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.91.2] — 2026-08-01
+
+### Fixed
+- #390: Fixed orchestrator-guard hook exemption for git subagent via self-declare sentinel `#agent-meta:agent=<name>` (PreToolUse payload missing `agent_name` field).
+- #390: Fixed Windows path interpolation bug in orchestrator-guard.sh causing backslash escape sequences to corrupt config file path.
+- #390: Fixed git-mutations regex to use token-aware parser instead of substring matching (eliminated false positives on `git merge-base`, `git check-ignore`).
+- #390: Fixed hook to read provider-specific `orchestrator.provider-overrides.<Provider>.mode` setting via `{{AGENT_META_PROVIDER}}` placeholder.
+
 ## [0.90.2] — 2026-07-28
 
 ### Fixed

@@ -249,6 +249,14 @@ def sync_hooks(
     for source_path, output_name in sources:
         target_path = safe_path(target_dir, output_name)
         source_content = source_path.read_text(encoding="utf-8")
+        # Hook scripts get no general {{VARIABLE}} substitution (unlike
+        # agents/rules) — this one placeholder is the exception. It lets a
+        # hook resolve `orchestrator.provider-overrides.<provider>` at
+        # runtime without the provider identity gap that affects everything
+        # else (see hooks/1-generic/orchestrator-guard.sh and issue #390):
+        # sync.py bakes the provider into each provider's own generated
+        # copy at build time instead.
+        source_content = source_content.replace("{{AGENT_META_PROVIDER}}", provider)
         meta = parse_hook_metadata(source_content)
         layer = source_path.parts[-2]
         hook_stem = Path(output_name).stem

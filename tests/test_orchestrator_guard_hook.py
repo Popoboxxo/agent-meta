@@ -1,24 +1,33 @@
-"""Regression test for the Task 6 CRITICAL security fix in
-hooks/1-generic/orchestrator-guard.sh: a bare/empty `agent_name` in the
-synthetic PreToolUse payload must NOT be treated as an implicit exemption
-(fail-open bug). Only `agent_name` values matching `orchestrator` or the
-exact literal `git` (anchored, not a substring match) are allowed through.
+"""Regression tests for hooks/1-generic/orchestrator-guard.sh.
+
+Background: the hook used to read an `agent_name` field from the
+PreToolUse JSON payload to exempt the `git`/`orchestrator` agents from the
+strict-mode block. That field does not exist in any provider's real
+PreToolUse payload (Claude Code's documented payload is
+`{session_id, transcript_path, hook_event_name, tool_name, tool_input}`
+only -- see docs/guides/features/hooks.md) -- the exemption never
+triggered (agent-meta issue #390).
+
+v2.0.0 replaces this with a self-declared identity: an authorized Bash
+command's first line must be the exact sentinel `#agent-meta:agent=<name>`.
+Write/Edit have no safe equivalent channel (a marker would corrupt file
+content) and are therefore never exempted under strict mode -- this is
+intentional, not a regression.
+
+This also covers two bugs found alongside #390 while fixing it:
+- the git-mutation regex matched substrings anywhere in the command
+  (`merge-base`, `check-ignore`, quoted text) instead of actual git
+  subcommands;
+- `$CONFIG_FILE` (a Windows path, containing backslashes) used to be
+  interpolated directly into a Python string literal, so Python's own
+  string-escape parsing (backslash-a, backslash-R, ...) silently corrupted
+  the path, `open()` raised, and strict mode resolved to 'false'
+  unconditionally on Windows regardless of `project.yaml`.
 
 This hook is a bash script outside the Python pytest suite, so nothing
-else guards against someone reintroducing the fail-open exemption bug.
-This test invokes the hook as a real subprocess with a synthetic
-PreToolUse JSON payload and asserts on its exit code.
-
-Empirically verified setup (see docstrings below for why):
-- `tool_name` must be `"Bash"` -- non-mutating tool names (or a missing
-  `tool_name`) exit 0 immediately, before the AGENT_NAME check is ever
-  reached.
-- `cwd` points at THIS repo's own root, which has
-  `orchestrator.strict: true` in `.meta-config/project.yaml`. That makes
-  the hook enter the strict-mode branch immediately after the AGENT_NAME
-  check, giving a direct assertion on exactly the exemption logic under
-  test. `tool_input.command` can be any harmless string in this mode --
-  strict mode blocks on tool_name alone, not on command content.
+else guards against regressions here. These tests invoke the hook as a
+real subprocess with synthetic PreToolUse JSON payloads and assert on its
+exit code.
 
 Run: python -m pytest tests/test_orchestrator_guard_hook.py -v
 """
@@ -41,28 +50,12 @@ _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
 # to get deterministic behavior across environments.
 _BASH = shutil.which("bash") or "bash"
 
-# (agent_name, expected_exit_code)
-CASES = [
-    ("", 2),  # empty agent_name must NOT be treated as an implicit exemption
-    ("git", 0),  # exact literal "git" is allowed
-    ("gitx", 2),  # "^git$" must be anchored, not a substring match
-    ("orchestrator", 0),  # orchestrator is allowed
-    ("developer", 2),  # any other agent is blocked in strict mode
-]
+pytestmark = pytest.mark.skipif(
+    sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
+)
 
 
-def _run_hook(agent_name: str) -> subprocess.CompletedProcess:
-    payload = {
-        "tool_name": "Bash",
-        "tool_input": {"command": "echo test"},
-        # Forward slashes: the hook does raw shell string concatenation
-        # (`$PROJECT_ROOT/.meta-config/project.yaml`) without normalizing
-        # path separators, so a Windows-style backslash path here would
-        # silently fail the `-f` existence check and short-circuit the
-        # strict-mode branch under test.
-        "cwd": _REPO_ROOT.as_posix(),
-        "agent_name": agent_name,
-    }
+def _run_hook(payload: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=json.dumps(payload),
@@ -72,14 +65,103 @@ def _run_hook(agent_name: str) -> subprocess.CompletedProcess:
     )
 
 
-@pytest.mark.skipif(sys.platform not in ("win32", "linux", "darwin"), reason="requires bash")
-@pytest.mark.parametrize("agent_name,expected_exit_code", CASES)
-def test_orchestrator_guard_exit_code(agent_name, expected_exit_code):
+def _bash_payload(command: str) -> dict:
+    return {
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+        # Forward slashes: the hook does raw shell string concatenation
+        # (`$PROJECT_ROOT/.meta-config/project.yaml`) without normalizing
+        # path separators, so a Windows-style backslash path here would
+        # exercise the same bug as the dedicated backslash-cwd test below.
+        # Kept as .as_posix() here since these cases aren't testing that.
+        "cwd": _REPO_ROOT.as_posix(),
+    }
+
+
+# This repo's own .meta-config/project.yaml has orchestrator.strict: true,
+# which is what makes these assertions meaningful without a fixture project.
+STRICT_CASES = [
+    ("echo test", 2),  # no sentinel -> blocked
+    ("#agent-meta:agent=git\ngit status", 0),  # exact sentinel -> exempt
+    ("#agent-meta:agent=orchestrator\necho test", 0),  # exact sentinel -> exempt
+    ("#agent-meta:agent=gitx\necho test", 2),  # not a recognized agent -> blocked
+    (" #agent-meta:agent=git\ngit status", 0),  # surrounding whitespace is stripped before matching, still exempt
+    ("echo '#agent-meta:agent=git'\ngit status", 2),  # sentinel must be the actual first line, not embedded text
+]
+
+
+@pytest.mark.parametrize("command,expected_exit_code", STRICT_CASES)
+def test_strict_mode_sentinel_exemption(command, expected_exit_code):
     assert _HOOK_PATH.is_file(), f"hook script not found: {_HOOK_PATH}"
-
-    result = _run_hook(agent_name)
-
+    result = _run_hook(_bash_payload(command))
     assert result.returncode == expected_exit_code, (
-        f"agent_name={agent_name!r}: expected exit code {expected_exit_code}, "
+        f"command={command!r}: expected exit code {expected_exit_code}, "
         f"got {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+def test_strict_mode_blocks_write_unconditionally():
+    # Write/Edit have no safe self-declaration channel (a marker line would
+    # corrupt file content) -- they must stay blocked even for otherwise
+    # "trusted" content, unlike Bash which can carry a sentinel comment.
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": "foo.txt", "content": "#agent-meta:agent=git\nirrelevant"},
+        "cwd": _REPO_ROOT.as_posix(),
+    }
+    result = _run_hook(payload)
+    assert result.returncode == 2
+
+
+def test_strict_mode_survives_backslash_cwd():
+    # Regression for the Windows path-interpolation bug: a cwd containing
+    # backslashes must not silently disable strict-mode detection.
+    payload = _bash_payload("echo test")
+    payload["cwd"] = str(_REPO_ROOT)  # native form; backslashes on Windows
+    result = _run_hook(payload)
+    assert result.returncode == 2, (
+        "strict mode should still block an undeclared command with a "
+        f"backslash-style cwd\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+# (command, expect_blocked) -- exercised in non-strict mode via a project
+# root with no .meta-config/project.yaml, so only the git-mutation regex
+# in the non-strict branch is under test, not strict-mode gating.
+MUTATION_CASES = [
+    ("git commit -m 'x'", True),
+    ("git push origin main", True),
+    ("git add .", True),
+    ("git branch -d old-branch", True),
+    ("git branch new-branch", True),
+    ("git checkout other-branch", True),
+    ("git stash pop", True),
+    ("git tag -a v1.0.0 -m 'x'", True),
+    ("git status", False),
+    ("git branch --show-current", False),
+    ("git branch -a", False),
+    ("git log --oneline -5", False),
+    ("git merge-base main HEAD", False),  # 'merge' substring, not the subcommand
+    ("git check-ignore -v some/path", False),  # 'push'-like substring only in the binary name path
+    ("gh issue create --title x --body \"mentions git push and git commit\"", False),
+    ("git checkout -- some/path", True),  # discards working-tree changes -- a real mutation
+    ("git stash list", False),
+]
+
+
+@pytest.mark.parametrize("command,expect_blocked", MUTATION_CASES)
+def test_git_mutation_regex_precision(command, expect_blocked, tmp_path):
+    # Use a cwd with no .meta-config/project.yaml so the hook falls through
+    # to the non-strict git-mutation branch under test, independent of this
+    # repo's own strict-mode setting.
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+        "cwd": tmp_path.as_posix(),
+    }
+    result = _run_hook(payload)
+    expected = 2 if expect_blocked else 0
+    assert result.returncode == expected, (
+        f"command={command!r}: expected exit {expected}, got {result.returncode}\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
