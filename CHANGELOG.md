@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.91.3] — 2026-08-01
+
+### Fixed
+- #392: fill_defaults() now respects the `silent` parameter to prevent duplicate variable warnings
+- #392: Skip reporting BUILTIN_VARS (AGENTS_DIR, PLUGIN_DIR_NAME, PRIMARY_IMAGE_TAG) as missing to eliminate false positives
+- #392: Add _rmtree_force() utility to handle Windows read-only .git/objects/pack files during skill cleanup
+- #392: Fix reqogniloom pinned_commit reference (was branch name 'main', now actual commit hash)
+
+### Changed
+- #393: Remove Continue provider support — sync.py no longer generates Continue-specific agent files
+
 ## [0.91.2] — 2026-08-01
 
 ### Fixed
