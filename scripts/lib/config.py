@@ -282,11 +282,21 @@ def fill_defaults(
         log.info("fill-defaults", "all structural fields already set — nothing to write")
 
     # --- Warn about missing variable keys ---
-    known_vars = _load_schema_variable_keys(agent_meta_root)
-    set_vars = set(config.get("variables", {}).keys())
-    missing_vars = [v for v in known_vars if v not in set_vars]
-    for var in missing_vars:
-        log.warning(f"Variable not set in config: variables.{var}")
+    # Respect `silent` per the docstring ("only the summary line is logged for
+    # auto-fill during sync") — sync.py calls fill_defaults() twice per run
+    # (once normally, once silent at the end), so without this guard every
+    # warning below fired twice on every sync.
+    if not silent:
+        from .consistency.placeholders import _BUILTIN_VARS
+        known_vars = _load_schema_variable_keys(agent_meta_root)
+        set_vars = set(config.get("variables", {}).keys())
+        # Skip vars auto-injected by build_variables() (see _BUILTIN_VARS) —
+        # they never need to be set in project.yaml, so flagging them as
+        # "missing" was a false positive caused by this check and the
+        # build_variables() auto-injection list drifting out of sync.
+        missing_vars = [v for v in known_vars if v not in set_vars and v not in _BUILTIN_VARS]
+        for var in missing_vars:
+            log.warning(f"Variable not set in config: variables.{var}")
 
 
 def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[str, str]]) -> None:
