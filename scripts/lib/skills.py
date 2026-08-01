@@ -1,6 +1,8 @@
 """External skills: loading, commit checks, sync, add."""
 
+import os
 import re
+import stat
 import subprocess
 from pathlib import Path
 
@@ -10,6 +12,22 @@ from .log import SyncLog
 EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
 _EXTERNAL_SKILLS_CONFIG_LEGACY = "external-skills.config.yaml"
 _EXTERNAL_SKILLS_CONFIG_JSON = "external-skills.config.json"  # legacy fallback
+
+
+def _rmtree_force(path) -> None:
+    """shutil.rmtree that survives Windows' read-only .git pack/idx files.
+
+    Git marks objects in .git/objects/pack/* read-only; plain shutil.rmtree()
+    fails there with [WinError 5] Access Denied. On error, clear the
+    read-only bit and retry the removal once.
+    """
+    import shutil
+
+    def _on_error(func, target_path, exc_info):
+        os.chmod(target_path, stat.S_IWRITE)
+        func(target_path)
+
+    shutil.rmtree(path, onerror=_on_error)
 
 
 def _normalize_project_skills(raw) -> dict:
@@ -245,16 +263,16 @@ def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str
             modules_dir = Path(cwd) / ".git" / "modules" / local_path
             if modules_dir.exists():
                 try:
-                    shutil.rmtree(modules_dir)
+                    _rmtree_force(modules_dir)
                 except Exception as e:
                     log.warn(f"Failed to remove .git/modules/{local_path}: {e}")
             try:
-                shutil.rmtree(target_dir, ignore_errors=True)
+                _rmtree_force(target_dir)
             except Exception as e:
                 log.warn(f"Failed to remove working directory {local_path}: {e}")
         else:
             try:
-                shutil.rmtree(target_dir)
+                _rmtree_force(target_dir)
             except Exception as e:
                 log.warn(f"Failed to remove cloned repo {local_path}: {e}")
 

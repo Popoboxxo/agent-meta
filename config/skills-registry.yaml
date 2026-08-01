@@ -11,7 +11,7 @@ repos:
   reqogniloom:
     repo: https://github.com/Popoboxxo/ReqogniLoom
     local_path: external/ReqogniLoom
-    pinned_commit: main
+    pinned_commit: a05f6d567450f439fbdfbfc11af90bec2096a894
 
   neat-little-package:
     repo: https://github.com/racurry/neat-little-package
