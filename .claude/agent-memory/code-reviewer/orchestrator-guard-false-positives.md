@@ -5,6 +5,10 @@ metadata:
   type: project
 ---
 
+**Resolved in orchestrator-guard.sh v2.1.0** (see agent-meta issue #390): the substring
+regex was replaced with a token-based git-subcommand parser. `git merge-base`/`check-ignore`
+and quoted text no longer false-positive. Kept below for historical context only.
+
 `.claude/hooks/orchestrator-guard.sh` (PreToolUse, wired to `Bash` only) blocks any Bash
 call whose command string matches its git-mutation regex — and the regex matches on
 **substrings anywhere in the command text**, not just actual git subcommands.

@@ -259,6 +259,16 @@ test-repo:
 max-parallel-agents: 4
 orchestrator:
   enabled: true
+  # `mode: strict` below is the effective default for every provider
+  # except Claude — Claude gets the `main-chat` override further down
+  # (provider-overrides.Claude.mode), matching how this repo runs
+  # main_chat as router+worker (see use-orchestrator.md), which does
+  # direct Write/Edit in main chat by design. Strict mode has no safe
+  # self-declaration channel for Write/Edit (a marker would corrupt file
+  # content, see orchestrator-guard.sh v2.1.0), so strict mode would block
+  # that workflow entirely for Claude without the override. This `strict`
+  # boolean is only a fallback for when `mode` is unset; it plays no role
+  # here. See agent-meta issue #390.
   strict: true
   direct-dispatch-enabled: true
   unknown-fallback:

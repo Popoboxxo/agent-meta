@@ -84,10 +84,55 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.91.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.91.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
+
+# Branch-Guard
+
+Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
+
+
+
+# Commit-Konventionen
+
+Verwende Conventional Commits (feat, fix, chore).
+Beschreibungssprache: `Englisch`
+Max 72 Zeichen in erster Zeile. Imperativ.
+Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
+
+
+
+# GitHub Issue Lifecycle
+
+Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
+
+
+
+# Sprachregeln
+
+| Kontext | Sprache |
+|---|---|
+| User-Kommunikation | **Deutsch** |
+| User-Input | **Deutsch** |
+| Externe Doku | **Englisch** |
+| Interne Doku | **Deutsch** |
+| Code/Commits | **Englisch** |
+
+
+
+# CRITICAL GATE
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+
+## Git Delegation
+Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
+
+Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
+
+Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
+
+
 
 # agent-meta — Schichten-Architektur
 
@@ -167,51 +212,6 @@ zu werden. Exakte Implementierung: `scripts/lib/config.py::substitute()`.
 Quelldatei nicht als roher, verarbeitbarer Text auftauchen — jedes Vorkommen
 würde von `substitute()` beim nächsten Sync genauso entschärft wie ein echter
 Platzhalter, wodurch die Doku ihr eigenes Beispiel unsichtbar macht.
-
-
-
-# Branch-Guard
-
-Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
-
-
-
-# Commit-Konventionen
-
-Verwende Conventional Commits (feat, fix, chore).
-Beschreibungssprache: `Englisch`
-Max 72 Zeichen in erster Zeile. Imperativ.
-Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
-
-
-
-# GitHub Issue Lifecycle
-
-Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
-
-
-
-# Sprachregeln
-
-| Kontext | Sprache |
-|---|---|
-| User-Kommunikation | **Deutsch** |
-| User-Input | **Deutsch** |
-| Externe Doku | **Englisch** |
-| Interne Doku | **Deutsch** |
-| Code/Commits | **Englisch** |
-
-
-
-# CRITICAL GATE
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
-
-## Git Delegation
-Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
-
-Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
-
-Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 
 
 
@@ -751,6 +751,14 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 - **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 
 <!-- agent-meta:managed-end -->
+
+
+
+
+
+
+
+
 
 
 
