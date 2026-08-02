@@ -6,7 +6,7 @@ Public interface:
     resolve_active_mcp_servers(config, root)        → list of active server names
     generate_mcp_artifacts(...)                     → writes rule + provider config files,
                                                       returns gitignore entries
-    init_secrets_template(...)                      → creates .meta-config/secrets.local.yaml
+    sync_secrets_template(...)                       → creates/updates .meta-config/secrets.local.yaml
 """
 
 import json
@@ -162,11 +162,13 @@ def _subst(value: str, secrets: dict | None) -> str:
     """Replace {{VAR}} placeholders.
 
     secrets=None  → ${VAR}  (committed config — env var reference, safe to commit)
-    secrets=dict  → actual value from dict, or ${VAR} if key absent
+    secrets=dict  → actual value from dict, or ${VAR} if key absent/still empty
+                    (secrets_template.py pre-fills new keys as "" — those must
+                    keep falling back to the placeholder, not resolve to "")
     """
     def _replace(m: re.Match) -> str:
         var_name = m.group(1)
-        if secrets is not None and var_name in secrets:
+        if secrets is not None and secrets.get(var_name):
             return str(secrets[var_name])
         return f"${{{var_name}}}"
     return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
@@ -176,11 +178,12 @@ def _subst_opencode(value: str, secrets: dict | None) -> str:
     """Replace {{VAR}} placeholders with opencode {env:VAR} syntax.
 
     secrets=None  → {env:VAR}  (committed config — env var reference)
-    secrets=dict  → actual value from dict, or {env:VAR} if key absent
+    secrets=dict  → actual value from dict, or {env:VAR} if key absent/still empty
+                    (see _subst — an unfilled "" placeholder must not resolve to "")
     """
     def _replace(m: re.Match) -> str:
         var_name = m.group(1)
-        if secrets is not None and var_name in secrets:
+        if secrets is not None and secrets.get(var_name):
             return str(secrets[var_name])
         return f"{{env:{var_name}}}"
     return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
@@ -489,34 +492,36 @@ def _write_provider_config(
 
 
 # ---------------------------------------------------------------------------
-# Secrets template initialisation (--init)
+# Secrets template sync (runs on every sync.py invocation)
 # ---------------------------------------------------------------------------
 
-def init_secrets_template(
+def _required_secrets_by_server(
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
-    log: SyncLog,
-    dry_run: bool,
-) -> None:
-    """Generate .meta-config/secrets.local.yaml from active servers' secrets lists.
-
-    Only runs when --init is active and the file does not already exist.
-    The file is gitignored — users fill in the actual secret values.
-    """
-    target_path = project_root / SECRETS_LOCAL_FILE
-    if target_path.exists():
-        log.skip(SECRETS_LOCAL_FILE, "already exists — not overwritten")
-        return
-
+) -> dict[str, list[str]]:
+    """Map active MCP server → its declared `secrets:` list, skipping servers without any."""
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
-        return
+        return {}
 
     active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
     if not active_servers:
-        return
+        return {}
 
+    required: dict[str, list[str]] = {}
+    for server_name in active_servers:
+        server_def = registry.get(server_name)
+        if not server_def:
+            continue
+        secrets = server_def.get("secrets", [])
+        if secrets:
+            required[server_name] = secrets
+    return required
+
+
+def _render_secrets_template(required: dict[str, list[str]]) -> str:
+    """Build full secrets.local.yaml content (header + one block per server)."""
     lines: list[str] = [
         "# MCP Secrets — lokale Konfiguration",
         "# ====================================",
@@ -525,29 +530,80 @@ def init_secrets_template(
         "# Danach: python .agent-meta/scripts/sync.py",
         "",
     ]
-
-    has_content = False
-    for server_name in active_servers:
-        server_def = registry.get(server_name)
-        if not server_def:
-            continue
-        secrets = server_def.get("secrets", [])
-        if not secrets:
-            continue
-        has_content = True
+    for server_name, secrets in required.items():
         lines.append(f"# ── {server_name} ──")
         for secret in secrets:
             lines.append(f'{secret}: ""')
         lines.append("")
+    return "\n".join(lines)
 
-    if not has_content:
+
+def sync_secrets_template(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Keep .meta-config/secrets.local.yaml prepared for every active MCP server.
+
+    Runs on every sync.py invocation (not just --init), so activating a new MCP
+    server (e.g. via /add-mcp-server) immediately preps its required env vars as
+    empty placeholders — the "Env Dialog" doesn't need to be filled out by hand
+    from mcp-registry.yaml.
+
+    - File missing: write the full template.
+    - File exists: append only the secret keys of newly-active servers that
+      aren't declared yet. Existing keys/values/comments are never touched or
+      reordered, so filled-in secrets survive re-syncs untouched.
+    """
+    required = _required_secrets_by_server(agent_meta_root, project_root, config)
+    if not required:
         return
 
-    content = "\n".join(lines)
-    log.action("INIT", SECRETS_LOCAL_FILE, "MCP secrets template (gitignored)")
-    if not dry_run:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+    target_path = project_root / SECRETS_LOCAL_FILE
+
+    if not target_path.exists():
+        content = _render_secrets_template(required)
+        log.action("INIT", SECRETS_LOCAL_FILE, "MCP secrets template (gitignored)")
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(content, encoding="utf-8")
+        return
+
+    existing_data, _ = _load_yaml_or_json(target_path)
+    existing_keys = set((existing_data or {}).keys())
+
+    added_lines: list[str] = []
+    added_count = 0
+    for server_name, secrets in required.items():
+        missing = [s for s in secrets if s not in existing_keys]
+        if not missing:
+            continue
+        added_lines.append(f"# ── {server_name} (neu aktiviert) ──")
+        for secret in missing:
+            added_lines.append(f'{secret}: ""')
+            added_count += 1
+        added_lines.append("")
+
+    if not added_lines:
+        log.skip(SECRETS_LOCAL_FILE, "all required secrets already present")
+        return
+
+    log.action(
+        "UPDATE", SECRETS_LOCAL_FILE,
+        f"appended {added_count} new secret key(s) for newly active MCP server(s)",
+    )
+    if dry_run:
+        return
+
+    existing_text = target_path.read_text(encoding="utf-8")
+    if not existing_text.endswith("\n"):
+        existing_text += "\n"
+    target_path.write_text(
+        existing_text + "\n" + "\n".join(added_lines).rstrip() + "\n",
+        encoding="utf-8",
+    )
 
 
 # ---------------------------------------------------------------------------

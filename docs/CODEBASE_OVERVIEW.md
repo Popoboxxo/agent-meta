@@ -995,7 +995,7 @@ Die Auflösungslogik ist identisch mit der in `scripts/lib/agents.py` (`_compose
 - `load_mcp_registry()`: Lädt und mergt globale und projektspezifische MCP-Registries.
 - `resolve_active_mcp_servers()`: Bestimmt aktive Server (explizit aus `project.yaml` und implizit über Provider-Defaults).
 - `generate_mcp_artifacts()`: Generiert Markdown-Regeldateien (`mcp-<server>.md`) pro Provider und fügt Provider-Konfigurationen (wie `mcpServers` in `settings.json`) ein.
-- `init_secrets_template()`: Erstellt die lokale, gitignorierte `.meta-config/secrets.local.yaml` für MCP-bezogene Secrets (z.B. API-Keys).
+- `sync_secrets_template()`: Erstellt bzw. ergänzt bei jedem Sync-Lauf die lokale, gitignorierte `.meta-config/secrets.local.yaml` um die Secret-Keys aller aktiven MCP-Server (z.B. API-Keys) — neu aktivierte Server bekommen ihre fehlenden Keys automatisch angehängt, bestehende Werte bleiben unangetastet.
 
 **Integrierte MCP-Server (Registry):**
 - **ReqogniLoom:** Plattform für Requirements-Engineering, Architektur, Tests und Traceability (via SSE).
