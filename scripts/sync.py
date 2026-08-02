@@ -100,7 +100,7 @@ from lib.knowledge import generate_initial_index, generate_initial_log, generate
 from lib.log import SyncLog
 from lib.mcp import (
     generate_mcp_artifacts,
-    init_secrets_template,
+    sync_secrets_template,
 )
 from lib.platform import load_platform_config
 from lib.providers import (
@@ -948,8 +948,7 @@ def main():
         # Auto-generated env scripts — always gitignored (may contain defaults/secrets).
         env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
                          ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
-        if args.init:
-            init_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+        sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
         # Per-provider sync
         debug_mode = config.get("debug-mode", False)
         if debug_mode:
