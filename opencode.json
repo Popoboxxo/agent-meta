@@ -9,7 +9,7 @@
         "npx",
         "@playwright/mcp@latest"
       ]
-    },
+    },    
     "reqogniloom": {
       "type": "remote",
       "enabled": true,
