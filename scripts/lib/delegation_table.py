@@ -55,6 +55,8 @@ def get_intent_routing_table(agent_meta_root: Path, config: dict, variables: dic
     active_agent_names = {agent["name"] for agent in active_agents_data}
 
     table_lines = [
+        "> Parallel ist rein informativ — kein Runtime-Enforcement, nur CI-Konsistenzcheck bei required/recommended-Tier-Abdeckung.",
+        "",
         "| Intent / Keywords | Agent | Tier | Parallel |",
         "|-------------------|-------|------|----------|"
     ]
