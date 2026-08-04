@@ -31,6 +31,7 @@ live flat in that directory, and `type:` records the finer-grained kind.
 | `API Reference` | `knowledge/wiki/entities/` | Reference documentation for a concrete interface, script, config schema, or tool |
 | `Guide` | `knowledge/wiki/topics/` | How-to guide, howto, analysis, audit, or spec — practical or investigative write-ups organized by topic |
 | `Session Conclusion` | `knowledge/wiki/sources/` | Summary of a completed work session (decisions made, what changed, follow-ups) |
+| `Plan` | `knowledge/wiki/plans/` | Concrete, ordered implementation plan derived from a concept, REQ, or bug — produced by the `planner` role |
 
 ## Usage
 
