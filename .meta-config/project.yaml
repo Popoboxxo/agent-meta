@@ -58,6 +58,7 @@ roles:
 - release
 - meta-feedback
 - ideation
+- planner
 - agent-meta-manager
 - feature
 - agent-meta-scout

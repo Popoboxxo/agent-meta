@@ -470,7 +470,7 @@ In `scripts/sync.py`, inside `elif args.validate:` (currently lines 840-863), af
 ```python
         from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
         from lib.consistency.report import print_report
-        from lib.providers import load_providers_config as _load_pc, resolve_providers as _resolve_p
+        from lib.providers import load_providers_config as _load_pc
 
         _provider_config = _load_pc(agent_meta_root)
         _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)

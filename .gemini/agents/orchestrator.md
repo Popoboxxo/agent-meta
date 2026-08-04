@@ -46,6 +46,8 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
 
 ## 3. Intent routing
+> Parallel ist rein informativ — kein Runtime-Enforcement, nur CI-Konsistenzcheck bei required/recommended-Tier-Abdeckung.
+
 | Intent / Keywords | Agent | Tier | Parallel |
 |-------------------|-------|------|----------|
 | accessibility, a11y, WCAG, ARIA, screen reader, keyboard navigation, color contrast, focus management | `accessibility-specialist` | optional | yes |
@@ -60,7 +62,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Copilot, GitHub Copilot | `copilot-expert` | optional | no |
 | ETL, ELT, data pipeline, data quality, lineage, streaming, batch, schema registry | `data-engineer` | optional | yes |
 | dependency, license, SBOM, package audit, vulnerability, outdated, supply chain | `dependency-auditor` | optional | yes |
-| Feature, Bugfix, Refactoring, Implementierung, Code schreiben | `developer` | required | yes |
+| Bugfix, Refactoring, Implementierung, Code schreiben | `developer` | required | yes |
 | CI/CD, Kubernetes, Infrastruktur | `devops-engineer` | optional | yes |
 | Docker, Dev-Stack, Container | `docker` | optional | no |
 | Dokumentation, README, Docs, Doku | `documenter` | recommended | yes |
@@ -87,6 +89,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Meta-Feedback, Verbesserung | `meta-feedback` | optional | no |
 | Opencode | `opencode-expert` | optional | no |
 | Performance, Bottleneck, Optimierung | `performance-optimizer` | optional | no |
+| Plan, Planung, Schritte, Umsetzungsplan, wie setzen wir das um | `planner` | recommended | no |
 | Prompt, Prompt Engineering, Agenten-Definition | `prompt-engineer` | optional | no |
 | refactoring, strangler fig, legacy modernization, code smell, systematic transformation, framework upgrade | `refactoring-specialist` | optional | no |
 | Release, Version, Changelog | `release` | optional | no |
@@ -283,6 +286,8 @@ SE mode: optional
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
 
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
+
+| `planner` | Umsetzungsplanung |
 
 | `principal-developer` | Last-Resort-Eskalationsstufe |
 

@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-version: 1.2.0
+version: 1.2.1
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/senior-developer.md@1.2.0
+generated-from: 1-generic/senior-developer.md@1.2.1
 model: claude-opus-4-8
 memory: project
 ---
@@ -39,7 +39,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 0. 1. ANALYSIS: read subsystems, blast radius (callers, contracts, test coverage)
 2. DECISION: choose approach — with multiple options, note the trade-off
 3. IMPLEMENTATION: incremental, tests green after each step
-4. SELF-VERIFICATION: actually run the changed components; observe cross-cutting effects on neighbouring subsystems and caller paths; do not report done before observing the expected behavior
+4. SELF-VERIFICATION: same discipline as `developer` (see developer.md workflow step 6 — actually run/call the changed code, do not rely on green tests alone) — additionally observe cross-cutting effects on neighbouring subsystems and caller paths; do not report done before observing the expected behavior
 5. SELF-REVIEW: full diff — edge cases, error paths, concurrency, backward compat
 6. ```
 

@@ -84,7 +84,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.91.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.91.3` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
@@ -706,6 +706,8 @@ Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, 
 
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
 
+| `planner` | Umsetzungsplanung |
+
 | `principal-developer` | Last-Resort-Eskalationsstufe |
 
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
@@ -751,6 +753,10 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 - **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 
 <!-- agent-meta:managed-end -->
+
+
+
+
 
 
 
@@ -849,6 +855,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `opencode-expert.md` → registriere als `opencode-expert`
    - `orchestrator.md` → registriere als `orchestrator`
    - `performance-optimizer.md` → registriere als `performance-optimizer`
+   - `planner.md` → registriere als `planner`
    - `principal-developer.md` → registriere als `principal-developer`
    - `prompt-engineer.md` → registriere als `prompt-engineer`
    - `refactoring-specialist.md` → registriere als `refactoring-specialist`
@@ -903,6 +910,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="opencode-expert", ...)
    define_subagent(name="orchestrator", ...)
    define_subagent(name="performance-optimizer", ...)
+   define_subagent(name="planner", ...)
    define_subagent(name="principal-developer", ...)
    define_subagent(name="prompt-engineer", ...)
    define_subagent(name="refactoring-specialist", ...)

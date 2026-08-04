@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- New `planner` agent role: turns a concept, REQ, or bug into a concrete, ordered implementation plan with per-step agent assignment and measurable acceptance criteria (`agents/1-generic/planner.md`, `config/role-defaults.yaml`).
+
 ## [0.91.3] — 2026-08-01
 
 ### Fixed
