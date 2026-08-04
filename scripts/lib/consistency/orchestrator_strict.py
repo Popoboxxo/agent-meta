@@ -14,13 +14,22 @@ of providers.
 
 from pathlib import Path
 
+from .. import providers as providers_lib
 from .report import Finding, Severity
 
 
 def _resolve_effective_strict(orch: dict, provider: str) -> bool:
-    """Mirror resolve_mode() in hooks/1-generic/orchestrator-guard.sh."""
+    """Mirror resolve_mode() in hooks/1-generic/orchestrator-guard.sh.
+
+    Three precedence tiers, checked in order:
+    1. orchestrator.provider-overrides.<provider>.mode
+    2. orchestrator.mode (global)
+    3. legacy orchestrator.strict + orchestrator.enabled booleans
+    """
     override = orch.get("provider-overrides", {}).get(provider, {})
     mode = override.get("mode")
+    if mode is None:
+        mode = orch.get("mode")
     if mode is not None:
         return str(mode).strip().lower() == "strict"
     strict = orch.get("strict", False)
@@ -32,8 +41,6 @@ def check_orchestrator_strict_hook_support(project_root: Path, config: dict,
                                             provider_config: dict) -> list[Finding]:
     """Warn when orchestrator.strict is effectively active for a provider with no
     PreToolUse hook wiring (config/ai-providers.yaml has_hooks: false)."""
-    from .. import providers as providers_lib
-
     findings: list[Finding] = []
     orch = config.get("orchestrator", {})
     if not orch:

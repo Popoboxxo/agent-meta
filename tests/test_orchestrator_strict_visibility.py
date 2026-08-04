@@ -56,3 +56,30 @@ def test_provider_override_narrows_strict_mode_to_claude_only():
     }
     findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
     assert findings == []
+
+
+def test_provider_override_turns_strict_on_despite_global_off():
+    """Provider-overrides must be able to widen strict mode too, not just narrow it --
+    global orchestrator.strict is False here, but the Opencode override sets
+    mode: 'strict' explicitly."""
+    config = {
+        "ai-providers": ["Claude", "Opencode"],
+        "orchestrator": {
+            "enabled": True,
+            "strict": False,
+            "provider-overrides": {"Opencode": {"mode": "strict"}},
+        },
+    }
+    findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
+    assert any(f.severity == Severity.WARNING and "Opencode" in f.message for f in findings)
+
+
+def test_global_mode_key_triggers_warning_without_legacy_booleans():
+    """Regression test for the missing precedence tier: orchestrator.mode (global)
+    must be honored even when no legacy strict/enabled booleans are present at all."""
+    config = {
+        "ai-providers": ["Claude", "Opencode"],
+        "orchestrator": {"mode": "strict"},
+    }
+    findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
+    assert any(f.severity == Severity.WARNING and "Opencode" in f.message for f in findings)
