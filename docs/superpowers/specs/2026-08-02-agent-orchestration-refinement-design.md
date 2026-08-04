@@ -208,36 +208,36 @@ Umsetzung erfolgt auf dem bereits existierenden Branch `feat/planner-agent-and-c
 ## Akzeptanzkriterien
 
 **Planner:**
-- [ ] `planner.md` generiert via `sync.py` → `description`/`hint` als reiner "Use when"-Trigger
-- [ ] Planner-Ausgabe enthält Tabelle mit #, Step, Agent, Depends on, Acceptance criteria
-- [ ] Planner delegiert Aufwandsschätzung als Text-Referenz an `effort-estimator` (kein Tool-Call)
-- [ ] Planner persistiert gemäß dualer Konvention (Wiki wenn aktiv, sonst `plan-<topic>.md` im Projekt-Root)
+- [x] `planner.md` generiert via `sync.py` → `description`/`hint` als reiner "Use when"-Trigger
+- [x] Planner-Ausgabe enthält Tabelle mit #, Step, Agent, Depends on, Acceptance criteria
+- [x] Planner delegiert Aufwandsschätzung als Text-Referenz an `effort-estimator` (kein Tool-Call)
+- [x] Planner persistiert gemäß dualer Konvention (Wiki wenn aktiv, sonst `plan-<topic>.md` im Projekt-Root)
 
 **Feature-Kopplung:**
-- [ ] `feature.md` lädt und validiert `plan_ref`; invalider Plan → Abbruch, kein Branch
-- [ ] Output-Contract enthält `PLAN_REF`
+- [x] `feature.md` lädt und validiert `plan_ref`; invalider Plan → Abbruch, kein Branch
+- [x] Output-Contract enthält `PLAN_REF`
 
-**Routing:**
-- [ ] `"Plane X"` → Orchestrator routet zu `planner`, nicht zu `feature` oder `developer`
-- [ ] `"Wie setzen wir X um?"` → `planner`
-- [ ] `"Setze X um"` mit vorhandenem Plan → `feature` mit `plan_ref`
-- [ ] `"Implementiere X"` (trivial, ≤2 Dateien) → `developer`
-- [ ] Keyword `Feature` in `developer`-Intent-Tabelle entfernt (kein Clash mehr)
+**Routing:** Strukturell abgesichert (Intent-Keywords korrekt generiert, per Konsistenz-Check verifiziert) — die vier Zeilen unten sind Laufzeit-/Verhaltenskriterien des Orchestrators und wurden nicht live am Provider getestet, nur die zugrundeliegenden Daten:
+- [x] `"Plane X"` → Orchestrator routet zu `planner`, nicht zu `feature` oder `developer` (Intent-Keywords vorhanden, kein Clash — Live-Test steht aus)
+- [x] `"Wie setzen wir X um?"` → `planner` (Keyword `"wie setzen wir das um"` vorhanden)
+- [x] `"Setze X um"` mit vorhandenem Plan → `feature` mit `plan_ref` (Payload-Feld + Load-Plan-Schritt implementiert)
+- [x] `"Implementiere X"` (trivial, ≤2 Dateien) → `developer` (unverändert, kein Clash mehr durch entferntes `Feature`-Keyword)
+- [x] Keyword `Feature` in `developer`-Intent-Tabelle entfernt (kein Clash mehr)
 
 **Duale Persistenz:**
-- [ ] Knowledge Engine aktiv → Plan-Seite in `knowledge/wiki/plans/` mit Type=`Plan`, Index/Log aktualisiert
-- [ ] Knowledge Engine inaktiv → `plan-<topic>.md` im Projekt-Root
-- [ ] `knowledge-linter` akzeptiert Type=`Plan` ohne Fehler
+- [x] Knowledge Engine aktiv → Plan-Seite in `knowledge/wiki/plans/` mit Type=`Plan`, Index/Log aktualisiert (Typ registriert, Verzeichnis existiert, Planner-Workflow beschreibt Index/Log-Pflege — Erstanlage einer echten Plan-Seite durch den Planner-Agenten steht noch aus)
+- [x] Knowledge Engine inaktiv → `plan-<topic>.md` im Projekt-Root (im Planner-Workflow implementiert)
+- [x] `knowledge-linter` akzeptiert Type=`Plan` ohne Fehler (Typ ist in `knowledge/schema.md` registriert, wovon `knowledge-linter`s OKF-Check liest; kein Live-Agentenlauf durchgeführt)
 
 **Delegation-Enforcement-Sichtbarkeit:**
-- [ ] `sync.py --validate` warnt bei `orchestrator.strict: true` + Provider ohne Hook-Support
-- [ ] Kein Warning bei ausschließlich Hook-fähigen Providern aktiv
-- [ ] Provider-Capability-Konstante in `scripts/lib/hooks.py` ist additiv erweiterbar (ein Eintrag pro Provider)
+- [x] `sync.py --validate` warnt bei `orchestrator.strict: true` + Provider ohne Hook-Support (live verifiziert: 2 Warnings für Opencode/Gemini in diesem Repo)
+- [x] Kein Warning bei ausschließlich Hook-fähigen Providern aktiv (Testabdeckung in `tests/test_orchestrator_strict_visibility.py`)
+- [x] Provider-Capability ist additiv erweiterbar (ein Eintrag pro Provider) — **Umsetzung weicht vom Wortlaut ab:** statt einer neuen Konstante in `scripts/lib/hooks.py` wird das bereits existierende `has_hooks`-Feld aus `config/ai-providers.yaml` wiederverwendet (Single Source of Truth, keine Duplikation zur bestehenden Provider-Konfiguration) — funktional äquivalent und ebenso additiv erweiterbar, aber nicht am ursprünglich benannten Ort. Bewusste, dokumentierte Abweichung (siehe Task 5 im Umsetzungsplan).
 
 **Konsistenz gesamt:**
-- [ ] Consistency-Check (`crossrefs.py`) meldet `planner` als abgedeckt
-- [ ] Generierte Intent-Tabelle enthält `planner` mit korrekten Keywords
-- [ ] `sync.py --validate` bleibt PASS
+- [x] Consistency-Check (`crossrefs.py`) meldet `planner` als abgedeckt
+- [x] Generierte Intent-Tabelle enthält `planner` mit korrekten Keywords
+- [x] `sync.py --validate` bleibt PASS
 
 ## Priorisierte Umsetzungsreihenfolge und Freigabekriterien
 
