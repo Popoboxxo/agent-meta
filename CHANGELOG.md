@@ -5,6 +5,11 @@
 ### Added
 - New `planner` agent role: turns a concept, REQ, or bug into a concrete, ordered implementation plan with per-step agent assignment and measurable acceptance criteria (`agents/1-generic/planner.md`, `config/role-defaults.yaml`).
 
+### Changed
+- `developer`'s intent-routing keywords no longer include the bare word `Feature` — it collided with the `feature` role's own keywords and caused mis-routing.
+- `sync.py --validate` now warns when `orchestrator.strict` is active for a provider with no PreToolUse hook support (currently: any provider except Claude and Mammouth).
+- `developer`'s dead `Agent` tool grant was removed — the role was already instructed to delegate via text reference only, never via tool call.
+
 ## [0.91.3] — 2026-08-01
 
 ### Fixed

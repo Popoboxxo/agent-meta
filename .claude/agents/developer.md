@@ -1,7 +1,7 @@
 ---
 name: developer
-version: 1.0.3
-based-on: 1-generic/developer.md@2.5.2
+version: 1.0.4
+based-on: 1-generic/developer.md@3.1.1
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
@@ -16,8 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-- Agent
-generated-from: 2-platform/agent-meta-developer.md@1.0.3
+generated-from: 2-platform/agent-meta-developer.md@1.0.4
 model: claude-sonnet-5
 ---
 
@@ -165,7 +164,6 @@ A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (prot
 - **Bash** — build/test/shell commands
 - **Glob/Grep** — code search
 - **TodoWrite** — track progress
-- **Agent** — delegate to other roles (only when explicitly allowed)
 </tools>
 
 <output_contract>
@@ -224,13 +222,3 @@ Anti-Recursion: NIEMALS zurück an orchestrator delegieren. Nur tester/documente
 
 **Language:** Communication → Deutsch. Code comments and commit messages → Englisch.
 </constraints>
-
-## Singleton-Regel: Orchestrator-Spawn (auto-generated)
-
-**NIEMALS** `task(subagent_type="orchestrator", ...)` oder `Agent(subagent_type="orchestrator", ...)` aufrufen.
-
-- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.
-- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.
-- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.
-
-> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.

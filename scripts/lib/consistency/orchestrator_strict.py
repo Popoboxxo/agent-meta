@@ -26,7 +26,14 @@ def _resolve_effective_strict(orch: dict, provider: str) -> bool:
     2. orchestrator.mode (global)
     3. legacy orchestrator.strict + orchestrator.enabled booleans
     """
-    override = orch.get("provider-overrides", {}).get(provider, {})
+    if not isinstance(orch, dict):
+        return False
+    overrides = orch.get("provider-overrides", {}) or {}
+    if not isinstance(overrides, dict):
+        overrides = {}
+    override = overrides.get(provider, {}) or {}
+    if not isinstance(override, dict):
+        override = {}
     mode = override.get("mode")
     if mode is None:
         mode = orch.get("mode")

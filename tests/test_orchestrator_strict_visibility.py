@@ -83,3 +83,36 @@ def test_global_mode_key_triggers_warning_without_legacy_booleans():
     }
     findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
     assert any(f.severity == Severity.WARNING and "Opencode" in f.message for f in findings)
+
+
+def test_malformed_provider_overrides_null_does_not_crash():
+    """provider-overrides: null (whole key empty) must not raise AttributeError."""
+    config = {
+        "ai-providers": ["Claude", "Opencode"],
+        "orchestrator": {"enabled": True, "strict": True, "provider-overrides": None},
+    }
+    findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
+    assert any(f.severity == Severity.WARNING and "Opencode" in f.message for f in findings)
+
+
+def test_malformed_orchestrator_as_plain_string_does_not_crash():
+    """orchestrator: "strict" (a plain string instead of a dict) must not raise
+    AttributeError -- treated as absent/malformed, no warning (safer than crashing)."""
+    config = {"ai-providers": ["Claude", "Opencode"], "orchestrator": "strict"}
+    findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
+    assert findings == []
+
+
+def test_malformed_provider_override_null_entry_does_not_crash():
+    """provider-overrides: {Opencode: null} must not raise AttributeError when
+    resolving the override for the active 'Opencode' provider."""
+    config = {
+        "ai-providers": ["Claude", "Opencode"],
+        "orchestrator": {
+            "enabled": True,
+            "strict": True,
+            "provider-overrides": {"Opencode": None},
+        },
+    }
+    findings = check_orchestrator_strict_hook_support(_REPO_ROOT, config, _provider_config())
+    assert any(f.severity == Severity.WARNING and "Opencode" in f.message for f in findings)

@@ -1,6 +1,6 @@
 ---
 name: feature
-version: 1.11.0
+version: 1.11.1
 description: Use when the orchestrator needs to run a full feature lifecycle (branch
   through PR) instead of a single delegated step.
 hint: Nur vom Orchestrator gestartet — orchestriert den kompletten Feature-Lifecycle,
@@ -11,7 +11,7 @@ tools:
 - Read
 - Agent
 - TodoWrite
-generated-from: 1-generic/feature.md@1.11.0
+generated-from: 1-generic/feature.md@1.11.1
 model: claude-sonnet-5
 ---
 
@@ -31,15 +31,15 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}` (`t`=feature).
 
 **HITL:** on `requires_human_approval: true`, pause and ask the user. On "no" → abort, inform orchestrator.
 
-`payload.plan_ref` (optional): relative path to a plan file/page in `planner-output-v1` format — triggers Step 0.
+`payload.plan_ref` (optional): relative path to a plan file/page in `planner-output-v1` format — triggers Step 1a.
 
-## 0. Load plan (optional)
+## 1a. Load plan (optional)
 
 **Active when:** `payload.plan_ref` is set.
 
 1. Read the referenced plan (`plan-<topic>.md` or a Knowledge-Wiki `Plan` page).
 2. Validate: table with columns `#, Step, Agent, Depends on, Acceptance criteria` present, at least one row, no circular dependencies in "Depends on".
-3. On invalid plan: report the missing/broken fields, abort — do not create a branch, do not start step 1.
+3. On invalid plan: report the missing/broken fields, abort — do not create a branch, do not start the lifecycle.
 4. Map plan steps onto the lifecycle phases below by `Agent` column: `tester` → step 3, `developer` → step 4, `requirements` → step 2 (if not already satisfied).
 
 ## 2. Feature lifecycle (8 steps)

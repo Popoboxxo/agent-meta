@@ -1,6 +1,6 @@
 ---
 name: sharkord-developer
-version: "2.1.2"
+version: "2.1.3"
 based-on: "1-generic/developer.md@2.3.0"
 description: "Sharkord-spezifischer Developer-Agent. Ergänzt den generischen Developer um Sharkord-Build-Kommandos. Das Sharkord Plugin-SDK Wissen (PluginContext API, Mediasoup, Commands, Events, Don'ts) kommt automatisch aus der Rule rules/2-platform/sharkord-sdk.md."
 hint: "Feature-Implementierung und Bugfixes nach REQ-IDs (Sharkord Plugin SDK)"
@@ -12,7 +12,6 @@ tools:
   - Edit
   - Glob
   - Grep
-  - Agent
   - TodoWrite
 ---
 
@@ -76,7 +75,6 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - **Bash** — build/test/shell commands
 - **Glob/Grep** — code search
 - **TodoWrite** — track progress
-- **Agent** — delegate to other roles (only when explicitly allowed)
 </tools>
 
 <output_contract>

@@ -1,6 +1,6 @@
 ---
 name: developer
-version: "1.1.1"
+version: "1.1.2"
 based-on: "1-generic/developer.md@2.3.0"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
@@ -12,7 +12,6 @@ tools:
   - Edit
   - Glob
   - Grep
-  - Agent
   - TodoWrite
 ---
 
@@ -142,7 +141,6 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - **Bash** — build/test/shell commands
 - **Glob/Grep** — code search
 - **TodoWrite** — track progress
-- **Agent** — delegate to other roles (only when explicitly allowed)
 </tools>
 
 <output_contract>

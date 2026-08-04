@@ -47,12 +47,13 @@ def _extract_yaml_permissions(fm: str) -> dict[str, str]:
 AGENTS_DIR = Path(__file__).resolve().parent.parent / ".opencode" / "agents"
 
 # Roles that are expected to have a `task` permission because they delegate.
-# ideation/tester are workers by design (anti-recursion guard) — they refer
-# to other roles in text but never dispatch via tool calls.
+# ideation/tester/developer are workers by design (anti-recursion guard) — they
+# refer to other roles in text but never dispatch via tool calls. developer's
+# dead `Agent` tool grant was removed across 1-generic and all 2-platform
+# full-replacement overrides (see CHANGELOG.md [Unreleased] / Änderung).
 DELEGATING_ROLES = {
     "orchestrator",
     "feature",
-    "developer",
     "agent-meta-manager",
 }
 

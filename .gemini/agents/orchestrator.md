@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.6.1
+version: 7.7.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -10,7 +10,7 @@ tools:
 - TodoWrite
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@7.6.1
+generated-from: 1-generic/orchestrator.md@7.7.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -135,6 +135,8 @@ All "yes" → start. Otherwise resolve first.
 | Same tasks, independent | FANOUT(N, agent) |
 | Mixed tasks | PARALLEL_GROUP |
 | Complex feature | → `feature` or pipeline |
+
+Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to `feature` as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
 **Parallel:** disjoint files, max 4, in doubt → sequential, overlap → BARRIER.
 **Not parallel:** sequential dependencies, shared mutable state, deterministic workflow, tight budget.
