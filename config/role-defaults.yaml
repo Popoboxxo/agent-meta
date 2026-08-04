@@ -18,7 +18,6 @@ roles:
     description: Feature-Implementierung und Bugfixes
     routing:
       intent_keywords:
-      - Feature
       - Bugfix
       - Refactoring
       - Implementierung
@@ -178,6 +177,21 @@ roles:
       target_roles:
       - requirements
     short_desc: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
+  planner:
+    model: balanced
+    memory: ''
+    workflow_tier: recommended
+    description: Erzeugt konkrete, geordnete Umsetzungspläne aus Konzepten/REQs/Bugs
+    routing:
+      intent_keywords:
+      - Plan
+      - Planung
+      - Schritte
+      - Umsetzungsplan
+      - "wie setzen wir das um"
+      parallel: false
+      orchestrator_only: false
+    short_desc: Umsetzungsplanung
   feature:
     model: balanced
     memory: ''
