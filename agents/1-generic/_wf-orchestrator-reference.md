@@ -13,9 +13,10 @@
 | Pattern | Vorgehen |
 |---------|----------|
 | Single Feature | `feature` oder Pipeline: git→req→test→dev→test→review→doc→git |
+| Plan vorhanden | planner→feature(plan_ref=<path>) |
 | Multi-Bug Fix | FANOUT(N, developer) → BARRIER → git |
 | Mixed Tasks | PARALLEL_GROUP(dev, tester) → BARRIER → review → git |
-| Refactoring | ideation→dev→tester→review→git |
+| Refactoring | explorer→dev→tester→review→git |
 | Analysis + Design | PARALLEL_GROUP(explorer, ideation) → BARRIER |
 | Unknown Intent | Klärende Frage → Fallback |
 

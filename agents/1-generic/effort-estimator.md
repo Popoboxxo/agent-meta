@@ -1,6 +1,6 @@
 ---
 name: template-effort-estimator
-version: "1.0.2"
+version: "1.0.3"
 description: "Estimates effort for development tasks based on task type and LLM capabilities."
 hint: "Effort estimation for tasks — delegate here when the user asks about time/cost"
 prompt_mode: modern
@@ -8,6 +8,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - TodoWrite
 ---
 
 > **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-effort-estimator-ext.md` exists → read and apply immediately.

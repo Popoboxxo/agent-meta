@@ -1,15 +1,16 @@
 ---
 name: effort-estimator
-version: 1.0.2
+version: 1.0.3
 description: Estimates effort for development tasks based on task type and LLM capabilities.
 prompt_mode: modern
-generated-from: 1-generic/effort-estimator.md@1.0.2
+generated-from: 1-generic/effort-estimator.md@1.0.3
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow
   grep: allow
+  todowrite: allow
   bash: deny
   edit: deny
 ---

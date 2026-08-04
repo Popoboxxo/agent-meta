@@ -1,7 +1,7 @@
 ---
 name: agent-meta-developer
-version: "1.0.3"
-based-on: "1-generic/developer.md@2.5.2"
+version: "1.0.4"
+based-on: "1-generic/developer.md@3.1.1"
 description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface."
 hint: "Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML)"
 prompt_mode: modern
@@ -13,7 +13,6 @@ tools:
   - Glob
   - Grep
   - TodoWrite
-  - Agent
 ---
 
 > **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` exists → read and apply immediately.
@@ -148,7 +147,6 @@ Neue Funktionalität gehört in das zuständige `lib/`-Modul, nie direkt in `syn
 - **Bash** — build/test/shell commands
 - **Glob/Grep** — code search
 - **TodoWrite** — track progress
-- **Agent** — delegate to other roles (only when explicitly allowed)
 </tools>
 
 <output_contract>

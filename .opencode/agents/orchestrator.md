@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 7.6.1
+version: 7.7.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@7.6.1
+generated-from: 1-generic/orchestrator.md@7.7.0
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
@@ -45,6 +45,8 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
 
 ## 3. Intent routing
+> Parallel ist rein informativ — kein Runtime-Enforcement, nur CI-Konsistenzcheck bei required/recommended-Tier-Abdeckung.
+
 | Intent / Keywords | Agent | Tier | Parallel |
 |-------------------|-------|------|----------|
 | accessibility, a11y, WCAG, ARIA, screen reader, keyboard navigation, color contrast, focus management | `accessibility-specialist` | optional | yes |
@@ -59,7 +61,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Copilot, GitHub Copilot | `copilot-expert` | optional | no |
 | ETL, ELT, data pipeline, data quality, lineage, streaming, batch, schema registry | `data-engineer` | optional | yes |
 | dependency, license, SBOM, package audit, vulnerability, outdated, supply chain | `dependency-auditor` | optional | yes |
-| Feature, Bugfix, Refactoring, Implementierung, Code schreiben | `developer` | required | yes |
+| Bugfix, Refactoring, Implementierung, Code schreiben | `developer` | required | yes |
 | CI/CD, Kubernetes, Infrastruktur | `devops-engineer` | optional | yes |
 | Docker, Dev-Stack, Container | `docker` | optional | no |
 | Dokumentation, README, Docs, Doku | `documenter` | recommended | yes |
@@ -86,6 +88,7 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Meta-Feedback, Verbesserung | `meta-feedback` | optional | no |
 | Opencode | `opencode-expert` | optional | no |
 | Performance, Bottleneck, Optimierung | `performance-optimizer` | optional | no |
+| Plan, Planung, Schritte, Umsetzungsplan, wie setzen wir das um | `planner` | recommended | no |
 | Prompt, Prompt Engineering, Agenten-Definition | `prompt-engineer` | optional | no |
 | refactoring, strangler fig, legacy modernization, code smell, systematic transformation, framework upgrade | `refactoring-specialist` | optional | no |
 | Release, Version, Changelog | `release` | optional | no |
@@ -131,6 +134,8 @@ All "yes" → start. Otherwise resolve first.
 | Same tasks, independent | FANOUT(N, agent) |
 | Mixed tasks | PARALLEL_GROUP |
 | Complex feature | → `feature` or pipeline |
+
+Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to `feature` as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
 **Parallel:** disjoint files, max 4, in doubt → sequential, overlap → BARRIER.
 **Not parallel:** sequential dependencies, shared mutable state, deterministic workflow, tight budget.
@@ -282,6 +287,8 @@ SE mode: optional
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
 
 | `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
+
+| `planner` | Umsetzungsplanung |
 
 | `principal-developer` | Last-Resort-Eskalationsstufe |
 

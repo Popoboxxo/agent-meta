@@ -1,9 +1,9 @@
 ---
 name: ideation
-version: 1.6.2
-description: Idea generation, vision sharpening and concept concretization — asks
-  questions, thinks around corners, hands mature ideas to Requirements.
-hint: Explore new ideas, sharpen vision, hand off to requirements
+version: 1.7.0
+description: Use when an idea needs scoping and thoughts need sorting before a concept
+  or REQ exists.
+hint: Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert.
 prompt_mode: modern
 tools:
 - Read
@@ -13,7 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/ideation.md@1.6.2
+generated-from: 1-generic/ideation.md@1.7.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -121,6 +121,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 - Do not judge or block ideas immediately
 - Do not ask all questions at once
 - Never write code
+- Do not produce an ordered implementation plan — hand off to `planner` for that.
 
 **User proxy:** `main_chat`.
 

@@ -1,10 +1,10 @@
 ---
 name: feature
-version: 1.10.1
-description: 'Full feature lifecycle: Branch → Requirements → TDD → Implementation
-  → Validation → Commit → PR.'
+version: 1.11.1
+description: Use when the orchestrator needs to run a full feature lifecycle (branch
+  through PR) instead of a single delegated step.
 prompt_mode: modern
-generated-from: 1-generic/feature.md@1.10.1
+generated-from: 1-generic/feature.md@1.11.1
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
@@ -30,6 +30,17 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}` (`t`=feature).
 
 **HITL:** on `requires_human_approval: true`, pause and ask the user. On "no" → abort, inform orchestrator.
 
+`payload.plan_ref` (optional): relative path to a plan file/page in `planner-output-v1` format — triggers Step 1a.
+
+## 1a. Load plan (optional)
+
+**Active when:** `payload.plan_ref` is set.
+
+1. Read the referenced plan (`plan-<topic>.md` or a Knowledge-Wiki `Plan` page).
+2. Validate: table with columns `#, Step, Agent, Depends on, Acceptance criteria` present, at least one row, no circular dependencies in "Depends on".
+3. On invalid plan: report the missing/broken fields, abort — do not create a branch, do not start the lifecycle.
+4. Map plan steps onto the lifecycle phases below by `Agent` column: `tester` → step 3, `developer` → step 4, `requirements` → step 2 (if not already satisfied).
+
 ## 2. Feature lifecycle (8 steps)
 
 | # | Phase | Agent | Notes | Active when |
@@ -45,6 +56,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}` (`t`=feature).
 **On failure in 5:** back to 4 with the test result.
 **On validation failure (6):** back to the affected step.
 **After 8:** report REQ-ID, branch name, PR link, summary.
+**Escalation:** if `developer` (step 4) returns `STATUS: escalate`, re-run step 4 with `senior-developer` instead — same task, same context, `payload.ctx` carries the escalation findings.
 
 ## 3. Delegation prompts
 
@@ -110,6 +122,7 @@ Delegations to sub-agents as A2A envelope:
 ```
 STATUS: done|partial|failed
 REQ_ID: <id>
+PLAN_REF: <path | n/a>
 BRANCH: <name>
 PR_URL: <url>
 SUMMARY: <1-2 sentences, overall result>
@@ -122,7 +135,8 @@ ARTIFACTS: [changed files]
 - Do not skip a step — even if the user pushes
 - No commit without green tests and passed validation
 - No PR without REQ-ID in the commit message
-- 
+- - When `plan_ref` is set: validate the plan before branch creation. Do not create a branch for an invalid plan.
+
 **User proxy:** `main_chat`. On a direct user request: "Please start the `orchestrator` — it will call me when a feature lifecycle is needed."
 
 **Language:** standard.

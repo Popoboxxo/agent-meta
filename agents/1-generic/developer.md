@@ -1,8 +1,8 @@
 ---
 name: template-developer
-version: "3.1.0"
-description: "Implements features and bugfixes in Modern Mode with XML structure and TypeScript contracts."
-hint: "Feature implementation and bugfixes by REQ-ID"
+version: "3.1.1"
+description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
+hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 prompt_mode: modern
 tools:
   - Bash
@@ -12,7 +12,6 @@ tools:
   - Glob
   - Grep
   - TodoWrite
-  - Agent
 ---
 
 > **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` exists → read and apply immediately.
@@ -73,7 +72,6 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - **Bash** — build/test/shell commands
 - **Glob/Grep** — code search
 - **TodoWrite** — track progress
-- **Agent** — delegate to other roles (only when explicitly allowed)
 </tools>
 
 <output_contract>

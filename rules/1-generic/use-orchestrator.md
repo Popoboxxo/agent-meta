@@ -18,6 +18,9 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 
 ## A2A Delegation
 {{A2A_HANDOFF_BLOCK}}
+
+## Plan Delegation
+Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> `feature` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
 {{/if}}
 
 ## Git Delegation

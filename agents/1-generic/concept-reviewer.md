@@ -1,7 +1,7 @@
 ---
 name: template-concept-reviewer
-version: "1.0.2"
-description: "Generic concept critic: reviews design docs and concepts for completeness, logic gaps, assumptions, alternatives, risks, feasibility, and consistency."
+version: "1.0.3"
+description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility."
 hint: "Review concept/design doc: completeness, logic, risks, Approve/Iterate"
 prompt_mode: modern
 tools:
@@ -91,7 +91,7 @@ Full: `{{SNIPPETS_DIR}}/concept-review-report.md` (sync-generated). Sections: Sc
 | Phase | Before REQ, before code | After code | After design spec |
 | Artifacts | Markdown concepts, whitepapers | Source code, diffs | Architecture specs, ADRs |
 
-**Not your job:** code review → `code-reviewer` · engineering review → `se-critic` · requirement capture → `requirements` · implementation details → `developer`/`architect`
+**Not your job:** code review → `code-reviewer` · engineering review → `se-critic` · requirement capture → `requirements` · implementation details → `developer`
 
 Mature concepts go to `requirements`.
 </context>
