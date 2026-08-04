@@ -1,7 +1,7 @@
-# Agent-Orchestrierung: Planner-Rolle, Intent-Tabelle, Cluster-Cleanup — Design
+# Agent-Orchestrierung: Planner-Rolle, Intent-Tabelle, Cluster-Cleanup, Delegation-Enforcement — Design
 
-**Status:** Entwurf zur Freigabe
-**Kontext:** Ausgelöst durch die Frage "wie integrieren wir Superpowers-Skills (brainstorming, writing-plans, ...) in agent-meta" — im Brainstorming wurde das verworfen (zu komplex, Provider-Kopplung an Claude widerspricht der Provider-Agnostik-Prämisse von `1-generic/`). Stattdessen: ein neuer, nativer, providerunabhängiger `planner`-Agent, eine Schärfung der Orchestrator-Intent-Tabelle, und ein Cleanup-Abschnitt für einen 7-Rollen-Cluster, der bei der Analyse auffiel.
+**Status:** Entwurf zur Freigabe (Revision 2026-08-04 — konsolidiert Review-Anmerkungen vom 2026-08-03 und ergänzt Delegation-Enforcement)
+**Kontext:** Ausgelöst durch die Frage "wie integrieren wir Superpowers-Skills (brainstorming, writing-plans, ...) in agent-meta" — im Brainstorming wurde das verworfen (zu komplex, Provider-Kopplung an Claude widerspricht der Provider-Agnostik-Prämisse von `1-generic/`). Stattdessen: ein neuer, nativer, providerunabhängiger `planner`-Agent, eine Schärfung der Orchestrator-Intent-Tabelle, ein Cleanup-Abschnitt für einen 7-Rollen-Cluster, und (neu in dieser Revision) ein Fix für die stille Delegation-Enforcement-Lücke zwischen Providern.
 
 ## Ausgangslage — was existiert bereits
 
@@ -11,6 +11,8 @@
 - Die Knowledge Engine (aktiv in diesem Repo, Domäne `personal`) kennt 5 Concept Types (`knowledge/schema.md`): `Concept`/`Architecture` → `concepts/`, `API Reference` → `entities/`, `Guide` → `topics/` (deckt laut Beschreibung bereits "howto, analysis, audit, or spec" ab), `Session Conclusion` → `sources/`. Additive neue Types sind ohne Sign-off erlaubt (nur Entfernen/Umbenennen bestehender Types braucht laut `knowledge-curator` Freigabe).
 - Bestehende Quality-Pipeline `refactor` (`config/role-defaults.yaml → quality_pipelines.refactor`): `analyze` (senior-developer, Blast-Radius) → `implement` (developer) → `review` (Loop developer↔code-reviewer, max 2) → `commit` (git). `signal_keywords` enthalten wörtlich "aufräumen"/"Cleanup".
 - Mechanischer `consistency-check` (`scripts/lib/consistency/{crossrefs,frontmatter,placeholders,docs,handoff_contracts}.py`) prüft ausschließlich **strukturelle** Dinge: Orchestrator-Tabellen-Abdeckung, Platzhalter, Anchors, Changelog-Erwähnungen, Schema-Refs, Frontmatter-Gültigkeit (`workflow_tier` ∈ `{required, recommended, optional}`). Er prüft **nicht** Freitext-Cross-Refs in der Prompt-Prosa, nicht Content-Duplikation, nicht Beschreibungsqualität — das bleibt manuelle Review-Arbeit.
+- `hooks/1-generic/orchestrator-guard.sh` (v2.1.0, PreToolUse) blockt Write/Edit/Bash im Main-Chat, wenn `orchestrator.strict: true` in `.meta-config/project.yaml` gesetzt ist; Read/Glob/Grep sind bewusst nie blockiert. Git-Mutationen werden zusätzlich auch außerhalb von Strict-Mode geblockt. `Bash`-Delegates (`orchestrator`, `git`) können sich per Sentinel-Kommentarzeile (`#agent-meta:agent=<name>`) selbst deklarieren und so ausnehmen (Fix für Issue #390); für `Write`/`Edit` existiert **keine** äquivalente Ausnahme-Möglichkeit.
+- `scripts/lib/hooks.py` verdrahtet PreToolUse-Hooks **ausschließlich für Claude** (`.claude/hooks/`, `.claude/settings.json`). Für keinen anderen Provider (OpenCode, Gemini, Continue, Copilot, Mammouth) existiert eine äquivalente Registrierung.
 
 ## Entscheidung 1: Kein Superpowers-Bezug
 
@@ -87,6 +89,25 @@ Zwei mechanische Änderungen an bestehenden Einträgen, um die bei der Analyse g
 
 **Tier/Parallel-Doku-Klarstellung:** Kurzer Hinweis wird in den generierten Tabellenkopf (`scripts/lib/delegation_table.py::get_intent_routing_table()`, Header-Zeile) ergänzt: *"Parallel ist rein informativ — kein Runtime-Enforcement, nur CI-Konsistenzcheck bei required/recommended-Tier-Abdeckung."* Verhindert falsche Erwartungshaltung, dass die Spalte tatsächliches Parallel-Scheduling steuert.
 
+## Entscheidung 7: Delegation-Enforcement-Sichtbarkeit (neu)
+
+**Befund:** In diesem Projekt ist `orchestrator.strict: true` gesetzt (`.meta-config/project.yaml`). Die einzige technische Durchsetzung dieser Einstellung, `hooks/1-generic/orchestrator-guard.sh`, wird laut `scripts/lib/hooks.py` ausschließlich für den Provider Claude verdrahtet (`.claude/hooks/`, registriert in `.claude/settings.json`). Für alle anderen unterstützten Provider (OpenCode, Gemini, Continue, Copilot, Mammouth) existiert keine äquivalente PreToolUse-Registrierung — `strict: true` ist dort ein **stiller No-Op**: der Nutzer konfiguriert eine Sicherheitsgrenze, die auf einem Teil der unterstützten Provider schlicht nicht existiert, ohne jede Warnung. Beobachtetes Symptom (Nutzer-Report): der Orchestrator liest und schreibt bei Recherche- und Implementierungs-Tasks situativ selbst statt zu delegieren — auf Claude teilweise durch den Guard verhindert (Write/Edit/Bash im Main-Chat), auf OpenCode gar nicht.
+
+**Explizit nicht Teil dieser Entscheidung (Abgrenzung):**
+- Kein Fix für die fehlende Write/Edit-Subagent-Ausnahme unter Claude-Strict-Mode (der Sentinel-Trick existiert bisher nur für `Bash`/git; legitime Subagenten-Edits könnten unter Strict-Mode theoretisch mitgeblockt werden — separates, tieferes Thema).
+- Keine Implementierung eines OpenCode-Hook-Äquivalents.
+- Keine Änderung am "Read/Grep wird nie geblockt"-Designprinzip.
+
+Diese drei Punkte sind echte Enforcement-*Implementierungen* und bewusst auf eine spätere Spec verschoben (siehe Out of Scope). Diese Entscheidung behebt ausschließlich die **Intransparenz**: dass eine gesetzte Sicherheitsgrenze unbemerkt wirkungslos sein kann.
+
+**Fix — neue Validierung in `sync.py --validate`:**
+
+1. `scripts/lib/hooks.py` bekommt eine explizite, kleine Konstante mit den Providern, die PreToolUse-Hook-Verdrahtung unterstützen (aktuell: `{"claude"}`). Additive Erweiterung bei künftigem Provider-Support (Ein-Zeilen-Änderung).
+2. Neue Check-Funktion (Ort: `scripts/lib/consistency/` — analog zu den bestehenden Cross-Ref-/Frontmatter-Checks): liest `orchestrator.strict` (inkl. `provider-overrides`, siehe bestehende Resolve-Logik in `orchestrator-guard.sh`) und die im Projekt aktiven Provider aus `.meta-config/project.yaml`. Für jeden aktiven Provider ohne Hook-Support bei effektiv aktivem Strict-Mode: **WARNING** (kein Hard-Fail — Sichtbarkeit, keine neue harte Gate-Bedingung), Text z.B.: *"orchestrator.strict is active for provider '<provider>', but this provider has no PreToolUse hook wiring — the setting has no runtime effect there."*
+3. Der Check läuft bei jedem `sync.py --validate`-Aufruf mit (kein neues Flag nötig) und ist damit automatisch Teil der bestehenden CI (`validate.yml`, `orchestration-test.yml`).
+
+**Warum WARNING statt Hard-Fail:** Strict-Mode kann bewusst nur für einen Teil der Provider eines Multi-Provider-Projekts gewünscht sein (`provider-overrides` existiert genau dafür). Ein Hard-Fail würde diesen legitimen Fall bestrafen; die Warnung informiert, ohne den Sync-Lauf zu blockieren.
+
 ## Cleanup-Abschnitt — 7-Rollen-Cluster
 
 Gefunden bei der Analyse von `ideation`, `concept-reviewer`, `requirements`, `feature`, `effort-estimator`, `developer`, `senior-developer` gegen die Superpowers-`writing-skills`-Qualitätskriterien (SDO: Description = Trigger, nicht Workflow-Zusammenfassung; Token-Effizienz; Tool-Grant-Konsistenz):
@@ -99,84 +120,18 @@ Gefunden bei der Analyse von `ideation`, `concept-reviewer`, `requirements`, `fe
 | 4 | `TodoWrite` in Frontmatter-`tools:` ergänzen (wird im Body/Workflow Schritt 5 bereits referenziert) | `effort-estimator.md` | Strukturell, `consistency-check` deckt das NICHT ab (kein Tool-Grant-vs-Body-Check implementiert) |
 | 5 | Toten `Agent`-Tool-Grant entfernen (Constraint sagt explizit: nie per Tool-Call delegieren, nur Text-Referenz) | `developer.md` | Strukturell, ebenfalls kein automatischer Check vorhanden |
 | 6 | Self-/Browser-Verification-Absatz deduplizieren (fast wortgleich an zwei Stellen) — eine Quelle, Querverweis statt Copy-Paste | `developer.md` ↔ `senior-developer.md` | Semantisch, manuell |
-| 7 | Verwaiste `</output></output>`-Tags am Dateiende entfernen (Render-Artefakt ohne öffnendes Tag) | Alle 7 Dateien | Mechanisch, per Grep auffindbar |
 
-**Pipeline-Einsatz für die Umsetzung:** die bestehende `refactor`-Quality-Pipeline (`analyze` → `implement` → `review` Loop → `commit`) passt strukturell exakt (`signal_keywords` enthalten "aufräumen"/"Cleanup" wörtlich) und kann die Umsetzung tragen, statt sie manuell zu orchestrieren.
+> **Punkt 7 gestrichen** (ursprünglich: verwaiste `</output></output>`-Tags entfernen). Nachprüfung per Grep über alle 39 generischen Agenten (`agents/1-generic/*.md`) findet kein einziges Vorkommen von doppelten `</output></output>`-Tags — nur reguläre, einfache `</output>`-Schließtags als bestehende, korrekte Template-Struktur. Der Befund ist nicht reproduzierbar und wird nicht umgesetzt.
+
+**Pipeline-Einsatz für die Umsetzung:** Die Cleanup-Punkte 1–6 sind reine Text-/Frontmatter-Änderungen an Prompt-Prosa, kein Code-Refactoring. Die `refactor`-Quality-Pipeline (`analyze` mit senior-developer-Blast-Radius-Analyse → `implement` → `review`-Loop developer↔code-reviewer → `commit`) ist dafür **strukturell überdimensioniert** (Blast-Radius-Analyse für eine `description`-Zeile, Code-Reviewer-Loop für Prompt-Text ohne Code-/Logik-Bezug). **Entscheidung:** direkte Einzeldelegation an `developer` (Textänderungen) mit anschließendem `validator`-Check statt Pipeline — kein neuer Pipeline-Typ nötig für diesen einmaligen Cleanup.
 
 **Verifikation:** `consistency-check --file <geänderte Datei>` je Fix als struktureller Regressionsschutz (bestätigt: aktuell PASS auf allen 7 Dateien, d.h. keiner der obigen Findings wird heute schon gemeldet — nach dem Fix muss der Check weiterhin PASS bleiben). Punkte 1/2/3/6 sind semantisch und bleiben manuell verifizierbar (Nachlesen), keine automatische Abdeckung vorhanden oder geplant.
 
-## Testing
+## Planner-Output-Format und Consumer (`planner-output-v1`)
 
-- **`planner`-Neuanlage:** `sync.py --dry-run` auf einem Testprojekt mit `planner` in `config['roles']` → generierter Agent enthält korrekte `description`/`hint`/`tools`; `sync.py --validate` (Konsistenz-Suite) bleibt PASS.
-- **Intent-Tabellen-Diff:** `scripts/lib/consistency/crossrefs.py::check_orchestrator_table()` bleibt grün (neuer `planner`-Eintrag mit `workflow_tier: recommended` muss in der generierten Tabelle auftauchen — automatisch durch den bestehenden Check abgedeckt).
-- **KE Concept Type `Plan`:** Testseite mit `type: Plan` anlegen → landet unter `knowledge/wiki/plans/`, `index.md`/`log.md`-Eintrag vorhanden, `knowledge-linter` meldet keinen OKF-Compliance-Fehler.
-- **Cleanup Punkte 4/5/7:** `consistency-check --all` vor und nach dem Fix vergleichen (muss vorher wie nachher PASS bleiben — reine Qualitätsverbesserung, keine Verhaltensänderung).
-- **Cleanup Punkte 1/2/3/6:** manuelles Review der geänderten Dateien (kein automatisierter Test vorhanden, wie oben dokumentiert).
+**Problem, das dieser Abschnitt schließt:** `planner` produziert ohne diese Festlegung einen Plan ohne definierten Leser — der naheliegende Consumer `feature` kennt keinen "Plan laden"-Schritt. Ohne diese Kopplung entsteht ein Read-Only-Feature, das Pläne produziert, die niemand ausführt.
 
-## Out of Scope
-
-- Superpowers-Integration in jeglicher Form (Entscheidung 1) — kann bei Bedarf als eigene, spätere Spec wieder aufgegriffen werden, falls sich die Zurückhaltung als zu konservativ erweist.
-- Vollständiger Sweep über alle ~40 generischen Agenten — nur der 7-Rollen-Planungs-/Umsetzungs-Cluster war Teil der Analyse.
-- Textliche Auflösung der `Architektur`-Keyword-Überlappung zwischen `ideation` und `senior-developer` — bewusst nicht angefasst (siehe Entscheidung 6), da keine belegte Fehlroutung vorliegt, nur eine theoretische Ambiguität.
-- Automatisierte Prüfung von Tool-Grant-vs-Body-Konsistenz oder Freitext-Cross-Refs im `consistency-check` — wäre eine sinnvolle Erweiterung des Checks selbst, aber eigenständiges Thema, nicht Teil dieser Spec.
-- Migration bestehender Projekte, die bereits `concept-<topic>.md`-Dateien im Root liegen haben, auf die Knowledge-Engine-Struktur — Bestandsdateien bleiben unangetastet, nur neue Konzepte/Pläne nutzen das duale Schema.
-
-## Branch-Hinweis
-
-Aktueller Branch (`feat/auto-prepare-mcp-secrets`) ist inhaltlich unabhängig von diesem Thema (MCP-Secrets-Bootstrapping vs. Agent-Orchestrierung) — vor Implementierungsbeginn einen eigenen Branch (z.B. `feat/planner-agent-and-cluster-cleanup`) von `main` abzweigen.
-
----
-
-## Review-Anmerkungen und Ueberarbeitungsvorschlaege (2026-08-03)
-
-**Review-Kontext:** Die Spec wurde gegen den Ist-Zustand der betroffenen Agenten
-(`feature.md`, `developer.md`, `senior-developer.md`, `ideation.md`,
-`concept-reviewer.md`, `effort-estimator.md`, `requirements.md`,
-`_wf-orchestrator-reference.md`) geprueft. Fokus: Vollstaendigkeit der
-Payload/Handoff-Schnittstellen und Umsetzbarkeit der Cleanup-Punkte.
-
-### (1) Gesamturteil: REVISE
-
-Die Spec adressiert korrekt:
-- Die Identifikation der Planungsluecke zwischen `requirements` und `feature`
-- Die saubere Trennung von Explorations-Rolle (`ideation`) und Planungs-Rolle (`planner`)
-- Die Keyword-Kollision `Feature` zwischen `developer` und `feature`-Rolle
-- Die duale Persistenz (Knowledge Engine vs. Flatfile) als explizite Entscheidung
-
-Folgende Fehler adressiert die Spec **nicht** bzw. nicht ausreichend:
-- `planner` hat derzeit keinen definierten Consumer — keine Rolle versteht das
-  Planner-Output-Format, kein Handoff-Mechanismus, kein Validierungsschritt
-- `feature.md` hat keinen Schritt fuer Plan-Input, keine Validierung gegen Plan
-- Das Cleanup der `</output></output>`-Tags basiert auf einem nicht
-  reproduzierbaren Befund (siehe Punkt (8))
-- Die `refactor`-Pipeline ist strukturell ueberdimensioniert fuer Text-aenderungen
-  in Templates (siehe Punkt (9))
-
-Insgesamt: Spezifikation tauglich als Ausgangspunkt, aber **nicht umsetzungsreif**
-ohne die unten genannten Ergaenzungen.
-
-### (2) Kritischer Befund: Planner ohne Consumer
-
-Der `planner`-Agent produziert einen Plan — aber welche Rolle konsumiert ihn?
-Die Spec definiert:
-
-- Input: Konzept, REQ, Bug (beliebig)
-- Output: geordneter Schritt-Plan (Tasks, Abhaengigkeiten, Akzeptanzkriterien)
-- Persistenz: `plan-<topic>.md` oder `knowledge/wiki/plans/<topic>.md`
-
-Keine Aussage darueber, **wer diesen Plan liest und ausfuehrt**. Der naechstliegende
-Consumer ist `feature` — aber `feature.md` kennt keinen "load existing plan"-Schritt
-und hat kein Platzhalter-Tag fuer Plan-Input. Der Orchestrator kann den Plan zwar
-delegieren und empfangen, weiss aber nicht, dass er den Output an `feature`
-weiterreichen muss.
-
-Dieser Gap muss geschlossen werden, bevor `planner` deployed wird — sonst
-entsteht ein Read-Only-Feature, das Plaene produziert, die niemand ausfuehrt.
-
-### (3) Verbesserungsvorschlag: `planner-output-v1` Payload/Artefakt-Format
-
-**Vorgeschlagenes Format** (als Artefaktdatei, z.B. `plan-<topic>.md` oder
-Knowledge-Wiki-Seite):
+**Artefakt-Format** (`plan-<topic>.md` bzw. Knowledge-Wiki-Seite Typ `Plan`):
 
 ```markdown
 ## Plan: <title>
@@ -191,244 +146,128 @@ Knowledge-Wiki-Seite):
 | N | ... | ... | ... | ... |
 ```
 
-**Zielrollen (Consumer):**
-- `feature` (primaer): empfaengt Plan als optionalen Input, fuehrt die Schritte
-  der Reihe nach aus
-- Orchestrator (sekundaer): kann Plan-Fragment an `developer`/`senior-developer`
-  delegieren, wenn kein Full-Lifecycle noetig (z.B. reiner Refactoring-Plan ohne
-  REQ-Traceability)
+**Consumer:**
+- `feature` (primär): empfängt den Plan als optionalen Input über `payload.plan_ref`, führt die Schritte der Reihe nach aus.
+- Orchestrator (sekundär): kann ein Plan-Fragment auch direkt an `developer`/`senior-developer` delegieren, wenn kein Full-Lifecycle nötig ist (z.B. reiner Refactoring-Plan ohne REQ-Traceability).
 
-**Handoff zu `feature`:**
-Der Orchestrator uebergibt den Plan-Referenz-Pfad an `feature` via
-`payload.plan_ref`. Feature fuegt einen **optionalen Schritt 0 "Load plan"** ein:
-
-```
-Wenn payload.plan_ref gesetzt:
-  - Lade die referenzierte Datei
-  - Validiere: alle Steps haben Agent/Dep/Acceptance
-   - Bei fehlenden Pflichtfeldern: Fehler mit Liste der fehlenden Felder, kein Branch, kein Start. Nur optionale, nicht relevante Schritte duerfen explizit ignoriert werden.
-  - Verwende die Steps als Vorlage fuer die Lifecycle-Schritte 2-6
-```
-
-### (4) Routing-Regeln: Planner vs. Feature vs. Developer vs. Requirements
-
-| User-Intent | Route zu | Begruendung |
-|---|---|---|
-| "Setze Feature X um" (REQ bereits vorhanden) | `feature` | Keine Planung noetig, REQ-ID liegt vor |
-| "Implementiere X" (klar, 1-3 Dateien) | `developer` | Direkter Dev-Case, kein Lifecycle noetig |
-| "Erstelle Anforderung fuer X" | `requirements` | Reine REQ-Erstellung |
-| "Plane die Umsetzung von X" | `planner` | Expliziter Planungswunsch |
-| "Wie setzen wir X um?" | `planner` | Planungsfrage, kein Implementierungsauftrag |
-| "Konzept X ist fertig, was nun?" | `planner` | Uebergang Konzept → Plan |
-| "X soll umgesetzt werden" (ohne REQ, komplex) | `planner` → `feature` | Erst Plan, dann Ausfuehrung |
-| "Analysiere/erkunde X" (vor jedem Code) | `explorer` | Read-Only-Analyse |
-| "Sammle meine Gedanken zu X" | `ideation` | Reines Scoping, kein Plan |
-
-**Orchestrator-Entscheidungslogik (Pseudo):**
-
-```
-if intent in [plan, planung, "wie setzen wir das um"]:
-    -> planner
-elif payload.plan_ref AND intent in [feature, umsetzen]:
-    -> feature(plan_ref=payload.plan_ref)
-elif intent in [feature, umsetzen] AND req_exists:
-    -> feature
-elif intent in [feature, umsetzen] AND NOT req_exists AND complex:
-    -> planner  (dann: next step -> feature mit plan_ref)
-elif intent in [implementierung, code schreiben] AND <=3 files:
-    -> developer
-elif intent in [implementierung, code schreiben] AND >3 files:
-    -> feature
-```
-
-### (5) Konkrete Aenderungen an `feature.md`
-
-**A. Kein Frontmatter-Aenderung noetig:**
-Plan-Input kommt als Runtime-Payload, nicht als statische Konfiguration.
-
-**B. Neuer Schritt 0 "Load plan" im Workflow (vor Schritt 1):**
+**Änderung an `feature.md` — neuer optionaler Schritt 0 „Load plan" (vor Schritt 1):**
 
 ```markdown
-## 0 ? Load plan
+## 0 — Load plan
 
 **Active when:** `payload.plan_ref` is set.
 
-1. Read `{{PLAN_REF}}` (path to plan-<topic>.md or wiki page)
-2. Validate plan structure:
-   - Table with columns: #, Step, Agent, Depends on, Acceptance criteria
-   - At least one row present
-   - No circular dependencies in Depends-on column
-3. On invalid plan: report error, abort — do not proceed with empty lifecycle
-4. Map plan steps to lifecycle phases:
-   - Plan step with agent=`tester` → step 3 (Write tests)
-   - Plan step with agent=`developer` → step 4 (Implementation)
-   - Plan step with agent=`requirements` → step 2 (if not already done)
+1. Read the referenced plan file/page.
+2. Validate plan structure: Tabelle mit Spalten #, Step, Agent, Depends on, Acceptance criteria vorhanden; mindestens eine Zeile; keine zirkulären Abhängigkeiten in "Depends on".
+3. Bei fehlenden Pflichtfeldern oder invalidem Plan: Fehler mit Liste der fehlenden Felder melden, **kein Branch, kein Start**. Nur optionale, nicht relevante Schritte dürfen explizit ignoriert werden.
+4. Plan-Schritte auf Lifecycle-Phasen mappen (Plan-Step mit `agent: tester` → Schritt 3 "Write tests", `agent: developer` → Schritt 4 "Implementation", `agent: requirements` → Schritt 2, falls noch nicht erledigt).
 ```
 
-**C. Aenderung in `payload`-Struktur (A2A Inbound):**
+**Payload-Erweiterung (A2A Inbound):** `payload.plan_ref: <relative-path-to-plan-file | null>`.
 
-```json
-{
-  "payload": {
-    "t": "<feature>",
-    "ctx": "<context>",
-    "plan_ref": "<relative-path-to-plan-file | null>"
-  }
-}
-```
+**Constraint-Ergänzung in `feature.md`:** "When `plan_ref` is set: validate plan before branch creation. Do not create a branch for an invalid plan."
 
-**D. Anpassung Constraints:**
-Ergaenzen: "When `plan_ref` is set: validate plan before branch creation. Do not
-create a branch for an invalid plan."
+**Output-Contract-Ergänzung:** `PLAN_REF: <path | n/a>`.
 
-**E. Anpassung Output-Contract:**
-Ergaenzen: `PLAN_REF: <path | n/a>`
+## Routing-Regeln: Planner vs. Feature vs. Developer vs. Requirements
 
-### (6) Akzeptanzkriterien
+| User-Intent | Route zu | Begründung |
+|---|---|---|
+| "Setze Feature X um" (REQ bereits vorhanden) | `feature` | Keine Planung nötig, REQ-ID liegt vor |
+| "Implementiere X" (klar, 1-3 Dateien) | `developer` | Direkter Dev-Case, kein Lifecycle nötig |
+| "Erstelle Anforderung für X" | `requirements` | Reine REQ-Erstellung |
+| "Plane die Umsetzung von X" | `planner` | Expliziter Planungswunsch |
+| "Wie setzen wir X um?" | `planner` | Planungsfrage, kein Implementierungsauftrag |
+| "Konzept X ist fertig, was nun?" | `planner` | Übergang Konzept → Plan |
+| "X soll umgesetzt werden" (ohne REQ, komplex) | `planner` → `feature` | Erst Plan, dann Ausführung |
+| "Analysiere/erkunde X" (vor jedem Code) | `explorer` | Read-Only-Analyse |
+| "Sammle meine Gedanken zu X" | `ideation` | Reines Scoping, kein Plan |
+
+## Korrektur: Refactoring-Few-Shot-Pattern in `_wf-orchestrator-reference.md`
+
+**Datei:** `agents/1-generic/_wf-orchestrator-reference.md`, Zeile 18.
+
+**Aktuell (falsch):** `| Refactoring | ideation→dev→tester→review→git |` — `ideation` ist eine explorative Rolle ("hilf mir meine Gedanken zu sammeln"), kein Refactoring-Analyseschritt.
+
+**Korrektur:** `| Refactoring | explorer→dev→tester→review→git |` (minimale Korrektur, ersetzt nur den falschen Agenten, behält das bestehende Pattern bei — vorzuziehen gegenüber einem Pipeline-Verweis, der mehr Zeichen ändert).
+
+## Branch-Hinweis
+
+Umsetzung erfolgt auf dem bereits existierenden Branch `feat/planner-agent-and-cluster-cleanup` (aktueller Branch, von `main` abgezweigt). Vor Implementierungsbeginn prüfen, ob zwischenzeitlich weitere Änderungen an den betroffenen Dateien (7-Rollen-Cluster, `config/role-defaults.yaml`, `scripts/lib/hooks.py`) auf `main` gelandet sind — ggf. rebasen.
+
+## Testing
+
+- **`planner`-Neuanlage:** `sync.py --dry-run` auf einem Testprojekt mit `planner` in `config['roles']` → generierter Agent enthält korrekte `description`/`hint`/`tools`; `sync.py --validate` (Konsistenz-Suite) bleibt PASS.
+- **Intent-Tabellen-Diff:** `scripts/lib/consistency/crossrefs.py::check_orchestrator_table()` bleibt grün (neuer `planner`-Eintrag mit `workflow_tier: recommended` muss in der generierten Tabelle auftauchen — automatisch durch den bestehenden Check abgedeckt).
+- **KE Concept Type `Plan`:** Testseite mit `type: Plan` anlegen → landet unter `knowledge/wiki/plans/`, `index.md`/`log.md`-Eintrag vorhanden, `knowledge-linter` meldet keinen OKF-Compliance-Fehler.
+- **`feature.md` Plan-Input:** `payload.plan_ref` mit validem Plan → Schritte 2–6 folgen der Plan-Tabelle; mit invalidem Plan (fehlende Spalte, zirkuläre Abhängigkeit) → Abbruch vor Branch-Erstellung, Fehlermeldung listet fehlende Felder.
+- **Delegation-Enforcement-Sichtbarkeit:** `sync.py --validate` auf Testprojekt mit `orchestrator.strict: true` + Provider `opencode` aktiv → WARNING erscheint mit Providername; gleiches Projekt mit nur Provider `claude` aktiv → kein WARNING.
+- **Cleanup Punkte 4/5:** `consistency-check --all` vor und nach dem Fix vergleichen (muss vorher wie nachher PASS bleiben — reine Qualitätsverbesserung, keine Verhaltensänderung).
+- **Cleanup Punkte 1/2/3/6:** manuelles Review der geänderten Dateien (kein automatisierter Test vorhanden, wie oben dokumentiert).
+
+## Akzeptanzkriterien
 
 **Planner:**
-- [ ] `planner.md` generiert via `sync.py` → `description`/`hint` als reiner
-  "Use when"-Trigger
-- [ ] Planner-Ausgabe enthaelt Tabelle mit #, Step, Agent, Depends on,
-  Acceptance criteria
-- [ ] Planner delegiert Aufwandsschaetzung als Text-Referenz an `effort-estimator`
-  (kein Tool-Call — konsistent mit Developer/Senior-Developer-Muster)
-- [ ] Planner persistiert gemaess dualer Konvention (Wiki wenn aktiv, sonst
-  `plan-<topic>.md` im Projekt-Root)
+- [ ] `planner.md` generiert via `sync.py` → `description`/`hint` als reiner "Use when"-Trigger
+- [ ] Planner-Ausgabe enthält Tabelle mit #, Step, Agent, Depends on, Acceptance criteria
+- [ ] Planner delegiert Aufwandsschätzung als Text-Referenz an `effort-estimator` (kein Tool-Call)
+- [ ] Planner persistiert gemäß dualer Konvention (Wiki wenn aktiv, sonst `plan-<topic>.md` im Projekt-Root)
+
+**Feature-Kopplung:**
+- [ ] `feature.md` lädt und validiert `plan_ref`; invalider Plan → Abbruch, kein Branch
+- [ ] Output-Contract enthält `PLAN_REF`
 
 **Routing:**
-- [ ] `"Plane X"` → Orchestrator routed zu `planner`, nicht zu `feature` oder
-  `developer`
+- [ ] `"Plane X"` → Orchestrator routet zu `planner`, nicht zu `feature` oder `developer`
 - [ ] `"Wie setzen wir X um?"` → `planner`
 - [ ] `"Setze X um"` mit vorhandenem Plan → `feature` mit `plan_ref`
-- [ ] `"Implementiere X"` (trivial, <=2 Dateien) → `developer`
+- [ ] `"Implementiere X"` (trivial, ≤2 Dateien) → `developer`
 - [ ] Keyword `Feature` in `developer`-Intent-Tabelle entfernt (kein Clash mehr)
 
 **Duale Persistenz:**
-- [ ] Knowledge Engine aktiv → Plan-Seite in `knowledge/wiki/plans/` mit
-  Type=`Plan`, Index/Log aktualisiert
+- [ ] Knowledge Engine aktiv → Plan-Seite in `knowledge/wiki/plans/` mit Type=`Plan`, Index/Log aktualisiert
 - [ ] Knowledge Engine inaktiv → `plan-<topic>.md` im Projekt-Root
 - [ ] `knowledge-linter` akzeptiert Type=`Plan` ohne Fehler
 
-**Live-Intent-Aufloesung:**
+**Delegation-Enforcement-Sichtbarkeit:**
+- [ ] `sync.py --validate` warnt bei `orchestrator.strict: true` + Provider ohne Hook-Support
+- [ ] Kein Warning bei ausschließlich Hook-fähigen Providern aktiv
+- [ ] Provider-Capability-Konstante in `scripts/lib/hooks.py` ist additiv erweiterbar (ein Eintrag pro Provider)
+
+**Konsistenz gesamt:**
 - [ ] Consistency-Check (`crossrefs.py`) meldet `planner` als abgedeckt
-  (workflow_tier: recommended → muss in Intent-Tabelle erscheinen)
-- [ ] Generierte Intent-Tabelle enthaelt `planner` mit korrekten Keywords
+- [ ] Generierte Intent-Tabelle enthält `planner` mit korrekten Keywords
 - [ ] `sync.py --validate` bleibt PASS
 
-### (7) Korrektur: Falsches Refactoring-Few-Shot-Pattern
+## Priorisierte Umsetzungsreihenfolge und Freigabekriterien
 
-**Datei:** `agents/1-generic/_wf-orchestrator-reference.md`, Zeile 18
-
-**Aktuell (falsch):**
-```
-| Refactoring | ideation→dev→tester→review→git |
-```
-
-**Problem:** `ideation` ist eine explorative Rolle ("hilf mir meine Gedanken zu
-sammeln"), kein Refactoring-Schritt. Ein Refactoring-Flow braucht keine
-Ideensammlung, sondern Analyse + Ausfuehrung.
-
-**Korrekturvorschlag:**
-```
-| Refactoring | explorer→dev→tester→review→git |
-```
-
-Alternativ, wenn die `refactor`-Pipeline genutzt wird:
-```
-| Refactoring | pipeline: refactor (analyze → implement → review → commit) |
-```
-
-Die minimale Korrektur (`ideation` → `explorer`) ist vorzuziehen, da sie das
-bestehende Pattern beibehaelt und nur den falschen Agenten ersetzt. Eine
-Pipeline-Referenz ist ebenfalls gueltig, aendert aber mehr Zeichen.
-
-### (8) Korrektur der Cleanup-Punkte: `</output></output>`-Befund
-
-**Punkt 7 der Spec ("Verwaiste `</output></output>`-Tags am Dateiende entfernen")
-ist nach aktuellem Pruefstand nicht reproduzierbar.**
-
-Pruefung aller 39 generischen Agenten (`agents/1-generic/*.md`) per Grep auf
-`</output>` ergibt:
-
-- **Kein einziges** Vorkommen von `</output></output>` (doppeltes Tag)
-- Einzelne einfache `</output>`-Schliesstags sind als bestehende
-  Template-Struktur vorhanden (schliessen das im Orchestrator definierte
-  `<output_contract>`-Element ab).
-
-**Fazit:** Punkt 7 des Cleanups ist zu streichen — der Befund doppelter,
-verwaister Tags laesst sich nicht bestaetigen.
-
-**Hinweis fuer Reviewer:** Die einfachen `</output>`-Schliesstags sind normale
-XML-Schliess-Tags im modern mode. Nicht loeschen, nicht aendern.
-
-### (9) Ueberdimensionierte `refactor`-Pipeline fuer Template-Aenderungen
-
-Die Spec schlaegt vor, den 7-Punkte-Cleanup ueber die `refactor`-Pipeline
-abzuwickeln:
-
-```
-analyze (senior-developer, Blast-Radius)
-→ implement (developer)
-→ review (Loop developer↔code-reviewer, max 2)
-→ commit (git)
-```
-
-Das ist **strukturell ueberdimensioniert** fuer reine Template-/Dokumentations-
-aenderungen:
-
-- Ein `senior-developer` fuer "Blast-Radius-Analyse" einer `description`-Zeile?
-  Overkill.
-- `code-reviewer`-Loop fuer Textaenderungen in Prompt-Prosa? Weder Code noch
-  Logik betroffen.
-- Die Pipeline ist fuer Code-Refactoring gedacht (Strangler Fig, Feature Flags,
-  Rueckwaertskompatibilitaet) — nicht fuer Prompt-Texte.
-
-**Empfehlung:** Die Cleanup-Punkte 1-6 als `docs-update`-Pipeline oder direkt
-via `developer` (Textaenderungen, kein Code) umsetzen. Nur Punkt 4
-(Tool-Grant-Ergaenzung) und Punkt 5 (Tool-Grant-Entfernung) beruehren
-Frontmatter-Struktur — selbst das ist kein Refactoring, sondern Konfiguration.
-
-Falls dennoch Pipeline: `docs-update` (falls aktiv) oder direkte Einzeldelegation
-an `developer` mit anschliessendem `validator`-Check.
-
-### (10) Branch-Hinweis als Session-Artefakt
-
-Der alte Branch-Hinweis (Zeile 124-126) referenziert `feat/auto-prepare-mcp-secrets`
-— ein Session-Artefakt, das bei Uebernahme der Spec zu entfernen ist.
-
-**Empfehlung fuer den neuen Branch:**
-```
-feat/planner-role-and-orchestrator-refinement
-```
-
-**Ergaenzung:** Bei Implementierungsbeginn den Branch **nicht** nur von `main`
-abzweigen, sondern vorher pruefen, ob zwischenzeitlich weitere Aenderungen an
-den betroffenen 7 Agenten oder `config/role-defaults.yaml` auf `main` gelandet
-sind — dann ggf. rebase oder Merge-Konflikte vorab identifizieren.
-
-### (11) Priorisierte Umsetzungsreihenfolge und Freigabekriterien
-
-| Prio | Schritt | Haengt ab von | Freigabekriterium |
+| Prio | Schritt | Hängt ab von | Freigabekriterium |
 |---|---|---|---|
-| P1 | Planner-Agent anlegen (`planner.md` + `role-defaults.yaml`) | — | `sync.py --validate` PASS; generierter Agent enthaelt korrekte `description`/`hint`/`tools` |
-| P1 | Planner-Output-Format (`planner-output-v1`) in `planner.md` integrieren | P1 (Agent existiert) | Planner-Ausgabe valide gegen Format-Schema (manuell pruefbar) |
-| P1 | Intent-Tabelle: `developer`-Keyword `Feature` entfernen, `planner`-Keywords eintragen | P1 | `crossrefs.py` gruen; kein `Feature`-Clash mehr |
+| P1 | Planner-Agent anlegen (`planner.md` + `role-defaults.yaml`) | — | `sync.py --validate` PASS; generierter Agent enthält korrekte `description`/`hint`/`tools` |
+| P1 | Planner-Output-Format (`planner-output-v1`) in `planner.md` integrieren | P1 (Agent existiert) | Planner-Ausgabe valide gegen Format-Schema (manuell prüfbar) |
+| P1 | Intent-Tabelle: `developer`-Keyword `Feature` entfernen, `planner`-Keywords eintragen | P1 | `crossrefs.py` grün; kein `Feature`-Clash mehr |
 | P1 | `_wf-orchestrator-reference.md`: Refactoring-Pattern korrigieren | — | Pattern `ideation→dev→...` ersetzt durch `explorer→dev→...` |
-| P1 | Cleanup-Punkt 7 (`</output></output>`) aus Spec streichen | — | Spec aktualisiert, kein Loesch-Befehl ausgeloest |
-| P2 | `feature.md` um Plan-Input erweitern (Schritt 0, `plan_ref`-Parsing) | P1 (Planner existiert) | Feature laedt und validiert `plan_ref`; falscher Plan → Abbruch |
+| P1 | Delegation-Enforcement-Sichtbarkeit: Provider-Capability-Konstante + Validate-Check | — | WARNING erscheint korrekt für Nicht-Hook-Provider bei aktivem Strict-Mode |
+| P2 | `feature.md` um Plan-Input erweitern (Schritt 0, `plan_ref`-Parsing) | P1 (Planner existiert) | Feature lädt und validiert `plan_ref`; falscher Plan → Abbruch |
 | P2 | Orchestrator-Routing-Logik: Plan-Erkennung → `planner`, Plan-Weiterleitung → `feature(plan_ref=...)` | P1, P2 (feature kann plan_ref) | "Plane X" → Planner; "Setze X um" mit Plan → Feature mit Plan |
 | P2 | Duale Persistenz in `planner.md` implementieren | P1 | Plan-Seite korrekt in Wiki oder als Root-Flatfile |
-| P3 | Cleanup Punkte 1-3, 6 (Textaenderungen an 7 Agenten) | — | `description`/`hint` als reiner Trigger; toter Cross-Ref entfernt; Senior-Developer in Feature-Lifecycle-Tabelle; Deduplication developer<->senior-developer |
+| P3 | Cleanup Punkte 1-3, 6 (Textänderungen an 7 Agenten) | — | `description`/`hint` als reiner Trigger; toter Cross-Ref entfernt; Senior-Developer in Feature-Lifecycle-Tabelle; Deduplication developer↔senior-developer |
 | P3 | Cleanup Punkte 4-5 (Tool-Grants: `effort-estimator` +`TodoWrite`, `developer` -`Agent`) | — | Tools in Frontmatter korrekt; `consistency-check` bleibt PASS |
-| P3 | Pipeline-Wahl fuer Cleanup: `docs-update` oder Einzeldelegation statt `refactor` | P3 (Cleanup definiert) | Keine Senior-Developer-Analyse fuer Textaenderungen; Overhead vermieden |
 | P4 | `consistency-check` final: alle Cleanup-Dateien + Planner gegen Suite | P1-P3 | `sync.py --validate` PASS auf allen betroffenen Dateien |
 | P4 | Manuelles Review: semantische Cleanup-Punkte 1/2/3/6 nachlesen | P3 | Alle Punkte optisch verifiziert, keine Verschlechterung |
 
 **Freigabe-Gate Gesamt:**
-- Alle P1-Schritte abgeschlossen → Planner ist eigenstaendig nutzbar (generiert
-  Plaene, persistiert sie, wird korrekt geroutet)
-- Alle P2-Schritte abgeschlossen → Planner+Feature-Kette ist durchgaengig (Plan
-  → Ausfuehrung)
-- Alle P3-Schritte abgeschlossen → 7-Rollen-Cluster bereinigt
-- P4-Schritte → Qualitaets-Gate, vor Merge
+- Alle P1-Schritte abgeschlossen → Planner ist eigenständig nutzbar (generiert Pläne, persistiert sie, wird korrekt geroutet) UND Delegation-Enforcement-Lücke ist sichtbar gemacht.
+- Alle P2-Schritte abgeschlossen → Planner+Feature-Kette ist durchgängig (Plan → Ausführung).
+- Alle P3-Schritte abgeschlossen → 7-Rollen-Cluster bereinigt.
+- P4-Schritte → Qualitäts-Gate, vor Merge.
+
+## Out of Scope
+
+- Superpowers-Integration in jeglicher Form (Entscheidung 1) — kann bei Bedarf als eigene, spätere Spec wieder aufgegriffen werden, falls sich die Zurückhaltung als zu konservativ erweist.
+- Vollständiger Sweep über alle ~40 generischen Agenten — nur der 7-Rollen-Planungs-/Umsetzungs-Cluster war Teil der Analyse.
+- Textliche Auflösung der `Architektur`-Keyword-Überlappung zwischen `ideation` und `senior-developer` — bewusst nicht angefasst (siehe Entscheidung 6), da keine belegte Fehlroutung vorliegt, nur eine theoretische Ambiguität.
+- Automatisierte Prüfung von Tool-Grant-vs-Body-Konsistenz oder Freitext-Cross-Refs im `consistency-check` — wäre eine sinnvolle Erweiterung des Checks selbst, aber eigenständiges Thema, nicht Teil dieser Spec.
+- Migration bestehender Projekte, die bereits `concept-<topic>.md`-Dateien im Root liegen haben, auf die Knowledge-Engine-Struktur — Bestandsdateien bleiben unangetastet, nur neue Konzepte/Pläne nutzen das duale Schema.
+- **Echte Delegation-Enforcement-Implementierung über die reine Sichtbarkeit hinaus** (Entscheidung 7): Write/Edit-Subagent-Ausnahme-Mechanismus für Claude-Strict-Mode, OpenCode-Hook-Äquivalent, Read/Grep-Nudge-Logik. Eigenständige, tiefergehende Spec, sobald die Sichtbarkeits-Basis steht.
+- **CI-Modernisierung** (Caching, Matrix-Reduktion, Laufzeit, generelle Health-Fragen) — orthogonal zum Orchestrierungs-Thema dieser Spec, wird als eigenes, separates Brainstorming direkt im Anschluss behandelt.
