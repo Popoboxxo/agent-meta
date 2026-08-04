@@ -847,6 +847,15 @@ def main():
         # contracts against the agent-meta sources themselves.
         consistency_errors = _run_consistency_checks(agent_meta_root)
 
+        from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
+        from lib.consistency.report import print_report
+        from lib.providers import load_providers_config as _load_pc
+
+        _provider_config = _load_pc(agent_meta_root)
+        _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
+        if _strict_findings:
+            print_report(_strict_findings, project_root, changed_only=False)
+
         test_repo_path = resolve_test_repo_path(config, project_root, log)
         if test_repo_path is None or not test_repo_path.exists():
             reason = (f"configured path {test_repo_path} does not exist"
