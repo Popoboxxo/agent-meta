@@ -38,7 +38,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}` (`t`=feature).
 3. On invalid plan: report the missing/broken fields, abort — do not create a branch, do not start step 1.
 4. Map plan steps onto the lifecycle phases below by `Agent` column: `tester` → step 3, `developer` → step 4, `requirements` → step 2 (if not already satisfied).
 
-## 1. Feature lifecycle (8 steps)
+## 2. Feature lifecycle (8 steps)
 
 | # | Phase | Agent | Notes | Active when |
 |---|-------|-------|-------|-------------|
