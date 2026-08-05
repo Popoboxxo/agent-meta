@@ -144,7 +144,7 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     - plan-driven stage roles (fallback_agent, allowed_agents) exist
     """
     errors = []
-    orchestrator_roles = {"orchestrator", "feature"}
+    orchestrator_roles = {"orchestrator"}
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])

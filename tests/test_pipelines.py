@@ -161,6 +161,25 @@ def test_generate_pipeline_block_payload_flag_annotation():
     assert "needs_scoping" in block
 
 
+def test_validate_pipelines_only_orchestrator_is_circular_guard():
+    from scripts.lib.pipelines import validate_pipelines
+
+    # "feature" must no longer trigger the circular-orchestration guard —
+    # it is being retired as a role in this plan.
+    pipelines = {
+        "p1": {"stages": [{"id": "x", "agent": "feature", "task": "t", "mode": "sequential"}]}
+    }
+    errors = validate_pipelines(pipelines, available_roles=["feature"])
+    assert not any("circular delegation" in e for e in errors)
+
+    # "orchestrator" must still trigger it.
+    pipelines2 = {
+        "p1": {"stages": [{"id": "x", "agent": "orchestrator", "task": "t", "mode": "sequential"}]}
+    }
+    errors2 = validate_pipelines(pipelines2, available_roles=["orchestrator"])
+    assert any("circular delegation" in e for e in errors2)
+
+
 def test_validate_pipelines_detects_direct_cycle():
     from scripts.lib.pipelines import validate_pipelines
 
