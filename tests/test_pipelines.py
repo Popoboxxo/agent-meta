@@ -215,3 +215,98 @@ def test_generate_pipeline_block_run_pipeline_missing_reference_is_marked():
     pipeline = {"stages": [{"id": "implement", "run_pipeline": "ghost", "mode": "run_pipeline"}]}
     block = _generate_pipeline_block(pipeline, "Opencode", all_pipelines={})
     assert "nicht aufgelöst" in block
+
+
+def test_generate_pipeline_block_cuts_off_at_root_max_depth():
+    """Rendering must honour the ROOT pipeline's max_depth for the whole chain,
+    not re-derive a fresh default at every nesting level (mirrors
+    _validate_pipeline_composition()'s semantics — see task-4 review finding 2).
+    """
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    # a -> b -> c -> d -> e is a 5-hop chain. Root "a" overrides max_depth to 6,
+    # so validate_pipelines() would accept it in full. Intermediate pipelines
+    # deliberately set no max_depth of their own (implicit default 4) to prove
+    # the root override — not a per-level recomputed default — governs rendering.
+    pipelines = {
+        "a": {
+            "max_depth": 6,
+            "stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}],
+        },
+        "b": {"stages": [{"id": "x", "run_pipeline": "c", "mode": "run_pipeline"}]},
+        "c": {"stages": [{"id": "x", "run_pipeline": "d", "mode": "run_pipeline"}]},
+        "d": {"stages": [{"id": "x", "run_pipeline": "e", "mode": "run_pipeline"}]},
+        "e": {
+            "stages": [
+                {"id": "leaf", "agent": "developer", "task": "Leaf-Stage erreicht", "mode": "sequential"}
+            ]
+        },
+    }
+    block = _generate_pipeline_block(pipelines["a"], "Opencode", all_pipelines=pipelines)
+    # The full chain must resolve (root max_depth=6 covers 5 hops) — no
+    # intermediate level may cut off early using its own default-4.
+    assert "Leaf-Stage erreicht" in block
+    assert "max_depth" not in block
+
+
+def test_generate_pipeline_block_render_cutoff_when_depth_exceeds_max_depth():
+    """Covers the _depth >= _max_depth render branch directly (not just via
+    validate_pipelines' separate walk)."""
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipelines = {
+        "a": {
+            "max_depth": 2,
+            "stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}],
+        },
+        "b": {"stages": [{"id": "x", "run_pipeline": "c", "mode": "run_pipeline"}]},
+        "c": {"stages": [{"id": "x", "run_pipeline": "d", "mode": "run_pipeline"}]},
+        "d": {"stages": []},
+    }
+    block = _generate_pipeline_block(pipelines["a"], "Opencode", all_pipelines=pipelines)
+    assert "max_depth=2 erreicht" in block
+
+
+def test_build_pipeline_variables_resolves_run_pipeline_via_all_pipelines():
+    """Integration test proving all_pipelines actually reaches
+    _generate_pipeline_block() through build_pipeline_variables() (task-4
+    review finding 1) — a run_pipeline composition must render the sub-pipeline
+    content, not the "nicht aufgelöst" fallback."""
+    from scripts.lib.pipelines import build_pipeline_variables
+
+    pipelines = {
+        "outer": {
+            "stages": [{"id": "implement", "run_pipeline": "inner", "mode": "run_pipeline"}]
+        },
+        "inner": {
+            "stages": [
+                {"id": "step", "agent": "developer", "task": "Feature implementieren", "mode": "sequential"}
+            ]
+        },
+    }
+    variables = build_pipeline_variables(pipelines, active_dod={})
+    provider_blocks = variables["PIPELINE_OUTER_PROVIDER_BLOCKS"]
+    for provider, block in provider_blocks.items():
+        assert "nicht aufgelöst" not in block, f"provider={provider}"
+        assert "Feature implementieren" in block, f"provider={provider}"
+
+
+def test_inject_pipeline_blocks_resolves_run_pipeline_via_all_pipelines():
+    """Integration test proving all_pipelines reaches _generate_pipeline_block()
+    through inject_pipeline_blocks() as well (task-4 review finding 1)."""
+    from scripts.lib.pipelines import inject_pipeline_blocks
+
+    pipelines = {
+        "outer": {
+            "stages": [{"id": "implement", "run_pipeline": "inner", "mode": "run_pipeline"}]
+        },
+        "inner": {
+            "stages": [
+                {"id": "step", "agent": "developer", "task": "Feature implementieren", "mode": "sequential"}
+            ]
+        },
+    }
+    content = "{{PIPELINE_OUTER_BLOCK}}"
+    result = inject_pipeline_blocks(content, pipelines, "Opencode", active_dod={})
+    assert "nicht aufgelöst" not in result
+    assert "Feature implementieren" in result

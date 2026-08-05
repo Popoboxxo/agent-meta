@@ -274,7 +274,7 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         for provider in KNOWN_PROVIDERS:
             if _pipeline_active_for_provider(pipeline, provider):
                 provider_blocks[provider] = _generate_pipeline_block(
-                    pipeline, provider, active_dod=active_dod
+                    pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
                 )
             else:
                 provider_blocks[provider] = ""
@@ -297,7 +297,9 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
             return match.group(0)
         if not _pipeline_active_for_provider(pipeline, provider):
             return ""
-        return _generate_pipeline_block(pipeline, provider, active_dod=active_dod)
+        return _generate_pipeline_block(
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+        )
 
     return pattern.sub(_replacer, content)
 
@@ -396,6 +398,7 @@ def _generate_pipeline_block(
     all_pipelines: dict | None = None,
     active_dod: dict | None = None,
     _depth: int = 0,
+    _max_depth: int | None = None,
 ) -> str:
     """Generate a provider-specific markdown block for a single pipeline."""
     provider_key = provider.lower()
@@ -404,7 +407,13 @@ def _generate_pipeline_block(
     lines = []
     stages = pipeline.get("stages", [])
     seq_idx = 0
-    max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
+    # max_depth is resolved once at the entry point (_depth == 0) from the
+    # root pipeline's own field, then threaded unchanged through recursion —
+    # mirrors _validate_pipeline_composition()'s semantics, so a validated
+    # composition renders consistently instead of being cut off early by a
+    # sub-pipeline's own (possibly lower) default.
+    if _max_depth is None:
+        _max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
 
     # Execution mode header (Issue #285)
     exec_mode = _execution_mode_for_pipeline(stages)
@@ -502,8 +511,8 @@ def _generate_pipeline_block(
             lines.append(f"**{stage_id}** — enthält Pipeline `{ref_name}`:")
             if ref_pipeline is None:
                 lines.append(f"  [nicht aufgelöst — Pipeline '{ref_name}' nicht gefunden]")
-            elif _depth >= max_depth:
-                lines.append(f"  [nicht aufgelöst — max_depth={max_depth} erreicht]")
+            elif _depth >= _max_depth:
+                lines.append(f"  [nicht aufgelöst — max_depth={_max_depth} erreicht]")
             else:
                 sub_block = _generate_pipeline_block(
                     ref_pipeline,
@@ -511,6 +520,7 @@ def _generate_pipeline_block(
                     all_pipelines=all_pipelines,
                     active_dod=active_dod,
                     _depth=_depth + 1,
+                    _max_depth=_max_depth,
                 )
                 for sub_line in sub_block.splitlines():
                     lines.append(f"  {sub_line}")
