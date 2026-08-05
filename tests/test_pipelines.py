@@ -310,3 +310,80 @@ def test_inject_pipeline_blocks_resolves_run_pipeline_via_all_pipelines():
     result = inject_pipeline_blocks(content, pipelines, "Opencode", active_dod={})
     assert "nicht aufgelöst" not in result
     assert "Feature implementieren" in result
+
+
+def test_validate_pipelines_plan_driven_rejects_unknown_fallback_agent():
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "implement",
+                    "mode": "plan-driven",
+                    "plan-driven": {"fallback_agent": "ghost-role"},
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(pipelines, available_roles=["developer"])
+    assert any("ghost-role" in e for e in errors)
+
+
+def test_validate_pipelines_plan_driven_rejects_unknown_allowed_agent():
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "implement",
+                    "mode": "plan-driven",
+                    "plan-driven": {
+                        "fallback_agent": "developer",
+                        "allowed_agents": ["developer", "ghost-role"],
+                    },
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(pipelines, available_roles=["developer"])
+    assert any("ghost-role" in e for e in errors)
+
+
+def test_validate_pipelines_plan_driven_accepts_known_roles():
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "implement",
+                    "mode": "plan-driven",
+                    "plan-driven": {
+                        "fallback_agent": "developer",
+                        "allowed_agents": ["junior-developer", "developer", "senior-developer"],
+                    },
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(
+        pipelines, available_roles=["junior-developer", "developer", "senior-developer"]
+    )
+    assert errors == []
+
+
+def test_generate_pipeline_block_plan_driven_rendering():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "implement",
+                "mode": "plan-driven",
+                "plan-driven": {
+                    "fallback_agent": "developer",
+                    "allowed_agents": ["junior-developer", "developer", "senior-developer"],
+                },
+            }
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    assert "Plan-driven" in block
+    assert "developer" in block
+    assert "kein stiller Fallback" in block

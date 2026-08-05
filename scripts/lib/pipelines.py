@@ -201,6 +201,21 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                             f"Add '{sub_agent}' to roles: in .meta-config/project.yaml to enable this pipeline."
                         )
 
+            if mode == "plan-driven":
+                pd = stage.get("plan-driven", {})
+                fallback = pd.get("fallback_agent")
+                if fallback and fallback not in available_roles:
+                    errors.append(
+                        f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
+                        f"fallback_agent '{fallback}' not found in available roles."
+                    )
+                for allowed in pd.get("allowed_agents", []):
+                    if allowed not in available_roles:
+                        errors.append(
+                            f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
+                            f"allowed_agents entry '{allowed}' not found in available roles."
+                        )
+
             # Circular orchestration guard
             if agent in orchestrator_roles and not stage.get("allow_orchestrator"):
                 errors.append(
@@ -524,6 +539,23 @@ def _generate_pipeline_block(
                 )
                 for sub_line in sub_block.splitlines():
                     lines.append(f"  {sub_line}")
+            lines.append("")
+
+        elif mode == "plan-driven":
+            pd = stage.get("plan-driven", {})
+            fallback = pd.get("fallback_agent", "")
+            allowed = pd.get("allowed_agents", [])
+            lines.append("")
+            lines.append(
+                f"**{stage_id}** — Plan-driven: Agent aus payload.plan_ref "
+                f"(Stage-ID '{stage_id}') übernehmen."
+            )
+            if allowed:
+                lines.append(f"  Erlaubte Rollen: {', '.join(allowed)}")
+            lines.append(f"  Ohne plan_ref: fallback_agent = {fallback}")
+            lines.append(
+                "  Plan_ref vorhanden, aber Stage-Zeile fehlt: Fehler, kein stiller Fallback."
+            )
             lines.append("")
 
     if not lines:
