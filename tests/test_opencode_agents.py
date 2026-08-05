@@ -53,7 +53,6 @@ AGENTS_DIR = Path(__file__).resolve().parent.parent / ".opencode" / "agents"
 # full-replacement overrides (see CHANGELOG.md [Unreleased] / Änderung).
 DELEGATING_ROLES = {
     "orchestrator",
-    "feature",
     "agent-meta-manager",
 }
 
