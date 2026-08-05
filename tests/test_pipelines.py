@@ -497,3 +497,40 @@ def test_sync_agents_passes_real_dod_resolved_to_inject_pipeline_blocks(monkeypa
     source = inspect.getsource(agents_mod.sync_agents_for_provider)
     assert "inject_pipeline_blocks(content, effective, provider, {})" not in source
     assert "resolve_dod(" in source
+
+
+def test_feature_lifecycle_pipeline_definition_is_valid():
+    import yaml
+    from scripts.lib.pipelines import load_quality_pipelines, validate_pipelines
+
+    agent_meta_root = "."  # repo root; test runs from repo root under pytest
+    pipelines = load_quality_pipelines(agent_meta_root)
+    assert "standard-feature" not in pipelines
+    assert "feature-lifecycle" in pipelines
+
+    fl = pipelines["feature-lifecycle"]
+    expected_keywords = {
+        "Feature implementieren", "Feature bauen", "neues Feature", "Funktion bauen",
+        "Feature Lifecycle", "komplexes Feature", "Feature Pipeline",
+    }
+    assert expected_keywords.issubset(set(fl["signal_keywords"]))
+
+    stage_ids = [s["id"] for s in fl["stages"]]
+    assert stage_ids == ["branch", "requirement", "tests", "implement", "verify", "validate-and-document", "commit"]
+
+    implement_stage = next(s for s in fl["stages"] if s["id"] == "implement")
+    assert implement_stage["mode"] == "plan-driven"
+    assert implement_stage["plan-driven"]["fallback_agent"] == "developer"
+
+    requirement_stage = next(s for s in fl["stages"] if s["id"] == "requirement")
+    assert requirement_stage["condition"] == {"dod_flag": "req-traceability"}
+
+    # role-defaults.yaml roles: `feature` must be gone.
+    with open("config/role-defaults.yaml", encoding="utf-8") as f:
+        roles_cfg = yaml.safe_load(f)
+    assert "feature" not in roles_cfg.get("roles", {})
+
+    # Full validation must be clean against the roles this pipeline references.
+    all_roles = set(roles_cfg.get("roles", {}).keys())
+    errors = validate_pipelines({"feature-lifecycle": fl}, list(all_roles))
+    assert errors == [], f"Unexpected validation errors: {errors}"
