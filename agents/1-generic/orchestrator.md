@@ -63,9 +63,9 @@ All "yes" → start. Otherwise resolve first.
 | Single task | → target agent |
 | Same tasks, independent | FANOUT(N, agent) |
 | Mixed tasks | PARALLEL_GROUP |
-| Complex feature | → `feature` or pipeline |
+| Complex feature | → `feature-lifecycle` pipeline |
 
-Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to `feature` as `payload.plan_ref` instead of starting a fresh lifecycle blind.
+Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
 **Parallel:** disjoint files, max {{MAX_PARALLEL_AGENTS}}, in doubt → sequential, overlap → BARRIER.
 **Not parallel:** sequential dependencies, shared mutable state, deterministic workflow, tight budget.
