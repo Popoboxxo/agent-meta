@@ -1,6 +1,6 @@
 # Pipeline-Driven Orchestration: Config-Native Superpowers-Equivalent — Design
 
-**Status:** Entwurf zur Freigabe
+**Status:** Freigegeben (2026-08-05, nach Interview zur Klärung der Audit-Lücken)
 **Kontext:** Ausgelöst durch Nachfragen zu PR #398 (`feat/planner-agent-and-cluster-cleanup`, `docs/superpowers/specs/2026-08-02-agent-orchestration-refinement-design.md`): der Nutzer wollte wissen, ob `planner` eine Pipeline nutzt — tut es nicht, sein 5-Schritt-Workflow ist Prosa im Agenten-Prompt. Das führte zur Entdeckung derselben Anti-Pattern in `feature.md` (hartkodierte 8-Schritt-Lifecycle-Choreografie, delegiert per `Agent`-Tool an 6 andere Rollen) und zu einem grundlegenden Architekturprinzip: **der Orchestrator ist der einzige Delegator; Pipelines sind seine einzige, deklarative Ablauf-Beschreibung — kein Agent choreografiert intern mehrere andere Agenten.**
 
 Dieses Dokument spezifiziert die Umsetzung dieses Prinzips als vollständig konfigurationsgetriebene Erweiterung der bestehenden `quality_pipelines`-Engine (`config/role-defaults.yaml`, `scripts/lib/pipelines.py`), inklusive Admin-UI-Unterstützung, sodass neue Pipelines **ohne Code-Änderung** rein per YAML entstehen können — genau wie heute schon `standard-feature`/`quick-fix`/`bugfix`.
