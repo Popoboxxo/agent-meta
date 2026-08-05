@@ -505,12 +505,22 @@ def _generate_pipeline_block(
             lines.append("")
 
         elif mode == "conditional":
+            cond = stage.get("condition", {})
+            if "dod_flag" in cond:
+                # Already resolved at sync time (inactive stages were skipped
+                # via `continue` above) — render as a plain instruction, not
+                # as an unresolved runtime conditional.
+                seq_idx += 1
+                line = fmt["sequential_item"].format(
+                    index=seq_idx, agent=agent, task=task
+                )
+                lines.append(line + " → warten bis abgeschlossen")
+                continue
             lines.append("")
             lines.append(f"**{stage_id}** — {fmt['conditional_start']}")
             lines.append(
                 fmt["conditional_item"].format(agent=agent, task=task)
             )
-            cond = stage.get("condition", {})
             if cond.get("type") == "agent_decision":
                 lines.append(f"  Decision agent: {cond.get('agent', agent)}")
                 lines.append("  If 'continue': Orchestrator spawns new cell at level n+1 with sanitized context")

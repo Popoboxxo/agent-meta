@@ -118,6 +118,28 @@ def test_generate_pipeline_block_dod_flag_defaults_to_active_when_missing():
     assert "REQ-ID vergeben" in block
 
 
+def test_generate_pipeline_block_dod_flag_survivor_renders_as_plain_instruction():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "req",
+                "agent": "requirements",
+                "task": "REQ-ID vergeben",
+                "mode": "conditional",
+                "condition": {"dod_flag": "req-traceability"},
+            },
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode", active_dod={"req-traceability": True})
+    assert "REQ-ID vergeben" in block
+    # Must NOT render as an unresolved conditional wrapper — the flag is
+    # already decided at sync time, nothing left to evaluate at runtime.
+    assert "Conditional execution" not in block
+    assert "Condition evaluated by" not in block
+
+
 def test_generate_pipeline_block_payload_flag_annotation():
     from scripts.lib.pipelines import _generate_pipeline_block
 
