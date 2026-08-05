@@ -116,3 +116,24 @@ def test_generate_pipeline_block_dod_flag_defaults_to_active_when_missing():
     # active_dod does not mention "req-traceability" at all
     block = _generate_pipeline_block(pipeline, "Opencode", active_dod={})
     assert "REQ-ID vergeben" in block
+
+
+def test_generate_pipeline_block_payload_flag_annotation():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "scope",
+                "agent": "ideation",
+                "task": "Idee scopen",
+                "mode": "conditional",
+                "condition": {"payload_flag": "needs_scoping"},
+            },
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    # payload_flag stages stay in the text (unlike dod_flag) — orchestrator
+    # decides at runtime whether to skip them.
+    assert "Idee scopen" in block
+    assert "needs_scoping" in block

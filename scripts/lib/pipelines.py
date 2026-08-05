@@ -450,6 +450,11 @@ def _generate_pipeline_block(
                 lines.append(f"  Decision agent: {cond.get('agent', agent)}")
                 lines.append("  If 'continue': Orchestrator spawns new cell at level n+1 with sanitized context")
                 lines.append("  If 'leaf': Component is final — handover to implementation discipline")
+            elif "payload_flag" in cond:
+                lines.append(
+                    f"  Laufzeit-Skip: Orchestrator überspringt diese Stage, wenn "
+                    f"payload.{cond['payload_flag']} fehlt oder false ist."
+                )
             lines.append("")
 
     if not lines:
