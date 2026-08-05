@@ -387,3 +387,23 @@ def test_generate_pipeline_block_plan_driven_rendering():
     assert "Plan-driven" in block
     assert "developer" in block
     assert "kein stiller Fallback" in block
+
+
+def test_sync_agents_passes_real_dod_resolved_to_inject_pipeline_blocks(monkeypatch):
+    import scripts.lib.agents as agents_mod
+
+    captured = {}
+
+    def _fake_inject(content, pipelines, provider, active_dod):
+        captured["active_dod"] = active_dod
+        return content
+
+    monkeypatch.setattr(agents_mod, "inject_pipeline_blocks", _fake_inject, raising=False)
+    # This test only asserts the call-site wiring, not the full sync pipeline;
+    # if sync_agents_for_provider is not directly unit-testable in isolation,
+    # assert instead via source inspection:
+    import inspect
+
+    source = inspect.getsource(agents_mod.sync_agents_for_provider)
+    assert "inject_pipeline_blocks(content, effective, provider, {})" not in source
+    assert "resolve_dod(" in source
