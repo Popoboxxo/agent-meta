@@ -262,6 +262,16 @@ Die bestehende `/pipelines`-Seite (`docs/ui/admin-ui.html`, `/api/pipelines`) ed
 
 PR #398 ist bereits gepusht (nicht gemerged). Diese Spec berührt zwei seiner Kern-Dateien erneut: `planner.md` (Entscheidung 6 vereinfacht den Workflow), `feature.md` (Entscheidung 2 löscht die Datei komplett). Empfehlung: eigener Branch von `feat/planner-agent-and-cluster-cleanup` (nicht von `main`, da `planner.md`/`feature.md` in ihrer PR-#398-Form dort noch nicht existieren) — PR #398 bleibt fokussiert und review-fähig, dieser Umbau landet als eigene, referenzierende PR obendrauf.
 
+## Entscheidung 11: Neue `condition`-Typen `dod_flag` und `payload_flag` (Nachtrag, Interview 2026-08-05)
+
+**Fund während der Planungsphase:** `mode: conditional` unterstützt in `scripts/lib/pipelines.py` bisher nur `condition: {type: agent_decision, agent: ...}` (einzige heutige Verwendung: `config/role-defaults.yaml:1609`, `se-termination`). Entscheidung 2 (`feature-lifecycle`) verwendet aber durchgängig `condition: {dod_flag: req-traceability}` etc., Entscheidung 4 (`concept-to-review`) verwendet `condition: {payload_flag: needs_scoping}` — beide Formen existieren im Code nicht. War weder in der ursprünglichen Spec noch im Audit-Abschnitt erfasst.
+
+**`dod_flag` (Sync-Zeit):** Neuer `condition`-Typ neben `agent_decision`. `validate_pipelines()`/`_generate_pipeline_block()` prüfen zur Sync-Zeit, ob das benannte DOD-Preset-Flag (aus demselben `active_dod`-Dict, das `build_pipeline_variables()` bereits als Parameter erhält) aktiv ist — ist es inaktiv, wird die Stage vollständig aus dem generierten Block weggelassen (nicht nur textuell markiert), analog zum heutigen `{{#if DOD_...}}`-Verhalten in `feature.md`.
+
+**`payload_flag` (Laufzeit):** Anders als `dod_flag` bleibt eine `payload_flag`-Stage im generierten Prompt-Text sichtbar (der Payload-Inhalt ist zur Sync-Zeit nicht bekannt) — der Orchestrator überspringt sie zur Laufzeit, wenn das benannte Flag im Payload fehlt oder `false` ist. Kein Engine-Codepfad nötig, nur eine dokumentierte Konvention im generierten Stage-Text (z.B. `**scope** — Conditional execution (payload_flag: needs_scoping):`).
+
+Beide Typen sind Ergänzung zu Entscheidung 9 ("generisch, datengetrieben, keine Sonderfälle pro Pipeline-Name") — betreffen ausschließlich den bestehenden `conditional`-Modus, keine neuen Stage-Modi.
+
 ## Audit: Cross-Referenz-Prüfung (Ergebnis, geklärt im Interview 2026-08-05)
 
 Nachträgliche Prüfung (2026-08-05) gegen den aktuellen Code-Stand deckte 12 Lücken auf, die die ursprüngliche Migrationstabelle (Entscheidung 2) und die übrigen Entscheidungen nicht abdeckten. Alle 12 sind mittlerweile in die jeweilige Entscheidung eingearbeitet:
