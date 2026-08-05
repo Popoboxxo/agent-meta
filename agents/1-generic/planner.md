@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.0.0"
+version: "1.0.1"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern

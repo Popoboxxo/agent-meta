@@ -1,8 +1,8 @@
 ---
 name: template-bug-feature-analyzer
-version: "1.1.3"
+version: "1.1.4"
 description: "Analyzes and classifies incoming bug reports and feature requests before resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope."
-hint: "Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature delegation"
+hint: "Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation"
 prompt_mode: modern
 tools:
   - Read

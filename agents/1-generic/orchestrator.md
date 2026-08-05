@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.7.0"
+version: "7.7.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
