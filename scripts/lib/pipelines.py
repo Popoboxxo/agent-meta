@@ -236,7 +236,9 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         provider_blocks = {}
         for provider in KNOWN_PROVIDERS:
             if _pipeline_active_for_provider(pipeline, provider):
-                provider_blocks[provider] = _generate_pipeline_block(pipeline, provider)
+                provider_blocks[provider] = _generate_pipeline_block(
+                    pipeline, provider, active_dod=active_dod
+                )
             else:
                 provider_blocks[provider] = ""
         variables[f"PIPELINE_{var_name}_PROVIDER_BLOCKS"] = provider_blocks
@@ -258,7 +260,7 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
             return match.group(0)
         if not _pipeline_active_for_provider(pipeline, provider):
             return ""
-        return _generate_pipeline_block(pipeline, provider)
+        return _generate_pipeline_block(pipeline, provider, active_dod=active_dod)
 
     return pattern.sub(_replacer, content)
 
@@ -351,10 +353,17 @@ def _execution_mode_for_pipeline(stages: list) -> str:
     return "sequential"
 
 
-def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
+def _generate_pipeline_block(
+    pipeline: dict,
+    provider: str,
+    all_pipelines: dict | None = None,
+    active_dod: dict | None = None,
+    _depth: int = 0,
+) -> str:
     """Generate a provider-specific markdown block for a single pipeline."""
     provider_key = provider.lower()
     fmt = _PROVIDER_NOTATION.get(provider_key, _PROVIDER_NOTATION["opencode"])
+    active_dod = active_dod or {}
     lines = []
     stages = pipeline.get("stages", [])
     seq_idx = 0
@@ -366,6 +375,10 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
 
     for stage in stages:
         mode = stage.get("mode", "sequential")
+        if mode == "conditional":
+            cond = stage.get("condition", {})
+            if "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True):
+                continue
         agent = stage.get("agent", "")
         task = stage.get("task", "")
         stage_id = stage.get("id", "")

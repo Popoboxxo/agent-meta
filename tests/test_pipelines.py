@@ -59,3 +59,60 @@ def test_validate_pipelines_rejects_bad_default_value():
     pipelines = {"p1": {"providers": {"default": "sometimes"}, "stages": []}}
     errors = validate_pipelines(pipelines, available_roles=[])
     assert any("providers.default" in e for e in errors)
+
+
+def test_generate_pipeline_block_skips_inactive_dod_flag_stage():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {"id": "always", "agent": "git", "task": "Branch anlegen", "mode": "sequential"},
+            {
+                "id": "req",
+                "agent": "requirements",
+                "task": "REQ-ID vergeben",
+                "mode": "conditional",
+                "condition": {"dod_flag": "req-traceability"},
+            },
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode", active_dod={"req-traceability": False})
+    assert "Branch anlegen" in block
+    assert "REQ-ID vergeben" not in block
+
+
+def test_generate_pipeline_block_includes_active_dod_flag_stage():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "req",
+                "agent": "requirements",
+                "task": "REQ-ID vergeben",
+                "mode": "conditional",
+                "condition": {"dod_flag": "req-traceability"},
+            },
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode", active_dod={"req-traceability": True})
+    assert "REQ-ID vergeben" in block
+
+
+def test_generate_pipeline_block_dod_flag_defaults_to_active_when_missing():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "req",
+                "agent": "requirements",
+                "task": "REQ-ID vergeben",
+                "mode": "conditional",
+                "condition": {"dod_flag": "req-traceability"},
+            },
+        ]
+    }
+    # active_dod does not mention "req-traceability" at all
+    block = _generate_pipeline_block(pipeline, "Opencode", active_dod={})
+    assert "REQ-ID vergeben" in block
