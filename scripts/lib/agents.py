@@ -1498,7 +1498,10 @@ def sync_agents_for_provider(
         pipeline_overrides = config.get("quality-pipelines", {})
         effective = apply_overrides(pipelines, pipeline_overrides)
         if effective:
-            content = inject_pipeline_blocks(content, effective, provider, {})
+            from .dod import resolve_dod
+
+            dod_resolved = resolve_dod(config, agent_meta_root)
+            content = inject_pipeline_blocks(content, effective, provider, dod_resolved)
 
         content = substitute(content, merged_vars, rel_source, log)
         # Apply PAL delegation syntax per provider (Issue #277).
