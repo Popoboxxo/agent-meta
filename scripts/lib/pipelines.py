@@ -139,6 +139,9 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     - agent exists in available_roles
     - loop.generator / loop.critic exist
     - no circular orchestration (orchestrator agents inside pipelines)
+    - providers field is well-formed (default/include/exclude, known providers)
+    - run_pipeline composition: referenced pipelines exist, no cycles, depth limit
+    - plan-driven stage roles (fallback_agent, allowed_agents) exist
     """
     errors = []
     orchestrator_roles = {"orchestrator", "feature"}
@@ -526,7 +529,11 @@ def _generate_pipeline_block(
             lines.append(f"**{stage_id}** — enthält Pipeline `{ref_name}`:")
             if ref_pipeline is None:
                 lines.append(f"  [nicht aufgelöst — Pipeline '{ref_name}' nicht gefunden]")
-            elif _depth >= _max_depth:
+            elif not _pipeline_active_for_provider(ref_pipeline, provider):
+                lines.append(
+                    f"  [nicht aufgelöst — Pipeline '{ref_name}' für Provider {provider} inaktiv]"
+                )
+            elif _depth + 1 >= _max_depth:
                 lines.append(f"  [nicht aufgelöst — max_depth={_max_depth} erreicht]")
             else:
                 sub_block = _generate_pipeline_block(

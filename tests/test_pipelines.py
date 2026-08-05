@@ -267,6 +267,55 @@ def test_generate_pipeline_block_render_cutoff_when_depth_exceeds_max_depth():
     assert "max_depth=2 erreicht" in block
 
 
+def test_generate_pipeline_block_run_pipeline_respects_provider_filter():
+    """Final-review finding F1: run_pipeline recursion must honour the
+    referenced sub-pipeline's own `providers` filter instead of always
+    inlining it regardless of the current provider."""
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipelines = {
+        "outer": {
+            "stages": [{"id": "implement", "run_pipeline": "inner", "mode": "run_pipeline"}]
+        },
+        "inner": {
+            "providers": {"default": "inactive", "include": ["Gemini"]},
+            "stages": [
+                {"id": "step", "agent": "developer", "task": "Feature implementieren", "mode": "sequential"}
+            ],
+        },
+    }
+    block = _generate_pipeline_block(pipelines["outer"], "Claude", all_pipelines=pipelines)
+    assert "Feature implementieren" not in block
+    assert "inaktiv" in block
+    assert "inner" in block
+
+    active_block = _generate_pipeline_block(pipelines["outer"], "Gemini", all_pipelines=pipelines)
+    assert "Feature implementieren" in active_block
+    assert "inaktiv" not in active_block
+
+
+def test_generate_pipeline_block_default_max_depth_cuts_off_five_chain():
+    """Final-review finding F2: with the default max_depth=4, a 5-pipeline
+    chain (root + 4 hops) must be cut off exactly at the last hop — mirroring
+    validate_pipelines(), which rejects this chain as exceeding max_depth."""
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipelines = {
+        "a": {"stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}]},
+        "b": {"stages": [{"id": "x", "run_pipeline": "c", "mode": "run_pipeline"}]},
+        "c": {"stages": [{"id": "x", "run_pipeline": "d", "mode": "run_pipeline"}]},
+        "d": {"stages": [{"id": "x", "run_pipeline": "e", "mode": "run_pipeline"}]},
+        "e": {
+            "stages": [
+                {"id": "leaf", "agent": "developer", "task": "Leaf-Stage erreicht", "mode": "sequential"}
+            ]
+        },
+    }
+    block = _generate_pipeline_block(pipelines["a"], "Opencode", all_pipelines=pipelines)
+    assert "Leaf-Stage erreicht" not in block
+    assert "max_depth=4 erreicht" in block
+
+
 def test_build_pipeline_variables_resolves_run_pipeline_via_all_pipelines():
     """Integration test proving all_pipelines actually reaches
     _generate_pipeline_block() through build_pipeline_variables() (task-4
