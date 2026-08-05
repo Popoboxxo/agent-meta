@@ -98,6 +98,40 @@ def apply_overrides(base: dict, overrides: dict) -> dict:
     return result
 
 
+def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -> list[str]:
+    """Check run_pipeline references for missing targets, cycles, and depth limit."""
+    errors = []
+    max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
+
+    def _walk(current_name: str, visited: list[str], depth: int) -> None:
+        if depth > max_depth:
+            errors.append(
+                f"Pipeline '{name}': run_pipeline nesting exceeds max_depth="
+                f"{max_depth} (path: {' -> '.join(visited)})"
+            )
+            return
+        current = pipelines.get(current_name)
+        if current is None:
+            errors.append(
+                f"Pipeline '{name}': referenced pipeline '{current_name}' not found"
+            )
+            return
+        for stage in current.get("stages", []):
+            ref = stage.get("run_pipeline")
+            if not ref:
+                continue
+            if ref in visited:
+                errors.append(
+                    f"Pipeline '{name}': circular run_pipeline reference "
+                    f"({' -> '.join(visited + [ref])})"
+                )
+                continue
+            _walk(ref, visited + [ref], depth + 1)
+
+    _walk(name, [name], 1)
+    return errors
+
+
 def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
@@ -126,6 +160,9 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                             f"Pipeline '{name}': providers.{key} entry '{p}' is not "
                             f"a known provider ({', '.join(KNOWN_PROVIDERS)})"
                         )
+
+        errors.extend(_validate_pipeline_composition(pipelines, name, pipeline))
+
         for stage in stages:
             agent = stage.get("agent")
             if agent and agent not in available_roles:
@@ -367,6 +404,7 @@ def _generate_pipeline_block(
     lines = []
     stages = pipeline.get("stages", [])
     seq_idx = 0
+    max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
 
     # Execution mode header (Issue #285)
     exec_mode = _execution_mode_for_pipeline(stages)
@@ -455,6 +493,27 @@ def _generate_pipeline_block(
                     f"  Laufzeit-Skip: Orchestrator überspringt diese Stage, wenn "
                     f"payload.{cond['payload_flag']} fehlt oder false ist."
                 )
+            lines.append("")
+
+        elif mode == "run_pipeline":
+            ref_name = stage.get("run_pipeline", "")
+            ref_pipeline = (all_pipelines or {}).get(ref_name)
+            lines.append("")
+            lines.append(f"**{stage_id}** — enthält Pipeline `{ref_name}`:")
+            if ref_pipeline is None:
+                lines.append(f"  [nicht aufgelöst — Pipeline '{ref_name}' nicht gefunden]")
+            elif _depth >= max_depth:
+                lines.append(f"  [nicht aufgelöst — max_depth={max_depth} erreicht]")
+            else:
+                sub_block = _generate_pipeline_block(
+                    ref_pipeline,
+                    provider,
+                    all_pipelines=all_pipelines,
+                    active_dod=active_dod,
+                    _depth=_depth + 1,
+                )
+                for sub_line in sub_block.splitlines():
+                    lines.append(f"  {sub_line}")
             lines.append("")
 
     if not lines:

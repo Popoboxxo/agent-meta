@@ -137,3 +137,81 @@ def test_generate_pipeline_block_payload_flag_annotation():
     # decides at runtime whether to skip them.
     assert "Idee scopen" in block
     assert "needs_scoping" in block
+
+
+def test_validate_pipelines_detects_direct_cycle():
+    from scripts.lib.pipelines import validate_pipelines
+
+    pipelines = {
+        "a": {"stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}]},
+        "b": {"stages": [{"id": "y", "run_pipeline": "a", "mode": "run_pipeline"}]},
+    }
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("circular" in e.lower() for e in errors)
+
+
+def test_validate_pipelines_detects_missing_referenced_pipeline():
+    from scripts.lib.pipelines import validate_pipelines
+
+    pipelines = {
+        "a": {"stages": [{"id": "x", "run_pipeline": "does-not-exist", "mode": "run_pipeline"}]},
+    }
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("does-not-exist" in e for e in errors)
+
+
+def test_validate_pipelines_enforces_default_max_depth():
+    from scripts.lib.pipelines import validate_pipelines
+
+    # a -> b -> c -> d -> e is 4 hops; default max_depth is 4, so 5 pipelines
+    # (depth 5 reached) must fail, depth 4 must pass.
+    pipelines = {
+        "a": {"stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}]},
+        "b": {"stages": [{"id": "x", "run_pipeline": "c", "mode": "run_pipeline"}]},
+        "c": {"stages": [{"id": "x", "run_pipeline": "d", "mode": "run_pipeline"}]},
+        "d": {"stages": [{"id": "x", "run_pipeline": "e", "mode": "run_pipeline"}]},
+        "e": {"stages": []},
+    }
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("max_depth" in e for e in errors)
+
+
+def test_validate_pipelines_max_depth_override_allows_deeper_nesting():
+    from scripts.lib.pipelines import validate_pipelines
+
+    pipelines = {
+        "a": {
+            "max_depth": 5,
+            "stages": [{"id": "x", "run_pipeline": "b", "mode": "run_pipeline"}],
+        },
+        "b": {"stages": [{"id": "x", "run_pipeline": "c", "mode": "run_pipeline"}]},
+        "c": {"stages": [{"id": "x", "run_pipeline": "d", "mode": "run_pipeline"}]},
+        "d": {"stages": [{"id": "x", "run_pipeline": "e", "mode": "run_pipeline"}]},
+        "e": {"stages": []},
+    }
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert errors == []
+
+
+def test_generate_pipeline_block_renders_nested_pipeline_indented():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipelines = {
+        "outer": {
+            "stages": [{"id": "implement", "run_pipeline": "inner", "mode": "run_pipeline"}]
+        },
+        "inner": {
+            "stages": [{"id": "step", "agent": "developer", "task": "Feature implementieren", "mode": "sequential"}]
+        },
+    }
+    block = _generate_pipeline_block(pipelines["outer"], "Opencode", all_pipelines=pipelines)
+    assert "enthält Pipeline `inner`" in block
+    assert "Feature implementieren" in block
+
+
+def test_generate_pipeline_block_run_pipeline_missing_reference_is_marked():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {"stages": [{"id": "implement", "run_pipeline": "ghost", "mode": "run_pipeline"}]}
+    block = _generate_pipeline_block(pipeline, "Opencode", all_pipelines={})
+    assert "nicht aufgelöst" in block
