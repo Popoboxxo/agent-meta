@@ -4,6 +4,24 @@ import json
 import os
 import re
 
+KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
+DEFAULT_MAX_DEPTH = 4
+
+
+def _pipeline_active_for_provider(pipeline: dict, provider: str) -> bool:
+    """Return whether a pipeline is active for `provider` per its `providers` field.
+
+    No `providers` field means active everywhere (backward compatible with
+    pipelines that predate this field, e.g. quick-fix/bugfix).
+    """
+    providers_cfg = pipeline.get("providers")
+    if not providers_cfg:
+        return True
+    default = providers_cfg.get("default", "active")
+    if default == "active":
+        return provider not in providers_cfg.get("exclude", [])
+    return provider in providers_cfg.get("include", [])
+
 
 def load_quality_pipelines(agent_meta_root: str) -> dict:
     """Load quality_pipelines from config/role-defaults.yaml."""
@@ -93,6 +111,21 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])
+        providers_cfg = pipeline.get("providers")
+        if providers_cfg:
+            default = providers_cfg.get("default", "active")
+            if default not in ("active", "inactive"):
+                errors.append(
+                    f"Pipeline '{name}': providers.default must be 'active' or "
+                    f"'inactive', got '{default}'"
+                )
+            for key in ("include", "exclude"):
+                for p in providers_cfg.get(key, []):
+                    if p not in KNOWN_PROVIDERS:
+                        errors.append(
+                            f"Pipeline '{name}': providers.{key} entry '{p}' is not "
+                            f"a known provider ({', '.join(KNOWN_PROVIDERS)})"
+                        )
         for stage in stages:
             agent = stage.get("agent")
             if agent and agent not in available_roles:
@@ -201,10 +234,11 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         variables[f"PIPELINE_{var_name}_BLOCK"] = ""
         # Pre-compute provider-specific blocks for later injection
         provider_blocks = {}
-        for provider in ("Claude", "Opencode", "Gemini", "Continue", "Mammouth"):
-            provider_blocks[provider] = _generate_pipeline_block(
-                pipeline, provider
-            )
+        for provider in KNOWN_PROVIDERS:
+            if _pipeline_active_for_provider(pipeline, provider):
+                provider_blocks[provider] = _generate_pipeline_block(pipeline, provider)
+            else:
+                provider_blocks[provider] = ""
         variables[f"PIPELINE_{var_name}_PROVIDER_BLOCKS"] = provider_blocks
     return variables
 
@@ -222,6 +256,8 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
         pipeline = pipelines.get(name)
         if not pipeline:
             return match.group(0)
+        if not _pipeline_active_for_provider(pipeline, provider):
+            return ""
         return _generate_pipeline_block(pipeline, provider)
 
     return pattern.sub(_replacer, content)
