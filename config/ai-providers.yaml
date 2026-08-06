@@ -37,8 +37,19 @@ providers:
       - sync.log
       - .mcp.json
     mcp-config:
-      committed-file: .claude/settings.json
-      secrets-file: .claude/settings.local.json
+      # Claude Code does NOT read a top-level `mcpServers` key from
+      # settings.json/settings.local.json for MCP server registration — only
+      # from .mcp.json at the project root (or `claude mcp add --scope
+      # project`). Writing here previously produced a fully inert,
+      # silently-broken integration (audit #388, #400). Both entries point
+      # at the same already-gitignored .mcp.json (see gitignore_entries
+      # above): committed-file writes ${VAR}-placeholder entries first (safe
+      # even if this file were ever committed), then secrets-file overwrites
+      # the same mcpServers key with fully resolved values when
+      # secrets.local.yaml exists — matching .mcp.json's own native ${VAR}
+      # expansion as the fallback when it doesn't.
+      committed-file: .mcp.json
+      secrets-file: .mcp.json
       format: claude-settings
     # Provider-specific directories for multi-provider orchestration
     skills_dir: .claude/skills

@@ -293,14 +293,20 @@ def _update_json_config(
 
     existing: dict = {}
     if path.exists():
-        parsed = _read_json_lenient(path)
-        if parsed is None:
-            log.warning(
-                f"mcp: could not parse '{rel}' as JSON/JSONC — "
-                "MCP config not injected. Add mcpServers manually."
-            )
-            return
-        existing = parsed
+        if path.stat().st_size == 0:
+            # A zero-byte file is invalid JSON but not a real conflict —
+            # self-heal to {} instead of silently skipping the injection
+            # (audit #400, Secondary Finding A).
+            existing = {}
+        else:
+            parsed = _read_json_lenient(path)
+            if parsed is None:
+                log.warning(
+                    f"mcp: could not parse '{rel}' as JSON/JSONC — "
+                    "MCP config not injected. Add mcpServers manually."
+                )
+                return
+            existing = parsed
 
     # Bereinigung der Legacy-Keys wurde auf Wunsch des Users entfernt,
     # um manuelle Einträge in den Config-Dateien zu erhalten.
@@ -396,6 +402,38 @@ def _update_continue_yaml_config(
 # Provider config generation — main entry point
 # ---------------------------------------------------------------------------
 
+def _warn_stale_mcp_servers_key(
+    project_root: Path,
+    provider_cfg: dict,
+    committed_file: str,
+    secrets_file: str | None,
+    log: SyncLog,
+) -> None:
+    """Warn once if a leftover mcpServers key sits in a file no longer targeted.
+
+    Migration aid for #388/#400: projects synced before Claude's mcp-config
+    moved to .mcp.json can have an inert `mcpServers` block still sitting in
+    settings.json/settings.local.json. sync.py deliberately never strips
+    unrelated keys from those files (manual entries must survive a sync), so
+    this leftover has to be pointed out instead of silently cleaned up.
+    """
+    current_targets = {committed_file, secrets_file}
+    for key in ("settings_file", "settings_local_file"):
+        stale_rel = provider_cfg.get(key)
+        if not stale_rel or stale_rel in current_targets:
+            continue
+        stale_path = safe_path(project_root, stale_rel)
+        if not stale_path.exists():
+            continue
+        parsed = _read_json_lenient(stale_path)
+        if isinstance(parsed, dict) and "mcpServers" in parsed:
+            log.warning(
+                f"mcp: '{stale_rel}' still has a leftover 'mcpServers' key from "
+                f"before MCP config moved to '{committed_file}' — it has no "
+                "effect there and can be removed manually."
+            )
+
+
 def generate_provider_configs(
     agent_meta_root: Path,
     project_root: Path,
@@ -434,6 +472,8 @@ def generate_provider_configs(
 
     if not fmt or not committed_file:
         return
+
+    _warn_stale_mcp_servers_key(project_root, pc, committed_file, secrets_file, log)
 
     # Load secrets.local.yaml if present
     secrets_path = project_root / SECRETS_LOCAL_FILE
