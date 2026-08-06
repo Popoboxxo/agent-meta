@@ -166,13 +166,26 @@ def _template_path_for_role(agent_meta_root: Path, role: str) -> Path:
     return agent_meta_root / "agents" / "1-generic" / f"{role}.md"
 
 
+# Generic templates that are intentionally never instantiated as a standalone
+# role -- they exist only as an `extends:` base for other, real roles (see
+# their referencing 2-platform overrides). Flagging them under
+# "templates_without_default" on every --audit-config run is a known false
+# positive, not a gap to fix (audit #415).
+WRAPPER_TEMPLATES = frozenset({"provider-expert"})
+
+
 def _is_role_template(path: Path) -> bool:
     """True for generic templates that represent an actual role.
 
     Underscore-prefixed files (``_skill-wrapper.md``, ``_wf-*.md``) are partials
-    or workflow includes, not standalone roles.
+    or workflow includes, not standalone roles. Files in WRAPPER_TEMPLATES are
+    real files but intentionally have no role-defaults entry of their own.
     """
-    return path.suffix == ".md" and not path.name.startswith("_")
+    return (
+        path.suffix == ".md"
+        and not path.name.startswith("_")
+        and path.stem not in WRAPPER_TEMPLATES
+    )
 
 
 def _collect_role_defaults(agent_meta_root: Path) -> set[str]:
