@@ -94,6 +94,22 @@ def test_templates_without_default_detects_missing_entry(meta_root: Path) -> Non
     assert report.by_category("templates_without_default")[0].severity == "info"
 
 
+def test_templates_without_default_ignores_known_wrapper_templates(meta_root: Path) -> None:
+    # Regression test for audit #415: provider-expert.md is a real template
+    # file (unlike the underscore partials) but is intentionally never
+    # instantiated as its own role -- it only serves as an `extends:` base
+    # for claude-expert/gemini-expert/etc. It must not show up as a false
+    # positive on every --audit-config run.
+    _write(
+        meta_root / "agents" / "1-generic" / "provider-expert.md",
+        _template("provider-expert"),
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    flagged = {i.role for i in report.by_category("templates_without_default")}
+    assert "provider-expert" not in flagged
+
+
 def test_deprecated_roles(meta_root: Path) -> None:
     cfg = _config_path(
         meta_root,

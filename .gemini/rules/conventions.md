@@ -10,6 +10,15 @@
    - Platform agents (`2-platform/`) also keep `based-on` up to date.
 3. Placeholders are always `{{GROSS_MIT_UNTERSTRICH}}`. Lowercase or mixed case will not match.
 
+## Naming-Konvention (Frontmatter `name:`)
+
+Generische Templates in `agents/1-generic/` verwenden `name: template-<rolle>`. Ausnahme:
+SE-Rollen (`se-*.md`) verwenden `name: se-<rolle>` ohne `template-`-Präfix — bewusste
+Abweichung, um SE-Cascade-spezifische Rollen visuell von generischen Rollen zu
+unterscheiden (Audit #412). Keine funktionale Abhängigkeit vom Präfix — reine Konvention,
+nirgends in `scripts/lib/` oder den Consistency-Checks geprüft. Neue Rollen außerhalb der
+SE-Kaskade folgen der Standardkonvention; weitere Ausnahmen sollten hier dokumentiert werden.
+
 ## Composition-Risiko: Instruction Bleed
 
 Bei `extends + patches` in `2-platform/` und `3-project/` gilt:
