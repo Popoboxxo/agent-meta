@@ -26,7 +26,6 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 | Aufwand, Schätzung, Kosten | `effort-estimator` | optional | no |
 | Codebase, Dependencies, Impact, Recherche | `explorer` | optional | yes |
 | Export, Routing, Target | `export-manager` | optional | no |
-| Feature Lifecycle, komplexes Feature, Feature Pipeline | `feature` | recommended | yes |
 | Feedback, Issue, Bug melden | `feedback` | required | no |
 | Gemini, Antigravity | `gemini-expert` | optional | no |
 | Git, Commit, Branch, Push, Pull | `git` | required | no |
@@ -55,13 +54,19 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 | Tests, TDD, Testabdeckung | `tester` | recommended | yes |
 | UI, UX, Mockup, Design | `ui-ux-designer` | optional | yes |
 | Validierung, DoD, Traceability | `validator` | recommended | no |
+| Bug fixen, Bug beheben, Fehler beheben | → Pipeline: `bugfix` | pipeline | no |
+| Konzept, Design-Doc, Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
+| Dokumentation, README, Docs, Doku | → Pipeline: `docs-update` | pipeline | no |
+| Feature implementieren, Feature bauen, neues Feature, Funktion bauen, Feature Lifecycle, komplexes Feature, Feature Pipeline | → Pipeline: `feature-lifecycle` | pipeline | no |
+| Bug fixen, Bug beheben, Triage, schneller Fix, Hotfix | → Pipeline: `quick-fix` | pipeline | no |
+| Refactoring, aufräumen, Cleanup, Code verbessern | → Pipeline: `refactor` | pipeline | no |
 
 
 ## A2A Delegation
 A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
 
 ## Plan Delegation
-Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> `feature` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
+Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature-lifecycle` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
 
 ## Git Delegation
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.

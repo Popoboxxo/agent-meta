@@ -664,8 +664,6 @@ Parameter: event (agent_start|delegate_out|agent_end), agent, provider, status, 
 
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
 
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR |
-
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
 
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
@@ -806,6 +804,10 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 
 
 
+
+
+
+
 ## Eigene Notizen
 
 Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird von `agent-meta` nicht überschrieben!
@@ -838,7 +840,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `effort-estimator.md` → registriere als `effort-estimator`
    - `explorer.md` → registriere als `explorer`
    - `export-manager.md` → registriere als `export-manager`
-   - `feature.md` → registriere als `feature`
    - `feedback.md` → registriere als `feedback`
    - `gemini-expert.md` → registriere als `gemini-expert`
    - `git.md` → registriere als `git`
@@ -893,7 +894,6 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="effort-estimator", ...)
    define_subagent(name="explorer", ...)
    define_subagent(name="export-manager", ...)
-   define_subagent(name="feature", ...)
    define_subagent(name="feedback", ...)
    define_subagent(name="gemini-expert", ...)
    define_subagent(name="git", ...)

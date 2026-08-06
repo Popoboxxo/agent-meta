@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 7.7.0
+version: 7.7.1
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@7.7.0
+generated-from: 1-generic/orchestrator.md@7.7.1
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
@@ -35,7 +35,7 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 ## 2. Pipeline match check
 | Signal | Pipeline |
 |--------|----------|
-| Feature implementieren / Feature bauen / neues Feature | `standard-feature` |
+| Feature implementieren / Feature bauen / neues Feature | `feature-lifecycle` |
 | Bug fixen / Bug beheben / Triage | `quick-fix` |
 | Bug fixen / Bug beheben / Fehler beheben | `bugfix` |
 | Konzept / Design-Doc / Recherche | `concept-development` |
@@ -69,7 +69,6 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Aufwand, Schätzung, Kosten | `effort-estimator` | optional | no |
 | Codebase, Dependencies, Impact, Recherche | `explorer` | optional | yes |
 | Export, Routing, Target | `export-manager` | optional | no |
-| Feature Lifecycle, komplexes Feature, Feature Pipeline | `feature` | recommended | yes |
 | Feedback, Issue, Bug melden | `feedback` | required | no |
 | Gemini, Antigravity | `gemini-expert` | optional | no |
 | Git, Commit, Branch, Push, Pull | `git` | required | no |
@@ -98,6 +97,12 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 | Tests, TDD, Testabdeckung | `tester` | recommended | yes |
 | UI, UX, Mockup, Design | `ui-ux-designer` | optional | yes |
 | Validierung, DoD, Traceability | `validator` | recommended | no |
+| Bug fixen, Bug beheben, Fehler beheben | → Pipeline: `bugfix` | pipeline | no |
+| Konzept, Design-Doc, Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
+| Dokumentation, README, Docs, Doku | → Pipeline: `docs-update` | pipeline | no |
+| Feature implementieren, Feature bauen, neues Feature, Funktion bauen, Feature Lifecycle, komplexes Feature, Feature Pipeline | → Pipeline: `feature-lifecycle` | pipeline | no |
+| Bug fixen, Bug beheben, Triage, schneller Fix, Hotfix | → Pipeline: `quick-fix` | pipeline | no |
+| Refactoring, aufräumen, Cleanup, Code verbessern | → Pipeline: `refactor` | pipeline | no |
 
 
 ## 4. Developer tier selection
@@ -133,9 +138,9 @@ All "yes" → start. Otherwise resolve first.
 | Single task | → target agent |
 | Same tasks, independent | FANOUT(N, agent) |
 | Mixed tasks | PARALLEL_GROUP |
-| Complex feature | → `feature` or pipeline |
+| Complex feature | → `feature-lifecycle` pipeline |
 
-Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to `feature` as `payload.plan_ref` instead of starting a fresh lifecycle blind.
+Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
 **Parallel:** disjoint files, max 4, in doubt → sequential, overlap → BARRIER.
 **Not parallel:** sequential dependencies, shared mutable state, deterministic workflow, tight budget.
@@ -245,8 +250,6 @@ SE mode: optional
 | `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symb... |
 
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
-
-| `feature` | Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate → PR |
 
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
 

@@ -1,10 +1,10 @@
 ---
 name: bug-feature-analyzer
-version: 1.1.3
+version: 1.1.4
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before
-  developer/feature delegation'
+  developer/feature-lifecycle delegation'
 prompt_mode: modern
 tools:
 - Read
@@ -12,7 +12,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/bug-feature-analyzer.md@1.1.3
+generated-from: 1-generic/bug-feature-analyzer.md@1.1.4
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -74,7 +74,7 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 |----------|-----------|
 | **BUG** | → `developer` (fix) or `feedback` (create issue) |
 | **USER-ERROR** | Reply with explanation, no dev task |
-| **FEATURE** | → `requirements` (REQ-ID) → `feature` or `developer` |
+| **FEATURE** | → `requirements` (REQ-ID) → `feature-lifecycle` pipeline or `developer` |
 | **OUT-OF-SCOPE** | Rejection with rationale, no follow-up |
 | **UNCLEAR** | Questions to user, no action |
 
@@ -117,7 +117,7 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 ### Recommendation to orchestrator
 - BUG → "Delegate to `developer` with this triage report as context."
 - USER-ERROR → "No delegation. Reply to the user with: <explanation>"
-- FEATURE → "Delegate to `requirements` for a REQ-ID, then to `feature`."
+- FEATURE → "Delegate to `requirements` for a REQ-ID, then to the `feature-lifecycle` pipeline."
 - OUT-OF-SCOPE → "No delegation. Reply to the user with: <rejection>"
 - UNCLEAR → "Ask the user the following questions: <list>"
 ```
