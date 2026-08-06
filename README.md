@@ -102,7 +102,7 @@ mindmap
       External Skills
 ```
 
-## Agent Roster — 51 Generic Agents
+## Agent Roster — 69 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -121,10 +121,11 @@ mindmap
 | **documenter** | fast | 1.4.2 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 2.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
-### Workflow & Framework (8 agents)
+### Workflow & Framework (9 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
+| **planner** | balanced | 1.0.1 | Turns concepts/REQs/bugs into concrete, ordered implementation plans |
 | **release** | balanced | 1.4.2 | Versioning, changelogs, build processes, GitHub releases |
 | **ideation** | balanced | 1.6.1 | Idea exploration, vision sharpening, concept concretization |
 | **feedback** | fast | 1.2.2 | Standardizes bug reports and feature requests as GitHub issues |
@@ -134,12 +135,14 @@ mindmap
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.1 | Reviews design docs for completeness, logic, risks, feasibility |
 
-### Specialist Roles (16 agents)
+### Specialist Roles (22 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
+| **accessibility-specialist** | balanced | 0.1.0 | WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen-reader guidelines, color contrast, focus management |
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
 | **bug-feature-analyzer** | balanced | 1.1.2 | Triage and classify incoming bug reports and feature requests |
+| **data-engineer** | balanced | 0.1.0 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
 | **database-engineer** | powerful | 1.0.0 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
 | **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
 | **devops-engineer** | fast | 1.1.2 | CI/CD pipelines, IaC, container orchestration |
@@ -151,7 +154,11 @@ mindmap
 | **log-analyzer** | balanced | 1.1.2 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
 | **performance-optimizer** | powerful | 1.1.2 | Data-driven Big-O bottleneck identification |
+| **product-manager** | balanced | 0.1.0 | Strategic product management: backlog, user stories, sprint planning, RICE/MoSCoW prioritization, KPI definition |
+| **refactoring-specialist** | balanced | 0.1.0 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
 | **security-auditor** | powerful | 1.2.2 | Static security analysis: OWASP Top 10, secrets, supply-chain |
+| **sre-engineer** | balanced | 0.1.0 | Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbooks |
+| **technical-writer** | fast | 0.1.0 | External developer/user-facing docs: API references, getting-started guides, SDK docs, tutorials, CLI help |
 | **ui-ux-designer** | balanced | 1.1.2 | UI specs, mockups, design systems |
 | **e2e-tester** | balanced | 1.0.0 | End-to-end browser testing via Playwright: user flows, visual regression, accessibility audits |
 
@@ -174,7 +181,7 @@ Introduced in v0.83.0, the Knowledge Engine brings semantic codebase management 
 - **Phase B (Domain Presets):** Select pre-configured domain structures directly from the Admin UI (e.g. `technical-project`, `gamedev`, `personal-wiki`).
 - **Phase C (Bundle Manager):** The `knowledge.py` subsystem automatically aggregates wiki markdown into provider-specific context files dynamically.
 
-### Provider Expert Agents (5 agents)
+### Provider Expert Agents (6 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
