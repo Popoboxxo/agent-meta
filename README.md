@@ -422,6 +422,11 @@ Structured JSON envelopes for Agent-to-Agent communication:
 | Continue | CONTINUE.md | .continue/agents/ | .continue/rules/ | — | .continue/prompts/ | .continue/config.yaml |
 | Copilot | .github/copilot/COPILOT.md | .github/copilot/agents/ | .github/copilot/rules/ | — | — | .github/copilot/copilot.json |
 
+Only Claude and Mammouth generate PreToolUse hooks (`config/ai-providers.yaml: has_hooks`).
+`orchestrator.strict` has no runtime effect on the other providers — it's a config value, not an
+enforced restriction there. `sync.py --validate` warns automatically whenever `orchestrator.strict`
+is active for a provider without hook support.
+
 ## Native Extensions Whitelist
 
 Provider-native extensions (plugins, hooks, skills) require explicit approval gates to run safely.
