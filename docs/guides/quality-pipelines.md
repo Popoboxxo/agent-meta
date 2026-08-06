@@ -21,7 +21,7 @@ zentral in `config/role-defaults.yaml` definiert und provider-optimiert injizier
 ### Base-Pipelines: `config/role-defaults.yaml`
 ```yaml
 quality_pipelines:
-  standard-feature:
+  feature-lifecycle:
     description: "..."
     stages: [...]
 ```
@@ -30,11 +30,11 @@ quality_pipelines:
 ```yaml
 quality-pipelines:
   overrides:
-    standard-feature:
+    feature-lifecycle:
       stages:
-        review:
-          loop:
-            max_iterations: 5
+        implement:
+          plan-driven:
+            fallback_agent: senior-developer
   custom-pipelines:
     my-pipeline:
       stages: [...]

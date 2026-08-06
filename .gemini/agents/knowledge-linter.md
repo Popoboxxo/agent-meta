@@ -10,7 +10,7 @@ tools:
 - Grep
 - TodoWrite
 generated-from: 1-generic/knowledge-linter.md@1.0.0
-model: gemini-3.5-flash-high
+model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
 

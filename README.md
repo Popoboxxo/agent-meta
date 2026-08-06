@@ -121,11 +121,10 @@ mindmap
 | **documenter** | fast | 1.4.2 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 2.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
-### Workflow & Framework (9 agents)
+### Workflow & Framework (8 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
-| **feature** | balanced | 1.10.1 | Full feature lifecycle: Branch → REQ → TDD → Dev → Validate → PR |
 | **release** | balanced | 1.4.2 | Versioning, changelogs, build processes, GitHub releases |
 | **ideation** | balanced | 1.6.1 | Idea exploration, vision sharpening, concept concretization |
 | **feedback** | fast | 1.2.2 | Standardizes bug reports and feature requests as GitHub issues |
@@ -330,7 +329,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 
 | Pipeline | Stages | Flow |
 |----------|--------|------|
-| **standard-feature** | branch → implement → review (developer/code-reviewer, 3x) → commit | Full feature with reviews |
+| **feature-lifecycle** | branch → requirement → tests → implement (plan-driven) → verify → validate+document (parallel) → commit | Full feature lifecycle with optional plan input, REQ, TDD, review, PR |
 | **quick-fix** | fix → commit | Immediate fix without review |
 | **bugfix** | triage → fix → review (2x) → document | Bug with double review |
 | **concept-development** | research → concept-loop (ideation/concept-reviewer, 3x) → handoff | Idea refinement |
@@ -676,10 +675,10 @@ variables:
 
 | ID | Workflow | Orchestrator Agent | Stages |
 |----|----------|-------------------|--------|
-| **A** | New Feature | feature | Branch → REQ → Test → Dev → Validate → PR |
-| **B** | Bugfix | feature | Branch → REQ → Test → Dev → Validate → PR |
+| **A** | New Feature | feature-lifecycle (pipeline) | Branch → REQ → Test → Dev → Validate → PR |
+| **B** | Bugfix | bugfix (pipeline) | Triage → Fix → Review (2x) → Document |
 | **C** | Code Audit | code-reviewer | Review → blast-radius → quality scan |
-| **E** | Refactoring | feature | Branch → REQ → Dev → Test → Validate → PR |
+| **E** | Refactoring | refactor (pipeline) | Analyze → Implement → Review (2x) → Commit |
 | **H1** | Agent Sync | agent-meta-manager | sync.py → commit "chore: regenerate agents" |
 | **H2** | Upgrade | agent-meta-manager | Read workflow → apply |
 | **I** | Ideation | ideation | Explore → sharpen vision → handoff to requirements |
