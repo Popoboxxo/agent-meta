@@ -1,8 +1,8 @@
 ## Quality Pipelines (Generated)
 
-{{#if PIPELINE_STANDARD_FEATURE_ENABLED}}
-### Pipeline: standard-feature
-{{PIPELINE_STANDARD_FEATURE_BLOCK}}
+{{#if PIPELINE_FEATURE_LIFECYCLE_ENABLED}}
+### Pipeline: feature-lifecycle
+{{PIPELINE_FEATURE_LIFECYCLE_BLOCK}}
 {{/if}}
 
 {{#if PIPELINE_QUICK_FIX_ENABLED}}

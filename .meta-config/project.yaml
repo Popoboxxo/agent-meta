@@ -308,20 +308,14 @@ quality-pipelines:
       enabled: false
   custom-pipelines: {}
 model-overrides:
-  knowledge-curator:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-ingestor:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-querier:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-linter:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-indexer:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-gardener:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
-  knowledge-migrator:
-    Gemini: gemini-2.0-flash-lite-preview-02-05
+  Gemini:
+    knowledge-curator: gemini-2.0-flash-lite-preview-02-05
+    knowledge-ingestor: gemini-2.0-flash-lite-preview-02-05
+    knowledge-querier: gemini-2.0-flash-lite-preview-02-05
+    knowledge-linter: gemini-2.0-flash-lite-preview-02-05
+    knowledge-indexer: gemini-2.0-flash-lite-preview-02-05
+    knowledge-gardener: gemini-2.0-flash-lite-preview-02-05
+    knowledge-migrator: gemini-2.0-flash-lite-preview-02-05
 reflection-pairs:
   overrides:
     dev-review-loop:
