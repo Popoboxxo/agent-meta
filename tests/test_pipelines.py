@@ -61,6 +61,83 @@ def test_validate_pipelines_rejects_bad_default_value():
     assert any("providers.default" in e for e in errors)
 
 
+def test_validate_pipelines_reports_dict_stages_instead_of_crashing():
+    # Regression test for audit #403: a malformed override (e.g. a stale
+    # per-stage override fragment adopted as a whole pipeline by
+    # apply_overrides()) can leave 'stages' as a dict instead of a list.
+    # This must surface as a clean validation error, not an AttributeError.
+    pipelines = {"p1": {"stages": {"review": {"loop": {"max_iterations": 5}}}}}
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("'stages' must be a list" in e and "dict" in e for e in errors)
+
+
+def test_validate_pipelines_reports_string_stages_instead_of_crashing():
+    pipelines = {"p1": {"stages": "not-a-list"}}
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("'stages' must be a list" in e and "str" in e for e in errors)
+
+
+def test_validate_pipelines_malformed_stages_referenced_via_run_pipeline_does_not_crash():
+    # A second pipeline with valid stages that run_pipeline-references the
+    # malformed one must not crash while walking the composition graph.
+    pipelines = {
+        "p1": {"stages": {"review": {"loop": {"max_iterations": 5}}}},
+        "p2": {"stages": [{"id": "x", "agent": "developer", "task": "t",
+                            "mode": "sequential", "run_pipeline": "p1"}]},
+    }
+    errors = validate_pipelines(pipelines, available_roles=["developer"])
+    assert any("'stages' must be a list" in e for e in errors)
+
+
+def test_build_variables_surfaces_malformed_pipeline_override_as_warning():
+    # Regression test for audit #402: a malformed quality-pipelines override
+    # (e.g. targeting a pipeline name that no longer exists after a rename,
+    # exactly what happened in .meta-config/project.yaml before PR #401's
+    # follow-up fix) used to be swallowed by a bare `except Exception: pass`
+    # in build_variables(), leaving PIPELINE_MATCH_TABLE silently unset with
+    # zero indication of why. It must now show up in the warnings list.
+    from pathlib import Path
+
+    from scripts.lib.config import build_variables
+
+    repo_root = Path(__file__).resolve().parents[1]
+    config = {
+        "quality-pipelines": {
+            "overrides": {
+                "this-pipeline-does-not-exist": {
+                    "stages": {"review": {"loop": {"max_iterations": 5}}}
+                }
+            }
+        }
+    }
+    variables, warnings = build_variables(config, repo_root)
+    assert any("quality-pipelines" in w for w in warnings)
+    assert "PIPELINE_MATCH_TABLE" in variables
+
+
+def test_validate_pipelines_all_role_defaults_pipelines_are_clean():
+    # End-to-end guard: every pipeline actually shipped in
+    # config/role-defaults.yaml must validate cleanly against its own
+    # roles. Catches structural drift (e.g. the #402/#403 regression)
+    # without needing one hand-written test per pipeline.
+    from pathlib import Path
+
+    import yaml
+
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    repo_root = Path(__file__).resolve().parents[1]
+    pipelines = load_quality_pipelines(str(repo_root))
+    assert pipelines, "expected at least one pipeline in config/role-defaults.yaml"
+
+    with open(repo_root / "config" / "role-defaults.yaml", encoding="utf-8") as f:
+        roles_cfg = yaml.safe_load(f)
+    all_roles = list(roles_cfg.get("roles", {}).keys())
+
+    errors = validate_pipelines(pipelines, all_roles)
+    assert errors == [], f"Unexpected validation errors: {errors}"
+
+
 def test_generate_pipeline_block_skips_inactive_dod_flag_stage():
     from scripts.lib.pipelines import _generate_pipeline_block
 

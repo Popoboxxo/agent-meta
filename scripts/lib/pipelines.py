@@ -116,7 +116,12 @@ def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -
                 f"Pipeline '{name}': referenced pipeline '{current_name}' not found"
             )
             return
-        for stage in current.get("stages", []):
+        current_stages = current.get("stages", [])
+        if not isinstance(current_stages, list):
+            return  # malformed structure already reported by validate_pipelines()
+        for stage in current_stages:
+            if not isinstance(stage, dict):
+                continue
             ref = stage.get("run_pipeline")
             if not ref:
                 continue
@@ -148,6 +153,13 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])
+        if not isinstance(stages, list):
+            errors.append(
+                f"Pipeline '{name}': 'stages' must be a list, got "
+                f"{type(stages).__name__} (check for a malformed override in "
+                f".meta-config/project.yaml)"
+            )
+            continue
         providers_cfg = pipeline.get("providers")
         if providers_cfg:
             default = providers_cfg.get("default", "active")

@@ -356,11 +356,13 @@ def read_git_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
-def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
+def _load_se_variable_defaults(agent_meta_root: Path, warnings: list[str] | None = None) -> dict:
     """Load SE cascade variable defaults from config/role-defaults.yaml se_variables block.
 
     Returns a dict of {TEMPLATE_VAR_NAME: default_value} for variables not set
     in the project config. Template var names are the same as the YAML keys (uppercase).
+    Load errors resolve to an empty dict either way; if `warnings` is passed, the
+    error is also recorded there instead of failing silently (audit #402).
     """
     defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
     if not defaults_path.exists():
@@ -371,7 +373,9 @@ def _load_se_variable_defaults(agent_meta_root: Path) -> dict:
         if not isinstance(se_vars, dict):
             return {}
         return {str(k): v for k, v in se_vars.items()}
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        if warnings is not None:
+            warnings.append(f"se-variables: {e}")
         return {}
 
 
@@ -594,7 +598,10 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             _deps = analyze_project(agent_meta_root)
             _analyzer = FileAffinityAnalyzer(agent_meta_root)
             variables["FILE_AFFINITY_HINT"] = _analyzer.format_hint(_deps)
-        except Exception:  # noqa: BLE001
+        except (ImportError, ModuleNotFoundError):
+            variables["FILE_AFFINITY_HINT"] = ""  # optional feature, module not available
+        except Exception as e:  # noqa: BLE001
+            unmapped.append(f"analysis: {e}")
             variables["FILE_AFFINITY_HINT"] = ""
     else:
         variables["FILE_AFFINITY_HINT"] = ""
@@ -618,7 +625,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     se_output = config.get("se_output", {})
     variables["SE_BASE_DIR"] = se_output.get("base_dir", "SE") if isinstance(se_output, dict) else "SE"
     # SE cascade variables — fall back to role-defaults.yaml defaults if not set in project config.
-    _se_vars_defaults = _load_se_variable_defaults(agent_meta_root)
+    _se_vars_defaults = _load_se_variable_defaults(agent_meta_root, unmapped)
     for _sv_key, _sv_val in _se_vars_defaults.items():
         if _sv_key not in variables:
             variables[_sv_key] = str(_sv_val)
@@ -722,8 +729,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                     roles_defaults = _yaml.safe_load(f) or {}
                 if roles_defaults.get("reflection_pairs"):
                     variables["REFLECTION_PAIRS_ENABLED"] = "true"
-        except Exception:  # noqa: BLE001, S110
-            pass
+        except Exception as e:  # noqa: BLE001
+            unmapped.append(f"reflection-pairs (fallback): {e}")
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["QUALITY_PIPELINES_ENABLED"] = "false"
     effective = {}
@@ -746,6 +753,14 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         pipeline_errors = validate_pipelines(effective, list(available_roles))
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")
+        # Drop structurally malformed pipelines (e.g. 'stages' left as a dict
+        # by a stale per-stage override, see audit #402/#403) before they
+        # reach rendering — validate_pipelines() already reported them above,
+        # rendering them would only re-crash the functions it protects.
+        effective = {
+            name: pl for name, pl in effective.items()
+            if isinstance(pl.get("stages", []), list)
+        }
         if effective:
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled
@@ -761,8 +776,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[block_key] = ""
             if enabled_key not in variables:
                 variables[enabled_key] = "false"
-    except Exception:  # noqa: BLE001, S110
-        pass
+    except Exception as e:  # noqa: BLE001
+        unmapped.append(f"quality-pipelines: {e}")
 
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
     # using the same `effective` quality-pipelines dict resolved above.
