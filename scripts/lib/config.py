@@ -662,12 +662,13 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["WEB_PROJECT_ENABLED"] = "true" if "e2e-tester" in _roles else "false"
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
     variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
-    
+
     variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
-    
-    from .delegation_table import get_intent_routing_table
-    variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(agent_meta_root, config, variables)
-    
+
+    # INTENT_ROUTING_TABLE is finalized after `effective` quality-pipelines are
+    # resolved below (see QUALITY_PIPELINES_ENABLED block), so pipeline
+    # signal_keywords can appear as rows alongside role intent_keywords.
+
     _tb = TemplateBuilder(agent_meta_root / "templates" / "context")
     _table_tpl = _tb.resolve_partials("{{> agents-table }}")
     variables["AGENT_DELEGATION_TABLE"] = _tb.resolve_loops(_table_tpl, variables).strip()
@@ -725,6 +726,7 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             pass
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["QUALITY_PIPELINES_ENABLED"] = "false"
+    effective = {}
     try:
         pipelines = load_quality_pipelines(str(agent_meta_root))
         overrides = config.get("quality-pipelines", {})
@@ -761,6 +763,13 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
                 variables[enabled_key] = "false"
     except Exception:  # noqa: BLE001, S110
         pass
+
+    # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
+    # using the same `effective` quality-pipelines dict resolved above.
+    from .delegation_table import get_intent_routing_table
+    variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
+        agent_meta_root, config, variables, pipelines=effective
+    )
 
     # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
     # Each block is either the real content or an empty string when the flag is off.

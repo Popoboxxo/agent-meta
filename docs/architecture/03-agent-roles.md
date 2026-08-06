@@ -1,11 +1,10 @@
 # Agent Roles
 
-> [Back to Architecture Overview](../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogImdyYXBoIFREXG4gICAgT1JDW29yY2hlc3RyYXRvcl1cbiAgICBGRUFbZmVhdHVyZV1cbiAgICBPUkMgLS0-IElERVtpZGVhdGlvbl1cbiAgICBPUkMgLS0-IFJFUVtyZXF1aXJlbWVudHNdXG4gICAgT1JDIC0tPiBERVZbZGV2ZWxvcGVyXVxuICAgIE9SQyAtLT4gVFNUW3Rlc3Rlcl1cbiAgICBPUkMgLS0-IFZBTFt2YWxpZGF0b3JdXG4gICAgT1JDIC0tPiBET0NbZG9jdW1lbnRlcl1cbiAgICBPUkMgLS0-IEdJVFtnaXRdXG4gICAgT1JDIC0tPiBSRUxbcmVsZWFzZV1cbiAgICBPUkMgLS0-IERPS1tkb2NrZXJdXG4gICAgT1JDIC0tPiBNRkJbbWV0YS1mZWVkYmFja11cbiAgICBPUkMgLS0-IEVYVFSWW2FnZW50LW1ldGEtbWFuYWdlcl1cbiAgICBPUkMgLS0-IEVYVFSWW2V4dGVybmFsIHNraWxsc11cbiAgICBGRUEgLS0-IEdJVFxuICAgIEZFQSAtLT4gUkVRXG4gICAgRkVBIC0tPiBUU1RcbiAgICBGRUEgLS0-IERFVlxuICAgIEZFQSAtLT4gVkFMXG4gICAgRkVBIC0tPiBET0NcbiAgICBGRUEgLS0-IEdJVCIsICJtZXJtYWlkIjogeyJ0aGVtZSI6ICJkZWZhdWx0In19)
+> [Back to Architecture Overview](../../ARCHITECTURE.md)
 
 ```mermaid
 graph TD
     ORC[orchestrator]
-    FEA[feature]
     ORC --> IDE[ideation]
     ORC --> REQ[requirements]
     ORC --> DEV[developer]
@@ -27,12 +26,6 @@ graph TD
     SE_CRIT --> SE_IFM[se-interface-mgr]
     SE_IFM --> SE_TERM[se-termination]
     SE_TERM -->|continue| SE_ORCH
-    FEA --> GIT
-    FEA --> REQ
-    FEA --> TST
-    FEA --> DEV
-    FEA --> VAL
-    FEA --> DOC
 ```
 
 ## Rollen-Übersicht
@@ -40,7 +33,6 @@ graph TD
 | Agent | Zuständigkeit | Einstieg | Modell |
 |-------|--------------|---------|--------|
 | `orchestrator` | Einstiegspunkt — koordiniert alle anderen Agenten | Alle Entwicklungsaufgaben | *(voll)* |
-| `feature` | Vollständiger Feature-Lifecycle via Sub-Agent-Delegation | "Ich will ein neues Feature bauen" | *(voll)* |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs | Implementierungsaufgaben | *(voll)* |
 | `junior-developer` | Triviale Fixes (1-2 Dateien, kein Architektur-Impact), eskaliert strukturiert | Kleine Änderungen | haiku |
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs | Architektur-Impact, Cross-Cutting | max |
@@ -68,14 +60,3 @@ graph TD
 | `se-critic` | Quality Gate: Vollständigkeit, Konsistenz, Testbarkeit | SE-Audit | powerful |
 | `se-interface-mgr` | Interface-Verträge + Propagations-Map | SE-Interfaces | balanced |
 | `se-termination` | Leaf/Continue-Entscheidung pro Komponente | SE-Abschluss | fast |
-
-## feature vs. orchestrator
-
-`feature` ist kein Ersatz für `orchestrator`, sondern ein **Shortcut**:
-
-| | `orchestrator` | `feature` |
-|--|----------------|-----------|
-| Scope | Alle Entwicklungsaufgaben | Nur neues Feature |
-| Delegation | Ad-hoc je nach Aufgabe | Fester 8-Schritt-Lifecycle |
-| TDD erzwungen | Empfohlen, aber optional | Ja — fest eingebaut |
-| Branch + PR | Optional | Immer |

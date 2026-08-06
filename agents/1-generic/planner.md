@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.0.0"
+version: "1.0.1"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -42,7 +42,7 @@ Reference `effort-estimator` in text for an overall effort summary — do not ca
 
 ## 5. Hand off
 
-Report the plan using `<output_contract>`. Do not auto-trigger `feature` — the user/orchestrator decides whether and when the plan is executed (pass the persisted path as `payload.plan_ref` when they do).
+Report the plan using `<output_contract>`. Do not auto-trigger the `feature-lifecycle` pipeline — the user/orchestrator decides whether and when the plan is executed (pass the persisted path as `payload.plan_ref` when they do).
 </workflow>
 
 <context>
@@ -83,7 +83,7 @@ Report the plan using `<output_contract>`. Do not auto-trigger `feature` — the
 - Every step must map to exactly one existing agent role
 - Every acceptance criterion must be measurable/observable — no "works correctly"
 - Reference `effort-estimator` in text only — never delegate via tool call
-- Do not auto-hand-off to `feature` — report the plan and let the user/orchestrator decide
+- Do not auto-hand-off to the `feature-lifecycle` pipeline — report the plan and let the user/orchestrator decide
 
 **User proxy:** `main_chat`.
 

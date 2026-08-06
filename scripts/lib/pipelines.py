@@ -4,6 +4,24 @@ import json
 import os
 import re
 
+KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
+DEFAULT_MAX_DEPTH = 4
+
+
+def _pipeline_active_for_provider(pipeline: dict, provider: str) -> bool:
+    """Return whether a pipeline is active for `provider` per its `providers` field.
+
+    No `providers` field means active everywhere (backward compatible with
+    pipelines that predate this field, e.g. quick-fix/bugfix).
+    """
+    providers_cfg = pipeline.get("providers")
+    if not providers_cfg:
+        return True
+    default = providers_cfg.get("default", "active")
+    if default == "active":
+        return provider not in providers_cfg.get("exclude", [])
+    return provider in providers_cfg.get("include", [])
+
 
 def load_quality_pipelines(agent_meta_root: str) -> dict:
     """Load quality_pipelines from config/role-defaults.yaml."""
@@ -80,6 +98,40 @@ def apply_overrides(base: dict, overrides: dict) -> dict:
     return result
 
 
+def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -> list[str]:
+    """Check run_pipeline references for missing targets, cycles, and depth limit."""
+    errors = []
+    max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
+
+    def _walk(current_name: str, visited: list[str], depth: int) -> None:
+        if depth > max_depth:
+            errors.append(
+                f"Pipeline '{name}': run_pipeline nesting exceeds max_depth="
+                f"{max_depth} (path: {' -> '.join(visited)})"
+            )
+            return
+        current = pipelines.get(current_name)
+        if current is None:
+            errors.append(
+                f"Pipeline '{name}': referenced pipeline '{current_name}' not found"
+            )
+            return
+        for stage in current.get("stages", []):
+            ref = stage.get("run_pipeline")
+            if not ref:
+                continue
+            if ref in visited:
+                errors.append(
+                    f"Pipeline '{name}': circular run_pipeline reference "
+                    f"({' -> '.join(visited + [ref])})"
+                )
+                continue
+            _walk(ref, visited + [ref], depth + 1)
+
+    _walk(name, [name], 1)
+    return errors
+
+
 def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
@@ -87,12 +139,33 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
     - agent exists in available_roles
     - loop.generator / loop.critic exist
     - no circular orchestration (orchestrator agents inside pipelines)
+    - providers field is well-formed (default/include/exclude, known providers)
+    - run_pipeline composition: referenced pipelines exist, no cycles, depth limit
+    - plan-driven stage roles (fallback_agent, allowed_agents) exist
     """
     errors = []
-    orchestrator_roles = {"orchestrator", "feature"}
+    orchestrator_roles = {"orchestrator"}
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])
+        providers_cfg = pipeline.get("providers")
+        if providers_cfg:
+            default = providers_cfg.get("default", "active")
+            if default not in ("active", "inactive"):
+                errors.append(
+                    f"Pipeline '{name}': providers.default must be 'active' or "
+                    f"'inactive', got '{default}'"
+                )
+            for key in ("include", "exclude"):
+                for p in providers_cfg.get(key, []):
+                    if p not in KNOWN_PROVIDERS:
+                        errors.append(
+                            f"Pipeline '{name}': providers.{key} entry '{p}' is not "
+                            f"a known provider ({', '.join(KNOWN_PROVIDERS)})"
+                        )
+
+        errors.extend(_validate_pipeline_composition(pipelines, name, pipeline))
+
         for stage in stages:
             agent = stage.get("agent")
             if agent and agent not in available_roles:
@@ -129,6 +202,21 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
                             f"Pipeline '{name}': parallel_group agent '{sub_agent}' "
                             f"not found in available roles. "
                             f"Add '{sub_agent}' to roles: in .meta-config/project.yaml to enable this pipeline."
+                        )
+
+            if mode == "plan-driven":
+                pd = stage.get("plan-driven", {})
+                fallback = pd.get("fallback_agent")
+                if fallback and fallback not in available_roles:
+                    errors.append(
+                        f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
+                        f"fallback_agent '{fallback}' not found in available roles."
+                    )
+                for allowed in pd.get("allowed_agents", []):
+                    if allowed not in available_roles:
+                        errors.append(
+                            f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
+                            f"allowed_agents entry '{allowed}' not found in available roles."
                         )
 
             # Circular orchestration guard
@@ -201,10 +289,13 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         variables[f"PIPELINE_{var_name}_BLOCK"] = ""
         # Pre-compute provider-specific blocks for later injection
         provider_blocks = {}
-        for provider in ("Claude", "Opencode", "Gemini", "Continue", "Mammouth"):
-            provider_blocks[provider] = _generate_pipeline_block(
-                pipeline, provider
-            )
+        for provider in KNOWN_PROVIDERS:
+            if _pipeline_active_for_provider(pipeline, provider):
+                provider_blocks[provider] = _generate_pipeline_block(
+                    pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+                )
+            else:
+                provider_blocks[provider] = ""
         variables[f"PIPELINE_{var_name}_PROVIDER_BLOCKS"] = provider_blocks
     return variables
 
@@ -222,7 +313,11 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
         pipeline = pipelines.get(name)
         if not pipeline:
             return match.group(0)
-        return _generate_pipeline_block(pipeline, provider)
+        if not _pipeline_active_for_provider(pipeline, provider):
+            return ""
+        return _generate_pipeline_block(
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+        )
 
     return pattern.sub(_replacer, content)
 
@@ -315,13 +410,28 @@ def _execution_mode_for_pipeline(stages: list) -> str:
     return "sequential"
 
 
-def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
+def _generate_pipeline_block(
+    pipeline: dict,
+    provider: str,
+    all_pipelines: dict | None = None,
+    active_dod: dict | None = None,
+    _depth: int = 0,
+    _max_depth: int | None = None,
+) -> str:
     """Generate a provider-specific markdown block for a single pipeline."""
     provider_key = provider.lower()
     fmt = _PROVIDER_NOTATION.get(provider_key, _PROVIDER_NOTATION["opencode"])
+    active_dod = active_dod or {}
     lines = []
     stages = pipeline.get("stages", [])
     seq_idx = 0
+    # max_depth is resolved once at the entry point (_depth == 0) from the
+    # root pipeline's own field, then threaded unchanged through recursion —
+    # mirrors _validate_pipeline_composition()'s semantics, so a validated
+    # composition renders consistently instead of being cut off early by a
+    # sub-pipeline's own (possibly lower) default.
+    if _max_depth is None:
+        _max_depth = pipeline.get("max_depth", DEFAULT_MAX_DEPTH)
 
     # Execution mode header (Issue #285)
     exec_mode = _execution_mode_for_pipeline(stages)
@@ -330,6 +440,10 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
 
     for stage in stages:
         mode = stage.get("mode", "sequential")
+        if mode == "conditional":
+            cond = stage.get("condition", {})
+            if "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True):
+                continue
         agent = stage.get("agent", "")
         task = stage.get("task", "")
         stage_id = stage.get("id", "")
@@ -391,16 +505,74 @@ def _generate_pipeline_block(pipeline: dict, provider: str) -> str:
             lines.append("")
 
         elif mode == "conditional":
+            cond = stage.get("condition", {})
+            if "dod_flag" in cond:
+                # Already resolved at sync time (inactive stages were skipped
+                # via `continue` above) — render as a plain instruction, not
+                # as an unresolved runtime conditional.
+                seq_idx += 1
+                line = fmt["sequential_item"].format(
+                    index=seq_idx, agent=agent, task=task
+                )
+                lines.append(line + " → warten bis abgeschlossen")
+                continue
             lines.append("")
             lines.append(f"**{stage_id}** — {fmt['conditional_start']}")
             lines.append(
                 fmt["conditional_item"].format(agent=agent, task=task)
             )
-            cond = stage.get("condition", {})
             if cond.get("type") == "agent_decision":
                 lines.append(f"  Decision agent: {cond.get('agent', agent)}")
                 lines.append("  If 'continue': Orchestrator spawns new cell at level n+1 with sanitized context")
                 lines.append("  If 'leaf': Component is final — handover to implementation discipline")
+            elif "payload_flag" in cond:
+                lines.append(
+                    f"  Laufzeit-Skip: Orchestrator überspringt diese Stage, wenn "
+                    f"payload.{cond['payload_flag']} fehlt oder false ist."
+                )
+            lines.append("")
+
+        elif mode == "run_pipeline":
+            ref_name = stage.get("run_pipeline", "")
+            ref_pipeline = (all_pipelines or {}).get(ref_name)
+            lines.append("")
+            lines.append(f"**{stage_id}** — enthält Pipeline `{ref_name}`:")
+            if ref_pipeline is None:
+                lines.append(f"  [nicht aufgelöst — Pipeline '{ref_name}' nicht gefunden]")
+            elif not _pipeline_active_for_provider(ref_pipeline, provider):
+                lines.append(
+                    f"  [nicht aufgelöst — Pipeline '{ref_name}' für Provider {provider} inaktiv]"
+                )
+            elif _depth + 1 >= _max_depth:
+                lines.append(f"  [nicht aufgelöst — max_depth={_max_depth} erreicht]")
+            else:
+                sub_block = _generate_pipeline_block(
+                    ref_pipeline,
+                    provider,
+                    all_pipelines=all_pipelines,
+                    active_dod=active_dod,
+                    _depth=_depth + 1,
+                    _max_depth=_max_depth,
+                )
+                for sub_line in sub_block.splitlines():
+                    lines.append(f"  {sub_line}")
+            lines.append("")
+
+        elif mode == "plan-driven":
+            pd = stage.get("plan-driven", {})
+            fallback = pd.get("fallback_agent", "")
+            allowed = pd.get("allowed_agents", [])
+            lines.append("")
+            lines.append(
+                f"**{stage_id}** — Plan-driven: Agent aus payload.plan_ref "
+                f"(Stage-ID '{stage_id}') übernehmen."
+            )
+            if allowed:
+                lines.append(f"  Erlaubte Rollen: {', '.join(allowed)}")
+            lines.append(f"  Ohne plan_ref: fallback_agent = {fallback}")
+            lines.append(
+                "  Plan_ref vorhanden, aber Stage-Zeile fehlt: Fehler, kein stiller Fallback."
+            )
             lines.append("")
 
     if not lines:

@@ -60,7 +60,6 @@ roles:
 - ideation
 - planner
 - agent-meta-manager
-- feature
 - agent-meta-scout
 - log-analyzer
 - feedback
@@ -305,11 +304,6 @@ analysis:
   enabled: false
 quality-pipelines:
   overrides:
-    standard-feature:
-      stages:
-        review:
-          loop:
-            max_iterations: 5
     se-cascade:
       enabled: false
   custom-pipelines: {}

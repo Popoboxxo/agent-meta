@@ -47,8 +47,13 @@ def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict)
     return active_agents_data
 
 
-def get_intent_routing_table(agent_meta_root: Path, config: dict, variables: dict) -> str:
-    """Generate the INTENT_ROUTING_TABLE from active roles."""
+def get_intent_routing_table(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    pipelines: dict | None = None,
+) -> str:
+    """Generate the INTENT_ROUTING_TABLE from active roles and, optionally, pipelines."""
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
     active_agents_data = get_active_agents_data(agent_meta_root, config, variables)
@@ -78,6 +83,15 @@ def get_intent_routing_table(agent_meta_root: Path, config: dict, variables: dic
         
         keywords_str = ", ".join(intent_keywords)
         table_lines.append(f"| {keywords_str} | `{role_name}` | {tier} | {parallel} |")
+        has_entries = True
+
+    for pipeline_name in sorted((pipelines or {}).keys()):
+        pipeline_info = pipelines[pipeline_name]
+        signal_keywords = pipeline_info.get("signal_keywords", [])
+        if not signal_keywords:
+            continue
+        keywords_str = ", ".join(signal_keywords)
+        table_lines.append(f"| {keywords_str} | → Pipeline: `{pipeline_name}` | pipeline | no |")
         has_entries = True
 
     if not has_entries:

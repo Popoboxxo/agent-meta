@@ -21,13 +21,12 @@ from .roles import resolve_model
 # drift when templates change. See scripts/lib/config.py for template loading.
 _DELEGATION_MAP: dict[str, list[str]] = {
     "orchestrator": [
-        "developer", "feature", "git", "documenter", "ideation",
+        "developer", "git", "documenter", "ideation",
         "release", "security-auditor", "docker", "log-analyzer",
         "feedback", "agent-meta-manager", "agent-meta-scout", "meta-feedback",
         "requirements", "validator", "tester",
     ],
     "developer": ["tester", "git"],
-    "feature": ["requirements", "validator", "developer", "tester", "git"],
     "release": ["git", "documenter"],
     "log-analyzer": ["feedback", "developer", "security-auditor"],
     "agent-meta-manager": ["agent-meta-scout", "developer", "git"],

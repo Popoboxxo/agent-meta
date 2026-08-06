@@ -192,25 +192,6 @@ roles:
       parallel: false
       orchestrator_only: false
     short_desc: Umsetzungsplanung
-  feature:
-    model: balanced
-    memory: ''
-    workflow_tier: recommended
-    description: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate
-      → PR. Wird vom Orchestrator gestartet, nicht direkt vom User.'
-    routing:
-      intent_keywords:
-      - Feature Lifecycle
-      - komplexes Feature
-      - Feature Pipeline
-      parallel: true
-      orchestrator_only: true
-    handoff:
-      input_contracts:
-      - task-spec-v1
-      output_contract: feature-result-v1
-    short_desc: 'Feature-Lifecycle-Subagent: Branch → REQ → TDD → Dev → Validate →
-      PR'
   tester:
     model: fast
     memory: ''
@@ -1383,33 +1364,60 @@ reflection_pairs:
   max_iterations: 3
   on_blocked: escalate_to_orchestrator
 quality_pipelines:
-  standard-feature:
-    description: Full feature lifecycle with TDD, review, and PR
+  feature-lifecycle:
+    description: Vollständiger Feature-Lifecycle mit optionalem Plan-Input, REQ, TDD, Review, PR
     signal_keywords:
     - Feature implementieren
     - Feature bauen
     - neues Feature
     - Funktion bauen
+    - Feature Lifecycle
+    - komplexes Feature
+    - Feature Pipeline
+    accepts_plan_ref: true
     stages:
     - id: branch
       agent: git
       task: Feature-Branch anlegen
       mode: sequential
+    - id: requirement
+      agent: requirements
+      task: REQ-ID vergeben
+      mode: conditional
+      condition:
+        dod_flag: req-traceability
+    - id: tests
+      agent: tester
+      task: TDD Red Phase — Tests mit REQ-ID im Namen
+      mode: conditional
+      condition:
+        dod_flag: tests-required
     - id: implement
       agent: developer
-      task: Feature implementieren
-      mode: sequential
-    - id: review
-      agent: developer
-      task: Code schreiben und Review-Feedback einarbeiten
-      mode: loop
-      loop:
-        generator: developer
-        critic: code-reviewer
-        max_iterations: 3
+      task: Implementierung
+      mode: plan-driven
+      plan-driven:
+        fallback_agent: developer
+        allowed_agents:
+        - junior-developer
+        - developer
+        - senior-developer
+    - id: verify
+      agent: tester
+      task: Tests grün, keine Regression
+      mode: conditional
+      condition:
+        dod_flag: tests-required
+    - id: validate-and-document
+      mode: parallel_group
+      parallel_group:
+      - agent: validator
+        task: DoD-Check
+      - agent: documenter
+        task: CODEBASE_OVERVIEW aktualisieren
     - id: commit
       agent: git
-      task: Commit + Push + PR
+      task: 'Commit: feat([REQ-ID]): ... + PR'
       mode: sequential
     on_error: escalate_to_orchestrator
   quick-fix:
