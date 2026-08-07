@@ -985,9 +985,9 @@ function applyReadOnlyLock(hash, container) {
     const banner = document.createElement("div");
     banner.className = "info-box";
     banner.style.marginBottom = "24px";
-    banner.style.backgroundColor = "rgba(245, 158, 11, 0.05)";
-    banner.style.color = "#d97706";
-    banner.style.border = "1px solid rgba(245, 158, 11, 0.2)";
+    banner.style.backgroundColor = "rgba(210, 153, 34, 0.05)";
+    banner.style.color = "var(--accent-yellow)";
+    banner.style.border = "1px solid rgba(210, 153, 34, 0.2)";
     banner.innerHTML = "<strong style='display:flex;align-items:center;gap:6px;'><span style='font-size:1.2em;'>🔒</span> Framework defaults (Read-Only)</strong><div style='margin-top:6px;opacity:0.9;'>These settings are defined by the agent-meta framework. In this project context, they can only be viewed.</div>";
     container.insertBefore(banner, container.firstChild);
     
@@ -1008,14 +1008,14 @@ function makeToggle(ignored, onChange, readonly = false) {
    let isIgnored = ignored;
    const w = el("div", { style: "display:flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 11px; user-select: none;" });
    const btnIgnore = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${isIgnored ? "background: #2563eb; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["IGNORED"]);
-   const btnTrack = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${!isIgnored ? "background: #d97706; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
+   const btnTrack = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${!isIgnored ? "background: var(--accent-yellow); color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
    
    const setUI = (val) => {
        btnIgnore.style.background = val ? "#2563eb" : "var(--bg-card)";
        btnIgnore.style.color = val ? "white" : "var(--text-muted)";
        btnIgnore.style.fontWeight = val ? "bold" : "normal";
        
-       btnTrack.style.background = !val ? "#d97706" : "var(--bg-card)";
+       btnTrack.style.background = !val ? "var(--accent-yellow)" : "var(--bg-card)";
        btnTrack.style.color = !val ? "white" : "var(--text-muted)";
        btnTrack.style.fontWeight = !val ? "bold" : "normal";
    };
@@ -2382,7 +2382,7 @@ async function viewProjectMcpOverrides() {
                 "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
             ]);
             merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
+                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
                 secWrap.appendChild(code);
             });
             infoBox.appendChild(secWrap);
@@ -2633,7 +2633,7 @@ async function viewProjectSkillsOverrides() {
                 "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
             ]);
             merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
+                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
                 secWrap.appendChild(code);
             });
             infoBox.appendChild(secWrap);
@@ -3162,7 +3162,7 @@ async function viewRulesPresets() {
 
   const matrixPanel = el("details", { class: "panel", open: true });
   matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix — all rules vs. all presets"]));
-  const matrixTable = el("table", { style: "width:100%; border-collapse:collapse; font-size:0.8em; margin-top:8px;" });
+  const matrixTable = el("table", { class: "data-table", style: "font-size:0.8em; margin-top:8px;" });
   const mthead = el("thead");
   let headerRow = '<tr style="border-bottom:2px solid var(--border-color);"><th style="text-align:left;padding:4px 8px;min-width:140px;">Rule</th>';
   for (const pn of presetNames) {
@@ -4869,7 +4869,7 @@ async function viewReflectionPairs() {
 
         const severityColor = (sev) => ({
           ERROR: "var(--accent-red)",
-          WARN:  "var(--accent-yellow, #c9a227)",
+          WARN:  "var(--accent-yellow)",
           INFO:  "var(--text-muted)",
         }[sev] || "var(--text-muted)");
 
@@ -5009,7 +5009,7 @@ async function buildConfigAudit() {
 
   const severityColor = (sev) => ({
     error: "var(--accent-red)",
-    warn:  "var(--accent-yellow, #c9a227)",
+    warn:  "var(--accent-yellow)",
     info:  "var(--text-muted)",
   }[sev] || "var(--text-muted)");
 
@@ -5343,7 +5343,7 @@ async function viewProjectGeneral() {
   matrixHead.appendChild(matrixHint);
   rulesMatrix.appendChild(matrixHead);
   
-  const matrixTable = el("table", { style: "width:100%; border-collapse:collapse; font-size:0.82em;" });
+  const matrixTable = el("table", { class: "data-table", style: "font-size:0.82em;" });
   const thead = el("thead");
   thead.innerHTML = `<tr style="border-bottom:2px solid var(--border-color);">
     <th style="text-align:left;padding:4px 8px;">Rule</th>
@@ -6624,7 +6624,7 @@ async function viewProviderDeactivation() {
     const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
     header.appendChild(el("strong", {}, [name]));
     const badge = el("span", {
-      style: `font-size:11px; padding:2px 8px; border-radius:4px; background:${p.deactivated ? '#553333' : '#335533'}; color:${p.deactivated ? '#ff9999' : '#99ff99'};`
+      style: `font-size:11px; padding:2px 8px; border-radius:4px; background:${p.deactivated ? 'rgba(248,81,73,0.15)' : 'rgba(63,185,80,0.15)'}; color:${p.deactivated ? 'var(--accent-red)' : 'var(--accent-green)'};`
     }, [p.deactivated ? "DEACTIVATED" : "ACTIVE"]);
     header.appendChild(badge);
     card.appendChild(header);
@@ -6633,12 +6633,12 @@ async function viewProviderDeactivation() {
     if (p.directory_exists) {
       info.appendChild(el("div", {}, [`Dir: ${p.directory}`]));
     } else {
-      info.appendChild(el("div", { style: "color:#aa8866;" }, [`(no directory)`]));
+      info.appendChild(el("div", { style: "color:var(--text-muted);" }, [`(no directory)`]));
     }
     if (p.backups.length > 0) {
       info.appendChild(el("div", {}, [`Backups: ${p.backups.length} (latest: ${p.backups[p.backups.length - 1]})`]));
     } else {
-      info.appendChild(el("div", { style: "color:#aa8866;" }, ["No backups"]));
+      info.appendChild(el("div", { style: "color:var(--text-muted);" }, ["No backups"]));
     }
     card.appendChild(info);
 
@@ -8152,7 +8152,7 @@ async function viewModelsLegacy() {
       const statusTd = el("td", {});
       const toggleBtn = el("button", {
         class: "btn",
-        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow, #c08b00)" : "var(--accent-green, #2a8a2a)"}; color: white; border: none; border-radius: 4px;`,
+        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow)" : "var(--accent-green)"}; color: white; border: none; border-radius: 4px;`,
         title: isEnabled ? "Disable this model (exclude from active model picker without removing from registry)" : "Enable this model",
       }, [isEnabled ? "Disable" : "Enable"]);
       toggleBtn.onclick = async () => {
