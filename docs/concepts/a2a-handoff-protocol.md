@@ -1,23 +1,34 @@
 # A2A-Handoff-Protokoll — Implementationsnahe Konzeptschärfung
 
-> **Status:** Konzept v2.0 — Implementation-nah
-> **Baut auf:** [Best-Practice-Analyse](a2a-best-practice-analysis.md) (2026-06-07)
+> **Status:** Konzept v2.1 — Implementation-nah, entschlackt
+> **Baut auf:** [Best-Practice-Analyse](a2a-best-practice-analysis.md) (2026-06-07), [Update 2026-08](a2a-best-practice-analysis-2026-08.md)
 > **Basis-Issue:** [#212](https://github.com/Popoboxxo/agent-meta/issues/212)
-> **Letzte Aktualisierung:** 2026-06-07
+> **Letzte Aktualisierung:** 2026-08-07 — Code-Audit ergab: mehrere hier als "✓ Erledigt" geführte Punkte (Retry-Logik, `negotiated_format`, Token-Budget-Tracking, `compact-mode`) hatten nie einen Konsumenten in Code oder Agent-Prompt-Text. Entfernt statt nachträglich implementiert — siehe Update-Doc für Begründung. `human_approval_required` (Envelope-Feld) und `supersession` bleiben, weil sie tatsächlich in Agent-Prompts referenziert werden (das Modell folgt ihnen, wie der Rest dieses Frameworks prompt-basiert durchgesetzt wird).
+>
+> **Kein Bezug zu Googles Agent2Agent-Protokoll** (a2aproject.org, Linux Foundation, v1.0 seit 2026): reine Namensgleichheit. Google's A2A löst Cross-Vendor-Interop zwischen fremden, undurchsichtigen Agenten; dieses Dokument beschreibt interne Rollen-Delegation innerhalb eines Repos.
 
 ---
 
-## Implementierungsstatus (verifiziert 2026-06-14)
+## Implementierungsstatus (verifiziert 2026-08-07)
 
-**Umgesetzt:**
+**Umgesetzt und tatsächlich in Benutzung:**
 - 6 Schemas (`schemas/handoffs/`, `schemas/a2a-handoff.schema.json`, SE-Schemas)
 - Orchestrator als Envelope-Fabrik (`agents/1-generic/orchestrator.md` → »A2A Handoff Protocol«)
 - `{{PAL_HANDOFF}}` + Provider-Matrix: JSON für Claude/Opencode/Gemini, YAML-Text-Block-Fallback für Continue/Copilot (`config/delegation-syntax.yaml`, `scripts/lib/delegation_syntax.py`)
-- HITL (`human_approval_required`), Retry (`max_retries`), compact-mode, supersession-tracking (`project.yaml` → `orchestrator.handoff.*`)
-- **Token-Budget-Tracking** (`orchestrator.handoff.token-budget`, Default 10% des Session-Budgets) — Offener Punkt #3 erledigt
+- HITL (`requires_human_approval` im Envelope) — prompt-referenziert in `developer.md`, `orchestrator.md`, `_reference-agent.md`
+- `supersession` (unconditional, kein Feature-Flag) — prompt-referenziert in `se-architect.md`, `se-critic.md`
+- `trace_parent`/`trace_context` — prompt-referenziert in den SE-Kaskade-Rollen
+
+**Entfernt (2026-08-07, keine Konsumenten gefunden — weder Code noch Agent-Prompt):**
+- Retry-Logik (`retry_count`, `max_retries`, `escalation`, `timeout_seconds`)
+- `negotiated_format` (dynamisches Protocol-Routing)
+- `compact-mode` (TaskSpec-Feldnamen sind ohnehin immer kurz, es gab nie einen "lang"-Zustand)
+- Token-Budget-Tracking (`orchestrator.handoff.token-budget`)
+- `validate-before-delegate` als Config-Flag (die Funktion `validate_envelope()` bleibt als manuell aufrufbares Utility erhalten — kein Config-Toggle nötig, da sie kein automatischer Enforcement-Punkt ist, siehe `scripts/lib/delegation_syntax.py::validate_envelope()`)
+- Ungenutzte Schema-`definitions` (`handoffRoute`, `agentContract`, `handoffRegistry` — nirgends per `$ref` referenziert)
 
 **Offen:**
-- Response-Envelopes standardisiert (Offener Punkt #2)
+- Response-Envelopes standardisiert (siehe §12 Offene Punkte)
 - MCP-Tools `resolve-handoff-schema`, `validate-handoff` (Phase 4)
 
 ---
@@ -279,7 +290,7 @@ Die SE-Kaskade nutzt weiterhin `se-decomposition.schema.json` — eingebettet al
 }
 ```
 
-**SE-Schemas verwenden `compact-mode: false` in der Build-Config** — die langen Feldnamen bleiben erhalten (kein Breaking Change für existierende SE-Infrastruktur).
+**SE-Schemas behalten ihre langen, lesbaren Feldnamen unverändert** — kein Breaking Change für existierende SE-Infrastruktur.
 
 ---
 
@@ -321,10 +332,7 @@ Die SE-Kaskade nutzt weiterhin `se-decomposition.schema.json` — eingebettet al
 | `payload` | object \| array | ✓ | 2+ | Domain-spezifische Nutzdaten. Array wenn `batch: true`. |
 | `schema_ref` | string (URI) | — | 10 | Optional: wenn fehlt → implizit aus `source_agent` + `target_agent` via Routing-Tabelle aufgelöst |
 | `batch` | boolean | — | 2 | FANOUT-Modus: payload ist Array von Task-Objekten (default: false) |
-| `retry_count` | integer | — | 2 | Anzahl bisheriger Retries (default: 0). Bei ≥ `max_retries` → Abbruch |
-| `max_retries` | integer | — | 2 | Max. erlaubte Retries (default: 3). Config in project.yaml |
 | `requires_human_approval` | boolean | — | 2 | HITL: downstream-Agent pausiert vor Ausführung (default: false) |
-| `negotiated_format` | enum | — | 2 | Transport-Format: `json`, `yaml`, `text`, `auto` (default: `auto`) |
 | `trace_parent` | HOFF | — | 2 | Parent-handoff für Delegationsbaum. Einziger Parent-Tracing-Mechanismus |
 | `trace_context` | object | — | 5 | Erweitertes Tracing (trace_id, span_id, viz_task_id) |
 | `supersession` | object | — | 5 | Version-Tracking über history-Kette |
@@ -336,23 +344,7 @@ Die SE-Kaskade nutzt weiterhin `se-decomposition.schema.json` — eingebettet al
 - Mit Supersession (supersedes + history): +12 Tokens
 - Mit Batch (3 Tasks): +25 Tokens
 
-### 3.3 compact_mode — Build-Config, nicht Laufzeit-Konzept
-
-`compact_mode` steuert ob kurze (2-3 Zeichen) oder lange Payload-Feldnamen verwendet werden. Es ist ein **Build-Zeit-Konzept** — gesteuert in `.meta-config/project.yaml`, nicht im Envelope.
-
-| compact_mode | Payload-Feldnamen | Anwendung |
-|-------------|-------------------|-----------|
-| `false` (default) | Lesbare lange Namen | SE-Schemas, Debugging |
-| `true` | Kurze Namen (2-3 Zeichen) | TaskSpec, Extensions |
-
-**Konfiguration in `.meta-config/project.yaml`:**
-```yaml
-orchestrator:
-  handoff:
-    compact-mode: false   # true = Token-sparend im Produktivbetrieb
-```
-
-> **Warum nicht im Envelope:** Der Envelope enthält keine Felder die zur Laufzeit zwischen `compact_mode: true` und `false` wechseln. Die Payload-Feldnamen sind Teil des Schemas das zur Build-Zeit ausgerollt wird. Ein Laufzeit-Flag würde nur verwirren — der downstream-Agent bekommt immer das Format das die Build-Config vorgibt.
+> **compact_mode entfernt (2026-08-07):** Ein `compact-mode`-Toggle war hier zuvor als Build-Config dokumentiert. Tatsächlich gibt es keinen "langen" Zustand — TaskSpec und alle Extensions verwenden immer die kurzen Feldnamen (`t`, `ctx`, `con`, `refs`, `pri`, `dep`), SE-Schemas immer ihre eigenen (langen) Namen. Der Toggle hatte nie zwei echte Zustände zum Umschalten.
 
 ---
 
@@ -522,7 +514,6 @@ orchestrator:
       target: se-critic
       contract: se-arch-output-v1
       schema: schemas/se-decomposition.schema.json
-      # Keine compact_mode-Angabe — wird aus project.yaml gelesen
 ```
 
 ---
@@ -628,27 +619,27 @@ viz:
 
 ### 7.1 Token-Tabelle pro Handoff-Typ
 
-| Handoff-Typ | Envelope | Payload | Total | Mit compact_mode |
-|-------------|----------|---------|-------|-----------------|
-| Einfach (TaskSpec, `t` nur) | 42 | 5 | **47** | **47** |
-| Standard (TaskSpec mit ctx+con+pri) | 42 | 20 | **62** | **62** |
-| Ideation (TaskSpec + IdeationExt) | 64 | 45 | **109** | **89** (compact) |
-| Design (TaskSpec + DesignExt) | 64 | 55 | **119** | **94** (compact) |
-| Review (TaskSpec + ReviewExt, 3 findings) | 64 | 80 | **144** | **114** (compact) |
-| Batch (3 Tasks) | 70 | 30 | **100** | **85** (compact) |
-| SE-Decomposition (compact-mode: false) | 64 | 180–500 | **244–564** | N/A (compact off) |
-| Supersession-Handoff (+ history) | 64+12 | — | +12 | +12 |
+| Handoff-Typ | Envelope | Payload | Total |
+|-------------|----------|---------|-------|
+| Einfach (TaskSpec, `t` nur) | 42 | 5 | **47** |
+| Standard (TaskSpec mit ctx+con+pri) | 42 | 20 | **62** |
+| Ideation (TaskSpec + IdeationExt) | 64 | 45 | **109** |
+| Design (TaskSpec + DesignExt) | 64 | 55 | **119** |
+| Review (TaskSpec + ReviewExt, 3 findings) | 64 | 80 | **144** |
+| Batch (3 Tasks) | 70 | 30 | **100** |
+| SE-Decomposition | 64 | 180–500 | **244–564** |
+| Supersession-Handoff (+ history) | 64+12 | — | +12 |
 
 ### 7.2 Optimierungen (umgesetzt)
 
 | # | Optimierung | Ersparnis | Status |
 |---|-------------|-----------|--------|
-| 1 | Kurze Payload-Feldnamen (neue Schemas) | 20–50 Tokens/Handoff | ✓ Umgesetzt (TaskSpec + Extensions) |
-| 2 | `schema_ref` implizit aus Route | ~20 Tokens | ✓ Optional (im Envelope-Schema) |
-| 3 | `protocol_version` default = aktuell | ~9 Tokens | ✓ Implizit, nur explizit bei Major-Change |
-| 4 | `compact-mode` als Build-Config | 2 Tokens/Envelope | ✓ Aus Envelope entfernt (nur project.yaml) |
-| 5 | viz.debug: false default | 30 Tokens/Handoff | ✓ In project.yaml konfiguriert |
-| 6 | Batch-Mode für FANOUT | ~110 Tokens/FANOUT(3) | ✓ Neu (batch: true im Envelope) |
+| 1 | Kurze Payload-Feldnamen (TaskSpec + Extensions, fest im Schema) | 20–50 Tokens/Handoff | ✓ Umgesetzt |
+| 2 | `protocol_version` default = aktuell | ~9 Tokens | ✓ Implizit, nur explizit bei Major-Change |
+| 3 | viz.debug: false default | 30 Tokens/Handoff | ✓ In project.yaml konfiguriert |
+| 4 | Batch-Mode für FANOUT | ~110 Tokens/FANOUT(3) | ✓ Neu (batch: true im Envelope) |
+
+**Entfernt (2026-08-07, keine Konsumenten):** `schema_ref` implizite Auflösung aus der Routing-Tabelle (nirgends implementiert — ohne `schema_ref` kann Tier-2-Validierung in `validate_envelope()` schlicht nicht laufen, es gibt keinen Fallback) und `compact-mode` als eigener Optimierungspunkt (siehe Korrektur-Hinweis in §3 — es gab nie einen echten "unkomprimierten" Zustand, der Punkt war redundant zu #1).
 
 ### 7.3 Nicht umgesetzt (begründet)
 
@@ -723,78 +714,13 @@ Geplant: Optionaler Bridge-Modus der A2A-Envelopes transparent in Agent-Protocol
 
 ---
 
-## 10. Dynamisches Protocol Routing
-
-### 10.1 negotiated_format
-
-Der Envelope unterstützt `negotiated_format` zur Laufzeit-Aushandlung des Transport-Formats:
-
-| Wert | Bedeutung | Einsatz |
-|------|-----------|---------|
-| `json` | JSON-Envelope (nativ) | Provider mit `structured_handoff: true` |
-| `yaml` | YAML-Text-Block | Continue, Copilot |
-| `text` | Natural-Language-Fallback | Legacy / Debugging |
-| `auto` | Orchestrator wählt basierend auf Payload-Größe | Default |
-
-### 10.2 Routing-Entscheidungen (auto-Modus)
-
-| Payload-Größe | Format | Begründung |
-|--------------|--------|-----------|
-| < 1 KB | JSON | Beste LLM-Unterstützung, keine Größenprobleme |
-| 1–10 KB | YAML | ~33% Token-Ersparnis vs. JSON |
-| > 10 KB | Text | Vermeidet Context-Window-Überlauf, natürlichere Verarbeitung |
-
-### 10.3 Config-Steuerung
-
-```yaml
-# .meta-config/project.yaml
-orchestrator:
-  handoff:
-    protocol_routing: static   # static = feste Format-Wahl, dynamic = auto-Modus
-```
-
-Bei `static`: Format wird aus `config/provider-capabilities.yaml` → `handoff_format` gelesen (pro Provider).
-Bei `dynamic`: Orchestrator misst Payload-Größe und wählt Format via obiger Tabelle.
+> **Dynamisches Protocol Routing und Retry-Logik entfernt (2026-08-07):** Beide Konzepte (`negotiated_format`, `retry_count`/`max_retries`/`escalation`) waren vollständig spezifiziert, hatten aber nie eine Implementierung — weder Code noch eine Agent-Prompt-Instruktion, die sie referenziert. Das transportformat wird tatsächlich statisch über `config/provider-capabilities.yaml` → `handoff_format` pro Provider bestimmt (siehe §5), Retries laufen wie jeder andere Fehlerfall über das normale HITL-/Eskalations-Verhalten des Orchestrators, ohne eigenen Zähler-Mechanismus.
 
 ---
 
-## 11. Retry-Logik
+## 10. Token Pruning für supersession.history
 
-### 11.1 retry_count / max_retries
-
-Jeder Envelope führt `retry_count` (Anzahl bisheriger Retries) und `max_retries` (Limit):
-
-```json
-{
-  "handoff_id": "HOFF-20260607-060",
-  "retry_count": 2,
-  "max_retries": 3,
-  "payload": { "t": "Flaky-API-Integration mit Retry-Logik" }
-}
-```
-
-**Retry-Flow:**
-1. Orchestrator sendet Envelope mit `retry_count: 0`
-2. Downstream-Agent schlägt fehl (Timeout, Validierungsfehler, etc.)
-3. Orchestrator inkrementiert `retry_count` → sendet erneut (selbe `handoff_id`)
-4. Wenn `retry_count >= max_retries` → **Abbruch mit Fehler-Eskalation**:
-   - Orchestrator loggt Fehler
-   - User wird benachrichtigt
-   - Kein weiterer Retry
-
-**Config:**
-```yaml
-# .meta-config/project.yaml
-orchestrator:
-  handoff:
-    max_retries: 3   # Globaler Default, pro Envelope überschreibbar
-```
-
----
-
-## 12. Token Pruning für supersession.history
-
-### 12.1 KLARSTELLUNG
+### 10.1 KLARSTELLUNG
 
 `supersession.history` enthält **NUR handoff_ids** (Strings) — **NIE volle Payloads**.
 
@@ -812,7 +738,7 @@ orchestrator:
 
 ---
 
-## 13. Implementationsfahrplan
+## 11. Implementationsfahrplan
 
 ### Phase 1 — Schema-Grundlage (JETZT)
 
@@ -820,9 +746,9 @@ orchestrator:
 |---|----------|---------|--------|
 | 1 | TaskSpec-Kern-Schema | `schemas/handoffs/task-spec.schema.json` | ✓ Erstellt |
 | 2 | 4 Extensions | `schemas/handoffs/ext/*.schema.json` | ✓ Erstellt |
-| 3 | Envelope-Schema (v2: -compact_mode, -version, +batch, +retry, +HITL, +negotiated_format) | `schemas/a2a-handoff.schema.json` | ✓ Angepasst |
+| 3 | Envelope-Schema (v3, 2026-08-07: -retry/-timeout/-escalation, -negotiated_format, -ungenutzte `definitions`; +batch, +HITL) | `schemas/a2a-handoff.schema.json` | ✓ Angepasst |
 | 4 | Konzept-Dokument überarbeiten | `docs/concepts/a2a-handoff-protocol.md` | ✓ Angepasst |
-| 5 | Config-Block (handoff.max_retries, human_approval_required, protocol_routing) | `.meta-config/project.yaml` | ✓ Aktualisiert |
+| 5 | Config-Block auf tatsächlich konsumierte Felder reduziert (nur `handoff.protocol` bleibt) | `.meta-config/project.yaml` | ✓ Aktualisiert |
 | 6 | provider-capabilities.yaml prüfen | `config/provider-capabilities.yaml` | ✓ structured_handoff vorhanden |
 
 ### Phase 2 — Transport & Provider (1–2 Wochen)
@@ -853,26 +779,25 @@ orchestrator:
 
 ---
 
-## 14. Offene Punkte
+## 12. Offene Punkte
 
 | # | Thema | Stand |
 |---|-------|-------|
-| 1 | **Schema-Validierung zur Laufzeit:** Soll der Orchestrator vor jeder Delegation gegen das Payload-Schema validieren? → **JA — `validate-before-delegate: true` in Config (MUSS).** Fallback: Agent validiert selbst. | ✓ Erledigt |
+| 1 | **Schema-Validierung zur Laufzeit:** `validate_envelope()` existiert (Draft-07 + Self-Handoff/Tiefe-Checks), hat aber keinen echten Interception-Punkt — der Orchestrator dispatcht Subagenten über den `Agent`/`Task`-Tool-Call, nicht über einen Python-Layer, den ein Hook sinnvoll abfangen könnte (`orchestrator-guard.sh` prüft nur `Write`/`Edit`/`Bash`, siehe Code-Kommentar dort zur Payload-Identitätslücke). Bleibt manuell aufrufbares Utility (z.B. für Tests oder ein künftiges MCP-Tool), kein automatischer Enforcement. | Bewusst offen, kein Config-Flag mehr |
 | 2 | **Response-Envelopes standardisieren:** Welche Felder muss ein Worker in seinem Response-Envelope liefern? Vorschlag: TaskSpec `t`-Feld + `status` + `commit` im Payload. | Offen |
-| 3 | **Token-Budget-Tracking:** Soll der Orchestrator das Session-Token-Budget für A2A-Overhead tracken? Vorschlag: Ja, aber erst in Phase 3 — Ziel: max. 10% des Session-Budgets. | Offen |
-| 4 | **Rollback bei Supersession:** Automatisches Rollback oder nur Benachrichtigung? Vorschlag: Benachrichtigung + manuelle Bestätigung durch downstream-Agent. | Offen |
-| 5 | **Schema-Registry:** Zentrale Registry vs. dezentrale Dateien? Vorschlag: Dateien in `schemas/handoffs/` + MCP-Server für dynamische Resolution (Phase 4). | Offen |
-| 6 | **Kompatibilität Nicht-JSON-Provider:** Gelöst via YAML-Text-Block + `negotiated_format`. File-basierte Fallback-Strategie (`.handoff.json` im `.se-cascade/`) optional. | ✓ Erledigt |
-| 7 | **HITL-Integration:** Human-in-the-Loop via `requires_human_approval` umgesetzt. Config-gesteuert in project.yaml. | ✓ Erledigt |
-| 8 | **Agent Protocol Bridge:** Mapping-Tabelle dokumentiert. Optionaler Bridge-Modus für Phase 4 vorgemerkt. | ✓ Dokumentiert |
+| 3 | **Rollback bei Supersession:** Automatisches Rollback oder nur Benachrichtigung? Vorschlag: Benachrichtigung + manuelle Bestätigung durch downstream-Agent. | Offen |
+| 4 | **Schema-Registry:** Zentrale Registry vs. dezentrale Dateien? Vorschlag: Dateien in `schemas/handoffs/` + MCP-Server für dynamische Resolution (Phase 4). | Offen |
+| 5 | **HITL-Integration:** Human-in-the-Loop via `requires_human_approval` — prompt-referenziert in `developer.md`/`orchestrator.md`/`_reference-agent.md`, kein Code-Enforcement (konsistent mit dem restlichen, prompt-basierten Durchsetzungsmodell dieses Frameworks). | ✓ Umgesetzt (prompt-basiert) |
+| 6 | **Agent Protocol Bridge:** Mapping-Tabelle dokumentiert. Optionaler Bridge-Modus für Phase 4 vorgemerkt. | ✓ Dokumentiert |
 
 ---
 
-## 15. Referenzen
+## 13. Referenzen
 
 | Quelle | Link/Pfad |
 |--------|-----------|
-| Best-Practice-Analyse | `docs/concepts/a2a-best-practice-analysis.md` |
+| Best-Practice-Analyse (2026-06) | `docs/concepts/a2a-best-practice-analysis.md` |
+| Best-Practice-Analyse Update (2026-08, Entschlackung) | `docs/concepts/a2a-best-practice-analysis-2026-08.md` |
 | Envelope-Schema | `schemas/a2a-handoff.schema.json` |
 | TaskSpec-Schema | `schemas/handoffs/task-spec.schema.json` |
 | Extensions | `schemas/handoffs/ext/*.schema.json` |

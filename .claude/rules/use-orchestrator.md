@@ -63,7 +63,7 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 
 
 ## A2A Delegation
-A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
+A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
 
 ## Plan Delegation
 Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature-lifecycle` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.

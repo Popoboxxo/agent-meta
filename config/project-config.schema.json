@@ -1279,40 +1279,9 @@
               "type": "string",
               "description": "Handoff protocol identifier. Use 'a2a-v1' (default) or 'none'/'false' to disable.",
               "default": "a2a-v1"
-            },
-            "validate-before-delegate": {
-              "type": "boolean",
-              "default": true,
-              "description": "Validate envelope schema before each delegation."
-            },
-            "token-budget": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "default": false
-                },
-                "session_budget": {
-                  "type": "integer",
-                  "default": 200000
-                },
-                "max_overhead_pct": {
-                  "type": "number",
-                  "default": 10
-                },
-                "on_exceed": {
-                  "type": "string",
-                  "enum": [
-                    "compact",
-                    "warn"
-                  ],
-                  "default": "compact"
-                }
-              },
-              "additionalProperties": false
             }
           },
-          "additionalProperties": true
+          "additionalProperties": false
         },
         "delegation": {
           "type": "object",
