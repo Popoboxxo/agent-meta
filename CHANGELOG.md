@@ -2,13 +2,41 @@
 
 ## [Unreleased]
 
+## [0.92.0] — 2026-08-07
+
 ### Added
 - New `planner` agent role: turns a concept, REQ, or bug into a concrete, ordered implementation plan with per-step agent assignment and measurable acceptance criteria (`agents/1-generic/planner.md`, `config/role-defaults.yaml`).
+- Pipeline engine: `dod_flag`/`payload_flag` conditional stages, `plan-driven` mode, `run_pipeline` composition with cycle/depth validation, provider activation filters — quality pipelines are now a fully declarative, composable primitive instead of hand-authored stage lists (`scripts/lib/pipelines.py`).
+- `feature-lifecycle` pipeline replaces the hardcoded `feature` agent: branch → REQ (conditional) → tests (conditional) → implement (plan-driven) → verify (conditional) → validate+document (parallel) → commit, driven entirely by `config/role-defaults.yaml`.
+- Pipeline `signal_keywords` now appear as rows in the generated intent-routing table alongside role `intent_keywords` (`scripts/lib/delegation_table.py`).
+- Mandatory "Migration verification" workflow step on `developer`: after any migration/rename/move of existing entities or IDs, diff old→new over the stable key, 0 missing/0 duplicates, "lost" keys only acceptable if demonstrably inactive — closes a real gap that let a stable `unique_id` silently regenerate during a large migration (#327).
+- `docs/analysis/402-systemaudit-kernziele.md`: full framework self-audit across 5 dimensions (role standardization, pipeline engine, provider-agnosticism, governance hooks, doc consistency) — 14 findings, all filed and resolved as issues #402–#415.
+
+### Fixed
+- **MCP server config for Claude now targets `.mcp.json`, not `settings.json`/`settings.local.json`** — Claude Code never reads a top-level `mcpServers` key from either settings file, only from `.mcp.json` at the project root. Every agent-meta-generated Claude project that activated an MCP server previously ended up with a fully inert, silently-broken integration (#388, #400). Includes a migration warning for projects with a leftover `mcpServers` key in the old location, and a self-heal for zero-byte existing config files that previously skipped injection with only a buried warning.
+- Silent `except Exception: pass` blocks in `build_variables()` that swallowed pipeline/reflection/SE config errors now surface through the existing warnings list instead of failing invisibly — this is what let a stale pipeline override in `.meta-config/project.yaml` silently break `PIPELINE_MATCH_TABLE` generation with zero diagnostic signal (#402).
+- `validate_pipelines()` now checks that a pipeline's `stages` field is actually a list before iterating, reporting a clean structural error instead of crashing with an unhandled `AttributeError` on a malformed override (#403).
+- `PROJECT_CONTEXT`/`ARCHITECTURE`/`DEV_COMMANDS` template variables — previously only ever set by the interactive `sync.py --setup` wizard with no fallback — now default sensibly (`PROJECT_CONTEXT` falls back to `PROJECT_DESCRIPTION`, the other two to an empty string) instead of leaking a literal `{{VAR}}` into generated agent templates for any project that skipped the wizard (#423).
+- Admin UI: renaming a key in the provider-options KV editor (`/project/providers`) now actually deletes the old key instead of leaving both old and new keys in the saved config as an orphaned duplicate (#319).
+- Admin UI: `sync.py --audit-config`'s "template without role-default" check no longer false-positives on `provider-expert.md`, an intentional `extends:`-only base template with no role of its own (#415).
+- `config_audit.py`'s `templates_without_default` check now has an explicit `WRAPPER_TEMPLATES` allowlist instead of silently flagging known base templates on every run.
+- Two governance-hook limits (soft agent-identity self-declaration, git-mutation regex parser gaps) and the A2A `max_depth` rule (model-enforced only, not technically enforced) are now documented in `a2a-delegation-gates.md`/`branch-guard.md` instead of only in the hook's own source comment (#404, #405).
+- `orchestrator.strict`'s no-op on non-hook-support providers (everything except Claude/Mammouth) is now called out in README's Provider Generation Matrix, not just in the `sync.py --validate` warning (#406).
+- `.meta-config/project.yaml`'s `model-overrides` nesting order fixed (`{Provider: {role: ...}}`, not `{role: {Provider: ...}}`) — the wrong order meant `resolve_model()` silently never applied several Gemini model overrides, always falling back to the tier-preset default (#410).
+- Removed orphaned, stale generated provider output (`.continue/`, `.mammouth/`, `.github/copilot/`) for providers no longer in this project's active `ai-providers` list; `.github/workflows/` (real CI config, not generated) was explicitly preserved (#407).
+- Doc drift sweep: README, `docs/guides/quality-pipelines.md`, `snippets/orchestrator/quality-pipelines.md`, `docs/architecture/04-dev-workflow.md` no longer reference the deleted `feature` role or the pre-rename `standard-feature` pipeline name (#408). README's "Agent Roster" table was also missing 7 real, active roles entirely (`accessibility-specialist`, `data-engineer`, `planner`, `product-manager`, `refactoring-specialist`, `sre-engineer`, `technical-writer`) and had a stale header count (51 → 69) and a pre-existing Provider Expert Agents miscount (5 → 6).
+- Deleted 2 of 3 flagged duplicate `docs/concepts/planned/*.md` files after verifying against the knowledge wiki's own migration notes that nothing is lost (#414); a third (`prompt-modernization.md`) was intentionally kept — despite the matching filename it is not a duplicate of its `active/` counterpart.
+- Added a synthetic end-to-end test for the `extends`+`patches` composition engine (`compose_agent()`), previously untested since no real 2-platform/3-project override in this repo uses it yet (#411).
 
 ### Changed
 - `developer`'s intent-routing keywords no longer include the bare word `Feature` — it collided with the `feature` role's own keywords and caused mis-routing.
 - `sync.py --validate` now warns when `orchestrator.strict` is active for a provider with no PreToolUse hook support (currently: any provider except Claude and Mammouth).
 - `developer`'s dead `Agent` tool grant was removed — the role was already instructed to delegate via text reference only, never via tool call.
+- SE-role frontmatter naming exception (`se-<rolle>` without the `template-` prefix) documented in `rules/2-platform/agent-meta-conventions.md` instead of being an unexplained inconsistency (#412).
+
+### Known issues
+- `orchestrator-guard.sh`'s PreToolUse hook can hang non-deterministically on Windows/Git-Bash when spawning the native `python.exe` (~30–40% of invocations in reproduction testing) — surfaces to the harness as a raw "hook error" instead of the formatted guard message. Root cause identified (MSYS/Git-Bash pipe-to-native-exe unreliability), a first fix attempt made it worse and was reverted; not fixed in this release (#396).
+- Optional `*_SNIPPETS_PATH`/`DEV_STACK_START` template variables can still leak an unsubstituted `{{VAR}}` when unset, since the referencing templates interpolate them unconditionally instead of behind a `{{#if}}` guard — different root cause than the #423 fix above, tracked separately (#425).
 
 ## [0.91.3] — 2026-08-01
 
