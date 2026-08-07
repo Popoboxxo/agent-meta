@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Admin UI: the MCP server Env-Vars/Headers dict-editor and the Provider-Options KV editor silently corrupted data when a key was renamed to collide with an existing key in the same dict (one row would vanish, another's value silently overwritten) — both editors now reject the rename with a toast and revert the input. The dict-editor also silently dropped a row when its key field was cleared entirely; that's rejected the same way now (#432).
+
 ## [0.92.0] — 2026-08-07
 
 ### Added
