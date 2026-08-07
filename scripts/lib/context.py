@@ -488,6 +488,14 @@ def _sync_opencode_context(
             agent_meta_root, config, variables, log,
             provider=provider, provider_config=provider_config
         )
+        # The "agents-managed" template ends with a trailing newline after its
+        # own closing marker, but managed_pattern's match never consumes any
+        # whitespace after "-->" (only \s* before it) — so the old matched
+        # span always ends exactly at "-->". Replacing that span with text
+        # that ends in "-->\n" inserts one extra newline into the untouched
+        # footer every single sync run, compounding forever (#434). Strip it
+        # so match and replacement share the same boundary.
+        new_managed = new_managed.rstrip("\n")
         if managed_pattern.search(existing):
             new_content = managed_pattern.sub(new_managed, existing, count=1)
             if new_content != existing:
