@@ -2219,6 +2219,97 @@ async function viewSkillsRegistry() {
 /* =========================================================================
  * Views — MCP registry (Phase 3c)
  * ========================================================================= */
+// Shared by viewProjectMcpOverrides and viewProjectSkillsOverrides: both
+// render a per-item override panel (title/badges, active toggle,
+// description+secrets info-box, readonly/edit body swap, Customize/Reset
+// actions) that was previously duplicated near-verbatim between the two.
+// Only the readonly/edit body content is type-specific -- supplied via
+// buildReadonly/buildEdit callbacks.
+function renderOverridePanel(opts) {
+  const { id, badgeLabel, isFramework, isOverride, isActive, description, secrets, onToggleActive, buildReadonly, buildEdit, onReset } = opts;
+
+  const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
+  if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
+
+  const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+  const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
+  if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, [badgeLabel]));
+  if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
+  header.appendChild(titleBox);
+
+  const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  const activeToggle = makeToggle(isActive, onToggleActive);
+  // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
+  const btns = activeToggle.element.querySelectorAll("div");
+  btns[0].textContent = "ACTIVE";
+  btns[1].textContent = "INACTIVE";
+  toggleBox.appendChild(activeToggle.element);
+  header.appendChild(toggleBox);
+  p.appendChild(header);
+
+  // --- HINTS / INFO BOX ---
+  if (description || (secrets && secrets.length > 0)) {
+      const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
+
+      if (description) {
+          infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
+              el("strong", { style: "color: var(--text);" }, ["Description: "]),
+              description
+          ]));
+      }
+
+      if (secrets && secrets.length > 0) {
+          const secWrap = el("div", {}, [
+              el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
+              "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
+          ]);
+          secrets.forEach(sec => {
+              const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
+              secWrap.appendChild(code);
+          });
+          infoBox.appendChild(secWrap);
+      }
+
+      p.appendChild(infoBox);
+  }
+  // ------------------------
+
+  const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
+  const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
+  const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
+
+  buildReadonly(isReadonly);
+  buildEdit(isEditing);
+
+  detailsWrap.appendChild(isReadonly);
+  detailsWrap.appendChild(isEditing);
+
+  const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
+  const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
+  customizeBtn.onclick = () => {
+      isReadonly.style.display = "none";
+      isEditing.style.display = "flex";
+      customizeBtn.style.display = "none";
+  };
+  actionBox.appendChild(customizeBtn);
+
+  if (isOverride) {
+      const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
+      resetBtn.onclick = () => {
+          onReset();
+          isReadonly.style.display = "flex";
+          isEditing.style.display = "none";
+          toast("Override removed. Click save to apply.", "info");
+          p.style.borderLeft = "none";
+      };
+      actionBox.appendChild(resetBtn);
+  }
+  detailsWrap.appendChild(actionBox);
+  p.appendChild(detailsWrap);
+  return p;
+}
+
 async function viewProjectMcpOverrides() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — MCP Servers"]));
@@ -2338,88 +2429,8 @@ async function viewProjectMcpOverrides() {
     const isOverride = projOverrides.hasOwnProperty(id);
     const isActive = activeServers.has(id);
     const merged = getMerged(id);
-
-    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
-    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
-
-    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
-    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
-    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Server"]));
-    if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
-    header.appendChild(titleBox);
-
-    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(isActive, (newVal) => {
-        if(newVal) activeServers.add(id);
-        else activeServers.delete(id);
-        markDirty();
-    });
-    // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
-    const btns = activeToggle.element.querySelectorAll("div");
-    btns[0].textContent = "ACTIVE";
-    btns[1].textContent = "INACTIVE";
-    // Flip colors: active=blue(left), inactive=orange(right) — but makeToggle uses "ignored"=blue
-    // So we init with !isActive: isActive→false means "not ignored"→ACTIVE shows as blue
-    toggleBox.appendChild(activeToggle.element);
-    header.appendChild(toggleBox);
-    p.appendChild(header);
-
-    // --- HINTS / INFO BOX ---
-    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
-        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
-        
-        if (merged.description) {
-            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
-                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
-                merged.description
-            ]));
-        }
-        
-        if (merged.secrets && merged.secrets.length > 0) {
-            const secWrap = el("div", {}, [
-                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
-                "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
-            ]);
-            merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
-                secWrap.appendChild(code);
-            });
-            infoBox.appendChild(secWrap);
-        }
-        
-        p.appendChild(infoBox);
-    }
-    // ------------------------
-
-    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
-    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
-    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
-
     const conn = merged.connection || {};
-    
-    // Readonly View
-    isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
-    if (conn.type === "stdio") {
-        isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
-        if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
-        if (conn.env) {
-           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
-           Object.entries(conn.env).forEach(([k,v]) => {
-              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
-           });
-        }
-    } else if (conn.type === "sse") {
-        isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
-        if (conn.headers) {
-           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
-           Object.entries(conn.headers).forEach(([k,v]) => {
-              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
-           });
-        }
-    }
 
-    // Edit View
     const setupEditState = () => {
         if (!projOverrides[id]) {
             // Deep copy framework state to override
@@ -2429,76 +2440,88 @@ async function viewProjectMcpOverrides() {
         return projOverrides[id].connection;
     };
 
-    if (conn.type === "stdio") {
-        const wrapCmd = el("div", {});
-        wrapCmd.appendChild(el("label", {}, ["Command"]));
-        const inpCmd = el("input", { class: "form-control", value: conn.command || "" });
-        inpCmd.oninput = (e) => { const c = setupEditState(); c.command = e.target.value; markDirty(); };
-        wrapCmd.appendChild(inpCmd);
-        isEditing.appendChild(wrapCmd);
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Server",
+      isFramework,
+      isOverride,
+      isActive,
+      description: merged.description,
+      secrets: merged.secrets,
+      // Flip colors: active=blue(left), inactive=orange(right) — but makeToggle uses "ignored"=blue
+      // So we init with !isActive: isActive→false means "not ignored"→ACTIVE shows as blue
+      onToggleActive: (newVal) => {
+          if (newVal) activeServers.add(id);
+          else activeServers.delete(id);
+          markDirty();
+      },
+      buildReadonly: (isReadonly) => {
+        isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
+        if (conn.type === "stdio") {
+            isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
+            if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
+            if (conn.env) {
+               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
+               Object.entries(conn.env).forEach(([k,v]) => {
+                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
+               });
+            }
+        } else if (conn.type === "sse") {
+            isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
+            if (conn.headers) {
+               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
+               Object.entries(conn.headers).forEach(([k,v]) => {
+                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
+               });
+            }
+        }
+      },
+      buildEdit: (isEditing) => {
+        if (conn.type === "stdio") {
+            const wrapCmd = el("div", {});
+            wrapCmd.appendChild(el("label", {}, ["Command"]));
+            const inpCmd = el("input", { class: "form-control", value: conn.command || "" });
+            inpCmd.oninput = (e) => { const c = setupEditState(); c.command = e.target.value; markDirty(); };
+            wrapCmd.appendChild(inpCmd);
+            isEditing.appendChild(wrapCmd);
 
-        // Args editor
-        const localArgs = conn.args ? [...conn.args] : [];
-        isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
-            const c = setupEditState();
-            c.args = localArgs;
-            markDirty();
-        }));
+            // Args editor
+            const localArgs = conn.args ? [...conn.args] : [];
+            isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
+                const c = setupEditState();
+                c.args = localArgs;
+                markDirty();
+            }));
 
-        // Env editor
-        const localEnv = conn.env ? { ...conn.env } : {};
-        isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
-            const c = setupEditState();
-            c.env = localEnv;
-            markDirty();
-        }));
+            // Env editor
+            const localEnv = conn.env ? { ...conn.env } : {};
+            isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
+                const c = setupEditState();
+                c.env = localEnv;
+                markDirty();
+            }));
 
-    } else if (conn.type === "sse") {
-        const wrapUrl = el("div", {});
-        wrapUrl.appendChild(el("label", {}, ["URL"]));
-        const inpUrl = el("input", { class: "form-control", value: conn.url || "" });
-        inpUrl.oninput = (e) => { const c = setupEditState(); c.url = e.target.value; markDirty(); };
-        wrapUrl.appendChild(inpUrl);
-        isEditing.appendChild(wrapUrl);
+        } else if (conn.type === "sse") {
+            const wrapUrl = el("div", {});
+            wrapUrl.appendChild(el("label", {}, ["URL"]));
+            const inpUrl = el("input", { class: "form-control", value: conn.url || "" });
+            inpUrl.oninput = (e) => { const c = setupEditState(); c.url = e.target.value; markDirty(); };
+            wrapUrl.appendChild(inpUrl);
+            isEditing.appendChild(wrapUrl);
 
-        // Headers editor
-        const localHeaders = conn.headers ? { ...conn.headers } : {};
-        isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
-            const c = setupEditState();
-            c.headers = localHeaders;
-            markDirty();
-        }));
-    } else {
-         isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
-    }
-
-    detailsWrap.appendChild(isReadonly);
-    detailsWrap.appendChild(isEditing);
-
-    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
-    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
-    customizeBtn.onclick = () => {
-        isReadonly.style.display = "none";
-        isEditing.style.display = "flex";
-        customizeBtn.style.display = "none";
-    };
-    actionBox.appendChild(customizeBtn);
-
-    if (isOverride) {
-        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
-        resetBtn.onclick = () => {
-            delete projOverrides[id];
-            markDirty();
-            isReadonly.style.display = "flex";
-            isEditing.style.display = "none";
-            toast("Override removed. Click save to apply.", "info");
-            p.style.borderLeft = "none";
-        };
-        actionBox.appendChild(resetBtn);
-    }
-    detailsWrap.appendChild(actionBox);
-    p.appendChild(detailsWrap);
-    return p;
+            // Headers editor
+            const localHeaders = conn.headers ? { ...conn.headers } : {};
+            isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
+                const c = setupEditState();
+                c.headers = localHeaders;
+                markDirty();
+            }));
+        } else {
+             isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
+        }
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
   };
 
   const projListContainer = el("div", { style: "margin-bottom:24px" });
@@ -2586,128 +2609,63 @@ async function viewProjectSkillsOverrides() {
     const isOverride = projOverrides.hasOwnProperty(id);
     const isActive = activeSkills.has(id);
     const merged = getMerged(id);
-    
+
     // Look up pinned commit from repo if not overridden
     const repoId = merged.repo;
     const fwRepoInfo = fwRepos[repoId] || {};
     const recommendedVersion = fwRepoInfo.pinned_commit || "main";
     const currentVersion = merged.version || recommendedVersion;
-
-    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
-    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
-
-    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
-    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
-    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Skill"]));
-    if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
-    header.appendChild(titleBox);
-
-    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(isActive, (newVal) => {
-        if(newVal) activeSkills.add(id);
-        else activeSkills.delete(id);
-        markDirty();
-    });
-    const btns = activeToggle.element.querySelectorAll("div");
-    btns[0].textContent = "ACTIVE";
-    btns[1].textContent = "INACTIVE";
-    toggleBox.appendChild(activeToggle.element);
-    header.appendChild(toggleBox);
-    p.appendChild(header);
-
-    // --- HINTS / INFO BOX ---
-    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
-        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
-        
-        if (merged.description) {
-            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
-                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
-                merged.description
-            ]));
-        }
-        
-        if (merged.secrets && merged.secrets.length > 0) {
-            const secWrap = el("div", {}, [
-                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
-                "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
-            ]);
-            merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
-                secWrap.appendChild(code);
-            });
-            infoBox.appendChild(secWrap);
-        }
-        
-        p.appendChild(infoBox);
-    }
-    // ------------------------
-
-    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
-    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
-    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
-
     const repoUrl = fwRepoInfo.repo ? fwRepoInfo.repo : (merged.repo || "");
-    if (merged.name) {
-        isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:4px;" }, [`${merged.name}`]));
-    }
-    if (merged.role) {
-        isReadonly.appendChild(el("div", {}, [`Role: ${merged.role}`]));
-    }
-    isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
-    
-    // Display version with Recommended badge if it matches
-    const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
-    verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
-    if (currentVersion === recommendedVersion && isFramework) {
-        verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
-    } else if (isFramework) {
-        verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
-    }
-    isReadonly.appendChild(verWrap);
-    
-    // Edit View
-    const mkInput = (labelTxt, key, defaultVal) => {
-      const lbl = el("label", {}, [labelTxt]);
-      const inp = el("input", { type: "text", class: "form-control", value: merged[key] || defaultVal });
-      inp.oninput = (e) => {
-          if (!projOverrides[id]) projOverrides[id] = { ...fwSkills[id] };
-          projOverrides[id][key] = e.target.value;
+
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Skill",
+      isFramework,
+      isOverride,
+      isActive,
+      description: merged.description,
+      secrets: merged.secrets,
+      onToggleActive: (newVal) => {
+          if (newVal) activeSkills.add(id);
+          else activeSkills.delete(id);
           markDirty();
-      };
-      const w = el("div", {}, [lbl, inp]);
-      isEditing.appendChild(w);
-    };
-    mkInput("Repo ID / URL", "repo", repoUrl);
-    mkInput(`Version (Branch/Tag) - Framework default: ${recommendedVersion}`, "version", currentVersion);
+      },
+      buildReadonly: (isReadonly) => {
+        if (merged.name) {
+            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:4px;" }, [`${merged.name}`]));
+        }
+        if (merged.role) {
+            isReadonly.appendChild(el("div", {}, [`Role: ${merged.role}`]));
+        }
+        isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
 
-    detailsWrap.appendChild(isReadonly);
-    detailsWrap.appendChild(isEditing);
-
-    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
-    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
-    customizeBtn.onclick = () => {
-        isReadonly.style.display = "none";
-        isEditing.style.display = "flex";
-        customizeBtn.style.display = "none";
-    };
-    actionBox.appendChild(customizeBtn);
-
-    if (isOverride) {
-        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
-        resetBtn.onclick = () => {
-            delete projOverrides[id];
-            markDirty();
-            isReadonly.style.display = "flex";
-            isEditing.style.display = "none";
-            toast("Override removed. Click save to apply.", "info");
-            p.style.borderLeft = "none";
+        // Display version with Recommended badge if it matches
+        const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
+        verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
+        if (currentVersion === recommendedVersion && isFramework) {
+            verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
+        } else if (isFramework) {
+            verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
+        }
+        isReadonly.appendChild(verWrap);
+      },
+      buildEdit: (isEditing) => {
+        const mkInput = (labelTxt, key, defaultVal) => {
+          const lbl = el("label", {}, [labelTxt]);
+          const inp = el("input", { type: "text", class: "form-control", value: merged[key] || defaultVal });
+          inp.oninput = (e) => {
+              if (!projOverrides[id]) projOverrides[id] = { ...fwSkills[id] };
+              projOverrides[id][key] = e.target.value;
+              markDirty();
+          };
+          const w = el("div", {}, [lbl, inp]);
+          isEditing.appendChild(w);
         };
-        actionBox.appendChild(resetBtn);
-    }
-    detailsWrap.appendChild(actionBox);
-    p.appendChild(detailsWrap);
-    return p;
+        mkInput("Repo ID / URL", "repo", repoUrl);
+        mkInput(`Version (Branch/Tag) - Framework default: ${recommendedVersion}`, "version", currentVersion);
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
   };
 
   const projListContainer = el("div", { style: "margin-bottom:24px" });
