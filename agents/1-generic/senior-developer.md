@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.2.1"
+version: "1.2.2"
 description: "Complex features, architecture decisions, hard bugs and cross-cutting refactorings. Analyzes before implementing and documents decisions."
 hint: "High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements"
 prompt_mode: modern
@@ -100,7 +100,8 @@ Dispatch on at least one marker:
 
 ## Language best practices (MANDATORY)
 
-Strictly follow the best practices of `{{LANGUAGE}}`. If `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` exists: read immediately, apply all patterns.
+Strictly follow the best practices of `{{LANGUAGE}}`.
+{{#if DEVELOPER_SNIPPETS_PATH_SET}}If `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` exists: read immediately, apply all patterns.{{/if}}
 
 **General:** named exports only · kebab-case file names · existing patterns over personal preference.
 </context>

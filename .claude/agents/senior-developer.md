@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-version: 1.2.1
+version: 1.2.2
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/senior-developer.md@1.2.1
+generated-from: 1-generic/senior-developer.md@1.2.2
 model: claude-opus-4-8
 memory: project
 ---
@@ -113,7 +113,7 @@ Dispatch on at least one marker:
 
 ## Language best practices (MANDATORY)
 
-Strictly follow the best practices of `Python 3, Markdown, YAML`. If `.claude/snippets/` exists: read immediately, apply all patterns.
+Strictly follow the best practices of `Python 3, Markdown, YAML`.
 
 **General:** named exports only · kebab-case file names · existing patterns over personal preference.
 </context>

@@ -1,10 +1,10 @@
 ---
 name: docker
-version: 1.4.3
+version: 1.4.4
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 prompt_mode: modern
-generated-from: 1-generic/docker.md@1.4.3
+generated-from: 1-generic/docker.md@1.4.4
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:

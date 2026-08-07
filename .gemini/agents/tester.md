@@ -1,6 +1,6 @@
 ---
 name: tester
-version: 2.1.3
+version: 2.1.4
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 hint: Write tests (TDD), run the test suite, ensure coverage
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/tester.md@2.1.3
+generated-from: 1-generic/tester.md@2.1.4
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -59,7 +59,6 @@ describe / class / suite: ModuleName
 - **No `any`** in test code
 - **No flaky tests**
 
-Language-specific syntax → `.gemini/snippets/`.
 </workflow>
 
 <context>

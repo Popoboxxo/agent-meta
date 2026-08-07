@@ -1,6 +1,6 @@
 ---
 name: developer
-version: "1.1.2"
+version: "1.1.3"
 based-on: "1-generic/developer.md@2.3.0"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
@@ -49,7 +49,8 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 2. **REQ check:** {{DOD_REQ_BLOCK}}
 3. **Scope:** identify the minimal change — only what the task requires.
-4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present. `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.
+4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present.
+{{#if DEVELOPER_SNIPPETS_PATH_SET}}`{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.{{/if}}
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
 6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
 7. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}

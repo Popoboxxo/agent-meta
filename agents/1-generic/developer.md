@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.0.0"
+version: "4.0.1"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 prompt_mode: modern
@@ -28,7 +28,8 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 2. **REQ check:** {{DOD_REQ_BLOCK}}
 3. **Scope:** identify the minimal change — only what the task requires.
-4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present. `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.
+4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present.
+{{#if DEVELOPER_SNIPPETS_PATH_SET}}`{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.{{/if}}
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
 6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
 7. **Migration verification (mandatory when the task moves, renames, or re-derives existing entities/IDs):** silent identity loss during a migration (e.g. a stable `unique_id` regenerated or dropped instead of carried over) can be invisible in a diff and irreversible once committed — it doesn't just risk history/state, it can permanently break references other systems hold to that ID. Before reporting done:

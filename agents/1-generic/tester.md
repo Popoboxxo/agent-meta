@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.1.3"
+version: "2.1.4"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. For integration tests → se-test-engineer."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
@@ -55,7 +55,7 @@ describe / class / suite: ModuleName
 - **No `any`** in test code
 - **No flaky tests**
 
-Language-specific syntax → `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}`.
+{{#if TESTER_SNIPPETS_PATH_SET}}Language-specific syntax → `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}`.{{/if}}
 </workflow>
 
 <context>

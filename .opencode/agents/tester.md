@@ -1,10 +1,10 @@
 ---
 name: tester
-version: 2.1.3
+version: 2.1.4
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 prompt_mode: modern
-generated-from: 1-generic/tester.md@2.1.3
+generated-from: 1-generic/tester.md@2.1.4
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
@@ -56,7 +56,6 @@ describe / class / suite: ModuleName
 - **No `any`** in test code
 - **No flaky tests**
 
-Language-specific syntax → `.opencode/snippets/`.
 </workflow>
 
 <context>

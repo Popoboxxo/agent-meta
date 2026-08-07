@@ -500,6 +500,16 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
             variables[key] = str(value)
         else:
             variables[key] = value
+    # Optional, project-specific string variables (#425): unlike ARCHITECTURE/
+    # DEV_COMMANDS below, an empty-string fallback is wrong here because the
+    # referencing templates interpolate the value inline (e.g.
+    # "{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}") — substituting "" would
+    # render a misleading trailing-slash path instead of omitting the clause.
+    # A derived <VAR>_SET boolean lets templates wrap the whole clause in
+    # {{#if <VAR>_SET}}...{{/if}} (see strip_inactive_conditional_blocks).
+    for _optional_var in ("DEVELOPER_SNIPPETS_PATH", "TESTER_SNIPPETS_PATH", "DEV_STACK_START"):
+        variables[f"{_optional_var}_SET"] = "true" if variables.get(_optional_var) else "false"
+        variables.setdefault(_optional_var, "")
     # REQ category placeholders: guarantee substitution so generated context
     # files never keep a literal {{REQ_CATEGORIES_LIST}} / {{REQ_CATEGORIES}}.
     # User-set values (loaded above) take precedence; otherwise derive the long
@@ -853,6 +863,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
+    conditional_vars.update({k for k in variables if k.endswith("_SET")})
 
     if not conditional_vars:
         return text
