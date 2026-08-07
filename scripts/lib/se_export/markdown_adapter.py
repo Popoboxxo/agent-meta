@@ -1,4 +1,5 @@
 """Markdown adapter — writes SE requirements as Markdown files to docs/se/."""
+from __future__ import annotations
 
 import json
 from pathlib import Path

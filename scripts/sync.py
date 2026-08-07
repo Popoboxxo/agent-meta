@@ -32,6 +32,7 @@ External skills (config/skills-registry.yaml in agent-meta):
   - Use --add-skill to register a new submodule + skill entry
   - Activate per-project via .meta-config/skills.yaml or project.yaml external-skills block
 """
+from __future__ import annotations
 
 import argparse
 import os

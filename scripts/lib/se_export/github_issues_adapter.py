@@ -1,4 +1,5 @@
 """GitHub Issues adapter — creates SE requirements as GitHub Issues via gh CLI."""
+from __future__ import annotations
 
 import json
 import re

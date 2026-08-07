@@ -36,6 +36,7 @@ After migration:
   # or simply (auto-detect):
   py .agent-meta/scripts/sync.py
 """
+from __future__ import annotations
 
 import argparse
 import json

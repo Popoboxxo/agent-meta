@@ -1,4 +1,5 @@
 """SyncLog — collects sync actions, warnings, skips and infos."""
+from __future__ import annotations
 
 import sys
 from datetime import datetime

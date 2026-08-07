@@ -1,4 +1,5 @@
 """Agent-Visualisierung: Statische Mindmap-Generierung und Event-Log-Management."""
+from __future__ import annotations
 
 import json
 import re

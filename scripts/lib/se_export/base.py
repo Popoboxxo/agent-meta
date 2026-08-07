@@ -1,4 +1,5 @@
 """Abstract base class for SE export adapters."""
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 

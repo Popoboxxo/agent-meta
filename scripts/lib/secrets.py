@@ -8,6 +8,7 @@ Projects can extend detection via security.secret-patterns in project.yaml:
         - name: "my-service-token"
           regex: "my_[a-zA-Z0-9]{32}"
 """
+from __future__ import annotations
 
 import re
 

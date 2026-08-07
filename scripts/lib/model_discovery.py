@@ -28,6 +28,7 @@ Design notes:
     * Network failures are non-fatal: each fetcher returns ``[]`` on error so
       sync runs degrade gracefully in offline environments.
 """
+from __future__ import annotations
 
 import json
 import logging

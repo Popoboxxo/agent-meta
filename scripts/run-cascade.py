@@ -12,6 +12,7 @@ Usage:
     python scripts/run-cascade.py --list-sessions
     python scripts/run-cascade.py --clean-old --max-age 7d
 """
+from __future__ import annotations
 
 import argparse
 import hashlib

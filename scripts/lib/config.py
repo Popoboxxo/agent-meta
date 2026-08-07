@@ -1,4 +1,5 @@
 """Config loading, validation, variable building and substitution."""
+from __future__ import annotations
 
 import json
 import re

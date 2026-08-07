@@ -25,6 +25,7 @@ Exit codes:
   1 = one or more errors found
   2 = script error (file not found, git unavailable, etc.)
 """
+from __future__ import annotations
 
 import argparse
 import subprocess

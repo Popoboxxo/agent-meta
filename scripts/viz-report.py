@@ -20,6 +20,7 @@ Config in .meta-config/project.yaml:
       retention_days: 7
       session_timeout_min: 5
 """
+from __future__ import annotations
 
 import argparse
 import json

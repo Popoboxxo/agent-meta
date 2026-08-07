@@ -5,6 +5,7 @@ Public interface:
     generate_env_scripts(config, dry_run) → generate env.ps1 / env.sh / unset scripts
     update_env_var(config, name, value)   → update/remove env var in memory
 """
+from __future__ import annotations
 
 from pathlib import Path
 

@@ -9,6 +9,7 @@ Usage:
     engine = BootstrapEngine()
     result = engine.run_bootstrap(provider="Gemini", agents_dir=Path("..."))
 """
+from __future__ import annotations
 
 import re
 from pathlib import Path

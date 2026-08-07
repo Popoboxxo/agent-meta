@@ -1,4 +1,5 @@
 """Commands layer: collect, sync, create — analog to rules.py."""
+from __future__ import annotations
 
 import re
 from pathlib import Path

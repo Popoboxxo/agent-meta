@@ -10,6 +10,7 @@ Events: on-commit, on-merge, on-version-bump-patch, on-version-bump-minor,
 Reads lifecycle-triggers from .meta-config/project.yaml and appends pending
 tasks to .claude/pending-tasks.md.
 """
+from __future__ import annotations
 
 import json
 import sys

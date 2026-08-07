@@ -8,6 +8,7 @@ Public interface:
                                                       returns gitignore entries
     sync_secrets_template(...)                       → creates/updates .meta-config/secrets.local.yaml
 """
+from __future__ import annotations
 
 import json
 import re

@@ -1,4 +1,5 @@
 """Roles config loading and model/memory/permissionMode resolution."""
+from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional

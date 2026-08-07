@@ -9,6 +9,7 @@ Usage:
   Stdio MCP:   python viz-logger.py --mcp
   HTTP MCP:    python viz-logger.py --http [port]       (default port: 9090)
 """
+from __future__ import annotations
 
 import argparse
 import http.server
