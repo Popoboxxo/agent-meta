@@ -2268,19 +2268,29 @@ async function viewProjectMcpOverrides() {
               const inpV = el("input", { class: "form-control", value: v, style: "flex: 2;", placeholder: "Value" });
               const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
               
-              inpK.onchange = (e) => { 
-                  // Preserve key order: rebuild object with renamed key in same position
+              inpK.onchange = (e) => {
                   const newKey = e.target.value;
+                  if (!newKey) {
+                      toast("Key cannot be empty.", "error");
+                      inpK.value = k;
+                      return;
+                  }
+                  if (newKey !== k && Object.prototype.hasOwnProperty.call(dictData, newKey)) {
+                      toast(`Key "${newKey}" already exists.`, "error");
+                      inpK.value = k;
+                      return;
+                  }
+                  // Preserve key order: rebuild object with renamed key in same position
                   const entries = Object.entries(dictData);
                   const idx = entries.findIndex(([ek]) => ek === k);
                   // Clear all keys
                   for (const dk of Object.keys(dictData)) delete dictData[dk];
                   // Re-insert with renamed key at same position
                   entries.forEach(([ek, ev], i) => {
-                      if (i === idx) { if (newKey) dictData[newKey] = inpV.value; }
+                      if (i === idx) { dictData[newKey] = inpV.value; }
                       else { dictData[ek] = ev; }
                   });
-                  onChange(); renderRows(); 
+                  onChange(); renderRows();
               };
               inpV.oninput = (e) => { dictData[inpK.value] = e.target.value; onChange(); };
               btnDel.onclick = () => { delete dictData[k]; onChange(); renderRows(); };
@@ -5694,6 +5704,11 @@ async function viewProjectProviders() {
       let lastKey = key;
       function sync() {
         const k = keyInput.value.trim();
+        if (k !== lastKey && Object.prototype.hasOwnProperty.call(provOpts, k)) {
+          toast(`Key "${k}" already exists.`, "error");
+          keyInput.value = lastKey;
+          return;
+        }
         if (k !== lastKey && lastKey) {
           delete provOpts[lastKey];
         }
