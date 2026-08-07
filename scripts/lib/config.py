@@ -529,6 +529,18 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]
+    # PROJECT_CONTEXT / ARCHITECTURE / DEV_COMMANDS: only ever set by the
+    # interactive `sync.py --setup` wizard (scripts/lib/setup.py), with no
+    # fallback anywhere else — any project whose .meta-config/project.yaml
+    # was hand-written or predates these variables gets a literal
+    # unsubstituted {{VAR}} in every template that references them (e.g.
+    # openscad-developer.md's "Dev environment:" line). Fall back the same
+    # way PROJECT_GOAL does above, to the closest existing value, or to an
+    # empty string rather than leaking the placeholder.
+    if not variables.get("PROJECT_CONTEXT"):
+        variables["PROJECT_CONTEXT"] = variables.get("PROJECT_DESCRIPTION", "")
+    variables.setdefault("ARCHITECTURE", "")
+    variables.setdefault("DEV_COMMANDS", "")
     # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
     if "AI_PROVIDER" not in variables:
         provider_config = load_providers_config(agent_meta_root)
