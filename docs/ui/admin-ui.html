@@ -2506,7 +2506,7 @@ async function viewProjectMcpOverrides() {
   const allIds = new Set([...Object.keys(fwServers), ...Object.keys(projOverrides)]);
   
   if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "muted" }, ["No servers found."]));
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No servers found."]));
   } else {
     Array.from(allIds).sort().forEach(id => {
       projListContainer.appendChild(renderSrvPanel(id, fwServers.hasOwnProperty(id)));
@@ -2715,7 +2715,7 @@ async function viewProjectSkillsOverrides() {
   const allIds = new Set([...Object.keys(fwSkills), ...Object.keys(projOverrides)]);
   
   if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "muted" }, ["No skills found."]));
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No skills found."]));
   } else {
     Array.from(allIds).sort().forEach(id => {
       projListContainer.appendChild(renderSkillPanel(id, fwSkills.hasOwnProperty(id)));
@@ -2859,7 +2859,7 @@ async function viewMcpRegistry() {
   };
   
   if (Object.keys(fwServers).length === 0) {
-    fwListContainer.appendChild(el("div", { class: "muted" }, ["No framework servers."]));
+    fwListContainer.appendChild(el("div", { class: "empty" }, ["No framework servers."]));
   }
   for (const [id, srv] of Object.entries(fwServers)) {
     fwListContainer.appendChild(renderSrvPanel(id, srv, true, () => {}));
@@ -2906,7 +2906,7 @@ async function viewMcpRegistry() {
   const renderProjList = () => {
     projListContainer.innerHTML = "";
     if (Object.keys(projServers).length === 0) {
-      projListContainer.appendChild(el("div", { class: "muted" }, ["No project overrides."]));
+      projListContainer.appendChild(el("div", { class: "empty" }, ["No project overrides."]));
       return;
     }
     for (const [id, srv] of Object.entries(projServers)) {
@@ -5917,7 +5917,7 @@ async function viewProjectRoles() {
     }
 
     if (!active.length) {
-      activeList.appendChild(el("div", { class: "empty muted", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
+      activeList.appendChild(el("div", { class: "empty", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
     } else {
       for (const n of active) activeList.appendChild(buildCard(n, "active"));
     }
@@ -6078,7 +6078,7 @@ async function viewProjectOrchestrator() {
     povPanel.appendChild(row);
   }
   if (activeProviders.length === 0) {
-    povPanel.appendChild(el("p", { class: "muted" }, ["No active providers configured — set ai-providers first."]));
+    povPanel.appendChild(el("p", { class: "empty" }, ["No active providers configured — set ai-providers first."]));
   }
   wrap.appendChild(povPanel);
 
@@ -6520,7 +6520,7 @@ async function viewBackups() {
   const render = () => {
     tableWrap.innerHTML = "";
     if (!data || !data.archives || data.archives.length === 0) {
-      tableWrap.appendChild(el("p", {}, ["No backups found."]));
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No backups found."]));
       return;
     }
     const t = el("table", { class: "data" }, [
@@ -6746,7 +6746,7 @@ async function viewProjectEnvironments() {
     tableWrap.replaceChildren();
     const names = Object.keys(envs).sort();
     if (!names.length) {
-      tableWrap.appendChild(el("p", { class: "muted" }, ["No environment variables defined. Click '+ Add Variable' to start."]));
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No environment variables defined. Click '+ Add Variable' to start."]));
       return;
     }
     const table = el("table", { class: "data" });
