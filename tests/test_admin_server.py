@@ -124,11 +124,26 @@ class TestWritePathWhitelist(unittest.TestCase):
             with self.assertRaises(admin_server.SecurityError):
                 mgr.write("definitely-not-allowed", {"x": 1})
 
-    def test_super_admin_only_key_rejected_in_project_mode(self) -> None:
+    def test_super_admin_only_key_readable_in_project_mode(self) -> None:
+        # resolve_path() (and by extension read()) is deliberately
+        # mode-agnostic -- project_admin mode must still be able to *view*
+        # framework defaults like role-defaults.yaml. The actual write
+        # boundary is enforced in write(), tested below. This test used to
+        # assert the opposite (a stale expectation that predates that design
+        # decision) and had been failing for weeks without anyone checking
+        # whether it pointed at a real vulnerability -- it didn't; write()
+        # already rejects this key in project_admin mode (audit follow-up,
+        # 2026-08-07).
+        with tempfile.TemporaryDirectory() as tmp:
+            mgr = admin_server.ConfigManager(Path(tmp), mode="project_admin")
+            path = mgr.resolve_path("role-defaults")
+            self.assertTrue(str(path).endswith("role-defaults.yaml"))
+
+    def test_super_admin_only_key_rejected_on_write_in_project_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             mgr = admin_server.ConfigManager(Path(tmp), mode="project_admin")
             with self.assertRaises(admin_server.SecurityError):
-                mgr.resolve_path("role-defaults")
+                mgr.write("role-defaults", {"roles": {}})
 
     def test_super_admin_key_allowed_in_super_admin_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

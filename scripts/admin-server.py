@@ -572,9 +572,16 @@ class ConfigManager:
         (``_build_agent_hierarchy``, ``_find_schema_path``). Otherwise the
         primary path is returned (the file may not exist yet).
 
+        Deliberately mode-agnostic: ``_allowed_keys()`` always returns both
+        ``PROJECT_FILES`` and ``SUPER_ADMIN_FILES`` so project_admin mode can
+        still *view* framework defaults (e.g. ``role-defaults``). The write
+        boundary for project_admin mode is enforced in :py:meth:`write`, not
+        here -- resolving a path is not the same as being allowed to write it.
+
         Raises:
-            SecurityError: if ``key`` is unknown, restricted for the current
-                mode, or would escape ``root`` (path traversal protection).
+            SecurityError: if ``key`` is unknown, or the resolved path would
+                escape ``root`` (path traversal protection). Does NOT raise
+                for mode restrictions -- see :py:meth:`write`.
         """
         if not isinstance(key, str) or not key:
             raise SecurityError("invalid config key")

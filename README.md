@@ -28,7 +28,7 @@
 >    - **Automated Default Init:** `python .agent-meta/scripts/sync.py --init`
 > 3. **Re-Sync After Config Changes:** Re-run `python .agent-meta/scripts/sync.py` whenever `.meta-config/project.yaml` is modified.
 
-[![Version](https://img.shields.io/badge/version-0.91.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.92.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 | **Date:** 2026-08-01
@@ -66,7 +66,7 @@ graph TD
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.91.2 && cd ..
+cd .agent-meta && git checkout v0.92.0 && cd ..
 
 # Install dependencies
 pip install -r .agent-meta/requirements.txt

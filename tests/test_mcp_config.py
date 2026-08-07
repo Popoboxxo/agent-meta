@@ -28,6 +28,30 @@ def test_claude_mcp_config_targets_mcp_json_not_settings():
     assert ".mcp.json" in provider_config["Claude"]["gitignore_entries"]
 
 
+def test_every_provider_secrets_file_is_gitignored():
+    # Regression test found live in a follow-up system audit (2026-08-07):
+    # Continue's mcp-config.secrets-file was `.continue/config.local.yaml`,
+    # but gitignore_entries listed `.continue/settings.local.yaml` -- a
+    # filename that matched nothing, so the real secrets file was never
+    # gitignored. Opencode had the same class of gap: its secrets-file
+    # (`.opencode/mcp.local.json`) is a *third*, distinct path from
+    # settings_local_file and was missing from gitignore_entries entirely.
+    # Both are the same severity as #388/#400 (secrets ending up somewhere
+    # unprotected) -- generalized here so it can't silently regress again
+    # for any provider, present or future.
+    repo_root = Path(__file__).resolve().parents[1]
+    provider_config = load_providers_config(repo_root)
+    missing = []
+    for name, pc in provider_config.items():
+        secrets_file = pc.get("mcp-config", {}).get("secrets-file")
+        settings_local = pc.get("settings_local_file")
+        entries = set(pc.get("gitignore_entries", []))
+        for path in (secrets_file, settings_local):
+            if path and path not in entries:
+                missing.append(f"{name}: {path!r} not in gitignore_entries")
+    assert not missing, "\n".join(missing)
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
