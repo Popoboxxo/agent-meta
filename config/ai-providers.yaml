@@ -159,6 +159,7 @@ providers:
       - AGENTS.personal.md
       - .opencode/settings.local.json
       - .opencode/pending-tasks.md
+      - .opencode/mcp.local.json
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
@@ -210,7 +211,7 @@ providers:
     isolation-dirs:
       - .continue/
     gitignore_entries:
-      - .continue/settings.local.yaml
+      - .continue/config.local.yaml
       - .continue/pending-tasks.md
     mcp-config:
       committed-file: .continue/config.yaml
