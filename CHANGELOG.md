@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Admin UI, Phase 0 of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`): the "Preset Matrix" heading on Rules Presets showed the literal text `&#8212;` instead of an em dash (HTML entity in a text-node position never decodes); a skill's version badge read "Recommended Tag" instead of "Recommended"; 6 "Loading…" placeholders were split between the ellipsis character and three literal dots, now unified on the ellipsis character.
+
 ### Changed
 - A2A handoff concept simplified after a best-practice audit found most of `orchestrator.handoff.*` in `project.yaml` had no consumer anywhere (code or agent prompt): removed `validate-before-delegate`, `supersession-tracking`, `strict-validation`, `compact-mode`, `max_retries`, `human_approval_required`, `protocol_routing`, `token-budget` (only `protocol` remains; `config/project-config.schema.json`'s `handoff` block is now `additionalProperties: false` to stop this recurring). Removed the matching dead envelope fields from `schemas/a2a-handoff.schema.json` (`retry_count`, `max_retries`, `escalation`, `timeout_seconds`, `negotiated_format`) and 3 unreferenced schema `definitions`. Clarified in `snippets/orchestrator/a2a-protocol.md` and `A2A_HANDOFF_BLOCK` that a structured JSON envelope is only required for routes with a schema-backed contract (`role-defaults.yaml` `handoff.input_schema`/`output_schema` pointing at a real file) — everyday FANOUT/BARRIER delegation uses the existing plain-text format, previously undocumented and contradicting a "MUST" claim in the same snippet. `validate_envelope()` stays as a manually-invokable, now-tested utility (no automatic runtime interception point exists in this architecture). See `docs/concepts/a2a-best-practice-analysis-2026-08.md`.
 
