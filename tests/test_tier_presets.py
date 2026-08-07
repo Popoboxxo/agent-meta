@@ -3,6 +3,7 @@
 Tests use the real config files from the repo — no mocking.
 All tests target the Claude provider for deterministic model IDs.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

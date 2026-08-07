@@ -12,6 +12,7 @@ Usage:
   python tests/manual/test-engine/validate-delegation.py --all --report
   python tests/manual/test-engine/validate-delegation.py --log .meta-viz/events.jsonl --scenario SE-02
 """
+from __future__ import annotations
 
 import argparse
 import json

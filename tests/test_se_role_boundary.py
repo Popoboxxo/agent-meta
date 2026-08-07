@@ -1,4 +1,5 @@
 """Test SE Role Boundary: se-critic detects forbidden terms in requirements output."""
+from __future__ import annotations
 
 
 # ---------------------------------------------------------------------------
