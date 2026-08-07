@@ -2660,7 +2660,7 @@ async function viewProjectSkillsOverrides() {
     const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
     verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
     if (currentVersion === recommendedVersion && isFramework) {
-        verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended Tag"]));
+        verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
     } else if (isFramework) {
         verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
     }
@@ -3161,7 +3161,7 @@ async function viewRulesPresets() {
   const ICON_DEF = '<span style="color:var(--text-muted);font-size:0.85em;" title="default (true)">&#8212;</span>';
 
   const matrixPanel = el("details", { class: "panel", open: true });
-  matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix &#8212; all rules vs. all presets"]));
+  matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix — all rules vs. all presets"]));
   const matrixTable = el("table", { style: "width:100%; border-collapse:collapse; font-size:0.8em; margin-top:8px;" });
   const mthead = el("thead");
   let headerRow = '<tr style="border-bottom:2px solid var(--border-color);"><th style="text-align:left;padding:4px 8px;min-width:140px;">Rule</th>';
@@ -6573,13 +6573,13 @@ async function viewBackups() {
   wrap.appendChild(el("h1", {}, ["System Backups"]));
   wrap.appendChild(el("p", { class: "muted" }, ["Manage full system backups (agent-meta config + provider folders)."]));
 
-  const status = el("div", { class: "muted" }, ["Loading..."]);
+  const status = el("div", { class: "muted" }, ["Loading…"]);
   wrap.appendChild(status);
 
   let data = null;
   const load = async () => {
     try {
-      status.textContent = "Loading backups...";
+      status.textContent = "Loading backups…";
       data = await api.get("/api/backups");
       status.textContent = "";
       render();
@@ -6661,7 +6661,7 @@ async function viewProviderDeactivation() {
     "Deactivated providers will no longer read agent sub-definitions. Root context files (CLAUDE.md, AGENTS.md) are NOT affected.",
   ]));
 
-  const status = el("div", { class: "muted" }, ["Loading deactivation status..."]);
+  const status = el("div", { class: "muted" }, ["Loading deactivation status…"]);
   wrap.appendChild(status);
 
   let deactStatus = null;
@@ -7517,7 +7517,7 @@ async function viewModels() {
     }
 
     if (state.loading) {
-      wrap.appendChild(el("div", { style: "padding:32px;text-align:center;opacity:0.6;" }, ["Loading..."]));
+      wrap.appendChild(el("div", { style: "padding:32px;text-align:center;opacity:0.6;" }, ["Loading…"]));
       return;
     }
 
