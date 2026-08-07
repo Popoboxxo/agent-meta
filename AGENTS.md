@@ -84,7 +84,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.91.3` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.92.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
@@ -764,6 +764,10 @@ Die Knowledge Engine ist aktiviert. Domäne: **personal**.
 - **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
 
 <!-- agent-meta:managed-end -->
+
+
+
+
 
 
 
