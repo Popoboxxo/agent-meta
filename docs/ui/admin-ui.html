@@ -5685,12 +5685,22 @@ async function viewProjectProviders() {
       } }, ["✕"]);
       removeCell.appendChild(removeBtn);
 
-      // On change: update provOpts
+      // On change: update provOpts. Tracks the row's own last-known key so a
+      // rename (editing the key field in place) removes the old entry
+      // instead of leaving it behind as an orphaned duplicate (#319) — the
+      // previous version had no such tracking and relied on a "rebuild on
+      // save" that never actually happened, so a renamed key silently kept
+      // both the old and new key in the saved config.
+      let lastKey = key;
       function sync() {
         const k = keyInput.value.trim();
-        if (!k) return;
-        // Remove old key if renamed
-        // We can't easily track old key here, so we rebuild on save instead
+        if (k !== lastKey && lastKey) {
+          delete provOpts[lastKey];
+        }
+        if (!k) {
+          lastKey = k;
+          return;
+        }
         let v;
         if (valSel.value === "bool") {
           v = valInput.value.trim().toLowerCase() === "true";
@@ -5698,6 +5708,7 @@ async function viewProjectProviders() {
           v = valInput.value;
         }
         provOpts[k] = v;
+        lastKey = k;
       }
       keyInput.addEventListener("change", sync);
       valInput.addEventListener("change", sync);
