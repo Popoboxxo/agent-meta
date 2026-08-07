@@ -1,4 +1,5 @@
 """Placeholder validation: {{VAR}} usage in agent templates."""
+from __future__ import annotations
 
 import re
 from pathlib import Path

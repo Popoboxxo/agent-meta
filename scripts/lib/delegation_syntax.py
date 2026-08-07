@@ -9,6 +9,7 @@ Usage:
     engine = DelegationSyntaxEngine()
     processed = engine.apply(content, provider="Gemini")
 """
+from __future__ import annotations
 
 import json
 import re

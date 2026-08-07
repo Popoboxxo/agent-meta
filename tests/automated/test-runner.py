@@ -10,6 +10,7 @@ Exit codes:
     0 - Alle Tests bestanden
     1 - Mindestens ein Test fehlgeschlagen
 """
+from __future__ import annotations
 
 import json
 import re

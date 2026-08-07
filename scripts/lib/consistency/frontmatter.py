@@ -1,4 +1,5 @@
 """Frontmatter validation checks for agent templates."""
+from __future__ import annotations
 
 import re
 import subprocess

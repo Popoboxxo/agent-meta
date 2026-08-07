@@ -3,6 +3,7 @@
 Speichert Task-Fortschritt nach jedem Delegationsschritt.
 Ermöglicht Resume nach Session-Unterbrechung.
 """
+from __future__ import annotations
 
 import json
 import time

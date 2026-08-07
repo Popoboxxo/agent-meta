@@ -1,4 +1,5 @@
 """Context file management: CLAUDE.md managed block, provider context, gitignore, settings."""
+from __future__ import annotations
 
 import json
 import re

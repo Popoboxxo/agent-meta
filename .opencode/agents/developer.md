@@ -145,7 +145,7 @@ python scripts/sync.py
 python scripts/sync.py --dry-run
 
 
-A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
+A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
 
 **HITL:** on `requires_human_approval: true` ask BEFORE executing:
 > "[payload.t]. Execute? (yes/no)"

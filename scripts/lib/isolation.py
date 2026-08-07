@@ -13,6 +13,7 @@ Mechanisms per provider:
 Trigger: only when len(active_providers) > 1 AND project.yaml does not have
 provider-isolation: disabled.
 """
+from __future__ import annotations
 
 import json
 import re

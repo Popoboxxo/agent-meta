@@ -12,6 +12,7 @@ Usage:
   python tests/manual/test-engine/prepare-test-session.py --scenario SE-02 --start-server
   python tests/manual/test-engine/prepare-test-session.py --list
 """
+from __future__ import annotations
 
 import argparse
 import json

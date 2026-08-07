@@ -1,4 +1,5 @@
 """Config loading, validation, variable building and substitution."""
+from __future__ import annotations
 
 import json
 import re
@@ -819,7 +820,8 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
     )
     variables["A2A_HANDOFF_BLOCK"] = (
-        "A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), "
+        "A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: "
+        "IPayload (t, ctx, con, refs, pri, dep), "
         "IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). "
         f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
         if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""

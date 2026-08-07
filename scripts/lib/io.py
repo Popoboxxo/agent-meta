@@ -1,4 +1,5 @@
 """I/O helpers for loading YAML/JSON config files."""
+from __future__ import annotations
 
 import hashlib
 import json

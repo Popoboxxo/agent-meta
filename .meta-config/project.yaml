@@ -267,18 +267,6 @@ orchestrator:
     enabled: true
   handoff:
     protocol: a2a-v1
-    validate-before-delegate: true
-    supersession-tracking: true
-    strict-validation: false
-    compact-mode: true
-    max_retries: 3
-    human_approval_required: false
-    protocol_routing: static
-    token-budget:
-      enabled: false
-      session_budget: 200000
-      max_overhead_pct: 10
-      on_exceed: compact
   mode: strict
   provider-overrides:
     Claude:

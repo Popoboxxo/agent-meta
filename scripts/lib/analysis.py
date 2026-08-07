@@ -15,6 +15,7 @@ Usage:
     deps = analyzer.get_file_dependencies(["scripts/lib/config.py", "scripts/lib/agents.py"])
     hint = analyzer.format_hint(deps)
 """
+from __future__ import annotations
 
 import ast
 from pathlib import Path

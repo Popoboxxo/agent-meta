@@ -1,4 +1,5 @@
 """Quality pipeline configuration management and provider-specific injection."""
+from __future__ import annotations
 
 import json
 import os

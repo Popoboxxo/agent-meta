@@ -11,6 +11,7 @@ Validates the A2A handoff wiring declared under each role's ``handoff`` block:
 Roles without a ``handoff`` block are skipped. ``task-spec-v1`` is produced
 by the orchestrator at runtime and is exempt from the producer check.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

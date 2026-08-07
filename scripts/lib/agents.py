@@ -1,4 +1,5 @@
 """Agent file generation: frontmatter, composition, sync logic."""
+from __future__ import annotations
 
 import re
 from pathlib import Path

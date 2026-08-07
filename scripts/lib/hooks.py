@@ -1,4 +1,5 @@
 """Hooks layer: collect, sync, create."""
+from __future__ import annotations
 
 import json
 import re

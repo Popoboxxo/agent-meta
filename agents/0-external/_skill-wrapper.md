@@ -1,5 +1,5 @@
 ---
-name: {{SKILL_ROLE}}
+name: "{{SKILL_ROLE}}"
 version: "1.1.0"
 description: "{{SKILL_DESCRIPTION}}"
 generated-from: "0-external/{{SKILL_NAME}}@{{SKILL_COMMIT}}"

@@ -197,7 +197,7 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 **DoD flags:**
 
-**Quality pipelines:** A2A-Envelopes verwenden: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
+**Quality pipelines:** A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: IPayload (t, ctx, con, refs, pri, dep), IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). payload.t ≤ 300 Zeichen.
 
 **SE mode:** Recursive zig-zag decomposition L0→L6. Cell spawns: `continue`→new level, `leaf`→component. Context hygiene: only BB-REQ + propagation_map. Max 4 parallel cells.
 SE mode: optional
