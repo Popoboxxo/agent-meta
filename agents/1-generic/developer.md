@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "3.1.1"
+version: "4.0.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 prompt_mode: modern
@@ -31,9 +31,14 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 4. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-developer-ext.md` if present. `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
 6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
-7. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
-8. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
-9. **Return:** result in `IResult` format (see `<output_contract>`).
+7. **Migration verification (mandatory when the task moves, renames, or re-derives existing entities/IDs):** silent identity loss during a migration (e.g. a stable `unique_id` regenerated or dropped instead of carried over) can be invisible in a diff and irreversible once committed — it doesn't just risk history/state, it can permanently break references other systems hold to that ID. Before reporting done:
+   - Diff old→new over the stable key (ID, `unique_id`, slug — whatever identifies the entity across the move), not just line-by-line file content.
+   - Every stable key from the source must appear in the target exactly once — 0 missing, 0 duplicates.
+   - A key that doesn't reappear is only acceptable if you can point to where it's now explicitly inactive/commented/deleted — "not found" alone is not acceptable, go find out why.
+   - State the check result explicitly in your report (counts checked, 0 mismatches found) — don't just assert the migration succeeded.
+8. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
+9. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
+10. **Return:** result in `IResult` format (see `<output_contract>`).
 </workflow>
 
 <context>
