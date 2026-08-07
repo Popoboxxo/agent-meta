@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.4.3"
+version: "1.4.4"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
@@ -77,7 +77,7 @@ Read `{{DOCKER_STACKS_OVERVIEW}}` for the available stacks. Per stack: compose p
 **Docker stacks of this project:** {{DOCKER_STACKS_OVERVIEW}}
 
 **Build system:** {{BUILD_COMMANDS}}
-**Dev stack:** {{DEV_STACK_START}}
+{{#if DEV_STACK_START_SET}}**Dev stack:** {{DEV_STACK_START}}{{/if}}
 </context>
 
 <tools>

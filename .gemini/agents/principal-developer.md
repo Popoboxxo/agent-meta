@@ -1,6 +1,6 @@
 ---
 name: principal-developer
-version: 1.0.0
+version: 1.0.1
 description: Last-resort escalation tier. Invoked only after senior-developer has
   failed repeatedly on a task. Root-cause diagnosis before a single line of code.
   Maximum thoroughness, maximum cost.
@@ -18,7 +18,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/principal-developer.md@1.0.0
+generated-from: 1-generic/principal-developer.md@1.0.1
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -142,7 +142,7 @@ You handle ONLY what has already defeated senior-developer:
 
 ## Language best practices (MANDATORY)
 
-Strictly follow the best practices of `Python 3, Markdown, YAML`. If `.gemini/snippets/` exists: read immediately, apply all patterns.
+Strictly follow the best practices of `Python 3, Markdown, YAML`.
 
 **General:** named exports only · kebab-case file names · existing patterns over personal preference.
 </context>

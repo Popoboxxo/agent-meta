@@ -1,6 +1,6 @@
 ---
 name: docker
-version: 1.4.3
+version: 1.4.4
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 hint: Start/stop dev stack, Dockerfiles, binary management
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/docker.md@1.4.3
+generated-from: 1-generic/docker.md@1.4.4
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).

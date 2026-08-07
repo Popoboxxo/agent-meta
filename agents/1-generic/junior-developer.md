@@ -1,6 +1,6 @@
 ---
 name: template-junior-developer
-version: "1.2.0"
+version: "1.2.1"
 description: "Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates in a structured way as soon as scope grows."
 hint: "Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates on scope overrun"
 prompt_mode: modern
@@ -79,7 +79,8 @@ As soon as any scope criterion is violated:
 
 **Code conventions:** {{CODE_CONVENTIONS}}
 
-**Language best practices:** Strictly follow the best practices of `{{LANGUAGE}}`. If `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` exists: read now, apply all patterns.
+**Language best practices:** Strictly follow the best practices of `{{LANGUAGE}}`.
+{{#if DEVELOPER_SNIPPETS_PATH_SET}}If `{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` exists: read now, apply all patterns.{{/if}}
 </context>
 
 <tools>

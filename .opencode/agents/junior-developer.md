@@ -1,10 +1,10 @@
 ---
 name: junior-developer
-version: 1.2.0
+version: 1.2.1
 description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates
   in a structured way as soon as scope grows.'
 prompt_mode: modern
-generated-from: 1-generic/junior-developer.md@1.2.0
+generated-from: 1-generic/junior-developer.md@1.2.1
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 permission:
@@ -82,7 +82,7 @@ As soon as any scope criterion is violated:
 - YAML Frontmatter in allen Agent-Templates
 
 
-**Language best practices:** Strictly follow the best practices of `Python 3, Markdown, YAML`. If `.opencode/snippets/` exists: read now, apply all patterns.
+**Language best practices:** Strictly follow the best practices of `Python 3, Markdown, YAML`.
 </context>
 
 <tools>

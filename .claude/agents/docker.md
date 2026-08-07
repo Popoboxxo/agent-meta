@@ -1,6 +1,6 @@
 ---
 name: docker
-version: 1.4.3
+version: 1.4.4
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 hint: Start/stop dev stack, Dockerfiles, binary management
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/docker.md@1.4.3
+generated-from: 1-generic/docker.md@1.4.4
 model: claude-haiku-4-5-20251001
 ---
 

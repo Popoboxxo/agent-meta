@@ -1,10 +1,10 @@
 ---
 name: senior-developer
-version: 1.2.1
+version: 1.2.2
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 prompt_mode: modern
-generated-from: 1-generic/senior-developer.md@1.2.1
+generated-from: 1-generic/senior-developer.md@1.2.2
 mode: subagent
 model: opencode-go/kimi-k2.6
 permission:
@@ -109,7 +109,7 @@ Dispatch on at least one marker:
 
 ## Language best practices (MANDATORY)
 
-Strictly follow the best practices of `Python 3, Markdown, YAML`. If `.opencode/snippets/` exists: read immediately, apply all patterns.
+Strictly follow the best practices of `Python 3, Markdown, YAML`.
 
 **General:** named exports only · kebab-case file names · existing patterns over personal preference.
 </context>

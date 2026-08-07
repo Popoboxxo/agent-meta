@@ -1,6 +1,6 @@
 ---
 name: junior-developer
-version: 1.2.0
+version: 1.2.1
 description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates
   in a structured way as soon as scope grows.'
 hint: 'Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/junior-developer.md@1.2.0
+generated-from: 1-generic/junior-developer.md@1.2.1
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -86,7 +86,7 @@ As soon as any scope criterion is violated:
 - YAML Frontmatter in allen Agent-Templates
 
 
-**Language best practices:** Strictly follow the best practices of `Python 3, Markdown, YAML`. If `.gemini/snippets/` exists: read now, apply all patterns.
+**Language best practices:** Strictly follow the best practices of `Python 3, Markdown, YAML`.
 </context>
 
 <tools>

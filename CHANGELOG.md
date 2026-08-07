@@ -4,6 +4,7 @@
 
 ### Fixed
 - Admin UI: the MCP server Env-Vars/Headers dict-editor and the Provider-Options KV editor silently corrupted data when a key was renamed to collide with an existing key in the same dict (one row would vanish, another's value silently overwritten) — both editors now reject the rename with a toast and revert the input. The dict-editor also silently dropped a row when its key field was cleared entirely; that's rejected the same way now (#432).
+- `DEVELOPER_SNIPPETS_PATH`, `TESTER_SNIPPETS_PATH`, `DEV_STACK_START`: optional variables left an unconditional raw `{{VAR}}` placeholder (or, once interpolated, a misleading trailing-slash path like `` `snippets/` if present``) in generated templates when unset. `build_variables()` now derives a `<VAR>_SET` boolean per var so the 13 referencing template lines across `developer.md`, `data-engineer.md`, `database-engineer.md`, `docker.md`, `junior-developer.md`, `principal-developer.md`, `refactoring-specialist.md`, `senior-developer.md`, `tester.md` and the `agent-meta`/`homeassistant`/`sharkord` platform developer overrides can wrap the whole clause in `{{#if <VAR>_SET}}...{{/if}}` and omit it cleanly (#425).
 
 ## [0.92.0] — 2026-08-07
 
