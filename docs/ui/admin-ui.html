@@ -3114,44 +3114,51 @@ async function viewRulesPresets() {
 
   // --- Preset Matrix ---
   const presetNames = Object.keys(presets).sort();
-  const ICON_ON  = '<span style="color:var(--accent-green);font-size:0.85em;" title="true">&#10003;</span>';
-  const ICON_OFF = '<span style="color:var(--accent-red);font-size:0.85em;" title="false">&#10007;</span>';
-  const ICON_DEF = '<span style="color:var(--text-muted);font-size:0.85em;" title="default (true)">&#8212;</span>';
+  const ICON_ON  = () => el("span", { style: "color:var(--accent-green);font-size:0.85em;", title: "true" }, ["✓"]);
+  const ICON_OFF = () => el("span", { style: "color:var(--accent-red);font-size:0.85em;", title: "false" }, ["✗"]);
+  const ICON_DEF = () => el("span", { style: "color:var(--text-muted);font-size:0.85em;", title: "default (true)" }, ["—"]);
 
   const matrixPanel = el("details", { class: "panel", open: true });
   matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix — all rules vs. all presets"]));
   const matrixTable = el("table", { class: "data-table", style: "font-size:0.8em; margin-top:8px;" });
   const mthead = el("thead");
-  let headerRow = '<tr style="border-bottom:2px solid var(--border-color);"><th style="text-align:left;padding:4px 8px;min-width:140px;">Rule</th>';
+  const mHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
+  mHeadRow.appendChild(el("th", { style: "text-align:left;padding:4px 8px;min-width:140px;" }, ["Rule"]));
   for (const pn of presetNames) {
-    headerRow += `<th style="text-align:center;padding:4px 4px;font-size:0.85em;" title="${pn} preset">${pn}</th>`;
+    mHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 4px;font-size:0.85em;", title: `${pn} preset` }, [pn]));
   }
-  headerRow += '</tr>';
-  mthead.innerHTML = headerRow;
+  mthead.appendChild(mHeadRow);
   matrixTable.appendChild(mthead);
   const mtbody = el("tbody");
   for (const rule of rules) {
-    let row = `<tr style="border-bottom:1px solid var(--border-color);"><td style="padding:3px 8px; font-family:monospace; font-size:0.88em;">${rule}</td>`;
+    const mRow = el("tr", { style: "border-bottom:1px solid var(--border-color);" });
+    mRow.appendChild(el("td", { style: "padding:3px 8px; font-family:monospace; font-size:0.88em;" }, [rule]));
     for (const pn of presetNames) {
       const opts = (presets[pn] && presets[pn][rule]) ? presets[pn][rule] : null;
       if (!opts) {
-        row += '<td style="text-align:center;padding:3px 4px; color:var(--text-muted);">&#183;</td>';
+        mRow.appendChild(el("td", { style: "text-align:center;padding:3px 4px; color:var(--text-muted);" }, ["·"]));
       } else {
-        const aa = opts.alwaysApply !== undefined ? (opts.alwaysApply ? ICON_ON : ICON_OFF) : ICON_DEF;
-        const em = opts.embed !== undefined ? (opts.embed ? ICON_ON : ICON_OFF) : ICON_DEF;
-        const gm = opts.gemini === "skip" ? '<span style="color:var(--accent-red);font-size:0.75em;" title="gemini:skip">G</span>' : '';
-        row += `<td style="text-align:center;padding:3px 4px; white-space:nowrap;">${aa}${em}${gm}</td>`;
+        const aa = opts.alwaysApply !== undefined ? (opts.alwaysApply ? ICON_ON() : ICON_OFF()) : ICON_DEF();
+        const em = opts.embed !== undefined ? (opts.embed ? ICON_ON() : ICON_OFF()) : ICON_DEF();
+        const td = el("td", { style: "text-align:center;padding:3px 4px; white-space:nowrap;" }, [aa, em]);
+        if (opts.gemini === "skip") {
+          td.appendChild(el("span", { style: "color:var(--accent-red);font-size:0.75em;", title: "gemini:skip" }, ["G"]));
+        }
+        mRow.appendChild(td);
       }
     }
-    row += '</tr>';
-    mtbody.innerHTML += row;
+    mtbody.appendChild(mRow);
   }
   matrixTable.appendChild(mtbody);
   matrixPanel.appendChild(matrixTable);
-  
+
   // Legend
   const legend = el("div", { style: "margin-top:8px; font-size:0.78em; color:var(--text-muted); display:flex; gap:16px; flex-wrap:wrap;" });
-  legend.innerHTML = `${ICON_ON} = true &nbsp; ${ICON_OFF} = false &nbsp; ${ICON_DEF} = default (true) &nbsp; <span style="color:var(--accent-red);font-size:0.85em;">G</span> = gemini:skip &nbsp; <span style="color:var(--text-muted);">&#183;</span> = not in preset`;
+  legend.appendChild(el("span", {}, [ICON_ON(), " = true"]));
+  legend.appendChild(el("span", {}, [ICON_OFF(), " = false"]));
+  legend.appendChild(el("span", {}, [ICON_DEF(), " = default (true)"]));
+  legend.appendChild(el("span", {}, [el("span", { style: "color:var(--accent-red);font-size:0.85em;" }, ["G"]), " = gemini:skip"]));
+  legend.appendChild(el("span", {}, [el("span", { style: "color:var(--text-muted);" }, ["·"]), " = not in preset"]));
   matrixPanel.appendChild(legend);
   wrap.appendChild(matrixPanel);
 
@@ -5289,27 +5296,27 @@ async function viewProjectGeneral() {
   const allRulesArr = [...allRulesSet].sort();
   
   // Icons
-  const ICON_ON  = '<span style="color:var(--accent-green)" title="true">&#10003;</span>';
-  const ICON_OFF = '<span style="color:var(--accent-red)" title="false">&#10007;</span>';
-  const ICON_DEF = '<span style="color:var(--text-muted)" title="default (true)">&#8212;</span>';
-  const ICON_OVR = '<span style="color:var(--accent-yellow);font-weight:bold" title="overridden">&#9733;</span>';
-  
+  const ICON_ON  = () => el("span", { style: "color:var(--accent-green)", title: "true" }, ["✓"]);
+  const ICON_OFF = () => el("span", { style: "color:var(--accent-red)", title: "false" }, ["✗"]);
+  const ICON_DEF = () => el("span", { style: "color:var(--text-muted)", title: "default (true)" }, ["—"]);
+  const ICON_OVR = () => el("span", { style: "color:var(--accent-yellow);font-weight:bold", title: "overridden" }, ["★"]);
+
   const rulesMatrix = el("div", { class: "panel", style: "margin-top:0; border-top-left-radius:0; border-top-right-radius:0;" });
   const matrixHead = el("div", { style: "display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;" });
   matrixHead.appendChild(el("strong", {}, ["Rules Preset Matrix"]));
   const matrixHint = el("span", { style: "font-size:0.8em; color:var(--text-muted);" });
   matrixHead.appendChild(matrixHint);
   rulesMatrix.appendChild(matrixHead);
-  
+
   const matrixTable = el("table", { class: "data-table", style: "font-size:0.82em;" });
   const thead = el("thead");
-  thead.innerHTML = `<tr style="border-bottom:2px solid var(--border-color);">
-    <th style="text-align:left;padding:4px 8px;">Rule</th>
-    <th style="text-align:center;padding:4px 8px;width:40px;" title="alwaysApply &#8212; Claude/Continue load behavior">apply</th>
-    <th style="text-align:center;padding:4px 8px;width:40px;" title="embed &#8212; Opencode managed block inclusion">emb</th>
-    <th style="text-align:center;padding:4px 8px;width:30px;" title="Project override active">ovr</th>
-    <th style="text-align:center;padding:4px 8px;width:60px;" title="Effective: merged preset + override">eff</th>
-  </tr>`;
+  const gHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
+  gHeadRow.appendChild(el("th", { style: "text-align:left;padding:4px 8px;" }, ["Rule"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:40px;", title: "alwaysApply — Claude/Continue load behavior" }, ["apply"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:40px;", title: "embed — Opencode managed block inclusion" }, ["emb"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:30px;", title: "Project override active" }, ["ovr"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:60px;", title: "Effective: merged preset + override" }, ["eff"]));
+  thead.appendChild(gHeadRow);
   matrixTable.appendChild(thead);
   const tbody = el("tbody");
   matrixTable.appendChild(tbody);
@@ -5338,17 +5345,21 @@ async function viewProjectGeneral() {
       const oAA = projectOpts.alwaysApply !== undefined ? projectOpts.alwaysApply : null;
       const oEm = projectOpts.embed !== undefined ? projectOpts.embed : null;
       
-      const cellAA = pAA === null ? ICON_DEF : (pAA ? ICON_ON : ICON_OFF);
-      const cellEm = pEm === null ? ICON_DEF : (pEm ? ICON_ON : ICON_OFF);
-      const cellOv = hasOverride ? ICON_OVR : '<span style="color:var(--text-muted)">&#183;</span>';
-      const cellEf = `<span style="color:var(--accent-green)">${effAA ? '&#10003;' : '&#10007;'}</span> / <span style="color:${effEm ? 'var(--accent-green)' : 'var(--accent-red)'}">${effEm ? '&#10003;' : '&#10007;'}</span>`;
-      
+      const cellAA = pAA === null ? ICON_DEF() : (pAA ? ICON_ON() : ICON_OFF());
+      const cellEm = pEm === null ? ICON_DEF() : (pEm ? ICON_ON() : ICON_OFF());
+      const cellOv = hasOverride ? ICON_OVR() : el("span", { style: "color:var(--text-muted)" }, ["·"]);
+      const cellEf = el("span", {}, [
+        el("span", { style: "color:var(--accent-green)" }, [effAA ? "✓" : "✗"]),
+        " / ",
+        el("span", { style: `color:${effEm ? "var(--accent-green)" : "var(--accent-red)"}` }, [effEm ? "✓" : "✗"]),
+      ]);
+
       const tr = el("tr", { style: "border-bottom:1px solid var(--border-color);" + (isSuppressed ? " opacity:0.55;" : "") });
-      tr.innerHTML = `<td style="padding:3px 8px; font-family:monospace; font-size:0.9em;">${rule}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellAA}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellEm}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellOv}</td>
-        <td style="text-align:center;padding:3px 4px;font-size:0.85em;">${cellEf}</td>`;
+      tr.appendChild(el("td", { style: "padding:3px 8px; font-family:monospace; font-size:0.9em;" }, [rule]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellAA]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellEm]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellOv]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;font-size:0.85em;" }, [cellEf]));
       tbody.appendChild(tr);
     }
     matrixHint.textContent = `${activeP} | ${allRulesArr.length} rules | ${suppressedTotal} suppressed | ${overridesCount} overridden`;
