@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Fixed
+- Admin UI, Phase 1 of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`, #442): the Backups table referenced a `roles-table` CSS class that was never defined anywhere in the file (rendered fully unstyled) and its Delete button used a non-existent `"btn small"` class instead of the established `btn-danger btn-sm` convention. Found and fixed a real regression from the A2A cleanup (#436): the Orchestrator settings page still had form controls (and one leftover variable reference that would have thrown on Save) for `orchestrator.handoff.*` keys already removed from `config/project-config.schema.json`. Humanized ~25 raw kebab-case config-key labels shown directly to users across the General, Providers & Platforms, Orchestrator, and Viz & Admin pages (e.g. `provider-isolation` → "Provider isolation"), and unified `title` attribute casing on destructive/informational controls.
+
+### Fixed
 - Admin UI, Phase 0 of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`): the "Preset Matrix" heading on Rules Presets showed the literal text `&#8212;` instead of an em dash (HTML entity in a text-node position never decodes); a skill's version badge read "Recommended Tag" instead of "Recommended"; 6 "Loading…" placeholders were split between the ellipsis character and three literal dots, now unified on the ellipsis character.
 
 ### Changed

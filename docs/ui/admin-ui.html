@@ -1148,7 +1148,7 @@ class SchemaFormGenerator {
       wrap.innerHTML = "";
       tags.forEach((t, i) => {
         const tag = el("span", { class: "badge" }, [String(t)]);
-        const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "remove" }, ["×"]);
+        const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "Remove tag" }, ["×"]);
         rm.addEventListener("click", () => { tags.splice(i, 1); setter([...tags]); refresh(); });
         tag.appendChild(rm);
         wrap.appendChild(tag);
@@ -2827,7 +2827,7 @@ async function viewMcpRegistry() {
     panel.appendChild(cField);
 
     const eField = el("div", { class: "field" });
-    eField.appendChild(el("label", { class: "field-label" }, ["enabled-by-default"]));
+    eField.appendChild(el("label", { class: "field-label" }, ["Enabled by default"]));
     const eWrap = el("label", { class: "toggle" });
     const eCb = el("input", { type: "checkbox", disabled: isReadOnly });
     eCb.checked = !!srv["enabled-by-default"];
@@ -2944,7 +2944,7 @@ function tagEditor(initial, onChange) {
       const rm = el("button", {
         class: "btn btn-ghost",
         style: "padding:0 6px; font-size:11px; margin-left:4px;",
-        title: "remove",
+        title: "Remove tag",
       }, ["×"]);
       rm.addEventListener("click", () => {
         tags.splice(i, 1);
@@ -4185,7 +4185,7 @@ async function viewPipelines() {
 
     // on_error select
     const oeField = el("div", { class: "field" });
-    oeField.appendChild(el("label", { class: "field-label" }, ["on_error"]));
+    oeField.appendChild(el("label", { class: "field-label" }, ["On error"]));
     const oeSel = el("select");
     for (const opt of ["escalate_to_orchestrator", "skip", "abort", "retry"]) {
       const o = el("option", { value: opt }, [opt]);
@@ -4291,7 +4291,7 @@ async function viewPipelines() {
     node.appendChild(idInp);
 
     // mode dropdown
-    const modeSel = el("select", { title: "stage mode" });
+    const modeSel = el("select", { title: "Stage mode" });
     for (const opt of STAGE_MODES) {
       const o = el("option", { value: opt }, [opt]);
       if ((stage.mode || "sequential") === opt) o.selected = true;
@@ -4306,7 +4306,7 @@ async function viewPipelines() {
     // agent dropdown (from hierarchy). Fall back to a free-text input if the
     // hierarchy is empty so the form stays usable in degraded modes.
     if (agentNames.length) {
-      const ag = el("select", { title: "agent" });
+      const ag = el("select", { title: "Agent" });
       // Allow the currently configured agent even if it is not (yet) in the
       // hierarchy list — avoids silently losing the value.
       const known = new Set(agentNames);
@@ -4337,20 +4337,20 @@ async function viewPipelines() {
     if (stage.mode === "loop") {
       stage.loop = stage.loop || {};
       const loop = stage.loop;
-      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:6px;" }, ["loop config"]));
+      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:6px;" }, ["Loop config"]));
 
       const genWrap = el("div", { class: "field" });
-      genWrap.appendChild(el("label", { class: "field-label" }, ["generator"]));
+      genWrap.appendChild(el("label", { class: "field-label" }, ["Generator"]));
       genWrap.appendChild(agentDropdown(loop.generator, v => loop.generator = v));
       node.appendChild(genWrap);
 
       const critWrap = el("div", { class: "field" });
-      critWrap.appendChild(el("label", { class: "field-label" }, ["critic"]));
+      critWrap.appendChild(el("label", { class: "field-label" }, ["Critic"]));
       critWrap.appendChild(agentDropdown(loop.critic, v => loop.critic = v));
       node.appendChild(critWrap);
 
       const maxField = el("div", { class: "field" });
-      maxField.appendChild(el("label", { class: "field-label" }, ["max_iterations"]));
+      maxField.appendChild(el("label", { class: "field-label" }, ["Max iterations"]));
       const mi = el("input", { type: "number", min: "1", max: "20" });
       mi.value = loop.max_iterations ?? 3;
       mi.addEventListener("input", () => {
@@ -4365,21 +4365,21 @@ async function viewPipelines() {
     node.appendChild(el("div", { class: "btn-row" }, [
       el("button", {
         class: "btn btn-ghost",
-        title: "move left",
+        title: "Move left",
         onclick: () => {
           if (idx > 0) { [list[idx-1], list[idx]] = [list[idx], list[idx-1]]; refresh(); }
         },
       }, ["←"]),
       el("button", {
         class: "btn btn-ghost",
-        title: "move right",
+        title: "Move right",
         onclick: () => {
           if (idx < list.length-1) { [list[idx+1], list[idx]] = [list[idx], list[idx+1]]; refresh(); }
         },
       }, ["→"]),
       el("button", {
         class: "btn btn-danger",
-        title: "delete stage",
+        title: "Delete stage",
         onclick: () => { list.splice(idx, 1); refresh(); },
       }, ["×"]),
     ]));
@@ -5244,7 +5244,7 @@ function tagEditorField(label, values, onChange, helpText) {
     wrap.innerHTML = "";
     tags.forEach((t, i) => {
       const tag = el("span", { class: "badge" }, [String(t)]);
-      const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "remove" }, ["×"]);
+      const rm = el("button", { class: "btn btn-ghost", style: "padding:0 6px; font-size:11px;", title: "Remove tag" }, ["×"]);
       rm.addEventListener("click", () => { tags.splice(i, 1); onChange([...tags]); refresh(); });
       tag.appendChild(rm);
       wrap.appendChild(tag);
@@ -5316,10 +5316,10 @@ async function viewProjectGeneral() {
   wrap.appendChild(status);
 
   const panel = el("div", { class: "panel" });
-  panel.appendChild(labeledTextField("project.name", project.name, v => project.name = v));
-  panel.appendChild(labeledTextField("project.prefix", project.prefix, v => project.prefix = v));
-  panel.appendChild(labeledTextField("project.short", project.short, v => project.short = v));
-  panel.appendChild(dropdownField("dod-preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
+  panel.appendChild(labeledTextField("Project name", project.name, v => project.name = v));
+  panel.appendChild(labeledTextField("Project prefix", project.prefix, v => project.prefix = v));
+  panel.appendChild(labeledTextField("Project short name", project.short, v => project.short = v));
+  panel.appendChild(dropdownField("DoD preset", dodOptions, top["dod-preset"], v => top["dod-preset"] = v));
   // --- Rules Preset Matrix ---
   const presetsData = (rulesPresetsResp && rulesPresetsResp.presets) ? rulesPresetsResp.presets : {};
   const projectRules = (data.rules && typeof data.rules === "object") ? clone(data.rules) : {};
@@ -5429,16 +5429,16 @@ async function viewProjectGeneral() {
   
   refreshMatrix();
 
-  panel.appendChild(dropdownField("rules-preset", rulesOptions, top["rules-preset"], v => { top["rules-preset"] = v; refreshMatrix(); }));
-  panel.appendChild(dropdownField("speech-mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
-  
+  panel.appendChild(dropdownField("Rules preset", rulesOptions, top["rules-preset"], v => { top["rules-preset"] = v; refreshMatrix(); }));
+  panel.appendChild(dropdownField("Speech mode", SPEECH_MODES, top["speech-mode"], v => top["speech-mode"] = v));
+
   // Tier Preset logic
   const onTierPresetChange = (v) => {
       top["tier-preset"] = v;
       // Triggers live preview update if needed
   };
-  panel.appendChild(dropdownField("tier-preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange, TIER_PRESET_LABELS));
-  panel.appendChild(checkboxField("se-focus", top["se-focus"], v => { top["se-focus"] = v; }));
+  panel.appendChild(dropdownField("Tier preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange, TIER_PRESET_LABELS));
+  panel.appendChild(checkboxField("SE focus", top["se-focus"], v => { top["se-focus"] = v; }));
 
   wrap.appendChild(panel);
   wrap.appendChild(rulesMatrix);
@@ -5578,7 +5578,7 @@ async function viewProjectProviders() {
     cb.addEventListener("change", () => { cb.checked ? selProviders.add(p.name) : selProviders.delete(p.name); });
     line.appendChild(cb);
     line.appendChild(el("span", { class: "mono" }, [p.display_name || p.name]));
-    if (!p.has_model_tiers) line.appendChild(el("span", { class: "muted", title: "manages models centrally" }, ["(central models)"]));
+    if (!p.has_model_tiers) line.appendChild(el("span", { class: "muted", title: "Manages models centrally" }, ["(central models)"]));
     provPanel.appendChild(line);
   }
   wrap.appendChild(provPanel);
@@ -5616,7 +5616,7 @@ async function viewProjectProviders() {
   const isolationOptions = ["", "disabled"];
   const isolationLabels  = { "": "enabled (default)", "disabled": "disabled" };
   optPanel.appendChild(dropdownField(
-    "provider-isolation",
+    "Provider isolation",
     isolationOptions,
     typeof isolation === "string" ? isolation : "",
     v => { isolation = v; isolationTouched = true; },
@@ -5624,7 +5624,7 @@ async function viewProjectProviders() {
   ));
 
   // Provider Options — per-provider collapsible KV editors
-  optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["provider-options"]));
+  optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["Provider options"]));
 
   // Determine provider names: union of providers from API + keys already in providerOptions
   const providerNames = new Set([
@@ -5956,29 +5956,29 @@ async function viewProjectOrchestrator() {
   // ── General ──────────────────────────────────────────────────────────────
   const genPanel = el("div", { class: "panel" });
   genPanel.appendChild(el("h2", {}, ["General"]));
-  genPanel.appendChild(checkboxField("enabled", orch.enabled, v => { orch.enabled = v; }));
+  genPanel.appendChild(checkboxField("Enabled", orch.enabled, v => { orch.enabled = v; }));
   // Orchestrator mode enum — replaces the deprecated `strict` checkbox.
   // Takes precedence over legacy enabled/strict booleans in sync.py.
   // Framework default (config/project-config.schema.json): "strict".
   const orchModeValue = orch.mode
     || (orch.enabled === false ? "main-chat" : (orch.strict !== false ? "strict" : "advisory"));
   const modeField = el("div", { class: "field" });
-  modeField.appendChild(el("label", { class: "field-label" }, ["mode"]));
+  modeField.appendChild(el("label", { class: "field-label" }, ["Mode"]));
   modeField.appendChild(selectField(["strict", "advisory", "main-chat"], orchModeValue, v => { orch.mode = v; }));
   modeField.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:2px;" },
     ["Orchestrator mode. Replaces the deprecated strict/enabled checkboxes. main-chat = no orchestrator subagent, main chat routes. Default: strict."]));
   genPanel.appendChild(modeField);
-  genPanel.appendChild(checkboxField("direct-dispatch-enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
-  genPanel.appendChild(checkboxField("checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
+  genPanel.appendChild(checkboxField("Direct dispatch enabled", orch["direct-dispatch-enabled"], v => { orch["direct-dispatch-enabled"] = v; }));
+  genPanel.appendChild(checkboxField("Checkpointing", orch.checkpointing, v => { orch.checkpointing = v; }));
   wrap.appendChild(genPanel);
 
   // ── Native Extensions ────────────────────────────────────────────────────
   const nativeExt = (orch["native-extensions"] && typeof orch["native-extensions"] === "object") ? orch["native-extensions"] : {};
   const nePanel = el("div", { class: "panel" });
   nePanel.appendChild(el("h2", {}, ["Native Extensions"]));
-  nePanel.appendChild(checkboxField("enabled", nativeExt.enabled !== false, v => { nativeExt.enabled = v; orch["native-extensions"] = nativeExt; }));
+  nePanel.appendChild(checkboxField("Enabled", nativeExt.enabled !== false, v => { nativeExt.enabled = v; orch["native-extensions"] = nativeExt; }));
   nePanel.appendChild(tagEditorField(
-    "whitelist",
+    "Whitelist",
     nativeExt.whitelist,
     v => { nativeExt.whitelist = v; orch["native-extensions"] = nativeExt; },
     "Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement. Leer = kein Filter."
@@ -5989,18 +5989,23 @@ async function viewProjectOrchestrator() {
   const uf = (orch["unknown-fallback"] && typeof orch["unknown-fallback"] === "object") ? orch["unknown-fallback"] : {};
   const ufPanel = el("div", { class: "panel" });
   ufPanel.appendChild(el("h2", {}, ["Unknown Fallback"]));
-  ufPanel.appendChild(checkboxField("meta-feedback", uf["meta-feedback"], v => { uf["meta-feedback"] = v; orch["unknown-fallback"] = uf; }));
-  ufPanel.appendChild(checkboxField("main-chat", uf["main-chat"], v => { uf["main-chat"] = v; orch["unknown-fallback"] = uf; }));
-  ufPanel.appendChild(checkboxField("ask-user", uf["ask-user"], v => { uf["ask-user"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("Meta feedback", uf["meta-feedback"], v => { uf["meta-feedback"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("Main chat", uf["main-chat"], v => { uf["main-chat"] = v; orch["unknown-fallback"] = uf; }));
+  ufPanel.appendChild(checkboxField("Ask user", uf["ask-user"], v => { uf["ask-user"] = v; orch["unknown-fallback"] = uf; }));
   wrap.appendChild(ufPanel);
 
   // ── Handoff ───────────────────────────────────────────────────────────────
   const hf = (orch.handoff && typeof orch.handoff === "object") ? orch.handoff : {};
   const hPanel = el("div", { class: "panel" });
   hPanel.appendChild(el("h2", {}, ["Handoff"]));
-  // protocol — dropdown
+  // protocol — dropdown. This is the only field this panel still writes:
+  // validate-before-delegate/supersession-tracking/strict-validation/
+  // compact-mode/human_approval_required/max_retries/protocol_routing were
+  // removed here to match config/project-config.schema.json's handoff block
+  // (additionalProperties: false) — none of them had a real consumer in
+  // code or agent-prompt text (see docs/concepts/a2a-best-practice-analysis-2026-08.md).
   const protRow = el("div", { class: "field-row" });
-  protRow.appendChild(el("label", { class: "field-label" }, ["protocol"]));
+  protRow.appendChild(el("label", { class: "field-label" }, ["Protocol"]));
   const protSel = el("select", { class: "select" });
   for (const [val, label] of [["a2a-v1", "a2a-v1 (default)"], ["none", "none (disabled)"]]) {
     const o = el("option", { value: val }, [label]);
@@ -6013,40 +6018,6 @@ async function viewProjectOrchestrator() {
   });
   protRow.appendChild(protSel);
   hPanel.appendChild(protRow);
-  hPanel.appendChild(checkboxField("validate-before-delegate", hf["validate-before-delegate"], v => { hf["validate-before-delegate"] = v; orch.handoff = hf; }));
-  hPanel.appendChild(checkboxField("supersession-tracking", hf["supersession-tracking"], v => { hf["supersession-tracking"] = v; orch.handoff = hf; }));
-  hPanel.appendChild(checkboxField("strict-validation", hf["strict-validation"], v => { hf["strict-validation"] = v; orch.handoff = hf; }));
-  hPanel.appendChild(checkboxField("compact-mode", hf["compact-mode"], v => { hf["compact-mode"] = v; orch.handoff = hf; }));
-  hPanel.appendChild(checkboxField("human_approval_required", hf["human_approval_required"], v => { hf["human_approval_required"] = v; orch.handoff = hf; }));
-
-  // max_retries — number input
-  const retriesRow = el("div", { class: "field-row" });
-  retriesRow.appendChild(el("label", { class: "field-label" }, ["max_retries"]));
-  const retriesInput = el("input", { type: "number", min: "0", style: "width:80px;" });
-  retriesInput.value = hf.max_retries != null ? String(hf.max_retries) : "";
-  retriesInput.addEventListener("change", () => {
-    const v = parseInt(retriesInput.value, 10);
-    hf.max_retries = isNaN(v) ? undefined : v;
-    orch.handoff = hf;
-  });
-  retriesRow.appendChild(retriesInput);
-  hPanel.appendChild(retriesRow);
-
-  // protocol_routing — dropdown
-  const prRow = el("div", { class: "field-row" });
-  prRow.appendChild(el("label", { class: "field-label" }, ["protocol_routing"]));
-  const prSel = el("select", { class: "select" });
-  for (const opt of ["", "static", "dynamic"]) {
-    const o = el("option", { value: opt }, [opt || "(not set)"]);
-    if ((hf.protocol_routing || "") === opt) o.setAttribute("selected", "");
-    prSel.appendChild(o);
-  }
-  prSel.addEventListener("change", () => {
-    hf.protocol_routing = prSel.value || undefined;
-    orch.handoff = hf;
-  });
-  prRow.appendChild(prSel);
-  hPanel.appendChild(prRow);
 
   wrap.appendChild(hPanel);
 
@@ -6060,7 +6031,7 @@ async function viewProjectOrchestrator() {
 
   // max_depth — number input
   const mdRow = el("div", { class: "field-row" });
-  mdRow.appendChild(el("label", { class: "field-label" }, ["max_depth"]));
+  mdRow.appendChild(el("label", { class: "field-label" }, ["Max depth"]));
   const mdInput = el("input", { type: "number", min: "1", max: "50", style: "width:80px;" });
   mdInput.value = del.max_depth != null ? String(del.max_depth) : "10";
   mdInput.addEventListener("change", () => {
@@ -6111,55 +6082,11 @@ async function viewProjectOrchestrator() {
   }
   wrap.appendChild(povPanel);
 
-  // ── Token Budget ──────────────────────────────────────────────────────────
-  const tb = (hf["token-budget"] && typeof hf["token-budget"] === "object") ? hf["token-budget"] : {};
-  const tbPanel = el("div", { class: "panel" });
-  tbPanel.appendChild(el("h2", {}, ["Token Budget"]));
-  tbPanel.appendChild(checkboxField("enabled", tb.enabled, v => { tb.enabled = v; hf["token-budget"] = tb; orch.handoff = hf; }));
-
-  // session_budget — number input
-  const sbRow = el("div", { class: "field-row" });
-  sbRow.appendChild(el("label", { class: "field-label" }, ["session_budget"]));
-  const sbInput = el("input", { type: "number", min: "0", style: "width:120px;" });
-  sbInput.value = tb.session_budget != null ? String(tb.session_budget) : "";
-  sbInput.addEventListener("change", () => {
-    const v = parseInt(sbInput.value, 10);
-    tb.session_budget = isNaN(v) ? undefined : v;
-    hf["token-budget"] = tb; orch.handoff = hf;
-  });
-  sbRow.appendChild(sbInput);
-  tbPanel.appendChild(sbRow);
-
-  // max_overhead_pct — number input
-  const pctRow = el("div", { class: "field-row" });
-  pctRow.appendChild(el("label", { class: "field-label" }, ["max_overhead_pct"]));
-  const pctInput = el("input", { type: "number", min: "0", max: "100", style: "width:80px;" });
-  pctInput.value = tb.max_overhead_pct != null ? String(tb.max_overhead_pct) : "";
-  pctInput.addEventListener("change", () => {
-    const v = parseInt(pctInput.value, 10);
-    tb.max_overhead_pct = isNaN(v) ? undefined : v;
-    hf["token-budget"] = tb; orch.handoff = hf;
-  });
-  pctRow.appendChild(pctInput);
-  tbPanel.appendChild(pctRow);
-
-  // on_exceed — dropdown
-  const oeRow = el("div", { class: "field-row" });
-  oeRow.appendChild(el("label", { class: "field-label" }, ["on_exceed"]));
-  const oeSel = el("select", { class: "select" });
-  for (const opt of ["", "compact", "warn"]) {
-    const o = el("option", { value: opt }, [opt || "(not set)"]);
-    if ((tb.on_exceed || "") === opt) o.setAttribute("selected", "");
-    oeSel.appendChild(o);
-  }
-  oeSel.addEventListener("change", () => {
-    tb.on_exceed = oeSel.value || undefined;
-    hf["token-budget"] = tb; orch.handoff = hf;
-  });
-  oeRow.appendChild(oeSel);
-  tbPanel.appendChild(oeRow);
-
-  wrap.appendChild(tbPanel);
+  // Token Budget panel removed: the orchestrator.handoff token-budget
+  // sub-object had no consumer in code or agent-prompt text and was dropped
+  // from config/project-config.schema.json
+  // (additionalProperties: false) — see
+  // docs/concepts/a2a-best-practice-analysis-2026-08.md.
 
   // ── Save ─────────────────────────────────────────────────────────────────
   wrap.appendChild(el("div", { class: "btn-row" }, [
@@ -6169,7 +6096,6 @@ async function viewProjectOrchestrator() {
         orch["unknown-fallback"] = uf;
       }
       if (Object.keys(hf).length > 0 || orch.handoff !== undefined) {
-        hf["token-budget"] = tb;
         orch.handoff = hf;
       }
       if (Object.keys(del).length > 0 || orch.delegation !== undefined) {
@@ -6218,32 +6144,32 @@ async function viewProjectVizAdmin() {
   };
 
   const vizPanel = el("div", { class: "panel" });
-  vizPanel.appendChild(el("h2", {}, ["viz"]));
-  vizPanel.appendChild(checkboxField("enabled", viz.enabled, v => viz.enabled = v));
-  vizPanel.appendChild(labeledTextField("mode", viz.mode, v => viz.mode = v));
-  vizPanel.appendChild(labeledTextField("event_log", viz.event_log, v => viz.event_log = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["server (Viz dashboard)"]));
-  vizPanel.appendChild(numField("server.port",         viz.server.port,         v => viz.server.port = v));
-  vizPanel.appendChild(numField("server.timeout_sec",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["mcp (SSE server)"]));
-  vizPanel.appendChild(numField("mcp.port", viz.mcp.port, v => viz.mcp.port = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["report"]));
-  vizPanel.appendChild(numField("report.retention_days",      viz.report.retention_days,      v => viz.report.retention_days = v));
-  vizPanel.appendChild(numField("report.session_timeout_min", viz.report.session_timeout_min, v => viz.report.session_timeout_min = v));
+  vizPanel.appendChild(el("h2", {}, ["Viz"]));
+  vizPanel.appendChild(checkboxField("Enabled", viz.enabled, v => viz.enabled = v));
+  vizPanel.appendChild(labeledTextField("Mode", viz.mode, v => viz.mode = v));
+  vizPanel.appendChild(labeledTextField("Event log", viz.event_log, v => viz.event_log = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["Server (Viz dashboard)"]));
+  vizPanel.appendChild(numField("Server port",         viz.server.port,         v => viz.server.port = v));
+  vizPanel.appendChild(numField("Server timeout (sec)",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["MCP (SSE server)"]));
+  vizPanel.appendChild(numField("MCP port", viz.mcp.port, v => viz.mcp.port = v));
+  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["Report"]));
+  vizPanel.appendChild(numField("Retention (days)",      viz.report.retention_days,      v => viz.report.retention_days = v));
+  vizPanel.appendChild(numField("Session timeout (min)", viz.report.session_timeout_min, v => viz.report.session_timeout_min = v));
   wrap.appendChild(vizPanel);
 
   const adminPanel = el("div", { class: "panel" });
-  adminPanel.appendChild(el("h2", {}, ["admin-ui"]));
-  adminPanel.appendChild(checkboxField("enabled", admin.enabled, v => admin.enabled = v));
+  adminPanel.appendChild(el("h2", {}, ["Admin UI"]));
+  adminPanel.appendChild(checkboxField("Enabled", admin.enabled, v => admin.enabled = v));
   const portField = el("div", { class: "field" });
-  portField.appendChild(el("label", { class: "field-label" }, ["port"]));
+  portField.appendChild(el("label", { class: "field-label" }, ["Port"]));
   const portInp = el("input", { type: "number" });
   portInp.value = admin.port ?? "";
   portInp.addEventListener("input", () => { admin.port = portInp.value === "" ? null : Number(portInp.value); });
   portField.appendChild(portInp);
   adminPanel.appendChild(portField);
-  adminPanel.appendChild(checkboxField("auto-sync-on-save", admin["auto-sync-on-save"], v => admin["auto-sync-on-save"] = v));
-  adminPanel.appendChild(checkboxField("watch-config", admin["watch-config"], v => admin["watch-config"] = v));
+  adminPanel.appendChild(checkboxField("Auto-sync on save", admin["auto-sync-on-save"], v => admin["auto-sync-on-save"] = v));
+  adminPanel.appendChild(checkboxField("Watch config", admin["watch-config"], v => admin["watch-config"] = v));
   wrap.appendChild(adminPanel);
 
   wrap.appendChild(el("div", { class: "btn-row" }, [
@@ -6597,7 +6523,7 @@ async function viewBackups() {
       tableWrap.appendChild(el("p", {}, ["No backups found."]));
       return;
     }
-    const t = el("table", { class: "roles-table" }, [
+    const t = el("table", { class: "data" }, [
       el("thead", {}, [
         el("tr", {}, [
           el("th", {}, ["Date"]),
@@ -6606,13 +6532,13 @@ async function viewBackups() {
           el("th", {}, ["Actions"]),
         ])
       ]),
-      el("tbody", {}, data.archives.map(a => 
+      el("tbody", {}, data.archives.map(a =>
         el("tr", {}, [
           el("td", {}, [a.created.substring(0,19).replace("T"," ")]),
           el("td", {}, [a.label || "-"]),
           el("td", {}, [a.size_mb + " MB"]),
           el("td", {}, [
-            el("button", { class: "btn small", onclick: async () => {
+            el("button", { class: "btn btn-sm", onclick: async () => {
               if(!confirm("Restore this backup?")) return;
               try {
                 await api.post("/api/backups/restore", {archive_name: a.name, force: true});
@@ -6621,7 +6547,7 @@ async function viewBackups() {
               } catch(e) { alert("Error: " + e); }
             }}, ["Restore"]),
             " ",
-            el("button", { class: "btn small", onclick: async () => {
+            el("button", { class: "btn btn-danger btn-sm", onclick: async () => {
               if(!confirm("Delete this backup?")) return;
               try {
                 await api.delete("/api/backups/" + a.name);
@@ -6640,7 +6566,7 @@ async function viewBackups() {
       const label = prompt("Optional label for backup:");
       if (label === null) return;
       try {
-        status.textContent = "Creating backup...";
+        status.textContent = "Creating backup…";
         await api.post("/api/backups/create", { label });
         load();
       } catch(e) { alert("Error: " + e); load(); }
@@ -6720,7 +6646,7 @@ async function viewProviderDeactivation() {
     const deactBtn = el("button", { class: "btn btn-danger", style: "font-size:11px;", disabled: !p.directory_exists }, ["Deactivate"]);
     deactBtn.addEventListener("click", async () => {
       deactBtn.disabled = true;
-      deactBtn.textContent = "Working...";
+      deactBtn.textContent = "Working…";
       try {
         await api.post("/api/provider-deactivation/deactivate", { providers: [name] });
         router.resolve(); // refresh
@@ -6731,7 +6657,7 @@ async function viewProviderDeactivation() {
     const actBtn = el("button", { class: "btn", style: "font-size:11px;", disabled: p.backups.length === 0 || p.directory_exists }, ["Activate"]);
     actBtn.addEventListener("click", async () => {
       actBtn.disabled = true;
-      actBtn.textContent = "Working...";
+      actBtn.textContent = "Working…";
       try {
         await api.post("/api/provider-deactivation/activate", { providers: [name] });
         router.resolve(); // refresh
@@ -7576,7 +7502,7 @@ async function viewModels() {
     const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py (or GitHub override)"]);
     refreshBtn.onclick = async () => {
       refreshBtn.disabled = true;
-      refreshBtn.textContent = "Updating...";
+      refreshBtn.textContent = "Updating…";
       try {
         const r = await api.post("/api/models/update");
         if (r && r.success) { toast("Models updated", "success"); await loadRegistry(); render(); }
@@ -7983,7 +7909,7 @@ async function viewModels() {
         const impBtn = el("button", { class: "btn", style: "font-size:0.8em;padding:2px 8px;" }, ["Import"]);
         impBtn.onclick = async () => {
           impBtn.disabled = true;
-          impBtn.textContent = "...";
+          impBtn.textContent = "…";
           try {
             const r = await api.post("/api/models-dev/import", { provider: m._providerId, model_id: m.id, name: m.name, input_cost: m.cost.input, output_cost: m.cost.output, context: (m.limit || {}).context });
             if (r && r.success !== false) { toast("Imported — run sync.py", "success"); await loadRegistry(); render(); }
@@ -8334,7 +8260,7 @@ async function viewModelsLegacy() {
     const ids = Array.from(tableWrap.querySelectorAll(".model-cb:checked")).map(cb => cb.value);
     if (!ids.length) return;
     if (!confirm(`Exclude ${ids.length} models?`)) return;
-    deleteBtn.disabled = true; deleteBtn.textContent = "Deleting...";
+    deleteBtn.disabled = true; deleteBtn.textContent = "Deleting…";
     try {
       const r = await api.post("/api/models/exclude", { ids });
       if (r.success) { toast("Models excluded", "success"); await loadData(); }
@@ -8344,7 +8270,7 @@ async function viewModelsLegacy() {
   };
 
   saveBtn.onclick = async () => {
-    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    saveBtn.disabled = true; saveBtn.textContent = "Saving…";
     try {
       const updates = [];
       tableWrap.querySelectorAll("tr[data-provider]").forEach(tr => {
@@ -8504,7 +8430,7 @@ async function viewProviderTiers() {
   });
 
   saveBtn.onclick = async () => {
-    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    saveBtn.disabled = true; saveBtn.textContent = "Saving…";
     try {
       const newProvidersData = JSON.parse(JSON.stringify(aiProvidersData));
       const targetMap = newProvidersData.providers ? newProvidersData.providers : newProvidersData;
@@ -8593,7 +8519,7 @@ async function viewTierPresets() {
   const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
   saveBtn.onclick = async () => {
     saveBtn.disabled = true;
-    saveBtn.textContent = "Saving...";
+    saveBtn.textContent = "Saving…";
     try {
       const newPresetsData = JSON.parse(JSON.stringify(tierPresetsData));
       // Collect global (all-providers) tier values
