@@ -32,6 +32,15 @@
   --tier-required: #f85149;
   --tier-recommended: #58a6ff;
   --tier-optional: #6e7681;
+  /* Spacing scale (Task 19 of the admin-ui consistency plan) -- 4px grid.
+     Odd audit values not on the grid (6/10/14/18/20px) round to the
+     nearest step, ties rounding up: 6->8, 10->12, 14->16, 18->16, 20->24. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
 }
 
 * { box-sizing: border-box; }
@@ -79,7 +88,7 @@ a:hover { text-decoration: underline; }
 }
 #sidebar .brand .mode-badge {
   display: inline-block;
-  margin-top: 6px;
+  margin-top: var(--space-2);
   padding: 2px 8px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -102,7 +111,7 @@ a:hover { text-decoration: underline; }
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   padding: 8px 18px;
   cursor: pointer;
   color: var(--text-secondary);
@@ -129,7 +138,7 @@ a:hover { text-decoration: underline; }
  * ===================================================================== */
 h1, h2, h3, h4 { margin: 0 0 12px; }
 h1 { font-size: 22px; font-weight: 600; }
-h2 { font-size: 17px; font-weight: 600; color: var(--text-primary); margin-top: 24px; }
+h2 { font-size: 17px; font-weight: 600; color: var(--text-primary); margin-top: var(--space-5); }
 h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 p { color: var(--text-secondary); margin: 0 0 12px; }
 code, pre { font-family: var(--font-mono); }
@@ -153,18 +162,18 @@ pre {
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 18px 20px;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 .panel .panel-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .panel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .metric {
@@ -174,7 +183,7 @@ pre {
   padding: 14px 16px;
 }
 .metric .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.metric .value { font-size: 20px; margin-top: 6px; font-weight: 500; }
+.metric .value { font-size: 20px; margin-top: var(--space-2); font-weight: 500; }
 .metric .value.mono { font-family: var(--font-mono); font-size: 14px; }
 
 /* =====================================================================
@@ -183,7 +192,7 @@ pre {
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 6px 12px;
   font-size: 13px;
   font-family: inherit;
@@ -201,12 +210,12 @@ pre {
 .btn-danger:hover { background: rgba(248,81,73,0.25); }
 .btn-ghost { background: transparent; border-color: var(--border-color); color: var(--text-secondary); }
 .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.btn-row { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 16px;
+  margin-top: var(--space-4);
   font-size: 13px;
 }
 .data-table th,
@@ -224,18 +233,18 @@ pre {
 }
 .data-table td .badge {
   font-size: 10px;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 /* =====================================================================
  * Forms
  * ===================================================================== */
-.field { margin-bottom: 12px; }
+.field { margin-bottom: var(--space-3); }
 .field-label {
   display: block;
   font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   font-weight: 500;
 }
 .field-label .required { color: var(--accent-red); margin-left: 3px; }
@@ -244,8 +253,8 @@ pre {
 .field-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 .field-row .field-label { margin-bottom: 0; min-width: 160px; }
 select.select, .select {
@@ -279,7 +288,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px var(--accent-blue-soft);
 }
 textarea { resize: vertical; min-height: 70px; font-family: var(--font-mono); font-size: 12px; }
-input[type="checkbox"] { accent-color: var(--accent-blue); margin-right: 6px; }
+input[type="checkbox"] { accent-color: var(--accent-blue); margin-right: var(--space-2); }
 
 .toggle {
   position: relative;
@@ -359,7 +368,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   position: fixed;
   top: 20px; right: 20px;
   z-index: 9999;
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: var(--space-2);
   max-width: 360px;
 }
 .toast {
@@ -404,8 +413,8 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   border-bottom: 1px solid var(--border-color);
   display: flex; justify-content: space-between; align-items: center;
 }
-.modal-body { padding: 18px; overflow-y: auto; flex: 1; }
-.modal-footer { padding: 12px 18px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; justify-content: flex-end; }
+.modal-body { padding: var(--space-4); overflow-y: auto; flex: 1; }
+.modal-footer { padding: 12px 18px; border-top: 1px solid var(--border-color); display: flex; gap: var(--space-2); justify-content: flex-end; }
 .modal-close { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; }
 
 /* =====================================================================
@@ -414,14 +423,14 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .role-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 .role-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: var(--space-3);
   cursor: pointer;
   position: relative;
   transition: all var(--transition);
@@ -429,7 +438,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .role-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
 .role-card.active { border-color: var(--accent-green); background: rgba(63,185,80,0.06); }
 .role-card .name { font-size: 13px; font-weight: 600; }
-.role-card .meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.role-card .meta { font-size: 11px; color: var(--text-muted); margin-top: var(--space-1); }
 .role-card .tier-bar {
   position: absolute; top: 0; left: 0; bottom: 0;
   width: 3px; border-radius: 3px 0 0 3px;
@@ -456,9 +465,9 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 }
 .canvas-toolbar {
   position: absolute; top: 10px; right: 10px;
-  display: flex; gap: 6px;
+  display: flex; gap: var(--space-2);
   background: var(--bg-tertiary);
-  padding: 4px;
+  padding: var(--space-1);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
 }
@@ -467,14 +476,14 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
  * Pipeline swimlane (Phase 4)
  * ===================================================================== */
 .swimlane {
-  display: flex; gap: 10px;
+  display: flex; gap: var(--space-3);
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: var(--space-4);
   overflow-x: auto;
   min-height: 140px;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 .swimlane .stage {
   flex: 0 0 auto;
@@ -482,7 +491,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: var(--space-3);
   position: relative;
 }
 .swimlane .stage::after {
@@ -496,7 +505,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .swimlane .stage:last-child::after { content: ""; }
 .swimlane .stage .stage-name { font-weight: 600; font-size: 13px; }
 .swimlane .stage .stage-agent { font-size: 11px; color: var(--accent-blue); margin-top: 2px; font-family: var(--font-mono); }
-.swimlane .stage .stage-task { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.swimlane .stage .stage-task { font-size: 11px; color: var(--text-muted); margin-top: var(--space-2); }
 .swimlane .stage-add {
   align-self: center;
   border: 2px dashed var(--border-color);
@@ -522,7 +531,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   font-family: var(--font-mono);
   padding: 1px 6px;
   border-radius: 3px;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   text-transform: uppercase;
 }
 .swimlane .stage .level-label.level-l0 { background: rgba(88,166,255,0.2); color: var(--accent-blue); }
@@ -541,13 +550,13 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 /* SE depth slider container */
 .se-depth-config {
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
   padding: 8px 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .se-depth-config label {
   font-size: 12px;
@@ -572,7 +581,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .split-pane {
   display: grid;
   grid-template-columns: 220px 1fr;
-  gap: 14px;
+  gap: var(--space-4);
   min-height: 560px;
 }
 .template-list {
@@ -624,7 +633,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
  * Misc
  * ===================================================================== */
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
-.flex-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.flex-row { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
 .muted { color: var(--text-muted); font-size: 12px; }
 .error-box {
   background: rgba(248,81,73,0.08);
@@ -632,7 +641,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   border-radius: var(--radius);
   padding: 10px 14px;
   color: var(--accent-red);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .success-box {
   background: rgba(63,185,80,0.08);
@@ -640,7 +649,7 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   border-radius: var(--radius);
   padding: 10px 14px;
   color: var(--accent-green);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .empty {
   text-align: center;
@@ -656,9 +665,9 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .quick-filter-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .quick-filter-strip .badge {
   cursor: pointer;
@@ -1005,7 +1014,7 @@ function applyReadOnlyLock(hash, container) {
     banner.style.backgroundColor = "rgba(210, 153, 34, 0.05)";
     banner.style.color = "var(--accent-yellow)";
     banner.style.border = "1px solid rgba(210, 153, 34, 0.2)";
-    banner.innerHTML = "<strong style='display:flex;align-items:center;gap:6px;'><span style='font-size:1.2em;'>🔒</span> Framework defaults (Read-Only)</strong><div style='margin-top:6px;opacity:0.9;'>These settings are defined by the agent-meta framework. In this project context, they can only be viewed.</div>";
+    banner.innerHTML = "<strong style='display:flex;align-items:center;gap:var(--space-2);'><span style='font-size:1.2em;'>🔒</span> Framework defaults (Read-Only)</strong><div style='margin-top:var(--space-2);opacity:0.9;'>These settings are defined by the agent-meta framework. In this project context, they can only be viewed.</div>";
     container.insertBefore(banner, container.firstChild);
     
     // Disable inputs and buttons
@@ -1158,7 +1167,7 @@ class SchemaFormGenerator {
     return sel;
   }
   _renderArray(schema, value, setter) {
-    const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px;" });
+    const wrap = el("div", { class: "tag-editor flex-row", style: "gap:var(--space-2);" });
     const tags = Array.isArray(value) ? [...value] : [];
     const itemType = schema.items?.type;
     const refresh = () => {
@@ -1558,14 +1567,14 @@ async function viewDashboard() {
 
       wrap.appendChild(el("div", { class: "panel" }, [
         el("h2", {}, ["Sub-servers"]),
-        el("table", { class: "data", style: "margin-top:8px;" }, [
+        el("table", { class: "data", style: "margin-top:var(--space-2);" }, [
           el("thead", {}, [el("tr", {}, ["Server", "Status / URL"].map(h => el("th", {}, [h])))]),
           el("tbody", {}, [
             el("tr", {}, [el("td", { class: "mono" }, ["Viz dashboard"]), el("td", {}, vizLine)]),
             el("tr", {}, [el("td", { class: "mono" }, ["MCP SSE server"]), el("td", {}, mcpLine)]),
           ]),
         ]),
-        el("p", { class: "muted", style: "font-size:12px; margin-top:8px;" }, [
+        el("p", { class: "muted", style: "font-size:12px; margin-top:var(--space-2);" }, [
           "Start/stop: ",
           el("code", {}, ["python scripts/admin-server.py"]),
           " (unified) or ",
@@ -1713,14 +1722,14 @@ async function viewRoleDefaults() {
   };
 
   const mkSelect = (key, opts) => {
-    const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+    const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
     s.appendChild(el("option", { value: "" }, ["All"]));
     opts.filter(o => o !== "").forEach(o => s.appendChild(el("option", { value: o }, [o])));
     s.addEventListener("change", e => { filterState[key] = e.target.value; applyFilters(); });
     return s;
   };
   const mkText = (key) => {
-    const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+    const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
     inp.addEventListener("input", e => { filterState[key] = e.target.value; applyFilters(); });
     return inp;
   };
@@ -1825,11 +1834,11 @@ async function viewAIProviders() {
   }
 
   // — Project Tier Overrides section —
-  const overridePanel = el("div", { class: "panel", style: "margin-top: 24px;" });
+  const overridePanel = el("div", { class: "panel", style: "margin-top: var(--space-5);" });
   overridePanel.appendChild(el("h2", {}, ["Project Tier Overrides"]));
   const overrideDesc = el("p", { class: "muted" });
   overrideDesc.textContent = "Per-provider, per-tier overrides stored in .meta-config/project.yaml. These take priority over the tier mappings above.";
-  const overrideLink = el("a", { href: "#/project/provider-tier-overrides", style: "margin-left: 8px;" });
+  const overrideLink = el("a", { href: "#/project/provider-tier-overrides", style: "margin-left: var(--space-2);" });
   overrideLink.textContent = "→ Open full editor";
   overrideDesc.appendChild(overrideLink);
   overridePanel.appendChild(overrideDesc);
@@ -1915,7 +1924,7 @@ async function viewRoles() {
     const shortDesc = fullDesc.length > 80 ? fullDesc.slice(0, 77) + "…" : fullDesc;
     const descNode = el("div", {
       class: "meta",
-      style: "font-size:11px; color:var(--text-secondary); margin-top:4px; line-height:1.35;",
+      style: "font-size:11px; color:var(--text-secondary); margin-top:var(--space-1); line-height:1.35;",
       title: fullDesc,
     });
     // textContent ensures the description is rendered as plain text — never
@@ -2012,7 +2021,7 @@ async function viewSkillsRegistry() {
   projData["external-skills"] = projData["external-skills"] || {};
   const projSkills = projData["external-skills"];
 
-  const fwTitle = el("h2", { style: "margin-top: 24px;" }, ["Framework Defaults (Global)"]);
+  const fwTitle = el("h2", { style: "margin-top: var(--space-5);" }, ["Framework Defaults (Global)"]);
   wrap.appendChild(fwTitle);
 
   const status = el("div", { class: "muted" }, [
@@ -2136,7 +2145,7 @@ async function viewSkillsRegistry() {
   wrap.appendChild(skillTable);
 
   // ----------------------------------- Project Overrides
-  const projTitle = el("h2", { style: "margin-top: 32px;" }, ["Project Overrides (.meta-config/project.yaml)"]);
+  const projTitle = el("h2", { style: "margin-top: var(--space-6);" }, ["Project Overrides (.meta-config/project.yaml)"]);
   wrap.appendChild(projTitle);
 
   const projStatus = el("div", { class: "muted" }, [`${Object.keys(projSkills).length} project overrides`]);
@@ -2163,7 +2172,7 @@ async function viewSkillsRegistry() {
     el("button", { class: "btn btn-primary", onclick: saveProj }, ["Save Project Overrides"])
   ]));
 
-  const projTable = el("table", { class: "data", style: "margin-top: 16px;" });
+  const projTable = el("table", { class: "data", style: "margin-top: var(--space-4);" });
   projTable.appendChild(el("thead", {}, [
     el("tr", {}, ["Skill Name", "Project Enabled", "Pinned Commit Override", ""].map(h => el("th", {}, [h]))),
   ]));
@@ -2199,7 +2208,7 @@ async function viewSkillsRegistry() {
     pEnWrap.appendChild(pEnCb); pEnWrap.appendChild(el("span", { class: "slider" }));
     const enTd = el("td", {}, [pEnWrap]);
     if (pSkill.enabled === undefined) {
-      enTd.appendChild(el("span", { class: "muted", style: "margin-left:8px;font-size:0.85em;" }, ["(Framework Default)"]));
+      enTd.appendChild(el("span", { class: "muted", style: "margin-left:var(--space-2);font-size:0.85em;" }, ["(Framework Default)"]));
     }
     tr.appendChild(enTd);
 
@@ -2220,7 +2229,7 @@ async function viewSkillsRegistry() {
       pCommitInp.value = "";
       pEnCb.checked = fwEnabled;
       enTd.querySelectorAll("span.muted").forEach(e => e.remove());
-      enTd.appendChild(el("span", { class: "muted", style: "margin-left:8px;font-size:0.85em;" }, ["(Framework Default)"]));
+      enTd.appendChild(el("span", { class: "muted", style: "margin-left:var(--space-2);font-size:0.85em;" }, ["(Framework Default)"]));
       markProjDirty();
     });
     tr.appendChild(el("td", {}, [resetBtn]));
@@ -2245,17 +2254,17 @@ async function viewSkillsRegistry() {
 function renderOverridePanel(opts) {
   const { id, badgeLabel, isFramework, isOverride, isActive, description, secrets, onToggleActive, buildReadonly, buildEdit, onReset } = opts;
 
-  const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
+  const p = el("div", { class: "panel", style: "margin-bottom:var(--space-3);" });
   if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
 
   const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
-  const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  const titleBox = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
   titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
   if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, [badgeLabel]));
   if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
   header.appendChild(titleBox);
 
-  const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  const toggleBox = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
   const activeToggle = makeToggle(isActive, onToggleActive);
   // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
   const btns = activeToggle.element.querySelectorAll("div");
@@ -2267,10 +2276,10 @@ function renderOverridePanel(opts) {
 
   // --- HINTS / INFO BOX ---
   if (description || (secrets && secrets.length > 0)) {
-      const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
+      const infoBox = el("div", { style: "margin-top: var(--space-3); padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
 
       if (description) {
-          infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
+          infoBox.appendChild(el("div", { style: "margin-bottom: var(--space-1);" }, [
               el("strong", { style: "color: var(--text);" }, ["Description: "]),
               description
           ]));
@@ -2282,7 +2291,7 @@ function renderOverridePanel(opts) {
               "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
           ]);
           secrets.forEach(sec => {
-              const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
+              const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: var(--space-1); color: var(--accent-yellow);" }, [sec]);
               secWrap.appendChild(code);
           });
           infoBox.appendChild(secWrap);
@@ -2292,9 +2301,9 @@ function renderOverridePanel(opts) {
   }
   // ------------------------
 
-  const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
-  const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
-  const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
+  const detailsWrap = el("div", { style: "margin-top: var(--space-3); display: flex; gap: var(--space-3); flex-direction: column;" });
+  const isEditing = el("div", { style: "display: none; flex-direction: column; gap: var(--space-3); margin-top: var(--space-2);" });
+  const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-1); font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: var(--space-2); background: var(--bg-body); border-radius: 4px;" });
 
   buildReadonly(isReadonly);
   buildEdit(isEditing);
@@ -2302,7 +2311,7 @@ function renderOverridePanel(opts) {
   detailsWrap.appendChild(isReadonly);
   detailsWrap.appendChild(isEditing);
 
-  const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
+  const actionBox = el("div", { style: "margin-top: var(--space-3); display:flex; gap: var(--space-2);" });
   const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
   customizeBtn.onclick = () => {
       isReadonly.style.display = "none";
@@ -2336,14 +2345,14 @@ function renderOverridePanel(opts) {
 // renderDictEditor did.
 const renderDictEditor = (title, dictData, onChange, opts) => {
     const allowBool = !!(opts && opts.allowBool);
-    const w = el("div", { style: "margin-top: 8px;" });
+    const w = el("div", { style: "margin-top: var(--space-2);" });
     w.appendChild(el("label", {}, [title]));
-    const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
+    const list = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2);" });
 
     const renderRows = () => {
         list.innerHTML = "";
         Object.entries(dictData).forEach(([k, v]) => {
-            const row = el("div", { style: "display: flex; gap: 4px;" });
+            const row = el("div", { style: "display: flex; gap: var(--space-1);" });
             const inpK = el("input", { class: "form-control", value: k, style: "flex: 1;", placeholder: "Key" });
             const isBool = v === true || v === false;
             const inpV = el("input", { class: "form-control", value: isBool ? String(v) : v, style: "flex: 2;", placeholder: "Value" });
@@ -2451,14 +2460,14 @@ async function viewProjectMcpOverrides() {
 
   // UI Helpers
   const renderArrayEditor = (title, arrData, onChange) => {
-      const w = el("div", { style: "margin-top: 8px;" });
+      const w = el("div", { style: "margin-top: var(--space-2);" });
       w.appendChild(el("label", {}, [title]));
-      const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
+      const list = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2);" });
       
       const renderRows = () => {
           list.innerHTML = "";
           arrData.forEach((v, idx) => {
-              const row = el("div", { style: "display: flex; gap: 4px;" });
+              const row = el("div", { style: "display: flex; gap: var(--space-1);" });
               const inpV = el("input", { class: "form-control", value: v, style: "flex: 1;", placeholder: "Argument" });
               const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
               
@@ -2508,22 +2517,22 @@ async function viewProjectMcpOverrides() {
           markDirty();
       },
       buildReadonly: (isReadonly) => {
-        isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
+        isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:var(--space-1);"}, [`Type: ${conn.type || "unknown"}`]));
         if (conn.type === "stdio") {
             isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
             if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
             if (conn.env) {
-               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
+               isReadonly.appendChild(el("div", {style:"margin-top:var(--space-1)"}, ["Environment:"]));
                Object.entries(conn.env).forEach(([k,v]) => {
-                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
+                  isReadonly.appendChild(el("div", {style:"padding-left:var(--space-2);"}, [`${k}=${v}`]));
                });
             }
         } else if (conn.type === "sse") {
             isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
             if (conn.headers) {
-               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
+               isReadonly.appendChild(el("div", {style:"margin-top:var(--space-1)"}, ["Headers:"]));
                Object.entries(conn.headers).forEach(([k,v]) => {
-                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
+                  isReadonly.appendChild(el("div", {style:"padding-left:var(--space-2);"}, [`${k}: ${v}`]));
                });
             }
         }
@@ -2576,7 +2585,7 @@ async function viewProjectMcpOverrides() {
     });
   };
 
-  const projListContainer = el("div", { style: "margin-bottom:24px" });
+  const projListContainer = el("div", { style: "margin-bottom:var(--space-5)" });
   
   const allIds = new Set([...Object.keys(fwServers), ...Object.keys(projOverrides)]);
   
@@ -2606,7 +2615,7 @@ async function viewProjectMcpOverrides() {
   };
   wrap.appendChild(addBtn);
 
-  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:20px; display:block; width: 100%" }, ["Save Project MCP Configuration"]);
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Project MCP Configuration"]);
   saveBtn.onclick = async () => {
     try {
       await api.put("/api/config/project/section", { section: "mcp-servers", data: Array.from(activeServers) });
@@ -2684,7 +2693,7 @@ async function viewProjectSkillsOverrides() {
       },
       buildReadonly: (isReadonly) => {
         if (merged.name) {
-            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:4px;" }, [`${merged.name}`]));
+            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:var(--space-1);" }, [`${merged.name}`]));
         }
         if (merged.role) {
             isReadonly.appendChild(el("div", {}, [`Role: ${merged.role}`]));
@@ -2692,7 +2701,7 @@ async function viewProjectSkillsOverrides() {
         isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
 
         // Display version with Recommended badge if it matches
-        const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
+        const verWrap = el("div", {style:"display:flex; align-items:center; gap: var(--space-2);"});
         verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
         if (currentVersion === recommendedVersion && isFramework) {
             verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
@@ -2720,7 +2729,7 @@ async function viewProjectSkillsOverrides() {
     });
   };
 
-  const projListContainer = el("div", { style: "margin-bottom:24px" });
+  const projListContainer = el("div", { style: "margin-bottom:var(--space-5)" });
   
   const allIds = new Set([...Object.keys(fwSkills), ...Object.keys(projOverrides)]);
   
@@ -2750,7 +2759,7 @@ async function viewProjectSkillsOverrides() {
   };
   wrap.appendChild(addBtn);
 
-  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:20px; display:block; width: 100%" }, ["Save Project Skills Configuration"]);
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Project Skills Configuration"]);
   saveBtn.onclick = async () => {
     try {
       // Convert Set to dict format: { "skill-name": { "enabled": true/false }, ... }
@@ -2789,10 +2798,10 @@ async function viewMcpRegistry() {
   const fwServers = fwData["mcp-servers"];
   const projServers = projData["mcp-servers"];
 
-  const fwTitle = el("h2", { style: "margin-top: 24px;" }, ["Framework Defaults"]);
+  const fwTitle = el("h2", { style: "margin-top: var(--space-5);" }, ["Framework Defaults"]);
   wrap.appendChild(fwTitle);
   
-  const fwListContainer = el("div", { style: "display: flex; flex-direction: column; gap: 8px; margin-top: 16px; opacity: 0.8;" });
+  const fwListContainer = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); opacity: 0.8;" });
   wrap.appendChild(fwListContainer);
 
   const renderSrvPanel = (id, srv, isReadOnly, onChange) => {
@@ -2800,8 +2809,8 @@ async function viewMcpRegistry() {
     const panel = el("details", { class: "panel", style: isReadOnly ? "pointer-events: none; opacity: 0.8;" : "" });
     panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
       id,
-      isReadOnly ? el("span", { title: "Read-Only", style: "font-size: 0.85em; margin-left: 8px;" }, ["🔒"]) : "",
-      el("span", { class: "muted", style: "margin-left:8px; font-weight:400;" }, [srv.description || ""]),
+      isReadOnly ? el("span", { title: "Read-Only", style: "font-size: 0.85em; margin-left: var(--space-2);" }, ["🔒"]) : "",
+      el("span", { class: "muted", style: "margin-left:var(--space-2); font-weight:400;" }, [srv.description || ""]),
     ]));
 
     const dField = el("div", { class: "field" });
@@ -2875,7 +2884,7 @@ async function viewMcpRegistry() {
     fwListContainer.appendChild(renderSrvPanel(id, srv, true, () => {}));
   }
 
-  const projTitle = el("h2", { style: "margin-top: 32px;" }, ["Project Overrides"]);
+  const projTitle = el("h2", { style: "margin-top: var(--space-6);" }, ["Project Overrides"]);
   wrap.appendChild(projTitle);
 
   const status = el("div", { class: "muted" }, [`${Object.keys(projServers).length} project servers`]);
@@ -2910,7 +2919,7 @@ async function viewMcpRegistry() {
   ]);
   wrap.appendChild(actions);
 
-  const projListContainer = el("div", { style: "display: flex; flex-direction: column; gap: 8px; margin-top: 16px;" });
+  const projListContainer = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4);" });
   wrap.appendChild(projListContainer);
 
   const renderProjList = () => {
@@ -2922,7 +2931,7 @@ async function viewMcpRegistry() {
     for (const [id, srv] of Object.entries(projServers)) {
       const panel = renderSrvPanel(id, srv, false, markDirty);
       // Add delete button
-      const delBtn = el("button", { class: "btn", style: "color: var(--accent-red); margin-top: 8px;", onclick: () => {
+      const delBtn = el("button", { class: "btn", style: "color: var(--accent-red); margin-top: var(--space-2);", onclick: () => {
         confirmDestructive(`Delete override '${id}'?`, () => {
           delete projServers[id];
           markDirty();
@@ -2941,9 +2950,9 @@ async function viewMcpRegistry() {
 
 /* Reusable tag editor — comma- or Enter-separated entries; safe DOM build. */
 function tagEditor(initial, onChange) {
-  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px; flex-wrap:wrap;" });
+  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:var(--space-2); flex-wrap:wrap;" });
   const tags = Array.isArray(initial) ? [...initial] : [];
-  const tagsContainer = el("div", { class: "flex-row", style: "gap:4px; flex-wrap:wrap;" });
+  const tagsContainer = el("div", { class: "flex-row", style: "gap:var(--space-1); flex-wrap:wrap;" });
   const inp = el("input", { type: "text", placeholder: "add tag, then Enter or comma", style: "min-width:180px;" });
 
   const render = () => {
@@ -2953,7 +2962,7 @@ function tagEditor(initial, onChange) {
       tag.appendChild(document.createTextNode(String(t) + " "));
       const rm = el("button", {
         class: "btn btn-ghost",
-        style: "padding:0 6px; font-size:11px; margin-left:4px;",
+        style: "padding:0 6px; font-size:11px; margin-left:var(--space-1);",
         title: "Remove tag",
       }, ["×"]);
       rm.addEventListener("click", () => {
@@ -3172,7 +3181,7 @@ async function viewRulesPresets() {
 
   const matrixPanel = el("details", { class: "panel", open: true });
   matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix — all rules vs. all presets"]));
-  const matrixTable = el("table", { class: "data-table", style: "font-size:0.8em; margin-top:8px;" });
+  const matrixTable = el("table", { class: "data-table", style: "font-size:0.8em; margin-top:var(--space-2);" });
   const mthead = el("thead");
   const mHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
   mHeadRow.appendChild(el("th", { style: "text-align:left;padding:4px 8px;min-width:140px;" }, ["Rule"]));
@@ -3205,7 +3214,7 @@ async function viewRulesPresets() {
   matrixPanel.appendChild(matrixTable);
 
   // Legend
-  const legend = el("div", { style: "margin-top:8px; font-size:0.78em; color:var(--text-muted); display:flex; gap:16px; flex-wrap:wrap;" });
+  const legend = el("div", { style: "margin-top:var(--space-2); font-size:0.78em; color:var(--text-muted); display:flex; gap:var(--space-4); flex-wrap:wrap;" });
   legend.appendChild(el("span", {}, [ICON_ON(), " = true"]));
   legend.appendChild(el("span", {}, [ICON_OFF(), " = false"]));
   legend.appendChild(el("span", {}, [ICON_DEF(), " = default (true)"]));
@@ -3244,7 +3253,7 @@ async function viewRulesPresets() {
     const rulesHere = new Set(Object.keys(preset));
 
     // Add-rule row
-    const addRow = el("div", { class: "field-row", style: "margin-bottom:12px;" });
+    const addRow = el("div", { class: "field-row", style: "margin-bottom:var(--space-3);" });
     const addSel = el("select");
     addSel.appendChild(el("option", { value: "" }, ["— add rule —"]));
     for (const r of rules) {
@@ -3273,15 +3282,15 @@ async function viewRulesPresets() {
       rulesWrap.replaceChildren();
       for (const [rule, opts] of Object.entries(preset)) {
         if (!opts || typeof opts !== "object") continue;
-        const row = el("div", { class: "field-row", style: "align-items:center; gap:12px; margin-bottom:6px;" });
+        const row = el("div", { class: "field-row", style: "align-items:center; gap:var(--space-3); margin-bottom:var(--space-2);" });
         row.appendChild(el("span", { style: "min-width:160px; font-family:monospace;" }, [rule]));
 
         const alwaysCb = el("input", { type: "checkbox" });
         alwaysCb.checked = !!opts.alwaysApply;
         alwaysCb.addEventListener("change", () => { opts.alwaysApply = alwaysCb.checked; markDirty(); });
-        const l1 = el("label", { class: "toggle", style: "margin-right:8px;" });
+        const l1 = el("label", { class: "toggle", style: "margin-right:var(--space-2);" });
         l1.appendChild(alwaysCb); l1.appendChild(el("span", { class: "slider" }));
-        const f1 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        const f1 = el("div", { style: "display:flex; align-items:center; gap:var(--space-1);" });
         f1.appendChild(l1);
         f1.appendChild(el("span", { style: "font-size:0.85em;" }, ["alwaysApply"]));
         row.appendChild(f1);
@@ -3289,9 +3298,9 @@ async function viewRulesPresets() {
         const embedCb = el("input", { type: "checkbox" });
         embedCb.checked = !!opts.embed;
         embedCb.addEventListener("change", () => { opts.embed = embedCb.checked; markDirty(); });
-        const l2 = el("label", { class: "toggle", style: "margin-right:8px;" });
+        const l2 = el("label", { class: "toggle", style: "margin-right:var(--space-2);" });
         l2.appendChild(embedCb); l2.appendChild(el("span", { class: "slider" }));
-        const f2 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        const f2 = el("div", { style: "display:flex; align-items:center; gap:var(--space-1);" });
         f2.appendChild(l2);
         f2.appendChild(el("span", { style: "font-size:0.85em;" }, ["embed"]));
         row.appendChild(f2);
@@ -3307,7 +3316,7 @@ async function viewRulesPresets() {
           if (gemSel.value) { opts.gemini = gemSel.value; } else { delete opts.gemini; }
           markDirty();
         });
-        const f3 = el("div", { style: "display:flex; align-items:center; gap:4px;" });
+        const f3 = el("div", { style: "display:flex; align-items:center; gap:var(--space-1);" });
         f3.appendChild(gemSel);
         f3.appendChild(el("span", { style: "font-size:0.85em;" }, ["gemini"]));
         row.appendChild(f3);
@@ -3494,10 +3503,10 @@ async function viewProjectRulesOverrides() {
     const overridden = rule in projectOverrides;
     panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
       rule,
-      overridden ? el("span", { class: "badge warn", style: "margin-left:8px;" }, ["overridden"]) : "",
+      overridden ? el("span", { class: "badge warn", style: "margin-left:var(--space-2);" }, ["overridden"]) : "",
     ]));
 
-    const row = el("div", { class: "field-row", style: "align-items:center; gap:16px; flex-wrap:wrap;" });
+    const row = el("div", { class: "field-row", style: "align-items:center; gap:var(--space-4); flex-wrap:wrap;" });
 
     // alwaysApply
     const presetAlways = presetCfg.alwaysApply !== undefined ? String(presetCfg.alwaysApply) : "true (default)";
@@ -3522,7 +3531,7 @@ async function viewProjectRulesOverrides() {
       }
       updateStatus();
     });
-    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [alwaysLabel, alwaysSel]));
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:var(--space-1);" }, [alwaysLabel, alwaysSel]));
 
     // embed
     const presetEmbed = presetCfg.embed !== undefined ? String(presetCfg.embed) : "true (default)";
@@ -3547,7 +3556,7 @@ async function viewProjectRulesOverrides() {
       }
       updateStatus();
     });
-    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [embedLabel, embedSel]));
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:var(--space-1);" }, [embedLabel, embedSel]));
 
     // gemini
     const presetGemini = presetCfg.gemini || "";
@@ -3572,7 +3581,7 @@ async function viewProjectRulesOverrides() {
       }
       updateStatus();
     });
-    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:4px;" }, [gemLabel, gemSel]));
+    row.appendChild(el("div", { style: "display:flex; flex-direction:column; gap:var(--space-1);" }, [gemLabel, gemSel]));
 
     panel.appendChild(row);
     wrap.appendChild(panel);
@@ -3585,7 +3594,7 @@ async function viewProjectRulesOverrides() {
   // Add custom rule
   const addPanel = el("details", { class: "panel" });
   addPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["+ Add custom rule override"]));
-  const addRow = el("div", { class: "field-row", style: "gap:8px; align-items:center;" });
+  const addRow = el("div", { class: "field-row", style: "gap:var(--space-2); align-items:center;" });
   const nameInp = el("input", { type: "text", placeholder: "rule name (e.g. my-rule)" });
   const addBtn = el("button", { class: "btn" }, ["Add"]);
   addBtn.addEventListener("click", () => {
@@ -4167,7 +4176,7 @@ async function viewPipelines() {
     const block = el("div", { class: "pipeline-block panel" });
     const enabled = pipeline.enabled !== false;  // default: true
     const enabledLabel = el("span", { style: "font-size:10px; color: var(--text-muted); font-family: var(--font-mono);" }, [enabled ? "ENABLED" : "DISABLED"]);
-    const toggleWrap = el("label", { class: "toggle", style: "margin-right:8px;" });
+    const toggleWrap = el("label", { class: "toggle", style: "margin-right:var(--space-2);" });
     const toggleCb = el("input", { type: "checkbox" });
     toggleCb.checked = enabled;
     toggleCb.addEventListener("change", () => {
@@ -4177,7 +4186,7 @@ async function viewPipelines() {
     toggleWrap.appendChild(toggleCb);
     toggleWrap.appendChild(el("span", { class: "slider" }));
     const header = el("div", { class: "panel-title" }, [
-      el("div", { style: "display:flex; align-items:center; gap:8px;" }, [
+      el("div", { style: "display:flex; align-items:center; gap:var(--space-2);" }, [
         toggleWrap,
         enabledLabel,
       ]),
@@ -4356,7 +4365,7 @@ async function viewPipelines() {
     if (stage.mode === "loop") {
       stage.loop = stage.loop || {};
       const loop = stage.loop;
-      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:6px;" }, ["Loop config"]));
+      node.appendChild(el("div", { class: "muted", style: "font-size:11px; margin-top:var(--space-2);" }, ["Loop config"]));
 
       const genWrap = el("div", { class: "field" });
       genWrap.appendChild(el("label", { class: "field-label" }, ["Generator"]));
@@ -4494,7 +4503,7 @@ async function viewSync() {
   wrap.appendChild(el("p", {}, ["Run sync.py and view its output in real time."]));
 
   // Status card — reflects the most recent sync run and current sync state.
-  const statusEl = el("div", { style: "margin-bottom: 16px;" });
+  const statusEl = el("div", { style: "margin-bottom: var(--space-4);" });
   wrap.appendChild(statusEl);
 
   const loadStatus = async () => {
@@ -4512,11 +4521,11 @@ async function viewSync() {
 
     const card = el("div", {
       class: "metric",
-      style: "display: block; padding: 16px;",
+      style: "display: block; padding: var(--space-4);",
     });
-    card.appendChild(el("div", { class: "label", style: "margin-bottom: 10px;" }, ["Sync status"]));
+    card.appendChild(el("div", { class: "label", style: "margin-bottom: var(--space-3);" }, ["Sync status"]));
 
-    const row = el("div", { style: "display: flex; flex-wrap: wrap; gap: 8px; align-items: center;" });
+    const row = el("div", { style: "display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;" });
     row.appendChild(el("span", { class: "value mono", style: "font-size: 13px; color: var(--text-secondary);" }, [`Last run: ${ts}`]));
     row.appendChild(el("span", { class: `badge ${codeCls}` }, [`exit ${codeVal}`]));
     row.appendChild(el("span", {
@@ -4530,7 +4539,7 @@ async function viewSync() {
     if (s.last_run_summary) {
       card.appendChild(el("div", {
         class: "mono",
-        style: "margin-top: 10px; font-size: 12px; color: var(--text-muted);",
+        style: "margin-top: var(--space-3); font-size: 12px; color: var(--text-muted);",
       }, [s.last_run_summary]));
     }
     statusEl.appendChild(card);
@@ -4540,8 +4549,8 @@ async function viewSync() {
   const consoleEl = el("div", { class: "console" }, ["(idle)"]);
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
   const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
-  const statsWrap = el("div", { style: "margin-top: 16px; display: none;" });
-  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: 12px;" }, [runBtn, dryBtn]));
+  const statsWrap = el("div", { style: "margin-top: var(--space-4); display: none;" });
+  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: var(--space-3);" }, [runBtn, dryBtn]));
   wrap.appendChild(consoleEl);
   wrap.appendChild(statsWrap);
 
@@ -4587,7 +4596,7 @@ async function viewSync() {
       const warnings = parts[2] || "0 warnings";
 
       statsWrap.style.display = "block";
-      const cards = el("div", { class: "panel-grid", style: "margin-bottom: 12px;" });
+      const cards = el("div", { class: "panel-grid", style: "margin-bottom: var(--space-3);" });
 
       const makeCard = (label, valStr) => {
         const numMatch = valStr.match(/\d+/);
@@ -4606,9 +4615,9 @@ async function viewSync() {
       statsWrap.appendChild(cards);
 
       if (debugLines.length > 0) {
-        const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px;" });
+        const details = el("details", { style: "background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: var(--space-3);" });
         const summary = el("summary", { style: "cursor: pointer; font-weight: 600; color: var(--text-secondary); outline: none;" }, ["Debug Output (Model Substitutions)"]);
-        const pre = el("pre", { style: "margin-top: 10px; background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
+        const pre = el("pre", { style: "margin-top: var(--space-3); background: var(--bg-input); border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;" }, [debugLines.join("\n")]);
         details.appendChild(summary);
         details.appendChild(pre);
         statsWrap.appendChild(details);
@@ -4818,8 +4827,8 @@ async function viewReflectionPairs() {
            errPanel.appendChild(el("div", { class: "panel-title" }, [
              el("h2", { style: "margin:0; color:var(--accent-red);" }, ["Execution Error"])
            ]));
-           errPanel.appendChild(el("pre", { style: "margin:10px; font-family:monospace; color:var(--accent-red);" }, [res.error]));
-           if (res.output) errPanel.appendChild(el("pre", { style: "margin:10px; font-family:monospace; color:var(--text-muted);" }, [res.output]));
+           errPanel.appendChild(el("pre", { style: "margin:var(--space-3); font-family:monospace; color:var(--accent-red);" }, [res.error]));
+           if (res.output) errPanel.appendChild(el("pre", { style: "margin:var(--space-3); font-family:monospace; color:var(--text-muted);" }, [res.output]));
            resultBox.appendChild(errPanel);
            if (!res.findings || res.findings.length === 0) return;
         }
@@ -5197,7 +5206,7 @@ function dropdownField(label, options, value, onChange, labels, help) {
 
 function checkboxField(label, value, onChange, help) {
   const field = el("div", { class: "field" });
-  const wrapL = el("label", { class: "toggle", style: "margin-right:8px;" });
+  const wrapL = el("label", { class: "toggle", style: "margin-right:var(--space-2);" });
   const cb = el("input", { type: "checkbox" });
   cb.checked = !!value;
   cb.addEventListener("change", () => onChange(cb.checked));
@@ -5211,7 +5220,7 @@ function checkboxField(label, value, onChange, help) {
 function tagEditorField(label, values, onChange, helpText) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
-  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:6px; flex-wrap:wrap;" });
+  const wrap = el("div", { class: "tag-editor flex-row", style: "gap:var(--space-2); flex-wrap:wrap;" });
   const tags = Array.isArray(values) ? [...values] : [];
   const refresh = () => {
     wrap.innerHTML = "";
@@ -5310,7 +5319,7 @@ async function viewProjectGeneral() {
   const ICON_OVR = () => el("span", { style: "color:var(--accent-yellow);font-weight:bold", title: "overridden" }, ["★"]);
 
   const rulesMatrix = el("div", { class: "panel", style: "margin-top:0; border-top-left-radius:0; border-top-right-radius:0;" });
-  const matrixHead = el("div", { style: "display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;" });
+  const matrixHead = el("div", { style: "display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-2);" });
   matrixHead.appendChild(el("strong", {}, ["Rules Preset Matrix"]));
   const matrixHint = el("span", { style: "font-size:0.8em; color:var(--text-muted);" });
   matrixHead.appendChild(matrixHint);
@@ -5432,12 +5441,12 @@ async function viewProjectGeneral() {
     ]);
     
     const editor = el("textarea", { 
-        style: "width: 100%; height: 200px; margin-top: 10px; font-family: monospace;",
+        style: "width: 100%; height: 200px; margin-top: var(--space-3); font-family: monospace;",
         disabled: !isEnabled
     });
     editor.value = spResp.text === "False" || spResp.text === "false" ? "" : (spResp.text || "");
     
-    const toggleBtn = el("button", { class: "btn", style: "margin-right: 8px;" }, [isEnabled ? "Disable Protection" : "Enable Protection"]);
+    const toggleBtn = el("button", { class: "btn", style: "margin-right: var(--space-2);" }, [isEnabled ? "Disable Protection" : "Enable Protection"]);
     toggleBtn.onclick = async () => {
       try {
         await api.put("/api/submodule-protection", {
@@ -5451,7 +5460,7 @@ async function viewProjectGeneral() {
       }
     };
     
-    const saveBtn = el("button", { class: "btn btn-primary", style: "margin-right: 8px;" }, ["Save Project Override"]);
+    const saveBtn = el("button", { class: "btn btn-primary", style: "margin-right: var(--space-2);" }, ["Save Project Override"]);
     saveBtn.disabled = !isEnabled;
     saveBtn.onclick = async () => {
       try {
@@ -5481,13 +5490,13 @@ async function viewProjectGeneral() {
       }, { confirmLabel: "Restore" });
     };
     
-    const actionsRow = el("div", { style: "margin-top: 10px; display: flex; align-items: center;" }, [
+    const actionsRow = el("div", { style: "margin-top: var(--space-3); display: flex; align-items: center;" }, [
         toggleBtn,
         saveBtn,
         ...(isOverride ? [restoreBtn] : [])
     ]);
 
-    const spPanel = el("div", { class: "panel", style: "margin-top: 16px;" }, [
+    const spPanel = el("div", { class: "panel", style: "margin-top: var(--space-4);" }, [
       spTitle,
       el("p", { class: "muted" }, ["Enforces submodule boundaries: no direct edits to .agent-meta, no gitmodules mutation, no source code scaffolding."]),
       editor,
@@ -5496,7 +5505,7 @@ async function viewProjectGeneral() {
     wrap.appendChild(spPanel);
   }
 
-  wrap.appendChild(el("div", { class: "panel", style: "margin-top: 16px;" }, [
+  wrap.appendChild(el("div", { class: "panel", style: "margin-top: var(--space-4);" }, [
     el("h2", {}, ["Global Framework Setup"]),
     el("p", { class: "muted" }, ["Configure provider model tiers, tier mappings and other global settings."]),
     el("a", { href: "#/config/ai-providers", class: "btn" }, ["Open ai-providers.yaml →"]),
@@ -5550,7 +5559,7 @@ async function viewProjectProviders() {
   provPanel.appendChild(el("h2", {}, ["AI providers"]));
   if (!providers.length) provPanel.appendChild(el("div", { class: "empty" }, ["No providers available (super-admin config not found)."]));
   for (const p of providers) {
-    const line = el("label", { class: "flex-row", style: "gap:8px; margin-bottom:6px; cursor:pointer;" });
+    const line = el("label", { class: "flex-row", style: "gap:var(--space-2); margin-bottom:var(--space-2); cursor:pointer;" });
     const cb = el("input", { type: "checkbox" });
     cb.checked = selProviders.has(p.name);
     cb.addEventListener("change", () => { cb.checked ? selProviders.add(p.name) : selProviders.delete(p.name); });
@@ -5568,7 +5577,7 @@ async function viewProjectProviders() {
   const selectablePlatforms = platforms.filter(pl => pl.name !== "generic");
   if (!selectablePlatforms.length) platPanel.appendChild(el("div", { class: "empty" }, ["No platforms available."]));
   for (const pl of selectablePlatforms) {
-    const line = el("label", { class: "flex-row", style: "gap:8px; margin-bottom:6px; cursor:pointer;" });
+    const line = el("label", { class: "flex-row", style: "gap:var(--space-2); margin-bottom:var(--space-2); cursor:pointer;" });
     const cb = el("input", { type: "checkbox" });
     cb.checked = selPlatforms.has(pl.name);
     cb.addEventListener("change", () => { cb.checked ? selPlatforms.add(pl.name) : selPlatforms.delete(pl.name); });
@@ -5576,7 +5585,7 @@ async function viewProjectProviders() {
     line.appendChild(el("span", { class: "mono" }, [pl.name]));
     platPanel.appendChild(line);
   }
-  platPanel.appendChild(el("div", { class: "field-help", style: "margin-top:10px;" }, [
+  platPanel.appendChild(el("div", { class: "field-help", style: "margin-top:var(--space-3);" }, [
     "Multiple platform layers can be active simultaneously. Agents from ",
     el("code", {}, ["agents/2-platform/<platform>-*.md"]),
     " override generic agents. The ",
@@ -5602,7 +5611,7 @@ async function viewProjectProviders() {
   ));
 
   // Provider Options — per-provider collapsible KV editors
-  optPanel.appendChild(el("h3", { style: "margin-top:16px; margin-bottom:8px; font-size:13px; color:var(--text-secondary);" }, ["Provider options"]));
+  optPanel.appendChild(el("h3", { style: "margin-top:var(--space-4); margin-bottom:var(--space-2); font-size:13px; color:var(--text-secondary);" }, ["Provider options"]));
 
   // Determine provider names: union of providers from API + keys already in providerOptions
   const providerNames = new Set([
@@ -5621,7 +5630,7 @@ async function viewProjectProviders() {
     const provOpts = providerOptions[provName];
 
     // Collapsible section per provider
-    const section = el("div", { style: "margin-bottom:12px; border:1px solid var(--border-color); border-radius:var(--radius);" });
+    const section = el("div", { style: "margin-bottom:var(--space-3); border:1px solid var(--border-color); border-radius:var(--radius);" });
 
     const header = el("div", {
       style: "display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; background:var(--bg-tertiary); border-radius:var(--radius);",
@@ -5704,7 +5713,7 @@ async function viewProjectRoles() {
   // Two-column layout: Available ↔ Active
   const grid = el("div", {
     class: "panel",
-    style: "display:grid; grid-template-columns:1fr 1fr; gap:16px;",
+    style: "display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4);",
   });
 
   const availPanel  = el("div");
@@ -5712,8 +5721,8 @@ async function viewProjectRoles() {
   availPanel.appendChild(el("h2", { style: "margin-top:0;" }, ["Available"]));
   activePanel.appendChild(el("h2", { style: "margin-top:0;" }, ["Active"]));
 
-  const availList  = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:8px;" });
-  const activeList = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:8px;" });
+  const availList  = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:var(--space-2);" });
+  const activeList = el("div", { class: "role-list", style: "min-height:120px; border:1px dashed var(--border-color); border-radius:var(--radius); padding:var(--space-2);" });
   availPanel.appendChild(availList);
   activePanel.appendChild(activeList);
   grid.appendChild(availPanel);
@@ -5727,7 +5736,7 @@ async function viewProjectRoles() {
       class: "role-card",
       draggable: "true",
       "data-role": name,
-      style: "display:flex; align-items:flex-start; gap:8px; padding:8px 10px; margin-bottom:6px; border:1px solid var(--border-color); border-radius:var(--radius); background:var(--bg-secondary); cursor:grab;",
+      style: "display:flex; align-items:flex-start; gap:var(--space-2); padding:8px 10px; margin-bottom:var(--space-2); border:1px solid var(--border-color); border-radius:var(--radius); background:var(--bg-secondary); cursor:grab;",
     });
 
     // Move button: → adds to active, ← removes from active
@@ -5748,7 +5757,7 @@ async function viewProjectRoles() {
 
     const text = el("div", { style: "flex:1; min-width:0;" });
     const nameLine = el("div", { class: "mono", style: "font-weight:600;" }, [name]);
-    if (!knownSet.has(name)) nameLine.appendChild(el("span", { class: "muted", style: "margin-left:6px; font-weight:normal;" }, [" (unknown)"]));
+    if (!knownSet.has(name)) nameLine.appendChild(el("span", { class: "muted", style: "margin-left:var(--space-2); font-weight:normal;" }, [" (unknown)"]));
     text.appendChild(nameLine);
     if (desc) text.appendChild(el("div", { class: "muted", style: "font-size:12px; margin-top:2px; white-space:normal; word-break:break-word;" }, [desc]));
 
@@ -5802,13 +5811,13 @@ async function viewProjectRoles() {
     const availableNames = roleNames.filter(n => !activeSet.has(n));
 
     if (!availableNames.length) {
-      availList.appendChild(el("div", { class: "empty muted", style: "padding:8px;" }, ["All known roles are active."]));
+      availList.appendChild(el("div", { class: "empty muted", style: "padding:var(--space-2);" }, ["All known roles are active."]));
     } else {
       for (const n of availableNames) availList.appendChild(buildCard(n, "available"));
     }
 
     if (!active.length) {
-      activeList.appendChild(el("div", { class: "empty", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
+      activeList.appendChild(el("div", { class: "empty", style: "padding:var(--space-2);" }, ["No roles selected — drag from the left or use →."]));
     } else {
       for (const n of active) activeList.appendChild(buildCard(n, "active"));
     }
@@ -5817,7 +5826,7 @@ async function viewProjectRoles() {
   };
   render();
 
-  wrap.appendChild(el("div", { class: "field-help", style: "margin-top:10px;" }, [
+  wrap.appendChild(el("div", { class: "field-help", style: "margin-top:var(--space-3);" }, [
     "Drag cards between columns or use the arrow buttons. Active roles are saved in their current order to ",
     el("code", {}, ["project.yaml"]),
     " under the ",
@@ -5931,7 +5940,7 @@ async function viewProjectOrchestrator() {
     orch.delegation = del;
   });
   mdRow.appendChild(mdInput);
-  mdRow.appendChild(el("span", { class: "muted", style: "margin-left:8px;" }, ["Default: 10, Range: 1–50"]));
+  mdRow.appendChild(el("span", { class: "muted", style: "margin-left:var(--space-2);" }, ["Default: 10, Range: 1–50"]));
   delPanel.appendChild(mdRow);
 
   wrap.appendChild(delPanel);
@@ -6039,12 +6048,12 @@ async function viewProjectVizAdmin() {
   vizPanel.appendChild(checkboxField("Enabled", viz.enabled, v => viz.enabled = v));
   vizPanel.appendChild(labeledTextField("Mode", viz.mode, v => viz.mode = v));
   vizPanel.appendChild(labeledTextField("Event log", viz.event_log, v => viz.event_log = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["Server (Viz dashboard)"]));
+  vizPanel.appendChild(el("h3", { style: "margin-top:var(--space-3);" }, ["Server (Viz dashboard)"]));
   vizPanel.appendChild(numField("Server port",         viz.server.port,         v => viz.server.port = v));
   vizPanel.appendChild(numField("Server timeout (sec)",  viz.server.timeout_sec,  v => viz.server.timeout_sec = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["MCP (SSE server)"]));
+  vizPanel.appendChild(el("h3", { style: "margin-top:var(--space-3);" }, ["MCP (SSE server)"]));
   vizPanel.appendChild(numField("MCP port", viz.mcp.port, v => viz.mcp.port = v));
-  vizPanel.appendChild(el("h3", { style: "margin-top:12px;" }, ["Report"]));
+  vizPanel.appendChild(el("h3", { style: "margin-top:var(--space-3);" }, ["Report"]));
   vizPanel.appendChild(numField("Retention (days)",      viz.report.retention_days,      v => viz.report.retention_days = v));
   vizPanel.appendChild(numField("Session timeout (min)", viz.report.session_timeout_min, v => viz.report.session_timeout_min = v));
   wrap.appendChild(vizPanel);
@@ -6491,7 +6500,7 @@ async function viewProviderDeactivation() {
 
   // Enable/disable toggle
   const enabled = deactStatus.enabled === true;
-  const toggleRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  const toggleRow = el("div", { class: "btn-row", style: "gap:var(--space-3);" });
   toggleRow.appendChild(el("span", {}, ["Global: "]));
   const modeSel = el("select");
   modeSel.appendChild(el("option", { value: "all" }, ["All Providers"]));
@@ -6499,7 +6508,7 @@ async function viewProviderDeactivation() {
   if (deactStatus.mode === "selective") modeSel.value = "selective";
   else modeSel.value = "all";
   toggleRow.appendChild(modeSel);
-  toggleRow.appendChild(el("label", { style: "display:flex; align-items:center; gap:4px;" }, [
+  toggleRow.appendChild(el("label", { style: "display:flex; align-items:center; gap:var(--space-1);" }, [
     el("input", { type: "checkbox", checked: enabled, onchange: () => { modeSel.disabled = !event.target.checked; } }),
     el("span", {}, ["Enable deactivation"]),
   ]));
@@ -6509,11 +6518,11 @@ async function viewProviderDeactivation() {
   // Per-provider cards
   const providers = deactStatus.providers || {};
   const providerNames = Object.keys(providers).sort();
-  const grid = el("div", { style: "display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px;" });
+  const grid = el("div", { style: "display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:var(--space-3);" });
 
   for (const name of providerNames) {
     const p = providers[name];
-    const card = el("div", { class: "panel", style: "padding:12px;" });
+    const card = el("div", { class: "panel", style: "padding:var(--space-3);" });
     const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
     header.appendChild(el("strong", {}, [name]));
     const badge = el("span", {
@@ -6522,7 +6531,7 @@ async function viewProviderDeactivation() {
     header.appendChild(badge);
     card.appendChild(header);
 
-    const info = el("div", { style: "font-size:12px; color:var(--text-secondary); margin-top:6px;" });
+    const info = el("div", { style: "font-size:12px; color:var(--text-secondary); margin-top:var(--space-2);" });
     if (p.directory_exists) {
       info.appendChild(el("div", {}, [`Dir: ${p.directory}`]));
     } else {
@@ -6535,7 +6544,7 @@ async function viewProviderDeactivation() {
     }
     card.appendChild(info);
 
-    const btnRow = el("div", { class: "btn-row", style: "margin-top:8px;" });
+    const btnRow = el("div", { class: "btn-row", style: "margin-top:var(--space-2);" });
     const deactBtn = el("button", { class: "btn btn-danger", style: "font-size:11px;", disabled: !p.directory_exists }, ["Deactivate"]);
     deactBtn.addEventListener("click", async () => {
       deactBtn.disabled = true;
@@ -6566,7 +6575,7 @@ async function viewProviderDeactivation() {
   actions.appendChild(el("br"));
 
   // Bulk actions
-  const bulkRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  const bulkRow = el("div", { class: "btn-row", style: "gap:var(--space-3);" });
   const deactAllBtn = el("button", { class: "btn btn-danger" }, ["Deactivate ALL"]);
   deactAllBtn.addEventListener("click", () => {
     confirmDestructive("Deactivate ALL providers? This will zip and remove all provider directories.", async () => {
@@ -6590,7 +6599,7 @@ async function viewProviderDeactivation() {
 
   // Save config
   actions.appendChild(el("br"));
-  const saveRow = el("div", { class: "btn-row", style: "gap:12px;" });
+  const saveRow = el("div", { class: "btn-row", style: "gap:var(--space-3);" });
   saveRow.appendChild(el("button", { class: "btn btn-primary", onclick: async () => {
     const data = await loadProject();
     if (!data["provider-deactivation"]) data["provider-deactivation"] = {};
@@ -6626,7 +6635,7 @@ async function viewProjectEnvironments() {
   const envs = (data["environments"] && typeof data["environments"] === "object") ? data["environments"] : {};
 
   const statusEl = el("span");
-  const topBar = el("div", { style: "display:flex;gap:8px;margin-bottom:12px;align-items:center;" });
+  const topBar = el("div", { style: "display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center;" });
   const addBtn = el("button", { class: "btn", onclick: () => openEnvModal(null) }, ["+ Add Variable"]);
   const scriptsBtn = el("button", { class: "btn", style: "margin-left:auto;", onclick: showEnvScripts }, ["📜 Generate Scripts"]);
   topBar.appendChild(addBtn);
@@ -6689,7 +6698,7 @@ async function viewProjectEnvironments() {
     const reqCheck  = el("input", { type: "checkbox", checked: cfg.required === true });
     const secCheck  = el("input", { type: "checkbox", checked: cfg.secret === true });
 
-    const body = el("div", { style: "display:flex;flex-direction:column;gap:12px;" });
+    const body = el("div", { style: "display:flex;flex-direction:column;gap:var(--space-3);" });
     body.appendChild(envField("Name", nameInput, "UPPERCASE, e.g. MCP_HONCHO_URL"));
     body.appendChild(envField("Description", descInput, "What this variable is for"));
     body.appendChild(envField("Default", defInput, "Fallback value if not set in environment"));
@@ -6734,7 +6743,7 @@ async function viewProjectEnvironments() {
     try {
       const scripts = await api.get("/api/environments/scripts");
       const body = el("div");
-      const tabs = el("div", { style: "display:flex;gap:4px;margin-bottom:8px;" });
+      const tabs = el("div", { style: "display:flex;gap:var(--space-1);margin-bottom:var(--space-2);" });
       const content = el("div");
       let active = ".meta-config/env.ps1";
 
@@ -6749,9 +6758,9 @@ async function viewProjectEnvironments() {
 
       function renderScript() {
         content.replaceChildren();
-        const pre = el("pre", { style: "max-height:400px;overflow:auto;background:var(--bg-code);padding:12px;border-radius:6px;font-size:0.85em;" }, [scripts[active] || "(empty)"]);
+        const pre = el("pre", { style: "max-height:400px;overflow:auto;background:var(--bg-code);padding:var(--space-3);border-radius:6px;font-size:0.85em;" }, [scripts[active] || "(empty)"]);
         content.appendChild(pre);
-        const copyBtn = el("button", { class: "btn btn-sm", style: "margin-top:8px;", onclick: () => {
+        const copyBtn = el("button", { class: "btn btn-sm", style: "margin-top:var(--space-2);", onclick: () => {
           navigator.clipboard.writeText(scripts[active] || "").then(() => toast("Copied!", "success"));
         } }, ["📋 Copy"]);
         content.appendChild(copyBtn);
@@ -6841,14 +6850,14 @@ async function viewProjectGitignore() {
   });
 
   const renderCategory = (title, desc, catDefault, isChecked, paths) => {
-    const container = el("div", { class: "panel", style: "margin-bottom: 12px; padding: 12px;" });
+    const container = el("div", { class: "panel", style: "margin-bottom: var(--space-3); padding: var(--space-3);" });
     
     const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
     const leftTitle = el("div", {}, [
       el("strong", {style:"font-size:14px;"}, [title]),
-      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:4px;" }, [desc])
+      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:var(--space-1);" }, [desc])
     ]);
-    const rightToggleWrap = el("div", { style: "display:flex; align-items:center; gap:12px;" });
+    const rightToggleWrap = el("div", { style: "display:flex; align-items:center; gap:var(--space-3);" });
     
     rightToggleWrap.appendChild(el("span", { class: "badge", style: `padding:4px 8px; border-radius:4px; font-size:11px; ${catDefault ? "background-color:rgba(37,99,235,0.2); color:#60a5fa;" : "background-color:rgba(217,119,6,0.2); color:#fbbf24;"}` }, [catDefault ? "Framework: Ignored" : "Framework: Tracked"]));
     
@@ -6875,7 +6884,7 @@ async function viewProjectGitignore() {
     summary.innerText = "Show detailed files...";
     details.appendChild(summary);
 
-    const bulkActions = el("div", { style: "display:flex; justify-content:flex-end; gap:8px; padding-bottom:8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;" });
+    const bulkActions = el("div", { style: "display:flex; justify-content:flex-end; gap:var(--space-2); padding-bottom:var(--space-2); border-bottom: 1px solid var(--border); margin-bottom: var(--space-2);" });
     const bulkIgnore = el("button", { class: "btn btn-sm" }, ["Set All to IGNORED"]);
     const bulkTrack = el("button", { class: "btn btn-sm" }, ["Set All to TRACKED"]);
     bulkIgnore.onclick = () => { childrenToggles.forEach(ct => ct.setValue(true)); parentToggle.setValue(true); };
@@ -6884,7 +6893,7 @@ async function viewProjectGitignore() {
     bulkActions.appendChild(bulkTrack);
     details.appendChild(bulkActions);
 
-    const list = el("div", { style: "margin-top:12px; display:flex; flex-direction:column; gap:12px;" });
+    const list = el("div", { style: "margin-top:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3);" });
     paths.forEach(path => {
       const isPathIgnored = isIgnored(path, isChecked);
       const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
@@ -6927,12 +6936,12 @@ async function viewProjectGitignore() {
   wrap.appendChild(setSection.container);
 
   const customEntries = current.custom_entries || [];
-  wrap.appendChild(el("h3", { style: "margin-top:24px;" }, ["Custom Paths"]));
+  wrap.appendChild(el("h3", { style: "margin-top:var(--space-5);" }, ["Custom Paths"]));
   wrap.appendChild(el("p", { class: "help-text" }, ["Add any other files or directories you want agent-meta to manage in your .gitignore file. One path per line."]));
   
   const customTextArea = el("textarea", { 
     id: "git-custom", 
-    style: "width:100%; height:120px; font-family:var(--font-mono); font-size:13px; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text);",
+    style: "width:100%; height:120px; font-family:var(--font-mono); font-size:13px; padding:var(--space-3); border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text);",
     placeholder: ".claude/my-custom-folder/\nsome-other-file.txt"
   });
   customTextArea.value = customEntries.join("\n");
@@ -6949,7 +6958,7 @@ async function viewProjectGitignore() {
   });
   wrap.addEventListener("input", () => router.setDirty(true));
 
-  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top: 20px;" }, ["Save Gitignore Rules"]);
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top: var(--space-5);" }, ["Save Gitignore Rules"]);
   saveBtn.onclick = async () => {
     saveBtn.disabled = true;
     const lines = document.getElementById("git-custom").value.split("\n");
@@ -7004,11 +7013,11 @@ async function viewGitignoreDefaults() {
   wrap.appendChild(helpText);
 
   const renderReadonlyCategory = (title, desc, isChecked, paths) => {
-    const container = el("div", { class: "panel", style: "margin-bottom: 12px; padding: 12px;" });
+    const container = el("div", { class: "panel", style: "margin-bottom: var(--space-3); padding: var(--space-3);" });
     const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
     const leftTitle = el("div", {}, [
       el("strong", {style:"font-size:14px;"}, [title]),
-      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:4px;" }, [desc])
+      el("div", { style: "font-size:12px; color:var(--text-muted); margin-top:var(--space-1);" }, [desc])
     ]);
     header.appendChild(leftTitle);
     header.appendChild(makeToggle(isChecked, null, true).element);
@@ -7026,7 +7035,7 @@ async function viewGitignoreDefaults() {
     summary.innerText = "Show detailed files...";
     details.appendChild(summary);
 
-    const list = el("div", { style: "margin-top:12px; display:flex; flex-direction:column; gap:12px;" });
+    const list = el("div", { style: "margin-top:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3);" });
     paths.forEach(path => {
       const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
       row.appendChild(el("span", {}, [path]));
@@ -7119,7 +7128,7 @@ async function viewVizDashboard() {
   const renderControls = (status) => {
     controlBody.replaceChildren();
     const row = (label, name, running) => {
-      const line = el("div", { class: "flex-row", style: "margin-bottom:8px;" });
+      const line = el("div", { class: "flex-row", style: "margin-bottom:var(--space-2);" });
       const dot = running
         ? el("span", { style: "color:var(--accent-green)" }, ["● running"])
         : el("span", { style: "color:var(--text-muted)" }, ["○ stopped"]);
@@ -7159,7 +7168,7 @@ async function viewVizDashboard() {
       embedBody.replaceChildren();
       const placeholder = el("div", { class: "empty" });
       placeholder.appendChild(el("div", {}, ["Viz dashboard is not running."]));
-      const startBtn = el("button", { class: "btn btn-primary", style: "margin-top:12px;" }, ["Start Viz Server"]);
+      const startBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-3);" }, ["Start Viz Server"]);
       startBtn.disabled = inFlight;
       startBtn.addEventListener("click", () => doAction("viz", "start"));
       placeholder.appendChild(startBtn);
@@ -7255,8 +7264,8 @@ async function viewModels() {
     wrap.appendChild(el("h1", {}, ["Models & Pricing"]));
 
     // Source toggle
-    const srcRow = el("div", { class: "btn-row", style: "margin-bottom:16px;align-items:center;display:flex;gap:8px;" });
-    srcRow.appendChild(el("span", { style: "font-weight:600;margin-right:4px;" }, ["Source:"]));
+    const srcRow = el("div", { class: "btn-row", style: "margin-bottom:var(--space-4);align-items:center;display:flex;gap:var(--space-2);" });
+    srcRow.appendChild(el("span", { style: "font-weight:600;margin-right:var(--space-1);" }, ["Source:"]));
     for (const [val, label] of [["registry", "model-registry.json"], ["modelsdev", "models.dev"]]) {
       const active = state.source === val;
       srcRow.appendChild(el("button", {
@@ -7280,8 +7289,8 @@ async function viewModels() {
     // "Save" button at the end of the row is clicked, which persists every
     // changed provider in one batched POST /api/model-source/batch call.
     if (state.configuredProviders.length > 0) {
-      const provRow = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:0.82em;" });
-      provRow.appendChild(el("span", { style: "opacity:0.6;margin-right:4px;" }, ["Per provider:"]));
+      const provRow = el("div", { style: "display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-3);font-size:0.82em;" });
+      provRow.appendChild(el("span", { style: "opacity:0.6;margin-right:var(--space-1);" }, ["Per provider:"]));
       state.configuredProviders.forEach(provName => {
         const mdId = PROVIDER_MAP[provName];
         const saved = effectiveModelSource(provName);
@@ -7289,7 +7298,7 @@ async function viewModels() {
         const displayed = hasPending ? state.pendingSourceChanges[provName] : saved;
         const isRegistryOnly = REGISTRY_ONLY.has(provName) || !mdId;
         const wrap_el = el("span", {
-          style: "display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;background:var(--bg2);" +
+          style: "display:inline-flex;align-items:center;gap:var(--space-1);padding:2px 6px;border-radius:4px;background:var(--bg2);" +
             (hasPending ? "border:1px solid var(--accent-yellow);" : "border:1px solid var(--border);")
         });
         wrap_el.appendChild(el("span", { style: "font-weight:600;" }, [provName]));
@@ -7324,7 +7333,7 @@ async function viewModels() {
       const saveBtn = el("button", {
         class: "btn btn-primary",
         disabled: pendingCount === 0,
-        style: "font-size:0.85em;margin-left:4px;" + (pendingCount === 0 ? "opacity:0.5;cursor:not-allowed;" : ""),
+        style: "font-size:0.85em;margin-left:var(--space-1);" + (pendingCount === 0 ? "opacity:0.5;cursor:not-allowed;" : ""),
         onclick: async () => {
           if (pendingCount === 0) return;
           const changes = { ...state.pendingSourceChanges };
@@ -7347,7 +7356,7 @@ async function viewModels() {
     }
 
     if (state.loading) {
-      wrap.appendChild(el("div", { style: "padding:32px;text-align:center;opacity:0.6;" }, ["Loading…"]));
+      wrap.appendChild(el("div", { style: "padding:var(--space-6);text-align:center;opacity:0.6;" }, ["Loading…"]));
       return;
     }
 
@@ -7402,7 +7411,7 @@ async function viewModels() {
     ];
     const filterState = { provider: "", model: "", category: "" };
 
-    const controls = el("div", { class: "btn-row", style: "margin-bottom:12px;align-items:center;display:flex;gap:8px;" });
+    const controls = el("div", { class: "btn-row", style: "margin-bottom:var(--space-3);align-items:center;display:flex;gap:var(--space-2);" });
     const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py (or GitHub override)"]);
     refreshBtn.onclick = async () => {
       refreshBtn.disabled = true;
@@ -7434,7 +7443,7 @@ async function viewModels() {
 
     const QUICK = [...new Set(["", ...state.configuredProviders])];
     if (QUICK.length > 1) {
-      const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:8px;" });
+      const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:var(--space-2);" });
       QUICK.forEach((val, i) => {
         const label = val === "" ? "All" : val.charAt(0).toUpperCase() + val.slice(1);
         const btn = el("button", { class: "badge" + (i === 0 ? " active" : "") }, [label]);
@@ -7466,14 +7475,14 @@ async function viewModels() {
     };
 
     const mkSelect = (key, opts) => {
-      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
       s.appendChild(el("option", { value: "" }, ["All"]));
       opts.forEach(o => s.appendChild(el("option", { value: o }, [o])));
       s.addEventListener("change", e => { filterState[key] = e.target.value; applyFilters(); });
       return s;
     };
     const mkText = (key) => {
-      const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      const inp = el("input", { type: "text", placeholder: "Filter...", style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
       inp.addEventListener("input", e => { filterState[key] = e.target.value; applyFilters(); });
       return inp;
     };
@@ -7514,14 +7523,14 @@ async function viewModels() {
 
       const inVal = (m.input_cost || 0).toFixed(2);
       const outVal = (m.output_cost || 0).toFixed(2);
-      tr.appendChild(el("td", { class: "mono" }, [inVal, el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:6px;" }, [m.input_source || "API"])]));
-      tr.appendChild(el("td", { class: "mono" }, [outVal, el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:6px;" }, [m.output_source || "API"])]));
+      tr.appendChild(el("td", { class: "mono" }, [inVal, el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:var(--space-2);" }, [m.input_source || "API"])]));
+      tr.appendChild(el("td", { class: "mono" }, [outVal, el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left:var(--space-2);" }, [m.output_source || "API"])]));
 
       const cf = m.cost_factor || 0;
       let hc = "var(--accent-blue)";
       if (cf > 20) hc = "var(--accent-yellow)";
       if (cf > 50) hc = "var(--accent-red)";
-      tr.appendChild(el("td", { style: `color:${hc};font-weight:bold;` }, [cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left:6px;" }, ["Calc"])]));
+      tr.appendChild(el("td", { style: `color:${hc};font-weight:bold;` }, [cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left:var(--space-2);" }, ["Calc"])]));
 
       const st = el("td");
       if (m._fromModelsDev) {
@@ -7631,7 +7640,7 @@ async function viewModels() {
     const configuredHasData = configuredFirst.some(pid => getEffectiveModelsDevRows(pid).length > 0);
 
     // Provider quick-filter strip: configured providers first, then rest.
-    const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:8px;" });
+    const strip = el("div", { class: "quick-filter-strip", style: "margin-bottom:var(--space-2);" });
     const allBtn = el("button", { class: "badge" + (!state.filterProvider ? " active" : "") }, [
       state.showAllProviders ? "All Providers" : "All Configured"
     ]);
@@ -7648,7 +7657,7 @@ async function viewModels() {
     });
     // "Other" dropdown — only relevant once "Show all providers" is on.
     if (otherProviders.length > 0) {
-      const sel = el("select", { style: "margin-left:4px;padding:2px 4px;background:var(--bg2);color:var(--fg);border:1px solid var(--border);border-radius:3px;max-width:180px;" });
+      const sel = el("select", { style: "margin-left:var(--space-1);padding:2px 4px;background:var(--bg2);color:var(--fg);border:1px solid var(--border);border-radius:3px;max-width:180px;" });
       sel.appendChild(el("option", { value: "" }, ["Other providers (" + otherProviders.length + ")"]));
       otherProviders.forEach(pid => {
         const p = d.providers[pid];
@@ -7672,7 +7681,7 @@ async function viewModels() {
     // Capability filters — wrapped in a quick-filter-strip so they inherit
     // the same hover/active-blue styling as the provider strip above,
     // instead of a bare unstyled badge row.
-    const ctrl = el("div", { style: "display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;" });
+    const ctrl = el("div", { style: "display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-3);flex-wrap:wrap;" });
     const capsStrip = el("div", { class: "quick-filter-strip", style: "margin:0;" });
     for (const [k, label] of Object.entries({ reasoning: "🧠", toolCall: "🔧", attachment: "📎", vision: "👁", structured: "📋" })) {
       const active = state.filterCap[k];
@@ -7718,7 +7727,7 @@ async function viewModels() {
 
     // Header inline filters — mirrors renderRegistryTable's mkSelect/mkText-in-<th> pattern.
     const mkHeaderSelect = (opts, value, onChange) => {
-      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      const s = el("select", { style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
       s.appendChild(el("option", { value: "" }, ["All"]));
       opts.forEach(o => {
         const opt = el("option", { value: o.id }, [o.label]);
@@ -7729,7 +7738,7 @@ async function viewModels() {
       return s;
     };
     const mkHeaderText = (value, onChange) => {
-      const inp = el("input", { type: "text", placeholder: "Filter...", value, style: "width:100%;box-sizing:border-box;margin-top:4px;font-weight:normal;font-size:0.9em;" });
+      const inp = el("input", { type: "text", placeholder: "Filter...", value, style: "width:100%;box-sizing:border-box;margin-top:var(--space-1);font-weight:normal;font-size:0.9em;" });
       inp.addEventListener("input", e => onChange(e.target.value));
       return inp;
     };
@@ -7832,7 +7841,7 @@ async function viewModels() {
     });
     tbl.appendChild(tbody);
     parent.appendChild(tbl);
-    parent.appendChild(el("div", { style: "margin-top:8px;font-size:0.85em;opacity:0.5;" }, [allModels.length + " models shown"]));
+    parent.appendChild(el("div", { style: "margin-top:var(--space-2);font-size:0.85em;opacity:0.5;" }, [allModels.length + " models shown"]));
   }
 
   // Data loading
@@ -7879,7 +7888,7 @@ async function viewModelsLegacy() {
   let editMode = false;
   let modelsData = [];
 
-  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: var(--space-5); align-items: center; display: flex; gap: var(--space-3);" });
 
   const refreshBtn = el("button", { class: "btn btn-primary" }, ["Refresh via sync.py"]);
   const editBtn = el("button", { class: "btn" }, ["Edit Prices"]);
@@ -7941,7 +7950,7 @@ async function viewModelsLegacy() {
   };
 
   const createSelectFilter = (key, options) => {
-    const select = el("select", { style: "width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
+    const select = el("select", { style: "width: 100%; box-sizing: border-box; margin-top: var(--space-1); font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
     select.appendChild(el("option", { value: "" }, ["All"]));
     options.forEach(opt => select.appendChild(el("option", { value: opt }, [opt])));
     select.addEventListener("change", (e) => {
@@ -7952,7 +7961,7 @@ async function viewModelsLegacy() {
   };
 
   const createTextFilter = (key) => {
-    const input = el("input", { type: "text", placeholder: "Filter...", style: "width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
+    const input = el("input", { type: "text", placeholder: "Filter...", style: "width: 100%; box-sizing: border-box; margin-top: var(--space-1); font-weight: normal; font-size: 0.9em; padding: 2px 4px;" });
     input.addEventListener("input", (e) => {
       filterState[key] = e.target.value;
       applyFilters();
@@ -8037,9 +8046,9 @@ async function viewModelsLegacy() {
       outSpan.style.display = editMode ? "none" : "inline-block";
 
       inTd.appendChild(inInput); inTd.appendChild(inSpan);
-      inTd.appendChild(el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: 8px;" }, [m.input_source || "API"]));
+      inTd.appendChild(el("span", { class: m.input_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: var(--space-2);" }, [m.input_source || "API"]));
       outTd.appendChild(outInput); outTd.appendChild(outSpan);
-      outTd.appendChild(el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: 8px;" }, [m.output_source || "API"]));
+      outTd.appendChild(el("span", { class: m.output_source === "Overlay" ? "badge warn" : "badge ok", style: "margin-left: var(--space-2);" }, [m.output_source || "API"]));
       
       tr.appendChild(inTd); tr.appendChild(outTd);
       
@@ -8049,7 +8058,7 @@ async function viewModelsLegacy() {
       if (cf > 50) heatColor = "var(--accent-red)";
       
       tr.appendChild(el("td", { style: `color: ${heatColor}; font-weight: bold;` }, [
-        cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left: 8px;" }, ["Calc"])
+        cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left: var(--space-2);" }, ["Calc"])
       ]));
 
       // Status column — enable/disable toggle button per row.
@@ -8094,7 +8103,7 @@ async function viewModelsLegacy() {
       // Blacklist button — permanently excludes model from discovery.
       const blacklistBtn = el("button", {
         class: "btn btn-danger",
-        style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: 6px;",
+        style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: var(--space-2);",
         title: "Blacklist this model permanently (removed from registry, won't reappear on next sync)",
       }, ["Blacklist"]);
       blacklistBtn.onclick = () => {
@@ -8217,7 +8226,7 @@ async function viewProviderTiers() {
   let aiProvidersData = {};
   let displayNameMap = {};
 
-  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: var(--space-5); align-items: center; display: flex; gap: var(--space-3);" });
   const saveBtn = el("button", { class: "btn btn-primary", style: "background: var(--accent-green); border-color: var(--accent-green); color: white; display: none;" }, ["Save Configs"]);
   const editLabel = el("label", { style: "margin-left: auto; display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;" }, [el("span", {}, ["Edit Mode"])]);
   const editToggle = el("input", { type: "checkbox" });
@@ -8378,7 +8387,7 @@ async function viewTierPresets() {
   const TIERS = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
   // ---- Tab strip --------------------------------------------------------
-  const tabStrip = el("div", { class: "btn-row", style: "margin-bottom: 16px; display: flex; gap: 8px;" });
+  const tabStrip = el("div", { class: "btn-row", style: "margin-bottom: var(--space-4); display: flex; gap: var(--space-2);" });
   const tabResolved = el("button", { class: "btn btn-primary" }, ["Resolved View"]);
   const tabEdit = el("button", { class: "btn" }, ["Edit Mappings"]);
   tabStrip.appendChild(tabResolved);
@@ -8394,7 +8403,7 @@ async function viewTierPresets() {
   };
 
   // ---- Controls (Add / Save) -------------------------------------------
-  const controls = el("div", { class: "btn-row", style: "margin-bottom: 20px; align-items: center; display: flex; gap: 10px;" });
+  const controls = el("div", { class: "btn-row", style: "margin-bottom: var(--space-5); align-items: center; display: flex; gap: var(--space-3);" });
 
   const addBtn = el("button", { class: "btn" }, ["Add Preset"]);
   addBtn.onclick = async () => {
@@ -8507,12 +8516,12 @@ async function viewTierPresets() {
         if (pIdx === 0) {
           const presetTd = el("td", { rowspan: String(providerNames.length) });
           presetTd.appendChild(el("strong", {}, [presetId]));
-          if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
+          if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:var(--space-2);" }, ["Default"]));
           if (preset.source === "project") {
-            presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
+            presetTd.appendChild(el("span", { class: "badge", style: "margin-left:var(--space-2);" }, ["(project)"]));
           }
           if (preset.description) {
-            presetTd.appendChild(el("div", { class: "muted", style: "font-size: 0.85em; margin-top: 4px;" }, [preset.description]));
+            presetTd.appendChild(el("div", { class: "muted", style: "font-size: 0.85em; margin-top: var(--space-1);" }, [preset.description]));
           }
           tr.appendChild(presetTd);
         }
@@ -8614,9 +8623,9 @@ async function viewTierPresets() {
 
       const presetTd = el("td", { rowspan: String(totalRows) });
       presetTd.appendChild(el("strong", {}, [presetId]));
-      if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:6px;" }, ["Default"]));
-      if (preset.source === "project") presetTd.appendChild(el("span", { class: "badge", style: "margin-left:6px;" }, ["(project)"]));
-      if (preset.description) presetTd.appendChild(el("div", { class: "muted", style: "font-size:0.85em; margin-top:4px;" }, [preset.description]));
+      if (isDefault) presetTd.appendChild(el("span", { class: "badge ok", style: "margin-left:var(--space-2);" }, ["Default"]));
+      if (preset.source === "project") presetTd.appendChild(el("span", { class: "badge", style: "margin-left:var(--space-2);" }, ["(project)"]));
+      if (preset.description) presetTd.appendChild(el("div", { class: "muted", style: "font-size:0.85em; margin-top:var(--space-1);" }, [preset.description]));
       globalTr.appendChild(presetTd);
 
       globalTr.appendChild(el("td", {}, [el("span", { class: "muted", style: "font-size:0.85em;" }, ["All Providers (default)"])]));
@@ -8810,16 +8819,16 @@ init();
       .help-btn:hover { color: var(--text-primary); }
       .help-btn.active { background: var(--accent-blue-soft); color: var(--accent-blue); font-weight: bold; }
       
-      .help-icon-wrapper { position: relative; display: inline-block; margin-left: 10px; vertical-align: middle; }
+      .help-icon-wrapper { position: relative; display: inline-block; margin-left: var(--space-3); vertical-align: middle; }
       .help-icon-badge { cursor: help; background: var(--accent-blue); color: #fff; border-radius: 50%; width: 18px; height: 18px; text-align: center; line-height: 18px; font-size: 12px; display: inline-block; box-shadow: 0 0 8px rgba(88,166,255,0.4); }
       .help-icon-wrapper:hover .help-tooltip { display: block; }
-      .help-tooltip { display: none; position: absolute; left: 28px; top: -10px; width: 400px; background: var(--bg-secondary); border: 1px solid var(--accent-blue); padding: 14px; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 9999; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+      .help-tooltip { display: none; position: absolute; left: 28px; top: -10px; width: 400px; background: var(--bg-secondary); border: 1px solid var(--accent-blue); padding: var(--space-4); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 9999; font-size: 13px; color: var(--text-primary); line-height: 1.6; }
       
-      .help-expanded-block { background: var(--bg-tertiary); border-left: 4px solid var(--accent-blue); padding: 16px 20px; margin-top: 16px; margin-bottom: 24px; border-radius: 0 6px 6px 0; font-size: 13.5px; color: var(--text-primary); line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .help-expanded-block { background: var(--bg-tertiary); border-left: 4px solid var(--accent-blue); padding: 16px 20px; margin-top: var(--space-4); margin-bottom: var(--space-5); border-radius: 0 6px 6px 0; font-size: 13.5px; color: var(--text-primary); line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
       .help-expanded-block p { margin: 0 0 10px 0; }
       .help-expanded-block p:last-child { margin: 0; }
       
-      .field-expanded { margin-top: 6px; margin-bottom: 16px; padding: 12px 16px; border-left: 3px solid var(--accent-green); font-size: 13px; background: rgba(33,38,45,0.7); box-shadow: none; }
+      .field-expanded { margin-top: var(--space-2); margin-bottom: var(--space-4); padding: 12px 16px; border-left: 3px solid var(--accent-green); font-size: 13px; background: rgba(33,38,45,0.7); box-shadow: none; }
       .field-tooltip { width: 320px; border-color: var(--accent-green); }
     </style>
     <div class="help-toggle-widget">
