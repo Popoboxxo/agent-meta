@@ -1,0 +1,24 @@
+# agent-meta
+
+> Meta-repository for standardizing and reusing AI coding-agent role definitions (personas) across projects — role templates, a generation pipeline, and pre-rendered standalone personas usable with no installation at all.
+
+agent-meta is normally embedded as a git submodule and driven by `sync.py`, which generates provider-specific agent files (Claude Code, Gemini/Antigravity, Opencode, Continue, GitHub Copilot, Mammouth Code) from a shared set of role templates under `agents/1-generic/`. It also ships pre-rendered, dependency-free "standalone" personas for use outside that pipeline — no clone, no Python, no config.
+
+## For AI assistants just linked to this repo
+
+If a user pasted you this repo's URL and asked for help with something specific — not to integrate the framework into a codebase — you don't need to clone or run anything:
+
+- [Standalone agent index](standalone/README.md): available roles, one-line description each, links to the persona file for each role
+- Fetch the matching file under `standalone/agents/<role>.md` and adopt its whole content as your system prompt / persona for the rest of the conversation
+
+## Docs
+
+- [README](README.md): full framework overview, architecture, quick start, agent roster
+- [CLI reference](docs/api/cli-reference.md): every `sync.py` flag
+- [Composition system](docs/api/composition-system.md): `extends`/`patches` syntax for platform- and project-level template overrides
+- [Admin UI reference](docs/api/admin-ui-reference.md): local web UI for managing config without hand-editing YAML
+
+## Optional
+
+- [CHANGELOG](CHANGELOG.md): what changed release to release
+- [Architecture](ARCHITECTURE.md): deeper technical design notes
