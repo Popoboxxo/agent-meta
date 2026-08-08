@@ -121,7 +121,7 @@ Full lifecycle: `rules/2-platform/agent-meta-sync-interface.md` (--add-skill fla
 py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml
 
 # Add
-py {{AGENT_META_REL_PATH}}scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r>
+py {{AGENT_META_REL_PATH}}scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r> --entry <file>
 
 # Submodule init
 git submodule update --init --recursive

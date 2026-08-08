@@ -1,6 +1,6 @@
 ---
 name: principal-developer
-version: 1.0.1
+version: 1.0.2
 description: Last-resort escalation tier. Invoked only after senior-developer has
   failed repeatedly on a task. Root-cause diagnosis before a single line of code.
   Maximum thoroughness, maximum cost.
@@ -18,7 +18,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/principal-developer.md@1.0.1
+generated-from: 1-generic/principal-developer.md@1.0.2
 model: claude-opus-4-8
 memory: project
 ---

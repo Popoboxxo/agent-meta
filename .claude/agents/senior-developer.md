@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-version: 1.2.2
+version: 1.2.3
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 hint: 'High-tier developer: architecture impact, complex/risky changes, hard bugs
@@ -16,7 +16,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/senior-developer.md@1.2.2
+generated-from: 1-generic/senior-developer.md@1.2.3
 model: claude-opus-4-8
 memory: project
 ---

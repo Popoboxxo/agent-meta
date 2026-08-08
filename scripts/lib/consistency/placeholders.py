@@ -69,6 +69,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
+    # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)
+    "BROWSER_VERIFICATION_BLOCK", "LANGUAGE_BEST_PRACTICES_BLOCK",
     # SE cascade variables (from role-defaults.yaml se_variables)
     "SE_MIN_DEPTH", "SE_MAX_DEPTH", "SE_MAX_CRITIC_ITERATIONS", "SE_MAX_PARALLEL_CELLS",
     "SE_MAX_CELLS", "cost_limit_eur",
