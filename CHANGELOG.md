@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.93.0] — 2026-08-08
+
 ### Added
 - Two new optional generic agent roles: `proofreader` (correctness-only pass — spelling, grammar, punctuation, every finding tied to a stated rule) and `copyeditor` (style, sentence structure, repetition, throughline, content consistency — advisory, every suggestion names its reasoning). Both default to a categorized markdown findings report next to the reviewed file rather than a silent in-place rewrite.
 - `standalone/` — pre-rendered, fully self-contained English copies of a pilot set of 8 generic agent personas (`developer`, `senior-developer`, `documenter`, `technical-writer`, `requirements`, `tester`, `proofreader`, `copyeditor`), usable without Python or `sync.py`: paste the whole file as a system prompt in any chat AI. Identity/project-context placeholders resolve to explicit "ask the user" instructions rather than invented values; multi-agent/orchestration placeholders (A2A, DoD gates, extensions) resolve to empty, matching how they already behave when disabled in a real project. New `scripts/lib/standalone.py` module, `sync.py --render-standalone` (combine with `--check` for a CI drift gate), and an Admin UI "Render standalone agents" button on the Sync page.
