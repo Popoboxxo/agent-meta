@@ -27,6 +27,7 @@ from .config import (
     substitute,
 )
 from .log import SyncLog
+from .roles import load_roles_config
 
 REPO_URL = "https://github.com/Popoboxxo/agent-meta"
 
@@ -229,55 +230,62 @@ def _role_summary(role: str, agent_meta_root: Path) -> str:
     return desc.split(". ")[0].rstrip(".") + "."
 
 
+# German descriptions for 1-generic roles that role-defaults.yaml doesn't
+# cover — currently just `provider-expert`, whose role-defaults.yaml entries
+# only exist as concrete 2-platform variants (claude-expert, gemini-expert,
+# ...), not the abstract generic base this standalone render targets.
+_ROLE_SUMMARY_DE_FALLBACKS: dict[str, str] = {
+    "provider-expert": "Absoluter Analyse-Experte für eine KI-Plattform: Funktionsweise, "
+    "Konfiguration, Best Practices zur optimalen Anpassung von agent-meta.",
+}
+
+
+def _role_summary_de(role: str, roles_cfg: dict) -> str:
+    """German one-line description, sourced from config/role-defaults.yaml
+    (already German-language for internal routing tables like
+    use-orchestrator.md) rather than the frontmatter `description:` field,
+    which is inconsistently English/German across templates."""
+    desc = roles_cfg.get(role, {}).get("description") or _ROLE_SUMMARY_DE_FALLBACKS.get(role, "")
+    if not desc:
+        return ""
+    return desc.split(". ")[0].rstrip(".") + "."
+
+
 def render_index(agent_meta_root: Path, roles: tuple[str, ...] | None = None) -> str:
-    """Render standalone/README.md — the discovery index for chat AIs browsing the repo."""
+    """Render standalone/README.md — the discovery index for chat AIs browsing the repo.
+
+    Bilingual layout: every English block is immediately followed by its
+    German translation (not two separate top/bottom sections), and the role
+    table carries both an English and a German description column."""
     if roles is None:
         roles = discover_standalone_roles(agent_meta_root)
     version = read_version(agent_meta_root)
+    roles_cfg = load_roles_config(agent_meta_root)["roles"]
     lines = [
         "# Standalone Agent Personas",
         "",
         f"Pre-rendered, fully self-contained copies of [agent-meta]({REPO_URL})'s "
         "generic agent personas — no Python, no `sync.py`, no repo clone required.",
         "",
-        "*[Deutsche Beschreibung weiter unten ↓](#standalone-agent-personas-deutsch)*",
+        f"*Fertig gerenderte, vollständig eigenständige Kopien der generischen "
+        f"Agenten-Personas von [agent-meta]({REPO_URL}) — kein Python, kein `sync.py`, "
+        "kein Repo-Klon nötig.*",
         "",
-        "## How to use",
+        "## How to use / Verwendung",
         "",
         "1. Pick the role below that matches what you need help with.",
+        "   *Passende Rolle in der Tabelle unten auswählen.*",
         "2. Open its file (or ask a browsing-capable chat AI to fetch it from this "
         "repo directly).",
+        "   *Zugehörige Datei öffnen (oder eine browsing-fähige Chat-KI bitten, sie "
+        "direkt aus diesem Repo zu holen).*",
         "3. Paste the whole file as your system prompt / custom instructions.",
+        "   *Die gesamte Datei als System-Prompt / Custom Instructions einfügen.*",
         "",
         "**Scope note:** each persona is a solo snapshot. No multi-agent delegation, "
         "no DoD gate, no A2A protocol, no project-specific config — for the full "
         f"pipeline (multi-agent orchestration, project-aware context, quality gates), "
         f"see the [main repo]({REPO_URL}).",
-        "",
-        "## Available roles",
-        "",
-        "| Role | Description | File |",
-        "|------|-------------|------|",
-    ]
-    for role in roles:
-        summary = _role_summary(role, agent_meta_root) or "—"
-        lines.append(f"| `{role}` | {summary} | [`agents/{role}.md`](agents/{role}.md) |")
-    lines += [
-        "",
-        "---",
-        "",
-        "## Standalone Agent Personas (Deutsch)",
-        "",
-        f"Fertig gerenderte, vollständig eigenständige Kopien der generischen "
-        f"Agenten-Personas von [agent-meta]({REPO_URL}) — kein Python, kein `sync.py`, "
-        "kein Repo-Klon nötig.",
-        "",
-        "### Verwendung",
-        "",
-        "1. Passende Rolle in der Tabelle oben auswählen.",
-        "2. Zugehörige Datei öffnen (oder eine browsing-fähige Chat-KI bitten, sie "
-        "direkt aus diesem Repo zu holen).",
-        "3. Die gesamte Datei als System-Prompt / Custom Instructions einfügen.",
         "",
         "**Hinweis zum Umfang:** Jede Persona ist eine isolierte Momentaufnahme — "
         "ohne Multi-Agenten-Delegation, ohne DoD-Gate, ohne A2A-Protokoll, ohne "
@@ -285,7 +293,20 @@ def render_index(agent_meta_root: Path, roles: tuple[str, ...] | None = None) ->
         f"Orchestrierung, projektbewusster Kontext, Quality Gates) siehe das "
         f"[Haupt-Repo]({REPO_URL}).",
         "",
-        f"---",
+        "## Available roles / Verfügbare Rollen",
+        "",
+        "| Role | Description | Beschreibung (DE) | File |",
+        "|------|-------------|--------------------|------|",
+    ]
+    for role in roles:
+        summary_en = _role_summary(role, agent_meta_root) or "—"
+        summary_de = _role_summary_de(role, roles_cfg) or "—"
+        lines.append(
+            f"| `{role}` | {summary_en} | {summary_de} | [`agents/{role}.md`](agents/{role}.md) |"
+        )
+    lines += [
+        "",
+        "---",
         f"Generated from agent-meta v{version}. Regenerate via "
         "`python scripts/sync.py --render-standalone` (or the Admin UI's Sync page).",
         "",
