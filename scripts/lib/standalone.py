@@ -1,7 +1,7 @@
 """Render 1-generic agent templates as self-contained standalone personas.
 
-Produces plain-English, fully-resolved copies of selected generic agent
-templates under ``standalone/agents/`` — no ``{{PLACEHOLDER}}`` left over,
+Produces plain-English, fully-resolved copies of every generic agent
+template under ``standalone/agents/`` — no ``{{PLACEHOLDER}}`` left over,
 no Python/sync.py required to use them. Intended to be pasted directly as
 a system prompt / custom instructions into any chat AI.
 
@@ -18,22 +18,34 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .config import read_version, strip_inactive_conditional_blocks, substitute
+from .agents import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
+from .config import (
+    _orch_mode_flags,
+    _resolve_orch_mode,
+    read_version,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 from .log import SyncLog
 
-# Pilot batch — validated by hand before expanding to the full 1-generic set.
-STANDALONE_ROLES: tuple[str, ...] = (
-    "developer",
-    "senior-developer",
-    "documenter",
-    "technical-writer",
-    "requirements",
-    "tester",
-    "proofreader",
-    "copyeditor",
-)
-
 REPO_URL = "https://github.com/Popoboxxo/agent-meta"
+
+
+def discover_standalone_roles(agent_meta_root: Path) -> tuple[str, ...]:
+    """Every 1-generic role eligible for standalone rendering — by default, all
+    of them. Mirrors the same skip rules as the main sync pipeline (see
+    ``agents.py::resolve_agent_overrides``): files starting with ``_`` are
+    reserved resources/templates, not roles; templates marked
+    ``deprecated: true`` are excluded."""
+    generic_dir = agent_meta_root / "agents" / "1-generic"
+    roles = []
+    for f in sorted(generic_dir.glob("*.md")):
+        if f.name.startswith("_"):
+            continue
+        if is_deprecated_template(f.read_text(encoding="utf-8")):
+            continue
+        roles.append(f.stem)
+    return tuple(roles)
 
 # Identity/config placeholders that need real project.yaml data to resolve
 # meaningfully. Fallback values read as instructions to the LLM, not
@@ -67,17 +79,48 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     "DOD_TESTS_BLOCK": "",
 }
 
-# Conditional flags gating {{#if VAR}} blocks tied to extension/snippet
-# mechanisms and DoD gates — all inert in standalone mode. Must be present
-# (not merely absent) for strip_inactive_conditional_blocks() to treat them
-# as known conditional variables at all — see its docstring.
+# Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
+# extension/snippet mechanisms, DoD gates, and other project-specific
+# infrastructure — all inert in standalone mode. Every flag referenced by a
+# {{#if}} in agents/1-generic/*.md must have an entry here (regardless of
+# true/false): strip_inactive_conditional_blocks() only recognizes a
+# variable as conditional if it's a literal key in the variables dict — an
+# omitted flag falls through to that function's orphaned-marker cleanup,
+# which keeps the block unconditionally. For mutually exclusive flag groups
+# (ORCH_MODE_*, DOD_SE_*) omitting even one member means every branch
+# renders at once (e.g. "Mode: strictadvisorydisabled.") instead of picking
+# the single intended branch — see git history for the concrete case that
+# prompted this comment.
 _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "DOD_REQ_TRACEABILITY": "false",
     "DOD_TESTS_REQUIRED": "false",
+    "DOD_CODEBASE_OVERVIEW": "false",
+    "DOD_SECURITY_AUDIT": "false",
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
+    "DEV_STACK_START_SET": "false",
+    # No A2A infrastructure or knowledge-engine bundle exists standalone —
+    # matches the scope note in the rendered header ("no A2A protocol, no
+    # project-specific config").
+    "A2A_PROTOCOL_ENABLED": "false",
+    "KNOWLEDGE_ENGINE_ENABLED": "false",
+    # DIRECT_DISPATCH_SECTION is a large partial loaded from
+    # templates/direct-dispatch-section.md — unavailable standalone, so
+    # disable the flag rather than leak a "[...not available...]" note
+    # mid-document.
+    "DIRECT_DISPATCH_ENABLED": "false",
+    # SE-cascade requirement level: standalone has no SE infrastructure to
+    # enforce, so it's "optional" (the only one of the three that's true)
+    # rather than "recommended"/"strict".
+    "DOD_SE_OPTIONAL": "true",
+    "DOD_SE_RECOMMENDED": "false",
+    "DOD_SE_STRICT": "false",
 }
+# Orchestrator mode flags (mutually exclusive) — reuse the real resolver so
+# standalone matches the schema's own default (orchestrator.enabled=true,
+# strict=true → "strict") instead of hand-duplicating it.
+_CONDITIONAL_FALSE_FLAGS.update(_orch_mode_flags(_resolve_orch_mode({})))
 
 _FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 # The boilerplate pointer line every 1-generic template opens with — always
@@ -158,31 +201,46 @@ def render_standalone_agent(role: str, agent_meta_root: Path) -> str:
     return header + content.strip() + "\n"
 
 
-def render_all(agent_meta_root: Path) -> dict[str, str]:
-    """Return {role: rendered_content} for every STANDALONE_ROLES entry."""
-    return {role: render_standalone_agent(role, agent_meta_root) for role in STANDALONE_ROLES}
+def render_all(agent_meta_root: Path, roles: tuple[str, ...] | None = None) -> dict[str, str]:
+    """Return {role: rendered_content} for every discovered standalone role."""
+    if roles is None:
+        roles = discover_standalone_roles(agent_meta_root)
+    return {role: render_standalone_agent(role, agent_meta_root) for role in roles}
 
 
 def _role_summary(role: str, agent_meta_root: Path) -> str:
-    """One-line description pulled from the source template's frontmatter."""
+    """One-line description pulled from the source template's frontmatter.
+
+    Uses the real YAML frontmatter parser (agents.py::_parse_frontmatter_yaml)
+    rather than a hand-rolled regex — several SE-cascade templates fold their
+    `description:` across multiple lines (quoted or not), which a single-line
+    regex silently truncates or misses.
+    """
     source_path = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
     content = source_path.read_text(encoding="utf-8")
-    match = re.search(r'^description:\s*"(.+?)"\s*$', content, re.MULTILINE)
-    if not match:
+    if _YAML_AVAILABLE:
+        desc = _parse_frontmatter_yaml(content).get("description", "")
+    else:
+        match = re.search(r'^description:\s*"(.+?)"\s*$', content, re.MULTILINE)
+        desc = match.group(1) if match else ""
+    if not desc:
         return ""
-    desc = match.group(1)
     # First sentence only — the index is a scan list, not the full description.
     return desc.split(". ")[0].rstrip(".") + "."
 
 
-def render_index(agent_meta_root: Path) -> str:
+def render_index(agent_meta_root: Path, roles: tuple[str, ...] | None = None) -> str:
     """Render standalone/README.md — the discovery index for chat AIs browsing the repo."""
+    if roles is None:
+        roles = discover_standalone_roles(agent_meta_root)
     version = read_version(agent_meta_root)
     lines = [
         "# Standalone Agent Personas",
         "",
         f"Pre-rendered, fully self-contained copies of [agent-meta]({REPO_URL})'s "
         "generic agent personas — no Python, no `sync.py`, no repo clone required.",
+        "",
+        "*[Deutsche Beschreibung weiter unten ↓](#standalone-agent-personas-deutsch)*",
         "",
         "## How to use",
         "",
@@ -201,10 +259,31 @@ def render_index(agent_meta_root: Path) -> str:
         "| Role | Description | File |",
         "|------|-------------|------|",
     ]
-    for role in STANDALONE_ROLES:
+    for role in roles:
         summary = _role_summary(role, agent_meta_root) or "—"
         lines.append(f"| `{role}` | {summary} | [`agents/{role}.md`](agents/{role}.md) |")
     lines += [
+        "",
+        "---",
+        "",
+        "## Standalone Agent Personas (Deutsch)",
+        "",
+        f"Fertig gerenderte, vollständig eigenständige Kopien der generischen "
+        f"Agenten-Personas von [agent-meta]({REPO_URL}) — kein Python, kein `sync.py`, "
+        "kein Repo-Klon nötig.",
+        "",
+        "### Verwendung",
+        "",
+        "1. Passende Rolle in der Tabelle oben auswählen.",
+        "2. Zugehörige Datei öffnen (oder eine browsing-fähige Chat-KI bitten, sie "
+        "direkt aus diesem Repo zu holen).",
+        "3. Die gesamte Datei als System-Prompt / Custom Instructions einfügen.",
+        "",
+        "**Hinweis zum Umfang:** Jede Persona ist eine isolierte Momentaufnahme — "
+        "ohne Multi-Agenten-Delegation, ohne DoD-Gate, ohne A2A-Protokoll, ohne "
+        "projektspezifische Konfiguration. Für die volle Pipeline (Multi-Agenten-"
+        f"Orchestrierung, projektbewusster Kontext, Quality Gates) siehe das "
+        f"[Haupt-Repo]({REPO_URL}).",
         "",
         f"---",
         f"Generated from agent-meta v{version}. Regenerate via "
@@ -215,13 +294,17 @@ def render_index(agent_meta_root: Path) -> str:
 
 
 def write_standalone_files(agent_meta_root: Path, *, dry_run: bool = False) -> dict:
-    """Render all STANDALONE_ROLES + the index, write them to standalone/agents/,
-    return a summary dict of what changed. Does not write when dry_run=True."""
+    """Render every discovered standalone role + the index, write them to
+    standalone/agents/, return a summary dict of what changed. Removes
+    previously-rendered files for roles no longer eligible (e.g. deprecated
+    since the last render). Does not write when dry_run=True."""
     out_dir = agent_meta_root / "standalone" / "agents"
     written: list[str] = []
     unchanged: list[str] = []
+    removed: list[str] = []
 
-    rendered = render_all(agent_meta_root)
+    roles = discover_standalone_roles(agent_meta_root)
+    rendered = render_all(agent_meta_root, roles=roles)
     for role, content in rendered.items():
         target = out_dir / f"{role}.md"
         existing = target.read_text(encoding="utf-8") if target.exists() else None
@@ -233,7 +316,14 @@ def write_standalone_files(agent_meta_root: Path, *, dry_run: bool = False) -> d
             out_dir.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
 
-    index_content = render_index(agent_meta_root)
+    if out_dir.exists():
+        for stale in sorted(out_dir.glob("*.md")):
+            if stale.stem not in rendered:
+                removed.append(str(stale.relative_to(agent_meta_root)))
+                if not dry_run:
+                    stale.unlink()
+
+    index_content = render_index(agent_meta_root, roles=roles)
     index_target = agent_meta_root / "standalone" / "README.md"
     index_existing = index_target.read_text(encoding="utf-8") if index_target.exists() else None
     if index_existing != index_content:
@@ -243,11 +333,17 @@ def write_standalone_files(agent_meta_root: Path, *, dry_run: bool = False) -> d
     else:
         unchanged.append(str(index_target.relative_to(agent_meta_root)))
 
-    return {"written": written, "unchanged": unchanged, "roles": list(rendered.keys())}
+    return {
+        "written": written,
+        "unchanged": unchanged,
+        "removed": removed,
+        "roles": list(rendered.keys()),
+    }
 
 
 def check_standalone_drift(agent_meta_root: Path) -> list[str]:
-    """Return the list of standalone files that would change on a real render
-    (empty list = up to date). Used by `sync.py --render-standalone --check`."""
+    """Return the list of standalone files that would change (written or
+    removed) on a real render (empty list = up to date). Used by
+    `sync.py --render-standalone --check`."""
     result = write_standalone_files(agent_meta_root, dry_run=True)
-    return result["written"]
+    return result["written"] + result["removed"]

@@ -468,8 +468,8 @@ def main():
                              "optionally overridden by AGENT_META_TEST_REPO env var. "
                              "Performs a full sync into the test repo and checks sync.log for errors.")
     parser.add_argument("--render-standalone", action="store_true",
-                        help="Render fully self-contained, English-only copies of the pilot "
-                             "1-generic agent templates into standalone/agents/ — no Python/"
+                        help="Render fully self-contained, English-only copies of every "
+                             "1-generic agent template into standalone/agents/ — no Python/"
                              "project.yaml required to use them, no {{PLACEHOLDER}} left over. "
                              "Combine with --check for a read-only CI drift check.")
     parser.add_argument("--viz", action="store_true",
@@ -580,19 +580,24 @@ def main():
 
         result = write_standalone_files(agent_meta_root, dry_run=args.dry_run)
         if args.check:
-            if result["written"]:
+            drift = result["written"] + result["removed"]
+            if drift:
                 print("STANDALONE DRIFT — the following files are out of date:")
-                for path in result["written"]:
+                for path in drift:
                     print(f"  {path}")
                 sys.exit(1)
             print(f"  OK  standalone/ is up to date ({len(result['unchanged'])} file(s))")
             return
         verb = "would write" if args.dry_run else "wrote"
+        remove_verb = "would remove" if args.dry_run else "removed"
         for path in result["written"]:
             print(f"  {verb}: {path}")
+        for path in result["removed"]:
+            print(f"  {remove_verb}: {path}")
         for path in result["unchanged"]:
             print(f"  unchanged: {path}")
         print(f"\nSUMMARY\n-------\n{len(result['written'])} written  |  "
+              f"{len(result['removed'])} removed  |  "
               f"{len(result['unchanged'])} unchanged  |  {len(result['roles'])} role(s)")
         return
 
