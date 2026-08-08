@@ -467,6 +467,11 @@ def main():
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
                              "optionally overridden by AGENT_META_TEST_REPO env var. "
                              "Performs a full sync into the test repo and checks sync.log for errors.")
+    parser.add_argument("--render-standalone", action="store_true",
+                        help="Render fully self-contained, English-only copies of the pilot "
+                             "1-generic agent templates into standalone/agents/ — no Python/"
+                             "project.yaml required to use them, no {{PLACEHOLDER}} left over. "
+                             "Combine with --check for a read-only CI drift check.")
     parser.add_argument("--viz", action="store_true",
                         help="Generate static agent visualization (mindmap + interactive HTML)")
     parser.add_argument("--viz-mode", choices=["off", "static", "dynamic", "full"], default=None,
@@ -568,6 +573,27 @@ def main():
         from lib.model_discovery import discover_models
         print("  i  Updating model registry...")
         discover_models()
+        return
+
+    if args.render_standalone:
+        from lib.standalone import write_standalone_files
+
+        result = write_standalone_files(agent_meta_root, dry_run=args.dry_run)
+        if args.check:
+            if result["written"]:
+                print("STANDALONE DRIFT — the following files are out of date:")
+                for path in result["written"]:
+                    print(f"  {path}")
+                sys.exit(1)
+            print(f"  OK  standalone/ is up to date ({len(result['unchanged'])} file(s))")
+            return
+        verb = "would write" if args.dry_run else "wrote"
+        for path in result["written"]:
+            print(f"  {verb}: {path}")
+        for path in result["unchanged"]:
+            print(f"  unchanged: {path}")
+        print(f"\nSUMMARY\n-------\n{len(result['written'])} written  |  "
+              f"{len(result['unchanged'])} unchanged  |  {len(result['roles'])} role(s)")
         return
 
     if args.admin_only:

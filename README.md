@@ -75,6 +75,16 @@ pip install -r .agent-meta/requirements.txt
 python .agent-meta/scripts/sync.py --setup
 ```
 
+### No Python? Try a standalone agent persona
+
+No install, no clone, no `sync.py` — just a persona you paste into any chat AI:
+
+1. Browse [`standalone/`](standalone/README.md) and pick a role.
+2. Open its file (or ask a browsing-capable chat AI to fetch it from this repo for you).
+3. Paste the whole file as your system prompt / custom instructions.
+
+These are pre-rendered, fully self-contained copies of a pilot set of generic agent personas — no `{{PLACEHOLDER}}` left over, no project-specific config. They're a solo snapshot: no multi-agent delegation, no DoD gate, no A2A protocol. For the full pipeline, use the setup above.
+
 ## Core Capabilities & Features
 
 ```mermaid
