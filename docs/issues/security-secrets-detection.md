@@ -35,5 +35,3 @@ def _contains_secrets(content: str) -> list[str]:
 - [ ] Warning includes file path and line number
 - [ ] Can be disabled via config: `security.scan-secrets: false`
 
-## Related
-- `docs/reviews/framework-provider-review-2026-05-07.md` — Finding #5

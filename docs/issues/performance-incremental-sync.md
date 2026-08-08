@@ -49,5 +49,3 @@ Track a "generation fingerprint" (hash of all inputs) per file:
 - [ ] `--force` flag added to override incremental behavior
 - [ ] `sync.log` shows `[SKIP] (unchanged)` for skipped files
 
-## Related
-- `docs/reviews/framework-provider-review-2026-05-07.md` — Finding #7
