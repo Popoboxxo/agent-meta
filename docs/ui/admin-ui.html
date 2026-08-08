@@ -771,6 +771,23 @@ function showModal(title, body, footer = []) {
   document.getElementById("modal-overlay").hidden = false;
 }
 function hideModal() { document.getElementById("modal-overlay").hidden = true; }
+
+// Shared destructive-action confirmation (Task 17/18 of the admin-ui
+// consistency plan): replaces native confirm() dialogs, which break out of
+// the app's dark theme, with the existing showModal() component. Button
+// order/labels match openEnvModal's established convention (primary action
+// first, Cancel second). onConfirm may be async; its errors are not
+// swallowed here so existing per-call-site try/catch and toast handling
+// keeps working unchanged.
+function confirmDestructive(message, onConfirm, opts) {
+  const title = (opts && opts.title) || "Confirm";
+  const confirmLabel = (opts && opts.confirmLabel) || "Delete";
+  const body = el("p", {}, [message]);
+  const confirmBtn = el("button", { class: "btn btn-danger", onclick: async () => { hideModal(); await onConfirm(); } }, [confirmLabel]);
+  const cancelBtn = el("button", { class: "btn", onclick: hideModal }, ["Cancel"]);
+  showModal(title, body, [confirmBtn, cancelBtn]);
+}
+
 document.getElementById("modal-close").addEventListener("click", hideModal);
 document.getElementById("modal-overlay").addEventListener("click", (ev) => {
   if (ev.target.id === "modal-overlay") hideModal();
@@ -2310,6 +2327,93 @@ function renderOverridePanel(opts) {
   return p;
 }
 
+// Shared by viewProjectMcpOverrides (env vars / headers, string-only) and
+// viewProjectProviders (provider-options, string|bool) -- was previously
+// duplicated as viewProjectMcpOverrides' local renderDictEditor and
+// viewProjectProviders' local addKVRow, with addKVRow additionally
+// supporting a bool type. Pass { allowBool: true } to render the type
+// selector; omitted/false renders exactly as the old string-only
+// renderDictEditor did.
+const renderDictEditor = (title, dictData, onChange, opts) => {
+    const allowBool = !!(opts && opts.allowBool);
+    const w = el("div", { style: "margin-top: 8px;" });
+    w.appendChild(el("label", {}, [title]));
+    const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
+
+    const renderRows = () => {
+        list.innerHTML = "";
+        Object.entries(dictData).forEach(([k, v]) => {
+            const row = el("div", { style: "display: flex; gap: 4px;" });
+            const inpK = el("input", { class: "form-control", value: k, style: "flex: 1;", placeholder: "Key" });
+            const isBool = v === true || v === false;
+            const inpV = el("input", { class: "form-control", value: isBool ? String(v) : v, style: "flex: 2;", placeholder: "Value" });
+            const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
+
+            let typeSel = null;
+            if (allowBool) {
+                typeSel = el("select", { class: "form-control", style: "flex: 0 0 72px;" });
+                for (const [tv, tl] of [["string", "string"], ["bool", "bool"]]) {
+                    const o = el("option", { value: tv }, [tl]);
+                    if ((isBool && tv === "bool") || (!isBool && tv === "string")) o.setAttribute("selected", "");
+                    typeSel.appendChild(o);
+                }
+            }
+
+            const currentValue = () => {
+                if (allowBool && typeSel.value === "bool") return inpV.value.trim().toLowerCase() === "true";
+                return inpV.value;
+            };
+
+            inpK.onchange = (e) => {
+                const newKey = e.target.value;
+                if (!newKey) {
+                    toast("Key cannot be empty.", "error");
+                    inpK.value = k;
+                    return;
+                }
+                if (newKey !== k && Object.prototype.hasOwnProperty.call(dictData, newKey)) {
+                    toast(`Key "${newKey}" already exists.`, "error");
+                    inpK.value = k;
+                    return;
+                }
+                // Preserve key order: rebuild object with renamed key in same position
+                const entries = Object.entries(dictData);
+                const idx = entries.findIndex(([ek]) => ek === k);
+                // Clear all keys
+                for (const dk of Object.keys(dictData)) delete dictData[dk];
+                // Re-insert with renamed key at same position
+                entries.forEach(([ek, ev], i) => {
+                    if (i === idx) { dictData[newKey] = currentValue(); }
+                    else { dictData[ek] = ev; }
+                });
+                onChange(); renderRows();
+            };
+            const syncValue = () => { dictData[inpK.value] = currentValue(); onChange(); };
+            inpV.oninput = syncValue;
+            if (typeSel) typeSel.addEventListener("change", syncValue);
+            btnDel.onclick = () => {
+                // Empty-key rows are always just-added, not-yet-named
+                // placeholders -- nothing meaningful to lose, so skip the
+                // confirmation nag and remove them immediately.
+                if (!k) { delete dictData[k]; onChange(); renderRows(); return; }
+                confirmDestructive(`Delete "${k}"?`, () => { delete dictData[k]; onChange(); renderRows(); });
+            };
+
+            row.appendChild(inpK);
+            if (typeSel) row.appendChild(typeSel);
+            row.appendChild(inpV);
+            row.appendChild(btnDel);
+            list.appendChild(row);
+        });
+    };
+    renderRows();
+    w.appendChild(list);
+    const btnAdd = el("button", { class: "btn btn-sm" }, ["+ Add " + title]);
+    btnAdd.onclick = () => { let c = 1; while(dictData["NEW_KEY_" + c] !== undefined) c++; dictData["NEW_KEY_" + c] = ""; onChange(); renderRows(); };
+    w.appendChild(btnAdd);
+    return w;
+};
+
 async function viewProjectMcpOverrides() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — MCP Servers"]));
@@ -2346,58 +2450,6 @@ async function viewProjectMcpOverrides() {
   };
 
   // UI Helpers
-  const renderDictEditor = (title, dictData, onChange) => {
-      const w = el("div", { style: "margin-top: 8px;" });
-      w.appendChild(el("label", {}, [title]));
-      const list = el("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;" });
-      
-      const renderRows = () => {
-          list.innerHTML = "";
-          Object.entries(dictData).forEach(([k, v]) => {
-              const row = el("div", { style: "display: flex; gap: 4px;" });
-              const inpK = el("input", { class: "form-control", value: k, style: "flex: 1;", placeholder: "Key" });
-              const inpV = el("input", { class: "form-control", value: v, style: "flex: 2;", placeholder: "Value" });
-              const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
-              
-              inpK.onchange = (e) => {
-                  const newKey = e.target.value;
-                  if (!newKey) {
-                      toast("Key cannot be empty.", "error");
-                      inpK.value = k;
-                      return;
-                  }
-                  if (newKey !== k && Object.prototype.hasOwnProperty.call(dictData, newKey)) {
-                      toast(`Key "${newKey}" already exists.`, "error");
-                      inpK.value = k;
-                      return;
-                  }
-                  // Preserve key order: rebuild object with renamed key in same position
-                  const entries = Object.entries(dictData);
-                  const idx = entries.findIndex(([ek]) => ek === k);
-                  // Clear all keys
-                  for (const dk of Object.keys(dictData)) delete dictData[dk];
-                  // Re-insert with renamed key at same position
-                  entries.forEach(([ek, ev], i) => {
-                      if (i === idx) { dictData[newKey] = inpV.value; }
-                      else { dictData[ek] = ev; }
-                  });
-                  onChange(); renderRows();
-              };
-              inpV.oninput = (e) => { dictData[inpK.value] = e.target.value; onChange(); };
-              btnDel.onclick = () => { delete dictData[k]; onChange(); renderRows(); };
-              
-              row.appendChild(inpK); row.appendChild(inpV); row.appendChild(btnDel);
-              list.appendChild(row);
-          });
-      };
-      renderRows();
-      w.appendChild(list);
-      const btnAdd = el("button", { class: "btn btn-sm" }, ["+ Add " + title]);
-      btnAdd.onclick = () => { let c = 1; while(dictData["NEW_KEY_" + c] !== undefined) c++; dictData["NEW_KEY_" + c] = ""; onChange(); renderRows(); };
-      w.appendChild(btnAdd);
-      return w;
-  };
-
   const renderArrayEditor = (title, arrData, onChange) => {
       const w = el("div", { style: "margin-top: 8px;" });
       w.appendChild(el("label", {}, [title]));
@@ -2871,11 +2923,11 @@ async function viewMcpRegistry() {
       const panel = renderSrvPanel(id, srv, false, markDirty);
       // Add delete button
       const delBtn = el("button", { class: "btn", style: "color: var(--accent-red); margin-top: 8px;", onclick: () => {
-        if (confirm(`Delete override '${id}'?`)) {
+        confirmDestructive(`Delete override '${id}'?`, () => {
           delete projServers[id];
           markDirty();
           renderProjList();
-        }
+        });
       }}, ["Delete Server"]);
       panel.appendChild(delBtn);
       projListContainer.appendChild(panel);
@@ -4001,10 +4053,11 @@ async function viewExport() {
       // delete row
       const delBtn = el("button", { class: "btn btn-danger", title: "Remove mapping" }, ["×"]);
       delBtn.addEventListener("click", () => {
-        if (!confirm(`Remove export mapping "${name}"?`)) return;
-        delete data[name];
-        markDirty();
-        render();
+        confirmDestructive(`Remove export mapping "${name}"?`, () => {
+          delete data[name];
+          markDirty();
+          render();
+        });
       });
       tr.appendChild(el("td", {}, [delBtn]));
 
@@ -4132,9 +4185,10 @@ async function viewPipelines() {
       el("button", {
         class: "btn btn-danger",
         onclick: () => {
-          if (!confirm(`Delete pipeline "${name}"?`)) return;
-          delete pipelines[name];
-          render();
+          confirmDestructive(`Delete pipeline "${name}"?`, () => {
+            delete pipelines[name];
+            render();
+          });
         },
       }, ["Delete pipeline"]),
     ]);
@@ -4658,56 +4712,10 @@ async function viewReflectionPairs() {
         el("button", {
           class: "btn btn-danger",
           onclick: () => {
-            if (!confirm(`Delete reflection pair "${pair.id || idx + 1}"?`)) return;
-            pairs.splice(idx, 1);
-  function showPipelineHelp() {
-    api.get("/api/pipelines?help").then(data => {
-      const h = data.help;
-      if (!h) { showModal("Help", "No help data available."); return; }
-      const body = el("div");
-      body.appendChild(el("p", {}, [h.description]));
-
-      const structSec = el("div");
-      structSec.appendChild(el("h3", {}, ["Pipeline Structure"]));
-      structSec.appendChild(el("pre", { style: "max-height:200px;" }, [JSON.stringify(h.pipeline_structure, null, 2)]));
-      body.appendChild(structSec);
-
-      const modesSec = el("div");
-      modesSec.appendChild(el("h3", {}, ["Stage Modes"]));
-      const modesList = el("ul");
-      for (const [mode, desc] of Object.entries(h.stage_modes_explained || {})) {
-        modesList.appendChild(el("li", {}, [el("code", {}, [mode]), ` — ${desc}`]));
-      }
-      modesSec.appendChild(modesList);
-      body.appendChild(modesSec);
-
-      const epSec = el("div");
-      epSec.appendChild(el("h3", {}, ["API Endpoints"]));
-      for (const [ep, info] of Object.entries(h.endpoints || {})) {
-        const epBlock = el("div", { class: "panel", style: "padding:10px 14px; margin-bottom:8px;" });
-        epBlock.appendChild(el("h4", { style: "margin:0 0 6px;" }, [ep]));
-        epBlock.appendChild(el("p", { style: "margin:0 0 4px;" }, [info.description]));
-        if (info.warning) {
-          epBlock.appendChild(el("div", { class: "error-box", style: "margin:4px 0;" }, [info.warning]));
-        }
-        if (info.body) epBlock.appendChild(el("pre", {}, [info.body]));
-        if (info.example) epBlock.appendChild(el("code", {}, [info.example]));
-        body.appendChild(epBlock);
-      }
-
-      if (h.available_pipelines && h.available_pipelines.length) {
-        body.appendChild(el("p", {}, [
-          "Available pipelines: ",
-          el("code", {}, [h.available_pipelines.join(", ")]),
-        ]));
-      }
-      showModal("Pipelines Help", body);
-    }).catch(err => {
-      showModal("Help Error", `Failed to load help: ${err.message}`);
-    });
-  }
-
-  render();
+            confirmDestructive(`Delete reflection pair "${pair.id || idx + 1}"?`, () => {
+              pairs.splice(idx, 1);
+              render();
+            });
           },
         }, ["Delete pair"]),
       ]);
@@ -5459,17 +5467,18 @@ async function viewProjectGeneral() {
     };
     
     const restoreBtn = el("button", { class: "btn", style: "color: var(--accent-red);" }, ["Restore Framework Default"]);
-    restoreBtn.onclick = async () => {
-      if (!confirm("Remove project overrides and restore framework defaults?")) return;
-      try {
-        await api.put("/api/submodule-protection", {
-          restore_default: true
-        });
-        toast("Framework defaults restored", "success");
-        setTimeout(() => router.resolve(), 500);
-      } catch (e) {
-        toast(e.message, "error");
-      }
+    restoreBtn.onclick = () => {
+      confirmDestructive("Remove project overrides and restore framework defaults?", async () => {
+        try {
+          await api.put("/api/submodule-protection", {
+            restore_default: true
+          });
+          toast("Framework defaults restored", "success");
+          setTimeout(() => router.resolve(), 500);
+        } catch (e) {
+          toast(e.message, "error");
+        }
+      }, { confirmLabel: "Restore" });
     };
     
     const actionsRow = el("div", { style: "margin-top: 10px; display: flex; align-items: center;" }, [
@@ -5622,98 +5631,11 @@ async function viewProjectProviders() {
     header.appendChild(toggleBtn);
 
     const body = el("div", { style: "padding:8px 12px; display:block;" });
-
-    // KV table
-    const table = el("table", { style: "width:100%; border-collapse:collapse;" });
-    const thead = el("tr", {}, [
-      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Key"]),
-      el("th", { style: "text-align:left; font-size:11px; color:var(--text-muted); padding:4px 0; width:40%;" }, ["Value"]),
-      el("th", { style: "width:20%;" }, [""]),
-    ]);
-    table.appendChild(thead);
-
-    // Render existing rows
-    function addKVRow(key, val) {
-      const row = el("tr", {});
-      const keyCell = el("td", { style: "padding:2px 4px 2px 0;" });
-      const keyInput = el("input", { type: "text", style: "width:100%; font-family:var(--font-mono); font-size:12px;", placeholder: "key" });
-      keyInput.value = key;
-      keyCell.appendChild(keyInput);
-
-      const valCell = el("td", { style: "padding:2px 4px;" });
-      // Detect bool vs string
-      const isBool = val === true || val === false;
-      const valSel = el("select", { style: "margin-right:4px; font-size:12px;" });
-      const typeOpts = [["string", "string"], ["bool", "bool"]];
-      for (const [tv, tl] of typeOpts) {
-        const o = el("option", { value: tv }, [tl]);
-        if (isBool && tv === "bool") o.setAttribute("selected", "");
-        else if (!isBool && tv === "string") o.setAttribute("selected", "");
-        valSel.appendChild(o);
-      }
-      const valInput = el("input", { type: "text", style: "width:calc(100% - 70px); font-size:12px; font-family:var(--font-mono);", placeholder: "value" });
-      valInput.value = isBool ? String(val) : (val != null ? String(val) : "");
-      valCell.appendChild(valSel);
-      valCell.appendChild(valInput);
-
-      const removeCell = el("td", { style: "padding:2px 0 2px 4px; text-align:right;" });
-      const removeBtn = el("button", { class: "btn", style: "font-size:11px; padding:2px 6px; color:var(--accent-red);", onclick: () => {
-        const oldKey = keyInput.value.trim();
-        if (oldKey) delete provOpts[oldKey];
-        row.remove();
-      } }, ["✕"]);
-      removeCell.appendChild(removeBtn);
-
-      // On change: update provOpts. Tracks the row's own last-known key so a
-      // rename (editing the key field in place) removes the old entry
-      // instead of leaving it behind as an orphaned duplicate (#319) — the
-      // previous version had no such tracking and relied on a "rebuild on
-      // save" that never actually happened, so a renamed key silently kept
-      // both the old and new key in the saved config.
-      let lastKey = key;
-      function sync() {
-        const k = keyInput.value.trim();
-        if (k !== lastKey && Object.prototype.hasOwnProperty.call(provOpts, k)) {
-          toast(`Key "${k}" already exists.`, "error");
-          keyInput.value = lastKey;
-          return;
-        }
-        if (k !== lastKey && lastKey) {
-          delete provOpts[lastKey];
-        }
-        if (!k) {
-          lastKey = k;
-          return;
-        }
-        let v;
-        if (valSel.value === "bool") {
-          v = valInput.value.trim().toLowerCase() === "true";
-        } else {
-          v = valInput.value;
-        }
-        provOpts[k] = v;
-        lastKey = k;
-      }
-      keyInput.addEventListener("change", sync);
-      valInput.addEventListener("change", sync);
-      valSel.addEventListener("change", sync);
-
-      row.appendChild(keyCell);
-      row.appendChild(valCell);
-      row.appendChild(removeCell);
-      table.appendChild(row);
-    }
-
-    for (const [k, v] of Object.entries(provOpts)) {
-      addKVRow(k, v);
-    }
-
-    body.appendChild(table);
-
-    const addBtn = el("button", { class: "btn", style: "margin-top:6px; font-size:12px;", onclick: () => {
-      addKVRow("", "");
-    } }, ["+ Add option"]);
-    body.appendChild(addBtn);
+    // provOpts is the live object embedded in providerOptions[provName], so
+    // renderDictEditor's direct mutations are already what the Save button
+    // below reads -- no onChange bookkeeping needed on this page (it has no
+    // dirty-tracking status indicator at all).
+    body.appendChild(renderDictEditor("Options", provOpts, () => {}, { allowBool: true }));
 
     // Toggle collapse
     let expanded = true;
@@ -6507,21 +6429,23 @@ async function viewBackups() {
           el("td", {}, [a.label || "-"]),
           el("td", {}, [a.size_mb + " MB"]),
           el("td", {}, [
-            el("button", { class: "btn btn-sm", onclick: async () => {
-              if(!confirm("Restore this backup?")) return;
-              try {
-                await api.post("/api/backups/restore", {archive_name: a.name, force: true});
-                alert("Restored successfully.");
-                load();
-              } catch(e) { alert("Error: " + e); }
+            el("button", { class: "btn btn-sm", onclick: () => {
+              confirmDestructive("Restore this backup?", async () => {
+                try {
+                  await api.post("/api/backups/restore", {archive_name: a.name, force: true});
+                  alert("Restored successfully.");
+                  load();
+                } catch(e) { alert("Error: " + e); }
+              }, { confirmLabel: "Restore" });
             }}, ["Restore"]),
             " ",
-            el("button", { class: "btn btn-danger btn-sm", onclick: async () => {
-              if(!confirm("Delete this backup?")) return;
-              try {
-                await api.delete("/api/backups/" + a.name);
-                load();
-              } catch(e) { alert("Error: " + e); }
+            el("button", { class: "btn btn-danger btn-sm", onclick: () => {
+              confirmDestructive("Delete this backup?", async () => {
+                try {
+                  await api.delete("/api/backups/" + a.name);
+                  load();
+                } catch(e) { alert("Error: " + e); }
+              });
             }}, ["Delete"])
           ])
         ])
@@ -6644,20 +6568,22 @@ async function viewProviderDeactivation() {
   // Bulk actions
   const bulkRow = el("div", { class: "btn-row", style: "gap:12px;" });
   const deactAllBtn = el("button", { class: "btn btn-danger" }, ["Deactivate ALL"]);
-  deactAllBtn.addEventListener("click", async () => {
-    if (!confirm("Deactivate ALL providers? This will zip and remove all provider directories.")) return;
-    deactAllBtn.disabled = true;
-    try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
-    router.resolve(); } catch { /* ignore */ }
+  deactAllBtn.addEventListener("click", () => {
+    confirmDestructive("Deactivate ALL providers? This will zip and remove all provider directories.", async () => {
+      deactAllBtn.disabled = true;
+      try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
+      router.resolve(); } catch { /* ignore */ }
+    });
   });
   bulkRow.appendChild(deactAllBtn);
 
   const actAllBtn = el("button", { class: "btn" }, ["Activate ALL (from backups)"]);
-  actAllBtn.addEventListener("click", async () => {
-    if (!confirm("Activate ALL providers from backups?")) return;
-    actAllBtn.disabled = true;
-    try { await api.post("/api/provider-deactivation/activate", { providers: [] });
-    router.resolve(); } catch { /* ignore */ }
+  actAllBtn.addEventListener("click", () => {
+    confirmDestructive("Activate ALL providers from backups?", async () => {
+      actAllBtn.disabled = true;
+      try { await api.post("/api/provider-deactivation/activate", { providers: [] });
+      router.resolve(); } catch { /* ignore */ }
+    }, { confirmLabel: "Activate" });
   });
   bulkRow.appendChild(actAllBtn);
   actions.appendChild(bulkRow);
@@ -6734,7 +6660,7 @@ async function viewProjectEnvironments() {
       tr.appendChild(el("td", {}, [isReq ? "✅" : "—"]));
       tr.appendChild(el("td", {}, [isSec ? "🔒" : "—"]));
       const delCell = el("td");
-      const delBtn = el("button", { class: "btn btn-sm btn-danger", onclick: (ev) => { ev.stopPropagation(); deleteEnv(name); } }, ["✕"]);
+      const delBtn = el("button", { class: "btn btn-sm btn-danger", onclick: (ev) => { ev.stopPropagation(); deleteEnv(name); } }, ["×"]);
       delCell.appendChild(delBtn);
       tr.appendChild(delCell);
       tbody.appendChild(tr);
@@ -6744,11 +6670,12 @@ async function viewProjectEnvironments() {
     statusEl.textContent = `${names.length} variable(s).`;
   }
 
-  async function deleteEnv(name) {
-    if (!confirm(`Delete environment variable "${name}"?`)) return;
-    delete envs[name];
-    await saveProjectSection("environments", envs, statusEl);
-    render();
+  function deleteEnv(name) {
+    confirmDestructive(`Delete environment variable "${name}"?`, async () => {
+      delete envs[name];
+      await saveProjectSection("environments", envs, statusEl);
+      render();
+    });
   }
 
   async function openEnvModal(name) {
@@ -6773,6 +6700,14 @@ async function viewProjectEnvironments() {
       const newName = nameInput.value.trim().toUpperCase();
       if (!newName) { toast("Name is required", "error"); return; }
       const oldName = isNew ? null : name;
+      // Same #319 class of bug as the generic dict editors: renaming (or
+      // creating) to a name that already exists must be rejected, not
+      // silently delete the old entry and overwrite whatever was under the
+      // new name.
+      if (newName !== oldName && Object.prototype.hasOwnProperty.call(envs, newName)) {
+        toast(`Variable "${newName}" already exists.`, "error");
+        return;
+      }
       if (oldName && oldName !== newName) delete envs[oldName];
       // Guard: never persist masked placeholder values as actual defaults.
       const rawDefault = defInput.value.trim();
@@ -8148,10 +8083,11 @@ async function viewModelsLegacy() {
       if (m.source_url && !editMode) actionTd.appendChild(el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"]));
       const resetBtn = el("button", { class: "btn-icon", style: "cursor: pointer; background: transparent; border: none; font-size: 1.2em;", title: "Reset Pricing Overlay" }, ["🗑️"]);
       resetBtn.style.display = editMode ? "inline-block" : "none";
-      resetBtn.onclick = async () => {
-        if (!confirm(`Reset pricing overlay for ${m.id}?`)) return;
-        const r = await api.post("/api/pricing/reset", { provider: m.provider, id: m.id });
-        if (r.success) { toast("Pricing reset", "success"); await loadData(); }
+      resetBtn.onclick = () => {
+        confirmDestructive(`Reset pricing overlay for ${m.id}?`, async () => {
+          const r = await api.post("/api/pricing/reset", { provider: m.provider, id: m.id });
+          if (r.success) { toast("Pricing reset", "success"); await loadData(); }
+        }, { confirmLabel: "Reset" });
       };
       actionTd.appendChild(resetBtn);
 
@@ -8161,22 +8097,23 @@ async function viewModelsLegacy() {
         style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: 6px;",
         title: "Blacklist this model permanently (removed from registry, won't reappear on next sync)",
       }, ["Blacklist"]);
-      blacklistBtn.onclick = async () => {
-        if (!confirm(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`)) return;
-        blacklistBtn.disabled = true;
-        try {
-          const r = await api.post("/api/models/exclude", { ids: [m.id] });
-          if (r && r.success !== false) {
-            toast("Model blacklisted", "success");
-            await loadData();
-          } else {
-            toast((r && r.error) || "Blacklist failed", "error");
+      blacklistBtn.onclick = () => {
+        confirmDestructive(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`, async () => {
+          blacklistBtn.disabled = true;
+          try {
+            const r = await api.post("/api/models/exclude", { ids: [m.id] });
+            if (r && r.success !== false) {
+              toast("Model blacklisted", "success");
+              await loadData();
+            } else {
+              toast((r && r.error) || "Blacklist failed", "error");
+            }
+          } catch (err) {
+            toast(`Blacklist failed: ${err.message}`, "error");
+          } finally {
+            blacklistBtn.disabled = false;
           }
-        } catch (err) {
-          toast(`Blacklist failed: ${err.message}`, "error");
-        } finally {
-          blacklistBtn.disabled = false;
-        }
+        }, { confirmLabel: "Blacklist" });
       };
       actionTd.appendChild(blacklistBtn);
       tr.appendChild(actionTd);
@@ -8225,17 +8162,18 @@ async function viewModelsLegacy() {
     }
   };
 
-  deleteBtn.onclick = async () => {
+  deleteBtn.onclick = () => {
     const ids = Array.from(tableWrap.querySelectorAll(".model-cb:checked")).map(cb => cb.value);
     if (!ids.length) return;
-    if (!confirm(`Exclude ${ids.length} models?`)) return;
-    deleteBtn.disabled = true; deleteBtn.textContent = "Deleting…";
-    try {
-      const r = await api.post("/api/models/exclude", { ids });
-      if (r.success) { toast("Models excluded", "success"); await loadData(); }
-    } finally {
-      deleteBtn.disabled = false; deleteBtn.textContent = "Delete Selected";
-    }
+    confirmDestructive(`Exclude ${ids.length} models?`, async () => {
+      deleteBtn.disabled = true; deleteBtn.textContent = "Deleting…";
+      try {
+        const r = await api.post("/api/models/exclude", { ids });
+        if (r.success) { toast("Models excluded", "success"); await loadData(); }
+      } finally {
+        deleteBtn.disabled = false; deleteBtn.textContent = "Delete Selected";
+      }
+    });
   };
 
   saveBtn.onclick = async () => {
