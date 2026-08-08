@@ -143,7 +143,6 @@ def test_environment_variable_rename_to_existing_name_is_rejected(browser_ctx):
     # variables via the actual "+ Add Variable" flow, then remove them again
     # regardless of outcome, same discipline as every other test in this
     # suite that touches the real project.yaml.
-    page.on("dialog", lambda d: d.accept())
     seeded = ["__TEST_COLLISION_A__", "__TEST_COLLISION_B__"]
     try:
         page.goto(f"{base}/#/project/environments")
@@ -179,8 +178,13 @@ def test_environment_variable_rename_to_existing_name_is_rejected(browser_ctx):
         for var_name in seeded:
             expect(page.get_by_text(var_name, exact=True)).to_be_visible()
     finally:
+        # deleteEnv() now goes through the confirmDestructive() modal
+        # (Phase 3, Task 18) instead of deleting immediately -- click
+        # through it for each seeded entry still present.
         for var_name in seeded:
             row = page.get_by_text(var_name, exact=True)
             if row.count() > 0:
                 row.locator("xpath=ancestor::tr").locator(".btn-danger").click()
+                page.get_by_role("button", name="Delete", exact=True).click()
+                page.wait_for_timeout(200)
         page.close()

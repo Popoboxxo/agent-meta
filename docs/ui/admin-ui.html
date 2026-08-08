@@ -771,6 +771,23 @@ function showModal(title, body, footer = []) {
   document.getElementById("modal-overlay").hidden = false;
 }
 function hideModal() { document.getElementById("modal-overlay").hidden = true; }
+
+// Shared destructive-action confirmation (Task 17/18 of the admin-ui
+// consistency plan): replaces native confirm() dialogs, which break out of
+// the app's dark theme, with the existing showModal() component. Button
+// order/labels match openEnvModal's established convention (primary action
+// first, Cancel second). onConfirm may be async; its errors are not
+// swallowed here so existing per-call-site try/catch and toast handling
+// keeps working unchanged.
+function confirmDestructive(message, onConfirm, opts) {
+  const title = (opts && opts.title) || "Confirm";
+  const confirmLabel = (opts && opts.confirmLabel) || "Delete";
+  const body = el("p", {}, [message]);
+  const confirmBtn = el("button", { class: "btn btn-danger", onclick: async () => { hideModal(); await onConfirm(); } }, [confirmLabel]);
+  const cancelBtn = el("button", { class: "btn", onclick: hideModal }, ["Cancel"]);
+  showModal(title, body, [confirmBtn, cancelBtn]);
+}
+
 document.getElementById("modal-close").addEventListener("click", hideModal);
 document.getElementById("modal-overlay").addEventListener("click", (ev) => {
   if (ev.target.id === "modal-overlay") hideModal();
@@ -2374,7 +2391,13 @@ const renderDictEditor = (title, dictData, onChange, opts) => {
             const syncValue = () => { dictData[inpK.value] = currentValue(); onChange(); };
             inpV.oninput = syncValue;
             if (typeSel) typeSel.addEventListener("change", syncValue);
-            btnDel.onclick = () => { delete dictData[k]; onChange(); renderRows(); };
+            btnDel.onclick = () => {
+                // Empty-key rows are always just-added, not-yet-named
+                // placeholders -- nothing meaningful to lose, so skip the
+                // confirmation nag and remove them immediately.
+                if (!k) { delete dictData[k]; onChange(); renderRows(); return; }
+                confirmDestructive(`Delete "${k}"?`, () => { delete dictData[k]; onChange(); renderRows(); });
+            };
 
             row.appendChild(inpK);
             if (typeSel) row.appendChild(typeSel);
@@ -2900,11 +2923,11 @@ async function viewMcpRegistry() {
       const panel = renderSrvPanel(id, srv, false, markDirty);
       // Add delete button
       const delBtn = el("button", { class: "btn", style: "color: var(--accent-red); margin-top: 8px;", onclick: () => {
-        if (confirm(`Delete override '${id}'?`)) {
+        confirmDestructive(`Delete override '${id}'?`, () => {
           delete projServers[id];
           markDirty();
           renderProjList();
-        }
+        });
       }}, ["Delete Server"]);
       panel.appendChild(delBtn);
       projListContainer.appendChild(panel);
@@ -4030,10 +4053,11 @@ async function viewExport() {
       // delete row
       const delBtn = el("button", { class: "btn btn-danger", title: "Remove mapping" }, ["×"]);
       delBtn.addEventListener("click", () => {
-        if (!confirm(`Remove export mapping "${name}"?`)) return;
-        delete data[name];
-        markDirty();
-        render();
+        confirmDestructive(`Remove export mapping "${name}"?`, () => {
+          delete data[name];
+          markDirty();
+          render();
+        });
       });
       tr.appendChild(el("td", {}, [delBtn]));
 
@@ -4161,9 +4185,10 @@ async function viewPipelines() {
       el("button", {
         class: "btn btn-danger",
         onclick: () => {
-          if (!confirm(`Delete pipeline "${name}"?`)) return;
-          delete pipelines[name];
-          render();
+          confirmDestructive(`Delete pipeline "${name}"?`, () => {
+            delete pipelines[name];
+            render();
+          });
         },
       }, ["Delete pipeline"]),
     ]);
@@ -4687,56 +4712,10 @@ async function viewReflectionPairs() {
         el("button", {
           class: "btn btn-danger",
           onclick: () => {
-            if (!confirm(`Delete reflection pair "${pair.id || idx + 1}"?`)) return;
-            pairs.splice(idx, 1);
-  function showPipelineHelp() {
-    api.get("/api/pipelines?help").then(data => {
-      const h = data.help;
-      if (!h) { showModal("Help", "No help data available."); return; }
-      const body = el("div");
-      body.appendChild(el("p", {}, [h.description]));
-
-      const structSec = el("div");
-      structSec.appendChild(el("h3", {}, ["Pipeline Structure"]));
-      structSec.appendChild(el("pre", { style: "max-height:200px;" }, [JSON.stringify(h.pipeline_structure, null, 2)]));
-      body.appendChild(structSec);
-
-      const modesSec = el("div");
-      modesSec.appendChild(el("h3", {}, ["Stage Modes"]));
-      const modesList = el("ul");
-      for (const [mode, desc] of Object.entries(h.stage_modes_explained || {})) {
-        modesList.appendChild(el("li", {}, [el("code", {}, [mode]), ` — ${desc}`]));
-      }
-      modesSec.appendChild(modesList);
-      body.appendChild(modesSec);
-
-      const epSec = el("div");
-      epSec.appendChild(el("h3", {}, ["API Endpoints"]));
-      for (const [ep, info] of Object.entries(h.endpoints || {})) {
-        const epBlock = el("div", { class: "panel", style: "padding:10px 14px; margin-bottom:8px;" });
-        epBlock.appendChild(el("h4", { style: "margin:0 0 6px;" }, [ep]));
-        epBlock.appendChild(el("p", { style: "margin:0 0 4px;" }, [info.description]));
-        if (info.warning) {
-          epBlock.appendChild(el("div", { class: "error-box", style: "margin:4px 0;" }, [info.warning]));
-        }
-        if (info.body) epBlock.appendChild(el("pre", {}, [info.body]));
-        if (info.example) epBlock.appendChild(el("code", {}, [info.example]));
-        body.appendChild(epBlock);
-      }
-
-      if (h.available_pipelines && h.available_pipelines.length) {
-        body.appendChild(el("p", {}, [
-          "Available pipelines: ",
-          el("code", {}, [h.available_pipelines.join(", ")]),
-        ]));
-      }
-      showModal("Pipelines Help", body);
-    }).catch(err => {
-      showModal("Help Error", `Failed to load help: ${err.message}`);
-    });
-  }
-
-  render();
+            confirmDestructive(`Delete reflection pair "${pair.id || idx + 1}"?`, () => {
+              pairs.splice(idx, 1);
+              render();
+            });
           },
         }, ["Delete pair"]),
       ]);
@@ -5488,17 +5467,18 @@ async function viewProjectGeneral() {
     };
     
     const restoreBtn = el("button", { class: "btn", style: "color: var(--accent-red);" }, ["Restore Framework Default"]);
-    restoreBtn.onclick = async () => {
-      if (!confirm("Remove project overrides and restore framework defaults?")) return;
-      try {
-        await api.put("/api/submodule-protection", {
-          restore_default: true
-        });
-        toast("Framework defaults restored", "success");
-        setTimeout(() => router.resolve(), 500);
-      } catch (e) {
-        toast(e.message, "error");
-      }
+    restoreBtn.onclick = () => {
+      confirmDestructive("Remove project overrides and restore framework defaults?", async () => {
+        try {
+          await api.put("/api/submodule-protection", {
+            restore_default: true
+          });
+          toast("Framework defaults restored", "success");
+          setTimeout(() => router.resolve(), 500);
+        } catch (e) {
+          toast(e.message, "error");
+        }
+      }, { confirmLabel: "Restore" });
     };
     
     const actionsRow = el("div", { style: "margin-top: 10px; display: flex; align-items: center;" }, [
@@ -6449,21 +6429,23 @@ async function viewBackups() {
           el("td", {}, [a.label || "-"]),
           el("td", {}, [a.size_mb + " MB"]),
           el("td", {}, [
-            el("button", { class: "btn btn-sm", onclick: async () => {
-              if(!confirm("Restore this backup?")) return;
-              try {
-                await api.post("/api/backups/restore", {archive_name: a.name, force: true});
-                alert("Restored successfully.");
-                load();
-              } catch(e) { alert("Error: " + e); }
+            el("button", { class: "btn btn-sm", onclick: () => {
+              confirmDestructive("Restore this backup?", async () => {
+                try {
+                  await api.post("/api/backups/restore", {archive_name: a.name, force: true});
+                  alert("Restored successfully.");
+                  load();
+                } catch(e) { alert("Error: " + e); }
+              }, { confirmLabel: "Restore" });
             }}, ["Restore"]),
             " ",
-            el("button", { class: "btn btn-danger btn-sm", onclick: async () => {
-              if(!confirm("Delete this backup?")) return;
-              try {
-                await api.delete("/api/backups/" + a.name);
-                load();
-              } catch(e) { alert("Error: " + e); }
+            el("button", { class: "btn btn-danger btn-sm", onclick: () => {
+              confirmDestructive("Delete this backup?", async () => {
+                try {
+                  await api.delete("/api/backups/" + a.name);
+                  load();
+                } catch(e) { alert("Error: " + e); }
+              });
             }}, ["Delete"])
           ])
         ])
@@ -6586,20 +6568,22 @@ async function viewProviderDeactivation() {
   // Bulk actions
   const bulkRow = el("div", { class: "btn-row", style: "gap:12px;" });
   const deactAllBtn = el("button", { class: "btn btn-danger" }, ["Deactivate ALL"]);
-  deactAllBtn.addEventListener("click", async () => {
-    if (!confirm("Deactivate ALL providers? This will zip and remove all provider directories.")) return;
-    deactAllBtn.disabled = true;
-    try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
-    router.resolve(); } catch { /* ignore */ }
+  deactAllBtn.addEventListener("click", () => {
+    confirmDestructive("Deactivate ALL providers? This will zip and remove all provider directories.", async () => {
+      deactAllBtn.disabled = true;
+      try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
+      router.resolve(); } catch { /* ignore */ }
+    });
   });
   bulkRow.appendChild(deactAllBtn);
 
   const actAllBtn = el("button", { class: "btn" }, ["Activate ALL (from backups)"]);
-  actAllBtn.addEventListener("click", async () => {
-    if (!confirm("Activate ALL providers from backups?")) return;
-    actAllBtn.disabled = true;
-    try { await api.post("/api/provider-deactivation/activate", { providers: [] });
-    router.resolve(); } catch { /* ignore */ }
+  actAllBtn.addEventListener("click", () => {
+    confirmDestructive("Activate ALL providers from backups?", async () => {
+      actAllBtn.disabled = true;
+      try { await api.post("/api/provider-deactivation/activate", { providers: [] });
+      router.resolve(); } catch { /* ignore */ }
+    }, { confirmLabel: "Activate" });
   });
   bulkRow.appendChild(actAllBtn);
   actions.appendChild(bulkRow);
@@ -6686,11 +6670,12 @@ async function viewProjectEnvironments() {
     statusEl.textContent = `${names.length} variable(s).`;
   }
 
-  async function deleteEnv(name) {
-    if (!confirm(`Delete environment variable "${name}"?`)) return;
-    delete envs[name];
-    await saveProjectSection("environments", envs, statusEl);
-    render();
+  function deleteEnv(name) {
+    confirmDestructive(`Delete environment variable "${name}"?`, async () => {
+      delete envs[name];
+      await saveProjectSection("environments", envs, statusEl);
+      render();
+    });
   }
 
   async function openEnvModal(name) {
@@ -8098,10 +8083,11 @@ async function viewModelsLegacy() {
       if (m.source_url && !editMode) actionTd.appendChild(el("a", { href: m.source_url, target: "_blank" }, ["Pricing URL"]));
       const resetBtn = el("button", { class: "btn-icon", style: "cursor: pointer; background: transparent; border: none; font-size: 1.2em;", title: "Reset Pricing Overlay" }, ["🗑️"]);
       resetBtn.style.display = editMode ? "inline-block" : "none";
-      resetBtn.onclick = async () => {
-        if (!confirm(`Reset pricing overlay for ${m.id}?`)) return;
-        const r = await api.post("/api/pricing/reset", { provider: m.provider, id: m.id });
-        if (r.success) { toast("Pricing reset", "success"); await loadData(); }
+      resetBtn.onclick = () => {
+        confirmDestructive(`Reset pricing overlay for ${m.id}?`, async () => {
+          const r = await api.post("/api/pricing/reset", { provider: m.provider, id: m.id });
+          if (r.success) { toast("Pricing reset", "success"); await loadData(); }
+        }, { confirmLabel: "Reset" });
       };
       actionTd.appendChild(resetBtn);
 
@@ -8111,22 +8097,23 @@ async function viewModelsLegacy() {
         style: "cursor: pointer; padding: 4px 10px; font-size: 0.85em; margin-left: 6px;",
         title: "Blacklist this model permanently (removed from registry, won't reappear on next sync)",
       }, ["Blacklist"]);
-      blacklistBtn.onclick = async () => {
-        if (!confirm(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`)) return;
-        blacklistBtn.disabled = true;
-        try {
-          const r = await api.post("/api/models/exclude", { ids: [m.id] });
-          if (r && r.success !== false) {
-            toast("Model blacklisted", "success");
-            await loadData();
-          } else {
-            toast((r && r.error) || "Blacklist failed", "error");
+      blacklistBtn.onclick = () => {
+        confirmDestructive(`Blacklist model ${m.id}? It will be excluded from discovery permanently.`, async () => {
+          blacklistBtn.disabled = true;
+          try {
+            const r = await api.post("/api/models/exclude", { ids: [m.id] });
+            if (r && r.success !== false) {
+              toast("Model blacklisted", "success");
+              await loadData();
+            } else {
+              toast((r && r.error) || "Blacklist failed", "error");
+            }
+          } catch (err) {
+            toast(`Blacklist failed: ${err.message}`, "error");
+          } finally {
+            blacklistBtn.disabled = false;
           }
-        } catch (err) {
-          toast(`Blacklist failed: ${err.message}`, "error");
-        } finally {
-          blacklistBtn.disabled = false;
-        }
+        }, { confirmLabel: "Blacklist" });
       };
       actionTd.appendChild(blacklistBtn);
       tr.appendChild(actionTd);
@@ -8175,17 +8162,18 @@ async function viewModelsLegacy() {
     }
   };
 
-  deleteBtn.onclick = async () => {
+  deleteBtn.onclick = () => {
     const ids = Array.from(tableWrap.querySelectorAll(".model-cb:checked")).map(cb => cb.value);
     if (!ids.length) return;
-    if (!confirm(`Exclude ${ids.length} models?`)) return;
-    deleteBtn.disabled = true; deleteBtn.textContent = "Deleting…";
-    try {
-      const r = await api.post("/api/models/exclude", { ids });
-      if (r.success) { toast("Models excluded", "success"); await loadData(); }
-    } finally {
-      deleteBtn.disabled = false; deleteBtn.textContent = "Delete Selected";
-    }
+    confirmDestructive(`Exclude ${ids.length} models?`, async () => {
+      deleteBtn.disabled = true; deleteBtn.textContent = "Deleting…";
+      try {
+        const r = await api.post("/api/models/exclude", { ids });
+        if (r.success) { toast("Models excluded", "success"); await loadData(); }
+      } finally {
+        deleteBtn.disabled = false; deleteBtn.textContent = "Delete Selected";
+      }
+    });
   };
 
   saveBtn.onclick = async () => {
