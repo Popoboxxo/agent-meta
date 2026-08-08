@@ -359,7 +359,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.rules import sync_rules, sync_speech_mode
     from lib.skills import sync_external_skills_for_provider
 
-    test_variables, _pre_warnings = build_variables(config, agent_meta_root)
+    test_variables, _pre_warnings = build_variables(config, agent_meta_root, test_repo_path)
     # Override AGENT_META_REPO to point to test repo for validation context
     test_variables["PROJECT_NAME"] = test_variables.get("PROJECT_NAME", "agent-meta-test")
 
@@ -652,7 +652,7 @@ def main():
         project_root = config_resolved.parent
     config_path = Path(args.config).resolve()
     config = load_config(config_path)
-    variables, pre_warnings = build_variables(config, agent_meta_root)
+    variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
 
@@ -760,7 +760,7 @@ def main():
         # Re-sync context files so AGENTS.md reflects the updated provider list.
         if not args.dry_run:
             config = load_config(config_path)
-            variables, _ = build_variables(config, agent_meta_root)
+            variables, _ = build_variables(config, agent_meta_root, project_root)
             for prov in resolve_providers(config, provider_config):
                 sync_context_for_provider(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run,
@@ -786,7 +786,7 @@ def main():
                                     config, log, args.dry_run)
         if not args.dry_run:
             config = load_config(config_path)
-            variables, _ = build_variables(config, agent_meta_root)
+            variables, _ = build_variables(config, agent_meta_root, project_root)
             for prov in resolve_providers(config, provider_config):
                 sync_context_for_provider(agent_meta_root, project_root, config,
                                           variables, log, args.dry_run,

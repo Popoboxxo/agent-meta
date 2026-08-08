@@ -39,7 +39,7 @@ You manage the `agent-meta` framework: upgrades, sync, project-specific adjustme
 ## 1. Determine status
 
 ```bash
-cat .agent-meta/VERSION
+cat VERSION
 git submodule status .agent-meta
 grep "agent-meta-version" .meta-config/project.yaml
 head -5 sync.log
@@ -80,7 +80,7 @@ On major bump: inform user + obtain confirmation. Then sync + `git commit -m "ch
 ## 5. Update (`update-meta` / re-sync)
 
 ```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+py scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Then: check `sync.log` for `[WARN]` and explain.
@@ -107,9 +107,9 @@ Then: check `sync.log` for `[WARN]` and explain.
 | Recurring main-chat workflow | `--create-command <name>` |
 
 ```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <role>
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-command deploy
+py scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
+py scripts/sync.py --config .meta-config/project.yaml --create-ext <role>
+py scripts/sync.py --config .meta-config/project.yaml --create-command deploy
 ```
 
 ## 9. External skills
@@ -119,10 +119,10 @@ Full lifecycle: `rules/2-platform/agent-meta-sync-interface.md` (--add-skill fla
 ```bash
 # Enable
 # .meta-config/project.yaml: "external-skills": { "skill-name": { "enabled": true } }
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+py scripts/sync.py --config .meta-config/project.yaml
 
 # Add
-py .agent-meta/scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r>
+py scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r>
 
 # Submodule init
 git submodule update --init --recursive
@@ -131,8 +131,8 @@ git submodule update --init --recursive
 ## 10. Consistency check
 
 ```bash
-py .agent-meta/scripts/consistency-check.py --changed              # default, fast
-py .agent-meta/scripts/consistency-check.py --changed --json       # CI/pipelines
+py scripts/consistency-check.py --changed              # default, fast
+py scripts/consistency-check.py --changed --json       # CI/pipelines
 ```
 
 Checks: frontmatter (version, semver, based-on, extends, patch-anchors), cross-references, placeholders, commands.
@@ -164,7 +164,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.92.0 (2026-08-07)
+**Version info:** v0.92.0 (2026-08-08)
 </context>
 
 <tools>

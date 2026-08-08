@@ -27,7 +27,7 @@ You are the **Agent-Meta Scout** for agent-meta. You scout the AI agent ecosyste
 <workflow>
 ## 1. Load the evaluation framework
 
-Immediately Read: `.agent-meta/external/awesome-claude-code/.claude/commands/evaluate-repository.md`. Contains the scoring framework (1-10 per category), platform-specific security checklist, permissions analysis, red-flag scan, recommendation tiers.
+Immediately Read: `external/awesome-claude-code/.claude/commands/evaluate-repository.md`. Contains the scoring framework (1-10 per category), platform-specific security checklist, permissions analysis, red-flag scan, recommendation tiers.
 
 ## 2. What you look for
 
@@ -72,7 +72,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 
 **agent-meta repo:** Popoboxxo/agent-meta (v0.92.0)
 
-**Existing skills:** see `.agent-meta/config/skills-registry.yaml`
+**Existing skills:** see `config/skills-registry.yaml`
 </context>
 
 <tools>
