@@ -233,6 +233,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/accessibility-specialist.md` | `1-generic/accessibility-specialist.md` (optional, WCAG 2.1/2.2, ARIA-Checks, Keyboard-Navigation, Screenreader) |
 | `.claude/agents/refactoring-specialist.md` | `1-generic/refactoring-specialist.md` (optional, systematische Transformation, Strangler-Fig, Legacy-Modernisierung) |
 | `.claude/agents/product-manager.md` | `1-generic/product-manager.md` (optional, Backlog, User-Stories, Priorisierung RICE/MoSCoW, Roadmap) |
+| `.claude/agents/proofreader.md` | `1-generic/proofreader.md` (optional, Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung) |
+| `.claude/agents/copyeditor.md` | `1-generic/copyeditor.md` (optional, Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, Konsistenz) |
 
 ---
 

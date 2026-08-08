@@ -931,6 +931,40 @@ roles:
     handoff:
       output_contract: external-doc-v1
     short_desc: 'Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte...'
+  proofreader:
+    model: balanced
+    memory: ''
+    workflow_tier: optional
+    description: 'Korrektorat: reine Fehlerkorrektur — Rechtschreibung, Grammatik, Zeichensetzung.
+      Keine Stil- oder Strukturänderungen. Liefert kategorisierten Markdown-Findings-Report.'
+    routing:
+      intent_keywords:
+      - Korrektorat
+      - Rechtschreibung
+      - Grammatik prüfen
+      - Zeichensetzung
+      - proofreading
+      - Tippfehler
+      parallel: true
+      orchestrator_only: false
+    short_desc: 'Korrektorat: reine Fehlerkorrektur — Rechtschreibung, Grammatik, Zeichensetzung.'
+  copyeditor:
+    model: balanced
+    memory: ''
+    workflow_tier: optional
+    description: 'Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden und inhaltliche
+      Konsistenz — aufbauend auf sauberem Korrektorat. Liefert kategorisierten Markdown-Findings-Report.'
+    routing:
+      intent_keywords:
+      - Lektorat
+      - Stil verbessern
+      - Satzbau
+      - Wortwiederholungen
+      - roter Faden
+      - copyediting
+      parallel: true
+      orchestrator_only: false
+    short_desc: 'Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz.'
   data-engineer:
     model: balanced
     memory: project
