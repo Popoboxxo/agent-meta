@@ -985,9 +985,9 @@ function applyReadOnlyLock(hash, container) {
     const banner = document.createElement("div");
     banner.className = "info-box";
     banner.style.marginBottom = "24px";
-    banner.style.backgroundColor = "rgba(245, 158, 11, 0.05)";
-    banner.style.color = "#d97706";
-    banner.style.border = "1px solid rgba(245, 158, 11, 0.2)";
+    banner.style.backgroundColor = "rgba(210, 153, 34, 0.05)";
+    banner.style.color = "var(--accent-yellow)";
+    banner.style.border = "1px solid rgba(210, 153, 34, 0.2)";
     banner.innerHTML = "<strong style='display:flex;align-items:center;gap:6px;'><span style='font-size:1.2em;'>🔒</span> Framework defaults (Read-Only)</strong><div style='margin-top:6px;opacity:0.9;'>These settings are defined by the agent-meta framework. In this project context, they can only be viewed.</div>";
     container.insertBefore(banner, container.firstChild);
     
@@ -1008,14 +1008,14 @@ function makeToggle(ignored, onChange, readonly = false) {
    let isIgnored = ignored;
    const w = el("div", { style: "display:flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 11px; user-select: none;" });
    const btnIgnore = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${isIgnored ? "background: #2563eb; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["IGNORED"]);
-   const btnTrack = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${!isIgnored ? "background: #d97706; color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
+   const btnTrack = el("div", { style: `padding: 4px 12px; transition: all 0.2s; ${readonly ? "opacity:0.8; cursor:not-allowed;" : "cursor:pointer;"} ${!isIgnored ? "background: var(--accent-yellow); color: white; font-weight:bold;" : "background: var(--bg-card); color: var(--text-muted);"}` }, ["TRACKED"]);
    
    const setUI = (val) => {
        btnIgnore.style.background = val ? "#2563eb" : "var(--bg-card)";
        btnIgnore.style.color = val ? "white" : "var(--text-muted)";
        btnIgnore.style.fontWeight = val ? "bold" : "normal";
        
-       btnTrack.style.background = !val ? "#d97706" : "var(--bg-card)";
+       btnTrack.style.background = !val ? "var(--accent-yellow)" : "var(--bg-card)";
        btnTrack.style.color = !val ? "white" : "var(--text-muted)";
        btnTrack.style.fontWeight = !val ? "bold" : "normal";
    };
@@ -2219,6 +2219,97 @@ async function viewSkillsRegistry() {
 /* =========================================================================
  * Views — MCP registry (Phase 3c)
  * ========================================================================= */
+// Shared by viewProjectMcpOverrides and viewProjectSkillsOverrides: both
+// render a per-item override panel (title/badges, active toggle,
+// description+secrets info-box, readonly/edit body swap, Customize/Reset
+// actions) that was previously duplicated near-verbatim between the two.
+// Only the readonly/edit body content is type-specific -- supplied via
+// buildReadonly/buildEdit callbacks.
+function renderOverridePanel(opts) {
+  const { id, badgeLabel, isFramework, isOverride, isActive, description, secrets, onToggleActive, buildReadonly, buildEdit, onReset } = opts;
+
+  const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
+  if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
+
+  const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
+  const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
+  if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, [badgeLabel]));
+  if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
+  header.appendChild(titleBox);
+
+  const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
+  const activeToggle = makeToggle(isActive, onToggleActive);
+  // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
+  const btns = activeToggle.element.querySelectorAll("div");
+  btns[0].textContent = "ACTIVE";
+  btns[1].textContent = "INACTIVE";
+  toggleBox.appendChild(activeToggle.element);
+  header.appendChild(toggleBox);
+  p.appendChild(header);
+
+  // --- HINTS / INFO BOX ---
+  if (description || (secrets && secrets.length > 0)) {
+      const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
+
+      if (description) {
+          infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
+              el("strong", { style: "color: var(--text);" }, ["Description: "]),
+              description
+          ]));
+      }
+
+      if (secrets && secrets.length > 0) {
+          const secWrap = el("div", {}, [
+              el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
+              "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
+          ]);
+          secrets.forEach(sec => {
+              const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: var(--accent-yellow);" }, [sec]);
+              secWrap.appendChild(code);
+          });
+          infoBox.appendChild(secWrap);
+      }
+
+      p.appendChild(infoBox);
+  }
+  // ------------------------
+
+  const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
+  const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
+  const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
+
+  buildReadonly(isReadonly);
+  buildEdit(isEditing);
+
+  detailsWrap.appendChild(isReadonly);
+  detailsWrap.appendChild(isEditing);
+
+  const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
+  const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
+  customizeBtn.onclick = () => {
+      isReadonly.style.display = "none";
+      isEditing.style.display = "flex";
+      customizeBtn.style.display = "none";
+  };
+  actionBox.appendChild(customizeBtn);
+
+  if (isOverride) {
+      const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
+      resetBtn.onclick = () => {
+          onReset();
+          isReadonly.style.display = "flex";
+          isEditing.style.display = "none";
+          toast("Override removed. Click save to apply.", "info");
+          p.style.borderLeft = "none";
+      };
+      actionBox.appendChild(resetBtn);
+  }
+  detailsWrap.appendChild(actionBox);
+  p.appendChild(detailsWrap);
+  return p;
+}
+
 async function viewProjectMcpOverrides() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — MCP Servers"]));
@@ -2338,88 +2429,8 @@ async function viewProjectMcpOverrides() {
     const isOverride = projOverrides.hasOwnProperty(id);
     const isActive = activeServers.has(id);
     const merged = getMerged(id);
-
-    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
-    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
-
-    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
-    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
-    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Server"]));
-    if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
-    header.appendChild(titleBox);
-
-    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(isActive, (newVal) => {
-        if(newVal) activeServers.add(id);
-        else activeServers.delete(id);
-        markDirty();
-    });
-    // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
-    const btns = activeToggle.element.querySelectorAll("div");
-    btns[0].textContent = "ACTIVE";
-    btns[1].textContent = "INACTIVE";
-    // Flip colors: active=blue(left), inactive=orange(right) — but makeToggle uses "ignored"=blue
-    // So we init with !isActive: isActive→false means "not ignored"→ACTIVE shows as blue
-    toggleBox.appendChild(activeToggle.element);
-    header.appendChild(toggleBox);
-    p.appendChild(header);
-
-    // --- HINTS / INFO BOX ---
-    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
-        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
-        
-        if (merged.description) {
-            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
-                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
-                merged.description
-            ]));
-        }
-        
-        if (merged.secrets && merged.secrets.length > 0) {
-            const secWrap = el("div", {}, [
-                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
-                "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
-            ]);
-            merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
-                secWrap.appendChild(code);
-            });
-            infoBox.appendChild(secWrap);
-        }
-        
-        p.appendChild(infoBox);
-    }
-    // ------------------------
-
-    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
-    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
-    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
-
     const conn = merged.connection || {};
-    
-    // Readonly View
-    isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
-    if (conn.type === "stdio") {
-        isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
-        if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
-        if (conn.env) {
-           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
-           Object.entries(conn.env).forEach(([k,v]) => {
-              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
-           });
-        }
-    } else if (conn.type === "sse") {
-        isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
-        if (conn.headers) {
-           isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
-           Object.entries(conn.headers).forEach(([k,v]) => {
-              isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
-           });
-        }
-    }
 
-    // Edit View
     const setupEditState = () => {
         if (!projOverrides[id]) {
             // Deep copy framework state to override
@@ -2429,76 +2440,88 @@ async function viewProjectMcpOverrides() {
         return projOverrides[id].connection;
     };
 
-    if (conn.type === "stdio") {
-        const wrapCmd = el("div", {});
-        wrapCmd.appendChild(el("label", {}, ["Command"]));
-        const inpCmd = el("input", { class: "form-control", value: conn.command || "" });
-        inpCmd.oninput = (e) => { const c = setupEditState(); c.command = e.target.value; markDirty(); };
-        wrapCmd.appendChild(inpCmd);
-        isEditing.appendChild(wrapCmd);
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Server",
+      isFramework,
+      isOverride,
+      isActive,
+      description: merged.description,
+      secrets: merged.secrets,
+      // Flip colors: active=blue(left), inactive=orange(right) — but makeToggle uses "ignored"=blue
+      // So we init with !isActive: isActive→false means "not ignored"→ACTIVE shows as blue
+      onToggleActive: (newVal) => {
+          if (newVal) activeServers.add(id);
+          else activeServers.delete(id);
+          markDirty();
+      },
+      buildReadonly: (isReadonly) => {
+        isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:4px;"}, [`Type: ${conn.type || "unknown"}`]));
+        if (conn.type === "stdio") {
+            isReadonly.appendChild(el("div", {}, [`Command: ${conn.command || ""}`]));
+            if (conn.args) isReadonly.appendChild(el("div", {}, [`Args: ${conn.args.join(" ")}`]));
+            if (conn.env) {
+               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Environment:"]));
+               Object.entries(conn.env).forEach(([k,v]) => {
+                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}=${v}`]));
+               });
+            }
+        } else if (conn.type === "sse") {
+            isReadonly.appendChild(el("div", {}, [`URL: ${conn.url || ""}`]));
+            if (conn.headers) {
+               isReadonly.appendChild(el("div", {style:"margin-top:4px"}, ["Headers:"]));
+               Object.entries(conn.headers).forEach(([k,v]) => {
+                  isReadonly.appendChild(el("div", {style:"padding-left:8px;"}, [`${k}: ${v}`]));
+               });
+            }
+        }
+      },
+      buildEdit: (isEditing) => {
+        if (conn.type === "stdio") {
+            const wrapCmd = el("div", {});
+            wrapCmd.appendChild(el("label", {}, ["Command"]));
+            const inpCmd = el("input", { class: "form-control", value: conn.command || "" });
+            inpCmd.oninput = (e) => { const c = setupEditState(); c.command = e.target.value; markDirty(); };
+            wrapCmd.appendChild(inpCmd);
+            isEditing.appendChild(wrapCmd);
 
-        // Args editor
-        const localArgs = conn.args ? [...conn.args] : [];
-        isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
-            const c = setupEditState();
-            c.args = localArgs;
-            markDirty();
-        }));
+            // Args editor
+            const localArgs = conn.args ? [...conn.args] : [];
+            isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
+                const c = setupEditState();
+                c.args = localArgs;
+                markDirty();
+            }));
 
-        // Env editor
-        const localEnv = conn.env ? { ...conn.env } : {};
-        isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
-            const c = setupEditState();
-            c.env = localEnv;
-            markDirty();
-        }));
+            // Env editor
+            const localEnv = conn.env ? { ...conn.env } : {};
+            isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
+                const c = setupEditState();
+                c.env = localEnv;
+                markDirty();
+            }));
 
-    } else if (conn.type === "sse") {
-        const wrapUrl = el("div", {});
-        wrapUrl.appendChild(el("label", {}, ["URL"]));
-        const inpUrl = el("input", { class: "form-control", value: conn.url || "" });
-        inpUrl.oninput = (e) => { const c = setupEditState(); c.url = e.target.value; markDirty(); };
-        wrapUrl.appendChild(inpUrl);
-        isEditing.appendChild(wrapUrl);
+        } else if (conn.type === "sse") {
+            const wrapUrl = el("div", {});
+            wrapUrl.appendChild(el("label", {}, ["URL"]));
+            const inpUrl = el("input", { class: "form-control", value: conn.url || "" });
+            inpUrl.oninput = (e) => { const c = setupEditState(); c.url = e.target.value; markDirty(); };
+            wrapUrl.appendChild(inpUrl);
+            isEditing.appendChild(wrapUrl);
 
-        // Headers editor
-        const localHeaders = conn.headers ? { ...conn.headers } : {};
-        isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
-            const c = setupEditState();
-            c.headers = localHeaders;
-            markDirty();
-        }));
-    } else {
-         isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
-    }
-
-    detailsWrap.appendChild(isReadonly);
-    detailsWrap.appendChild(isEditing);
-
-    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
-    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
-    customizeBtn.onclick = () => {
-        isReadonly.style.display = "none";
-        isEditing.style.display = "flex";
-        customizeBtn.style.display = "none";
-    };
-    actionBox.appendChild(customizeBtn);
-
-    if (isOverride) {
-        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
-        resetBtn.onclick = () => {
-            delete projOverrides[id];
-            markDirty();
-            isReadonly.style.display = "flex";
-            isEditing.style.display = "none";
-            toast("Override removed. Click save to apply.", "info");
-            p.style.borderLeft = "none";
-        };
-        actionBox.appendChild(resetBtn);
-    }
-    detailsWrap.appendChild(actionBox);
-    p.appendChild(detailsWrap);
-    return p;
+            // Headers editor
+            const localHeaders = conn.headers ? { ...conn.headers } : {};
+            isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
+                const c = setupEditState();
+                c.headers = localHeaders;
+                markDirty();
+            }));
+        } else {
+             isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
+        }
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
   };
 
   const projListContainer = el("div", { style: "margin-bottom:24px" });
@@ -2506,7 +2529,7 @@ async function viewProjectMcpOverrides() {
   const allIds = new Set([...Object.keys(fwServers), ...Object.keys(projOverrides)]);
   
   if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "muted" }, ["No servers found."]));
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No servers found."]));
   } else {
     Array.from(allIds).sort().forEach(id => {
       projListContainer.appendChild(renderSrvPanel(id, fwServers.hasOwnProperty(id)));
@@ -2586,128 +2609,63 @@ async function viewProjectSkillsOverrides() {
     const isOverride = projOverrides.hasOwnProperty(id);
     const isActive = activeSkills.has(id);
     const merged = getMerged(id);
-    
+
     // Look up pinned commit from repo if not overridden
     const repoId = merged.repo;
     const fwRepoInfo = fwRepos[repoId] || {};
     const recommendedVersion = fwRepoInfo.pinned_commit || "main";
     const currentVersion = merged.version || recommendedVersion;
-
-    const p = el("div", { class: "panel", style: "margin-bottom:12px;" });
-    if (isOverride) p.style.borderLeft = "3px solid var(--accent)";
-
-    const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
-    const titleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    titleBox.appendChild(el("h3", { style: "margin:0" }, [id]));
-    if (isFramework) titleBox.appendChild(el("span", { class: "badge badge-warning", style:"background-color:#0d9488; color:#fff" }, ["Framework Skill"]));
-    if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
-    header.appendChild(titleBox);
-
-    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: 8px;" });
-    const activeToggle = makeToggle(isActive, (newVal) => {
-        if(newVal) activeSkills.add(id);
-        else activeSkills.delete(id);
-        markDirty();
-    });
-    const btns = activeToggle.element.querySelectorAll("div");
-    btns[0].textContent = "ACTIVE";
-    btns[1].textContent = "INACTIVE";
-    toggleBox.appendChild(activeToggle.element);
-    header.appendChild(toggleBox);
-    p.appendChild(header);
-
-    // --- HINTS / INFO BOX ---
-    if (merged.description || (merged.secrets && merged.secrets.length > 0)) {
-        const infoBox = el("div", { style: "margin-top: 12px; padding: 8px 12px; background-color: var(--bg-card); border-left: 3px solid #3b82f6; font-size: 12px; color: var(--text-muted); border-radius: 4px;" });
-        
-        if (merged.description) {
-            infoBox.appendChild(el("div", { style: "margin-bottom: 4px;" }, [
-                el("strong", { style: "color: var(--text);" }, ["Description: "]), 
-                merged.description
-            ]));
-        }
-        
-        if (merged.secrets && merged.secrets.length > 0) {
-            const secWrap = el("div", {}, [
-                el("strong", { style: "color: var(--text);" }, ["Required Environment Variables: "]),
-                "Set these as environment variables on your system (e.g. in .bashrc), or click Customize to hardcode values: "
-            ]);
-            merged.secrets.forEach(sec => {
-                const code = el("code", { style: "background: var(--bg-body); padding: 2px 4px; border-radius: 3px; margin-right: 4px; color: #f59e0b;" }, [sec]);
-                secWrap.appendChild(code);
-            });
-            infoBox.appendChild(secWrap);
-        }
-        
-        p.appendChild(infoBox);
-    }
-    // ------------------------
-
-    const detailsWrap = el("div", { style: "margin-top: 12px; display: flex; gap: 12px; flex-direction: column;" });
-    const isEditing = el("div", { style: "display: none; flex-direction: column; gap: 12px; margin-top: 8px;" });
-    const isReadonly = el("div", { style: "display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 8px; background: var(--bg-body); border-radius: 4px;" });
-
     const repoUrl = fwRepoInfo.repo ? fwRepoInfo.repo : (merged.repo || "");
-    if (merged.name) {
-        isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:4px;" }, [`${merged.name}`]));
-    }
-    if (merged.role) {
-        isReadonly.appendChild(el("div", {}, [`Role: ${merged.role}`]));
-    }
-    isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
-    
-    // Display version with Recommended badge if it matches
-    const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
-    verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
-    if (currentVersion === recommendedVersion && isFramework) {
-        verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
-    } else if (isFramework) {
-        verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
-    }
-    isReadonly.appendChild(verWrap);
-    
-    // Edit View
-    const mkInput = (labelTxt, key, defaultVal) => {
-      const lbl = el("label", {}, [labelTxt]);
-      const inp = el("input", { type: "text", class: "form-control", value: merged[key] || defaultVal });
-      inp.oninput = (e) => {
-          if (!projOverrides[id]) projOverrides[id] = { ...fwSkills[id] };
-          projOverrides[id][key] = e.target.value;
+
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Skill",
+      isFramework,
+      isOverride,
+      isActive,
+      description: merged.description,
+      secrets: merged.secrets,
+      onToggleActive: (newVal) => {
+          if (newVal) activeSkills.add(id);
+          else activeSkills.delete(id);
           markDirty();
-      };
-      const w = el("div", {}, [lbl, inp]);
-      isEditing.appendChild(w);
-    };
-    mkInput("Repo ID / URL", "repo", repoUrl);
-    mkInput(`Version (Branch/Tag) - Framework default: ${recommendedVersion}`, "version", currentVersion);
+      },
+      buildReadonly: (isReadonly) => {
+        if (merged.name) {
+            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:4px;" }, [`${merged.name}`]));
+        }
+        if (merged.role) {
+            isReadonly.appendChild(el("div", {}, [`Role: ${merged.role}`]));
+        }
+        isReadonly.appendChild(el("div", {}, [`Repo: ${repoUrl}`]));
 
-    detailsWrap.appendChild(isReadonly);
-    detailsWrap.appendChild(isEditing);
-
-    const actionBox = el("div", { style: "margin-top: 12px; display:flex; gap: 8px;" });
-    const customizeBtn = el("button", { class: "btn btn-sm" }, [isOverride ? "Edit Override" : "Customize (Create Override)"]);
-    customizeBtn.onclick = () => {
-        isReadonly.style.display = "none";
-        isEditing.style.display = "flex";
-        customizeBtn.style.display = "none";
-    };
-    actionBox.appendChild(customizeBtn);
-
-    if (isOverride) {
-        const resetBtn = el("button", { class: "btn btn-danger btn-sm" }, ["Reset to Default"]);
-        resetBtn.onclick = () => {
-            delete projOverrides[id];
-            markDirty();
-            isReadonly.style.display = "flex";
-            isEditing.style.display = "none";
-            toast("Override removed. Click save to apply.", "info");
-            p.style.borderLeft = "none";
+        // Display version with Recommended badge if it matches
+        const verWrap = el("div", {style:"display:flex; align-items:center; gap: 8px;"});
+        verWrap.appendChild(el("span", {}, [`Version: ${currentVersion}`]));
+        if (currentVersion === recommendedVersion && isFramework) {
+            verWrap.appendChild(el("span", { class: "badge", style:"background-color:#4f46e5; color:#fff" }, ["Recommended"]));
+        } else if (isFramework) {
+            verWrap.appendChild(el("span", { class: "badge badge-warning" }, [`Warning: Framework recommends ${recommendedVersion}`]));
+        }
+        isReadonly.appendChild(verWrap);
+      },
+      buildEdit: (isEditing) => {
+        const mkInput = (labelTxt, key, defaultVal) => {
+          const lbl = el("label", {}, [labelTxt]);
+          const inp = el("input", { type: "text", class: "form-control", value: merged[key] || defaultVal });
+          inp.oninput = (e) => {
+              if (!projOverrides[id]) projOverrides[id] = { ...fwSkills[id] };
+              projOverrides[id][key] = e.target.value;
+              markDirty();
+          };
+          const w = el("div", {}, [lbl, inp]);
+          isEditing.appendChild(w);
         };
-        actionBox.appendChild(resetBtn);
-    }
-    detailsWrap.appendChild(actionBox);
-    p.appendChild(detailsWrap);
-    return p;
+        mkInput("Repo ID / URL", "repo", repoUrl);
+        mkInput(`Version (Branch/Tag) - Framework default: ${recommendedVersion}`, "version", currentVersion);
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
   };
 
   const projListContainer = el("div", { style: "margin-bottom:24px" });
@@ -2715,7 +2673,7 @@ async function viewProjectSkillsOverrides() {
   const allIds = new Set([...Object.keys(fwSkills), ...Object.keys(projOverrides)]);
   
   if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "muted" }, ["No skills found."]));
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No skills found."]));
   } else {
     Array.from(allIds).sort().forEach(id => {
       projListContainer.appendChild(renderSkillPanel(id, fwSkills.hasOwnProperty(id)));
@@ -2859,7 +2817,7 @@ async function viewMcpRegistry() {
   };
   
   if (Object.keys(fwServers).length === 0) {
-    fwListContainer.appendChild(el("div", { class: "muted" }, ["No framework servers."]));
+    fwListContainer.appendChild(el("div", { class: "empty" }, ["No framework servers."]));
   }
   for (const [id, srv] of Object.entries(fwServers)) {
     fwListContainer.appendChild(renderSrvPanel(id, srv, true, () => {}));
@@ -2906,7 +2864,7 @@ async function viewMcpRegistry() {
   const renderProjList = () => {
     projListContainer.innerHTML = "";
     if (Object.keys(projServers).length === 0) {
-      projListContainer.appendChild(el("div", { class: "muted" }, ["No project overrides."]));
+      projListContainer.appendChild(el("div", { class: "empty" }, ["No project overrides."]));
       return;
     }
     for (const [id, srv] of Object.entries(projServers)) {
@@ -3156,44 +3114,51 @@ async function viewRulesPresets() {
 
   // --- Preset Matrix ---
   const presetNames = Object.keys(presets).sort();
-  const ICON_ON  = '<span style="color:var(--accent-green);font-size:0.85em;" title="true">&#10003;</span>';
-  const ICON_OFF = '<span style="color:var(--accent-red);font-size:0.85em;" title="false">&#10007;</span>';
-  const ICON_DEF = '<span style="color:var(--text-muted);font-size:0.85em;" title="default (true)">&#8212;</span>';
+  const ICON_ON  = () => el("span", { style: "color:var(--accent-green);font-size:0.85em;", title: "true" }, ["✓"]);
+  const ICON_OFF = () => el("span", { style: "color:var(--accent-red);font-size:0.85em;", title: "false" }, ["✗"]);
+  const ICON_DEF = () => el("span", { style: "color:var(--text-muted);font-size:0.85em;", title: "default (true)" }, ["—"]);
 
   const matrixPanel = el("details", { class: "panel", open: true });
   matrixPanel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, ["Preset Matrix — all rules vs. all presets"]));
-  const matrixTable = el("table", { style: "width:100%; border-collapse:collapse; font-size:0.8em; margin-top:8px;" });
+  const matrixTable = el("table", { class: "data-table", style: "font-size:0.8em; margin-top:8px;" });
   const mthead = el("thead");
-  let headerRow = '<tr style="border-bottom:2px solid var(--border-color);"><th style="text-align:left;padding:4px 8px;min-width:140px;">Rule</th>';
+  const mHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
+  mHeadRow.appendChild(el("th", { style: "text-align:left;padding:4px 8px;min-width:140px;" }, ["Rule"]));
   for (const pn of presetNames) {
-    headerRow += `<th style="text-align:center;padding:4px 4px;font-size:0.85em;" title="${pn} preset">${pn}</th>`;
+    mHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 4px;font-size:0.85em;", title: `${pn} preset` }, [pn]));
   }
-  headerRow += '</tr>';
-  mthead.innerHTML = headerRow;
+  mthead.appendChild(mHeadRow);
   matrixTable.appendChild(mthead);
   const mtbody = el("tbody");
   for (const rule of rules) {
-    let row = `<tr style="border-bottom:1px solid var(--border-color);"><td style="padding:3px 8px; font-family:monospace; font-size:0.88em;">${rule}</td>`;
+    const mRow = el("tr", { style: "border-bottom:1px solid var(--border-color);" });
+    mRow.appendChild(el("td", { style: "padding:3px 8px; font-family:monospace; font-size:0.88em;" }, [rule]));
     for (const pn of presetNames) {
       const opts = (presets[pn] && presets[pn][rule]) ? presets[pn][rule] : null;
       if (!opts) {
-        row += '<td style="text-align:center;padding:3px 4px; color:var(--text-muted);">&#183;</td>';
+        mRow.appendChild(el("td", { style: "text-align:center;padding:3px 4px; color:var(--text-muted);" }, ["·"]));
       } else {
-        const aa = opts.alwaysApply !== undefined ? (opts.alwaysApply ? ICON_ON : ICON_OFF) : ICON_DEF;
-        const em = opts.embed !== undefined ? (opts.embed ? ICON_ON : ICON_OFF) : ICON_DEF;
-        const gm = opts.gemini === "skip" ? '<span style="color:var(--accent-red);font-size:0.75em;" title="gemini:skip">G</span>' : '';
-        row += `<td style="text-align:center;padding:3px 4px; white-space:nowrap;">${aa}${em}${gm}</td>`;
+        const aa = opts.alwaysApply !== undefined ? (opts.alwaysApply ? ICON_ON() : ICON_OFF()) : ICON_DEF();
+        const em = opts.embed !== undefined ? (opts.embed ? ICON_ON() : ICON_OFF()) : ICON_DEF();
+        const td = el("td", { style: "text-align:center;padding:3px 4px; white-space:nowrap;" }, [aa, em]);
+        if (opts.gemini === "skip") {
+          td.appendChild(el("span", { style: "color:var(--accent-red);font-size:0.75em;", title: "gemini:skip" }, ["G"]));
+        }
+        mRow.appendChild(td);
       }
     }
-    row += '</tr>';
-    mtbody.innerHTML += row;
+    mtbody.appendChild(mRow);
   }
   matrixTable.appendChild(mtbody);
   matrixPanel.appendChild(matrixTable);
-  
+
   // Legend
   const legend = el("div", { style: "margin-top:8px; font-size:0.78em; color:var(--text-muted); display:flex; gap:16px; flex-wrap:wrap;" });
-  legend.innerHTML = `${ICON_ON} = true &nbsp; ${ICON_OFF} = false &nbsp; ${ICON_DEF} = default (true) &nbsp; <span style="color:var(--accent-red);font-size:0.85em;">G</span> = gemini:skip &nbsp; <span style="color:var(--text-muted);">&#183;</span> = not in preset`;
+  legend.appendChild(el("span", {}, [ICON_ON(), " = true"]));
+  legend.appendChild(el("span", {}, [ICON_OFF(), " = false"]));
+  legend.appendChild(el("span", {}, [ICON_DEF(), " = default (true)"]));
+  legend.appendChild(el("span", {}, [el("span", { style: "color:var(--accent-red);font-size:0.85em;" }, ["G"]), " = gemini:skip"]));
+  legend.appendChild(el("span", {}, [el("span", { style: "color:var(--text-muted);" }, ["·"]), " = not in preset"]));
   matrixPanel.appendChild(legend);
   wrap.appendChild(matrixPanel);
 
@@ -4869,7 +4834,7 @@ async function viewReflectionPairs() {
 
         const severityColor = (sev) => ({
           ERROR: "var(--accent-red)",
-          WARN:  "var(--accent-yellow, #c9a227)",
+          WARN:  "var(--accent-yellow)",
           INFO:  "var(--text-muted)",
         }[sev] || "var(--text-muted)");
 
@@ -5009,7 +4974,7 @@ async function buildConfigAudit() {
 
   const severityColor = (sev) => ({
     error: "var(--accent-red)",
-    warn:  "var(--accent-yellow, #c9a227)",
+    warn:  "var(--accent-yellow)",
     info:  "var(--text-muted)",
   }[sev] || "var(--text-muted)");
 
@@ -5331,27 +5296,27 @@ async function viewProjectGeneral() {
   const allRulesArr = [...allRulesSet].sort();
   
   // Icons
-  const ICON_ON  = '<span style="color:var(--accent-green)" title="true">&#10003;</span>';
-  const ICON_OFF = '<span style="color:var(--accent-red)" title="false">&#10007;</span>';
-  const ICON_DEF = '<span style="color:var(--text-muted)" title="default (true)">&#8212;</span>';
-  const ICON_OVR = '<span style="color:var(--accent-yellow);font-weight:bold" title="overridden">&#9733;</span>';
-  
+  const ICON_ON  = () => el("span", { style: "color:var(--accent-green)", title: "true" }, ["✓"]);
+  const ICON_OFF = () => el("span", { style: "color:var(--accent-red)", title: "false" }, ["✗"]);
+  const ICON_DEF = () => el("span", { style: "color:var(--text-muted)", title: "default (true)" }, ["—"]);
+  const ICON_OVR = () => el("span", { style: "color:var(--accent-yellow);font-weight:bold", title: "overridden" }, ["★"]);
+
   const rulesMatrix = el("div", { class: "panel", style: "margin-top:0; border-top-left-radius:0; border-top-right-radius:0;" });
   const matrixHead = el("div", { style: "display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;" });
   matrixHead.appendChild(el("strong", {}, ["Rules Preset Matrix"]));
   const matrixHint = el("span", { style: "font-size:0.8em; color:var(--text-muted);" });
   matrixHead.appendChild(matrixHint);
   rulesMatrix.appendChild(matrixHead);
-  
-  const matrixTable = el("table", { style: "width:100%; border-collapse:collapse; font-size:0.82em;" });
+
+  const matrixTable = el("table", { class: "data-table", style: "font-size:0.82em;" });
   const thead = el("thead");
-  thead.innerHTML = `<tr style="border-bottom:2px solid var(--border-color);">
-    <th style="text-align:left;padding:4px 8px;">Rule</th>
-    <th style="text-align:center;padding:4px 8px;width:40px;" title="alwaysApply &#8212; Claude/Continue load behavior">apply</th>
-    <th style="text-align:center;padding:4px 8px;width:40px;" title="embed &#8212; Opencode managed block inclusion">emb</th>
-    <th style="text-align:center;padding:4px 8px;width:30px;" title="Project override active">ovr</th>
-    <th style="text-align:center;padding:4px 8px;width:60px;" title="Effective: merged preset + override">eff</th>
-  </tr>`;
+  const gHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
+  gHeadRow.appendChild(el("th", { style: "text-align:left;padding:4px 8px;" }, ["Rule"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:40px;", title: "alwaysApply — Claude/Continue load behavior" }, ["apply"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:40px;", title: "embed — Opencode managed block inclusion" }, ["emb"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:30px;", title: "Project override active" }, ["ovr"]));
+  gHeadRow.appendChild(el("th", { style: "text-align:center;padding:4px 8px;width:60px;", title: "Effective: merged preset + override" }, ["eff"]));
+  thead.appendChild(gHeadRow);
   matrixTable.appendChild(thead);
   const tbody = el("tbody");
   matrixTable.appendChild(tbody);
@@ -5380,17 +5345,21 @@ async function viewProjectGeneral() {
       const oAA = projectOpts.alwaysApply !== undefined ? projectOpts.alwaysApply : null;
       const oEm = projectOpts.embed !== undefined ? projectOpts.embed : null;
       
-      const cellAA = pAA === null ? ICON_DEF : (pAA ? ICON_ON : ICON_OFF);
-      const cellEm = pEm === null ? ICON_DEF : (pEm ? ICON_ON : ICON_OFF);
-      const cellOv = hasOverride ? ICON_OVR : '<span style="color:var(--text-muted)">&#183;</span>';
-      const cellEf = `<span style="color:var(--accent-green)">${effAA ? '&#10003;' : '&#10007;'}</span> / <span style="color:${effEm ? 'var(--accent-green)' : 'var(--accent-red)'}">${effEm ? '&#10003;' : '&#10007;'}</span>`;
-      
+      const cellAA = pAA === null ? ICON_DEF() : (pAA ? ICON_ON() : ICON_OFF());
+      const cellEm = pEm === null ? ICON_DEF() : (pEm ? ICON_ON() : ICON_OFF());
+      const cellOv = hasOverride ? ICON_OVR() : el("span", { style: "color:var(--text-muted)" }, ["·"]);
+      const cellEf = el("span", {}, [
+        el("span", { style: "color:var(--accent-green)" }, [effAA ? "✓" : "✗"]),
+        " / ",
+        el("span", { style: `color:${effEm ? "var(--accent-green)" : "var(--accent-red)"}` }, [effEm ? "✓" : "✗"]),
+      ]);
+
       const tr = el("tr", { style: "border-bottom:1px solid var(--border-color);" + (isSuppressed ? " opacity:0.55;" : "") });
-      tr.innerHTML = `<td style="padding:3px 8px; font-family:monospace; font-size:0.9em;">${rule}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellAA}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellEm}</td>
-        <td style="text-align:center;padding:3px 4px;">${cellOv}</td>
-        <td style="text-align:center;padding:3px 4px;font-size:0.85em;">${cellEf}</td>`;
+      tr.appendChild(el("td", { style: "padding:3px 8px; font-family:monospace; font-size:0.9em;" }, [rule]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellAA]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellEm]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;" }, [cellOv]));
+      tr.appendChild(el("td", { style: "text-align:center;padding:3px 4px;font-size:0.85em;" }, [cellEf]));
       tbody.appendChild(tr);
     }
     matrixHint.textContent = `${activeP} | ${allRulesArr.length} rules | ${suppressedTotal} suppressed | ${overridesCount} overridden`;
@@ -5917,7 +5886,7 @@ async function viewProjectRoles() {
     }
 
     if (!active.length) {
-      activeList.appendChild(el("div", { class: "empty muted", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
+      activeList.appendChild(el("div", { class: "empty", style: "padding:8px;" }, ["No roles selected — drag from the left or use →."]));
     } else {
       for (const n of active) activeList.appendChild(buildCard(n, "active"));
     }
@@ -6078,7 +6047,7 @@ async function viewProjectOrchestrator() {
     povPanel.appendChild(row);
   }
   if (activeProviders.length === 0) {
-    povPanel.appendChild(el("p", { class: "muted" }, ["No active providers configured — set ai-providers first."]));
+    povPanel.appendChild(el("p", { class: "empty" }, ["No active providers configured — set ai-providers first."]));
   }
   wrap.appendChild(povPanel);
 
@@ -6520,7 +6489,7 @@ async function viewBackups() {
   const render = () => {
     tableWrap.innerHTML = "";
     if (!data || !data.archives || data.archives.length === 0) {
-      tableWrap.appendChild(el("p", {}, ["No backups found."]));
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No backups found."]));
       return;
     }
     const t = el("table", { class: "data" }, [
@@ -6624,7 +6593,7 @@ async function viewProviderDeactivation() {
     const header = el("div", { style: "display:flex; justify-content:space-between; align-items:center;" });
     header.appendChild(el("strong", {}, [name]));
     const badge = el("span", {
-      style: `font-size:11px; padding:2px 8px; border-radius:4px; background:${p.deactivated ? '#553333' : '#335533'}; color:${p.deactivated ? '#ff9999' : '#99ff99'};`
+      style: `font-size:11px; padding:2px 8px; border-radius:4px; background:${p.deactivated ? 'rgba(248,81,73,0.15)' : 'rgba(63,185,80,0.15)'}; color:${p.deactivated ? 'var(--accent-red)' : 'var(--accent-green)'};`
     }, [p.deactivated ? "DEACTIVATED" : "ACTIVE"]);
     header.appendChild(badge);
     card.appendChild(header);
@@ -6633,12 +6602,12 @@ async function viewProviderDeactivation() {
     if (p.directory_exists) {
       info.appendChild(el("div", {}, [`Dir: ${p.directory}`]));
     } else {
-      info.appendChild(el("div", { style: "color:#aa8866;" }, [`(no directory)`]));
+      info.appendChild(el("div", { style: "color:var(--text-muted);" }, [`(no directory)`]));
     }
     if (p.backups.length > 0) {
       info.appendChild(el("div", {}, [`Backups: ${p.backups.length} (latest: ${p.backups[p.backups.length - 1]})`]));
     } else {
-      info.appendChild(el("div", { style: "color:#aa8866;" }, ["No backups"]));
+      info.appendChild(el("div", { style: "color:var(--text-muted);" }, ["No backups"]));
     }
     card.appendChild(info);
 
@@ -6746,7 +6715,7 @@ async function viewProjectEnvironments() {
     tableWrap.replaceChildren();
     const names = Object.keys(envs).sort();
     if (!names.length) {
-      tableWrap.appendChild(el("p", { class: "muted" }, ["No environment variables defined. Click '+ Add Variable' to start."]));
+      tableWrap.appendChild(el("p", { class: "empty" }, ["No environment variables defined. Click '+ Add Variable' to start."]));
       return;
     }
     const table = el("table", { class: "data" });
@@ -8152,7 +8121,7 @@ async function viewModelsLegacy() {
       const statusTd = el("td", {});
       const toggleBtn = el("button", {
         class: "btn",
-        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow, #c08b00)" : "var(--accent-green, #2a8a2a)"}; color: white; border: none; border-radius: 4px;`,
+        style: `cursor: pointer; padding: 4px 10px; font-size: 0.85em; background: ${isEnabled ? "var(--accent-yellow)" : "var(--accent-green)"}; color: white; border: none; border-radius: 4px;`,
         title: isEnabled ? "Disable this model (exclude from active model picker without removing from registry)" : "Enable this model",
       }, [isEnabled ? "Disable" : "Enable"]);
       toggleBtn.onclick = async () => {
