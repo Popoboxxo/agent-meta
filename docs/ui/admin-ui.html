@@ -7053,7 +7053,7 @@ async function viewGitignoreDefaults() {
     paths.forEach(path => {
       const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
       row.appendChild(el("span", {}, [path]));
-      row.appendChild(makeToggle(isChecked));
+      row.appendChild(makeToggle(isChecked).element);
       list.appendChild(row);
     });
     details.appendChild(list);
