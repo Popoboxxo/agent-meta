@@ -1,11 +1,11 @@
 ---
 name: principal-developer
-version: 1.0.1
+version: 1.0.2
 description: Last-resort escalation tier. Invoked only after senior-developer has
   failed repeatedly on a task. Root-cause diagnosis before a single line of code.
   Maximum thoroughness, maximum cost.
 prompt_mode: modern
-generated-from: 1-generic/principal-developer.md@1.0.1
+generated-from: 1-generic/principal-developer.md@1.0.2
 mode: subagent
 model: opencode-go/kimi-k2.7-code
 permission:
