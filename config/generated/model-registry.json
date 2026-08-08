@@ -118,29 +118,38 @@
       "tier": "Standard"
     },
     {
-      "id": "claude-opus-4-1-20250805",
-      "name": "Claude Opus 4.1 (deprecated, retires 2026-08-05)",
-      "provider": "anthropic",
-      "input_cost_api": 15.0,
-      "output_cost_api": 75.0,
-      "context_length": 200000,
-      "tier": "Standard"
-    },
-    {
-      "id": "claude-opus-4-1",
-      "name": "(alias) Claude Opus 4.1 (deprecated, retires 2026-08-05)",
-      "provider": "anthropic",
-      "input_cost_api": 15.0,
-      "output_cost_api": 75.0,
-      "context_length": 200000,
-      "tier": "Standard"
-    },
-    {
       "id": "anthropic/claude-opus-5-fast",
       "name": "Claude Opus 5 (Fast)",
       "provider": "anthropic",
       "input_cost_api": 10.0,
       "output_cost_api": 50.0,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-5:batch",
+      "name": "Claude Opus 5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 2.5,
+      "output_cost_api": 12.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-sonnet-5:batch",
+      "name": "Anthropic: Claude Sonnet 5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 1.0,
+      "output_cost_api": 5.0,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-fable-5:batch",
+      "name": "Anthropic: Claude Fable 5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 5.0,
+      "output_cost_api": 25.0,
       "context_length": 1000000,
       "tier": "Standard"
     },
@@ -154,12 +163,93 @@
       "tier": "Standard"
     },
     {
+      "id": "anthropic/claude-opus-4.8:batch",
+      "name": "Anthropic: Claude Opus 4.8 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 2.5,
+      "output_cost_api": 12.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
       "id": "anthropic/claude-opus-4.7-fast",
       "name": "Anthropic: Claude Opus 4.7 (Fast)",
       "provider": "anthropic",
       "input_cost_api": 30.0,
       "output_cost_api": 150.0,
       "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-4.7:batch",
+      "name": "Anthropic: Claude Opus 4.7 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 2.5,
+      "output_cost_api": 12.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.6:batch",
+      "name": "Anthropic: Claude Sonnet 4.6 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 1.5,
+      "output_cost_api": 7.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-4.6:batch",
+      "name": "Anthropic: Claude Opus 4.6 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 2.5,
+      "output_cost_api": 12.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-4.5:batch",
+      "name": "Anthropic: Claude Opus 4.5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 2.5,
+      "output_cost_api": 12.5,
+      "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-haiku-4.5:batch",
+      "name": "Anthropic: Claude Haiku 4.5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 0.5,
+      "output_cost_api": 2.5,
+      "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.5:batch",
+      "name": "Anthropic: Claude Sonnet 4.5 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 1.5,
+      "output_cost_api": 7.5,
+      "context_length": 1000000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-4.1",
+      "name": "Anthropic: Claude Opus 4.1",
+      "provider": "anthropic",
+      "input_cost_api": 15.0,
+      "output_cost_api": 75.0,
+      "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-opus-4.1:batch",
+      "name": "Anthropic: Claude Opus 4.1 (batch)",
+      "provider": "anthropic",
+      "input_cost_api": 7.5,
+      "output_cost_api": 37.5,
+      "context_length": 200000,
       "tier": "Standard"
     },
     {
@@ -307,6 +397,15 @@
       "tier": "Standard"
     },
     {
+      "id": "opencode-go/qwen3.8-max",
+      "name": "Qwen3.8 Max",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
       "id": "opencode-go/qwen3.7-plus",
       "name": "Qwen3.7 Plus",
       "provider": "opencode-go",
@@ -381,6 +480,15 @@
     {
       "id": "opencode-go/hy3-preview",
       "name": "Hy3 Preview",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode-go/gpt-5.6-luna",
+      "name": "Gpt 5.6 Luna",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
