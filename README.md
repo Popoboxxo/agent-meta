@@ -15,7 +15,11 @@
 
 > [!IMPORTANT]
 > ## AI Agent Setup & Initialization Protocol
-> 
+>
+> **If you are an AI assistant reading this because a user linked you to this repo and asked for help with something** (not to integrate the framework into a codebase): you don't need any of the steps below. Fetch [`standalone/README.md`](standalone/README.md), pick the matching role file under `standalone/agents/`, and adopt it as your persona for the rest of the conversation. No clone, no Python, no execution capability required — just reading files.
+>
+> The steps below are for the other case: integrating `agent-meta` as a submodule into a project's own codebase.
+>
 > When initializing or connecting to a project, AI coding assistants and autonomous agents (Claude Code, Gemini/Antigravity, Opencode, Continue, GitHub Copilot, Mammouth Code, etc.) **MUST** follow these steps to integrate `agent-meta`:
 > 
 > 1. **Add Submodule:** If `.agent-meta` is missing in your repository, embed the framework:
