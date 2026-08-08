@@ -439,8 +439,16 @@ def _orch_mode_flags(orch_mode: str) -> dict:
     }
 
 
-def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str]]:
-    """Returns (variables_dict, pre_warnings)."""
+def build_variables(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> tuple[dict, list[str]]:
+    """Returns (variables_dict, pre_warnings).
+
+    project_root is the consuming project's root (where .meta-config/ lives).
+    It differs from agent_meta_root whenever agent-meta is embedded as a
+    submodule (project_root/.agent-meta) rather than self-hosting (they're
+    the same directory, as in the agent-meta repo's own project.yaml).
+    Templates need this distinction — a hardcoded ".agent-meta/scripts/..."
+    prefix is only correct in the embedded case; see AGENT_META_REL_PATH.
+    """
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
     from .context_templates.builder import TemplateBuilder
@@ -455,6 +463,17 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
     variables["PROJECT_NAME"]  = project.get("name", "")
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+    if project_root is not None:
+        try:
+            rel = agent_meta_root.resolve().relative_to(project_root.resolve())
+            variables["AGENT_META_REL_PATH"] = "" if str(rel) == "." else str(rel).replace("\\", "/") + "/"
+        except ValueError:
+            # agent_meta_root isn't under project_root at all (unusual setup) —
+            # fall back to the historically-hardcoded embedded-submodule form
+            # rather than emitting a broken relative path.
+            variables["AGENT_META_REL_PATH"] = ".agent-meta/"
+    else:
+        variables["AGENT_META_REL_PATH"] = ".agent-meta/"
     agent_table, unmapped = build_agent_table(config, agent_meta_root)
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
