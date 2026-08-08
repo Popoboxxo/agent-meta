@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.12.0
+version: 1.13.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -14,7 +14,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.12.0
+generated-from: 1-generic/agent-meta-manager.md@1.13.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -124,7 +124,7 @@ Full lifecycle: `rules/2-platform/agent-meta-sync-interface.md` (--add-skill fla
 py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 # Add
-py .agent-meta/scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r>
+py .agent-meta/scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r> --entry <file>
 
 # Submodule init
 git submodule update --init --recursive
@@ -158,6 +158,39 @@ Immediate rule: error observed → write an imperative rule → insert outside t
 ## 13. Configure SE cascade
 
 On request: extend `.meta-config/project.yaml` with an SE block. Explain the variables (`SE_MAX_DEPTH`, etc.). Confirmation required.
+
+## 14. Orchestrator modes & provider matrix (frequent questions)
+
+| Mode | Effect |
+|------|--------|
+| `strict` | Orchestrator mandatory, no direct dispatch |
+| `advisory` | Orchestrator recommended, user can override |
+| `main-chat` | No orchestrator subagent — `main_chat` routes and works itself |
+
+Set via `.meta-config/project.yaml` → `orchestrator.mode`. Per-provider override: `orchestrator.provider-overrides.<Provider>.mode`.
+
+| Provider | Context file | Agents dir | PreToolUse hooks |
+|----------|-------------|-----------|-------------------|
+| Claude | CLAUDE.md | `.claude/agents/` | ✓ |
+| Gemini | AGENTS.md | `.gemini/agents/` | — |
+| Opencode | AGENTS.md | `.opencode/agents/` | — |
+| Continue | CONTINUE.md | `.continue/agents/` | — |
+| Copilot | `.github/copilot/COPILOT.md` | `.github/copilot/agents/` | — |
+| Mammouth | (own) | `.mammouth/agents/` | ✓ |
+
+Only Claude+Mammouth generate PreToolUse hooks (`config/ai-providers.yaml: has_hooks`); `orchestrator.strict` has no runtime effect on the other providers.
+
+## 15. Other frequently needed flags
+
+```bash
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --setup            # interactive setup wizard
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --fill-defaults    # fill missing schema defaults
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-hook <n>  # new hook script
+py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --audit-config [--apply]  # deep config audit, deprecated-role/orphaned-pipeline detection
+py .agent-meta/scripts/sync.py --backup [--label <text>] | --restore <name> | --list-backups | --prune-backups
+py .agent-meta/scripts/sync.py --deactivate-providers <p1,p2> | --activate-providers <p1,p2> | --deactivation-status
+py .agent-meta/scripts/sync.py --update-models   # refresh config/generated/model-registry.json from OpenRouter/OpenCode Go
+```
 </workflow>
 
 <context>
@@ -166,7 +199,23 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.92.0 (2026-08-07)
+**Version info:** v0.92.0 (2026-08-08)
+
+**A2A handoff protocol — current state (checked, don't recite from memory, it changes):** only `orchestrator.handoff.protocol` remains in `project.yaml` (`a2a-v1` default, or `none`). `validate-before-delegate`, `supersession-tracking`, `strict-validation`, `compact-mode`, `max_retries`, `human_approval_required` (the project.yaml-level flag — distinct from the still-real per-envelope field of the same name), `protocol_routing`, and the whole `token-budget` block were removed — none had a real consumer in code or agent-prompt text. `config/project-config.schema.json`'s `handoff` block is `additionalProperties: false` specifically to stop this from silently recurring. A structured JSON envelope is only required for routes with a schema-bound contract (`role-defaults.yaml` `handoff.input_schema`/`output_schema` pointing at a real file); everyday FANOUT/BARRIER delegation uses plain-text. If asked about handoff config beyond `protocol`, say it doesn't exist anymore, don't guess a schema for it.
+
+**Knowledge sources (look up via Read/Grep when a question needs it — don't answer these from memory, they drift). Paths below are the consumer-project form (`agent-meta` embedded as a submodule); when self-hosting agent-meta itself — this repo's own `.meta-config/project.yaml` also has this role active — drop the `.agent-meta/` prefix, the same docs live at the repo root directly:**
+
+| Topic | File |
+|-------|------|
+| Full CLI reference (every sync.py flag) | `.agent-meta/docs/api/cli-reference.md` |
+| Composition system (extends/patches syntax) | `.agent-meta/docs/api/composition-system.md` |
+| PAL placeholders (e.g. PAL_DELEGATE — no double braces here on purpose, see below) | `.agent-meta/docs/api/pal-variables.md` |
+| Slash commands (22 total) | `.agent-meta/docs/api/slash-commands.md` |
+| Admin UI (start/debug, `--admin`) | `.agent-meta/docs/api/admin-ui-reference.md`, `.agent-meta/scripts/admin-server.py` |
+| Knowledge Engine (OKF scaffolding, domain presets, bundle manager) | `.agent-meta/docs/concepts/knowledge-engine-concept.md` |
+| Pipeline engine (stages, conditionals, plan-driven mode, `run_pipeline` composition) | `.agent-meta/docs/guides/quality-pipelines.md`, `.agent-meta/config/role-defaults.yaml` `quality_pipelines:` |
+| A2A handoff protocol, full detail beyond the summary above | `.agent-meta/docs/concepts/a2a-handoff-protocol.md` |
+| Hooks, including their documented limits ("Bekannte Grenzen") | `.claude/rules/*.md` (generated per-project; source: `.agent-meta/rules/`) |
 </context>
 
 <tools>
