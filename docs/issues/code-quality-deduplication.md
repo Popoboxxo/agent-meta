@@ -45,5 +45,3 @@ content = inject_memory_field(content, memory)
 - [ ] No functional changes — pure refactoring
 - [ ] sync.py dry-run produces identical output before/after
 
-## Related
-- `docs/reviews/framework-provider-review-2026-05-07.md` — Finding #9

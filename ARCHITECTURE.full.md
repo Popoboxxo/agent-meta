@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Version: **0.57.1** — last updated: 2026-06-07
+> Repo version: **0.92.0** — content last substantively reviewed: 2026-07-20 (predates several releases; a full architecture re-review is due — this header was stuck at 0.57.1/2026-06-07 despite this file's own policy to update it on every major release)
 
 ---
 

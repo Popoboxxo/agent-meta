@@ -98,13 +98,14 @@ Existieren mit Inhalt, sind aber nicht in der aktiven `ai-providers:`-Liste (`.m
 listet nur Claude/Opencode/Gemini). `.continue/prompts/orchestrator.md:26` ist seit 2026-07-27 nicht mehr
 resynct und zeigt noch den alten Pipeline-Namen `standard-feature`.
 
-### #408 — README.md/quality-pipelines.md referenzieren noch gelöschte Rolle `feature` / alte Pipeline `standard-feature`
+### #408 — README.md/quality-pipelines.md referenzieren noch gelöschte Rolle `feature` / alte Pipeline `standard-feature` — ✅ erledigt (verifiziert 2026-08-08)
 
 **Dateien:** `README.md:128,333,674-677`, `docs/guides/quality-pipelines.md:24,33`,
 `snippets/orchestrator/quality-pipelines.md:4`
 
 Aus dem `feature-lifecycle-migration`-Sweep (PR #401) herausgefallen, da diese Dateien nicht in dessen
-Datei-Liste standen.
+Datei-Liste standen. Keine Treffer für `standard-feature` mehr in den genannten Dateien — behoben in einem
+späteren Sweep.
 
 ### #409 — `tests/test_pipelines.py`: keine Negativtests, 6 von 7 Pipelines ungetestet
 

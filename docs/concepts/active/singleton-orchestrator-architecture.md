@@ -725,7 +725,7 @@ Gemini:
 | 4 | `scripts/lib/agents.py` | `_apply_subagent_restrictions()` + `_derive_spawn_policy_from_reflection_pairs()` implementieren; in `sync_agents_for_provider()` aufrufen | 3-4 h |
 | 5 | `rules/1-generic/a2a-delegation-gates.md` | Gate #5: Singleton-Regel ✓ **implementiert** | 15 min |
 | 6 | `tests/test_subagent_restrictions.py` | Unit-Tests wie oben | 1-2 h |
-| 7 | `docs/concepts/planned/prompt-modernization.md` | Verweis auf diese Architektur-Sektion; Sektion 21 erweitern | 30 min |
+| 7 | `docs/concepts/archive/2026-06-prompt-modernization-draft-v2.md` | Verweis auf diese Architektur-Sektion; Sektion 21 erweitern | 30 min |
 
 **Gesamt: 1 Arbeitstag**
 

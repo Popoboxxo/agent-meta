@@ -32,7 +32,7 @@
 
 ## SE-Pipeline-Erweiterung — Teilresultat-Protokoll & Rollentrennung
 
-> Quelle: `docs/concepts/se-pipeline-extension.md`
+> Quelle: `docs/concepts/archive/2026-06-se-pipeline-extension.md`
 
 ### Lösung A — Teilresultat-Protokoll (Persistence)
 

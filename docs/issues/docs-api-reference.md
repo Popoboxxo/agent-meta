@@ -34,5 +34,3 @@ docs/
 - [ ] Each function documented with: signature, parameters, return value, example
 - [ ] Cross-references to `howto/` guides where applicable
 
-## Related
-- `docs/reviews/framework-provider-review-2026-05-07.md` — Finding #10

@@ -1,6 +1,6 @@
 # SE Session Resume — Wiederaufnahme nach Token-Loss
 
-> Quelle: `docs/concepts/se-pipeline-extension.md` — Loesung A
+> Quelle: `docs/concepts/archive/2026-06-se-pipeline-extension.md` — Loesung A
 > Relevante REQs: REQ-SE-01, REQ-SE-02, REQ-SE-03, REQ-SE-04, REQ-SE-05
 
 ---
