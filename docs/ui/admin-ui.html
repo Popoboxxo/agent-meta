@@ -4549,8 +4549,9 @@ async function viewSync() {
   const consoleEl = el("div", { class: "console" }, ["(idle)"]);
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
   const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
+  const standaloneBtn = el("button", { class: "btn" }, ["Render standalone agents"]);
   const statsWrap = el("div", { style: "margin-top: var(--space-4); display: none;" });
-  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: var(--space-3);" }, [runBtn, dryBtn]));
+  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: var(--space-3);" }, [runBtn, dryBtn, standaloneBtn]));
   wrap.appendChild(consoleEl);
   wrap.appendChild(statsWrap);
 
@@ -4625,25 +4626,38 @@ async function viewSync() {
     }
   };
 
+  const setSyncButtonsDisabled = (disabled) => {
+    runBtn.disabled = disabled; dryBtn.disabled = disabled; standaloneBtn.disabled = disabled;
+  };
   runBtn.addEventListener("click", async () => {
-    runBtn.disabled = true; dryBtn.disabled = true;
+    setSyncButtonsDisabled(true);
     setOutput("Running sync.py …");
     try {
       const r = await api.post("/api/sync/run");
       setOutput(r.output);
       toast(r.success ? "Sync complete" : "Sync failed", r.success ? "success" : "error");
     } catch (err) { setOutput(err.message); toast(err.message, "error"); }
-    finally { runBtn.disabled = false; dryBtn.disabled = false; loadStatus(); }
+    finally { setSyncButtonsDisabled(false); loadStatus(); }
   });
   dryBtn.addEventListener("click", async () => {
-    runBtn.disabled = true; dryBtn.disabled = true;
+    setSyncButtonsDisabled(true);
     setOutput("Running sync.py --validate …");
     try {
       const r = await api.post("/api/sync/dry-run");
       setOutput(r.output);
       toast(r.success ? "Dry-run OK" : "Dry-run reported issues", r.success ? "success" : "warning");
     } catch (err) { setOutput(err.message); toast(err.message, "error"); }
-    finally { runBtn.disabled = false; dryBtn.disabled = false; loadStatus(); }
+    finally { setSyncButtonsDisabled(false); loadStatus(); }
+  });
+  standaloneBtn.addEventListener("click", async () => {
+    setSyncButtonsDisabled(true);
+    setOutput("Running sync.py --render-standalone …");
+    try {
+      const r = await api.post("/api/sync/render-standalone");
+      setOutput(r.output);
+      toast(r.success ? "Standalone agents regenerated" : "Standalone render failed", r.success ? "success" : "error");
+    } catch (err) { setOutput(err.message); toast(err.message, "error"); }
+    finally { setSyncButtonsDisabled(false); loadStatus(); }
   });
   return wrap;
 }
@@ -7039,7 +7053,7 @@ async function viewGitignoreDefaults() {
     paths.forEach(path => {
       const row = el("div", { style: "display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding: 4px 8px; background: var(--bg-body); border-radius:4px;" });
       row.appendChild(el("span", {}, [path]));
-      row.appendChild(makeToggle(isChecked));
+      row.appendChild(makeToggle(isChecked).element);
       list.appendChild(row);
     });
     details.appendChild(list);
