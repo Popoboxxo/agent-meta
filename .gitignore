@@ -53,7 +53,6 @@ docs/concepts/.local-Inputs/reqmanager-se.md
 .backup/provider-deactivation/
 *.bak.*
 
-# tokensave runtime cache files (never commit)
-.tokensave/*.db-shm
-.tokensave/*.db-wal
+# tokensave runtime cache/state (local tooling only, never commit)
+.tokensave/
 node_modules/

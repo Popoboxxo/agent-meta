@@ -783,6 +783,12 @@ class SyncExecutor:
         """Execute a real ``sync.py`` run (no extra flags)."""
         return self._run([])
 
+    def render_standalone(self) -> dict:
+        """Execute ``sync.py --render-standalone``: regenerate the fully
+        self-contained, English-only agent personas under ``standalone/``
+        that don't require a Python install to use."""
+        return self._run(["--render-standalone"])
+
     def status(self) -> dict:
         """Return current sync status for the admin UI.
 
@@ -1426,6 +1432,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/sync/run":
             return self._send_json(self.__class__.sync_executor.run())
+
+        if path == "/api/sync/render-standalone":
+            return self._send_json(self.__class__.sync_executor.render_standalone())
 
         if path == "/api/config-audit/apply":
             return self._send_json(self._apply_config_audit())
