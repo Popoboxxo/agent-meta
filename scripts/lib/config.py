@@ -844,6 +844,33 @@ def build_variables(config: dict, agent_meta_root: Path) -> tuple[dict, list[str
         _var_name = f"{_var_stem}_BLOCK"
         variables[_var_name] = _snippet_path.read_text(encoding="utf-8") if _snippet_path.exists() else ""
 
+    # Developer-tier shared blocks (senior/principal-developer.md): these were
+    # byte-identical duplicated text across both files until this was added --
+    # a shared snippet is the actual fix, not just a note to keep them in sync
+    # by hand. Same loading pattern as the orchestrator blocks above, with one
+    # difference: unlike the orchestrator snippets (which only use {{#if}}
+    # conditionals, resolved by a later whole-document pass), language-best-
+    # practices.md also references the plain {{LANGUAGE}} placeholder.
+    # substitute() runs once over the parent template and does not re-scan
+    # text it just inserted, so a {{VAR}} left inside a loaded block leaks
+    # through unresolved into the final output -- pre-resolve it here against
+    # the variables already built above, the same way A2A_HANDOFF_BLOCK
+    # inlines A2A_T_SIZE_LIMIT. Deliberately NOT extending this to
+    # {{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}: those are per-provider
+    # values injected later in sync_agents_for_provider, not available here
+    # at all (confirmed: absent from this function's own `variables`) -- a
+    # sentence using them has to stay inline in each template, not in a
+    # shared block resolved at this stage.
+    _dev_snippets_dir = agent_meta_root / "snippets" / "developer"
+    for _snippet_name, _var_stem in (
+        ("browser-verification", "BROWSER_VERIFICATION"),
+        ("language-best-practices", "LANGUAGE_BEST_PRACTICES"),
+    ):
+        _snippet_path = _dev_snippets_dir / f"{_snippet_name}.md"
+        _snippet_text = _snippet_path.read_text(encoding="utf-8") if _snippet_path.exists() else ""
+        _snippet_text = _snippet_text.replace("{{LANGUAGE}}", str(variables.get("LANGUAGE", "")))
+        variables[f"{_var_stem}_BLOCK"] = _snippet_text
+
     return variables, unmapped
 
 
