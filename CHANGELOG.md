@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Two new optional generic agent roles: `proofreader` (correctness-only pass — spelling, grammar, punctuation, every finding tied to a stated rule) and `copyeditor` (style, sentence structure, repetition, throughline, content consistency — advisory, every suggestion names its reasoning). Both default to a categorized markdown findings report next to the reviewed file rather than a silent in-place rewrite.
+
 ### Changed
 - Admin UI, Phase 3 Task 19 (optional, lowest priority in the consistency remediation plan): introduced a `--space-1` (4px) through `--space-6` (32px) CSS custom-property scale in `:root` and migrated 246 spacing declarations (`margin`/`padding`/`gap` and their directional variants, across both the static `<style>` block and inline `el()` styles) onto it. Values already on the 4px grid map directly; off-grid audit values round to the nearest step, ties rounding up (`6px→8px`, `10px→12px`, `14px→16px`, `18px→16px`, `20px→24px`). Deliberately left untouched: multi-value shorthand declarations (e.g. `padding: 18px 20px`, where a blind substitution risked silently corrupting one of the two values) and sub-grid fine-tuning values (`1px`–`3px`, `5px` — hairline/alignment adjustments, not spacing-grid values). No visual change intended; live-verified across Dashboard, MCP Servers, Pipelines, and Roles.
 
