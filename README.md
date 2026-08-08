@@ -31,7 +31,7 @@
 [![Version](https://img.shields.io/badge/version-0.92.0-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
-| **Date:** 2026-08-01
+| **Date:** 2026-08-07
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
@@ -108,32 +108,32 @@ mindmap
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
-| **orchestrator** | balanced | 6.6.0 | Provider-agnostic task router: decomposes, parallelizes, delegates with FANOUT/PIPELINE/BARRIER |
-| **developer** | powerful | 2.5.2 | Feature implementation and bugfixes |
-| **junior-developer** | fast | 1.1.1 | Trivial changes (1-2 files, no architecture impact) |
-| **senior-developer** | powerful | 1.1.2 | Complex features, architecture decisions, difficult bugs |
-| **principal-developer** | ultra | 1.0.0 | Last-resort escalation above senior-developer — root-cause diagnosis, systemic reasoning, no symptom fixes (most expensive call) |
+| **orchestrator** | balanced | 7.7.1 | Provider-agnostic task router: decomposes, parallelizes, delegates with FANOUT/PIPELINE/BARRIER |
+| **developer** | powerful | 4.0.1 | Feature implementation and bugfixes |
+| **junior-developer** | fast | 1.2.1 | Trivial changes (1-2 files, no architecture impact) |
+| **senior-developer** | powerful | 1.2.2 | Complex features, architecture decisions, difficult bugs |
+| **principal-developer** | ultra | 1.0.1 | Last-resort escalation above senior-developer — root-cause diagnosis, systemic reasoning, no symptom fixes (most expensive call) |
 | **intern-developer** | nano | 1.0.0 | Easter-egg/gag agent: over-eager clueless intern, read-only and harmless — not for production |
-| **requirements** | balanced | 1.4.2 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
-| **tester** | balanced | 2.1.2 | Isolated unit tests with mocks/stubs (TDD workflow) |
+| **requirements** | balanced | 1.4.3 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
+| **tester** | balanced | 2.1.4 | Isolated unit tests with mocks/stubs (TDD workflow) |
 | **validator** | balanced | 4.1.1 | Formal DoD gatekeeper: checkbox audit, REQ-ID presence, commit conventions |
 | **code-reviewer** | powerful | 1.2.2 | Code health gatekeeper: Clean Code, SOLID, blast-radius analysis |
-| **documenter** | fast | 1.4.2 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
-| **git** | fast | 2.4.0 | All git operations: commits, branches, merges, tags, push/pull |
+| **documenter** | fast | 1.4.3 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
+| **git** | fast | 1.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
 ### Workflow & Framework (9 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
 | **planner** | balanced | 1.0.1 | Turns concepts/REQs/bugs into concrete, ordered implementation plans |
-| **release** | balanced | 1.4.2 | Versioning, changelogs, build processes, GitHub releases |
-| **ideation** | balanced | 1.6.1 | Idea exploration, vision sharpening, concept concretization |
-| **feedback** | fast | 1.2.2 | Standardizes bug reports and feature requests as GitHub issues |
-| **agent-meta-manager** | balanced | 1.11.1 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
+| **release** | balanced | 1.4.3 | Versioning, changelogs, build processes, GitHub releases |
+| **ideation** | balanced | 1.7.0 | Idea exploration, vision sharpening, concept concretization |
+| **feedback** | fast | 1.2.3 | Standardizes bug reports and feature requests as GitHub issues |
+| **agent-meta-manager** | balanced | 1.12.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
-| **concept-reviewer** | balanced | 1.0.1 | Reviews design docs for completeness, logic, risks, feasibility |
+| **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
 ### Specialist Roles (22 agents)
 
@@ -141,25 +141,25 @@ mindmap
 |-------|------|---------|-------------|
 | **accessibility-specialist** | balanced | 0.1.0 | WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen-reader guidelines, color contrast, focus management |
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
-| **bug-feature-analyzer** | balanced | 1.1.2 | Triage and classify incoming bug reports and feature requests |
-| **data-engineer** | balanced | 0.1.0 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
-| **database-engineer** | powerful | 1.0.0 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
+| **bug-feature-analyzer** | balanced | 1.1.4 | Triage and classify incoming bug reports and feature requests |
+| **data-engineer** | balanced | 0.1.1 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
+| **database-engineer** | powerful | 1.0.1 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
 | **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
-| **devops-engineer** | fast | 1.1.2 | CI/CD pipelines, IaC, container orchestration |
-| **docker** | fast | 1.4.2 | Docker operations: Compose stacks, binary management, test environments |
-| **effort-estimator** | fast | 1.0.1 | Estimates effort for development tasks with complexity scoring |
-| **explorer** | nano | 1.0.0 | Read-only codebase research, dependency and impact mapping |
-| **export-manager** | fast | 1.1.2 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
+| **devops-engineer** | fast | 1.1.3 | CI/CD pipelines, IaC, container orchestration |
+| **docker** | fast | 1.4.4 | Docker operations: Compose stacks, binary management, test environments |
+| **effort-estimator** | fast | 1.0.3 | Estimates effort for development tasks with complexity scoring |
+| **explorer** | nano | 1.0.1 | Read-only codebase research, dependency and impact mapping |
+| **export-manager** | fast | 1.1.3 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
 | **incident-responder** | powerful | 1.0.0 | Live incident coordination: RCA (5-Whys/Fishbone), severity classification, prioritized hotfixes |
-| **log-analyzer** | balanced | 1.1.2 | Log analysis: frequency clustering, RFC 5424 severity classification |
+| **log-analyzer** | balanced | 1.1.3 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
-| **performance-optimizer** | powerful | 1.1.2 | Data-driven Big-O bottleneck identification |
+| **performance-optimizer** | powerful | 1.2.0 | Data-driven Big-O bottleneck identification |
 | **product-manager** | balanced | 0.1.0 | Strategic product management: backlog, user stories, sprint planning, RICE/MoSCoW prioritization, KPI definition |
-| **refactoring-specialist** | balanced | 0.1.0 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
-| **security-auditor** | powerful | 1.2.2 | Static security analysis: OWASP Top 10, secrets, supply-chain |
+| **refactoring-specialist** | balanced | 0.1.1 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
+| **security-auditor** | powerful | 1.2.3 | Static security analysis: OWASP Top 10, secrets, supply-chain |
 | **sre-engineer** | balanced | 0.1.0 | Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbooks |
 | **technical-writer** | fast | 0.1.0 | External developer/user-facing docs: API references, getting-started guides, SDK docs, tutorials, CLI help |
-| **ui-ux-designer** | balanced | 1.1.2 | UI specs, mockups, design systems |
+| **ui-ux-designer** | balanced | 1.1.3 | UI specs, mockups, design systems |
 | **e2e-tester** | balanced | 1.0.0 | End-to-end browser testing via Playwright: user flows, visual regression, accessibility audits |
 
 
@@ -173,7 +173,7 @@ mindmap
 | **knowledge-ingestor** | powerful | 1.0.0 | Ingests sources, extracts key info, creates/updates wiki pages |
 | **knowledge-linter** | balanced | 1.0.0 | Wiki health check: contradictions, orphans, stale claims, broken links |
 | **knowledge-migrator** | balanced | 1.0.0 | Cleans up and migrates existing project content into the OKF Wiki |
-| **knowledge-querier** | fast | 1.0.0 | Answers questions against the Knowledge Wiki |
+| **knowledge-querier** | fast | 1.0.1 | Answers questions against the Knowledge Wiki |
 
 ### Knowledge Engine Framework (Feature Overview)
 Introduced in v0.83.0, the Knowledge Engine brings semantic codebase management to the next level:
@@ -185,12 +185,14 @@ Introduced in v0.83.0, the Knowledge Engine brings semantic codebase management 
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
-| **claude-expert** | powerful | 1.0.0 | Claude Code platform analysis: .claude/ config, best practices, MCP integration |
-| **gemini-expert** | powerful | 1.0.0 | Gemini expert: configuration (.gemini), best practices, MCP integration |
-| **opencode-expert** | powerful | 1.0.0 | Opencode expert: configuration (.opencode), best practices, MCP integration |
+| **claude-expert** | powerful | 1.0.1 | Claude Code platform analysis: .claude/ config, best practices, MCP integration |
+| **gemini-expert** | powerful | 1.0.1 | Gemini expert: configuration (.gemini), best practices, MCP integration |
+| **opencode-expert** | powerful | 1.0.1 | Opencode expert: configuration (.opencode), best practices, MCP integration |
 | **mammouth-expert** | powerful | 1.0.0 | Mammouth Code expert: configuration (.mammouth), best practices, MCP integration |
-| **continue-expert** | powerful | 1.0.0 | Continue expert: configuration (.continue), best practices, MCP integration |
-| **copilot-expert** | powerful | 1.0.0 | GitHub Copilot expert: configuration (.github/copilot), best practices, MCP integration |
+| **continue-expert** | powerful | 1.0.1 | Continue expert: configuration (.continue), best practices, MCP integration |
+| **copilot-expert** | powerful | 1.0.1 | GitHub Copilot expert: configuration (.github/copilot), best practices, MCP integration |
+
+*claude/gemini/opencode/continue/copilot-expert share one template (`agents/1-generic/provider-expert.md`); `mammouth-expert` has its own file and versions independently.*
 
 ### Systems Engineering Cascade (13 agents — Legacy SE mode)
 
@@ -228,9 +230,14 @@ Overrides provide platform-specific customizations. Two modes:
 
 External skills are registered in `config/skills-registry.yaml` and are dynamically cloned by `sync.py` when enabled via `.meta-config/project.yaml`.
 
-**Active Skills:**
+**Approved Skills** (meta-maintainer-vetted, available to any project — `approved: true` in `skills-registry.yaml`; a project must still enable one explicitly via `.meta-config/project.yaml` to actually clone and use it):
 - `home-organization` — Home Organization Specialist (Gridfinity, OpenGrid, NeoGrid, French Cleat, Underware, Deskware)
 - `opengrid-openscad` — OpenGrid OpenSCAD Designer (28mm Grid, QuackWorks patterns)
+- `reqogniloom-change-manager` — ReqogniLoom Change Manager Agent
+- `reqogniloom-quality-auditor` — ReqogniLoom Quality Auditor Agent
+- `reqogniloom-requirements-architect` — ReqogniLoom Requirements Architect Agent
+- `reqogniloom-risk-analyst` — ReqogniLoom Risk Analyst Agent
+- `reqogniloom-test-engineer` — ReqogniLoom Test Engineer Agent
 
 **Add a new skill:**
 ```bash
@@ -342,7 +349,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **concept-development** | research → concept-loop (ideation/concept-reviewer, 3x) → handoff | Idea refinement |
 | **refactor** | analyze (senior-developer) → implement → review (2x) → commit | Large refactor |
 | **docs-update** | update → commit | Documentation only |
-| **se-cascade** | L0 stakeholder → L3 architecture → implementation → V&V (8 stages) | Full Systems Engineering |
+| **se-cascade** | L0 stakeholder → L1-L3 requirements/architecture → termination → implementation → validation (11 stages) | Full Systems Engineering |
 
 ## Reflection Pairs (5 pairs)
 
@@ -480,7 +487,7 @@ lifecycle-triggers:
 - `SE_MAX_CELLS` — Max total components in cascade
 - `cost_limit_eur` — Token cost ceiling
 
-**SE Cascade Pipeline:** Full 8-stage V-model from stakeholder requirements to system validation.
+**SE Cascade Pipeline:** Full 11-stage V-model from stakeholder requirements to system validation.
 
 **SE Roles:** 13 dedicated agents (see Agent Roster section).
 
@@ -491,11 +498,11 @@ Reference: `howto/se-workflow.md`
 Dynamic model registry updated via `sync.py --update-models`:
 
 **Sources:**
-- OpenRouter: ~338 models with live pricing
-- OpenCode Zen: ~48 models
-- OpenCode Go: max-tier models
+- OpenRouter: filtered to Anthropic-prefixed models only (`ALLOWED_OPENROUTER_PROVIDER_PREFIXES`)
+- OpenCode Go: max-tier models (primary catalog)
+- OpenCode Zen: retired, superseded by OpenCode Go — fetch code kept for backward compatibility only
 
-**Storage:** `config/generated/model-registry.json` (cached, network-outage resilient)
+**Storage:** `config/generated/model-registry.json` (cached, network-outage resilient; currently ~44 curated entries — run `--update-models` for a fresh fetch)
 
 **Live override capability:** Target configurations can now dynamically download updated model registries directly from GitHub via the Admin UI, enabling instant access to the latest models without waiting for a full `agent-meta` release!
 
@@ -511,18 +518,21 @@ Dynamic model registry updated via `sync.py --update-models`:
 ```
 agents/
   0-external/                # External skill wrappers (dynamically cloned)
-  1-generic/                 # Universal provider-agnostic templates (44 + 13 SE agents)
+  1-generic/                 # Universal provider-agnostic templates (56 + 13 SE agents)
   2-platform/                # Platform-specific overrides (extends + patches)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts
   skills-registry.yaml       # External skill repos
   dod-presets.yaml           # 6 DoD presets
-  tier-presets.yaml          # 5 tier presets (cheap, normal, advanced, expensive)
+  tier-presets.yaml          # 5 tier presets (cheap, normal, advanced, expensive, expensive as hell)
   ai-providers.yaml          # 6 provider configs (Claude, Gemini, Opencode, Continue, Copilot, Mammouth)
   mcp-registry.yaml          # 7 MCP server configs
   generated/
-    model-registry.json      # Cached real models (338+ models from APIs)
+    model-registry.json      # Cached model registry (currently ~44 curated entries; grows with --update-models)
   model-curation.yaml        # Model visibility: blacklist and disabled lists
+commands/1-generic/           # 22 slash-command definitions
+hooks/1-generic/               # 5 hook scripts (see Hooks section)
+rules/                        # Rule snippets injected into provider context files
 scripts/
   sync.py                    # Main CLI — agent generation and management
   admin-server.py            # Admin UI backend (port 7420)
@@ -533,7 +543,7 @@ scripts/
   run-cascade.py             # SE cascade runner
   lib/
     config.py, agents.py, rules.py, hooks.py, commands.py
-    model_discovery.py       # Keyless API fetching (OpenRouter, Zen, Go)
+    model_discovery.py       # Keyless API fetching (OpenRouter, anthropic-only filter; OpenCode Go; OpenCode Zen retired)
     curation.py              # Model visibility management
     delegation_syntax.py     # PAL engine (placeholder substitution)
     bootstrap.py             # Provider bootstrap (Gemini API, Continue config)
@@ -543,6 +553,9 @@ snippets/                    # Language-specific code snippets
 external/                    # Dynamically cloned skill repositories (gitignored)
 schemas/                     # A2A handoff JSON schemas
 speech/                      # Speech mode rule files
+templates/                   # Shared template fragments (composition system)
+platform-configs/            # Platform-specific variable overrides
+knowledge/                   # Knowledge Engine wiki bundle (when enabled)
 howto/
   setup/                     # First steps, instantiation, upgrade
   features/                  # 22 feature how-to guides
@@ -554,7 +567,8 @@ docs/
   admin-ui.html              # Web frontend for Admin UI
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
-VERSION                      # Current version (v0.86.3)
+tests/                        # pytest suite (unit + tests/browser Playwright suite)
+VERSION                      # Current version (v0.92.0)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```
@@ -694,7 +708,7 @@ variables:
 | **M** | Scout Ecosystem | agent-meta-scout | Search new skills/roles/rules/patterns |
 | **O** | Log Analysis | log-analyzer | Analyze → cluster → delegate findings |
 | **P** | Project Issue | feedback | Create standardized bug/feature issue |
-| **U** | SE Cascade | orchestrator (SE-Mode) | 8-stage V-model: stakeholder → architecture → implementation → V&V |
+| **U** | SE Cascade | orchestrator (SE-Mode) | 11-stage V-model: stakeholder → architecture → implementation → V&V |
 
 ## Contributing
 
