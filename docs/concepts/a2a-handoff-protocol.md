@@ -1,7 +1,7 @@
 # A2A-Handoff-Protokoll — Implementationsnahe Konzeptschärfung
 
 > **Status:** Konzept v2.1 — Implementation-nah, entschlackt
-> **Baut auf:** [Best-Practice-Analyse](a2a-best-practice-analysis.md) (2026-06-07), [Update 2026-08](a2a-best-practice-analysis-2026-08.md)
+> **Baut auf:** [Best-Practice-Analyse](archive/2026-06-a2a-best-practice-analysis.md) (2026-06-07), [Update 2026-08](archive/2026-08-a2a-best-practice-analysis.md)
 > **Basis-Issue:** [#212](https://github.com/Popoboxxo/agent-meta/issues/212)
 > **Letzte Aktualisierung:** 2026-08-07 — Code-Audit ergab: mehrere hier als "✓ Erledigt" geführte Punkte (Retry-Logik, `negotiated_format`, Token-Budget-Tracking, `compact-mode`) hatten nie einen Konsumenten in Code oder Agent-Prompt-Text. Entfernt statt nachträglich implementiert — siehe Update-Doc für Begründung. `human_approval_required` (Envelope-Feld) und `supersession` bleiben, weil sie tatsächlich in Agent-Prompts referenziert werden (das Modell folgt ihnen, wie der Rest dieses Frameworks prompt-basiert durchgesetzt wird).
 >
@@ -796,8 +796,8 @@ Geplant: Optionaler Bridge-Modus der A2A-Envelopes transparent in Agent-Protocol
 
 | Quelle | Link/Pfad |
 |--------|-----------|
-| Best-Practice-Analyse (2026-06) | `docs/concepts/a2a-best-practice-analysis.md` |
-| Best-Practice-Analyse Update (2026-08, Entschlackung) | `docs/concepts/a2a-best-practice-analysis-2026-08.md` |
+| Best-Practice-Analyse (2026-06) | `docs/concepts/archive/2026-06-a2a-best-practice-analysis.md` |
+| Best-Practice-Analyse Update (2026-08, Entschlackung) | `docs/concepts/archive/2026-08-a2a-best-practice-analysis.md` |
 | Envelope-Schema | `schemas/a2a-handoff.schema.json` |
 | TaskSpec-Schema | `schemas/handoffs/task-spec.schema.json` |
 | Extensions | `schemas/handoffs/ext/*.schema.json` |

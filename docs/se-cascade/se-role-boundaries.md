@@ -1,6 +1,6 @@
 # SE Role Boundaries — Trennung Requirements vs. Architect
 
-> Quelle: `docs/concepts/se-pipeline-extension.md` — Lösung B
+> Quelle: `docs/concepts/archive/2026-06-se-pipeline-extension.md` — Lösung B
 > Relevante REQs: REQ-SE-10, REQ-SE-11, REQ-SE-12, REQ-SE-13
 
 ---

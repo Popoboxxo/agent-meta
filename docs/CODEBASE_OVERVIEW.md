@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-07-24 (v0.82.0: Knowledge Engine implementiert, Phase A-C abgeschlossen)
+> Letzte Aktualisierung: 2026-08-08 (v0.92.0: `howto/`→`docs/guides/`+`docs/se-cascade/`-Pfade korrigiert; Knowledge Engine seit v0.82.0 implementiert, Phase A-C abgeschlossen)
 
 ---
 
@@ -509,7 +509,7 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `artifact_dir` | string | Artifact-Verzeichnis (z.B. `.claude/artifacts`) |
 | `checkpoint_dir` | string | Checkpoint-Verzeichnis |
 | `settings_file` | string | Provider-Settings-Datei (z.B. `.claude/settings.json`) |
-| `settings_template` | string | Template für Settings-Datei (z.B. `howto/configs/CLAUDE.settings-template.json`) |
+| `settings_template` | string | Template für Settings-Datei (z.B. `templates/configs/CLAUDE.settings-template.json`) |
 | `settings_local_file` | string | Lokale/persönliche Override-Datei (z.B. `.claude/settings.local.json`) |
 | `settings_local_template` | string | Template für lokale Settings |
 | `model-tiers` | dict | `nano/fast/balanced/powerful/max` → konkrete Modell-ID |
@@ -518,8 +518,8 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 | `isolation-dirs` | string[] | Verzeichnisse die isoliert werden (Cross-Provider-Contamination-Schutz) |
 
 **Neue Settings-Templates (v0.66.0):**
-- `howto/configs/CLAUDE.settings-template.json` — committed settings skeleton
-- `howto/configs/CLAUDE.settings-local-template.json` — local/personal overrides (gitignored)
+- `templates/configs/CLAUDE.settings-template.json` — committed settings skeleton
+- `templates/configs/CLAUDE.settings-local-template.json` — local/personal overrides (gitignored)
 
 ### `config/tier-presets.yaml` (NEU, REQ-MOD-01)
 
@@ -719,7 +719,7 @@ se-cascade:
 
 ## 7. Howto-Dokumentation
 
-### `howto/se-workflow.md` (181 Zeilen)
+### `docs/se-cascade/se-workflow.md` (181 Zeilen)
 
 **Zweck:** Vollständiger Ablauf des fraktalen SE-Workflows mit Mermaid-Diagrammen, Rollenbeschreibungen, Rekursionsregeln und Konfiguration.
 
@@ -733,7 +733,7 @@ se-cascade:
 - Korrekturschleifen (approved/rejected/blocked)
 - Konfiguration in `.meta-config/project.yaml`
 
-### `howto/se-blackbox-to-whitebox.md` (154 Zeilen)
+### `docs/se-cascade/se-blackbox-to-whitebox.md` (154 Zeilen)
 
 **Zweck:** Erklärung des zentralen BB → WB-Übergangs mit 7-Schritte-Methode, Beispiel (Wassererhitzungssystem), Regeln und Critic-Checkliste.
 
@@ -745,7 +745,7 @@ se-cascade:
 - Häufige Fehler-Tabelle
 - Critic-Checkliste (8 Punkte)
 
-### `howto/se-interface-management.md` (190 Zeilen)
+### `docs/se-cascade/se-interface-management.md` (190 Zeilen)
 
 **Zweck:** Detaillierte Erklärung des Interface-Managements mit Propagations-Map, Lifecycle, Vererbungsregeln und Fehlerbeispielen.
 
@@ -759,7 +759,7 @@ se-cascade:
 - Interface-Registry-Format
 - 3 Fehlerbeispiele (Spannung, Zuordnung, Drift)
 
-### `howto/se-mcp-adapters.md` (250 Zeilen)
+### `docs/se-cascade/se-mcp-adapters.md` (250 Zeilen)
 
 **Zweck:** MCP-Adapter-Konzept für Export von SE-Artefakten in externe Ticket-Systeme (Markdown, GitHub Issues, Jira, Linear, ReqIF).
 
@@ -1249,7 +1249,7 @@ BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 > **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
 > **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
 > **Dokument:** `docs/concepts/a2a-handoff-protocol.md`
-> **Analyse:** `docs/concepts/a2a-best-practice-analysis.md`
+> **Analyse:** `docs/concepts/archive/2026-06-a2a-best-practice-analysis.md`
 
 ### 11.1 Prinzip: A2A als EINZIGES Format
 
@@ -1685,7 +1685,6 @@ if config.get("knowledge-engine", {}).get("enabled"):
 | Datei | Zweck |
 |-------|-------|
 | `docs/concepts/knowledge-engine-concept.md` | Detailliertes Designdokument mit OKF/Karpathy Fusion, 42 Abschnitte |
-| `docs/howto/knowledge-engine-quickstart.md` | Quick-Start für Endnutzer (falls vorhanden) |
 | `templates/knowledge-schema.template.md` | Domain-spezifisches Steuerungsdokument-Template |
 
 ---

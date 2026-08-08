@@ -383,7 +383,7 @@ variables:
 
 ## A2A-Handoff-Protokoll für die SE-Kaskade
 
-> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/a2a-best-practice-analysis.md`
+> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/archive/2026-06-a2a-best-practice-analysis.md`
 
 ### A2A als EINZIGES Format
 

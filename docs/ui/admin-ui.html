@@ -5903,7 +5903,7 @@ async function viewProjectOrchestrator() {
   // compact-mode/human_approval_required/max_retries/protocol_routing were
   // removed here to match config/project-config.schema.json's handoff block
   // (additionalProperties: false) — none of them had a real consumer in
-  // code or agent-prompt text (see docs/concepts/a2a-best-practice-analysis-2026-08.md).
+  // code or agent-prompt text (see docs/concepts/archive/2026-08-a2a-best-practice-analysis.md).
   const protRow = el("div", { class: "field-row" });
   protRow.appendChild(el("label", { class: "field-label" }, ["Protocol"]));
   const protSel = el("select", { class: "select" });
@@ -5986,7 +5986,7 @@ async function viewProjectOrchestrator() {
   // sub-object had no consumer in code or agent-prompt text and was dropped
   // from config/project-config.schema.json
   // (additionalProperties: false) — see
-  // docs/concepts/a2a-best-practice-analysis-2026-08.md.
+  // docs/concepts/archive/2026-08-a2a-best-practice-analysis.md.
 
   // ── Save ─────────────────────────────────────────────────────────────────
   wrap.appendChild(el("div", { class: "btn-row" }, [
