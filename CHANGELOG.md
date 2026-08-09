@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.94.0] — 2026-08-09
+
+### Added
+- Standalone agent personas: all 67 eligible generic agent roles now render pre-built, fully self-contained versions in `standalone/agents/` usable without Python or `sync.py` — paste the entire file directly into any AI chat as a system prompt. Identity/project-context placeholders resolve to explicit "ask the user" instructions; multi-agent/orchestration placeholders resolve to empty, matching disabled behavior. Conditional-flag rendering bugs (ORCH_MODE_*, DOD_SE_*, A2A_PROTOCOL_ENABLED, KNOWLEDGE_ENGINE_ENABLED, DIRECT_DISPATCH_ENABLED) fixed across full role coverage; `write_standalone_files()` removes stale files for roles that later become ineligible.
+
+### Fixed
+- Bilingual persona documentation: `standalone/README.md` now interleaves English and German text paragraph-by-paragraph instead of separate top/bottom sections; added dedicated "Beschreibung (DE)" column to the role table sourced from `config/role-defaults.yaml`.
+
 ## [0.93.0] — 2026-08-08
 
 ### Added
