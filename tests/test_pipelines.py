@@ -553,7 +553,9 @@ def test_generate_pipeline_block_plan_driven_rendering():
     block = _generate_pipeline_block(pipeline, "Opencode")
     assert "Plan-driven" in block
     assert "developer" in block
-    assert "kein stiller Fallback" in block
+    assert "Plan-Validierung (vor Delegation)" in block
+    assert "Prüfe: payload.plan_ref-Pfad existiert" in block
+    assert "Prüfe: Plan-Frontmatter `pipeline_stages` enthält `implement`" in block
 
 
 def test_sync_agents_passes_real_dod_resolved_to_inject_pipeline_blocks(monkeypatch):

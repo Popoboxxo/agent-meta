@@ -203,10 +203,12 @@ def _load_viz_config(root: Path) -> dict:
     Viz/MCP supervisor can still start with sensible values.
     """
     config_path = root / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return _viz_defaults()
     try:
         sys.path.insert(0, str(root / "scripts"))
         sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-        from lib.config import load_config  # type: ignore[import]
+        from lib.config import load_config
         config = load_config(config_path)
         viz_cfg = config.get("viz") or {}
         server_cfg = viz_cfg.get("server") or {}
@@ -222,7 +224,7 @@ def _load_viz_config(root: Path) -> dict:
             "retention_days":      int(report_cfg.get("retention_days", _DEFAULT_VIZ_RETENTION)),
             "session_timeout_min": int(report_cfg.get("session_timeout_min", _DEFAULT_VIZ_SESSION_TIMEOUT)),
         }
-    except Exception:  # noqa: BLE001
+    except Exception:
         return _viz_defaults()
 
 
@@ -238,10 +240,19 @@ def _load_admin_ui_config(root: Path) -> dict:
       * ``port``          (int)          — admin-ui.port
     """
     config_path = root / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return {
+            "bind_host":     DEFAULT_HOST,
+            "token":         None,
+            "token_file":    None,
+            "allowed_hosts": list(DEFAULT_ALLOWED_HOSTS),
+            "enabled":       True,
+            "port":          DEFAULT_PORT,
+        }
     try:
         sys.path.insert(0, str(root / "scripts"))
         sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
-        from lib.config import load_config  # type: ignore[import]
+        from lib.config import load_config
         config = load_config(config_path)
         admin_cfg = config.get("admin-ui") or {}
         return {
@@ -252,7 +263,7 @@ def _load_admin_ui_config(root: Path) -> dict:
             "enabled":       bool(admin_cfg.get("enabled", True)),
             "port":          int(admin_cfg.get("port", DEFAULT_PORT)),
         }
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {
             "bind_host":     DEFAULT_HOST,
             "token":         None,

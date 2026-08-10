@@ -189,8 +189,17 @@ roles:
       - Schritte
       - Umsetzungsplan
       - "wie setzen wir das um"
+      - plane
+      - Plan erstellen
+      - Umsetzungsplan erstellen
+      - Implementierungsplan
       parallel: false
       orchestrator_only: false
+    produces:
+      plan:
+        pipeline: feature-lifecycle
+        ref_key: plan_ref
+        stage: implement
     short_desc: Umsetzungsplanung
   tester:
     model: fast

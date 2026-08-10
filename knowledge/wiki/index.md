@@ -115,6 +115,7 @@
 ## Plans
 
 - [Plan: Issue #456 – Admin UI Remote Access](plans/am-issue-456-remote-admin-auth.md) — Concrete implementation plan for configurable bind-host, token auth, and host allowlist for the Admin UI server. 8 ordered steps. `plan`
+- [Plan: Planner-Pipeline-Integration — 3 Bugs (Ghost-Entries, plan_ref-Validierung, deklarative Kopplung)](plans/am-fix-planner-pipeline-ghost-entries.md) — Framework-Fix für delegation_table.py tier-filter, plan_ref-Validierungsmechanismus in pipelines.py, und deklarative Planner↔Pipeline-Kopplung via produces-Feld. 4 Schritte. `plan`
 
 ## Sources (Session Conclusions)
 

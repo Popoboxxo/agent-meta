@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.7.1"
+version: "7.8.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -34,6 +34,14 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
 
+**Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
+(z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:
+→ delegiere ZUERST an `planner` zur Plan-Erstellung. Warte auf den Plan-Pfad
+(`plan-*.md` oder Knowledge-Wiki Plan-Seite). Dann starte die Pipeline mit
+`payload.plan_ref`. Ohne diesen Schritt würde die Pipeline mit dem Fallback-Agent
+laufen — das ist nur für Quick-Fixes und triviale Tasks akzeptabel, NIEMALS für
+Features mit >2 Dateien oder Architektur-Impact.
+
 ## 3. Intent routing
 {{INTENT_ROUTING_TABLE}}
 
@@ -63,7 +71,7 @@ All "yes" → start. Otherwise resolve first.
 | Single task | → target agent |
 | Same tasks, independent | FANOUT(N, agent) |
 | Mixed tasks | PARALLEL_GROUP |
-| Complex feature | → `feature-lifecycle` pipeline |
+| Complex feature | → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
 
 Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
