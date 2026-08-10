@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hmac
 import os
 import queue
 import subprocess
@@ -44,7 +45,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 try:
     import yaml
@@ -109,10 +110,12 @@ _DEFAULT_VIZ_EVENT_LOG     = ".meta-viz/events.jsonl"
 _DEFAULT_VIZ_RETENTION     = 7
 _DEFAULT_VIZ_SESSION_TIMEOUT = 5
 
-# Loopback addresses are the ONLY values the ``--host`` flag accepts. The admin
-# UI exposes write access to every editable config file; binding the server to
-# anything reachable from the network would be a privilege-escalation vector.
-ALLOWED_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
+# Loopback addresses are the default values the ``--host`` flag accepts.
+# Remote binding is now possible when token authentication (``--token``) is
+# configured — see ``--help`` for details.  Without token auth, the in-process
+# guard still restricts binding to DEFAULT_ALLOWED_HOSTS.
+DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
+LOOPBACK_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
 
 # Super-admin config files (only available when ``agents/1-generic/`` exists).
 SUPER_ADMIN_FILES: dict[str, str] = {
@@ -221,6 +224,43 @@ def _load_viz_config(root: Path) -> dict:
         }
     except Exception:  # noqa: BLE001
         return _viz_defaults()
+
+
+def _load_admin_ui_config(root: Path) -> dict:
+    """Load admin-ui configuration from ``.meta-config/project.yaml``.
+
+    Returns a flat dict:
+      * ``bind_host``     (str)          — admin-ui.bind-host
+      * ``token``         (str | None)   — admin-ui.token (None if not set)
+      * ``token_file``    (str | None)   — admin-ui.token-file (None if not set)
+      * ``allowed_hosts`` (list[str])    — admin-ui.allowed-hosts
+      * ``enabled``       (bool)         — admin-ui.enabled
+      * ``port``          (int)          — admin-ui.port
+    """
+    config_path = root / ".meta-config" / "project.yaml"
+    try:
+        sys.path.insert(0, str(root / "scripts"))
+        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        from lib.config import load_config  # type: ignore[import]
+        config = load_config(config_path)
+        admin_cfg = config.get("admin-ui") or {}
+        return {
+            "bind_host":     str(admin_cfg.get("bind-host", DEFAULT_HOST)),
+            "token":         admin_cfg.get("token"),
+            "token_file":    admin_cfg.get("token-file"),
+            "allowed_hosts": list(admin_cfg.get("allowed-hosts", list(DEFAULT_ALLOWED_HOSTS))),
+            "enabled":       bool(admin_cfg.get("enabled", True)),
+            "port":          int(admin_cfg.get("port", DEFAULT_PORT)),
+        }
+    except Exception:  # noqa: BLE001
+        return {
+            "bind_host":     DEFAULT_HOST,
+            "token":         None,
+            "token_file":    None,
+            "allowed_hosts": list(DEFAULT_ALLOWED_HOSTS),
+            "enabled":       True,
+            "port":          DEFAULT_PORT,
+        }
 
 
 def _is_pid_running(pid: int | None) -> bool:
@@ -516,6 +556,42 @@ class VizManager:
 
 class SecurityError(Exception):
     """Raised when a write/read attempt fails security validation."""
+
+
+class AuthError(Exception):
+    """Raised when token authentication fails. Mapped to HTTP 401."""
+
+
+def _verify_token(provided: str | None, expected: str | None) -> bool:
+    """Constant-time token comparison using hmac.compare_digest."""
+    if not provided or not expected:
+        return False
+    return hmac.compare_digest(
+        provided.encode("utf-8"),
+        expected.encode("utf-8"),
+    )
+
+
+def _resolve_admin_token(
+    cli_token: str | None,
+    config_token: str | None,
+    config_token_file: str | None,
+    env_var_name: str = "ADMIN_UI_TOKEN",
+) -> str | None:
+    """Resolve the admin token from multiple sources. Priority: CLI > env > config > file."""
+    if cli_token:
+        return cli_token
+    env_token = os.environ.get(env_var_name)
+    if env_token:
+        return env_token
+    if config_token:
+        return config_token
+    if config_token_file:
+        try:
+            return Path(config_token_file).read_text().strip()
+        except OSError:
+            pass
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -966,12 +1042,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Response helpers                                                   #
     # ------------------------------------------------------------------ #
 
-    def _send_json(self, payload: Any, status: int = 200) -> None:
+    def _send_json(self, payload: Any, status: int = 200,
+                   extra_headers: dict[str, str] | None = None) -> None:
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if extra_headers:
+            for key, value in extra_headers.items():
+                self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -1008,9 +1088,41 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # CSRF / DNS-rebinding protection                                    #
     # ------------------------------------------------------------------ #
 
+    def _check_token(self) -> None:
+        """Verify the admin token when token auth is configured.
+
+        Extracts token from:
+          1. ``Authorization: Bearer <token>`` header
+          2. ``?token=<token>`` query parameter
+
+        When no token is configured (AdminRequestHandler.admin_token is None),
+        this is a no-op — the server is loopback-only and auth is not required.
+
+        Raises AuthError on mismatch or missing token.
+        """
+        expected = self.__class__.admin_token
+        if expected is None:
+            return  # No token configured → no check needed (loopback-only mode)
+
+        # Extract token from Authorization header
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            provided = auth_header[7:]  # len("Bearer ") == 7
+            if _verify_token(provided, expected):
+                return
+
+        # Extract token from query parameter (convenience for browser access)
+        parsed = urlparse(self.path)
+        query_params = parse_qs(parsed.query)
+        token_list = query_params.get("token", [])
+        if token_list and _verify_token(token_list[0], expected):
+            return
+
+        raise AuthError("invalid or missing admin token")
+
     def _check_origin(self) -> None:
-        """Reject mutating requests whose ``Origin`` header is not a loopback
-        address and whose ``Host`` header does not match the bind target.
+        """Reject mutating requests whose Origin/Host is not in the configured
+        allowed-hosts list (default: loopback only).
 
         - Browser tabs on other origins cannot mutate configs (CSRF defence).
         - Even if a hostile site DNS-rebinds to ``127.0.0.1``, the ``Host``
@@ -1026,21 +1138,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # We still require the Host header to match — see below.
             pass
         else:
-            allowed_origins = {
-                f"http://127.0.0.1:{expected_port}",
-                f"http://localhost:{expected_port}",
-                f"http://[::1]:{expected_port}",
-            }
+            allowed_origins = set()
+            for h in self.__class__.allowed_hosts:
+                allowed_origins.add(f"http://{h}:{expected_port}")
             if origin not in allowed_origins:
                 raise SecurityError(f"origin not allowed: {origin!r}")
 
         host = self.headers.get("Host", "")
-        allowed_hosts = {
-            f"127.0.0.1:{expected_port}",
-            f"localhost:{expected_port}",
-            f"[::1]:{expected_port}",
-        }
-        # Allow the configured bind host as well (covers explicit ``--host``).
+        allowed_hosts = set()
+        for h in self.__class__.allowed_hosts:
+            allowed_hosts.add(f"{h}:{expected_port}")
+        # Always allow the actual bind host (covers explicit ``--host``).
         allowed_hosts.add(f"{expected_host}:{expected_port}")
         if host not in allowed_hosts:
             raise SecurityError(f"host header not allowed: {host!r}")
@@ -1059,7 +1167,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
+            self._check_token()
             self._dispatch_get()
+        except AuthError as exc:
+            self._send_json(
+                {"error": "unauthorized", "detail": str(exc)},
+                status=401,
+                extra_headers={"WWW-Authenticate": "Bearer"},
+            )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except FileNotFoundError as exc:
@@ -1075,8 +1190,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         try:
+            self._check_token()
             self._check_origin()
             self._dispatch_put()
+        except AuthError as exc:
+            self._send_json(
+                {"error": "unauthorized", "detail": str(exc)},
+                status=401,
+                extra_headers={"WWW-Authenticate": "Bearer"},
+            )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except ValueError as exc:
@@ -1091,8 +1213,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
+            self._check_token()
             self._check_origin()
             self._dispatch_post()
+        except AuthError as exc:
+            self._send_json(
+                {"error": "unauthorized", "detail": str(exc)},
+                status=401,
+                extra_headers={"WWW-Authenticate": "Bearer"},
+            )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except ValueError as exc:
@@ -1105,8 +1234,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         try:
+            self._check_token()
             self._check_origin()
             self._dispatch_delete()
+        except AuthError as exc:
+            self._send_json(
+                {"error": "unauthorized", "detail": str(exc)},
+                status=401,
+                extra_headers={"WWW-Authenticate": "Bearer"},
+            )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
         except FileNotFoundError as exc:
@@ -3943,12 +4079,30 @@ class AdminServer:
         port: int = DEFAULT_PORT,
         enable_watcher: bool = False,
         enable_viz: bool = True,
+        admin_token: str | None = None,
+        admin_token_file: str | None = None,
+        allowed_hosts: tuple[str, ...] | None = None,
     ) -> None:
-        if host not in ALLOWED_HOSTS:
+        # Load admin-ui config from project.yaml (token, allowed-hosts, bind-host)
+        admin_cfg = _load_admin_ui_config(root)
+        # CLI args override config file values
+        effective_token = _resolve_admin_token(
+            cli_token=admin_token,
+            config_token=admin_cfg["token"],
+            config_token_file=admin_token_file or admin_cfg["token_file"],
+        )
+        # Allowed hosts: CLI > config > default loopback
+        effective_allowed_hosts = tuple(allowed_hosts) if allowed_hosts else tuple(admin_cfg["allowed_hosts"])
+        # --- Fail-closed: non-loopback requires token ---
+        is_loopback = host in LOOPBACK_HOSTS
+        if not is_loopback and not effective_token:
             raise ValueError(
-                f"refusing to bind on non-loopback host {host!r}; "
-                f"allowed: {', '.join(ALLOWED_HOSTS)}"
+                f"refusing to bind on non-loopback host {host!r} without token authentication.\n"
+                f"Configure admin-ui.token in .meta-config/project.yaml, set ADMIN_UI_TOKEN "
+                f"environment variable, or pass --admin-token."
             )
+        if not is_loopback:
+            print(f"  * Token auth enabled — binding to {host}:{port}", file=sys.stderr)
         self.root = root.resolve()
         self.host = host
         self.port = port
@@ -3969,6 +4123,8 @@ class AdminServer:
         AdminRequestHandler.version = self._read_version()
         AdminRequestHandler.bind_host = self.host
         AdminRequestHandler.bind_port = self.port
+        AdminRequestHandler.allowed_hosts = effective_allowed_hosts
+        AdminRequestHandler.admin_token = effective_token
 
         self.httpd = _DaemonThreadingHTTPServer((self.host, self.port), AdminRequestHandler)
 
@@ -4044,8 +4200,17 @@ def main() -> None:
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT,
                         help=f"Server port (default: {DEFAULT_PORT})")
-    parser.add_argument("--host", default=DEFAULT_HOST, choices=list(ALLOWED_HOSTS),
-                        help=f"Bind host -- loopback only (default: {DEFAULT_HOST})")
+    parser.add_argument("--host", default=DEFAULT_HOST,
+                        help=f"Bind host address (default: {DEFAULT_HOST}). "
+                             f"Non-loopback addresses (e.g., 0.0.0.0) require --admin-token or ADMIN_UI_TOKEN env var.")
+    parser.add_argument("--admin-token", default=None,
+                        help="Authentication token for remote access. "
+                             "REQUIRED when --host is non-loopback. "
+                             "Equivalent to ADMIN_UI_TOKEN env var or admin-ui.token in project.yaml.")
+    parser.add_argument("--allowed-hosts", nargs="*", default=None,
+                        help="Additional allowed origin hosts for CORS/DNS-rebinding protection. "
+                             "Default: 127.0.0.1 localhost ::1. "
+                             "Extends (does not replace) the default loopback set.")
     parser.add_argument("--root", default=".",
                         help="Project root directory (default: current directory)")
     parser.add_argument("--watch", action="store_true",
@@ -4073,6 +4238,8 @@ def main() -> None:
         port=args.port,
         enable_watcher=args.watch,
         enable_viz=not args.no_viz,
+        admin_token=args.admin_token,
+        allowed_hosts=tuple(args.allowed_hosts) if args.allowed_hosts else None,
     )
     server.start()
 

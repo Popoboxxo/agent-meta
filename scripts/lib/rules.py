@@ -230,7 +230,12 @@ def sync_rules(
             log.skip(rel_out, "unchanged")
 
     # Remove stale managed rules no longer in current sources
+    # speech-mode.md is owned by sync_speech_mode (speech/ layer), not the rules/
+    # hierarchy — never treat it as stale here or it gets deleted and recreated
+    # on every sync (infinite drift).
     for stale_name in sorted(previously_managed - now_managed):
+        if stale_name == SPEECH_RULE_FILENAME:
+            continue
         stale_path = safe_path(target_dir, stale_name)
         if stale_path.exists():
             log.action("DELETE", str(stale_path.relative_to(project_root)),

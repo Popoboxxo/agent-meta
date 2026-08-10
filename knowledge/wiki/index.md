@@ -112,6 +112,10 @@
 - [Test-Repository Validation](topics/test-repo-validation.md) — Validiert die generierten Agenten-Dateien nach einer Implementierung in einem separaten Test-Repository. `guide`
 - [Upgrade Guide — agent-meta auf neue Version aktualisieren](topics/upgrade-guide.md) — Kernregel: Alles in .claude/agents/ wird bei jedem Sync neu generiert. Rollen die aus config['roles'] entfernt wurden, werden automatisch gelöscht. Alles in .claude/3-project/... `guide, setup`
 
+## Plans
+
+- [Plan: Issue #456 – Admin UI Remote Access](plans/am-issue-456-remote-admin-auth.md) — Concrete implementation plan for configurable bind-host, token auth, and host allowlist for the Admin UI server. 8 ordered steps. `plan`
+
 ## Sources (Session Conclusions)
 
 - [Erkenntnisse — 10. Mai 2026](sources/2026-05-10-session.md) — Framework Health-Check + Visualisierungs-System Fix. Das Viz-Event-Logging war konfiguriert (viz: enabled: true, mode: full), aber .agent-meta/viz/events.jsonl blieb leer.... `session, conclusion`

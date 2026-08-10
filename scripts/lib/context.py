@@ -888,6 +888,10 @@ def _build_managed_block(
             local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
     else:
         local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
+
+    if len(shared_users) > 1:
+        for p in shared_users:
+            local_vars[f"PLATFORM_{p.upper()}"] = True
         
     local_vars["HAS_NATIVE_RULES"] = has_native_rules
     local_vars[f"PLATFORM_{provider.upper()}"] = True
