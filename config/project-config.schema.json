@@ -919,9 +919,28 @@
           "type": "boolean",
           "default": false,
           "description": "Watch config files for external modifications and emit events to .meta-viz/events.jsonl."
+        },
+        "bind-host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "IP address the Admin UI HTTP server binds to. Default: 127.0.0.1 (loopback only). Set to 0.0.0.0 for network access — requires token authentication."
+        },
+        "token": {
+          "type": "string",
+          "description": "Authentication token for remote access. REQUIRED when bind-host is non-loopback. Equivalent to --admin-token CLI flag or ADMIN_UI_TOKEN env var. NEVER commit to version control."
+        },
+        "token-file": {
+          "type": "string",
+          "description": "Path to a file containing the admin auth token. Alternative to inline 'token' key for secret management (e.g., Docker secrets, 1Password CLI)."
+        },
+        "allowed-hosts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["127.0.0.1", "localhost", "::1"],
+          "description": "List of host:port origins allowed for CORS / DNS-rebinding protection. Extends the default loopback set. Use when binding to a specific network interface."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "knowledge-engine": {
       "type": "object",
