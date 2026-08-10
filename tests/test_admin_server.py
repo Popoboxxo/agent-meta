@@ -283,7 +283,7 @@ class TestBindHostEnforcement(unittest.TestCase):
             with mock.patch.object(admin_server, "_DaemonThreadingHTTPServer") as srv_cls:
                 srv_cls.return_value = mock.Mock()
                 # Should not raise for any allowed host.
-                for ok_host in admin_server.ALLOWED_HOSTS:
+                for ok_host in admin_server.DEFAULT_ALLOWED_HOSTS:
                     admin_server.AdminServer(root, host=ok_host, port=0)
 
 
