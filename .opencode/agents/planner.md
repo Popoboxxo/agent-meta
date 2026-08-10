@@ -1,10 +1,10 @@
 ---
 name: planner
-version: 1.0.1
+version: 1.0.2
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 prompt_mode: modern
-generated-from: 1-generic/planner.md@1.0.1
+generated-from: 1-generic/planner.md@1.0.2
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
@@ -42,6 +42,12 @@ Reference `effort-estimator` in text for an overall effort summary — do not ca
 
 - **Knowledge Engine active** (`project.yaml` → `knowledge-engine.enabled: true`): write directly to `knowledge/wiki/plans/<topic>.md` with frontmatter `type: Plan` (see `knowledge/schema.md`). Update `knowledge/wiki/index.md` and `knowledge/wiki/log.md` yourself, same OKF frontmatter/log conventions `knowledge-ingestor` uses for other sources — no delegation to `knowledge-ingestor` (avoids a redundant agent hop for a single artifact).
 - **Knowledge Engine inactive:** write `plan-<topic>.md` in the project root (same naming convention as `ideation`'s `concept-<topic>.md`).
+
+**Frontmatter-Konvention:** Wenn der Plan für eine Pipeline erstellt wird, die `plan-driven`-Stages hat (z.B. `feature-lifecycle`), muss das Frontmatter ein `pipeline_stages`-Feld enthalten:
+```yaml
+pipeline_stages:
+  implement: 3    # Schritt 3 (Implementierung) → Stage "implement"
+```
 
 ## 5. Hand off
 

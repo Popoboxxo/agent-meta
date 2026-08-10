@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.95.0] — 2026-08-11
+
+### Added
+- Planner-pipeline integration: new `parse_plan_ref()` and `validate_plan_ref()` in `scripts/lib/pipelines.py` parse plan markdown files (frontmatter `pipeline_stages:` mapping plus fallback steps table) and validate them against a pipeline's plan-driven stage constraints — plan file existence, stage mapping, agent allow-list. New `check_plan_producer_coupling()` warns when a pipeline has plan-driven stages but no role declares `produces.plan.pipeline` (and vice versa: producers pointing at non-existent or non-plan-driven pipelines). `validate_pipelines()` gained an optional `roles_config` parameter to run these checks.
+- Orchestrator plan-driven gate (`agents/1-generic/orchestrator.md` v7.7.1 → v7.8.0): if the matched pipeline has `plan-driven` stages (e.g. `feature-lifecycle` → `implement`) and no plan exists, the orchestrator must delegate to `planner` first and only start the pipeline with `payload.plan_ref` — no more silent fallback-agent runs for features with >2 files or architecture impact. Plan-driven stage generation in `_generate_pipeline_block()` now emits explicit pre-delegation validation steps (plan_ref path check, `pipeline_stages` frontmatter check, allowed-agent check, fallback + error documentation).
+- Planner frontmatter convention (`agents/1-generic/planner.md` v1.0.1 → v1.0.2): plans created for plan-driven pipelines must include a `pipeline_stages:` frontmatter field mapping stage IDs to step numbers. `config/role-defaults.yaml` declares the planner as `produces.plan.pipeline: feature-lifecycle` (ref_key `plan_ref`, stage `implement`) and adds the trigger keywords "plane", "Plan erstellen", "Umsetzungsplan erstellen", "Implementierungsplan".
+- Delegation-table ghost-entries fix (`scripts/lib/delegation_table.py`): the active-roles filter now applies to all workflow tiers, not only `optional` — tiers like `core` no longer produce ghost rows for inactive roles.
+- rtk-for-opencode plugin installed and configured (`.opencode/rtk-config.json`, `opencode.json`): token-filtered command output for shell tool calls.
+
+### Fixed
+- Admin-server crash on missing project.yaml (`scripts/admin-server.py`): `_load_viz_config()` returned defaults immediately when `.meta-config/project.yaml` does not exist (previously raised SystemExit); new `_load_admin_ui_config()` provides the same fallback for the admin-ui section. Test constant renamed `ALLOWED_HOSTS` → `DEFAULT_ALLOWED_HOSTS`.
+- Admin-server remote auth hardening: token authentication via `--token` CLI flag, `ADMIN_UI_TOKEN` env var, or `admin-ui.token`/`admin-ui.token-file` in project.yaml (priority CLI > env > config > file), verified with constant-time `hmac.compare_digest` from `Authorization: Bearer` header or `?token=` query parameter; unauthorized requests get HTTP 401 with `WWW-Authenticate: Bearer`. Remote bind-host now allowed when token auth is configured — without a token the server stays loopback-only.
+- Admin-server CSRF/DNS-rebinding protection now honors `admin-ui.allowed-hosts` (default: loopback only) for both Origin and Host header checks; `admin-ui.bind-host` is configurable in `.meta-config/project.yaml` (schema entries added to `config/project-config.schema.json`).
+- Sync drift fix (`scripts/lib/rules.py`): `speech-mode.md` is owned by the speech/ layer, not the rules hierarchy — excluded from stale-cleanup so it is no longer deleted and recreated on every sync (infinite drift).
+- Sync drift fix (`scripts/lib/context.py`): `PLATFORM_*` flags are now set for all providers sharing the context file, not just the primary provider.
+- External pin: `external/awesome-claude-code` checked out to pinned commit `3d8bde25`.
+- Generated files re-synced (CLAUDE.md, AGENTS.md, agent-meta-manager.md ×3 providers).
+
+### Changed
+- Changelog and version documentation updates; `knowledge/wiki/plans/am-fix-planner-pipeline-ghost-entries.md` and `am-issue-456-remote-admin-auth.md` added as implementation plan records.
+
 ## [0.94.0] — 2026-08-09
 
 ### Added

@@ -44,7 +44,7 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 | Meta-Feedback, Verbesserung | `meta-feedback` | optional | no |
 | Opencode | `opencode-expert` | optional | no |
 | Performance, Bottleneck, Optimierung | `performance-optimizer` | optional | no |
-| Plan, Planung, Schritte, Umsetzungsplan, wie setzen wir das um | `planner` | recommended | no |
+| Plan, Planung, Schritte, Umsetzungsplan, wie setzen wir das um, plane, Plan erstellen, Umsetzungsplan erstellen, Implementierungsplan | `planner` | recommended | no |
 | Prompt, Prompt Engineering, Agenten-Definition | `prompt-engineer` | optional | no |
 | refactoring, strangler fig, legacy modernization, code smell, systematic transformation, framework upgrade | `refactoring-specialist` | optional | no |
 | Release, Version, Changelog | `release` | optional | no |
