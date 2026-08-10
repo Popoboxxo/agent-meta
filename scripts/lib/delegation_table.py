@@ -36,7 +36,7 @@ def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict)
         role_info = roles[role_name]
         tier = role_info.get("workflow_tier", "optional")
 
-        if tier == "optional" and active_roles is not None and role_name not in active_roles:
+        if active_roles is not None and role_name not in active_roles:
             continue
 
         desc = role_info.get("short_desc", role_info.get("description", ""))

@@ -138,7 +138,7 @@ def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -
     return errors
 
 
-def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
+def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dict | None = None) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
     Checks:
@@ -257,6 +257,177 @@ def validate_pipelines(pipelines: dict, available_roles: list) -> list[str]:
         errors.append(
             f"Summary: {len(missing_roles)} missing role(s): {', '.join(sorted(missing_roles))}. "
             f"Add them to 'roles:' in .meta-config/project.yaml."
+        )
+
+    # Check plan-producer coupling (non-fatal warnings)
+    if roles_config is not None:
+        coupling_warnings = check_plan_producer_coupling(pipelines, roles_config)
+        errors.extend(coupling_warnings)
+
+    return errors
+
+
+def check_plan_producer_coupling(pipelines: dict, roles_config: dict) -> list[str]:
+    """Check that every pipeline with plan-driven stages has a declared producer.
+
+    Returns a list of warning messages (non-fatal). Empty list = consistent.
+    """
+    warnings = []
+    roles = roles_config.get("roles", {})
+
+    plan_driven_pipelines = set()
+    for name, pipeline in pipelines.items():
+        if not pipeline.get("enabled", True):
+            continue
+        for stage in pipeline.get("stages", []):
+            if stage.get("mode") == "plan-driven":
+                plan_driven_pipelines.add(name)
+
+    if not plan_driven_pipelines:
+        return warnings
+
+    producers_by_pipeline: dict[str, list[str]] = {}
+    for role_name, role_info in roles.items():
+        produces = role_info.get("produces", {})
+        plan_cfg = produces.get("plan")
+        if plan_cfg and plan_cfg.get("pipeline"):
+            pipeline_name = plan_cfg["pipeline"]
+            producers_by_pipeline.setdefault(pipeline_name, []).append(role_name)
+
+    missing = plan_driven_pipelines - set(producers_by_pipeline.keys())
+    for pipeline_name in sorted(missing):
+        warnings.append(
+            f"Pipeline '{pipeline_name}' has plan-driven stage(s) but no role "
+            f"declares produces.plan.pipeline = '{pipeline_name}'. "
+            f"Add a 'produces:' block to the planner role in config/role-defaults.yaml."
+        )
+
+    for pipeline_name, producers in producers_by_pipeline.items():
+        if pipeline_name not in pipelines:
+            warnings.append(
+                f"Role(s) {', '.join(producers)} declare produces.plan.pipeline = "
+                f"'{pipeline_name}' but this pipeline does not exist."
+            )
+        elif pipeline_name not in plan_driven_pipelines:
+            warnings.append(
+                f"Role(s) {', '.join(producers)} declare produces.plan.pipeline = "
+                f"'{pipeline_name}' but this pipeline has no plan-driven stages."
+            )
+
+    return warnings
+
+
+def parse_plan_ref(plan_path: str) -> dict:
+    """Parse a plan markdown file and extract stage-to-agent mappings.
+
+    Recognizes two sources of stage-to-agent information, in priority order:
+    1. Frontmatter field `pipeline_stages:` — explicit mapping of pipeline
+       stage IDs to step numbers: ``{implement: 4, verify: 5}``
+    2. Steps table (markdown table with columns Step and Agent) — treated
+       as fallback: step_index → agent mapping, consumer must match stage
+       IDs to step indices externally.
+
+    Returns:
+        dict with keys:
+        - 'stages': dict[str, int]  — {stage_id: step_number} from frontmatter
+        - 'steps':  dict[int, str]  — {step_number: agent_name} from table
+        - 'raw_agents': list[str]    — all agent names found in the plan
+        - 'file_exists': bool
+    """
+    result = {
+        "stages": {},
+        "steps": {},
+        "raw_agents": [],
+        "file_exists": False,
+    }
+
+    if not os.path.exists(plan_path):
+        return result
+
+    result["file_exists"] = True
+
+    with open(plan_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    fm_match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+    if fm_match:
+        try:
+            import yaml
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+            ps = fm.get("pipeline_stages")
+            if isinstance(ps, dict):
+                result["stages"] = {str(k): int(v) for k, v in ps.items()}
+        except Exception:
+            pass
+
+    table_pattern = re.compile(
+        r'^\|\s*(\d+)\s*\|\s*.+?\|\s*`?(\w[\w-]*)`?\s*\|',
+        re.MULTILINE,
+    )
+    for match in table_pattern.finditer(content):
+        step_num = int(match.group(1))
+        agent = match.group(2)
+        result["steps"][step_num] = agent
+        if agent not in result["raw_agents"]:
+            result["raw_agents"].append(agent)
+
+    return result
+
+
+def validate_plan_ref(
+    plan_path: str,
+    pipeline_name: str,
+    stage_id: str,
+    fallback_agent: str,
+    allowed_agents: list[str],
+) -> list[str]:
+    """Validate a plan file against a pipeline's plan-driven stage constraints.
+
+    Returns:
+        list of error messages (empty = valid plan_ref for this stage).
+    """
+    errors = []
+    plan = parse_plan_ref(plan_path)
+
+    if not plan["file_exists"]:
+        errors.append(
+            f"Plan file '{plan_path}' does not exist. "
+            f"Check the plan_ref path in the payload."
+        )
+        return errors
+
+    if plan["stages"]:
+        if stage_id not in plan["stages"]:
+            errors.append(
+                f"Plan file '{plan_path}' has pipeline_stages frontmatter "
+                f"but stage '{stage_id}' is not mapped. "
+                f"Available stages: {', '.join(sorted(plan['stages'].keys()))}."
+            )
+            return errors
+        step_num = plan["stages"][stage_id]
+        agent = plan["steps"].get(step_num)
+    else:
+        if not plan["steps"]:
+            errors.append(
+                f"Plan file '{plan_path}' contains no parsable steps table. "
+                f"Expected format: | # | Step | Agent | ... |"
+            )
+            return errors
+        return errors
+
+    if agent is None:
+        errors.append(
+            f"Plan stage '{stage_id}' maps to step {step_num}, "
+            f"but step {step_num} has no agent assigned."
+        )
+        return errors
+
+    if allowed_agents and agent not in allowed_agents:
+        errors.append(
+            f"Plan assigns agent '{agent}' to stage '{stage_id}', "
+            f"but pipeline '{pipeline_name}' only allows: "
+            f"{', '.join(allowed_agents)}. "
+            f"Fallback agent '{fallback_agent}' will be used instead."
         )
 
     return errors
@@ -580,12 +751,15 @@ def _generate_pipeline_block(
                 f"**{stage_id}** — Plan-driven: Agent aus payload.plan_ref "
                 f"(Stage-ID '{stage_id}') übernehmen."
             )
+            lines.append("")
+            lines.append("  **Plan-Validierung (vor Delegation):**")
+            lines.append(f"  1. Prüfe: payload.plan_ref-Pfad existiert → sonst fallback_agent = `{fallback}`")
+            lines.append(f"  2. Prüfe: Plan-Frontmatter `pipeline_stages` enthält `{stage_id}` → sonst Fehler")
             if allowed:
-                lines.append(f"  Erlaubte Rollen: {', '.join(allowed)}")
-            lines.append(f"  Ohne plan_ref: fallback_agent = {fallback}")
-            lines.append(
-                "  Plan_ref vorhanden, aber Stage-Zeile fehlt: Fehler, kein stiller Fallback."
-            )
+                lines.append(f"  3. Prüfe: Agent in Stage `{stage_id}` ∈ {{{', '.join(allowed)}}} → sonst `{fallback}`")
+            else:
+                lines.append(f"  3. Keine allowed_agents-Restriktion — jeder Agent aus Plan akzeptiert")
+            lines.append(f"  4. Bei allen Fehlern: `{fallback}` verwenden, Fehler in Status-Payload dokumentieren")
             lines.append("")
 
     if not lines:
