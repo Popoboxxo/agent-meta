@@ -223,6 +223,10 @@ roles:
     model: balanced
     memory: ''
     workflow_tier: optional
+    # Browser tools are bound into the generated frontmatter only when the
+    # project actually activates the playwright server (issue #467).
+    mcp-servers:
+    - playwright
     description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
       — User-Flows statt isolierter Units
     routing:

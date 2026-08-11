@@ -290,7 +290,12 @@ def _update_json_config(
     Reads the existing file (if any), updates the MCP key, writes clean JSON.
     Warns and skips if the file cannot be parsed.
     """
+    # Log label: include the containing directory when there is one, so
+    # sibling configs (.vscode/mcp.json vs .cursor/mcp.json) stay
+    # distinguishable in sync.log instead of both reading as "mcp.json".
     rel = str(path.name)
+    if path.parent.name:
+        rel = str(path.relative_to(path.parent.parent))
 
     existing: dict = {}
     if path.exists():
@@ -314,7 +319,6 @@ def _update_json_config(
 
     existing[mcp_key] = mcp_entries
     content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
-    str(path.relative_to(path.parent.parent)) if path.parent.name else rel
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)

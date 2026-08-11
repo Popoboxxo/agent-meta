@@ -32,12 +32,65 @@ def _load_yaml_or_json(*paths: Path) -> tuple[dict, Path]:
             if not _YAML_AVAILABLE:
                 print(f"WARNING: PyYAML not installed, skipping {path.name}.", file=sys.stderr)
                 continue
-            with path.open(encoding="utf-8") as f:
-                return _yaml.safe_load(f) or {}, path
+            try:
+                with path.open(encoding="utf-8") as f:
+                    data = _yaml.safe_load(f)
+            except _yaml.YAMLError as exc:
+                raise SyncError(f"Invalid YAML in '{path}': {exc}") from exc
         else:
-            with path.open(encoding="utf-8") as f:
-                return json.load(f), path
+            try:
+                with path.open(encoding="utf-8") as f:
+                    data = json.load(f)
+            except json.JSONDecodeError as exc:
+                raise SyncError(f"Invalid JSON in '{path}': {exc}") from exc
+        # Every caller immediately does data.get(...) — a top-level list or
+        # scalar would blow up there with an opaque AttributeError instead.
+        if data is None:
+            data = {}
+        if not isinstance(data, dict):
+            raise SyncError(
+                f"Invalid config '{path}': expected a mapping at the top level, "
+                f"got {type(data).__name__}."
+            )
+        return data, path
     return {}, preferred  # none found — return empty + preferred path
+
+
+def strip_jsonc_comments(text: str) -> str:
+    """Remove // line comments from JSONC text without touching string values.
+
+    A regex cannot do this safely: a string value may legitimately contain
+    ``//`` (a URL, a regex, a path), and a quote-excluding pattern truncates
+    the line instead — silently corrupting the document (issue #474). This
+    walks the text once, tracking whether the cursor is inside a quoted
+    string, and only strips ``//`` runs found outside one.
+    """
+    out: list[str] = []
+    in_string = False
+    escape = False
+    i = 0
+    length = len(text)
+    while i < length:
+        char = text[i]
+        if escape:
+            out.append(char)
+            escape = False
+        elif char == "\\":
+            out.append(char)
+            escape = in_string  # backslash only escapes inside a string
+        elif char == '"':
+            out.append(char)
+            in_string = not in_string
+        elif not in_string and char == "/" and i + 1 < length and text[i + 1] == "/":
+            # Drop everything up to (but not including) the line break, so
+            # line structure — and therefore JSON error line numbers — survive.
+            while i < length and text[i] != "\n":
+                i += 1
+            continue
+        else:
+            out.append(char)
+        i += 1
+    return "".join(out)
 
 
 def read_json_lenient(path: Path) -> dict | None:
@@ -48,9 +101,7 @@ def read_json_lenient(path: Path) -> dict | None:
     Returns None when the file cannot be parsed even after cleanup.
     """
     text = path.read_text(encoding="utf-8-sig")
-    stripped = re.sub(r'(?m)^\s*//.*$', '', text)
-    # Inline comments: require whitespace before // so URLs ("https://...") survive
-    stripped = re.sub(r'(?m)\s+//[^"\n]*$', '', stripped)
+    stripped = strip_jsonc_comments(text)
     stripped = re.sub(r',\s*([}\]])', r'\1', stripped)
     try:
         return json.loads(stripped)

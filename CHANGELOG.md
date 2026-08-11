@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- MCP toolset propagation into agent frontmatter (#467): a role opts into MCP servers via `mcp-servers:` in `config/role-defaults.yaml` (project override: `mcp-role-overrides.<role>` in `project.yaml`, new schema entry), and `sync.py` binds the server's `tools.allowed` entries as `mcp__<server>__<tool>` into the generated Claude agent frontmatter. Only servers active for the project contribute; `tools.blocked` never leaks in. `e2e-tester` now opts into `playwright` — previously the role was documented as browser-capable in `.claude/rules/mcp-playwright.md` while its generated frontmatter listed base tools only, so every browser delegation failed structurally. New `resolve_mcp_tools_for_role()` and `append_frontmatter_tools()` in `scripts/lib/agents.py`, plus consistency tests catching future rule/frontmatter drift.
+- `docs/guides/mcp/playwright-setup.md`: activation, browser install, role opt-in and troubleshooting.
+
+### Fixed
+- Orchestrator-guard block reason was lost (#396): on exit 2 the harness feeds *stderr* back to the model and ignores stdout, but the hook wrote its guard message to stdout — every block surfaced as a bare `hook error: No stderr output` instead of the explanation, which read as a non-deterministic hook failure. All blocking-path messages now go to stderr (`hooks/1-generic/orchestrator-guard.sh` v2.1.0 → v2.2.0), covered by two new regression tests.
+- Playwright MCP no longer requires root (#470): `config/mcp-registry.yaml` pins `--browser chromium`. The server's default `chrome` channel expects a system-wide Google Chrome at `/opt/google/chrome`, and its installer calls `sudo` — unavailable in CI runners and sandboxes. Chromium ships with Playwright (`npx playwright install chromium`).
+- `_load_yaml_or_json()` crashed the whole sync on a malformed config (#461): `yaml.safe_load` and `json.load` are now wrapped and raise `SyncError` with the offending path, and a non-mapping root (top-level list/scalar) is rejected with a readable message instead of surfacing as `AttributeError: 'list' object has no attribute 'get'` in whichever caller happened to run first.
+- `read_json_lenient()` silently corrupted JSONC files (#474): the inline-comment regex excluded quotes, so any line whose *string value* contained `//` (a URL, a regex, a path) was truncated, JSON parsing failed and the entire config was silently dropped. Replaced with `strip_jsonc_comments()`, a single-pass scanner that tracks string state and escapes, and preserves line structure so parse-error line numbers stay usable.
+- `lifecycle_check.py` raised unhandled tracebacks inside git hooks (#475): `--project-root` as the last argument no longer IndexErrors, and a mapping- or nested-shaped `ai-providers:` no longer passes an unhashable dict into `.get()` — mapping form uses its keys, non-string entries are skipped with a warning.
+- Dead statement in `scripts/lib/mcp.py::_update_json_config` (#464): the abandoned path expression is now the intended assignment and moved to where `rel` is defined, so sibling configs (`.vscode/mcp.json` vs `.cursor/mcp.json`) stay distinguishable in `sync.log` instead of both logging as `mcp.json`.
+- Misleading re-export import in `scripts/lib/viz.py` (#471): `_load_yaml_or_json` is imported from `.io`, its actual definition site, instead of relying on `.config` transitively re-exporting it.
+- `validate_envelope()` documented as dormant by design (#460): the docstring now states explicitly that it is a manually-invokable utility with no interception point (the orchestrator dispatches through the provider's `Agent`/`Task` call, and `orchestrator-guard.sh` sees only `Write`/`Edit`/`Bash`), so the depth and self-handoff limits in `.claude/rules/a2a-delegation-gates.md` are model-followed conventions, not enforced barriers — and must not be cited as evidence of enforcement.
+
 ## [0.95.0] — 2026-08-11
 
 ### Added

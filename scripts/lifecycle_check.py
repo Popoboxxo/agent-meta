@@ -151,6 +151,10 @@ def main() -> None:
     project_root = Path.cwd()
     if "--project-root" in args:
         idx = args.index("--project-root")
+        if idx + 1 >= len(args):
+            print("lifecycle-check: --project-root requires a path argument",
+                  file=sys.stderr)
+            sys.exit(1)
         project_root = Path(args[idx + 1]).resolve()
 
     config_path = _find_config(project_root)
@@ -179,7 +183,20 @@ def main() -> None:
     providers = config.get("ai-providers", config.get("ai-provider", ["Claude"]))
     if isinstance(providers, str):
         providers = [providers]
+    elif isinstance(providers, dict):
+        # Mapping form (provider -> settings): the keys are the provider names.
+        providers = list(providers)
+    elif not isinstance(providers, list):
+        print(f"lifecycle-check: 'ai-providers' must be a list or mapping, "
+              f"got {type(providers).__name__} — skipping", file=sys.stderr)
+        sys.exit(0)
+
     for provider in providers:
+        if not isinstance(provider, str):
+            # A nested mapping/list entry is unhashable — .get() would raise.
+            print(f"lifecycle-check: ignoring non-string provider entry "
+                  f"({type(provider).__name__})", file=sys.stderr)
+            continue
         pending_file = _PROVIDER_PENDING_FILES.get(provider, ".claude/pending-tasks.md")
         write_pending_tasks(project_root, event, tasks, pending_file)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.1.0
+# version: 2.2.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -13,7 +13,13 @@
 # Only mutating tools (Write, Edit, Bash) are intercepted.
 # Research tools (read, glob, grep) are never blocked.
 #
-# Exit codes: 0 = allow, 2 = block (stdout shown as error context).
+# Exit codes: 0 = allow, 2 = block.
+#
+# On exit 2 the harness feeds *stderr* back to the model as the block reason
+# and ignores stdout. Writing the guard message to stdout (as versions <=2.1.0
+# did) therefore surfaced a bare "hook error: No stderr output" instead of the
+# explanation — the block worked, the reason was lost (issue #396). Every
+# message emitted on a blocking path must go to stderr.
 #
 # Identity note (see agent-meta issue #390): no provider's PreToolUse hook
 # payload identifies which subagent issued the call — Claude Code's
@@ -130,8 +136,8 @@ except Exception:
 " "$CONFIG_FILE" "$AGENT_META_PROVIDER" 2>/dev/null)
 
   if [ "$STRICT" = "true" ]; then
-    echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked."
-    echo "Delegate this task to the orchestrator agent."
+    echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked." >&2
+    echo "Delegate this task to the orchestrator agent." >&2
     exit 2
   fi
 fi
@@ -197,9 +203,9 @@ print('true' if blocked else 'false')
 " 2>/dev/null || echo "false")
 
   if [ "$IS_MUTATION" = "true" ]; then
-    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat."
-    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)"
-    echo "Delegate git operations to the \`git\` agent."
+    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
+    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+    echo "Delegate git operations to the \`git\` agent." >&2
     exit 2
   fi
 fi
