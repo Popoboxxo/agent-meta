@@ -33,7 +33,7 @@ Check before every release:
 
 | Check | Verification |
 |-------|--------------|
-| Tests green | `python scripts/sync.py --validate` |
+| Tests green | `python3 scripts/sync.py --validate` |
 | DoD met | Validator check |
 | CHANGELOG.md updated | All changes since last tag recorded |
 | Version bumped | SemVer convention (see `<context>`) |
@@ -88,7 +88,7 @@ Check before every release:
 
 **Build:** `python scripts/sync.py`
 
-**Test:** `python scripts/sync.py --validate`
+**Test:** `python3 scripts/sync.py --validate`
 </context>
 
 <tools>

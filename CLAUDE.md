@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.95.0 — `2026-08-11`
+> Generiert von agent-meta v0.95.1 — `2026-08-12`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -81,7 +81,7 @@ scripts/sync.py — Haupt-CLI für Agent-Generierung
 python scripts/sync.py
 
 # Tests
-python scripts/sync.py --validate
+python3 scripts/sync.py --validate
 
 # Dev-Stack starten
 (kein Dev-Stack)
@@ -108,7 +108,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 
-Generiert von agent-meta v0.95.0 — `2026-08-12`
+Generiert von agent-meta v0.95.1 — `2026-08-12`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Du bist im `main-chat` Modus. Du agierst direkt als Router und Worker (siehe `use-orchestrator.md`).
 
