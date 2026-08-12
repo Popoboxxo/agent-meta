@@ -73,3 +73,25 @@ capabilities:
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
       - "Dateien in .github/copilot/agents/ werden automatisch geladen."
+
+  # Conservative baseline — Mammouth is a CLI-first tool (Plan/Build modes) whose
+  # native orchestration surface is undocumented. Only capabilities backed by
+  # config/ai-providers.yaml are enabled; everything orchestration-specific stays
+  # false until verified. `hooks: true` is evidence-based: ai-providers.yaml sets
+  # has_hooks: true + hooks_dir (.mammouth/hooks), enforced by
+  # tests/test_provider_hooks_config.py.
+  Mammouth:
+    subagent_dispatch: false
+    parallel_execution: false
+    file_based_agents: true
+    text_mentions: true
+    hooks: true
+    native_agent_tools: []
+    structured_handoff: false
+    handoff_format: "yaml_text_block"
+    handoff_envelope_support: false
+    description: "Dateibasierte Agenten (.mammouth/agents/), CLI-first mit Plan/Build-Modi. Text-basierte Delegation, keine native Subagent-API."
+    special_notes:
+      - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
+      - "Keine native parallele Subagent-Ausführung — Delegation sequentiell/textbasiert."
+      - "Hooks werden unterstützt (.mammouth/hooks); MCP-Integration in ai-providers.yaml nicht konfiguriert."
