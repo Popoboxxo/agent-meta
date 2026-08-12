@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- Dead code `sync_agents()` in `scripts/lib/agents.py` removed (#462): superseded entirely by `sync_agents_for_provider()`; repo-wide grep confirmed zero remaining callers.
+- `_collect_role_defaults()` in `scripts/lib/config_audit.py` replaced with the canonical `load_roles_config()` from `scripts/lib/roles.py` (#480): the private duplicate lacked `load_roles_config()`'s `_`-prefix filtering and legacy-path fallback; no behavior change in the current role set.
+- Repeated local `import zipfile` statements in `scripts/lib/backup.py` consolidated to a single module-level import (#466).
+- Repeated local `TemplateBuilder` imports in `scripts/lib/context.py` (7 call sites) consolidated to a single module-level import (#469): verified no circular-import risk (`context_templates/builder.py` only imports stdlib).
+- `substitute()` in `scripts/lib/config.py` gained an optional `strict: bool = False` parameter (#477): when `True`, an unknown placeholder now raises `SyncError` (name + `source_label`) instead of silently warning. Default behavior is unchanged; no existing call site was switched to strict mode yet, since several rely on partially-populated variables for conditional template blocks.
+- Missing docstrings added to `SyncLog` (`scripts/lib/log.py`, 11 members) and `TemplateBuilder` (`scripts/lib/context_templates/builder.py`, 7 members) (#484).
+- `config/provider-tools.yaml`: `terminal_tool` section was missing a `Mammouth: bash` entry present in every other provider and already asserted as a hardcoded fallback in `scripts/lib/viz.py` — config now matches the code-level default.
+
 ## [0.95.1] — 2026-08-12
 
 ### Added

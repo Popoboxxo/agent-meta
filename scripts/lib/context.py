@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .io import content_hash, safe_path
 from .log import SyncLog
+from .context_templates.builder import TemplateBuilder
 
 SNIPPETS_DIR = "snippets"
 
@@ -145,7 +146,6 @@ def _regenerate_static_context(
         log.info(rel_label, "no static template — skipping static regeneration")
         return
 
-    from .context_templates.builder import TemplateBuilder
     fallback_partials = template_path.parent.parent / "context" / "partials"
     builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
     rendered = builder.build(template_path.stem, variables)
@@ -234,7 +234,6 @@ def _ensure_context_file(
         return
 
     if template_path and template_path.exists():
-        from .context_templates.builder import TemplateBuilder
         fallback_partials = template_path.parent.parent / "context" / "partials"
         builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
         content = builder.build(template_path.stem, variables)
@@ -290,7 +289,6 @@ def _update_managed_html_block(
     if provider == "Claude" and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
 
-    from .context_templates.builder import TemplateBuilder
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     try:
         new_managed = builder.build("claude-managed", render_vars)
@@ -450,7 +448,6 @@ def _sync_opencode_context(
 
     if not target_path.exists():
         if template_path and template_path.exists():
-            from .context_templates.builder import TemplateBuilder
             fallback_partials = template_path.parent.parent / "context" / "partials"
             builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
             ocontent = builder.build(template_path.stem, variables)
@@ -598,7 +595,6 @@ def _sync_continue_context(
         template_path = agent_meta_root / pc["context_template"]
         if not ctx_path.exists():
             if template_path.exists():
-                from .context_templates.builder import TemplateBuilder
                 fallback_partials = template_path.parent.parent / "context" / "partials"
                 builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
                 ccontent = builder.build(template_path.stem, variables)
@@ -856,7 +852,6 @@ def _build_managed_block(
         strip_inactive_conditional_blocks,
         substitute,
     )
-    from .context_templates.builder import TemplateBuilder
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules
     from .agents import build_knowledge_engine_hints
@@ -1194,7 +1189,6 @@ def sync_claude_md_static(
         return
 
     if not target_path.exists():
-        from .context_templates.builder import TemplateBuilder
         fallback_partials = agent_meta_root / "templates" / "context" / "partials"
         builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
         rendered = builder.build(template_path.stem, variables)

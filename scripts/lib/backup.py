@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -179,7 +180,6 @@ def list_backups(
 
             # Try to read manifest from inside the zip for richer info
             try:
-                import zipfile
                 with zipfile.ZipFile(f, "r") as zf:
                     if MANIFEST_FILENAME in zf.namelist():
                         manifest_data = json.loads(zf.read(MANIFEST_FILENAME).decode("utf-8"))
@@ -388,7 +388,6 @@ def restore_backup(
     # Read manifest
     manifest: dict = {}
     try:
-        import zipfile
         with zipfile.ZipFile(archive_path, "r") as zf:
             names = zf.namelist()
             if MANIFEST_FILENAME in names:
@@ -400,7 +399,6 @@ def restore_backup(
     if not archive_providers:
         # Fallback: infer from directory structure in zip
         try:
-            import zipfile
             with zipfile.ZipFile(archive_path, "r") as zf:
                 names = zf.namelist()
                 archive_providers = []
@@ -465,7 +463,6 @@ def restore_backup(
 
         # Extract from zip
         try:
-            import zipfile
             with zipfile.ZipFile(archive_path, "r") as zf:
                 # Extract only the matching provider directory
                 for member in zf.namelist():
@@ -485,7 +482,6 @@ def restore_backup(
     project_yaml_in_archive = ".meta-config/project.yaml" if manifest else None
     if project_yaml_in_archive and not dry_run:
         try:
-            import zipfile
             target_yaml = project_root / ".meta-config" / "project.yaml"
             with zipfile.ZipFile(archive_path, "r") as zf:
                 if project_yaml_in_archive in zf.namelist():  # noqa: SIM102

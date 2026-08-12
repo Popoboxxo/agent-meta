@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from .roles import load_roles_config
+
 try:
     import yaml as _yaml
     _YAML_AVAILABLE = True
@@ -188,15 +190,6 @@ def _is_role_template(path: Path) -> bool:
     )
 
 
-def _collect_role_defaults(agent_meta_root: Path) -> set[str]:
-    """Return the set of role names defined in config/role-defaults.yaml."""
-    defaults = _read_yaml(agent_meta_root / "config" / "role-defaults.yaml")
-    roles = defaults.get("roles", {})
-    if isinstance(roles, dict):
-        return set(roles.keys())
-    return set()
-
-
 def _collect_based_on_roles(agent_meta_root: Path) -> set[str]:
     """Return roles generated via ``based-on`` from a 2-platform override.
 
@@ -275,7 +268,7 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         project_roles = []
     project_roles_set = set(project_roles)
 
-    role_defaults = _collect_role_defaults(agent_meta_root)
+    role_defaults = set(load_roles_config(agent_meta_root)["roles"].keys())
     generic_dir = agent_meta_root / "agents" / "1-generic"
 
     # Roles produced by a 2-platform override via ``based-on:`` (e.g. the five
