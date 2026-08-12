@@ -17,7 +17,11 @@ def load_providers_config(agent_meta_root: Path) -> dict:
         agent_meta_root / _PROVIDERS_CONFIG_JSON,
     )
     if not data:
-        # Minimal fallback — keeps backward compat if providers.config.yaml is missing
+        # Minimal-but-schema-complete fallback — used only if ai-providers.yaml is
+        # missing entirely. Mirrors the current Claude provider schema (identity,
+        # capability flags, `capabilities` list, `model-tiers`/`model-aliases`) so
+        # downstream code that reads e.g. caps or tiers does not trip over partial
+        # data. Keep field names in sync with config/ai-providers.yaml::Claude.
         return {
             "Claude": {
                 "agents_dir": ".claude/agents",
@@ -26,14 +30,50 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 "context_template": "templates/configs/CLAUDE.project-template.md",
                 "has_rules": True,
                 "has_hooks": True,
+                "has_commands": True,
                 "has_settings": True,
+                "capabilities": [
+                    "agents",
+                    "rules",
+                    "hooks",
+                    "commands",
+                    "settings",
+                    "snippets",
+                    "skills",
+                    "context-managed-block",
+                    "artifacts",
+                    "checkpoints",
+                    "mcp",
+                ],
+                "artifact_dir": ".claude/artifacts",
+                "checkpoint_dir": ".meta-viz",
                 "settings_file": ".claude/settings.json",
+                "settings_template": "templates/configs/CLAUDE.settings-template.json",
+                "skills_dir": ".claude/skills",
+                "snippets_dir": ".claude/snippets",
+                "pending_tasks_file": ".claude/pending-tasks.md",
+                "extension_dir": ".claude/3-project",
                 "gitignore_entries": [
                     ".claude/settings.local.json",
                     ".claude/agent-memory-local/",
+                    ".claude/pending-tasks.md",
                     "CLAUDE.personal.md",
                     "sync.log",
+                    ".mcp.json",
                 ],
+                "model-tiers": {
+                    "nano": "claude-haiku-4-5-20251001",
+                    "fast": "claude-haiku-4-5-20251001",
+                    "balanced": "claude-sonnet-5",
+                    "powerful": "claude-opus-4-8",
+                    "max": "claude-fable-5",
+                },
+                "model-aliases": {
+                    "haiku": "claude-haiku-4-5-20251001",
+                    "sonnet": "claude-sonnet-4-6",
+                    "opus": "claude-opus-4-8",
+                    "fable": "claude-fable-5",
+                },
             }
         }
     return data.get("providers", data)

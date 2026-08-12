@@ -35,3 +35,8 @@ bootstrap:
     mechanism: "file-based"
     action: "none"
     description: "Agenten in .github/copilot/agents/ werden automatisch geladen."
+
+  Mammouth:
+    mechanism: "file-based"
+    action: "none"
+    description: "Agenten in .mammouth/agents/ werden dateibasiert bereitgestellt — kein Session-Bootstrap nötig."

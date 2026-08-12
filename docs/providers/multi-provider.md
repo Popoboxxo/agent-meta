@@ -1,4 +1,4 @@
-# Multi-Provider Support — Gemini, Continue und Claude gleichzeitig
+# Multi-Provider Support — Claude, Gemini, Opencode, Continue, Copilot, Mammouth
 
 > Dieses Dokument beschreibt wie `sync.py` mehrere AI-Provider gleichzeitig bedienen kann
 > und was jeder Provider an Output erhält.
@@ -8,11 +8,11 @@
 ## Konzept
 
 `sync.py` generiert Provider-spezifischen Output aus denselben universellen Agent-Templates.
-Ein einziges `.meta-config/project.yaml` reicht, um Agenten-Dateien für Claude Code, Gemini CLI
-und Continue gleichzeitig zu erzeugen.
+Ein einziges `.meta-config/project.yaml` reicht, um Agenten-Dateien für Claude Code, Gemini CLI,
+Opencode, Continue, GitHub Copilot und Mammouth Code gleichzeitig zu erzeugen.
 
 ```json
-"ai-providers": ["Claude", "Gemini", "Continue", "Opencode"]
+"ai-providers": ["Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth"]
 ```
 
 Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
@@ -32,9 +32,16 @@ Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin u
 | Provider | Agents-Verzeichnis | Dateiendung | Kontext-Datei | Frontmatter |
 |----------|--------------------|-------------|---------------|-------------|
 | `Claude` | `.claude/agents/` | `.md` | `CLAUDE.md` | Vollständig (`model`, `memory`, `permissionMode`, …) |
-| `Gemini` | `.gemini/agents/` | `.md` | `.gemini/GEMINI.md` | Reduziert (`model` only, kein `memory`/`permissionMode`) |
+| `Gemini` | `.gemini/agents/` | `.md` | `AGENTS.md` | Reduziert (`model` only, kein `memory`/`permissionMode`) |
 | `Continue` | `.continue/agents/` | `.md` | `.continue/rules/project-context.md` | Minimal (`name`, `description`, `alwaysApply: false`) |
 | `Opencode` | `.opencode/agents/` | `.md` | `AGENTS.md` | Nativ (`description`, `mode: subagent`, `model: provider/id`) |
+| `Copilot` | `.github/copilot/agents/` | `.md` | `.github/copilot/COPILOT.md` | Reduziert (`name`, `description`) |
+| `Mammouth` | `.mammouth/agents/` | `.md` | `MAMMOUTH.md` | Reduziert (`model` only) |
+
+> **AGENTS.md ist geteilt:** `Gemini`, `Opencode` und (als Vorlage) `Mammouth` verwenden
+> alle das gemeinsame Template `templates/configs/AGENTS.project-template.md`. Gemini und
+> Opencode schreiben ihren managed block in dieselbe `AGENTS.md` im Projekt-Root — die Datei
+> ist bewusst provider-neutral (siehe Routing in `CLAUDE.md`: „Opencode, Gemini -> AGENTS.md").
 
 ### Claude Code
 
@@ -48,12 +55,20 @@ Vollständiger Output — keine Einschränkungen:
 ### Gemini CLI
 
 - `.gemini/agents/*.md` — generierte Agenten (gleicher Markdown-Body wie Claude)
-- `.gemini/GEMINI.md` — Kontext-Datei, managed block wird bei jedem sync aktualisiert
+- `AGENTS.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert); geteilt mit Opencode
 - `.gemini/settings.json` — Skeleton (einmalig angelegt); Hooks werden bei jedem sync eingetragen
 - `.gemini/commands/*.toml` — Slash-Commands (aus `commands/` transformiert, `.md` → `.toml`)
 - `.gemini/hooks/*.sh` — Hook-Skripte (kopiert, stale gelöscht)
+- `.gemini/rules/*.md` — Rules (Gemini CLI besitzt ein natives Rules-Verzeichnis, `has_rules: true`)
 
-Kein Rules-System in Gemini CLI — Regeln werden direkt in GEMINI.md eingebettet.
+> **AGENTS.md vs. natives GEMINI.md — nicht verwechseln:**
+> agent-meta schreibt Geminis Projekt-Kontext in `AGENTS.md` (`context_file: AGENTS.md` in
+> `config/ai-providers.yaml`), NICHT in eine `GEMINI.md`. Gemini CLI unterstützt *zusätzlich*
+> nativ ein eigenes, hierarchisches `GEMINI.md`-Konzept (global `~/.gemini/GEMINI.md` →
+> Workspace → JIT beim Datei-Zugriff), mit `@./pfad/datei.md`-Imports (siehe
+> `docs/providers/gemini-cli.md`). Dieses GEMINI.md wird von agent-meta **nicht** generiert
+> oder verwaltet. Wer den agent-meta-Kontext über Geminis native Ladehierarchie einbinden
+> möchte, referenziert die verwaltete Datei per `@./AGENTS.md` in einer eigenen GEMINI.md.
 
 **Frontmatter-Unterschiede zu Claude:**
 - `permissionMode` wird entfernt (nicht unterstützt)
@@ -80,6 +95,47 @@ alwaysApply: false        # false = explizit aufrufen; true = immer geladen
 # globs: ["**/*.ts"]     # optional: nur bei passenden Dateien aktivieren
 ---
 ```
+
+### GitHub Copilot
+
+Schlanker Provider — dateibasierte Agenten und Rules, keine Hooks/Commands/Settings.
+
+- `.github/copilot/agents/*.md` — generierte Agenten (werden automatisch geladen)
+- `.github/copilot/COPILOT.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert)
+- `.github/copilot/rules/*.md` — Rules (`has_rules: true`)
+
+**Fähigkeiten (`config/provider-capabilities.yaml`):**
+- Keine native Subagent-Dispatch-API und keine parallele Ausführung — Delegation erfolgt
+  text-basiert per `@agent`-Mention, sequentiell.
+- Handoff als YAML-Text-Block (kein JSON-Envelope).
+
+**Frontmatter:** reduziert auf `name`, `description`.
+
+### Mammouth Code
+
+CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung). Als Provider konservativ
+konfiguriert — nur belegte Fähigkeiten sind aktiviert.
+
+- `.mammouth/agents/*.md` — generierte Agenten (dateibasiert, kein Session-Bootstrap nötig)
+- `MAMMOUTH.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert; nutzt das
+  gemeinsame `AGENTS.project-template.md`)
+- `.mammouth/rules/*.md` — Rules (`has_rules: true`)
+- `.mammouth/hooks/*.sh` — Hooks (`has_hooks: true`, eigenes `.mammouth/settings.json`)
+
+**Fähigkeiten (`config/provider-capabilities.yaml`):**
+- `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
+- Keine native Subagent-Dispatch-API und keine parallele Ausführung (konservativ auf `false`,
+  da Mammouths native Orchestrierungs-Oberfläche nicht dokumentiert ist) — Delegation
+  text-basiert per `@agent`-Mention, sequentiell, YAML-Text-Block-Handoff.
+- MCP-Integration ist in `config/ai-providers.yaml` (noch) nicht konfiguriert (`mcp-config: {}`).
+
+**Frontmatter:** reduziert (`model`).
+
+> Hintergrund zur konservativen Konfiguration: Ohne Einträge in
+> `provider-capabilities.yaml`, `provider-bootstrap.yaml` und `delegation-syntax.yaml` würde
+> Mammouth beim Sync still degradiert — sämtliche `PAL_*`-Delegations-Syntax würde entfernt und
+> `bootstrap_required`/`subagent_dispatch` defaulteten stumm auf `false`. Die Einträge machen
+> dieses Verhalten explizit statt implizit.
 
 ---
 
@@ -111,9 +167,10 @@ Nur bekannte Provider werden verarbeitet. Unbekannte Werte werden stillschweigen
 }
 ```
 
-**Hinweis:** Rules werden für Claude und Continue generiert (Claude → `.claude/rules/`,
-Continue → `.continue/rules/`). Hooks werden für Claude und Gemini generiert.
-Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
+**Hinweis:** Rules werden für alle Provider mit `has_rules: true` generiert (Claude →
+`.claude/rules/`, Gemini → `.gemini/rules/`, Continue → `.continue/rules/`, Copilot →
+`.github/copilot/rules/`, Mammouth → `.mammouth/rules/`; Opencode bettet Rules in `AGENTS.md`
+ein). Hooks werden für Provider mit `has_hooks: true` generiert (Claude, Gemini, Mammouth).
 
 ---
 
@@ -121,19 +178,21 @@ Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
 
 ### `CLAUDE.md` (Claude)
 
-- Einmalig angelegt via `howto/configs/CLAUDE.project-template.md` (bei `--init`)
+- Einmalig angelegt via `templates/configs/CLAUDE.project-template.md` (bei `--init`)
 - Managed block (`<!-- agent-meta:managed-begin/end -->`) wird bei **jedem sync** aktualisiert
 - Rest der Datei: manuell gepflegt, wird nie überschrieben
 
-### `.gemini/GEMINI.md` (Gemini)
+### `AGENTS.md` (Gemini + Opencode)
 
-- Einmalig angelegt via `howto/GEMINI.project-template.md`
+- Einmalig angelegt via `templates/configs/AGENTS.project-template.md`
 - Managed block wird bei **jedem sync** aktualisiert
+- Von Gemini und Opencode gemeinsam genutzt (provider-neutrale Kontext-Datei)
 - Kein `--init` nötig — wird beim ersten normalen sync angelegt
+- **Nicht** identisch mit Geminis nativem `GEMINI.md` (siehe Gemini-CLI-Hinweis oben)
 
 ### `.continue/rules/project-context.md` (Continue)
 
-- Einmalig angelegt via `howto/CONTINUE.project-template.md`
+- Einmalig angelegt via `templates/configs/CONTINUE.project-template.md`
 - Managed block wird bei **jedem sync** aktualisiert
 - Kein `--init` nötig — wird beim ersten normalen sync angelegt
 
@@ -153,9 +212,14 @@ Gemini hat kein natives Rules-System — Regeln direkt in GEMINI.md einbetten.
 | Kontext-Datei (managed block) | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert | ✅ Aktualisiert (incl. eingebettete Rules) |
 | Kontext-Datei (Rest) | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst |
 | Settings/Config Skeleton | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig |
-| Rules | ✅ Sync (stale gelöscht) | — | ✅ Sync nach `.continue/rules/` | ✅ In `AGENTS.md` eingebettet |
+| Rules | ✅ Sync (stale gelöscht) | ✅ Sync nach `.gemini/rules/` | ✅ Sync nach `.continue/rules/` | ✅ In `AGENTS.md` eingebettet |
 | Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — | — |
 | Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` | ✅ `.opencode/commands/*.md` |
+
+> **Copilot & Mammouth** folgen demselben Grundmuster (Agenten + Kontext-Datei + Rules
+> überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot hat keine
+> Hooks/Commands/Settings; Mammouth hat Hooks (`.mammouth/hooks/`) und ein eigenes
+> `.mammouth/settings.json`. Details siehe die Provider-Abschnitte oben.
 
 ---
 
@@ -172,14 +236,14 @@ Agenten die aus der Rollen-Whitelist entfernt werden, werden beim nächsten sync
 
 ## Vorlagen anpassen
 
-### GEMINI.md anpassen
+### AGENTS.md anpassen (Gemini, Opencode, Mammouth-Vorlage)
 
-Bearbeite `howto/GEMINI.project-template.md` im agent-meta-Repo.
+Bearbeite `templates/configs/AGENTS.project-template.md` im agent-meta-Repo.
 Der Inhalt außerhalb des managed blocks kann frei gestaltet werden.
 
 ### project-context.md (Continue) anpassen
 
-Bearbeite `howto/CONTINUE.project-template.md` im agent-meta-Repo.
+Bearbeite `templates/configs/CONTINUE.project-template.md` im agent-meta-Repo.
 Unterstützt dieselben `{{PLATZHALTER}}` wie alle anderen Templates.
 
 ### Eigene Continue-Konfiguration
@@ -217,7 +281,7 @@ CLAUDE.personal.md
 → Ja. Continue lädt Rules als plain Markdown. Frontmatter würde als Rohtext angezeigt.
 
 **`project-context.md` wurde nicht angelegt**
-→ Prüfe ob `howto/CONTINUE.project-template.md` im agent-meta-Repo existiert.
+→ Prüfe ob `templates/configs/CONTINUE.project-template.md` im agent-meta-Repo existiert.
 → Führe sync erneut aus — die Datei wird beim ersten sync ohne `--init` angelegt.
 
 **Managed block in `.continue/rules/project-context.md` wird nicht aktualisiert**
