@@ -15,11 +15,17 @@ Two modes:
     integrated as a submodule. Only ``.meta-config/project.yaml`` is exposed.
 
 Start:
-  python scripts/admin-server.py               (Admin UI + Viz dashboard + MCP server)
+  python scripts/admin-server.py               (Admin UI + Viz dashboard + MCP server, foreground)
   python scripts/admin-server.py --no-viz      (Admin UI only, lightweight mode)
   python scripts/admin-server.py --port 7420 --root .
   python scripts/sync.py --admin               (after a normal sync)
   python scripts/sync.py --admin-only          (skip sync)
+
+Detached background mode (for scripts / slash-commands):
+  python scripts/admin-server.py start          (launch detached, returns immediately)
+  python scripts/admin-server.py stop           (stop Admin UI + Viz + MCP)
+  python scripts/admin-server.py status         (show running state)
+  python scripts/admin-server.py restart
 
 Unified entry-point:
   In super_admin mode the server also starts the Viz dashboard (viz-report.py)
@@ -100,6 +106,8 @@ VIZ_PID_FILE   = ".meta-viz/.server-pid"
 VIZ_LOG_FILE   = ".meta-viz/server.log"
 MCP_PID_FILE   = ".meta-viz/.mcp-server-pid"
 MCP_LOG_FILE   = ".meta-viz/mcp-server.log"
+ADMIN_PID_FILE = ".meta-viz/.admin-server-pid"
+ADMIN_LOG_FILE = ".meta-viz/admin-server.log"
 
 _DEFAULT_VIZ_PORT          = 8765
 _DEFAULT_VIZ_TIMEOUT       = 300
@@ -4195,9 +4203,126 @@ class AdminServer:
             if self.watcher is not None:
                 self.watcher.stop()
             # Sub-servers are intentionally left running — they are detached
-            # processes with their own PID-files. The user can stop them via
-            # ``python scripts/viz-server.py stop`` or a subsequent
-            # ``admin-server.py`` invocation with ``--stop-viz`` (future).
+            # processes with their own PID-files. Stop them via
+            # ``python scripts/admin-server.py stop`` (or ``viz-server.py stop``).
+
+
+# --------------------------------------------------------------------------- #
+# CLI subcommands (start/stop/status) -- detached background mode            #
+# --------------------------------------------------------------------------- #
+#
+# ``start`` launches the Admin UI (and, unless --no-viz, the Viz dashboard +
+# MCP server) as a detached background process and returns immediately, so it
+# can be driven from a slash-command/skill without blocking the caller.
+# A bare invocation with no subcommand keeps the historic behaviour: it runs
+# the server in the foreground until Ctrl+C.
+
+
+def _admin_start_detached(args: argparse.Namespace) -> None:
+    root = Path(args.root).resolve()
+    pid_file = root / ADMIN_PID_FILE
+    log_file = root / ADMIN_LOG_FILE
+
+    existing_pid = _read_pid(pid_file)
+    if _is_pid_running(existing_pid):
+        print(f"  -  Admin UI already running (PID: {existing_pid})")
+        print(f"  i  URL: http://{args.host}:{args.port}")
+        return
+
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    if log_file.exists():
+        try:
+            log_file.unlink()
+        except PermissionError:
+            pass
+
+    # Re-invoke this script with the same flags but no subcommand, so the
+    # child runs the historic blocking `serve_forever()` path.
+    cmd = [sys.executable, str(Path(__file__).resolve()),
+           "--port", str(args.port), "--host", args.host, "--root", str(root)]
+    if args.admin_token:
+        cmd += ["--admin-token", args.admin_token]
+    if args.allowed_hosts:
+        cmd += ["--allowed-hosts", *args.allowed_hosts]
+    if args.watch:
+        cmd.append("--watch")
+    if args.no_viz:
+        cmd.append("--no-viz")
+
+    log_fh = open(log_file, "a", encoding="utf-8")  # noqa: SIM115
+    if sys.platform == "win32":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0
+        proc = subprocess.Popen(
+            cmd, stdout=log_fh, stderr=subprocess.STDOUT,
+            startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            cwd=str(root),
+        )
+    else:
+        proc = subprocess.Popen(
+            cmd, stdout=log_fh, stderr=subprocess.STDOUT,
+            start_new_session=True, cwd=str(root),
+        )
+
+    pid_file.write_text(str(proc.pid), encoding="utf-8")
+    time.sleep(1.5)
+
+    if _is_pid_running(proc.pid):
+        print(f"  +  Admin UI started (PID: {proc.pid})")
+        print(f"  i  URL:  http://{args.host}:{args.port}")
+        print(f"  i  Logs: {log_file}")
+    else:
+        print(f"  !  Admin UI failed to start -- see {log_file}")
+        pid_file.unlink(missing_ok=True)
+        sys.exit(1)
+
+
+def _admin_stop(args: argparse.Namespace) -> None:
+    root = Path(args.root).resolve()
+    pid_file = root / ADMIN_PID_FILE
+    pid = _read_pid(pid_file)
+    if pid and _is_pid_running(pid):
+        try:
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/F"],
+                    check=True, capture_output=True,
+                )
+            else:
+                os.kill(pid, 15)
+                time.sleep(1)
+                if _is_pid_running(pid):
+                    os.kill(pid, 9)
+            print(f"  -  Admin UI stopped (PID: {pid})")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  !  Error stopping Admin UI: {exc}")
+    else:
+        print("  -  Admin UI not running")
+    pid_file.unlink(missing_ok=True)
+
+    # Stop the supervised Viz dashboard + MCP server too -- `start` brings
+    # all three up together, so `stop` tears all three down together.
+    VizManager(root).stop_all()
+
+
+def _admin_status(args: argparse.Namespace) -> None:
+    root = Path(args.root).resolve()
+    admin_pid = _read_pid(root / ADMIN_PID_FILE)
+    admin_running = _is_pid_running(admin_pid)
+    print(f"  Admin UI      (port {args.port}): {'RUNNING' if admin_running else 'STOPPED'}")
+    if admin_running:
+        print(f"    PID: {admin_pid}  |  http://{args.host}:{args.port}")
+
+    status = VizManager(root).status()
+    viz = status["viz"]
+    mcp = status["mcp"]
+    print(f"  Viz dashboard (port {viz['port']}): {'RUNNING' if viz['running'] else 'STOPPED'}")
+    if viz["running"]:
+        print(f"    PID: {viz['pid']}  |  {viz['url']}")
+    print(f"  MCP server    (port {mcp['port']}): {'RUNNING' if mcp['running'] else 'STOPPED'}")
+    if mcp["running"]:
+        print(f"    PID: {mcp['pid']}  |  {mcp['url']}")
 
 
 # --------------------------------------------------------------------------- #
@@ -4209,6 +4334,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="agent-meta Admin UI Server (zero-dependency stdlib HTTP)",
     )
+    parser.add_argument("command", nargs="?", default=None,
+                        choices=["start", "stop", "status", "restart"],
+                        help="start: launch detached in the background (default when omitted: "
+                             "run in the foreground until Ctrl+C). stop: terminate Admin UI + "
+                             "Viz + MCP. status: show running state. restart: stop then start.")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT,
                         help=f"Server port (default: {DEFAULT_PORT})")
     parser.add_argument("--host", default=DEFAULT_HOST,
@@ -4242,6 +4372,21 @@ def main() -> None:
     if not root.is_dir():
         print(f"  !  root directory does not exist: {root}", file=sys.stderr)
         sys.exit(1)
+
+    if args.command == "stop":
+        _admin_stop(args)
+        return
+    if args.command == "status":
+        _admin_status(args)
+        return
+    if args.command == "start":
+        _admin_start_detached(args)
+        return
+    if args.command == "restart":
+        _admin_stop(args)
+        time.sleep(1)
+        _admin_start_detached(args)
+        return
 
     server = AdminServer(
         root,

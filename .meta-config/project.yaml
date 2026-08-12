@@ -138,7 +138,7 @@ variables:
   SYSTEM_DEPENDENCIES: '- Python: `>=3.8`'
   SYSTEM_URLS: ''
   BUILD_COMMAND: python scripts/sync.py
-  TEST_COMMAND: python scripts/sync.py --validate
+  TEST_COMMAND: python3 scripts/sync.py --validate
   TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
   DEV_COMMANDS: 'python scripts/sync.py
 
