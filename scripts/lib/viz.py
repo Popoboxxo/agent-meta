@@ -111,7 +111,7 @@ def _infer_tier(role: str, config: dict) -> str:
     """Inferiere workflow_tier aus role-defaults.yaml oder Config."""
     # Versuche role-defaults.yaml zu laden
     try:
-        from .config import _load_yaml_or_json
+        from .io import _load_yaml_or_json
         agent_meta_root = Path(__file__).resolve().parent.parent.parent
         defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
         if defaults_path.exists():

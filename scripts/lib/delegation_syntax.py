@@ -159,6 +159,20 @@ class DelegationSyntaxEngine:
     ) -> list[str]:
         """Validate an A2A envelope dict and return a list of error strings.
 
+        .. note:: **Dormant by design — not a runtime gate.**
+
+           This is a manually-invokable utility, not an enforcement hook. There
+           is no interception point for it: the orchestrator dispatches
+           subagents through the provider's ``Agent``/``Task`` tool call, not
+           through a Python layer, and ``orchestrator-guard.sh`` (the only
+           PreToolUse hook running on every tool) can inspect ``Write``,
+           ``Edit`` and ``Bash`` only. The depth and self-handoff limits in
+           ``.claude/rules/a2a-delegation-gates.md`` are therefore conventions
+           the model follows, not barriers the framework enforces — that rule
+           file states this explicitly, and the decision is recorded in
+           ``docs/concepts/a2a-handoff-protocol.md``. Do not cite this function
+           as evidence that the gates are enforced (issue #460).
+
         Validation strategy (two tiers):
 
         1. **Stdlib required-fields check** — always runs, no extra dependencies.

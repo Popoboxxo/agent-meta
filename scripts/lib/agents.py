@@ -186,6 +186,80 @@ def _tools_can_spawn(tools) -> bool:
     return "Agent" in names or "Task" in names
 
 
+def resolve_mcp_tools_for_role(
+    role: str,
+    config: dict,
+    agent_meta_root: Path,
+    project_root: Path | None = None,
+) -> list[str]:
+    """Return the namespaced MCP tool names a role may use, e.g. ``mcp__playwright__browser_click``.
+
+    A role opts in via ``mcp-servers:`` in ``config/role-defaults.yaml`` (or
+    ``mcp-role-overrides.<role>`` in project.yaml, which wins). Only servers
+    that are actually active for the project contribute tools, and only the
+    server's ``tools.allowed`` entries — ``tools.blocked`` never leaks in.
+
+    Without this the generated frontmatter lists just the base tools, so a role
+    documented as MCP-capable (e2e-tester + playwright) starts a session with
+    none of those tools bound (issue #467).
+    """
+    from .mcp import load_mcp_registry, resolve_active_mcp_servers
+    from .roles import load_roles_config
+
+    overrides = config.get("mcp-role-overrides", {}) or {}
+    if role in overrides:
+        wanted = overrides.get(role) or []
+    else:
+        role_cfg = load_roles_config(agent_meta_root)["roles"].get(role, {}) or {}
+        wanted = role_cfg.get("mcp-servers", []) or []
+    if isinstance(wanted, str):
+        wanted = [wanted]
+    if not wanted:
+        return []
+
+    active = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
+
+    tools: list[str] = []
+    for server in wanted:
+        if server not in active:
+            continue
+        allowed = (registry.get(server, {}).get("tools", {}) or {}).get("allowed", []) or []
+        for tool in allowed:
+            name = f"mcp__{server}__{tool}"
+            if name not in tools:
+                tools.append(name)
+    return tools
+
+
+def append_frontmatter_tools(content: str, extra_tools: list[str]) -> str:
+    """Append extra_tools to the frontmatter `tools` list, preserving order.
+
+    No-op when there is nothing to add or when the template grants `*`
+    (a wildcard already covers every tool).
+    """
+    if not extra_tools:
+        return content
+    fm = _parse_frontmatter_yaml(content)
+    current = fm.get("tools")
+    if current is None:
+        return content
+    if isinstance(current, str):
+        if current.strip() == "*":
+            return content
+        current = [t for t in re.split(r"[,\s]+", current) if t]
+    elif isinstance(current, (list, tuple)):
+        if "*" in current:
+            return content
+        current = list(current)
+    else:
+        return content
+    merged = list(current) + [t for t in extra_tools if t not in current]
+    if merged == list(current):
+        return content
+    return _update_frontmatter_dict(content, {"tools": merged})
+
+
 def is_deprecated_template(content: str) -> bool:
     """Return True if the template frontmatter declares `deprecated: true`.
 
@@ -1536,6 +1610,20 @@ def sync_agents_for_provider(
             provider_config=provider_config,
             log=log,
         )
+
+        # MCP toolset: bind the servers this role opted into (issue #467).
+        # Claude-only — `mcp__<server>__<tool>` is Claude Code's namespacing;
+        # other providers surface MCP tools through their own config, not
+        # through agent frontmatter.
+        if provider == 'Claude':
+            mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
+            if mcp_tools:
+                before = content
+                content = append_frontmatter_tools(content, mcp_tools)
+                if content != before:
+                    servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
+                    log.info(str(target_path.relative_to(project_root)),
+                             f'mcp tools: +{len(mcp_tools)} from {servers}')
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
         # Applies to ALL providers — every generated agent gets the viz reporting block

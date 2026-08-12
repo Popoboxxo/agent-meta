@@ -314,4 +314,10 @@ mcp-servers:
       command: npx
       args:
       - '@playwright/mcp@latest'
+      # --browser chromium: the server defaults to the 'chrome' channel, which
+      # expects a system-wide Google Chrome at /opt/google/chrome and whose
+      # installer calls sudo — unavailable in CI and sandboxes (issue #470).
+      # Chromium ships with Playwright: `npx playwright install chromium`.
+      - '--browser'
+      - 'chromium'
     secrets: []

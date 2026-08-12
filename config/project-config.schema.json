@@ -430,6 +430,16 @@
         ]
       }
     },
+    "mcp-role-overrides": {
+      "type": "object",
+      "description": "Override which MCP servers a role gets tools for. Precedence: this > role-defaults.yaml mcp-servers > (none). Only servers active for the project contribute tools; an empty list removes them.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "permission-mode-overrides": {
       "type": "object",
       "description": "Override the default permissionMode per role. Precedence: this > roles.config.json > (none).",

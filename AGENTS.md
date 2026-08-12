@@ -494,7 +494,7 @@ Arbiträre Code-Ausführung (browser_run_code_unsafe, browser_evaluate) ist gesp
 ## Verbindungstyp
 
 - Typ: `stdio`
-- Kommando: `npx @playwright/mcp@latest`
+- Kommando: `npx @playwright/mcp@latest --browser chromium`
 
 ---
 

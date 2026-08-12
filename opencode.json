@@ -10,7 +10,9 @@
       "enabled": true,
       "command": [
         "npx",
-        "@playwright/mcp@latest"
+        "@playwright/mcp@latest",
+        "--browser",
+        "chromium"
       ]
     },
     "reqogniloom": {

@@ -149,6 +149,33 @@ MUTATION_CASES = [
 ]
 
 
+def test_strict_block_reason_goes_to_stderr():
+    # Issue #396: on exit 2 the harness feeds stderr back to the model and
+    # ignores stdout. Emitting the guard message on stdout surfaced a bare
+    # "hook error: No stderr output" -- the block worked, the reason was lost.
+    result = _run_hook(_bash_payload("echo test"))
+    assert result.returncode == 2
+    assert "ORCHESTRATOR_GUARD" in result.stderr, (
+        f"block reason must be on stderr, got stdout={result.stdout!r} "
+        f"stderr={result.stderr!r}"
+    )
+
+
+def test_git_mutation_block_reason_goes_to_stderr(tmp_path):
+    # Same contract for the non-strict git-mutation branch (issue #396).
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git commit -m 'x'"},
+        "cwd": tmp_path.as_posix(),
+    }
+    result = _run_hook(payload)
+    assert result.returncode == 2
+    assert "ORCHESTRATOR_GUARD" in result.stderr, (
+        f"block reason must be on stderr, got stdout={result.stdout!r} "
+        f"stderr={result.stderr!r}"
+    )
+
+
 @pytest.mark.parametrize("command,expect_blocked", MUTATION_CASES)
 def test_git_mutation_regex_precision(command, expect_blocked, tmp_path):
     # Use a cwd with no .meta-config/project.yaml so the hook falls through
