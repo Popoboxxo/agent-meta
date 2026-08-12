@@ -42,3 +42,23 @@ def test_orchestrator_guard_source_file_parses_to_empty_matcher():
     path = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
     meta = parse_hook_metadata(path.read_text(encoding="utf-8"))
     assert meta.get("matcher", "") == ""
+
+
+def test_graphify_search_guard_metadata_parses():
+    path = _REPO_ROOT / "hooks" / "0-external" / "graphify-search-guard.sh"
+    meta = parse_hook_metadata(path.read_text(encoding="utf-8"))
+    assert meta["hook"] == "graphify-search-guard"
+    assert meta["event"] == "PreToolUse"
+    assert meta["matcher"] == "Bash|Grep"
+    assert meta["provider"] == "Claude"
+    assert meta["enabled_by_default"] == "false"
+
+
+def test_graphify_read_guard_metadata_parses():
+    path = _REPO_ROOT / "hooks" / "0-external" / "graphify-read-guard.sh"
+    meta = parse_hook_metadata(path.read_text(encoding="utf-8"))
+    assert meta["hook"] == "graphify-read-guard"
+    assert meta["event"] == "PreToolUse"
+    assert meta["matcher"] == "Read|Glob"
+    assert meta["provider"] == "Claude"
+    assert meta["enabled_by_default"] == "false"

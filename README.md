@@ -258,6 +258,24 @@ External skills are registered in `config/skills-registry.yaml` and are dynamica
 python scripts/sync.py --add-skill <repo-url> --skill-name <name> --role <role>
 ```
 
+## External Dev-Tool Integrations
+
+Locally installed CLI development tools (e.g., `graphify` for architecture analysis) can contribute rules and hooks to agent-meta via a curated registry. Rather than allowing tools to self-mutate generated files like `CLAUDE.md` or `settings.json` (which violates framework invariants), external tools are registered in `config/external-tools-registry.yaml`. Each tool entry includes:
+
+- **Rule content:** Markdown instructions (bundled into `.claude/rules/tool-<name>.md` or embedded in `AGENTS.md` for Opencode)
+- **Hook wiring:** References to maintainer-authored shell wrapper scripts under `hooks/0-external/` that guard or augment tool operations
+
+The registry entry is versioned, human-curated, and rendered deterministically by `sync.py` — the same security model as MCP servers. Activation is per-project:
+
+```yaml
+# .meta-config/project.yaml
+external-tools:
+  graphify:
+    enabled: true
+```
+
+See the Admin UI's "External Tools" page for configuration and toggle interface.
+
 ## 📖 Documentation Index
 
 The extensive documentation for Agent-Meta has been reorganized into the `docs/` folder for better readability.

@@ -94,6 +94,7 @@ from lib.deactivation import (
 )
 from lib.dod import resolve_dod
 from lib.extensions import create_extension, update_extensions
+from lib.external_tools import generate_external_tool_artifacts
 from lib.hooks import create_hook, sync_hooks
 from lib.io import SyncError, safe_path, write_checked
 from lib.isolation import sync_provider_isolation
@@ -1112,6 +1113,15 @@ def main():
             for entry in mcp_extras:
                 if entry not in mcp_gitignore_extras:
                     mcp_gitignore_extras.append(entry)
+            # External tools: generate rule files for active locally-installed CLI tools
+            try:
+                generate_external_tool_artifacts(
+                    agent_meta_root, project_root, config, provider_config,
+                    log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+                )
+            except SyncError as exc:
+                print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
+                sys.exit(1)
             if pc.get("has_hooks", False):
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)

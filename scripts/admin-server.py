@@ -131,6 +131,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "ai-providers":      "config/ai-providers.yaml",
     "skills-registry":   "config/skills-registry.yaml",
     "mcp-registry":      "config/mcp-registry.yaml",
+    "external-tools-registry": "config/external-tools-registry.yaml",
     "dod-presets":       "config/dod-presets.yaml",
     "rules-presets":     "config/rules-presets.yaml",
     "delegation-syntax": "config/delegation-syntax.yaml",
@@ -141,6 +142,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
 PROJECT_FILES: dict[str, str] = {
     "project": ".meta-config/project.yaml",
     "project-mcp-registry": ".meta-config/mcp-registry.yaml",
+    "project-external-tools-registry": ".meta-config/external-tools-registry.yaml",
 }
 
 
@@ -3487,6 +3489,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
             "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",
+            "external-tools", "external-tools-registry",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")

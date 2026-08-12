@@ -939,6 +939,23 @@ def _build_managed_block(
         except ImportError:
             pass
 
+        try:
+            from .external_tools import (
+                _generate_tool_rule_content,
+                load_external_tools_registry,
+                resolve_active_external_tools,
+            )
+            tool_registry = load_external_tools_registry(agent_meta_root, config)
+            if tool_registry:
+                for tool_name in resolve_active_external_tools(config, agent_meta_root):
+                    tool_def = tool_registry.get(tool_name)
+                    if tool_def and provider not in tool_def.get("provider-skip", []):
+                        embedded_rules.append(
+                            {"content": _generate_tool_rule_content(tool_name, tool_def)}
+                        )
+        except ImportError:
+            pass
+
     local_vars["embedded_rules"] = embedded_rules
 
     local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(config)

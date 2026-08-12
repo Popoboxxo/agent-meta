@@ -1434,6 +1434,7 @@ function buildSidebar() {
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/mcp-overrides", label: "MCP Servers", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
+        { route: "/project/external-tools-overrides", label: "External Tools", icon: "🧰" },
         { route: "/project/gitignore", label: "Gitignore Rules", icon: "🚫" },
         { route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "⌨" },
@@ -2773,6 +2774,215 @@ async function viewProjectSkillsOverrides() {
       dirty = false;
       router.setDirty(false);
       router.navigate("/project/skills-overrides");
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  };
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
+async function viewProjectExternalToolsOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — External Tools"]));
+  wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable curated external CLI dev-tool integrations (rule text + hook wiring) for your project, or customize them specifically for this repository."]));
+
+  let projData, fwData;
+  try {
+    projData = await api.get("/api/config/project");
+    fwData = await api.get("/api/config/external-tools-registry").catch(() => ({ "external-tools": {} }));
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+
+  // "external-tools" in project.yaml is a dict { name: { enabled: bool } },
+  // not a flat array like "mcp-servers". Unlike the MCP panel's Set, we keep
+  // this as an explicit map so both enabled:true AND enabled:false can be
+  // recorded (a framework enabled-by-default:true tool can be explicitly
+  // switched off without touching the registry override).
+  const rawTools = projData["external-tools"] || {};
+  const activeTools = {};
+  if (Array.isArray(rawTools)) {
+    rawTools.forEach((name) => { activeTools[name] = { enabled: true }; });
+  } else {
+    Object.entries(rawTools).forEach(([name, v]) => {
+      if (v && typeof v === "object" && typeof v.enabled === "boolean") {
+        activeTools[name] = { enabled: v.enabled };
+      } else if (v === true || v === false) {
+        activeTools[name] = { enabled: v };
+      }
+    });
+  }
+  const projOverrides = projData["external-tools-registry"] || {};
+  const fwTools = fwData["external-tools"] || {};
+
+  let dirty = false;
+  const markDirty = () => { dirty = true; router.setDirty(true); };
+
+  const getMerged = (id) => {
+      const fw = fwTools[id] || {};
+      const ov = projOverrides[id] || {};
+      return { ...fw, ...ov };
+  };
+
+  const isToolActive = (id, merged) => {
+      if (activeTools[id] && typeof activeTools[id].enabled === "boolean") return activeTools[id].enabled;
+      return !!merged["enabled-by-default"];
+  };
+
+  const renderBadgeList = (items) => {
+      const w = el("div", { style: "display:flex; flex-wrap:wrap; gap: var(--space-1); margin-top: var(--space-1);" });
+      (items || []).forEach((v) => {
+          w.appendChild(el("span", { class: "badge" }, [String(v)]));
+      });
+      return w;
+  };
+
+  const renderToolPanel = (id, isFramework) => {
+    const isOverride = projOverrides.hasOwnProperty(id);
+    const isActive = isToolActive(id, getMerged(id));
+    const merged = getMerged(id);
+
+    const setupEditState = () => {
+        if (!projOverrides[id]) {
+            // Deep copy framework state to override
+            projOverrides[id] = JSON.parse(JSON.stringify(fwTools[id] || {}));
+        }
+        return projOverrides[id];
+    };
+
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Tool",
+      isFramework,
+      isOverride,
+      isActive,
+      description: merged.description,
+      secrets: null,
+      onToggleActive: (newVal) => {
+          // Always write an explicit {enabled: true|false} entry — unlike the
+          // MCP panel's Set-membership, an explicit "false" here overrides an
+          // enabled-by-default:true framework tool.
+          activeTools[id] = { enabled: newVal };
+          markDirty();
+      },
+      buildReadonly: (isReadonly) => {
+        if (merged.category) {
+            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:var(--space-1);" }, [`Category: ${merged.category}`]));
+        }
+        isReadonly.appendChild(el("div", {}, [`Enabled by default: ${merged["enabled-by-default"] ? "yes" : "no"}`]));
+
+        if (merged["rule-content"]) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2); font-weight:bold; color:#fff;" }, ["Rule content:"]));
+            isReadonly.appendChild(el("pre", { style: "white-space:pre-wrap; margin:0; padding:var(--space-2); background:var(--bg-card); border-radius:4px;" }, [merged["rule-content"]]));
+        }
+
+        if (merged.hooks && merged.hooks.length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Hooks:"]));
+            isReadonly.appendChild(renderBadgeList(merged.hooks));
+        }
+
+        if (merged["provider-skip"] && merged["provider-skip"].length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Provider skip:"]));
+            isReadonly.appendChild(renderBadgeList(merged["provider-skip"]));
+        }
+      },
+      buildEdit: (isEditing) => {
+        const wrapDesc = el("div", {});
+        wrapDesc.appendChild(el("label", {}, ["Description"]));
+        const inpDesc = el("input", { class: "form-control", value: merged.description || "" });
+        inpDesc.oninput = (e) => { const ov = setupEditState(); ov.description = e.target.value; markDirty(); };
+        wrapDesc.appendChild(inpDesc);
+        isEditing.appendChild(wrapDesc);
+
+        const wrapCat = el("div", {});
+        wrapCat.appendChild(el("label", {}, ["Category"]));
+        const inpCat = el("input", { class: "form-control", value: merged.category || "" });
+        inpCat.oninput = (e) => { const ov = setupEditState(); ov.category = e.target.value; markDirty(); };
+        wrapCat.appendChild(inpCat);
+        isEditing.appendChild(wrapCat);
+
+        const wrapDefault = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
+        const cbDefault = el("input", { type: "checkbox" });
+        cbDefault.checked = !!merged["enabled-by-default"];
+        cbDefault.onchange = (e) => { const ov = setupEditState(); ov["enabled-by-default"] = e.target.checked; markDirty(); };
+        wrapDefault.appendChild(cbDefault);
+        wrapDefault.appendChild(el("label", {}, ["Enabled by default"]));
+        isEditing.appendChild(wrapDefault);
+
+        const wrapRule = el("div", {});
+        wrapRule.appendChild(el("label", {}, ["Rule content (Markdown)"]));
+        const taRule = el("textarea", {
+            class: "form-control",
+            style: "width:100%; height:160px; font-family:var(--font-mono); font-size:12px;",
+        });
+        taRule.value = merged["rule-content"] || "";
+        taRule.oninput = (e) => { const ov = setupEditState(); ov["rule-content"] = e.target.value; markDirty(); };
+        wrapRule.appendChild(taRule);
+        isEditing.appendChild(wrapRule);
+
+        const wrapHooks = el("div", { style: "margin-top: var(--space-2);" });
+        wrapHooks.appendChild(el("label", {}, ["Hooks (hooks/0-external/<stem>.sh)"]));
+        wrapHooks.appendChild(tagEditor(merged.hooks || [], (v) => {
+            const ov = setupEditState();
+            ov.hooks = v;
+            markDirty();
+        }));
+        isEditing.appendChild(wrapHooks);
+
+        const wrapSkip = el("div", { style: "margin-top: var(--space-2);" });
+        wrapSkip.appendChild(el("label", {}, ["Provider skip"]));
+        wrapSkip.appendChild(tagEditor(merged["provider-skip"] || [], (v) => {
+            const ov = setupEditState();
+            ov["provider-skip"] = v;
+            markDirty();
+        }));
+        isEditing.appendChild(wrapSkip);
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
+  };
+
+  const projListContainer = el("div", { style: "margin-bottom:var(--space-5)" });
+
+  const allIds = new Set([...Object.keys(fwTools), ...Object.keys(projOverrides)]);
+
+  if (allIds.size === 0) {
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No external tools found."]));
+  } else {
+    Array.from(allIds).sort().forEach(id => {
+      projListContainer.appendChild(renderToolPanel(id, fwTools.hasOwnProperty(id)));
+    });
+  }
+
+  wrap.appendChild(projListContainer);
+
+  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Tool (Not in Framework)"]);
+  addBtn.onclick = () => {
+    const id = prompt("External Tool ID:");
+    if (id && !allIds.has(id)) {
+      projOverrides[id] = { description: "", category: "", "enabled-by-default": false, "rule-content": "", hooks: [], "provider-skip": [] };
+      activeTools[id] = { enabled: true };
+      markDirty();
+      // Render new panel immediately
+      const newPanel = renderToolPanel(id, false);
+      projListContainer.appendChild(newPanel);
+      allIds.add(id);
+      toast("Custom tool added. Configure it below.", "success");
+    }
+  };
+  wrap.appendChild(addBtn);
+
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Project External Tools Configuration"]);
+  saveBtn.onclick = async () => {
+    try {
+      await api.put("/api/config/project/section", { section: "external-tools", data: activeTools });
+      await api.put("/api/config/project/section", { section: "external-tools-registry", data: projOverrides });
+      toast("External tools configuration saved", "success");
+      dirty = false;
+      router.setDirty(false);
+      router.navigate("/project/external-tools-overrides");
     } catch (e) {
       toast(e.message, "error");
     }
@@ -8787,6 +8997,7 @@ async function init() {
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
   router.register("/project/mcp-overrides",    viewProjectMcpOverrides);
   router.register("/project/skills-overrides", viewProjectSkillsOverrides);
+  router.register("/project/external-tools-overrides", viewProjectExternalToolsOverrides);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/gitignore-defaults", viewGitignoreDefaults);
