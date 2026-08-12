@@ -202,6 +202,10 @@ ein). Hooks werden für Provider mit `has_hooks: true` generiert (Claude, Gemini
 - **Wird nie überschrieben** — eigene Continue-Konfiguration bleibt erhalten
 - Enthält Hinweis auf `.continue/rules/`
 
+### External-Tool-Rule-Content
+
+Rule-Content aus `config/external-tools-registry.yaml` (z.B. für lokal installierte CLI-Tools wie `graphify`) wird nach dem gleichen Muster wie MCP-Server-Rules eingebettet: für Provider mit `has_rules: true` wird eine eigene Datei `.claude/rules/tool-<name>.md` geschrieben; für Opencode wird der Content direkt in den managed block von `AGENTS.md` eingebettet. Das Layout und die Versioning folgen exakt dem bestehenden MCP-Rule-Embed-Mechanismus (`scripts/lib/context.py`).
+
 ---
 
 ## Sync-Verhalten pro Provider

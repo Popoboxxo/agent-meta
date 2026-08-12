@@ -47,6 +47,8 @@ mcp-servers:
 - honcho
 - playwright
 - reqogniloom
+external-tools:
+- graphify
 roles:
 - orchestrator
 - developer

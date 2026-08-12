@@ -855,6 +855,72 @@
         "additionalProperties": false
       }
     },
+    "external-tools": {
+      "description": "Opt-in activation of locally installed external CLI dev-tools defined in config/external-tools-registry.yaml. Accepts a flat list shorthand (['graphify'], alias for {enabled: true}) or a dict mapping tool name to {enabled: bool}. An explicit enabled value always wins over the registry enabled-by-default flag, so a tool can be force-enabled or force-disabled per project.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9_-]+$": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Force-enable or force-disable this external tool, overriding the registry enabled-by-default flag."
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "external-tools-registry": {
+      "type": "object",
+      "description": "Project-specific overrides or custom external-tool definitions. Deep-merged over the global config/external-tools-registry.yaml defaults.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "enabled-by-default": {
+              "type": "boolean"
+            },
+            "provider-skip": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rule-content": {
+              "type": "string"
+            },
+            "hooks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "quality-pipelines": {
       "type": "object",
       "properties": {
