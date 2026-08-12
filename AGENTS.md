@@ -59,7 +59,7 @@ scripts/sync.py — Haupt-CLI für Agent-Generierung
 python scripts/sync.py
 
 # Tests
-python scripts/sync.py --validate
+python3 scripts/sync.py --validate
 
 # Dev-Stack starten
 (kein Dev-Stack)
@@ -84,7 +84,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
  Opencode->AGENTS.md |
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.95.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.95.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln

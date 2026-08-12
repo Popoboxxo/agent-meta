@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.95.1] — 2026-08-12
+
 ### Added
 - MCP toolset propagation into agent frontmatter (#467): a role opts into MCP servers via `mcp-servers:` in `config/role-defaults.yaml` (project override: `mcp-role-overrides.<role>` in `project.yaml`, new schema entry), and `sync.py` binds the server's `tools.allowed` entries as `mcp__<server>__<tool>` into the generated Claude agent frontmatter. Only servers active for the project contribute; `tools.blocked` never leaks in. `e2e-tester` now opts into `playwright` — previously the role was documented as browser-capable in `.claude/rules/mcp-playwright.md` while its generated frontmatter listed base tools only, so every browser delegation failed structurally. New `resolve_mcp_tools_for_role()` and `append_frontmatter_tools()` in `scripts/lib/agents.py`, plus consistency tests catching future rule/frontmatter drift.
 - `docs/guides/mcp/playwright-setup.md`: activation, browser install, role opt-in and troubleshooting.
@@ -15,6 +17,8 @@
 - Dead statement in `scripts/lib/mcp.py::_update_json_config` (#464): the abandoned path expression is now the intended assignment and moved to where `rel` is defined, so sibling configs (`.vscode/mcp.json` vs `.cursor/mcp.json`) stay distinguishable in `sync.log` instead of both logging as `mcp.json`.
 - Misleading re-export import in `scripts/lib/viz.py` (#471): `_load_yaml_or_json` is imported from `.io`, its actual definition site, instead of relying on `.config` transitively re-exporting it.
 - `validate_envelope()` documented as dormant by design (#460): the docstring now states explicitly that it is a manually-invokable utility with no interception point (the orchestrator dispatches through the provider's `Agent`/`Task` call, and `orchestrator-guard.sh` sees only `Write`/`Edit`/`Bash`), so the depth and self-handoff limits in `.claude/rules/a2a-delegation-gates.md` are model-followed conventions, not enforced barriers — and must not be cited as evidence of enforcement.
+- Test command uses python3 explicitly (`scripts/sync.py`): corrected `TEST_COMMAND` reference from `python` to `python3` for compatibility with environments that only have `python3` in PATH.
+- Admin-server lifecycle subcommands (`scripts/admin-server.py`): `start`/`stop`/`status`/`restart` are now implemented (were documented in `/admin` skill but unwired). `start` launches detached with PID tracking in `.meta-viz/.admin-server-pid` and logging to `.meta-viz/admin-server.log`; backward compatible (no subcommand retains blocking mode).
 
 ## [0.95.0] — 2026-08-11
 
