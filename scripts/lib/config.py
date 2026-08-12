@@ -8,7 +8,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml
+from .io import SyncError, _load_yaml_or_json, _write_yaml
 from .log import SyncLog
 from .pipelines import (
     apply_overrides,
@@ -1005,10 +1005,23 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     return text
 
 
-def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> str:
+def substitute(
+    text: str,
+    variables: dict,
+    source_label: str,
+    log: SyncLog,
+    strict: bool = False,
+) -> str:
     """Replace {{VAR}} occurrences. Warn for missing variables.
 
     Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
+
+    Args:
+        strict: if True, raise SyncError on the first unknown placeholder
+            instead of warning and leaving it unsubstituted. Escaped
+            placeholders ({{%VAR%}}) and PAL_* placeholders are never
+            considered "unknown" — they are exempt in both modes.
+            Default False preserves the historic warn-and-continue behavior.
     """
     # First pass: protect escaped literals {{%VAR%}} with unique sentinel
     _SENTINEL = "\x00ESC\x00"
@@ -1029,6 +1042,11 @@ def substitute(text: str, variables: dict, source_label: str, log: SyncLog) -> s
             return match.group(0)
         if key in variables:
             return str(variables[key])
+        if strict:
+            raise SyncError(
+                f"Unknown placeholder {{{{{key}}}}} in {source_label} — "
+                f"not found in config variables (strict mode)."
+            )
         if log:
             log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return match.group(0)

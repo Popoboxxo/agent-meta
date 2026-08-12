@@ -75,3 +75,4 @@ terminal_tool:
   Gemini: code_execution
   Continue: null
   Copilot: null
+  Mammouth: bash

@@ -4,11 +4,27 @@ from pathlib import Path
 
 
 class TemplateBuilder:
+    """Handlebars-style template builder with support for partials, conditionals, loops, and variables."""
+
     def __init__(self, templates_dir: Path, fallback_partials_dir: Path | None = None):
+        """Initialize the template builder with template and partial directories.
+
+        Args:
+            templates_dir: Directory containing .md template files.
+            fallback_partials_dir: Optional fallback directory for partials if not found in templates_dir.
+        """
         self.templates_dir = templates_dir
         self.fallback_partials_dir = fallback_partials_dir
 
     def resolve_partials(self, template_str: str) -> str:
+        """Resolve {{> partial-name }} inclusions by loading and embedding partial files.
+
+        Args:
+            template_str: Template string containing partial references.
+
+        Returns:
+            Template string with partials replaced by their content (YAML frontmatter stripped).
+        """
         def replace_partial(match):
             partial_name = match.group(1).strip()
             partial_path = self.templates_dir / 'partials' / f"{partial_name}.md"
@@ -26,6 +42,15 @@ class TemplateBuilder:
         return re.sub(r'\{\{>\s*(.+?)\s*\}\}', replace_partial, template_str)
 
     def resolve_conditionals(self, template_str: str, variables: dict) -> str:
+        """Resolve {{#if variable}}...{{else}}...{{/if}} and {{#unless}} blocks.
+
+        Args:
+            template_str: Template string containing conditional blocks.
+            variables: Dictionary of variable values for condition evaluation.
+
+        Returns:
+            Template string with conditionals replaced based on variable truthiness.
+        """
         pattern = r'\{\{#(if|unless)\s+([A-Za-z0-9_]+)\}\}((?:(?!\{\{#(?:if|unless)|\{\{/(?:if|unless)\}\}).)*?)(?:\{\{else\}\}((?:(?!\{\{#(?:if|unless)|\{\{/(?:if|unless)\}\}).)*?))?\{\{/(?:if|unless)\}\}'
         
         def repl(match):
@@ -48,6 +73,15 @@ class TemplateBuilder:
         return template_str
 
     def resolve_loops(self, template_str: str, variables: dict) -> str:
+        """Resolve {{#each list}}...{{/each}} loop blocks.
+
+        Args:
+            template_str: Template string containing loop blocks.
+            variables: Dictionary where values can be lists of objects to iterate over.
+
+        Returns:
+            Template string with loops expanded, rendering the inner template for each list item.
+        """
         pattern = r'\{\{#each\s+([A-Za-z0-9_]+)\}\}(.*?)\{\{/each\}\}'
         
         def repl(match):
@@ -73,6 +107,15 @@ class TemplateBuilder:
         return template_str
         
     def resolve_variables(self, template_str: str, variables: dict) -> str:
+        """Resolve {{variable}} placeholders by substituting values from the variables dictionary.
+
+        Args:
+            template_str: Template string containing variable references.
+            variables: Dictionary of variable names to values.
+
+        Returns:
+            Template string with {{variable}} placeholders replaced or left unchanged if not found.
+        """
         def repl(match):
             var_name = match.group(1).strip()
             val = variables.get(var_name)
@@ -83,6 +126,21 @@ class TemplateBuilder:
         return re.sub(r'\{\{([^#>/][^}]*)\}\}', repl, template_str)
 
     def build(self, template_name: str, variables: dict) -> str:
+        """Load and render a template with the provided variables.
+
+        Processes partials, loops, conditionals, and variable substitutions in order.
+        Strips YAML frontmatter (--- ... ---) from templates and partials.
+
+        Args:
+            template_name: Name of the template file (without .md extension).
+            variables: Dictionary of variable values for rendering.
+
+        Returns:
+            Fully rendered template content.
+
+        Raises:
+            FileNotFoundError: If the template file is not found.
+        """
         template_path = self.templates_dir / f"{template_name}.md"
         if not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_path}")
