@@ -391,11 +391,17 @@ def scan_injection_drift(
         provider_findings: list[dict] = []
 
         # --- managed subdirs: skill / hook / rule (declarable kinds) ---
-        dir_specs = [
-            ("skill", pc.get("skills_dir", ".claude/skills")),
-            ("hook", pc.get("hooks_dir", ".claude/hooks")),
-            ("rule", pc.get("rules_dir", ".claude/rules")),
-        ]
+        # "skill" is unconditional (no has_skills flag exists in
+        # ai-providers.yaml). "hook"/"rule" are gated on the provider's own
+        # has_hooks/has_rules capability flags — without the gate, a provider
+        # lacking the key (e.g. Opencode: no hooks_dir/rules_dir at all) would
+        # silently fall through to Claude's ".claude/hooks"/".claude/rules"
+        # defaults and misattribute Claude's own dir content to it.
+        dir_specs = [("skill", pc.get("skills_dir", ".claude/skills"))]
+        if pc.get("has_hooks", False):
+            dir_specs.append(("hook", pc.get("hooks_dir", ".claude/hooks")))
+        if pc.get("has_rules", False):
+            dir_specs.append(("rule", pc.get("rules_dir", ".claude/rules")))
         for kind, dir_rel in dir_specs:
             dir_path = project_root / dir_rel
             if not dir_path.is_dir():
@@ -451,7 +457,19 @@ def scan_injection_drift(
                     val = pc.get(key)
                     if val:
                         known_names.add(Path(val).name)
+                # settings_local_file's basename varies per provider (e.g.
+                # Continue: config.local.yaml, not settings.local.json).
+                settings_local_val = pc.get("settings_local_file")
+                if settings_local_val:
+                    known_names.add(Path(settings_local_val).name)
                 known_names.add("settings.local.json")
+                # agent-memory/agent-memory-local are a documented agent-meta
+                # feature (docs/guides/features/agent-memory.md), not external-
+                # tool injections — no dedicated provider_config key exists for
+                # them (agent-memory-local only appears buried in Claude's
+                # gitignore_entries), so they're excused as literals.
+                known_names.add("agent-memory")
+                known_names.add("agent-memory-local")
                 for child in sorted(infra_root.iterdir()):
                     if child.name in known_names:
                         continue

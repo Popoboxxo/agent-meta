@@ -454,3 +454,49 @@ def test_scan_injection_drift_flags_stray_agent_file(tmp_path):
     paths = [f["path"] for f in findings["Claude"]]
     assert ".claude/agents/rogue-role.md" in paths
     assert ".claude/agents/developer.md" not in paths
+
+
+def test_scan_injection_drift_skips_hook_and_rule_dirs_without_capability(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    # Unmanaged content in Claude's real hooks/rules dirs.
+    hooks_dir = project_root / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "some-hook.sh").write_text("x", encoding="utf-8")
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "some-rule.md").write_text("x", encoding="utf-8")
+
+    # Opencode: has_hooks/has_rules False, no hooks_dir/rules_dir key at all
+    # (mirrors config/ai-providers.yaml:134-135) — must not fall through to
+    # Claude's ".claude/hooks"/".claude/rules" defaults and misattribute them.
+    provider_config = {"Opencode": {
+        "skills_dir": ".opencode/skills",
+        "agents_dir": ".opencode/agents",
+        "has_hooks": False,
+        "has_rules": False,
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Opencode"] == []
+
+
+def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_settings_local(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    infra_root = project_root / ".continue"
+    infra_root.mkdir(parents=True)
+    (infra_root / "agent-memory").mkdir()
+    (infra_root / "agent-memory-local").mkdir()
+    (infra_root / "config.local.yaml").write_text("x", encoding="utf-8")
+
+    provider_config = {"Continue": {
+        "skills_dir": ".continue/skills",
+        "agents_dir": ".continue/agents",
+        "settings_local_file": ".continue/config.local.yaml",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Continue"] == []
