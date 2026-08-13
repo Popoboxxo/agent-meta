@@ -646,6 +646,10 @@ laufen dann folgenlos durch (exit 0), nichts wird blockiert.
 - `hooks/0-external/graphify-search-guard.sh`
 - `hooks/0-external/graphify-read-guard.sh`
 
+## Erlaubte Injektionen
+
+- `.gemini/skills/graphify` (skill) — Claude-Code-Skill (SKILL.md + references), vom graphify-Installer selbst verwaltet
+
 ---
 
 *Generiert von agent-meta aus `config/external-tools-registry.yaml` — nicht manuell bearbeiten.*
