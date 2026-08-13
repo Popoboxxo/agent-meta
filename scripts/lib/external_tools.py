@@ -50,7 +50,7 @@ _INJECTION_KINDS_NAME = {"skill", "hook", "rule"}
 _INJECTION_KINDS_PATH = {"config", "other"}
 
 
-def _validate_permitted_injections(tool_name: str, entries) -> None:
+def _validate_permitted_injections(tool_name: str, entries: list[dict]) -> None:
     """Validate a tool's ``permitted-injections`` list.
 
     kind in {skill, hook, rule} requires 'name' (provider-relative);
