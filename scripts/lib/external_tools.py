@@ -425,10 +425,22 @@ def _read_managed_index(dir_path: Path) -> set[str]:
 # provider_config field that names each one; a field absent from `pc` is
 # skipped (not every provider has every capability).
 _INFRA_ROOT_KNOWN_KEYS = [
-    "agents_dir", "hooks_dir", "rules_dir", "skills_dir", "snippets_dir",
-    "extension_dir", "artifact_dir", "checkpoint_dir", "settings_file",
-    "pending_tasks_file",
+    "agents_dir", "hooks_dir", "rules_dir", "commands_dir", "skills_dir",
+    "snippets_dir", "extension_dir", "artifact_dir", "checkpoint_dir",
+    "settings_file", "pending_tasks_file",
 ]
+# Per-provider hardcoded fallback dirs for capability-gated keys that some
+# providers (Claude, Continue) never store in ai-providers.yaml, relying
+# instead on a literal default in the sync code itself (dir_specs above /
+# lib.commands.sync_commands_for_provider). Without this, the fallback
+# directory is agent-meta's own managed dir, but scan_injection_drift has no
+# key to read its name from and misreports it as a top-level foreign "other"
+# finding.
+_INFRA_ROOT_FALLBACK_DIRS = {
+    "hooks_dir": {"Claude": ".claude/hooks"},
+    "rules_dir": {"Claude": DEFAULT_RULES_DIR},
+    "commands_dir": {"Claude": ".claude/commands", "Continue": ".continue/prompts"},
+}
 
 
 def scan_injection_drift(
@@ -534,6 +546,19 @@ def scan_injection_drift(
                     val = pc.get(key)
                     if val:
                         known_names.add(Path(val).name)
+                # Capability-gated fallback: the key may be absent from
+                # ai-providers.yaml (Claude's hooks_dir/rules_dir/
+                # commands_dir, Continue's commands_dir) with sync code
+                # falling back to a hardcoded literal instead — only excuse
+                # it when the provider actually has the capability, so e.g.
+                # Opencode (has_rules: False) doesn't get a same-named
+                # directory excused for the wrong reason.
+                capability_by_key = {
+                    "hooks_dir": "has_hooks", "rules_dir": "has_rules", "commands_dir": "has_commands",
+                }
+                for key, fallbacks in _INFRA_ROOT_FALLBACK_DIRS.items():
+                    if pc.get(capability_by_key[key], False) and provider in fallbacks:
+                        known_names.add(Path(fallbacks[provider]).name)
                 # settings_local_file's basename varies per provider (e.g.
                 # Continue: config.local.yaml, not settings.local.json).
                 settings_local_val = pc.get("settings_local_file")
@@ -547,6 +572,11 @@ def scan_injection_drift(
                 # gitignore_entries), so they're excused as literals.
                 known_names.add("agent-memory")
                 known_names.add("agent-memory-local")
+                # Claude Code harness's own session task-scheduler lock —
+                # local-machine runtime state (excluded via .git/info/exclude,
+                # not a shared gitignore entry), not an external-tool
+                # injection or an agent-meta artifact.
+                known_names.add("scheduled_tasks.lock")
                 for child in sorted(infra_root.iterdir()):
                     if child.name in known_names:
                         continue
