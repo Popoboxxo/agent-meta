@@ -484,7 +484,7 @@ def _sync_opencode_context(
         existing = target_path.read_text(encoding="utf-8")
         new_managed = _build_managed_block(
             agent_meta_root, config, variables, log,
-            provider=provider, provider_config=provider_config
+            provider=provider, provider_config=provider_config, project_root=project_root
         )
         # The "agents-managed" template ends with a trailing newline after its
         # own closing marker, but managed_pattern's match never consumes any
@@ -845,6 +845,7 @@ def _build_managed_block(
     log: SyncLog,
     provider: str,
     provider_config: dict | None = None,
+    project_root: Path | None = None,
 ) -> str:
     from .config import (
         _orch_mode_flags,
@@ -951,7 +952,7 @@ def _build_managed_block(
                     tool_def = tool_registry.get(tool_name)
                     if tool_def and provider not in tool_def.get("provider-skip", []):
                         embedded_rules.append(
-                            {"content": _generate_tool_rule_content(tool_name, tool_def)}
+                            {"content": _generate_tool_rule_content(tool_name, tool_def, pc, project_root)}
                         )
         except ImportError:
             pass
