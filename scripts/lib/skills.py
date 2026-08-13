@@ -44,6 +44,33 @@ def _normalize_project_skills(raw) -> dict:
     return {}
 
 
+def _read_skills_managed_index(skills_dir: Path) -> set[str]:
+    """Read the .agent-meta-managed index from skills_dir.
+
+    Returns empty set if file doesn't exist.
+    """
+    managed_index_path = skills_dir / ".agent-meta-managed"
+    if not managed_index_path.exists():
+        return set()
+    return {
+        line.strip()
+        for line in managed_index_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+
+
+def _write_skills_managed_index(skills_dir: Path, now_managed: set[str], dry_run: bool) -> None:
+    """Write the .agent-meta-managed index for skills_dir.
+
+    Skips if dry_run is True or if now_managed is empty.
+    """
+    if dry_run or not now_managed:
+        return
+    managed_index_path = skills_dir / ".agent-meta-managed"
+    managed_index_path.parent.mkdir(parents=True, exist_ok=True)
+    managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+
+
 def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
     """Return True if a skill should be generated for the current project.
 
@@ -305,6 +332,8 @@ def sync_external_skills_for_provider(
     agents_dir = project_root / agents_dir_rel
     skills_dir = project_root / skills_dir_rel
 
+    now_managed: set[str] = set()
+
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
     repos = ext_config.get("repos", {})
@@ -359,6 +388,8 @@ def sync_external_skills_for_provider(
                 if skill_target_dir.exists():
                     shutil.rmtree(skill_target_dir, ignore_errors=True)
             continue
+
+        now_managed.add(skill_name)
 
         repo_key   = skill_cfg.get("repo", "")
         repo_cfg   = repos.get(repo_key, {})
@@ -462,6 +493,8 @@ def sync_external_skills_for_provider(
                     (skill_target_dir / af).write_text(
                         af_source.read_text(encoding="utf-8"), encoding="utf-8"
                     )
+
+    _write_skills_managed_index(skills_dir, now_managed, dry_run)
 
     # Deinit repos that are no longer needed by any active skill
     is_project_admin = agent_meta_root != project_root
