@@ -1386,6 +1386,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/consistency-check":
             return self._send_json(self._run_consistency_check())
 
+        if path == "/api/external-tools/drift":
+            return self._send_json(self._compute_injection_drift())
+
         if path == "/api/models":
             return self._handle_get_models()
 
@@ -3795,6 +3798,26 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             pass
         finally:
             watcher.unsubscribe(event_queue)
+
+    # ------------------------------------------------------------------ #
+    # External-tool injection governance                                  #
+    # ------------------------------------------------------------------ #
+
+    def _compute_injection_drift(self) -> dict:
+        """Return undeclared external-tool artifacts per active provider."""
+        root = self.__class__.root
+        try:
+            sys.path.insert(0, str(root / "scripts"))
+            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            from lib.external_tools import scan_injection_drift  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
+
+            project_config = self.__class__.config_manager.read("project")
+            provider_config = load_providers_config(root)
+            findings = scan_injection_drift(root, root, project_config, provider_config)
+            return {"findings": findings}
+        except Exception as exc:  # noqa: BLE001
+            return {"error": str(exc)}
 
     # ------------------------------------------------------------------ #
     # Provider deactivation handlers                                      #
