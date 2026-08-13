@@ -50,6 +50,13 @@ _INJECTION_KINDS_NAME = {"skill", "hook", "rule"}
 _INJECTION_KINDS_PATH = {"config", "other"}
 
 
+_INJECTION_DIR_KEYS = {
+    "skill": ("skills_dir", ".claude/skills"),
+    "hook": ("hooks_dir", ".claude/hooks"),
+    "rule": ("rules_dir", ".claude/rules"),
+}
+
+
 def _validate_permitted_injections(tool_name: str, entries: list[dict]) -> None:
     """Validate a tool's ``permitted-injections`` list.
 
@@ -94,6 +101,20 @@ def _validate_permitted_injections(tool_name: str, entries: list[dict]) -> None:
                     f"external-tools-registry: '{tool_name}'.permitted-injections entry "
                     f"with kind '{kind}' must not set 'name' (use 'path')"
                 )
+
+
+def resolve_injection_path(entry: dict, pc: dict, project_root: Path) -> Path:
+    """Resolve one permitted-injections entry to an absolute path.
+
+    kind in {skill, hook, rule}: <pc[<kind>s_dir]>/<name>
+    kind in {config, other}: <project_root>/<path>, verbatim.
+    """
+    kind = entry["kind"]
+    if kind in _INJECTION_DIR_KEYS:
+        dir_key, default_dir = _INJECTION_DIR_KEYS[kind]
+        base = project_root / pc.get(dir_key, default_dir)
+        return (base / entry["name"]).resolve()
+    return (project_root / entry["path"]).resolve()
 
 
 def load_external_tools_registry(

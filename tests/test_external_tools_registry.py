@@ -16,6 +16,7 @@ from scripts.lib.external_tools import (
     generate_external_tool_artifacts,
     load_external_tools_registry,
     resolve_active_external_tools,
+    resolve_injection_path,
 )
 from scripts.lib.io import SyncError
 from scripts.lib.log import SyncLog
@@ -313,3 +314,28 @@ def test_permitted_injections_valid_entry_passes(tmp_path):
     })
     registry = load_external_tools_registry(agent_meta_root, {}, project_root)
     assert registry["graphify"]["permitted-injections"] == [{"kind": "skill", "name": "graphify"}]
+
+
+# ---------------------------------------------------------------------------
+# resolve_injection_path
+# ---------------------------------------------------------------------------
+
+def test_resolve_injection_path_skill(tmp_path):
+    pc = {"skills_dir": ".claude/skills"}
+    entry = {"kind": "skill", "name": "graphify"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "skills" / "graphify").resolve()
+
+
+def test_resolve_injection_path_config_uses_path_verbatim(tmp_path):
+    pc = {}
+    entry = {"kind": "config", "path": ".claude/settings.json"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "settings.json").resolve()
+
+
+def test_resolve_injection_path_defaults_without_explicit_dir(tmp_path):
+    pc = {}  # no hooks_dir set — must fall back to .claude/hooks
+    entry = {"kind": "hook", "name": "graphify-guard.sh"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "hooks" / "graphify-guard.sh").resolve()
