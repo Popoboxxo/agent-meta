@@ -916,6 +916,20 @@
               "items": {
                 "type": "string"
               }
+            },
+            "permitted-injections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": { "type": "string", "enum": ["skill", "hook", "rule", "config", "other"] },
+                  "name": { "type": "string" },
+                  "path": { "type": "string" },
+                  "description": { "type": "string" }
+                },
+                "required": ["kind"],
+                "additionalProperties": false
+              }
             }
           }
         }

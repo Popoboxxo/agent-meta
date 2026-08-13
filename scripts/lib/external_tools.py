@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import _load_yaml_or_json, safe_path, write_checked
+from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
 
 EXTERNAL_TOOLS_REGISTRY_YAML = "config/external-tools-registry.yaml"
@@ -44,6 +44,56 @@ def _deep_merge(dict1: dict, dict2: dict) -> dict:
         else:
             dict1[k] = v
     return dict1
+
+
+_INJECTION_KINDS_NAME = {"skill", "hook", "rule"}
+_INJECTION_KINDS_PATH = {"config", "other"}
+
+
+def _validate_permitted_injections(tool_name: str, entries) -> None:
+    """Validate a tool's ``permitted-injections`` list.
+
+    kind in {skill, hook, rule} requires 'name' (provider-relative);
+    kind in {config, other} requires an explicit 'path'. Mixing either
+    field with the wrong kind group is a SyncError.
+    """
+    if not isinstance(entries, list):
+        raise SyncError(
+            f"external-tools-registry: '{tool_name}'.permitted-injections must be a list"
+        )
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SyncError(
+                f"external-tools-registry: '{tool_name}'.permitted-injections entries must be objects"
+            )
+        kind = entry.get("kind")
+        if kind not in _INJECTION_KINDS_NAME | _INJECTION_KINDS_PATH:
+            raise SyncError(
+                f"external-tools-registry: '{tool_name}'.permitted-injections has invalid "
+                f"kind '{kind}' (expected one of skill, hook, rule, config, other)"
+            )
+        if kind in _INJECTION_KINDS_NAME:
+            if not entry.get("name"):
+                raise SyncError(
+                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
+                    f"with kind '{kind}' requires 'name'"
+                )
+            if entry.get("path"):
+                raise SyncError(
+                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
+                    f"with kind '{kind}' must not set 'path' (use 'name')"
+                )
+        else:
+            if not entry.get("path"):
+                raise SyncError(
+                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
+                    f"with kind '{kind}' requires 'path'"
+                )
+            if entry.get("name"):
+                raise SyncError(
+                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
+                    f"with kind '{kind}' must not set 'name' (use 'path')"
+                )
 
 
 def load_external_tools_registry(
@@ -80,6 +130,10 @@ def load_external_tools_registry(
         inline_registry = config.get("external-tools-registry", {})
         if isinstance(inline_registry, dict):
             _deep_merge(registry, inline_registry)
+
+    for tool_name, tool_def in registry.items():
+        if isinstance(tool_def, dict) and "permitted-injections" in tool_def:
+            _validate_permitted_injections(tool_name, tool_def["permitted-injections"])
 
     return registry
 

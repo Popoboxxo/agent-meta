@@ -8,6 +8,7 @@ write_checked (content + footer), the missing-hook warning, and provider-skip.
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from scripts.lib.external_tools import (
@@ -16,6 +17,7 @@ from scripts.lib.external_tools import (
     load_external_tools_registry,
     resolve_active_external_tools,
 )
+from scripts.lib.io import SyncError
 from scripts.lib.log import SyncLog
 
 
@@ -268,3 +270,46 @@ def test_generate_skips_rule_file_for_provider_without_rules(tmp_path):
         dry_run=False, provider="Opencode",
     )
     assert not (project_root / ".claude" / "rules" / "tool-graphify.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# permitted-injections validation
+# ---------------------------------------------------------------------------
+
+def test_permitted_injections_skill_requires_name(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "skill", "path": ".claude/skills/graphify"}],
+        }
+    })
+    with pytest.raises(SyncError, match="requires 'name'"):
+        load_external_tools_registry(agent_meta_root, {}, project_root)
+
+
+def test_permitted_injections_config_requires_path(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "config", "name": "graphify"}],
+        }
+    })
+    with pytest.raises(SyncError, match="requires 'path'"):
+        load_external_tools_registry(agent_meta_root, {}, project_root)
+
+
+def test_permitted_injections_valid_entry_passes(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "skill", "name": "graphify"}],
+        }
+    })
+    registry = load_external_tools_registry(agent_meta_root, {}, project_root)
+    assert registry["graphify"]["permitted-injections"] == [{"kind": "skill", "name": "graphify"}]
