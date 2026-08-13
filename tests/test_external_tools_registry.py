@@ -536,3 +536,20 @@ def test_render_drift_artifacts_removes_stale_file_when_clean(tmp_path):
     log = SyncLog()
     render_injection_drift_artifacts({"Claude": []}, project_root, provider_config, log, dry_run=False)
     assert not stale.exists()
+
+
+def test_render_drift_artifacts_warns_even_without_has_rules(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    findings = {"Opencode": [
+        {"path": ".opencode/skills/rogue", "kind": "skill", "tool": None}
+    ]}
+    # Opencode has has_rules: False — file should not be written, but warning should fire.
+    provider_config = {"Opencode": {"has_rules": False, "skills_dir": ".opencode/skills"}}
+    log = SyncLog()
+    render_injection_drift_artifacts(findings, project_root, provider_config, log, dry_run=False)
+
+    # No drift file should be written for non-has_rules providers.
+    assert not (project_root / ".opencode" / "external-tools-drift.md").exists()
+    # But warning should still fire.
+    assert any("undeclared artifact" in w and "rogue" in w for w in log.warnings)

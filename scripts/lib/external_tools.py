@@ -367,30 +367,40 @@ def render_injection_drift_artifacts(
 
     For each provider with has_rules: True, if findings exist, write
     .claude/rules/external-tools-drift.md (capped at 10 items). If no
-    findings exist, delete the file if present. Uses write_checked for
+    findings exist, delete the file if present. Warnings are logged for all
+    findings regardless of has_rules setting. Uses write_checked for
     idempotence.
     """
     for provider, findings in findings_by_provider.items():
         pc = provider_config.get(provider, {})
-        if not pc.get("has_rules"):
-            continue
-        rules_dir = project_root / pc.get("rules_dir", DEFAULT_RULES_DIR)
-        target_path = rules_dir / DRIFT_FILENAME
 
-        if not findings:
-            if target_path.exists() and not dry_run:
-                target_path.unlink()
-                log.action("DELETE", str(target_path.relative_to(project_root)), "no drift found")
-            continue
-
+        # Log warnings for all findings unconditionally.
         for f in findings:
             log.warning(
                 f"external-tools: undeclared artifact '{f['path']}' ({f['kind']}) for provider "
                 f"'{provider}' — not covered by any active tool's permitted-injections"
             )
 
+        # Skip file rendering for providers without has_rules capability.
+        if not pc.get("has_rules"):
+            continue
+
+        rules_dir = project_root / pc.get("rules_dir", DEFAULT_RULES_DIR)
+        target_path = rules_dir / DRIFT_FILENAME
+
+        if not findings:
+            if target_path.exists():
+                log.action("DELETE", str(target_path.relative_to(project_root)), "no drift found")
+                if not dry_run:
+                    target_path.unlink()
+            continue
+
         content = _generate_drift_content(findings)
         rel_out = str(target_path.relative_to(project_root))
+
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+
         if write_checked(target_path, content, log, "external-tools-drift", dry_run=dry_run):
             log.action("WRITE", rel_out, "external-tools-drift")
         else:
