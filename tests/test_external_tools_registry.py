@@ -339,3 +339,31 @@ def test_resolve_injection_path_defaults_without_explicit_dir(tmp_path):
     entry = {"kind": "hook", "name": "graphify-guard.sh"}
     result = resolve_injection_path(entry, pc, tmp_path)
     assert result == (tmp_path / ".claude" / "hooks" / "graphify-guard.sh").resolve()
+
+
+# ---------------------------------------------------------------------------
+# _generate_tool_rule_content with permitted-injections rendering
+# ---------------------------------------------------------------------------
+
+def test_rule_content_renders_permitted_injections(tmp_path):
+    from scripts.lib.external_tools import _generate_tool_rule_content
+    tool_def = {
+        "description": "d",
+        "permitted-injections": [
+            {"kind": "skill", "name": "graphify", "description": "Claude-Code-Skill"},
+        ],
+    }
+    content = _generate_tool_rule_content(
+        "graphify", tool_def, pc={"skills_dir": ".claude/skills"}, project_root=tmp_path
+    )
+    assert "## Erlaubte Injektionen" in content
+    assert ".claude/skills/graphify" in content
+    assert "Claude-Code-Skill" in content
+
+
+def test_rule_content_omits_section_when_no_injections(tmp_path):
+    from scripts.lib.external_tools import _generate_tool_rule_content
+    content = _generate_tool_rule_content(
+        "graphify", {"description": "d"}, pc={}, project_root=tmp_path
+    )
+    assert "## Erlaubte Injektionen" not in content

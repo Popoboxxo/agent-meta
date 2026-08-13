@@ -221,7 +221,7 @@ def resolve_active_external_tools(
 # Rule content generation
 # ---------------------------------------------------------------------------
 
-def _generate_tool_rule_content(name: str, tool_def: dict) -> str:
+def _generate_tool_rule_content(name: str, tool_def: dict, pc: dict, project_root: Path) -> str:
     """Build Markdown rule content for one external tool from its registry def."""
     lines: list[str] = []
 
@@ -236,6 +236,16 @@ def _generate_tool_rule_content(name: str, tool_def: dict) -> str:
     if isinstance(hooks, list) and hooks:
         lines += ["## Hook-Wrapper", ""]
         lines += [f"- `{EXTERNAL_HOOKS_DIR}/{stem}.sh`" for stem in hooks]
+        lines.append("")
+
+    injections = tool_def.get("permitted-injections", [])
+    if isinstance(injections, list) and injections:
+        lines += ["## Erlaubte Injektionen", ""]
+        for entry in injections:
+            resolved = resolve_injection_path(entry, pc, project_root)
+            rel = resolved.relative_to(project_root.resolve()) if resolved.is_relative_to(project_root.resolve()) else resolved
+            desc_suffix = f" — {entry['description']}" if entry.get("description") else ""
+            lines.append(f"- `{rel}` ({entry['kind']}){desc_suffix}")
         lines.append("")
 
     lines += [
@@ -310,7 +320,7 @@ def generate_external_tool_artifacts(
 
         filename = f"{TOOL_RULE_PREFIX}{tool_name}.md"
         target_path = safe_path(target_dir, filename)
-        content = _generate_tool_rule_content(tool_name, tool_def)
+        content = _generate_tool_rule_content(tool_name, tool_def, pc, project_root)
         rel_out = str(target_path.relative_to(project_root))
         src_label = f"external-tools-registry/{tool_name}"
 
