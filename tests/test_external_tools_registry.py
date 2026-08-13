@@ -367,3 +367,90 @@ def test_rule_content_omits_section_when_no_injections(tmp_path):
         "graphify", {"description": "d"}, pc={}, project_root=tmp_path
     )
     assert "## Erlaubte Injektionen" not in content
+
+
+# ---------------------------------------------------------------------------
+# scan_injection_drift
+# ---------------------------------------------------------------------------
+
+def test_scan_injection_drift_flags_unexplained_skill_dir(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {"graphify": {"description": "d", "enabled-by-default": True}})
+    # No permitted-injections declared — the skill dir below is unexplained.
+    skills_dir = project_root / ".claude" / "skills" / "graphify"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("x", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/skills/graphify" in paths
+
+
+def test_scan_injection_drift_clean_when_declared(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {"graphify": {
+        "description": "d", "enabled-by-default": True,
+        "permitted-injections": [{"kind": "skill", "name": "graphify"}],
+    }})
+    skills_dir = project_root / ".claude" / "skills" / "graphify"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("x", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Claude"] == []
+
+
+def test_scan_injection_drift_flags_loose_root_file(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    infra_root = project_root / ".claude"
+    infra_root.mkdir(parents=True)
+    (infra_root / "CLAUDE.md").write_text("rogue block", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+        "settings_file": ".claude/settings.json",
+        "pending_tasks_file": ".claude/pending-tasks.md",
+        "extension_dir": ".claude/3-project", "snippets_dir": ".claude/snippets",
+        "artifact_dir": ".claude/artifacts",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/CLAUDE.md" in paths
+
+
+def test_scan_injection_drift_flags_stray_agent_file(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    agents_dir = project_root / ".claude" / "agents"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "rogue-role.md").write_text("x", encoding="utf-8")
+    # A real agent-meta-managed role stays unflagged.
+    (agents_dir / "developer.md").write_text("x", encoding="utf-8")
+    (agents_dir / ".agent-meta-managed").write_text("developer.md\n", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/agents/rogue-role.md" in paths
+    assert ".claude/agents/developer.md" not in paths

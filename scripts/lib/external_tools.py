@@ -328,3 +328,141 @@ def generate_external_tool_artifacts(
             log.action("WRITE", rel_out, src_label)
         else:
             log.skip(rel_out, "unchanged")
+
+
+# ---------------------------------------------------------------------------
+# Injection drift scanning
+# ---------------------------------------------------------------------------
+
+def _read_managed_index(dir_path: Path) -> set[str]:
+    index_path = dir_path / ".agent-meta-managed"
+    if not index_path.exists():
+        return set()
+    return {
+        line.strip() for line in index_path.read_text(encoding="utf-8").splitlines() if line.strip()
+    }
+
+
+# Top-level entries under a provider's infra root that agent-meta itself may
+# place there, independent of the four managed subdirs. Keyed by the
+# provider_config field that names each one; a field absent from `pc` is
+# skipped (not every provider has every capability).
+_INFRA_ROOT_KNOWN_KEYS = [
+    "agents_dir", "hooks_dir", "rules_dir", "skills_dir", "snippets_dir",
+    "extension_dir", "artifact_dir", "checkpoint_dir", "settings_file",
+    "pending_tasks_file",
+]
+
+
+def scan_injection_drift(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+) -> dict[str, list[dict]]:
+    """Find files/dirs under each active provider's infra root that neither
+    agent-meta itself manages (per-directory .agent-meta-managed indexes) nor
+    any active external tool's permitted-injections declares. Pure — no writes.
+    """
+    from .deactivation import is_provider_active
+    from .mcp import resolve_active_mcp_servers
+
+    registry = load_external_tools_registry(agent_meta_root, config, project_root)
+    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root)
+    active_mcp = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))
+
+    findings_by_provider: dict[str, list[dict]] = {}
+
+    for provider, pc in provider_config.items():
+        if not is_provider_active(config, provider):
+            continue
+
+        # Permitted set, resolved to absolute paths, keyed by dir-kind.
+        permitted_by_kind: dict[str, set[Path]] = {"skill": set(), "hook": set(), "rule": set()}
+        permitted_root_extra: set[Path] = set()  # kind: config/other
+        for tool_name in active_tools:
+            for entry in registry.get(tool_name, {}).get("permitted-injections", []):
+                resolved = resolve_injection_path(entry, pc, project_root)
+                if entry["kind"] in permitted_by_kind:
+                    permitted_by_kind[entry["kind"]].add(resolved)
+                else:
+                    permitted_root_extra.add(resolved)
+
+        provider_findings: list[dict] = []
+
+        # --- managed subdirs: skill / hook / rule (declarable kinds) ---
+        dir_specs = [
+            ("skill", pc.get("skills_dir", ".claude/skills")),
+            ("hook", pc.get("hooks_dir", ".claude/hooks")),
+            ("rule", pc.get("rules_dir", ".claude/rules")),
+        ]
+        for kind, dir_rel in dir_specs:
+            dir_path = project_root / dir_rel
+            if not dir_path.is_dir():
+                continue
+            managed = _read_managed_index(dir_path)
+            if kind == "rule":
+                managed |= {f"{TOOL_RULE_PREFIX}{t}.md" for t in active_tools}
+                managed |= {f"mcp-{s}.md" for s in active_mcp}
+            for child in sorted(dir_path.iterdir()):
+                if child.name == ".agent-meta-managed":
+                    continue
+                if child.name in managed:
+                    continue
+                if child.resolve() in permitted_by_kind[kind]:
+                    continue
+                provider_findings.append({
+                    "path": str(child.relative_to(project_root)),
+                    "kind": kind,
+                    "tool": None,
+                })
+
+        # --- agents_dir: no declarable permitted-injections kind exists for
+        # it (per spec — agent files are never legitimately tool-installed).
+        # Only an explicit kind: config/other entry (permitted_root_extra)
+        # can excuse a finding here; the existing .agent-meta-managed index
+        # (agents.py:1498) still excuses agent-meta's own generated roles.
+        agents_dir_path = project_root / pc.get("agents_dir", ".claude/agents")
+        if agents_dir_path.is_dir():
+            managed = _read_managed_index(agents_dir_path)
+            for child in sorted(agents_dir_path.iterdir()):
+                if child.name == ".agent-meta-managed":
+                    continue
+                if child.name in managed:
+                    continue
+                if child.resolve() in permitted_root_extra:
+                    continue
+                provider_findings.append({
+                    "path": str(child.relative_to(project_root)),
+                    "kind": "other",
+                    "tool": None,
+                })
+
+        # --- infra root: loose files/dirs beside the four managed subdirs ---
+        # Determined from the provider's own infra root (parent of skills_dir,
+        # e.g. ".claude" for Claude) rather than a hardcoded ".claude" literal,
+        # so Gemini/.gemini, Opencode/.opencode etc. are covered the same way.
+        skills_dir_rel = pc.get("skills_dir")
+        if skills_dir_rel:
+            infra_root = (project_root / skills_dir_rel).parent
+            if infra_root.is_dir() and infra_root != project_root:
+                known_names = set()
+                for key in _INFRA_ROOT_KNOWN_KEYS:
+                    val = pc.get(key)
+                    if val:
+                        known_names.add(Path(val).name)
+                known_names.add("settings.local.json")
+                for child in sorted(infra_root.iterdir()):
+                    if child.name in known_names:
+                        continue
+                    if child.resolve() in permitted_root_extra:
+                        continue
+                    provider_findings.append({
+                        "path": str(child.relative_to(project_root)),
+                        "kind": "other",
+                        "tool": None,
+                    })
+
+        findings_by_provider[provider] = provider_findings
+
+    return findings_by_provider
