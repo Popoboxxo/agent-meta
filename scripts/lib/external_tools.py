@@ -30,6 +30,8 @@ EXTERNAL_HOOKS_DIR = "hooks/0-external"
 # Fallback rules directory for providers without an explicit rules_dir (Claude).
 # Mirrors mcp.DEFAULT_RULES_DIR to keep tool rule output aligned with sync_rules().
 DEFAULT_RULES_DIR = ".claude/rules"
+DRIFT_FILENAME = "external-tools-drift.md"
+_DRIFT_CAP = 10
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +328,71 @@ def generate_external_tool_artifacts(
 
         if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
             log.action("WRITE", rel_out, src_label)
+        else:
+            log.skip(rel_out, "unchanged")
+
+
+# ---------------------------------------------------------------------------
+# Drift artifact rendering
+# ---------------------------------------------------------------------------
+
+def _generate_drift_content(findings: list[dict]) -> str:
+    """Generate Markdown content for external-tools-drift.md from findings."""
+    lines = [
+        "# External-Tool Injection Drift", "",
+        "> Automatisch erkannt von `check_injection_drift` — Fremd-Artefakte, die keinem "
+        "aktiven Tool in `config/external-tools-registry.yaml` als `permitted-injections` "
+        "deklariert sind. Nur Warnung, kein automatisches Eingreifen.",
+        "", "---", "",
+    ]
+    shown = findings[:_DRIFT_CAP]
+    for f in shown:
+        tool_label = f["tool"] or "keinem registrierten Tool zugeordnet"
+        lines.append(f"- `{f['path']}` ({f['kind']}) — {tool_label}")
+    remaining = len(findings) - len(shown)
+    if remaining > 0:
+        lines.append(f"- … {remaining} weitere, siehe sync.log")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def render_injection_drift_artifacts(
+    findings_by_provider: dict[str, list[dict]],
+    project_root: Path,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Render sparse external-tools-drift.md files when drift is detected.
+
+    For each provider with has_rules: True, if findings exist, write
+    .claude/rules/external-tools-drift.md (capped at 10 items). If no
+    findings exist, delete the file if present. Uses write_checked for
+    idempotence.
+    """
+    for provider, findings in findings_by_provider.items():
+        pc = provider_config.get(provider, {})
+        if not pc.get("has_rules"):
+            continue
+        rules_dir = project_root / pc.get("rules_dir", DEFAULT_RULES_DIR)
+        target_path = rules_dir / DRIFT_FILENAME
+
+        if not findings:
+            if target_path.exists() and not dry_run:
+                target_path.unlink()
+                log.action("DELETE", str(target_path.relative_to(project_root)), "no drift found")
+            continue
+
+        for f in findings:
+            log.warning(
+                f"external-tools: undeclared artifact '{f['path']}' ({f['kind']}) for provider "
+                f"'{provider}' — not covered by any active tool's permitted-injections"
+            )
+
+        content = _generate_drift_content(findings)
+        rel_out = str(target_path.relative_to(project_root))
+        if write_checked(target_path, content, log, "external-tools-drift", dry_run=dry_run):
+            log.action("WRITE", rel_out, "external-tools-drift")
         else:
             log.skip(rel_out, "unchanged")
 

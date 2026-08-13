@@ -500,3 +500,39 @@ def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_setti
     }}
     findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
     assert findings["Continue"] == []
+
+
+# ---------------------------------------------------------------------------
+# render_injection_drift_artifacts
+# ---------------------------------------------------------------------------
+
+def test_render_drift_artifacts_writes_capped_file(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    (project_root / ".claude" / "rules").mkdir(parents=True)
+    findings = {"Claude": [
+        {"path": f".claude/skills/rogue-{i}", "kind": "skill", "tool": None} for i in range(12)
+    ]}
+    provider_config = {"Claude": {"has_rules": True, "rules_dir": ".claude/rules"}}
+    log = SyncLog()
+    render_injection_drift_artifacts(findings, project_root, provider_config, log, dry_run=False)
+
+    out = project_root / ".claude" / "rules" / "external-tools-drift.md"
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert text.count("rogue-") == 10
+    assert "2 weitere, siehe sync.log" in text
+
+
+def test_render_drift_artifacts_removes_stale_file_when_clean(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    stale = rules_dir / "external-tools-drift.md"
+    stale.write_text("old drift", encoding="utf-8")
+
+    provider_config = {"Claude": {"has_rules": True, "rules_dir": ".claude/rules"}}
+    log = SyncLog()
+    render_injection_drift_artifacts({"Claude": []}, project_root, provider_config, log, dry_run=False)
+    assert not stale.exists()
