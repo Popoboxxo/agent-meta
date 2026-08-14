@@ -63,6 +63,34 @@ def test_mcp_rule_file_removed_when_server_deactivated(tmp_path):
     assert set(index_path.read_text(encoding="utf-8").split()) == {"mcp-honcho.md"}
 
 
+def test_mcp_rule_file_removed_when_last_server_deactivated(tmp_path):
+    # Regression test: dropping the active-server list to EMPTY (not just
+    # shrinking it) must still run stale-cleanup — an early return on an
+    # empty active_servers list would orphan every previously-written
+    # mcp-*.md rule file forever (they'd never be revisited on later syncs
+    # either, since the same early return fires again each time).
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_mcp_registry(agent_meta_root, {"honcho": {"description": "honcho"}})
+    provider_config = {"Claude": {"has_rules": True}}
+
+    generate_mcp_artifacts(
+        agent_meta_root, project_root, {"mcp-servers": ["honcho"], "platforms": []},
+        provider_config, SyncLog(), dry_run=False, provider="Claude",
+    )
+    honcho_rule = project_root / ".claude" / "rules" / "mcp-honcho.md"
+    index_path = project_root / ".claude" / "rules" / ".agent-meta-managed-mcp"
+    assert honcho_rule.exists()
+
+    # All servers deactivated — active_servers is now [].
+    generate_mcp_artifacts(
+        agent_meta_root, project_root, {"mcp-servers": [], "platforms": []},
+        provider_config, SyncLog(), dry_run=False, provider="Claude",
+    )
+    assert not honcho_rule.exists()
+    assert index_path.read_text(encoding="utf-8").split() == []
+
+
 def test_mcp_rule_file_removed_when_server_deleted_from_registry(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
@@ -186,6 +214,31 @@ def test_tool_rule_file_removed_when_tool_deactivated(tmp_path):
     assert graphify_rule.exists()
     assert not otherctl_rule.exists()
     assert set(index_path.read_text(encoding="utf-8").split()) == {"tool-graphify.md"}
+
+
+def test_tool_rule_file_removed_when_last_tool_deactivated(tmp_path):
+    # Mirrors test_mcp_rule_file_removed_when_last_server_deactivated for the
+    # external-tools write loop (same early-return bug existed in
+    # generate_external_tool_artifacts).
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_tools_registry(agent_meta_root, {"graphify": {"enabled-by-default": True, "rule-content": "body"}})
+    provider_config = {"Claude": {"has_rules": True}}
+
+    generate_external_tool_artifacts(
+        agent_meta_root, project_root, {}, provider_config, SyncLog(), dry_run=False, provider="Claude",
+    )
+    graphify_rule = project_root / ".claude" / "rules" / "tool-graphify.md"
+    index_path = project_root / ".claude" / "rules" / ".agent-meta-managed-tools"
+    assert graphify_rule.exists()
+
+    # All tools deactivated — active_tools is now [].
+    config = {"external-tools": {"graphify": {"enabled": False}}}
+    generate_external_tool_artifacts(
+        agent_meta_root, project_root, config, provider_config, SyncLog(), dry_run=False, provider="Claude",
+    )
+    assert not graphify_rule.exists()
+    assert index_path.read_text(encoding="utf-8").split() == []
 
 
 def test_tool_rule_file_bootstrap_sweeps_legacy_orphan_without_prior_index(tmp_path):

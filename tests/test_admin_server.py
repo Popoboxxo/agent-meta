@@ -381,5 +381,60 @@ class TestWriteSubmoduleProtection(unittest.TestCase):
             self.assertNotIn("submodule-protection", saved.get("rules", {}))
 
 
+# --------------------------------------------------------------------------- #
+# Injection-drift endpoint — submodule (project_admin) root resolution        #
+# --------------------------------------------------------------------------- #
+
+
+class TestComputeInjectionDrift(unittest.TestCase):
+    """_compute_injection_drift() must resolve the framework registries via
+    ``self._agent_meta_root()``, not the raw project root — in project_admin
+    (submodule) mode those live under ``.agent-meta/``, not the project root
+    itself (config-drift regression: passing the wrong root silently falls
+    back to a stub provider config and produces false-positive findings)."""
+
+    def _make_handler(self, root: Path) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin"
+        )
+        return handler
+
+    def test_uses_agent_meta_root_not_project_root_for_provider_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            submodule = root / ".agent-meta"
+            # Marks this as project_admin mode for detect_mode()/_agent_meta_root().
+            (submodule / "agents" / "1-generic").mkdir(parents=True)
+            (submodule / "config").mkdir(parents=True)
+            # scripts/lib is imported by _compute_injection_drift() itself — point
+            # it at the real repo's lib package rather than re-vendoring it into
+            # the fixture, so this test exercises the actual scan_injection_drift.
+            (submodule / "scripts").symlink_to(_PROJECT_ROOT / "scripts")
+            (submodule / "config" / "ai-providers.yaml").write_text(
+                "providers:\n"
+                "  ZzzTestProvider:\n"
+                "    agents_dir: .zzz/agents\n"
+                "    has_hooks: false\n"
+                "    has_rules: false\n"
+                "    capabilities: []\n",
+                encoding="utf-8",
+            )
+            (root / ".meta-config").mkdir(parents=True)
+            (root / ".meta-config" / "project.yaml").write_text("ai-providers: []\n", encoding="utf-8")
+
+            handler = self._make_handler(root)
+            result = handler._compute_injection_drift()
+
+            self.assertNotIn("error", result, result.get("error"))
+            # "ZzzTestProvider" only exists in .agent-meta/config/ai-providers.yaml
+            # — its presence proves load_providers_config() was called with the
+            # submodule root. The old bug passed the (empty) project root instead,
+            # silently falling back to a Claude-only stub and never seeing this
+            # provider at all.
+            self.assertIn("ZzzTestProvider", result["findings"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -910,7 +910,16 @@ def _build_managed_block(
         rule_options = resolve_rules(config, agent_meta_root)
         platforms = config.get("platforms", [])
         rule_sources = collect_rule_sources(agent_meta_root, platforms)
-        
+
+        # Loaded before the plain-rules loop (not with the per-server embedding
+        # below) so MCP_GUARDRAILS_LIST is available for mcp-guardrails.md's
+        # {{MCP_GUARDRAILS_LIST}} placeholder — mirrors sync_rules()'s
+        # provider_vars wiring for providers with a native rules_dir.
+        from .mcp import build_mcp_guardrails_list, load_mcp_registry, resolve_active_mcp_servers
+        mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+        mcp_active = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
+        local_vars["MCP_GUARDRAILS_LIST"] = build_mcp_guardrails_list(mcp_registry, mcp_active)
+
         for src_path, _ in rule_sources:
             rule_stem = src_path.stem
             opts = rule_options.get(rule_stem, {})
@@ -928,10 +937,8 @@ def _build_managed_block(
             embedded_rules.append({"content": rule_content})
         
         try:
-            from .mcp import load_mcp_registry, resolve_active_mcp_servers, _generate_rule_content
-            mcp_registry = load_mcp_registry(agent_meta_root, config)
+            from .mcp import _generate_rule_content
             if mcp_registry:
-                mcp_active = resolve_active_mcp_servers(config, agent_meta_root)
                 for server_name in mcp_active:
                     server_def = mcp_registry.get(server_name)
                     if server_def:
@@ -946,9 +953,12 @@ def _build_managed_block(
                 load_external_tools_registry,
                 resolve_active_external_tools,
             )
-            tool_registry = load_external_tools_registry(agent_meta_root, config)
+            tool_registry = load_external_tools_registry(agent_meta_root, config, project_root)
             if tool_registry:
-                for tool_name in resolve_active_external_tools(config, agent_meta_root):
+                active_tools = resolve_active_external_tools(
+                    config, agent_meta_root, project_root, registry=tool_registry,
+                )
+                for tool_name in active_tools:
                     tool_def = tool_registry.get(tool_name)
                     if tool_def and provider not in tool_def.get("provider-skip", []):
                         embedded_rules.append(

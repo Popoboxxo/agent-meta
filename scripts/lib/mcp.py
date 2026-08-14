@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .io import (
+    _deep_merge,
     _load_yaml_or_json,
     safe_path,
     write_checked,
@@ -39,15 +40,6 @@ MCP_MANAGED_INDEX_FILENAME = ".agent-meta-managed-mcp"
 # ---------------------------------------------------------------------------
 # Registry loading
 # ---------------------------------------------------------------------------
-
-def _deep_merge(dict1: dict, dict2: dict) -> dict:
-    """Recursively merges dict2 into dict1."""
-    for k, v in dict2.items():
-        if isinstance(v, dict) and k in dict1 and isinstance(dict1[k], dict):
-            _deep_merge(dict1[k], v)
-        else:
-            dict1[k] = v
-    return dict1
 
 def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project_root: Path | None = None) -> dict:
     """Load config/mcp-registry.yaml and deep-merge with project-specific mcp-registry (if provided)."""
@@ -77,7 +69,10 @@ def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project
 # Server resolution
 # ---------------------------------------------------------------------------
 
-def resolve_active_mcp_servers(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> list[str]:
+def resolve_active_mcp_servers(
+    config: dict, agent_meta_root: Path, project_root: Path | None = None,
+    registry: dict | None = None,
+) -> list[str]:
     """Determine which MCP servers are active for this project.
 
     Sources (merged, preserving order, no duplicates):
@@ -87,8 +82,14 @@ def resolve_active_mcp_servers(config: dict, agent_meta_root: Path, project_root
 
     Servers from bundles not in the explicit list are skipped when
     enabled-by-default: false in mcp-registry.yaml.
+
+    registry: pass an already-loaded load_mcp_registry() result to skip
+    re-reading/re-parsing config/mcp-registry.yaml when the caller has one
+    on hand (e.g. sync.py's per-provider loop, which would otherwise reload
+    the same on-disk registry once per active provider).
     """
-    registry = load_mcp_registry(agent_meta_root, config, project_root)
+    if registry is None:
+        registry = load_mcp_registry(agent_meta_root, config, project_root)
     explicit: set[str] = set(config.get("mcp-servers", []))
     active: list[str] = list(config.get("mcp-servers", []))
 
@@ -109,6 +110,24 @@ def resolve_active_mcp_servers(config: dict, agent_meta_root: Path, project_root
                 active.append(server)
 
     return active
+
+
+def build_mcp_guardrails_list(registry: dict, active_servers: list[str]) -> str:
+    """Render the hard-prohibitions bullet list for rules/1-generic/mcp-guardrails.md.
+
+    Generated from each active server's tools.blocked (config/mcp-registry.yaml)
+    instead of being hand-copied — a server added/removed from the active list,
+    or a blocked-tools edit, is picked up on the next sync instead of silently
+    going stale in a hand-authored always-on guardrail file.
+    """
+    lines = [
+        f"- **{name}:** " + ", ".join(f"`{t}`" for t in blocked) + " — absolut verboten."
+        for name in sorted(active_servers)
+        if (blocked := (registry.get(name, {}).get("tools", {}).get("blocked", [])))
+    ]
+    if not lines:
+        return "- (keine aktiven MCP-Server mit gesperrten Tools)"
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +208,7 @@ def _required_secrets_by_server(
     if not registry:
         return {}
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry)
     if not active_servers:
         return {}
 
@@ -331,9 +350,12 @@ def generate_mcp_artifacts(
     if not registry:
         return []
 
-    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root)
-    if not active_servers:
-        return []
+    # No early return on an empty active_servers list here (unlike
+    # load_mcp_registry's empty-registry check above): the loops below still
+    # need to run with zero entries so cleanup_stale_managed_files() sees an
+    # empty now_managed set and removes every previously-generated mcp-*.md
+    # rule file — deactivating the last server must not orphan its rule file.
+    active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry)
 
     pc = provider_config.get(provider, {})
     rule_options = resolve_rules(config, agent_meta_root)

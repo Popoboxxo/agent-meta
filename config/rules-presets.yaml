@@ -15,10 +15,12 @@
 #                        sondern als <skills_dir>/<name>/SKILL.md — der einzige
 #                        echte Lazy-Load-Kanal auf Claude Code: nur `name` +
 #                        `description` landen im System-Prompt, der Body erst
-#                        auf Abruf per Read. Nur für Claude + Opencode wirksam
-#                        (siehe scripts/lib/skill_channel.py PROVIDERS) — für
-#                        alle anderen Provider fällt die Rule unverändert auf
-#                        die normale <rules_dir>/<name>.md-Datei zurück.
+#                        auf Abruf per Read. Nur für Claude wirksam (siehe
+#                        scripts/lib/skill_channel.py PROVIDERS) — für alle
+#                        anderen Provider (inkl. Opencode: hat zwar skills_dir,
+#                        aber has_rules: false, jeder Call-Site ist dahinter
+#                        gated) fällt die Rule unverändert auf die normale
+#                        <rules_dir>/<name>.md-Datei zurück.
 #   skill-description: "..." → Description im SKILL.md-Frontmatter (Englisch).
 #                        Fallback: erste Textzeile nach der H1-Überschrift des
 #                        Rule-Bodies. Nur relevant zusammen mit channel: skill.

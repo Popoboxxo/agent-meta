@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .io import _write_yaml
+from .io import _load_yaml_or_json, _write_yaml
 from .log import SyncLog
 from .skills import (
     _EXTERNAL_SKILLS_CONFIG_JSON,
@@ -62,27 +62,14 @@ def add_skill(
     legacy_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_LEGACY
     json_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON
 
-    try:
-        import yaml as _yaml
-        _yaml_available = True
-    except ImportError:
-        _yaml_available = False
-
-    if yaml_path.exists() and _yaml_available:
-        config_path = yaml_path
-        with config_path.open(encoding="utf-8") as f:
-            raw = _yaml.safe_load(f) or {}
-    elif legacy_path.exists() and _yaml_available:
-        config_path = yaml_path  # write to new path even when reading legacy
-        with legacy_path.open(encoding="utf-8") as f:
-            raw = _yaml.safe_load(f) or {}
-    elif json_path.exists():
-        config_path = json_path
-        with config_path.open(encoding="utf-8") as f:
-            raw = json.load(f)
-    else:
-        config_path = yaml_path
+    raw, used_path = _load_yaml_or_json(yaml_path, legacy_path, json_path)
+    if not raw:
         raw = {"repos": {}, "skills": {}}
+    # Write to the new yaml_path even when legacy_path was the read source
+    # (migrates off the legacy filename); json_path is preserved as-is since
+    # switching an existing JSON registry to YAML on a routine add would be
+    # a surprising, unrelated format change.
+    config_path = json_path if used_path == json_path else yaml_path
 
     # Capture current commit for pinning
     actual_commit = get_skill_commit(agent_meta_root, local_path)

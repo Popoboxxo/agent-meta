@@ -87,8 +87,15 @@ def cleanup_stale_managed_files(
 
 
 def write_managed_index(index_path: Path, now_managed: set[str], dry_run: bool) -> None:
-    """Write the managed-index file. No-op for dry_run or an empty set."""
-    if dry_run or not now_managed:
+    """Write the managed-index file, including when ``now_managed`` is empty.
+
+    An empty set is a legitimate state (every server/tool got deactivated) —
+    it must still be written so the index doesn't keep listing stale entries
+    that cleanup_stale_managed_files() already deleted from disk. No-op only
+    for dry_run.
+    """
+    if dry_run:
         return
     index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    content = "\n".join(sorted(now_managed))
+    index_path.write_text(f"{content}\n" if content else "", encoding="utf-8")

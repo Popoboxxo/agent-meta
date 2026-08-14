@@ -156,7 +156,7 @@ def scan_injection_drift(
     from .mcp import resolve_active_mcp_servers
 
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
-    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root)
+    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root, registry=registry)
     active_mcp = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))
 
     findings_by_provider: dict[str, list[dict]] = {}
