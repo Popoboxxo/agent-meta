@@ -128,6 +128,13 @@ _INFRA_ROOT_KNOWN_KEYS = [
 # directory is agent-meta's own managed dir, but scan_injection_drift has no
 # key to read its name from and misreports it as a top-level foreign "other"
 # finding.
+#
+# Mammouth has `has_commands: true` in ai-providers.yaml but no entry here:
+# harmless today because lib.commands.sync_commands_for_provider() doesn't
+# implement a Mammouth branch yet (no commands dir is ever written), so
+# there's nothing to misreport. The moment a Mammouth commands writer lands,
+# add its literal target dir here too, or this same false-positive class
+# reappears for it.
 _INFRA_ROOT_FALLBACK_DIRS = {
     "hooks_dir": {"Claude": ".claude/hooks"},
     "rules_dir": {"Claude": DEFAULT_RULES_DIR},

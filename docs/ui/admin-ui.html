@@ -2788,23 +2788,37 @@ async function viewProjectExternalToolsOverrides() {
   wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable curated external CLI dev-tool integrations (rule text + hook wiring) for your project, or customize them specifically for this repository."]));
 
   try {
+    // This banner runs scan_injection_drift() live, so it can briefly
+    // disagree with the last-sync snapshot rendered into
+    // external-tools-drift.md (e.g. right after a manual file drop, before
+    // the next `sync.py` run regenerates that file). That's expected —
+    // treat the banner as "right now", the .md as "as of last sync".
     const driftResp = await api.get("/api/external-tools/drift");
-    const allFindings = Object.values(driftResp.findings || {}).flat();
-    if (allFindings.length > 0) {
-      const banner = el("div", {
-        style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
-             + "border-radius:4px; background:rgba(180,83,9,0.1);",
-      });
-      banner.appendChild(el("strong", {}, [`${allFindings.length} undeklarierte Artefakte gefunden`]));
-      const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
-      allFindings.slice(0, 10).forEach((f) => {
-        list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "kein Tool zugeordnet"}`]));
-      });
-      banner.appendChild(list);
-      wrap.appendChild(banner);
+    if (driftResp.error) {
+      wrap.appendChild(el("div", {
+        style: "margin-bottom:var(--space-4); padding:var(--space-2) var(--space-3); "
+             + "border:1px solid var(--border-color); border-radius:4px; "
+             + "color:var(--text-muted); font-size:12px;",
+      }, [`Drift-Scan fehlgeschlagen: ${driftResp.error}`]));
+    } else {
+      const allFindings = Object.values(driftResp.findings || {}).flat();
+      if (allFindings.length > 0) {
+        const banner = el("div", {
+          style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
+               + "border-radius:4px; background:rgba(180,83,9,0.1);",
+        });
+        banner.appendChild(el("strong", {}, [`${allFindings.length} undeklarierte Artefakte gefunden`]));
+        const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
+        allFindings.slice(0, 10).forEach((f) => {
+          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "kein Tool zugeordnet"}`]));
+        });
+        banner.appendChild(list);
+        wrap.appendChild(banner);
+      }
     }
   } catch (err) {
-    // Non-fatal — drift banner is a convenience, not a blocker for the panel.
+    // Non-fatal — network-level failure (e.g. server unreachable); the
+    // drift banner is a convenience, not a blocker for the panel.
   }
 
   let projData, fwData;
@@ -2981,7 +2995,26 @@ async function viewProjectExternalToolsOverrides() {
               if (item.kind === k) opt.selected = true;
               kindSel.appendChild(opt);
             });
-            kindSel.onchange = (e) => { const ov = setupEditState(); ov["permitted-injections"][idx].kind = e.target.value; markDirty(); };
+            kindSel.onchange = (e) => {
+              const ov = setupEditState();
+              const entry = ov["permitted-injections"][idx];
+              const newKind = e.target.value;
+              const wasPathKind = entry.kind === "config" || entry.kind === "other";
+              const isPathKindNow = newKind === "config" || newKind === "other";
+              entry.kind = newKind;
+              if (wasPathKind !== isPathKindNow) {
+                // Migrate the value across the name/path field split so the
+                // persisted entry never mixes kind with the wrong field —
+                // a mismatch is schema-invalid and breaks every subsequent
+                // sync.py run (see _validate_permitted_injections).
+                const carried = wasPathKind ? entry.path : entry.name;
+                delete entry.path;
+                delete entry.name;
+                if (isPathKindNow) entry.path = carried || ""; else entry.name = carried || "";
+              }
+              markDirty();
+              renderInjectionRows();
+            };
             const isPathKind = item.kind === "config" || item.kind === "other";
             const valInput = el("input", { class: "form-control", placeholder: isPathKind ? "path" : "name", value: isPathKind ? (item.path || "") : (item.name || "") });
             valInput.oninput = (e) => {

@@ -3496,11 +3496,37 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
+        if section == "external-tools-registry" and isinstance(data, dict):
+            self._validate_permitted_injections_overrides(data)
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write("project", existing))
+
+    def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
+        """Reject a project-override write whose ``permitted-injections`` would
+        break the next ``sync.py`` run (schema-invalid kind/name/path combo).
+
+        Without this, a bad edit in the Admin UI (e.g. switching an entry's
+        ``kind`` without migrating ``name``/``path``) silently persists to
+        ``project.yaml`` and only surfaces as a hard ``SyncError`` the next
+        time anything calls ``load_external_tools_registry`` — which is most
+        sync operations, not just this panel.
+        """
+        root = self.__class__.root
+        sys.path.insert(0, str(root / "scripts"))
+        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        from lib.external_tools import _validate_permitted_injections  # type: ignore[import]
+        from lib.io import SyncError  # type: ignore[import]
+
+        for tool_name, override in overrides.items():
+            if not isinstance(override, dict) or "permitted-injections" not in override:
+                continue
+            try:
+                _validate_permitted_injections(tool_name, override["permitted-injections"])
+            except SyncError as exc:
+                raise ValueError(str(exc)) from exc
 
     def _read_template_description(self, role: str) -> str:
         """Read the description from a generated agent template's frontmatter."""
