@@ -1,12 +1,13 @@
-# Rules-Preset Optimierung für platform-heavy Projekte
+# Rules-Optimierung für Token-Effizienz
 
-> Für Projekte mit vielen Platform Rules die bei jedem Request Token-Overhead erzeugen.
+> Für Projekte mit vielen Rules die bei jedem Request Token-Overhead erzeugen.
+> Die Optimierungsstrategie unterscheidet sich stark zwischen Providern.
 
 ---
 
 ## Problem: Zu viele alwaysApply Rules
 
-Jede Rule in `.claude/rules/` mit `alwaysApply: true` (Standard) wird in **jeden Agenten-Request** geladen — egal ob relevant. Bei Platform-heavy Projekten (Home Assistant, Sharkord) kann das schnell 3.000–8.000 Token pro Request kosten.
+Jede Rule in `.claude/rules/` wird standardmäßig in **jeden Agenten-Request** geladen. Bei Platform-heavy Projekten (Home Assistant, Sharkord) kann das schnell 3.000–8.000 Token pro Request kosten.
 
 **Signale dass Rules zu viel Last erzeugen:**
 - Platform Rules > 400 Wörter (`wc -w <datei>`)
@@ -15,42 +16,53 @@ Jede Rule in `.claude/rules/` mit `alwaysApply: true` (Standard) wird in **jeden
 
 ---
 
-## Lösung: rules-preset + gezielte alwaysApply: false
+## Lösungen — Provider-spezifisch
 
-### Schritt 1 — Preset wählen
+### Für Claude Code & Opencode: `channel: skill` + `lazy` Preset
+
+Claude Code lädt `.claude/rules/*.md` **immer vollständig**, unabhängig von `alwaysApply: false`. Der einzige echte Lazy-Load-Kanal ist `.claude/skills/<name>/SKILL.md`:
+
+> **Verifiziert:** Token-Messung agent-meta selbst: 9.421 Token (alle Rules geladen) → 3.448 Token (mit `channel: skill` Preset `lazy`) = **−63 % Token-Overhead**.
+
+**Lösung:**
+
+```yaml
+# .meta-config/project.yaml
+rules-preset: lazy
+```
+
+Das ist es. sync.py schreibt große situative Rules (sync-interface, architecture, conventions, etc.) zu `.claude/skills/<name>/SKILL.md` statt `.claude/rules/<name>.md`. Claude Code lädt nur `name` + `description` im System-Prompt, den Body erst on-demand via Read.
+
+**Welche Rules betroffen:** Siehe `config/rules-presets.yaml` `lazy` Preset — aktuell ~13 Regeln umgestellt, Kern-Rules (branch-guard, commit-conventions, language, speech-mode, use-orchestrator, dod-criteria) bleiben immer on.
+
+**Weitere Info:** → [rules.md — Abschnitt "Skill-Channel (`channel: skill`)"](rules.md#skill-channel-channel-skill)
+
+---
+
+### Für Continue: `alwaysApply: false` + `minimal`/`silent` Presets
+
+Continue UNTERSTÜTZT `alwaysApply: false` nativ — Rules landen nicht im System-Prompt, werden nur bei Keyword-Match geladen.
 
 In `.meta-config/project.yaml`:
 
 ```yaml
-# Empfehlung für platform-heavy Projekte
+# Situative Rules on-demand (guter Kompromiss)
 rules-preset: minimal
+
+# oder für maximale Einsparung
+rules-preset: silent
 ```
 
-Verfügbare Presets:
+**Verfügbare Presets:**
 
-| Preset | Verhalten | Wann |
-|--------|-----------|------|
-| `default` | Alle Rules immer aktiv | Kleine Projekte, wenige Rules |
-| `minimal` | Situative Rules on-demand | Platform-heavy Projekte (empfohlen) |
-| `silent` | Nur Kern-Rules immer aktiv | Rapid-Prototyping, Token-Budget kritisch |
+| Preset | Verhalten | Token-Einsparung |
+|--------|-----------|------------------|
+| `default` | Alle Rules immer aktiv | 0 % |
+| `minimal` | Situative Rules on-demand | ~30–40 % (Continue) |
+| `silent` | Nur Kern-Rules immer aktiv, Rest optional | ~60–70 % (Continue) |
+| `lazy` | **Claude Code optimiert** — `channel: skill` statt `alwaysApply` | ~60–70 % (Claude Code) |
 
-### Schritt 2 — Große Platform Rules identifizieren
-
-```bash
-# Wort-Zahl aller Rules prüfen
-wc -w .claude/rules/*.md | sort -n
-```
-
-Faustregeln:
-
-| Wörter | Empfehlung |
-|--------|------------|
-| < 200 | `alwaysApply: true` — kein Problem |
-| 200–400 | Prüfen ob Inhalt wirklich immer relevant |
-| > 400 | `alwaysApply: false` empfohlen |
-| > 800 | Lazy-Load Pattern erwägen (siehe unten) |
-
-### Schritt 3 — Projekt-Override für einzelne Rules
+**Beispiel — Projekt-Override für einzelne Continue-Rules:**
 
 ```yaml
 # .meta-config/project.yaml
@@ -61,62 +73,52 @@ rules:
     alwaysApply: false   # ~900 Wörter, nur bei Package-Arbeit relevant
   homeassistant-energy-abstraction:
     alwaysApply: false   # ~480 Wörter, nur bei Energy-Features relevant
-  homeassistant-entity-data:
-    alwaysApply: false   # ~560 Wörter, situational
 ```
 
-Nach sync: Diese Rules werden nur geladen wenn Claude Code sie für den aktuellen Request
-als relevant erkennt (Keyword-Match im Kontext).
+Continue lädt diese Rules dann nur bei Keyword-Match.
 
 ---
 
-## Lazy-Load Pattern für sehr große Rules
+### Für andere Provider (Gemini, Copilot, Mammouth): Fallback `_wf-*.md` Pattern
 
-Analog zum `_wf-*.md` Pattern bei Agenten: Kern-Rule + ausgelagertes Workflow-Dokument.
+Falls ein Provider weder `channel: skill` noch `alwaysApply: false` effektiv nutzt, bleibt das manuelle Aufteilen großer Rules eine Option:
 
-**Vorher:** Eine große Rule mit allem:
-```
-homeassistant-package-structure.md   ← 900 Wörter, alwaysApply: true
-  → Core-Direktiven (100W) + Migration-Tabellen (400W) + Troubleshooting (400W)
-```
+**Kern-Rule + ausgelagertes Workflow-Dokument:**
 
-**Nachher:** Schlanke Core-Rule + lazy-geladenes Workflow-Doc:
 ```
-homeassistant-package-structure.md   ← ~150 Wörter, alwaysApply: true
+platform-rule.md                ← ~150 Wörter, alwaysApply: true
   → Nur Kern-Direktiven + Verweis auf Workflow
-_wf-ha-package-migration.md          ← ~750 Wörter, alwaysApply: false
-  → Migration-Workflow, Troubleshooting (nur bei Bedarf geladen)
+_wf-platform-migration.md       ← ~750 Wörter, alwaysApply: false
+  → Migration-Workflow, Troubleshooting (Lazy-Load)
 ```
 
 **Namens-Konvention:** `_wf-<platform>-<thema>.md` (Unterstrich-Prefix = Workflow-Datei)
 
-**Verweis in der Core-Rule:**
-```markdown
-# HA Package Structure
-
-[Kern-Direktiven hier — kurz, imperativ]
-
-Für Migration-Workflow und Troubleshooting:
-→ Lies `_wf-ha-package-migration.md` (Claude Code lädt bei Bedarf)
-```
+Diese Datei ist mittlerweile weitgehend durch `channel: skill` ersetzt worden (Claude Code) oder unnötig (Continue mit `alwaysApply`). Nur für exotische Provider noch relevant.
 
 ---
 
 ## Wann NICHT optimieren
 
-- Wenn eine Rule bei wirklich jedem Task relevant ist (z.B. `commit-conventions.md`) → `alwaysApply: true` behalten
-- Wenn das Projekt wenige Rules hat (< 5) → overhead vernachlässigbar
+- Wenn eine Rule bei wirklich jedem Task relevant ist (z.B. `commit-conventions.md`, `language.md`) → `alwaysApply: true` behalten
+- Wenn das Projekt wenige Rules hat (< 5) → Overhead vernachlässigbar
 - Wenn Token-Budget keine Rolle spielt → Standard-Preset reicht
 
 ---
 
-## Checkliste: Rules-Preset-Optimierung
+## Checkliste: Rules-Optimierung
 
-- [ ] `wc -w .claude/rules/*.md` ausgeführt — Rules > 400W identifiziert
-- [ ] `rules-preset: minimal` oder `silent` in project.yaml gesetzt
-- [ ] Große Platform Rules auf `alwaysApply: false` gesetzt
+### Claude Code / Opencode Projekte
+- [ ] `rules-preset: lazy` in `.meta-config/project.yaml` gesetzt
 - [ ] Sync ausgeführt: `py .agent-meta/scripts/sync.py`
+- [ ] Verifiziert: `.claude/skills/` enthält jetzt große Rules (z.B. `sync-interface/`, `architecture/`)
 - [ ] Getestet: Agenten erhalten bei typischen Requests noch die wichtigsten Rules
+
+### Continue Projekte
+- [ ] `wc -w .claude/rules/*.md` ausgeführt — Rules > 400W identifiziert
+- [ ] `rules-preset: minimal` oder `silent` in `.meta-config/project.yaml` gesetzt
+- [ ] Sync ausgeführt: `py .agent-meta/scripts/sync.py`
+- [ ] Getestet: Continue lädt große Rules nur bei Bedarf
 
 ---
 
