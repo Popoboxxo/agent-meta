@@ -1,4 +1,4 @@
-agent-meta-version: 0.95.1
+agent-meta-version: 0.96.0
 provider-isolation: disabled
 ai-providers:
 - Claude
