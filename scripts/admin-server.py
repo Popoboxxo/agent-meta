@@ -3831,16 +3831,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _compute_injection_drift(self) -> dict:
         """Return undeclared external-tool artifacts per active provider."""
-        root = self.__class__.root
+        project_root = self.__class__.root
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            sys.path.insert(0, str(project_root / "scripts"))
+            sys.path.insert(0, str(project_root / ".agent-meta" / "scripts"))
             from lib.external_tools import scan_injection_drift  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
+            # agent_meta_root, NOT project_root: in project_admin (submodule)
+            # mode the framework's config/ai-providers.yaml and
+            # config/external-tools-registry.yaml live under .agent-meta/,
+            # not the project root — passing project_root there silently
+            # finds nothing and produces false-positive "undeclared artifact"
+            # findings for every legitimately registered tool/provider.
+            agent_meta_root = self._agent_meta_root()
             project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-            findings = scan_injection_drift(root, root, project_config, provider_config)
+            provider_config = load_providers_config(agent_meta_root)
+            findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
             return {"findings": findings}
         except Exception as exc:  # noqa: BLE001
             return {"error": str(exc)}
