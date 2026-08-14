@@ -1,4 +1,5 @@
 """External skills: loading, commit checks, sync, add."""
+from __future__ import annotations
 
 import os
 import re
