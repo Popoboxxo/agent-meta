@@ -7,7 +7,7 @@ import stat
 import subprocess
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _write_yaml, safe_path
+from .io import _load_yaml_or_json, _normalize_enabled_config, _write_yaml, safe_path
 from .log import SyncLog
 
 EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
@@ -31,18 +31,6 @@ def _rmtree_force(path) -> None:
     shutil.rmtree(path, onerror=_on_error)
 
 
-def _normalize_project_skills(raw) -> dict:
-    """Normalize project external-skills config to dict format.
-
-    Accepts both legacy list format ['skill-a', 'skill-b'] and
-    canonical dict format {'skill-a': {'enabled': True}}.
-    Returns dict format always.
-    """
-    if isinstance(raw, list):
-        return {name: {"enabled": True} for name in raw}
-    if isinstance(raw, dict):
-        return raw
-    return {}
 
 
 def _read_skills_managed_index(skills_dir: Path) -> set[str]:
@@ -359,7 +347,7 @@ def sync_external_skills_for_provider(
     ext_config = load_external_skills_config(agent_meta_root)
     skills = ext_config.get("skills", {})
     repos = ext_config.get("repos", {})
-    project_skills = _normalize_project_skills(config.get("external-skills", {}))
+    project_skills = _normalize_enabled_config(config.get("external-skills", {}))
 
     # Collect active repos for dynamic cloning/submodule
     active_repos = {}

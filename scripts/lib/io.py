@@ -11,6 +11,37 @@ from pathlib import Path
 class SyncError(Exception):
     """Fatal sync error — sync cannot continue safely."""
 
+
+def _normalize_enabled_config(raw) -> dict:
+    """Normalize a project activation config to dict format.
+
+    Accepts both the flat list shorthand ['name-a', 'name-b'] (alias for
+    {'name-a': {'enabled': True}, 'name-b': {'enabled': True}}) and the
+    canonical dict form {'name': {'enabled': True|False, ...}}. Shared by
+    every registry with this activation shape (external-skills, external-
+    tools, ...) — previously duplicated verbatim in each.
+    """
+    if isinstance(raw, list):
+        return {name: {"enabled": True} for name in raw}
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+def _deep_merge(dict1: dict, dict2: dict) -> dict:
+    """Recursively merge dict2 into dict1. Mutates and returns dict1.
+
+    Shared by every registry loader that layers project overrides onto a
+    framework default (mcp.py, external_tools.py, ...) — previously
+    duplicated verbatim in each.
+    """
+    for k, v in dict2.items():
+        if isinstance(v, dict) and k in dict1 and isinstance(dict1[k], dict):
+            _deep_merge(dict1[k], v)
+        else:
+            dict1[k] = v
+    return dict1
+
 try:
     import yaml as _yaml
     _YAML_AVAILABLE = True
