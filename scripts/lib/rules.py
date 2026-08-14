@@ -200,7 +200,14 @@ def sync_rules(
     # Override hint if main-chat mode is active
     if _orch_mode == "main-chat":
         provider_vars["ORCHESTRATOR_INVOCATION_HINT"] = "- Du bist der Orchestrator! Befolge die Regeln in use-orchestrator.md."
-        
+
+    # Deferred import: avoids a circular import at module load time (mcp.py
+    # itself imports resolve_rules from this module, deferred the same way).
+    from .mcp import build_mcp_guardrails_list, load_mcp_registry, resolve_active_mcp_servers
+    mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    active_mcp_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
+    provider_vars['MCP_GUARDRAILS_LIST'] = build_mcp_guardrails_list(mcp_registry, active_mcp_servers)
+
     merged_vars = {**variables, **provider_vars} if variables is not None else provider_vars
 
     platforms = config.get("platforms", [])

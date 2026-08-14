@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from scripts.lib.log import SyncLog
-from scripts.lib.mcp import _update_json_config, generate_provider_configs
+from scripts.lib.mcp import _update_json_config, build_mcp_guardrails_list, generate_provider_configs
 from scripts.lib.providers import load_providers_config
 
 
@@ -172,3 +172,45 @@ def test_generate_provider_configs_warns_about_leftover_mcp_servers_key(tmp_path
     )
 
     assert any("leftover 'mcpServers'" in w for w in log.warnings)
+
+
+# ---------------------------------------------------------------------------
+# build_mcp_guardrails_list — generated (not hand-maintained) hard-prohibitions
+# ---------------------------------------------------------------------------
+
+def test_build_mcp_guardrails_list_renders_active_servers_with_blocked_tools():
+    registry = {
+        "honcho": {"tools": {"blocked": ["delete_conclusion", "set_config"]}},
+        "playwright": {"tools": {"blocked": ["browser_evaluate"]}},
+        "reqflow": {"tools": {"blocked": ["issue.delete"]}},  # not active
+    }
+    result = build_mcp_guardrails_list(registry, ["honcho", "playwright"])
+    lines = result.splitlines()
+    assert lines == [
+        "- **honcho:** `delete_conclusion`, `set_config` — absolut verboten.",
+        "- **playwright:** `browser_evaluate` — absolut verboten.",
+    ]
+
+
+def test_build_mcp_guardrails_list_sorted_regardless_of_input_order():
+    registry = {
+        "zserver": {"tools": {"blocked": ["z_tool"]}},
+        "aserver": {"tools": {"blocked": ["a_tool"]}},
+    }
+    result = build_mcp_guardrails_list(registry, ["zserver", "aserver"])
+    assert result.splitlines()[0].startswith("- **aserver:**")
+
+
+def test_build_mcp_guardrails_list_excludes_servers_without_blocked_tools():
+    registry = {
+        "honcho": {"tools": {"blocked": ["delete_conclusion"]}},
+        "viz-logger": {"tools": {"allowed": ["log_event"]}},  # no blocked list
+    }
+    result = build_mcp_guardrails_list(registry, ["honcho", "viz-logger"])
+    assert "viz-logger" not in result
+    assert "honcho" in result
+
+
+def test_build_mcp_guardrails_list_empty_when_no_active_server_has_blocked_tools():
+    result = build_mcp_guardrails_list({}, [])
+    assert result == "- (keine aktiven MCP-Server mit gesperrten Tools)"
