@@ -7,6 +7,7 @@ dod-criteria.md
 issue-lifecycle.md
 language.md
 lifecycle-tasks.md
+mcp-guardrails.md
 no-worktree-isolation.md
 provider-agnostic.md
 python-conventions.md
@@ -14,4 +15,5 @@ session-conclusion.md
 speech-mode.md
 submodule-protection.md
 sync-interface.md
+use-lazy-rules.md
 use-orchestrator.md

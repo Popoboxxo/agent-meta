@@ -116,8 +116,8 @@ from lib.providers import (
 from lib.roles import build_role_map
 from lib.rules import create_rule, resolve_rules, sync_rules, sync_speech_mode
 from lib.schema import update_roles_enum
+from lib.skill_admin import add_skill
 from lib.skills import (
-    add_skill,
     check_pinned_commits,
     load_external_skills_config,
     sync_external_skills_for_provider,

@@ -59,16 +59,37 @@ def _read_skills_managed_index(skills_dir: Path) -> set[str]:
     }
 
 
-def _write_skills_managed_index(skills_dir: Path, now_managed: set[str], dry_run: bool) -> None:
-    """Write the .agent-meta-managed index for skills_dir.
+def _write_skills_managed_index(
+    skills_dir: Path,
+    now_managed: set[str],
+    dry_run: bool,
+    universe: set[str] | None = None,
+) -> None:
+    """Write (or merge into) the .agent-meta-managed index for skills_dir.
 
-    Skips if dry_run is True or if now_managed is empty.
+    skills_dir has two independent writers now: external-skill sync (this
+    module) and the lazy-rules 'channel: skill' mechanism (see
+    scripts/lib/skill_channel.py). universe=None (default): full replace —
+    legacy behavior, skipped if now_managed is empty. universe=<set>: merge
+    mode — only entries within `universe` (this caller's own name-space) are
+    added/removed, so another writer's entries in the same shared index
+    survive untouched.
     """
-    if dry_run or not now_managed:
+    if dry_run:
         return
     managed_index_path = skills_dir / ".agent-meta-managed"
+    if universe is None:
+        if not now_managed:
+            return
+        merged = set(now_managed)
+    else:
+        existing = _read_skills_managed_index(skills_dir)
+        merged = (existing - universe) | now_managed
     managed_index_path.parent.mkdir(parents=True, exist_ok=True)
-    managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    if merged:
+        managed_index_path.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
+    elif managed_index_path.exists():
+        managed_index_path.unlink()
 
 
 def _skill_is_active(skill_name: str, skill_cfg: dict, project_skills: dict) -> bool:
@@ -494,7 +515,7 @@ def sync_external_skills_for_provider(
                         af_source.read_text(encoding="utf-8"), encoding="utf-8"
                     )
 
-    _write_skills_managed_index(skills_dir, now_managed, dry_run)
+    _write_skills_managed_index(skills_dir, now_managed, dry_run, universe=set(skills.keys()))
 
     # Deinit repos that are no longer needed by any active skill
     is_project_admin = agent_meta_root != project_root
@@ -518,100 +539,3 @@ def sync_external_skills_for_provider(
         acc_local = acc_cfg.get("local_path", "external/awesome-claude-code")
         deinit_skill_repo(agent_meta_root, project_root, acc_local, log, dry_run, is_submodule=is_project_admin)
 
-
-def add_skill(
-    agent_meta_root: Path,
-    repo_url: str,
-    skill_name: str,
-    source_path: str,
-    role: str,
-    entry: str,
-    log: SyncLog,
-    dry_run: bool,
-):
-    """Register a new submodule + skill entry in external-skills.config.yaml.
-
-    Runs: git submodule add <repo_url> external/<submodule_name>
-    Then updates external-skills.config.yaml (or .json fallback) with the new entry.
-    """
-    import json
-    import sys
-
-    # Derive submodule name from repo URL (last path segment without .git)
-    submodule_name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
-    local_path = f"external/{submodule_name}"
-
-    # Run git clone (skip if already exists)
-    submodule_target = agent_meta_root / local_path
-    if submodule_target.exists():
-        print(f"  i  Repo clone already exists: {local_path}")
-    else:
-        print(f"  >  git clone {repo_url} {local_path}")
-        if not dry_run:
-            result = subprocess.run(  # noqa: PLW1510
-                ["git", "clone", repo_url, local_path],
-                cwd=str(agent_meta_root),
-                capture_output=False,
-            )
-            if result.returncode != 0:
-                print("  !  git clone failed", file=sys.stderr)
-                return
-
-    # Update config/skills-registry.yaml (or legacy fallback)
-    yaml_path = agent_meta_root / EXTERNAL_SKILLS_CONFIG
-    legacy_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_LEGACY
-    json_path = agent_meta_root / _EXTERNAL_SKILLS_CONFIG_JSON
-
-    try:
-        import yaml as _yaml
-        _yaml_available = True
-    except ImportError:
-        _yaml_available = False
-
-    if yaml_path.exists() and _yaml_available:
-        config_path = yaml_path
-        with config_path.open(encoding="utf-8") as f:
-            raw = _yaml.safe_load(f) or {}
-    elif legacy_path.exists() and _yaml_available:
-        config_path = yaml_path  # write to new path even when reading legacy
-        with legacy_path.open(encoding="utf-8") as f:
-            raw = _yaml.safe_load(f) or {}
-    elif json_path.exists():
-        config_path = json_path
-        with config_path.open(encoding="utf-8") as f:
-            raw = json.load(f)
-    else:
-        config_path = yaml_path
-        raw = {"repos": {}, "skills": {}}
-
-    # Capture current commit for pinning
-    actual_commit = get_skill_commit(agent_meta_root, local_path)
-
-    raw.setdefault("repos", {})[submodule_name] = {
-        "repo": repo_url,
-        "local_path": local_path,
-        "pinned_commit": actual_commit,
-    }
-    raw.setdefault("skills", {})[skill_name] = {
-        "approved": False,
-        "repo": submodule_name,
-        "source": source_path,
-        "entry": entry,
-        "role": role,
-        "name": skill_name.replace("-", " ").title(),
-        "description": f"Specialist for {skill_name}.",
-        "additional_files": [],
-    }
-
-    log.action("UPDATE", EXTERNAL_SKILLS_CONFIG,
-               f"added repo '{submodule_name}' @{actual_commit[:8]}, skill '{skill_name}'")
-    if not dry_run:
-        if config_path.suffix.lower() in (".yaml", ".yml"):
-            _write_yaml(config_path, raw)
-        else:
-            with config_path.open("w", encoding="utf-8") as f:
-                json.dump(raw, f, indent=2, ensure_ascii=False)
-        print(f"  +  {config_path.name} updated")
-        print(f"  i  Repo '{submodule_name}' pinned to commit {actual_commit[:8]}")
-        print(f"  i  Skill '{skill_name}' added (approved: false) → role: '{role}'")
-        print(f"  i  To activate: set enabled: true in .meta-config/project.yaml (or approved: true in registry)")

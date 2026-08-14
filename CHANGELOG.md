@@ -3,6 +3,46 @@
 ## [Unreleased]
 
 ### Added
+- Token-efficiency lazy-rules mechanism: a fresh token measurement (tiktoken cl100k as
+  proxy) showed the `rules-preset: silent` mechanism was actually *worse* than `default`
+  on Claude Code (9.421 vs. 9.358 tokens always-on) because `alwaysApply: false` is a
+  Cursor/Continue frontmatter convention Claude Code silently ignores — `.claude/rules/*.md`
+  is always loaded in full regardless. The only real Claude Code lazy-load channel is
+  `.claude/skills/<name>/SKILL.md` (only `name` + `description` land in the system prompt,
+  the body loads on demand via `Read`, available to every generated agent since all 50 have
+  the `Read` tool even without the `Skill` tool). New `channel: skill` rule-option
+  (`config/rules-presets.yaml`) routes a rule to `<skills_dir>/<rule-stem>/SKILL.md` instead
+  of `<rules_dir>/<rule-stem>.md`, restricted to Claude + Opencode (`scripts/lib/skill_channel.py`,
+  new shared module also used by `scripts/lib/mcp.py` and `scripts/lib/external_tools.py` so
+  MCP- and external-tool-generated rules can opt in too); other providers keep the plain
+  rules_dir file unchanged. New `lazy` preset moves 15 situational rules (sync-interface,
+  architecture, conventions, submodule-protection, a2a-delegation-gates, python-conventions,
+  issue-lifecycle, lifecycle-tasks, session-conclusion, provider-agnostic, mcp-reqogniloom,
+  mcp-honcho, mcp-playwright, mcp-viz-logger, tool-graphify) to the skill channel; a new
+  always-on `rules/1-generic/mcp-guardrails.md` keeps the hard MCP tool prohibitions
+  (honcho/reqogniloom/playwright) visible without the full tool-list detail, and a new
+  always-on `rules/1-generic/use-lazy-rules.md` indexes all 15 skill paths. `_ALWAYS_APPLY_PROVIDERS`
+  in `scripts/lib/rules.py` dropped Claude (verified no-op there) — only Continue honors
+  `alwaysApply: false`, and it now also gets a `description:` in the injected frontmatter
+  (previously missing, which silently prevented Continue's own lazy-loading from working).
+  This repo dogfoods the new preset (`rules-preset: lazy`); measured always-on budget after
+  the switch: see CI/verification notes.
+- Stale-cleanup for `mcp-<server>.md` / `tool-<name>.md` rule files (`scripts/lib/mcp.py`,
+  `scripts/lib/external_tools.py`): both write loops previously had no cleanup path when a
+  server/tool was deactivated or removed from its registry, unlike `rules.py::sync_rules()`'s
+  `previously_managed`/`now_managed` diff — the orphaned rule file just stayed on disk
+  forever (e.g. `mcp-reqflow.md`, still present in `.claude/rules/` and `.gemini/rules/`
+  from a server no longer referenced anywhere). Both now maintain their own
+  `.agent-meta-managed-mcp` / `.agent-meta-managed-tools` sidecar index (new shared helpers
+  in `scripts/lib/rule_index.py`) and delete stale files on the next sync; a content-marker
+  check on the first-run bootstrap glob avoids false-positive sweeps of unrelated
+  same-prefixed files (e.g. the new `mcp-guardrails.md`).
+- Intent-routing table in `use-orchestrator.md` (`scripts/lib/delegation_table.py`) now
+  lists only pipeline rows — per-agent routing rows were pure duplication of each active
+  agent's name + description already shown in the system prompt (Claude/Opencode), and
+  pipelines aren't represented there. A compact `**Tiers**` summary line (required/
+  recommended agent names, computed from `role-defaults.yaml` at sync time) replaces the
+  removed rows so tier coverage stays visible at a glance.
 - External Dev-Tool Registry (`config/external-tools-registry.yaml`): known locally-installed CLI dev-tools (e.g. `graphify`) can now contribute a rule-doc section (`.claude/rules/tool-<name>.md`, or embedded into `AGENTS.md`'s managed block for providers without a native rules dir) and hook wiring (`hooks/0-external/*.sh`), rendered deterministically by `sync.py` from a maintainer-curated, version-controlled registry entry — instead of the tool hand-editing generated files at runtime (which happened this session: `graphify`'s self-installer directly appended a section to `CLAUDE.md` and added hook entries to `.claude/settings.json`, violating the "CLAUDE.md is auto-generated, never hand-edit" invariant). New `scripts/lib/external_tools.py` mirrors the existing MCP-registry pipeline (`scripts/lib/mcp.py`); activation is dict-based (`external-tools: { <name>: { enabled: true|false } }` in `.meta-config/project.yaml`, flat-array shorthand still supported) so a framework-default-on tool can be explicitly disabled per project, not just additively enabled — mirrors `external-skills`' activation format rather than `mcp-servers`' flat allowlist. New Admin UI panel ("External Tools") reuses the existing generic `renderOverridePanel()`/`PUT /api/config/project/section` pattern. Shipped with one real, dogfooded entry (`graphify`, rule-content only — its hooks stay opt-in/disabled by default in this repo).
 
 ### Fixed

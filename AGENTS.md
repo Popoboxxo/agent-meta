@@ -89,6 +89,21 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 ## Regeln
 
+# A2A Anti-Re-Delegation Gates
+
+1. Limit depth to 10, no self-handoff.
+2. Short payload: `payload.t` max 300 Zeichen.
+3. No Re-Delegation (payload starts with "Du bist...").
+4. Singleton Orchestrator: NUR der `main_chat` darf den `orchestrator` spawnen.
+5. Execution-Trace-Isolation: Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
+
+## Bekannte Grenzen
+
+- **Tiefenlimit (Punkt 1) ist modellbasiert, keine technische Barriere.** Eine passende Implementierung existiert (`validate_envelope(max_depth=...)` in `scripts/lib/delegation_syntax.py`), wird aber im aktiven Delegationspfad nirgends aufgerufen. Die Regel verlässt sich auf Modell-Gehorsam, nicht auf Enforcement.
+- **Singleton-Orchestrator (Punkt 4) wird nur über eine Selbstdeklaration der Agenten-Identität gestützt** (`#agent-meta:agent=<name>` in `.claude/hooks/orchestrator-guard.sh`), die im Hook-Quelltext selbst als "soft, self-reported convention, not a security boundary" dokumentiert ist. Jeder Agent kann sich technisch als privilegiert deklarieren.
+
+
+
 # Branch-Guard
 
 Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
@@ -108,6 +123,12 @@ Format: `<type>: <beschreibung>` (Bsp: `feat: ...`)
 
 
 
+# Definition of Done (DoD)
+
+Pflicht: Code komplett, Konventionen & Conv. Commits eingehalten, keine Regressions.
+
+
+
 # GitHub Issue Lifecycle
 
 Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
@@ -123,6 +144,83 @@ Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #1
 | Externe Doku | **Englisch** |
 | Interne Doku | **Deutsch** |
 | Code/Commits | **Englisch** |
+
+
+
+# Lifecycle-Tasks
+
+Beim Start prüfen: existiert `.gemini/pending-tasks.md`?
+Falls ja und enthält `- [ ]`: User fragen ob delegiert werden soll.
+Nach Erledigung: löschen. Datei nicht committen.
+
+
+
+# MCP Hard Prohibitions
+
+> Kurzfassung der harten Tool-Verbote aktiver MCP-Server. Vollständige Tool-Listen und
+> Hinweise: siehe `.claude/skills/mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
+
+- **honcho:** `delete_conclusion`, `set_config` — absolut verboten.
+- **reqogniloom:** `workspace.close|reactivate|delete`, alle `permissions.*`, `admin.*`, `audit.*`, `events.dlq_*`, alle `user.*` — absolut verboten.
+- **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
+
+
+
+# No Worktree Isolation
+
+**Anti-Pattern:** Niemals das Argument `isolation: "worktree"` beim Spawnen von Subagenten verwenden.
+**Grund:** Agenten schreiben dann ihren Output in den internen Ordner `.claude/worktrees/agent-<id>/` anstatt in das eigentliche Projektverzeichnis. Das führt zu fehlgeleiteten Dateien und Datenverlust in der eigentlichen Codebase.
+
+Alle Agenten müssen direkt im Projektverzeichnis arbeiten (Isolation deaktivieren oder weglassen). Der `.claude/` Ordner (sowie `.gemini/`, `.continue/`, `.mammouth/` etc.) ist strikt als Infrastruktur-Ordner zu betrachten und darf nicht für Arbeitskopien missbraucht werden.
+
+
+
+# Python Conventions
+
+PEP8 einhalten. Type Hints (typing) verwenden. Docstrings für Klassen/Methoden schreiben.
+
+
+
+# Session-Abschluss
+
+Delegate Session-Zusammenfassung an `documenter` am Ende großer Features, um CODEBASE_OVERVIEW.md aktuell zu halten.
+
+
+
+# Submodule-Schutzkonzept
+
+Regeln für den Umgang mit allen Git-Submodulen (`.agent-meta/`, `external/*/`, und alle weiteren in `.gitmodules`):
+
+- **Keine direkten Änderungen in Submodul-Verzeichnissen:** Dateien in `.agent-meta/`, `external/*/` und allen anderen Submodul-Pfaden dürfen in Konsumenten-Repositories niemals direkt editiert oder committet werden. Submodule sind separate Repositories mit eigenem Lifecycle (Build, Push, Deploy, Version-Tags). Änderungen MÜSSEN im Submodul-Repo selbst durchgeführt, committet und gepusht werden — danach aktualisiert das Parent-Repo die Pinned-Commit-Referenz.
+- **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden.
+- **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks.
+- **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden.
+
+
+
+# Lazy-Loaded Rules
+
+> Nicht immer geladen — bei Bedarf per `Read` öffnen: `.claude/skills/<skill>/SKILL.md`.
+
+| Skill | Wann |
+|---|---|
+| sync-interface | sync.py, Templates/Rules ändern |
+| architecture | Templates/Overrides/Placeholder ändern |
+| conventions | Vor Commits in agents/, config/, scripts/lib |
+| submodule-protection | .agent-meta/, external/, .gitmodules |
+| a2a-delegation-gates | A2A-Delegation an Subagenten |
+| python-conventions | Python-Code |
+| issue-lifecycle | GitHub-Issue |
+| lifecycle-tasks | Session-Start, pending-tasks.md vorhanden |
+| session-conclusion | Feature-Abschluss |
+| provider-agnostic | agents/1-generic editieren |
+| mcp-reqogniloom | ReqogniLoom-MCP-Tools |
+| mcp-honcho | Honcho-MCP-Memory-Tools |
+| mcp-playwright | Playwright-MCP-Browser-Tools |
+| mcp-viz-logger | viz-logger Event-Logging |
+| tool-graphify | Architektur-/Datei-Fragen mit graphify |
+
+Harte MCP-Tool-Verbote: siehe `mcp-guardrails.md` (always-on).
 
 
 

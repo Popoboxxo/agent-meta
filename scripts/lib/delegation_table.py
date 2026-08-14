@@ -54,38 +54,45 @@ def get_intent_routing_table(
     variables: dict,
     pipelines: dict | None = None,
 ) -> str:
-    """Generate the INTENT_ROUTING_TABLE from active roles and, optionally, pipelines."""
+    """Generate the INTENT_ROUTING_TABLE: pipeline routing rows + a Tiers summary.
+
+    Per-agent routing rows were dropped (token-efficiency review, 2026-08-14):
+    each active agent's name + description already appears in the system
+    prompt (Claude/Opencode), so a keyword->agent row in this table was pure
+    duplication. Pipelines are NOT represented in the system prompt, so those
+    rows stay. A compact 'Tiers' line replaces the removed per-agent rows so
+    required/recommended coverage is still visible at a glance.
+    """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
     active_agents_data = get_active_agents_data(agent_meta_root, config, variables)
     active_agent_names = {agent["name"] for agent in active_agents_data}
 
+    required = sorted(
+        name for name in active_agent_names
+        if roles.get(name, {}).get("workflow_tier", "optional") == "required"
+    )
+    recommended = sorted(
+        name for name in active_agent_names
+        if roles.get(name, {}).get("workflow_tier", "optional") == "recommended"
+    )
+
     table_lines = [
         "> Parallel ist rein informativ — kein Runtime-Enforcement, nur CI-Konsistenzcheck bei required/recommended-Tier-Abdeckung.",
         "",
+    ]
+    if required or recommended:
+        rec_str = ", ".join(f"`{n}`" for n in recommended) or "—"
+        req_str = ", ".join(f"`{n}`" for n in required) or "—"
+        table_lines.append(f"**Tiers** (nicht gelistet = optional): recommended: {rec_str} | required: {req_str}")
+        table_lines.append("")
+
+    table_lines += [
         "| Intent / Keywords | Agent | Tier | Parallel |",
         "|-------------------|-------|------|----------|"
     ]
 
     has_entries = False
-    for role_name in sorted(roles.keys()):
-        if role_name not in active_agent_names:
-            continue
-        
-        role_info = roles[role_name]
-        routing = role_info.get("routing", {})
-        intent_keywords = routing.get("intent_keywords", [])
-        
-        if not intent_keywords:
-            continue
-            
-        tier = role_info.get("workflow_tier", "optional")
-        parallel = "yes" if routing.get("parallel", False) else "no"
-        
-        keywords_str = ", ".join(intent_keywords)
-        table_lines.append(f"| {keywords_str} | `{role_name}` | {tier} | {parallel} |")
-        has_entries = True
-
     for pipeline_name in sorted((pipelines or {}).keys()):
         pipeline_info = pipelines[pipeline_name]
         signal_keywords = pipeline_info.get("signal_keywords", [])
@@ -95,7 +102,7 @@ def get_intent_routing_table(
         table_lines.append(f"| {keywords_str} | → Pipeline: `{pipeline_name}` | pipeline | no |")
         has_entries = True
 
-    if not has_entries:
+    if not has_entries and not (required or recommended):
         return ""
 
     return "\n".join(table_lines) + "\n"

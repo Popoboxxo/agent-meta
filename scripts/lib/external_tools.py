@@ -16,6 +16,10 @@ Public interface:
         → list of active tool names
     generate_external_tool_artifacts(...)
         → writes .claude/rules/tool-<name>.md for providers with has_rules
+    scan_injection_drift(...) / render_injection_drift_artifacts(...)
+        → thin re-exports of scripts/lib/external_tools_drift.py (split out
+          to keep this module under the <=600-line convention; see that
+          module's docstring)
 """
 from __future__ import annotations
 
@@ -23,6 +27,7 @@ from pathlib import Path
 
 from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
 
 EXTERNAL_TOOLS_REGISTRY_YAML = "config/external-tools-registry.yaml"
 TOOL_RULE_PREFIX = "tool-"
@@ -30,8 +35,10 @@ EXTERNAL_HOOKS_DIR = "hooks/0-external"
 # Fallback rules directory for providers without an explicit rules_dir (Claude).
 # Mirrors mcp.DEFAULT_RULES_DIR to keep tool rule output aligned with sync_rules().
 DEFAULT_RULES_DIR = ".claude/rules"
-DRIFT_FILENAME = "external-tools-drift.md"
-_DRIFT_CAP = 10
+# Own managed-index filename for tool-*.md rule files — deliberately separate
+# from rules.py's ".agent-meta-managed" and mcp.py's ".agent-meta-managed-mcp"
+# so the three independent write loops never fight over the same index file.
+TOOLS_MANAGED_INDEX_FILENAME = ".agent-meta-managed-tools"
 
 
 # ---------------------------------------------------------------------------
@@ -276,12 +283,23 @@ def generate_external_tool_artifacts(
     """Generate external-tool rule files for all active tools.
 
     For providers with has_rules: writes .claude/rules/tool-<name>.md for every
-    active tool not skipped for this provider. Warns when a tool declares a hook
-    stem that has no matching hooks/0-external/<stem>.sh file. The hook wrapper
+    active tool not skipped for this provider — or <skills_dir>/tool-<name>/
+    SKILL.md instead when rules-presets.yaml flags rule stem 'tool-<name>'
+    with channel: skill for a provider that supports it (see
+    scripts/lib/skill_channel.py). Warns when a tool declares a hook stem
+    that has no matching hooks/0-external/<stem>.sh file. The hook wrapper
     .sh files themselves are deployed independently by sync_hooks() (all
     0-external hooks are always copied; registration in settings.json stays
     opt-in per project).
     """
+    from .rules import resolve_rules
+    from .skill_channel import (
+        cleanup_stale_skill_channel_rules,
+        provider_supports_skill_channel,
+        write_skill_channel_managed_index,
+        write_skill_channel_rule,
+    )
+
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
     if not registry:
         return
@@ -308,10 +326,30 @@ def generate_external_tool_artifacts(
     if not pc.get("has_rules"):
         return
 
+    rule_options = resolve_rules(config, agent_meta_root)
+    supports_skill_channel = provider_supports_skill_channel(provider, pc)
+    skills_dir_rel = pc.get("skills_dir")
+    skills_target_dir = (
+        (project_root / skills_dir_rel) if (skills_dir_rel and supports_skill_channel) else None
+    )
+    all_tool_rule_stems = {f"{TOOL_RULE_PREFIX}{t}" for t in registry}
+    now_managed_skill_rules: set[str] = set()
+
     effective_rules_dir = rules_dir or DEFAULT_RULES_DIR
     target_dir = project_root / effective_rules_dir
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
+
+    managed_index_path = target_dir / TOOLS_MANAGED_INDEX_FILENAME
+    previously_managed = bootstrap_previously_managed(
+        target_dir, managed_index_path, f"{TOOL_RULE_PREFIX}*.md",
+        # "tool-*.md" isn't an exclusive namespace — see mcp.py's identical
+        # comment on its own bootstrap call for why an unmarked glob match
+        # is not safe to treat as previously managed.
+        content_marker="config/external-tools-registry.yaml` — "
+                        "nicht manuell bearbeiten",
+    )
+    now_managed: set[str] = set()
 
     for tool_name in active_tools:
         tool_def = registry.get(tool_name)
@@ -320,274 +358,65 @@ def generate_external_tool_artifacts(
         if provider in tool_def.get("provider-skip", []):
             continue
 
-        filename = f"{TOOL_RULE_PREFIX}{tool_name}.md"
-        target_path = safe_path(target_dir, filename)
+        rule_stem = f"{TOOL_RULE_PREFIX}{tool_name}"
+        opts = rule_options.get(rule_stem, {})
         content = _generate_tool_rule_content(tool_name, tool_def, pc, project_root)
-        rel_out = str(target_path.relative_to(project_root))
         src_label = f"external-tools-registry/{tool_name}"
+
+        if opts.get("channel") == "skill" and skills_target_dir is not None:
+            now_managed_skill_rules.add(rule_stem)
+            write_skill_channel_rule(
+                rule_stem, content, opts, skills_target_dir, project_root,
+                log, dry_run, src_label,
+            )
+            continue
+
+        filename = f"{rule_stem}.md"
+        target_path = safe_path(target_dir, filename)
+        rel_out = str(target_path.relative_to(project_root))
+        now_managed.add(filename)
 
         if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
             log.action("WRITE", rel_out, src_label)
         else:
             log.skip(rel_out, "unchanged")
 
+    # Remove stale tool-*.md rule files no longer covered by the current
+    # active-tool list (tool deactivated in project.yaml or removed from
+    # external-tools-registry.yaml).
+    cleanup_stale_managed_files(
+        target_dir, project_root, previously_managed, now_managed, log, dry_run,
+        "external tool no longer active/registered",
+    )
+    write_managed_index(managed_index_path, now_managed, dry_run)
 
-# ---------------------------------------------------------------------------
-# Drift artifact rendering
-# ---------------------------------------------------------------------------
-
-def _generate_drift_content(findings: list[dict]) -> str:
-    """Generate Markdown content for external-tools-drift.md from findings."""
-    lines = [
-        "# External-Tool Injection Drift", "",
-        "> Automatisch erkannt von `check_injection_drift` — Fremd-Artefakte, die keinem "
-        "aktiven Tool in `config/external-tools-registry.yaml` als `permitted-injections` "
-        "deklariert sind. Nur Warnung, kein automatisches Eingreifen.",
-        "", "---", "",
-    ]
-    shown = findings[:_DRIFT_CAP]
-    for f in shown:
-        tool_label = f["tool"] or "keinem registrierten Tool zugeordnet"
-        lines.append(f"- `{f['path']}` ({f['kind']}) — {tool_label}")
-    remaining = len(findings) - len(shown)
-    if remaining > 0:
-        lines.append(f"- … {remaining} weitere, siehe sync.log")
-    lines.append("")
-    return "\n".join(lines) + "\n"
-
-
-def render_injection_drift_artifacts(
-    findings_by_provider: dict[str, list[dict]],
-    project_root: Path,
-    provider_config: dict,
-    log: SyncLog,
-    dry_run: bool,
-) -> None:
-    """Render sparse external-tools-drift.md files when drift is detected.
-
-    For each provider with has_rules: True, if findings exist, write
-    .claude/rules/external-tools-drift.md (capped at 10 items). If no
-    findings exist, delete the file if present. Warnings are logged for all
-    findings regardless of has_rules setting. Uses write_checked for
-    idempotence.
-    """
-    for provider, findings in findings_by_provider.items():
-        pc = provider_config.get(provider, {})
-
-        # Log warnings for all findings unconditionally.
-        for f in findings:
-            log.warning(
-                f"external-tools: undeclared artifact '{f['path']}' ({f['kind']}) for provider "
-                f"'{provider}' — not covered by any active tool's permitted-injections"
-            )
-
-        # Skip file rendering for providers without has_rules capability.
-        if not pc.get("has_rules"):
-            continue
-
-        rules_dir = project_root / pc.get("rules_dir", DEFAULT_RULES_DIR)
-        target_path = rules_dir / DRIFT_FILENAME
-
-        if not findings:
-            if target_path.exists():
-                log.action("DELETE", str(target_path.relative_to(project_root)), "no drift found")
-                if not dry_run:
-                    target_path.unlink()
-            continue
-
-        content = _generate_drift_content(findings)
-        rel_out = str(target_path.relative_to(project_root))
-
-        if not dry_run:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if write_checked(target_path, content, log, "external-tools-drift", dry_run=dry_run):
-            log.action("WRITE", rel_out, "external-tools-drift")
-        else:
-            log.skip(rel_out, "unchanged")
+    if skills_target_dir is not None:
+        cleanup_stale_skill_channel_rules(
+            skills_target_dir, project_root, all_tool_rule_stems, now_managed_skill_rules,
+            log, dry_run, "external tool rule no longer routed to channel: skill",
+        )
+        write_skill_channel_managed_index(
+            skills_target_dir, now_managed_skill_rules, dry_run, universe=all_tool_rule_stems
+        )
 
 
 # ---------------------------------------------------------------------------
-# Injection drift scanning
+# Injection drift — thin re-exports (see external_tools_drift.py)
 # ---------------------------------------------------------------------------
+# Deferred imports (inside the function body, not at module top-level):
+# external_tools_drift.py imports concrete registry/activation helpers from
+# *this* module at its own top level, so a top-level import in the other
+# direction here would be a circular import. Deferring until call-time avoids
+# that while keeping both names importable from scripts.lib.external_tools
+# for existing callers (sync.py, admin-server.py, tests).
 
-def _read_managed_index(dir_path: Path) -> set[str]:
-    index_path = dir_path / ".agent-meta-managed"
-    if not index_path.exists():
-        return set()
-    return {
-        line.strip() for line in index_path.read_text(encoding="utf-8").splitlines() if line.strip()
-    }
-
-
-# Top-level entries under a provider's infra root that agent-meta itself may
-# place there, independent of the four managed subdirs. Keyed by the
-# provider_config field that names each one; a field absent from `pc` is
-# skipped (not every provider has every capability).
-_INFRA_ROOT_KNOWN_KEYS = [
-    "agents_dir", "hooks_dir", "rules_dir", "commands_dir", "skills_dir",
-    "snippets_dir", "extension_dir", "artifact_dir", "checkpoint_dir",
-    "settings_file", "pending_tasks_file",
-]
-# Per-provider hardcoded fallback dirs for capability-gated keys that some
-# providers (Claude, Continue) never store in ai-providers.yaml, relying
-# instead on a literal default in the sync code itself (dir_specs above /
-# lib.commands.sync_commands_for_provider). Without this, the fallback
-# directory is agent-meta's own managed dir, but scan_injection_drift has no
-# key to read its name from and misreports it as a top-level foreign "other"
-# finding.
-_INFRA_ROOT_FALLBACK_DIRS = {
-    "hooks_dir": {"Claude": ".claude/hooks"},
-    "rules_dir": {"Claude": DEFAULT_RULES_DIR},
-    "commands_dir": {"Claude": ".claude/commands", "Continue": ".continue/prompts"},
-}
+def scan_injection_drift(*args, **kwargs):
+    """Re-export of external_tools_drift.scan_injection_drift()."""
+    from .external_tools_drift import scan_injection_drift as _impl
+    return _impl(*args, **kwargs)
 
 
-def scan_injection_drift(
-    agent_meta_root: Path,
-    project_root: Path,
-    config: dict,
-    provider_config: dict,
-) -> dict[str, list[dict]]:
-    """Find files/dirs under each active provider's infra root that neither
-    agent-meta itself manages (per-directory .agent-meta-managed indexes) nor
-    any active external tool's permitted-injections declares. Pure — no writes.
-    """
-    from .deactivation import is_provider_active
-    from .mcp import resolve_active_mcp_servers
-
-    registry = load_external_tools_registry(agent_meta_root, config, project_root)
-    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root)
-    active_mcp = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))
-
-    findings_by_provider: dict[str, list[dict]] = {}
-
-    for provider, pc in provider_config.items():
-        if not is_provider_active(config, provider):
-            continue
-
-        # Permitted set, resolved to absolute paths, keyed by dir-kind.
-        permitted_by_kind: dict[str, set[Path]] = {"skill": set(), "hook": set(), "rule": set()}
-        permitted_root_extra: set[Path] = set()  # kind: config/other
-        for tool_name in active_tools:
-            for entry in registry.get(tool_name, {}).get("permitted-injections", []):
-                resolved = resolve_injection_path(entry, pc, project_root)
-                if entry["kind"] in permitted_by_kind:
-                    permitted_by_kind[entry["kind"]].add(resolved)
-                else:
-                    permitted_root_extra.add(resolved)
-
-        provider_findings: list[dict] = []
-
-        # --- managed subdirs: skill / hook / rule (declarable kinds) ---
-        # "skill" is unconditional (no has_skills flag exists in
-        # ai-providers.yaml). "hook"/"rule" are gated on the provider's own
-        # has_hooks/has_rules capability flags — without the gate, a provider
-        # lacking the key (e.g. Opencode: no hooks_dir/rules_dir at all) would
-        # silently fall through to Claude's ".claude/hooks"/".claude/rules"
-        # defaults and misattribute Claude's own dir content to it.
-        dir_specs = [("skill", pc.get("skills_dir", ".claude/skills"))]
-        if pc.get("has_hooks", False):
-            dir_specs.append(("hook", pc.get("hooks_dir", ".claude/hooks")))
-        if pc.get("has_rules", False):
-            dir_specs.append(("rule", pc.get("rules_dir", ".claude/rules")))
-        for kind, dir_rel in dir_specs:
-            dir_path = project_root / dir_rel
-            if not dir_path.is_dir():
-                continue
-            managed = _read_managed_index(dir_path)
-            if kind == "rule":
-                managed |= {f"{TOOL_RULE_PREFIX}{t}.md" for t in active_tools}
-                managed |= {f"mcp-{s}.md" for s in active_mcp}
-            for child in sorted(dir_path.iterdir()):
-                if child.name == ".agent-meta-managed":
-                    continue
-                if child.name in managed:
-                    continue
-                if child.resolve() in permitted_by_kind[kind]:
-                    continue
-                provider_findings.append({
-                    "path": str(child.relative_to(project_root)),
-                    "kind": kind,
-                    "tool": None,
-                })
-
-        # --- agents_dir: no declarable permitted-injections kind exists for
-        # it (per spec — agent files are never legitimately tool-installed).
-        # Only an explicit kind: config/other entry (permitted_root_extra)
-        # can excuse a finding here; the existing .agent-meta-managed index
-        # (agents.py:1498) still excuses agent-meta's own generated roles.
-        agents_dir_path = project_root / pc.get("agents_dir", ".claude/agents")
-        if agents_dir_path.is_dir():
-            managed = _read_managed_index(agents_dir_path)
-            for child in sorted(agents_dir_path.iterdir()):
-                if child.name == ".agent-meta-managed":
-                    continue
-                if child.name in managed:
-                    continue
-                if child.resolve() in permitted_root_extra:
-                    continue
-                provider_findings.append({
-                    "path": str(child.relative_to(project_root)),
-                    "kind": "other",
-                    "tool": None,
-                })
-
-        # --- infra root: loose files/dirs beside the four managed subdirs ---
-        # Determined from the provider's own infra root (parent of skills_dir,
-        # e.g. ".claude" for Claude) rather than a hardcoded ".claude" literal,
-        # so Gemini/.gemini, Opencode/.opencode etc. are covered the same way.
-        skills_dir_rel = pc.get("skills_dir")
-        if skills_dir_rel:
-            infra_root = (project_root / skills_dir_rel).parent
-            if infra_root.is_dir() and infra_root != project_root:
-                known_names = set()
-                for key in _INFRA_ROOT_KNOWN_KEYS:
-                    val = pc.get(key)
-                    if val:
-                        known_names.add(Path(val).name)
-                # Capability-gated fallback: the key may be absent from
-                # ai-providers.yaml (Claude's hooks_dir/rules_dir/
-                # commands_dir, Continue's commands_dir) with sync code
-                # falling back to a hardcoded literal instead — only excuse
-                # it when the provider actually has the capability, so e.g.
-                # Opencode (has_rules: False) doesn't get a same-named
-                # directory excused for the wrong reason.
-                capability_by_key = {
-                    "hooks_dir": "has_hooks", "rules_dir": "has_rules", "commands_dir": "has_commands",
-                }
-                for key, fallbacks in _INFRA_ROOT_FALLBACK_DIRS.items():
-                    if pc.get(capability_by_key[key], False) and provider in fallbacks:
-                        known_names.add(Path(fallbacks[provider]).name)
-                # settings_local_file's basename varies per provider (e.g.
-                # Continue: config.local.yaml, not settings.local.json).
-                settings_local_val = pc.get("settings_local_file")
-                if settings_local_val:
-                    known_names.add(Path(settings_local_val).name)
-                known_names.add("settings.local.json")
-                # agent-memory/agent-memory-local are a documented agent-meta
-                # feature (docs/guides/features/agent-memory.md), not external-
-                # tool injections — no dedicated provider_config key exists for
-                # them (agent-memory-local only appears buried in Claude's
-                # gitignore_entries), so they're excused as literals.
-                known_names.add("agent-memory")
-                known_names.add("agent-memory-local")
-                # Claude Code harness's own session task-scheduler lock —
-                # local-machine runtime state (excluded via .git/info/exclude,
-                # not a shared gitignore entry), not an external-tool
-                # injection or an agent-meta artifact.
-                known_names.add("scheduled_tasks.lock")
-                for child in sorted(infra_root.iterdir()):
-                    if child.name in known_names:
-                        continue
-                    if child.resolve() in permitted_root_extra:
-                        continue
-                    provider_findings.append({
-                        "path": str(child.relative_to(project_root)),
-                        "kind": "other",
-                        "tool": None,
-                    })
-
-        findings_by_provider[provider] = provider_findings
-
-    return findings_by_provider
+def render_injection_drift_artifacts(*args, **kwargs):
+    """Re-export of external_tools_drift.render_injection_drift_artifacts()."""
+    from .external_tools_drift import render_injection_drift_artifacts as _impl
+    return _impl(*args, **kwargs)
