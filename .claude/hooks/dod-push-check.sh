@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 1.3.0
+# version: 1.4.0
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
@@ -96,6 +96,48 @@ print(val)
 PYEOF
 }
 
+# --- Tag-only push detection ---
+# A tag push (`git push origin v1.2.3`, `git push origin --tags`,
+# `git push origin tag v1.2.3`, `git push origin refs/tags/v1.2.3`) does not
+# touch any branch ref — it cannot add commits to main/master, which is the
+# entire premise the Branch-Guard below exists to prevent. Without this
+# check, cutting a release while sitting on main (the normal place to be
+# right after a release PR merges) was blocked identically to an actual
+# direct push of main's commit history, even though the two are unrelated
+# in risk. Not a full shell parser (matches this repo's other hooks'
+# documented approach) — covers the realistic `git push <remote> <ref>` /
+# `--tags` / `tag <name>` forms; anything else (bare `git push`, `git push
+# origin`, an explicit branch ref) still falls through to the branch check.
+IS_TAG_ONLY_PUSH=$(python3 - "$COMMAND" <<'PYEOF' 2>/dev/null
+import subprocess, sys
+tokens = sys.argv[1].split()
+try:
+    rest = tokens[tokens.index("push") + 1:]
+except ValueError:
+    print("false"); sys.exit(0)
+if "--tags" in rest:
+    print("true"); sys.exit(0)
+non_flags = [t for t in rest if not t.startswith("-")]
+if len(non_flags) >= 3 and non_flags[1] == "tag":
+    print("true"); sys.exit(0)
+if len(non_flags) == 2:
+    ref = non_flags[1]
+    if ref.startswith("refs/tags/"):
+        print("true"); sys.exit(0)
+    is_tag = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"refs/tags/{ref}"],
+        capture_output=True,
+    ).returncode == 0
+    is_branch = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{ref}"],
+        capture_output=True,
+    ).returncode == 0
+    print("true" if (is_tag and not is_branch) else "false")
+    sys.exit(0)
+print("false")
+PYEOF
+)
+
 # --- Branch-Guard: block push on main/master ---
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
@@ -107,7 +149,7 @@ if [ -z "$MAIN_BRANCH" ] && [ -n "$CONFIG_FILE" ]; then
 fi
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
 
-if [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+if [ "$IS_TAG_ONLY_PUSH" != "true" ] && { [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "master" ]; }; then
   echo "Branch-Guard: Push blocked — you are on '$CURRENT_BRANCH'."
   echo "Create a feature branch first: git checkout -b feat/<topic>"
   echo "Direct pushes to $MAIN_BRANCH are not allowed by DoD policy."
