@@ -6,6 +6,14 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .skill_channel import (
+    cleanup_stale_skill_channel_rules,
+    provider_supports_skill_channel,
+    resolve_skill_description,
+    write_skill_channel_managed_index,
+    write_skill_channel_rule,
+)
+from .skill_channel import yaml_quote as _yaml_quote
 
 RULES_DIR = "rules"
 CLAUDE_RULES_DIR = ".claude/rules"
@@ -14,8 +22,15 @@ SPEECH_DIR = "speech"
 
 RULES_PRESETS_CONFIG_YAML = "config/rules-presets.yaml"
 
-# Providers that support alwaysApply frontmatter
-_ALWAYS_APPLY_PROVIDERS = {"Claude", "Continue"}
+# Providers that support alwaysApply frontmatter.
+# Claude Code was removed (#Phase-C token-efficiency review, 2026-08-14):
+# a fresh sync.py test-lab run confirmed alwaysApply: false has zero effect
+# on Claude Code — it is a Cursor/Continue frontmatter convention Claude Code
+# silently ignores, loading '.claude/rules/*.md' in full regardless. Keeping
+# it there only added noise (and, worse, made the 'silent' preset *heavier*
+# than 'default' because of the extra frontmatter bytes with no lazy-loading
+# benefit). Continue does honor it — see _build_always_apply_frontmatter().
+_ALWAYS_APPLY_PROVIDERS = {"Continue"}
 
 
 def load_rules_presets(agent_meta_root: Path) -> dict:
@@ -64,22 +79,34 @@ def resolve_rules(config: dict, agent_meta_root: Path) -> dict:
     return resolved
 
 
-def _build_always_apply_frontmatter(content: str) -> str:
-    """Prepend alwaysApply: false frontmatter to a rule file.
+def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
+    """Prepend alwaysApply: false (+ description) frontmatter to a rule file.
 
-    If the file already has frontmatter, inject alwaysApply into it.
+    Continue needs both alwaysApply: false AND a description to actually lazy-
+    load a rule — alwaysApply: false alone is not sufficient for it to decide
+    relevance. description is only added when non-empty and not already present.
+
+    If the file already has frontmatter, inject the missing keys into it.
     Otherwise prepend a minimal frontmatter block.
     """
     if content.startswith("---"):
-        # Already has frontmatter — inject alwaysApply: false after opening ---
+        # Already has frontmatter — inject missing keys after opening ---
         end = content.find("\n---", 3)
         if end != -1:
             fm = content[3:end]
+            addition = ""
             if "alwaysApply" not in fm:
-                content = "---" + fm + "\nalwaysApply: false" + content[end:]
+                addition += "\nalwaysApply: false"
+            if description and "description" not in fm:
+                addition += f"\ndescription: {_yaml_quote(description)}"
+            if addition:
+                content = "---" + fm + addition + content[end:]
         return content
     # No frontmatter — prepend minimal block
-    return "---\nalwaysApply: false\n---\n" + content
+    fm_lines = ["alwaysApply: false"]
+    if description:
+        fm_lines.append(f"description: {_yaml_quote(description)}")
+    return "---\n" + "\n".join(fm_lines) + "\n---\n" + content
 
 
 def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
@@ -135,11 +162,17 @@ def sync_rules(
       2-platform  >  1-generic  >  0-external
 
     Rule options (from resolve_rules()):
-      alwaysApply: false  → prepend frontmatter (Claude + Continue only)
+      alwaysApply: false  → prepend frontmatter (Continue only)
       gemini: skip        → skip rule entirely for Gemini provider
+      channel: skill       → render to <skills_dir>/<rule-stem>/SKILL.md instead
+                             of <rules_dir>/<rule-stem>.md (Claude + Opencode only,
+                             see _SKILL_CHANNEL_PROVIDERS); unsupported providers
+                             fall back to the normal rules_dir file, unchanged.
 
     Project rules in .claude/rules/ that are NOT from agent-meta are never touched.
     Stale agent-meta-managed rules (tracked in <rules_dir>/.agent-meta-managed) are removed.
+    channel: skill rules share <skills_dir>/.agent-meta-managed with the external-skill
+    sync (scripts/lib/skills.py) via merge-mode writes — see skill_channel.py.
     """
     from .config import (
         _orch_mode_flags,
@@ -193,6 +226,16 @@ def sync_rules(
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
 
+    # channel: skill bookkeeping — computed once, outside the loop, so the
+    # post-loop stale-cleanup below is correct even on a run where nothing
+    # is currently flagged (e.g. rules-preset just switched away from a
+    # preset that used channel: skill).
+    all_rule_stems = {Path(output_name).stem for _, output_name in sources}
+    supports_skill_channel = provider_supports_skill_channel(provider, pc)
+    skills_dir_rel = pc.get("skills_dir")
+    skills_target_dir = (project_root / skills_dir_rel) if (skills_dir_rel and supports_skill_channel) else None
+    now_managed_skill_rules: set[str] = set()
+
     for source_path, output_name in sources:
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
@@ -203,10 +246,10 @@ def sync_rules(
                      f"rules-preset: gemini: skip for '{rule_stem}'")
             continue
 
-        target_path = safe_path(target_dir, output_name)
         source_content = source_path.read_text(encoding="utf-8")
         layer = source_path.parts[-2]
         rel_source = f"rules/{layer}/{source_path.name}"
+        src_label = f"rules/{layer}/{source_path.name}"
 
         source_content = substitute(source_content, merged_vars, rel_source, log)
         source_content = strip_inactive_conditional_blocks(source_content, merged_vars)
@@ -214,14 +257,29 @@ def sync_rules(
         if platform_vars is not None:
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)
 
-        # Provider-aware: inject alwaysApply: false for Claude + Continue
+        # channel: skill — render into skills_dir instead of rules_dir, for
+        # providers with real Skill lazy-loading support. Deliberately NOT
+        # added to `now_managed` (rules_dir index): if this rule previously
+        # rendered as a plain rules_dir file (preset changed since), the
+        # normal stale-cleanup below removes that old copy automatically.
+        if opts.get("channel") == "skill" and skills_target_dir is not None:
+            now_managed_skill_rules.add(rule_stem)
+            write_skill_channel_rule(
+                rule_stem, source_content, opts, skills_target_dir, project_root,
+                log, dry_run, src_label,
+            )
+            continue
+
+        target_path = safe_path(target_dir, output_name)
+
+        # Provider-aware: inject alwaysApply: false for Continue
         if opts.get("alwaysApply") is False and provider in _ALWAYS_APPLY_PROVIDERS:
-            source_content = _build_always_apply_frontmatter(source_content)
+            description = resolve_skill_description(opts, source_content)
+            source_content = _build_always_apply_frontmatter(source_content, description)
             log.info(str(target_path.relative_to(project_root)),
                      f"alwaysApply: false (rules-preset: '{config.get('rules-preset', 'default')}')")
 
         rel_out = str(target_path.relative_to(project_root))
-        src_label = f"rules/{layer}/{source_path.name}"
         now_managed.add(output_name)
 
         if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
@@ -242,6 +300,19 @@ def sync_rules(
                        "rule removed from agent-meta sources")
             if not dry_run:
                 stale_path.unlink()
+
+    # channel: skill stale-cleanup + shared managed-index merge in skills_dir.
+    # Scoped to `all_rule_stems` (this caller's full possible name-space) so
+    # entries owned by the external-skill sync (scripts/lib/skills.py) in the
+    # same shared index are never touched.
+    if skills_target_dir is not None:
+        cleanup_stale_skill_channel_rules(
+            skills_target_dir, project_root, all_rule_stems, now_managed_skill_rules,
+            log, dry_run, "rule no longer routed to channel: skill",
+        )
+        write_skill_channel_managed_index(
+            skills_target_dir, now_managed_skill_rules, dry_run, universe=all_rule_stems
+        )
 
     if not dry_run and now_managed:
         managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")

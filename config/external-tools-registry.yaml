@@ -17,3 +17,7 @@ external-tools:
     hooks:
       - graphify-search-guard
       - graphify-read-guard
+    permitted-injections:
+      - kind: skill
+        name: graphify
+        description: "Claude-Code-Skill (SKILL.md + references), vom graphify-Installer selbst verwaltet"

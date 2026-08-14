@@ -94,7 +94,11 @@ from lib.deactivation import (
 )
 from lib.dod import resolve_dod
 from lib.extensions import create_extension, update_extensions
-from lib.external_tools import generate_external_tool_artifacts
+from lib.external_tools import (
+    generate_external_tool_artifacts,
+    render_injection_drift_artifacts,
+    scan_injection_drift,
+)
 from lib.hooks import create_hook, sync_hooks
 from lib.io import SyncError, safe_path, write_checked
 from lib.isolation import sync_provider_isolation
@@ -112,8 +116,8 @@ from lib.providers import (
 from lib.roles import build_role_map
 from lib.rules import create_rule, resolve_rules, sync_rules, sync_speech_mode
 from lib.schema import update_roles_enum
+from lib.skill_admin import add_skill
 from lib.skills import (
-    add_skill,
     check_pinned_commits,
     load_external_skills_config,
     sync_external_skills_for_provider,
@@ -1137,6 +1141,15 @@ def main():
                                        provider, provider_config)
             sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
                                               log, args.dry_run, provider, provider_config)
+        # External-tool injection governance: once per sync run (not per
+        # provider) — diffs each active provider's managed dirs against
+        # permitted-injections, warns on anything undeclared.
+        try:
+            drift = scan_injection_drift(agent_meta_root, project_root, config, provider_config)
+            render_injection_drift_artifacts(drift, project_root, provider_config, log, args.dry_run)
+        except SyncError as exc:
+            print(f"\n  !!  External-tool injection drift scan aborted: {exc}", file=sys.stderr)
+            sys.exit(1)
         # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
         try:
             sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)

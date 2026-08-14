@@ -2787,6 +2787,40 @@ async function viewProjectExternalToolsOverrides() {
   wrap.appendChild(el("h1", {}, ["Project — External Tools"]));
   wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable curated external CLI dev-tool integrations (rule text + hook wiring) for your project, or customize them specifically for this repository."]));
 
+  try {
+    // This banner runs scan_injection_drift() live, so it can briefly
+    // disagree with the last-sync snapshot rendered into
+    // external-tools-drift.md (e.g. right after a manual file drop, before
+    // the next `sync.py` run regenerates that file). That's expected —
+    // treat the banner as "right now", the .md as "as of last sync".
+    const driftResp = await api.get("/api/external-tools/drift");
+    if (driftResp.error) {
+      wrap.appendChild(el("div", {
+        style: "margin-bottom:var(--space-4); padding:var(--space-2) var(--space-3); "
+             + "border:1px solid var(--border-color); border-radius:4px; "
+             + "color:var(--text-muted); font-size:12px;",
+      }, [`Drift-Scan fehlgeschlagen: ${driftResp.error}`]));
+    } else {
+      const allFindings = Object.values(driftResp.findings || {}).flat();
+      if (allFindings.length > 0) {
+        const banner = el("div", {
+          style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
+               + "border-radius:4px; background:rgba(180,83,9,0.1);",
+        });
+        banner.appendChild(el("strong", {}, [`${allFindings.length} undeklarierte Artefakte gefunden`]));
+        const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
+        allFindings.slice(0, 10).forEach((f) => {
+          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "kein Tool zugeordnet"}`]));
+        });
+        banner.appendChild(list);
+        wrap.appendChild(banner);
+      }
+    }
+  } catch (err) {
+    // Non-fatal — network-level failure (e.g. server unreachable); the
+    // drift banner is a convenience, not a blocker for the panel.
+  }
+
   let projData, fwData;
   try {
     projData = await api.get("/api/config/project");
@@ -2887,6 +2921,13 @@ async function viewProjectExternalToolsOverrides() {
             isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Provider skip:"]));
             isReadonly.appendChild(renderBadgeList(merged["provider-skip"]));
         }
+
+        if (merged["permitted-injections"] && merged["permitted-injections"].length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Permitted injections:"]));
+            isReadonly.appendChild(renderBadgeList(merged["permitted-injections"].map(
+              (i) => `${i.kind}: ${i.name || i.path}`
+            )));
+        }
       },
       buildEdit: (isEditing) => {
         const wrapDesc = el("div", {});
@@ -2939,6 +2980,69 @@ async function viewProjectExternalToolsOverrides() {
             markDirty();
         }));
         isEditing.appendChild(wrapSkip);
+
+        const wrapInjections = el("div", { style: "margin-top: var(--space-2);" });
+        wrapInjections.appendChild(el("label", {}, ["Permitted Injections (skills/hooks/rules a tool may self-install)"]));
+        const injectionsList = el("div", {});
+        const renderInjectionRows = () => {
+          injectionsList.innerHTML = "";
+          const items = merged["permitted-injections"] || [];
+          items.forEach((item, idx) => {
+            const row = el("div", { style: "display:flex; gap:var(--space-1); margin-bottom:var(--space-1);" });
+            const kindSel = el("select", { class: "form-control" });
+            ["skill", "hook", "rule", "config", "other"].forEach((k) => {
+              const opt = el("option", { value: k }, [k]);
+              if (item.kind === k) opt.selected = true;
+              kindSel.appendChild(opt);
+            });
+            kindSel.onchange = (e) => {
+              const ov = setupEditState();
+              const entry = ov["permitted-injections"][idx];
+              const newKind = e.target.value;
+              const wasPathKind = entry.kind === "config" || entry.kind === "other";
+              const isPathKindNow = newKind === "config" || newKind === "other";
+              entry.kind = newKind;
+              if (wasPathKind !== isPathKindNow) {
+                // Migrate the value across the name/path field split so the
+                // persisted entry never mixes kind with the wrong field —
+                // a mismatch is schema-invalid and breaks every subsequent
+                // sync.py run (see _validate_permitted_injections).
+                const carried = wasPathKind ? entry.path : entry.name;
+                delete entry.path;
+                delete entry.name;
+                if (isPathKindNow) entry.path = carried || ""; else entry.name = carried || "";
+              }
+              markDirty();
+              renderInjectionRows();
+            };
+            const isPathKind = item.kind === "config" || item.kind === "other";
+            const valInput = el("input", { class: "form-control", placeholder: isPathKind ? "path" : "name", value: isPathKind ? (item.path || "") : (item.name || "") });
+            valInput.oninput = (e) => {
+              const ov = setupEditState();
+              const field = (ov["permitted-injections"][idx].kind === "config" || ov["permitted-injections"][idx].kind === "other") ? "path" : "name";
+              ov["permitted-injections"][idx][field] = e.target.value;
+              markDirty();
+            };
+            const descInput = el("input", { class: "form-control", placeholder: "description", value: item.description || "" });
+            descInput.oninput = (e) => { const ov = setupEditState(); ov["permitted-injections"][idx].description = e.target.value; markDirty(); };
+            const removeBtn = el("button", { class: "btn btn-sm" }, ["✕"]);
+            removeBtn.onclick = () => { const ov = setupEditState(); ov["permitted-injections"].splice(idx, 1); markDirty(); renderInjectionRows(); };
+            row.appendChild(kindSel); row.appendChild(valInput); row.appendChild(descInput); row.appendChild(removeBtn);
+            injectionsList.appendChild(row);
+          });
+        };
+        renderInjectionRows();
+        wrapInjections.appendChild(injectionsList);
+        const addInjectionBtn = el("button", { class: "btn btn-sm" }, ["+ Add Permitted Injection"]);
+        addInjectionBtn.onclick = () => {
+          const ov = setupEditState();
+          ov["permitted-injections"] = ov["permitted-injections"] || [];
+          ov["permitted-injections"].push({ kind: "skill", name: "" });
+          markDirty();
+          renderInjectionRows();
+        };
+        wrapInjections.appendChild(addInjectionBtn);
+        isEditing.appendChild(wrapInjections);
       },
       onReset: () => { delete projOverrides[id]; markDirty(); },
     });

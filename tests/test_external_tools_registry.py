@@ -8,6 +8,7 @@ write_checked (content + footer), the missing-hook warning, and provider-skip.
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from scripts.lib.external_tools import (
@@ -15,7 +16,9 @@ from scripts.lib.external_tools import (
     generate_external_tool_artifacts,
     load_external_tools_registry,
     resolve_active_external_tools,
+    resolve_injection_path,
 )
+from scripts.lib.io import SyncError
 from scripts.lib.log import SyncLog
 
 
@@ -268,3 +271,285 @@ def test_generate_skips_rule_file_for_provider_without_rules(tmp_path):
         dry_run=False, provider="Opencode",
     )
     assert not (project_root / ".claude" / "rules" / "tool-graphify.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# permitted-injections validation
+# ---------------------------------------------------------------------------
+
+def test_permitted_injections_skill_requires_name(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "skill", "path": ".claude/skills/graphify"}],
+        }
+    })
+    with pytest.raises(SyncError, match="requires 'name'"):
+        load_external_tools_registry(agent_meta_root, {}, project_root)
+
+
+def test_permitted_injections_config_requires_path(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "config", "name": "graphify"}],
+        }
+    })
+    with pytest.raises(SyncError, match="requires 'path'"):
+        load_external_tools_registry(agent_meta_root, {}, project_root)
+
+
+def test_permitted_injections_valid_entry_passes(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {
+        "graphify": {
+            "description": "d",
+            "permitted-injections": [{"kind": "skill", "name": "graphify"}],
+        }
+    })
+    registry = load_external_tools_registry(agent_meta_root, {}, project_root)
+    assert registry["graphify"]["permitted-injections"] == [{"kind": "skill", "name": "graphify"}]
+
+
+# ---------------------------------------------------------------------------
+# resolve_injection_path
+# ---------------------------------------------------------------------------
+
+def test_resolve_injection_path_skill(tmp_path):
+    pc = {"skills_dir": ".claude/skills"}
+    entry = {"kind": "skill", "name": "graphify"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "skills" / "graphify").resolve()
+
+
+def test_resolve_injection_path_config_uses_path_verbatim(tmp_path):
+    pc = {}
+    entry = {"kind": "config", "path": ".claude/settings.json"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "settings.json").resolve()
+
+
+def test_resolve_injection_path_defaults_without_explicit_dir(tmp_path):
+    pc = {}  # no hooks_dir set — must fall back to .claude/hooks
+    entry = {"kind": "hook", "name": "graphify-guard.sh"}
+    result = resolve_injection_path(entry, pc, tmp_path)
+    assert result == (tmp_path / ".claude" / "hooks" / "graphify-guard.sh").resolve()
+
+
+# ---------------------------------------------------------------------------
+# _generate_tool_rule_content with permitted-injections rendering
+# ---------------------------------------------------------------------------
+
+def test_rule_content_renders_permitted_injections(tmp_path):
+    from scripts.lib.external_tools import _generate_tool_rule_content
+    tool_def = {
+        "description": "d",
+        "permitted-injections": [
+            {"kind": "skill", "name": "graphify", "description": "Claude-Code-Skill"},
+        ],
+    }
+    content = _generate_tool_rule_content(
+        "graphify", tool_def, pc={"skills_dir": ".claude/skills"}, project_root=tmp_path
+    )
+    assert "## Erlaubte Injektionen" in content
+    assert ".claude/skills/graphify" in content
+    assert "Claude-Code-Skill" in content
+
+
+def test_rule_content_omits_section_when_no_injections(tmp_path):
+    from scripts.lib.external_tools import _generate_tool_rule_content
+    content = _generate_tool_rule_content(
+        "graphify", {"description": "d"}, pc={}, project_root=tmp_path
+    )
+    assert "## Erlaubte Injektionen" not in content
+
+
+# ---------------------------------------------------------------------------
+# scan_injection_drift
+# ---------------------------------------------------------------------------
+
+def test_scan_injection_drift_flags_unexplained_skill_dir(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {"graphify": {"description": "d", "enabled-by-default": True}})
+    # No permitted-injections declared — the skill dir below is unexplained.
+    skills_dir = project_root / ".claude" / "skills" / "graphify"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("x", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/skills/graphify" in paths
+
+
+def test_scan_injection_drift_clean_when_declared(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {"graphify": {
+        "description": "d", "enabled-by-default": True,
+        "permitted-injections": [{"kind": "skill", "name": "graphify"}],
+    }})
+    skills_dir = project_root / ".claude" / "skills" / "graphify"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("x", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Claude"] == []
+
+
+def test_scan_injection_drift_flags_loose_root_file(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    infra_root = project_root / ".claude"
+    infra_root.mkdir(parents=True)
+    (infra_root / "CLAUDE.md").write_text("rogue block", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+        "settings_file": ".claude/settings.json",
+        "pending_tasks_file": ".claude/pending-tasks.md",
+        "extension_dir": ".claude/3-project", "snippets_dir": ".claude/snippets",
+        "artifact_dir": ".claude/artifacts",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/CLAUDE.md" in paths
+
+
+def test_scan_injection_drift_flags_stray_agent_file(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    agents_dir = project_root / ".claude" / "agents"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "rogue-role.md").write_text("x", encoding="utf-8")
+    # A real agent-meta-managed role stays unflagged.
+    (agents_dir / "developer.md").write_text("x", encoding="utf-8")
+    (agents_dir / ".agent-meta-managed").write_text("developer.md\n", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/agents/rogue-role.md" in paths
+    assert ".claude/agents/developer.md" not in paths
+
+
+def test_scan_injection_drift_skips_hook_and_rule_dirs_without_capability(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    # Unmanaged content in Claude's real hooks/rules dirs.
+    hooks_dir = project_root / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "some-hook.sh").write_text("x", encoding="utf-8")
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "some-rule.md").write_text("x", encoding="utf-8")
+
+    # Opencode: has_hooks/has_rules False, no hooks_dir/rules_dir key at all
+    # (mirrors config/ai-providers.yaml:134-135) — must not fall through to
+    # Claude's ".claude/hooks"/".claude/rules" defaults and misattribute them.
+    provider_config = {"Opencode": {
+        "skills_dir": ".opencode/skills",
+        "agents_dir": ".opencode/agents",
+        "has_hooks": False,
+        "has_rules": False,
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Opencode"] == []
+
+
+def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_settings_local(tmp_path):
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    infra_root = project_root / ".continue"
+    infra_root.mkdir(parents=True)
+    (infra_root / "agent-memory").mkdir()
+    (infra_root / "agent-memory-local").mkdir()
+    (infra_root / "config.local.yaml").write_text("x", encoding="utf-8")
+
+    provider_config = {"Continue": {
+        "skills_dir": ".continue/skills",
+        "agents_dir": ".continue/agents",
+        "settings_local_file": ".continue/config.local.yaml",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    assert findings["Continue"] == []
+
+
+# ---------------------------------------------------------------------------
+# render_injection_drift_artifacts
+# ---------------------------------------------------------------------------
+
+def test_render_drift_artifacts_writes_capped_file(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    (project_root / ".claude" / "rules").mkdir(parents=True)
+    findings = {"Claude": [
+        {"path": f".claude/skills/rogue-{i}", "kind": "skill", "tool": None} for i in range(12)
+    ]}
+    provider_config = {"Claude": {"has_rules": True, "rules_dir": ".claude/rules"}}
+    log = SyncLog()
+    render_injection_drift_artifacts(findings, project_root, provider_config, log, dry_run=False)
+
+    out = project_root / ".claude" / "rules" / "external-tools-drift.md"
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert text.count("rogue-") == 10
+    assert "2 weitere, siehe sync.log" in text
+
+
+def test_render_drift_artifacts_removes_stale_file_when_clean(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    stale = rules_dir / "external-tools-drift.md"
+    stale.write_text("old drift", encoding="utf-8")
+
+    provider_config = {"Claude": {"has_rules": True, "rules_dir": ".claude/rules"}}
+    log = SyncLog()
+    render_injection_drift_artifacts({"Claude": []}, project_root, provider_config, log, dry_run=False)
+    assert not stale.exists()
+
+
+def test_render_drift_artifacts_warns_even_without_has_rules(tmp_path):
+    from scripts.lib.external_tools import render_injection_drift_artifacts
+    project_root = tmp_path / "project"
+    findings = {"Opencode": [
+        {"path": ".opencode/skills/rogue", "kind": "skill", "tool": None}
+    ]}
+    # Opencode has has_rules: False — file should not be written, but warning should fire.
+    provider_config = {"Opencode": {"has_rules": False, "skills_dir": ".opencode/skills"}}
+    log = SyncLog()
+    render_injection_drift_artifacts(findings, project_root, provider_config, log, dry_run=False)
+
+    # No drift file should be written for non-has_rules providers.
+    assert not (project_root / ".opencode" / "external-tools-drift.md").exists()
+    # But warning should still fire.
+    assert any("undeclared artifact" in w and "rogue" in w for w in log.warnings)

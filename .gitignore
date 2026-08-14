@@ -17,6 +17,7 @@ graphify-out/
 .claude/settings.local.json
 .gemini/pending-tasks.md
 .gemini/settings.local.json
+.mammouth/pending-tasks.md
 .mcp.json
 .meta-config/env.ps1
 .meta-config/env.sh
@@ -56,3 +57,6 @@ docs/concepts/.local-Inputs/reqmanager-se.md
 # tokensave runtime cache/state (local tooling only, never commit)
 .tokensave/
 node_modules/
+
+# local Python virtualenv (never commit)
+.venv/

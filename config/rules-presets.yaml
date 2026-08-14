@@ -4,10 +4,24 @@
 # Precedence: rules (Projekt-Override) > rules-preset > default (impliziter Default).
 #
 # Rule-Optionen:
-#   alwaysApply: false  → Claude + Continue: Rule nur bei Keyword-Match laden (nicht immer)
+#   alwaysApply: false  → Continue: Rule nur bei Keyword-Match laden (nicht immer).
+#                        Ohne Effekt auf Claude Code — dessen '.claude/rules/*.md'
+#                        wird unabhängig vom Frontmatter immer komplett geladen
+#                        (verifiziert per frischem sync.py-Testlauf, 2026-08-14).
 #   gemini: skip        → Gemini: Rule wird gar nicht generiert
 #   embed: false        → Rule wird nicht in den Managed Block eingebettet
 #                        (nur als separate Datei verfügbar, z.B. .claude/rules/)
+#   channel: skill       → Rule wird NICHT als <rules_dir>/<name>.md generiert,
+#                        sondern als <skills_dir>/<name>/SKILL.md — der einzige
+#                        echte Lazy-Load-Kanal auf Claude Code: nur `name` +
+#                        `description` landen im System-Prompt, der Body erst
+#                        auf Abruf per Read. Nur für Claude + Opencode wirksam
+#                        (siehe scripts/lib/skill_channel.py PROVIDERS) — für
+#                        alle anderen Provider fällt die Rule unverändert auf
+#                        die normale <rules_dir>/<name>.md-Datei zurück.
+#   skill-description: "..." → Description im SKILL.md-Frontmatter (Englisch).
+#                        Fallback: erste Textzeile nach der H1-Überschrift des
+#                        Rule-Bodies. Nur relevant zusammen mit channel: skill.
 #
 # Kein Eintrag = alwaysApply: true, embed: true für alle Provider (Standardverhalten).
 
@@ -68,3 +82,61 @@ presets:
     a2a-delegation-gates:
       alwaysApply: false
       embed: false
+
+  # Token-efficiency review (2026-08-14): 'silent' turned out to be a no-op on
+  # Claude Code (alwaysApply: false has zero effect there; '.claude/rules/*.md'
+  # is always loaded in full — see the comment on 'alwaysApply: false' above).
+  # 'lazy' uses the one real Claude Code lazy-load channel instead: moving
+  # rule bodies to '.claude/skills/<name>/SKILL.md' (channel: skill) so only
+  # `name` + `description` land in the system prompt, the body on demand via
+  # Read. Kernregeln (branch-guard, commit-conventions, language, speech-mode,
+  # no-worktree-isolation, dod-criteria, use-orchestrator) stay always-on —
+  # not listed here at all, so they keep the default (alwaysApply: true).
+  # MCP hard tool-prohibitions stay always-on too, via the separate
+  # rules/1-generic/mcp-guardrails.md rule (not a rules-preset entry).
+  lazy:
+    sync-interface:
+      channel: skill
+      skill-description: "Use when running sync.py, changing agent templates or rules in agent-meta — covers CLI flags, branch policy for syncs, --check/context-hashes drift detection."
+    architecture:
+      channel: skill
+      skill-description: "Use when adding or changing agent templates, platform overrides, project extensions or placeholders in agent-meta — covers the 0/1/2/3 layer model, composition syntax and placeholder escaping."
+    conventions:
+      channel: skill
+      skill-description: "Use before committing changes to agents/, config/ or scripts/lib in agent-meta — covers version bumping, naming, instruction-bleed checks, new-role and new-placeholder procedures."
+    submodule-protection:
+      channel: skill
+      skill-description: "Use when touching files under .agent-meta/, external/ or .gitmodules — covers the submodule no-direct-edit policy."
+    a2a-delegation-gates:
+      channel: skill
+      skill-description: "Use when delegating to subagents with A2A envelopes — covers depth limits, payload size, re-delegation and orchestrator singleton gates."
+    python-conventions:
+      channel: skill
+      skill-description: "Use when writing or reviewing Python code in this project — PEP8, type hints, docstrings."
+    issue-lifecycle:
+      channel: skill
+      skill-description: "Use when working on a GitHub issue — referencing, closing keywords and post-completion commenting."
+    lifecycle-tasks:
+      channel: skill
+      skill-description: "Use at session start or when .claude/pending-tasks.md exists — covers pending-task handling."
+    session-conclusion:
+      channel: skill
+      skill-description: "Use at the end of a large feature — covers delegating the session summary to the documenter agent."
+    provider-agnostic:
+      channel: skill
+      skill-description: "Use when editing templates in agents/1-generic — covers the provider-agnostic policy."
+    mcp-reqogniloom:
+      channel: skill
+      skill-description: "Use when calling ReqogniLoom MCP tools — full allowed-tool list and usage hints."
+    mcp-honcho:
+      channel: skill
+      skill-description: "Use when calling Honcho MCP memory tools — allowed-tool list and usage hints."
+    mcp-playwright:
+      channel: skill
+      skill-description: "Use when calling Playwright MCP browser tools — allowed-tool list and usage hints."
+    mcp-viz-logger:
+      channel: skill
+      skill-description: "Use when logging agent visualization events via the viz-logger MCP server."
+    tool-graphify:
+      channel: skill
+      skill-description: "Use when asking architecture or file-relationship questions with graphify — hooks and permitted injections."

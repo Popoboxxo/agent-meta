@@ -3,9 +3,10 @@ provider-isolation: disabled
 ai-providers:
 - Claude
 - Opencode
+- Mammouth
 - Gemini
 dod-preset: rapid-prototyping
-rules-preset: silent
+rules-preset: lazy
 systems-engineering:
   enabled: false
 knowledge-engine:

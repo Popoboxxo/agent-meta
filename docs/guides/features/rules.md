@@ -57,10 +57,15 @@ Ein `sharkord-security.md` in `2-platform/` ersetzt `security.md` aus `1-generic
 | `0-external` | `rules/0-external/<name>.md` | `<name>.md` | ✅ kopiert (geringste Priorität) |
 | Projekt | `.claude/rules/<name>.md` | — | ❌ **nie angefasst** |
 
-**Stale-Cleanup:** sync.py führt eine Index-Datei `.claude/rules/.agent-meta-managed`.
-Rules die dort gelistet sind, aber nicht mehr in den agent-meta-Quellen existieren,
-werden beim nächsten Sync **gelöscht**. Projekt-eigene Rules (nicht in der Index-Datei)
-werden nie gelöscht.
+**Stale-Cleanup:** sync.py führt Index-Dateien zur Verfolgung von generierten Rules:
+
+- `.claude/rules/.agent-meta-managed` — für reguläre Rules aus `rules/1-generic/` und `rules/2-platform/`
+- `.claude/rules/.agent-meta-managed-mcp` — für MCP-Server-Rules (automatisch aus `config/mcp-registry.yaml` generiert)
+- `.claude/rules/.agent-meta-managed-tools` — für External-Tool-Rules (automatisch aus `config/external-tools-registry.yaml` generiert)
+
+Rules die in einer dieser Indizes gelistet sind, aber nicht mehr in den agent-meta-Quellen existieren (z.B. weil ein MCP-Server deaktiviert oder ein Tool entfernt wurde), werden beim nächsten Sync **automatisch gelöscht**. Projekt-eigene Rules (nicht in den Indizes) werden niemals gelöscht.
+
+Die getrennten Index-Dateien verhindern, dass unterschiedliche Schreiber (rules.py, mcp.py, external_tools.py) sich gegenseitig überschreiben.
 
 ---
 
@@ -80,6 +85,32 @@ werden nie gelöscht.
 
 sync.py strippt den Platform-Prefix beim Kopieren:
 `sharkord-plugin-constraints.md` → `.claude/rules/plugin-constraints.md`
+
+---
+
+## Skill-Channel (`channel: skill`)
+
+Große Rules können statt als `.claude/rules/<name>.md` zu `.claude/skills/<name>/SKILL.md` geschrieben werden — nur für Projekte mit Claude Code oder Opencode als Target-Provider (siehe `config/rules-presets.yaml` und `scripts/lib/skill_channel.py`).
+
+**Effekt:** Claude Code lädt nur `name` + `description` im System-Prompt, den Rule-Body erst on-demand via Read-Tool. Das spart Token bei der Lazy-Load-Strategie.
+
+**Verwendung:**
+
+In `config/rules-presets.yaml` oder Projekt-Overrides:
+
+```yaml
+lazy:
+  sync-interface:
+    channel: skill
+    skill-description: "Use when running sync.py..."
+  architecture:
+    channel: skill
+    skill-description: "Use when adding agent templates..."
+```
+
+**Hintergrund:** `alwaysApply: false` hat auf Claude Code keine Wirkung (Claude Code lädt `.claude/rules/*.md` immer vollständig). `channel: skill` ist der einzige echte Lazy-Load-Kanal auf Claude Code.
+
+**Weitere Info:** → [rules-preset-optimization.md — "Für Claude Code & Opencode"](rules-preset-optimization.md#für-claude-code--opencode-channel-skill--lazy-preset)
 
 ---
 
