@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, safe_path, write_checked
+from .io import SyncError, _deep_merge, _load_yaml_or_json, _normalize_enabled_config, safe_path, write_checked
 from .log import SyncLog
 from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
 
@@ -44,16 +44,6 @@ TOOLS_MANAGED_INDEX_FILENAME = ".agent-meta-managed-tools"
 # ---------------------------------------------------------------------------
 # Registry loading
 # ---------------------------------------------------------------------------
-
-def _deep_merge(dict1: dict, dict2: dict) -> dict:
-    """Recursively merge dict2 into dict1 (mirrors mcp._deep_merge)."""
-    for k, v in dict2.items():
-        if isinstance(v, dict) and k in dict1 and isinstance(dict1[k], dict):
-            _deep_merge(dict1[k], v)
-        else:
-            dict1[k] = v
-    return dict1
-
 
 _INJECTION_KINDS_NAME = {"skill", "hook", "rule"}
 _INJECTION_KINDS_PATH = {"config", "other"}
@@ -172,19 +162,6 @@ def load_external_tools_registry(
 # Activation resolution
 # ---------------------------------------------------------------------------
 
-def _normalize_project_tools(raw) -> dict:
-    """Normalize project external-tools config to dict format.
-
-    Accepts both the flat list shorthand ['graphify'] (alias for
-    {'graphify': {'enabled': True}}) and the canonical dict form
-    {'graphify': {'enabled': True}}. Mirrors skills._normalize_project_skills.
-    """
-    if isinstance(raw, list):
-        return {name: {"enabled": True} for name in raw}
-    if isinstance(raw, dict):
-        return raw
-    return {}
-
 
 def _tool_is_active(name: str, merged_def: dict, project_tools: dict) -> bool:
     """Return True if an external tool should be rendered for this project.
@@ -207,15 +184,21 @@ def resolve_active_external_tools(
     config: dict,
     agent_meta_root: Path,
     project_root: Path | None = None,
+    registry: dict | None = None,
 ) -> list[str]:
     """Determine which external tools are active for this project.
 
     Returns tool names (registry order) for which _tool_is_active is True.
     Tools named in the project config but absent from the registry are skipped
     — without a registry definition there is no rule-content to render.
+
+    registry: pass an already-loaded load_external_tools_registry() result to
+    skip re-reading/re-parsing config/external-tools-registry.yaml when the
+    caller has one on hand.
     """
-    registry = load_external_tools_registry(agent_meta_root, config, project_root)
-    project_tools = _normalize_project_tools((config or {}).get("external-tools", {}))
+    if registry is None:
+        registry = load_external_tools_registry(agent_meta_root, config, project_root)
+    project_tools = _normalize_enabled_config((config or {}).get("external-tools", {}))
 
     active: list[str] = []
     for name, tool_def in registry.items():
@@ -304,9 +287,13 @@ def generate_external_tool_artifacts(
     if not registry:
         return
 
-    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root)
-    if not active_tools:
-        return
+    # No early return on an empty active_tools list here (unlike
+    # load_external_tools_registry's empty-registry check above): the loops
+    # below still need to run with zero entries so cleanup_stale_managed_files()
+    # sees an empty now_managed set and removes every previously-generated
+    # tool-*.md rule file — deactivating the last tool must not orphan its
+    # rule file.
+    active_tools = resolve_active_external_tools(config, agent_meta_root, project_root, registry=registry)
 
     # --- Missing-hook warnings (provider-independent) ---
     for tool_name in active_tools:
