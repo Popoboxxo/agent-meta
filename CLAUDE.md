@@ -106,7 +106,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
 <!-- Manuelle Änderungen hier werden überschrieben. -->
 
-> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
 
 Generiert von agent-meta v0.95.1 — `2026-08-14`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
