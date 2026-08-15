@@ -291,3 +291,19 @@ CLAUDE.personal.md
 **Managed block in `.continue/rules/project-context.md` wird nicht aktualisiert**
 → Prüfe ob `<!-- agent-meta:managed-begin -->` und `<!-- agent-meta:managed-end -->` in der Datei vorhanden sind.
 → Fehlende Marker: Datei löschen und sync erneut ausführen (wird neu angelegt).
+
+**Provider/Validierungsschicht lehnt generierte Agent-Dateien mit "Extra inputs are not permitted" ab**
+→ Manche Provider-seitigen Validatoren (z.B. ein strikter Registrierungslayer vor einem
+  Opencode-Agent-Schema) akzeptieren nur die eigenen Schema-Felder und lehnen agent-meta-Bookkeeping-
+  Felder (`version`, `prompt_mode`, `generated-from`) als unbekannte Extra-Inputs ab (Issue #505).
+→ Fix ohne agent-meta-Kernänderung: in `.meta-config/project.yaml` unter dem bestehenden
+  `provider-options`-Block (wie schon bei Continues `generate-prompts`/`prompt-mode`) das
+  betroffene Feld je Provider strippen lassen:
+  ```yaml
+  provider-options:
+    Opencode:
+      frontmatter-strip-fields: [version, prompt_mode, generated-from]
+  ```
+→ Die gestrippten Werte gehen nicht verloren — sie landen als `<!-- agent-meta-provenance: ... -->`
+  HTML-Kommentar direkt nach dem Frontmatter, damit Traceability/Version-Bump-Enforcement erhalten bleibt.
+→ Default (kein `frontmatter-strip-fields` gesetzt) ist für alle Provider unverändert — reines Opt-in.
