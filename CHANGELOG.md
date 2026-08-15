@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- Approval gates for quality pipeline stages (`scripts/lib/pipelines.py`): new optional
+  `approval_default` (pipeline-level) and `requires_approval` (stage-level, overrides the
+  pipeline default) fields in `config/role-defaults.yaml` / `.meta-config/project.yaml`
+  overrides. When effectively `true` for a stage, the generated pipeline block gets an
+  explicit "wait for user confirmation before this stage starts" instruction, provider-
+  independent, purely instructive like the rest of the pipeline notation. Neither field
+  set means `false` — no shipped base pipeline sets them, so existing generated output is
+  unchanged. Lets projects require sign-off on a planner-produced plan (or any other stage)
+  before it drives execution, e.g. via a `feature-lifecycle` `implement`-stage override.
+  See `docs/guides/quality-pipelines.md#approval-gates-abnahme`.
+
 ## [0.96.0] — 2026-08-15
 
 ### Added

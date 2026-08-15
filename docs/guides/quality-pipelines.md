@@ -51,6 +51,36 @@ Jeder Provider bekommt angepasste Notation:
 | Gemini | `define_subagent` + `invoke_subagent` | `invoke_subagent("developer", "...")` |
 | Continue | Sequentieller Text | `1. @developer ...` |
 
+## Approval Gates (Abnahme)
+
+Jede Stage kann optional eine explizite Nutzer-Abnahme erzwingen, bevor sie startet:
+
+```yaml
+quality_pipelines:
+  feature-lifecycle:
+    approval_default: false   # Pipeline-weiter Default (optional)
+    stages:
+    - id: implement
+      mode: plan-driven
+      requires_approval: true # Override pro Stage (optional)
+      ...
+```
+
+- **Stage-Ebene** (`requires_approval`) überschreibt **Pipeline-Ebene** (`approval_default`).
+- Fehlen beide Felder → `false` (Default, abwärtskompatibel — keine bestehende Pipeline setzt sie).
+- Gilt für jeden Stage-Modus, nicht nur `plan-driven` — z.B. auch vor `commit`.
+- Rendering: eine `⏸`-Zeile vor dem normalen Stage-Block, provider-unabhängig (rein instruktiv, kein Runtime-Enforcement — wie bei `Execution mode`).
+
+Beispiel für den Planner-Anwendungsfall (Plan muss vor Ausführung abgenommen werden), als Projekt-Override in `.meta-config/project.yaml`:
+```yaml
+quality-pipelines:
+  overrides:
+    feature-lifecycle:
+      stages:
+        implement:
+          requires_approval: true
+```
+
 ## SE-Kaskade als Pipeline
 
 Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:
