@@ -24,6 +24,16 @@ def _pipeline_active_for_provider(pipeline: dict, provider: str) -> bool:
     return provider in providers_cfg.get("include", [])
 
 
+def _stage_requires_approval(stage: dict, pipeline: dict) -> bool:
+    """Return whether `stage` needs explicit user approval before it runs.
+
+    Stage-level `requires_approval` overrides the pipeline-level
+    `approval_default`. Neither field set means `False` — backward
+    compatible with pipelines that predate this mechanism.
+    """
+    return bool(stage.get("requires_approval", pipeline.get("approval_default", False)))
+
+
 def load_quality_pipelines(agent_meta_root: str) -> dict:
     """Load quality_pipelines from config/role-defaults.yaml."""
     try:
@@ -177,9 +187,23 @@ def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dic
                             f"a known provider ({', '.join(KNOWN_PROVIDERS)})"
                         )
 
+        approval_default = pipeline.get("approval_default")
+        if approval_default is not None and not isinstance(approval_default, bool):
+            errors.append(
+                f"Pipeline '{name}': approval_default must be a boolean, got "
+                f"{type(approval_default).__name__}"
+            )
+
         errors.extend(_validate_pipeline_composition(pipelines, name, pipeline))
 
         for stage in stages:
+            requires_approval = stage.get("requires_approval")
+            if requires_approval is not None and not isinstance(requires_approval, bool):
+                errors.append(
+                    f"Pipeline '{name}': stage '{stage.get('id')}' requires_approval "
+                    f"must be a boolean, got {type(requires_approval).__name__}"
+                )
+
             agent = stage.get("agent")
             if agent and agent not in available_roles:
                 if stage.get("optional"):
@@ -631,6 +655,12 @@ def _generate_pipeline_block(
         agent = stage.get("agent", "")
         task = stage.get("task", "")
         stage_id = stage.get("id", "")
+
+        if _stage_requires_approval(stage, pipeline):
+            lines.append(
+                f"⏸ Abnahme erforderlich vor Stage '{stage_id}' — warte auf "
+                f"explizite Nutzerbestätigung, bevor {agent or 'diese Stage'} startet."
+            )
 
         if mode == "sequential":
             seq_idx += 1

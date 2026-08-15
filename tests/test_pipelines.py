@@ -578,6 +578,105 @@ def test_sync_agents_passes_real_dod_resolved_to_inject_pipeline_blocks(monkeypa
     assert "resolve_dod(" in source
 
 
+def test_generate_pipeline_block_no_approval_gate_by_default():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {"id": "implement", "agent": "developer", "task": "Feature bauen", "mode": "sequential"},
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    assert "Abnahme erforderlich" not in block
+
+
+def test_generate_pipeline_block_stage_requires_approval_renders_gate():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "implement",
+                "agent": "developer",
+                "task": "Feature bauen",
+                "mode": "sequential",
+                "requires_approval": True,
+            },
+        ]
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    assert "Abnahme erforderlich vor Stage 'implement'" in block
+    # Gate must precede the stage's own rendered line.
+    assert block.index("Abnahme erforderlich") < block.index("Feature bauen")
+
+
+def test_generate_pipeline_block_pipeline_approval_default_applies_to_all_stages():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "approval_default": True,
+        "stages": [
+            {"id": "implement", "agent": "developer", "task": "Feature bauen", "mode": "sequential"},
+            {"id": "commit", "agent": "git", "task": "Commit + PR", "mode": "sequential"},
+        ],
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    assert "Abnahme erforderlich vor Stage 'implement'" in block
+    assert "Abnahme erforderlich vor Stage 'commit'" in block
+
+
+def test_generate_pipeline_block_stage_requires_approval_overrides_pipeline_default():
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "approval_default": True,
+        "stages": [
+            {
+                "id": "implement",
+                "agent": "developer",
+                "task": "Feature bauen",
+                "mode": "sequential",
+                "requires_approval": False,
+            },
+        ],
+    }
+    block = _generate_pipeline_block(pipeline, "Opencode")
+    assert "Abnahme erforderlich" not in block
+
+
+def test_validate_pipelines_rejects_non_bool_approval_default():
+    pipelines = {"p1": {"approval_default": "yes", "stages": []}}
+    errors = validate_pipelines(pipelines, available_roles=[])
+    assert any("approval_default" in e and "boolean" in e for e in errors)
+
+
+def test_validate_pipelines_rejects_non_bool_requires_approval():
+    pipelines = {
+        "p1": {
+            "stages": [
+                {"id": "implement", "agent": "developer", "task": "t", "mode": "sequential",
+                 "requires_approval": "yes"}
+            ]
+        }
+    }
+    errors = validate_pipelines(pipelines, available_roles=["developer"])
+    assert any("requires_approval" in e and "boolean" in e for e in errors)
+
+
+def test_role_defaults_pipelines_render_no_approval_gate_by_default():
+    # Backward-compat guard: no shipped base pipeline sets approval_default/
+    # requires_approval, so no generated block may contain a gate line.
+    from scripts.lib.pipelines import build_pipeline_variables, load_quality_pipelines
+
+    pipelines = load_quality_pipelines(".")
+    variables = build_pipeline_variables(pipelines, active_dod={})
+    for var_name, value in variables.items():
+        if not var_name.endswith("_PROVIDER_BLOCKS"):
+            continue
+        for provider, block in value.items():
+            assert "Abnahme erforderlich" not in block, f"{var_name}/{provider}"
+
+
 def test_feature_lifecycle_pipeline_definition_is_valid():
     import yaml
     from scripts.lib.pipelines import load_quality_pipelines, validate_pipelines
