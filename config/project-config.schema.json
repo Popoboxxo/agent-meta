@@ -74,6 +74,7 @@
           "data-engineer",
           "database-engineer",
           "dependency-auditor",
+          "design-system-architect",
           "developer",
           "devops-engineer",
           "docker",
@@ -83,6 +84,7 @@
           "explorer",
           "export-manager",
           "feedback",
+          "frontend-component-engineer",
           "gemini-expert",
           "git",
           "ideation",
@@ -922,12 +924,29 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "kind": { "type": "string", "enum": ["skill", "hook", "rule", "config", "other"] },
-                  "name": { "type": "string" },
-                  "path": { "type": "string" },
-                  "description": { "type": "string" }
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "skill",
+                      "hook",
+                      "rule",
+                      "config",
+                      "other"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
                 },
-                "required": ["kind"],
+                "required": [
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1025,8 +1044,14 @@
         },
         "allowed-hosts": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["127.0.0.1", "localhost", "::1"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "127.0.0.1",
+            "localhost",
+            "::1"
+          ],
           "description": "List of host:port origins allowed for CORS / DNS-rebinding protection. Extends the default loopback set. Use when binding to a specific network interface."
         }
       },

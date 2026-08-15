@@ -786,13 +786,16 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
             effective = {k: v for k, v in effective.items()
                          if not k.startswith("se-")}
         # Validate pipeline agent references against available roles
-        from .roles import build_role_map
+        from .roles import build_role_map, load_roles_config
         all_roles = list(build_role_map(agent_meta_root).keys())
         if "roles" in config:
             available_roles = set(config["roles"])
         else:
             available_roles = set(all_roles)
-        pipeline_errors = validate_pipelines(effective, list(available_roles))
+        roles_cfg_for_coupling = load_roles_config(agent_meta_root)
+        pipeline_errors = validate_pipelines(
+            effective, list(available_roles), roles_config=roles_cfg_for_coupling
+        )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")
         # Drop structurally malformed pipelines (e.g. 'stages' left as a dict

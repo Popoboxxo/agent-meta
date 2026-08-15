@@ -81,6 +81,17 @@ quality-pipelines:
           requires_approval: true
 ```
 
+## Stage-Detail-Sichtbarkeit: Full-Inline vs. Lean-Reference
+
+Der gerenderte Stage-Detail-Block (`_generate_pipeline_block`) erreicht Agenten auf zwei Wegen, je nach Orchestrator-Modus:
+
+| Modus | Mechanismus | Wo | Token-Kosten |
+|---|---|---|---|
+| `strict`/`advisory` (dedizierter `orchestrator`-Subagent) | `{{PIPELINE_DETAIL_BLOCKS}}` — alle aktiven Pipelines voll inline | `agents/1-generic/orchestrator.md` | einmalig beim Subagent-Spawn, nicht immer-on |
+| `main-chat` (kein Orchestrator-Subagent) | `{{PIPELINE_DETAILS_DIR}}` — ein Zeiger pro Sync, volle Details in separaten Dateien | `rules/1-generic/use-orchestrator.md` (immer geladen) | eine Zeile always-on, volle Details nur per `Read` bei Bedarf |
+
+Für `main-chat` schreibt `sync_pipeline_detail_files()` (`scripts/lib/pipelines.py`) bei jedem Sync eine `<pipeline-name>.md`-Datei pro aktiver Pipeline nach `<PIPELINE_DETAILS_DIR>/` (Default: Geschwisterverzeichnis von `agents_dir`, z.B. `.claude/pipeline-details/`) — inklusive Stale-Cleanup über einen `.agent-meta-managed`-Index (gleiches Muster wie `mcp.py`/`external_tools.py`, siehe `scripts/lib/rule_index.py`). `main_chat` liest die passende Datei erst, wenn eine Pipeline tatsächlich gematcht wurde — die immer geladene `use-orchestrator.md` wächst dadurch nur um einen fixen Hinweis-Satz, unabhängig von der Anzahl der Pipelines.
+
 ## SE-Kaskade als Pipeline
 
 Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:
@@ -95,4 +106,5 @@ Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:
 1. Pipeline in `config/role-defaults.yaml` hinzufügen
 2. Oder Projekt-spezifisch in `.meta-config/project.yaml` unter `custom-pipelines`
 3. `sync.py` ausführen → Platzhalter werden generiert
-4. Im Orchestrator-Template mit `{{PIPELINE_<NAME>_BLOCK}}` referenzieren
+4. Wird automatisch über `{{PIPELINE_DETAIL_BLOCKS}}` in `agents/1-generic/orchestrator.md` gerendert
+   (aggregiert alle aktiven Pipelines) — für eine einzelne Pipeline gezielt: `{{PIPELINE_<NAME>_BLOCK}}`

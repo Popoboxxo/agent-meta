@@ -786,6 +786,8 @@ laufen dann folgenlos durch (exit 0), nichts wird blockiert.
 
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
 
+| `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts. |
+
 | `developer` | Feature-Implementierung und Bugfixes |
 
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
@@ -803,6 +805,8 @@ laufen dann folgenlos durch (exit 0), nichts wird blockiert.
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
 
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
+
+| `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten. |
 
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
 
@@ -914,6 +918,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `copilot-expert.md` → registriere als `copilot-expert`
    - `data-engineer.md` → registriere als `data-engineer`
    - `dependency-auditor.md` → registriere als `dependency-auditor`
+   - `design-system-architect.md` → registriere als `design-system-architect`
    - `developer.md` → registriere als `developer`
    - `devops-engineer.md` → registriere als `devops-engineer`
    - `docker.md` → registriere als `docker`
@@ -923,6 +928,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `explorer.md` → registriere als `explorer`
    - `export-manager.md` → registriere als `export-manager`
    - `feedback.md` → registriere als `feedback`
+   - `frontend-component-engineer.md` → registriere als `frontend-component-engineer`
    - `gemini-expert.md` → registriere als `gemini-expert`
    - `git.md` → registriere als `git`
    - `ideation.md` → registriere als `ideation`
@@ -968,6 +974,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="copilot-expert", ...)
    define_subagent(name="data-engineer", ...)
    define_subagent(name="dependency-auditor", ...)
+   define_subagent(name="design-system-architect", ...)
    define_subagent(name="developer", ...)
    define_subagent(name="devops-engineer", ...)
    define_subagent(name="docker", ...)
@@ -977,6 +984,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="explorer", ...)
    define_subagent(name="export-manager", ...)
    define_subagent(name="feedback", ...)
+   define_subagent(name="frontend-component-engineer", ...)
    define_subagent(name="gemini-expert", ...)
    define_subagent(name="git", ...)
    define_subagent(name="ideation", ...)

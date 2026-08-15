@@ -102,6 +102,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `data-engineer` | Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer |
 | `dependency-auditor` | Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue |
+| `design-system-architect` | Design-System-Schema → echte Token-Artefakte: Primitive/Semantic/Component-Ebenen, Farbharmonie + Kontrast-Gate (Design-time, kein WCAG-Audit), Spacing/Breakpoint-Methodik, Variant-Contracts, Motion-Tokens. |
 | `developer` | Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML) |
 | `devops-engineer` | Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks. |
 | `docker` | Start/stop dev stack, Dockerfiles, binary management |
@@ -111,6 +112,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `explorer` | Analyze codebase / dependencies / impact — read-only, delegates findings |
 | `export-manager` | Use this agent for export routing of structured data to configured targets. |
 | `feedback` | Project feedback: submit bugs, features, improvements as standardized GitHub issues — always before git |
+| `frontend-component-engineer` | Screen-Spec + Token-/Variant-Contract → produktionsreife UI-Komponenten: Props-Contract, State-Matrix (loading/error/empty/success), A11y-Baseline (kein Audit), Motion aus Tokens, Mobile-first, Test-Grundgerüst. |
 | `gemini-expert` | Gemini Experte: Funktionsweise, .gemini Konfiguration, Best Practices |
 | `git` | Commits, branches, tags, push/pull and all git operations |
 | `ideation` | Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert. |

@@ -231,6 +231,8 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/technical-writer.md` | `1-generic/technical-writer.md` (optional, externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials) |
 | `.claude/agents/data-engineer.md` | `1-generic/data-engineer.md` (optional, ETL/ELT-Pipelines, Data-Quality, Lineage-Analyse) |
 | `.claude/agents/accessibility-specialist.md` | `1-generic/accessibility-specialist.md` (optional, WCAG 2.1/2.2, ARIA-Checks, Keyboard-Navigation, Screenreader) |
+| `.claude/agents/design-system-architect.md` | `1-generic/design-system-architect.md` (optional, Design-System-Schema → Token-Artefakte, Farbharmonie, Variant-Contracts) |
+| `.claude/agents/frontend-component-engineer.md` | `1-generic/frontend-component-engineer.md` (optional, Screen-Spec + Token-Contract → produktionsreife UI-Komponenten) |
 | `.claude/agents/refactoring-specialist.md` | `1-generic/refactoring-specialist.md` (optional, systematische Transformation, Strangler-Fig, Legacy-Modernisierung) |
 | `.claude/agents/product-manager.md` | `1-generic/product-manager.md` (optional, Backlog, User-Stories, Priorisierung RICE/MoSCoW, Roadmap) |
 | `.claude/agents/proofreader.md` | `1-generic/proofreader.md` (optional, Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung) |

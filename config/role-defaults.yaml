@@ -217,6 +217,7 @@ roles:
       input_contracts:
       - task-spec-v1
       - req-output-v1
+      - component-build-v1
       output_contract: test-result-v1
     short_desc: TDD, Test-Suite ausführen, Testabdeckung sichern
   e2e-tester:
@@ -796,6 +797,7 @@ roles:
     handoff:
       input_contracts:
       - dev-result-v1
+      - component-build-v1
       output_contract: review-output-v1
       output_schema: schemas/handoffs/ext/review-extension.schema.json
       target_roles:
@@ -839,7 +841,56 @@ roles:
       output_schema: schemas/handoffs/ext/design-extension.schema.json
       target_roles:
       - developer
+      - design-system-architect
     short_desc: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
+  design-system-architect:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: Übersetzt Design-System-Schema (ui-ux-designer) in echte Token-Artefakte
+      (CSS/Tailwind), Farbharmonie-Systematik, Component-Variant-Contracts, Spacing-/Breakpoint-Methodik
+      und Motion-Tokens.
+    routing:
+      intent_keywords:
+      - Design-System
+      - Design-Token
+      - Design-Tokens
+      - Farbschema
+      - Variant-Contract
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - design-spec-v1
+      output_contract: design-token-contract-v1
+      target_roles:
+      - frontend-component-engineer
+    short_desc: Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts.
+  frontend-component-engineer:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: Baut produktionsreife UI-Komponenten aus Screen-Spec (ui-ux-designer)
+      und Token-/Variant-Contract (design-system-architect) — Props-Contract, State-Matrix,
+      A11y-Baseline, Motion-/Responsive-Umsetzung.
+    routing:
+      intent_keywords:
+      - UI-Komponente
+      - React-Komponente
+      - Frontend-Komponente
+      - Komponente bauen
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      input_contracts:
+      - design-token-contract-v1
+      - design-spec-v1
+      output_contract: component-build-v1
+      target_roles:
+      - accessibility-specialist
+      - code-reviewer
+      - tester
+    short_desc: Screen-Spec + Token-Contract → produktionsreife UI-Komponenten.
   api-specialist:
     model: balanced
     memory: project
@@ -1021,6 +1072,8 @@ roles:
       parallel: true
       orchestrator_only: false
     handoff:
+      input_contracts:
+      - component-build-v1
       output_contract: a11y-audit-v1
       target_roles:
       - developer
@@ -1449,6 +1502,7 @@ quality_pipelines:
         - junior-developer
         - developer
         - senior-developer
+        - frontend-component-engineer
     - id: verify
       agent: tester
       task: Tests grün, keine Regression

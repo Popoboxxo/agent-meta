@@ -13,6 +13,43 @@
   unchanged. Lets projects require sign-off on a planner-produced plan (or any other stage)
   before it drives execution, e.g. via a `feature-lifecycle` `implement`-stage override.
   See `docs/guides/quality-pipelines.md#approval-gates-abnahme`.
+- `design-system-architect` and `frontend-component-engineer` agent roles
+  (`agents/1-generic/`): closes the gap between `ui-ux-designer`'s design-system schema
+  and generic `developer` implementation. `design-system-architect` translates a schema
+  into real token artifacts (primitive/semantic/component layers, color-harmony +
+  design-time contrast gate, spacing/breakpoint methodology, component-variant contracts,
+  motion tokens) — explicitly not a WCAG verdict, that stays with `accessibility-specialist`.
+  `frontend-component-engineer` builds production components from screen spec + token/
+  variant contract (props contract, mandatory loading/error/empty/success state matrix,
+  accessibility baseline, motion/responsive implementation from tokens, test scaffold).
+  Registered in `config/role-defaults.yaml` (handoff chain: `ui-ux-designer` ->
+  `design-system-architect` -> `frontend-component-engineer` -> `accessibility-specialist`/
+  `code-reviewer`/`tester`) and added to `feature-lifecycle`'s `implement`-stage
+  `allowed_agents`. See `docs/concepts/planned/ui-expert-agents.md`.
+- Pipeline stage-detail rendering now reaches generated agents (previously dead code):
+  new `{{PIPELINE_DETAIL_BLOCKS}}` in `agents/1-generic/orchestrator.md` (full inline
+  detail for the `ORCH_MODE_STRICT`/`ADVISORY` subagent) and, for the always-loaded
+  main-chat mode, a lean `{{PIPELINE_DETAILS_DIR}}` pointer in `use-orchestrator.md` —
+  one `<pipeline-name>.md` stage-detail file per active pipeline (`scripts/lib/pipelines.py`
+  `sync_pipeline_detail_files()`), read on demand instead of inlined, so the always-on
+  token cost stays a single routing-table line. Also fixes `check_plan_producer_coupling()`
+  never running in production (`build_variables()` was calling `validate_pipelines()`
+  without `roles_config`) and a crash it would have hit on malformed `stages` data.
+- Lean, token-saving pipeline stage-detail visibility for `main-chat` orchestrator mode:
+  new `{{PIPELINE_DETAILS_DIR}}` placeholder in `rules/1-generic/use-orchestrator.md`
+  (always-loaded) points at a new `sync_pipeline_detail_files()` (`scripts/lib/pipelines.py`)
+  output — one `<pipeline-name>.md` stage-detail file per active pipeline, written per
+  provider (derived from `agents_dir`'s sibling, e.g. `.claude/pipeline-details/`, correct
+  even for non-standard nesting like Copilot's `.github/copilot/agents`), with stale-file
+  cleanup via the same managed-index pattern as `mcp.py`/`external_tools.py`. `main_chat`
+  reads the relevant file only once it actually routes to that pipeline — the always-on
+  routing table grows by exactly one instruction line regardless of pipeline count, instead
+  of inlining every pipeline's full stage detail (`{{PIPELINE_DETAIL_BLOCKS}}`, still used
+  as-is for the `strict`/`advisory` `orchestrator` subagent template). Computed centrally
+  in `sync.py`'s per-provider loop so it also reaches providers without a native rules_dir
+  (e.g. Opencode), whose rules content is embedded into the context file instead. Registered
+  as a known first-party artifact in `external_tools_drift.py` so it isn't flagged as
+  undeclared injection drift.
 
 ## [0.96.0] — 2026-08-15
 

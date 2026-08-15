@@ -108,6 +108,12 @@ from lib.mcp import (
     generate_mcp_artifacts,
     sync_secrets_template,
 )
+from lib.pipelines import (
+    apply_overrides,
+    load_quality_pipelines,
+    resolve_pipeline_details_dir,
+    sync_pipeline_detail_files,
+)
 from lib.platform import load_platform_config
 from lib.providers import (
     load_providers_config,
@@ -375,6 +381,18 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     for provider in providers:
         pc = provider_config[provider]
         log.info("test-repo", f"syncing agents for provider: {provider}")  # noqa: PLE1205
+
+        pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
+        test_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
+        pipelines_for_details = apply_overrides(
+            load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+        )
+        if pipelines_for_details:
+            sync_pipeline_detail_files(
+                pipelines_for_details, provider, test_repo_path / pipeline_details_dir,
+                test_repo_path, resolve_dod(config, agent_meta_root), log, dry_run,
+            )
+
         sync_agents_for_provider(agent_meta_root, test_repo_path, config, test_variables,
                                  log, dry_run, provider, provider_config)
         sync_context_for_provider(agent_meta_root, test_repo_path, config, test_variables,
@@ -1088,6 +1106,29 @@ def main():
                 )
             else:
                 provider_variables = variables
+
+            # PIPELINE_DETAILS_DIR + on-demand pipeline stage-detail files —
+            # the lean, always-on-token-saving counterpart to
+            # PIPELINE_DETAIL_BLOCKS (which inlines every pipeline's full
+            # stage detail directly into orchestrator.md; fine for the
+            # ORCH_MODE_STRICT/ADVISORY subagent, too expensive for
+            # main-chat mode's always-loaded use-orchestrator.md / embedded
+            # context file). One file per active pipeline; main_chat Read()s
+            # the relevant one only once it actually routes there. Computed
+            # centrally here (not inside sync_rules()) so it also reaches
+            # providers without a native rules_dir (e.g. Opencode), whose
+            # rules content is embedded into the context file instead
+            # (sync_context_for_provider / _build_managed_block).
+            pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
+            provider_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
+            pipelines_for_details = apply_overrides(
+                load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+            )
+            if pipelines_for_details:
+                sync_pipeline_detail_files(
+                    pipelines_for_details, provider, project_root / pipeline_details_dir,
+                    project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,
+                )
 
             sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
                                      log, args.dry_run, provider, provider_config,

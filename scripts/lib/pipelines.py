@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 
 KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
 DEFAULT_MAX_DEPTH = 4
@@ -303,7 +304,12 @@ def check_plan_producer_coupling(pipelines: dict, roles_config: dict) -> list[st
     for name, pipeline in pipelines.items():
         if not pipeline.get("enabled", True):
             continue
-        for stage in pipeline.get("stages", []):
+        stages = pipeline.get("stages", [])
+        if not isinstance(stages, list):
+            continue  # malformed structure already reported by validate_pipelines()
+        for stage in stages:
+            if not isinstance(stage, dict):
+                continue
             if stage.get("mode") == "plan-driven":
                 plan_driven_pipelines.add(name)
 
@@ -511,6 +517,10 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
 def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_dod: dict) -> str:
     """Replace {{PIPELINE_<NAME>_BLOCK}} in template with provider-optimised notation.
 
+    Also replaces the aggregate {{PIPELINE_DETAIL_BLOCKS}} marker (all active
+    pipelines, one after another) where present — see
+    `generate_pipeline_detail_blocks()`.
+
     Runs *before* standard variable substitution so the placeholder does not
     trigger a "missing variable" warning.
     """
@@ -527,7 +537,35 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
             pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
         )
 
-    return pattern.sub(_replacer, content)
+    content = pattern.sub(_replacer, content)
+    if "{{PIPELINE_DETAIL_BLOCKS}}" in content:
+        content = content.replace(
+            "{{PIPELINE_DETAIL_BLOCKS}}",
+            generate_pipeline_detail_blocks(pipelines, provider, active_dod),
+        )
+    return content
+
+
+def generate_pipeline_detail_blocks(pipelines: dict, provider: str, active_dod: dict) -> str:
+    """Concatenate provider-specific stage-detail blocks for every active pipeline.
+
+    Companion to `generate_pipeline_match_table()` (which only lists signal →
+    pipeline-name rows): this renders the actual stage-by-stage instructions
+    `_generate_pipeline_block()` produces, headed by the pipeline name, for
+    every pipeline that is enabled and active for `provider`.
+    """
+    sections = []
+    for name, pipeline in pipelines.items():
+        if not pipeline.get("enabled", True):
+            continue
+        if not _pipeline_active_for_provider(pipeline, provider):
+            continue
+        block = _generate_pipeline_block(
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+        )
+        if block:
+            sections.append(f"### `{name}`\n{block}")
+    return "\n\n".join(sections)
 
 
 # ---------------------------------------------------------------------------
@@ -796,3 +834,83 @@ def _generate_pipeline_block(
         return ""
 
     return "\n".join(lines)
+
+
+def resolve_pipeline_details_dir(pc: dict, provider: str) -> str:
+    """Resolve the provider-specific pipeline-detail-files directory.
+
+    An explicit `pipeline_details_dir` in ai-providers.yaml wins. Otherwise
+    derived as a sibling of `agents_dir` — not a naive `.{provider.lower()}/`
+    literal — so providers with non-standard nesting (e.g. Copilot's
+    `.github/copilot/agents`) resolve correctly instead of a wrong
+    `.copilot/pipeline-details`. The basename is always "pipeline-details"
+    regardless of provider (see `_PIPELINE_DETAILS_DIR_NAME` in
+    external_tools_drift.py, which relies on this for drift-detection).
+    """
+    if pc.get("pipeline_details_dir"):
+        return pc["pipeline_details_dir"]
+    agents_dir = pc.get("agents_dir", f".{provider.lower()}/agents")
+    return str(Path(agents_dir).parent / "pipeline-details")
+
+
+def sync_pipeline_detail_files(
+    pipelines: dict,
+    provider: str,
+    target_dir,
+    project_root,
+    active_dod: dict,
+    log,
+    dry_run: bool,
+) -> None:
+    """Write one `<name>.md` stage-detail file per active pipeline to `target_dir`.
+
+    Lean, token-saving companion to `generate_pipeline_detail_blocks()`: instead
+    of inlining every pipeline's full stage detail into an always-loaded rules
+    file (main-chat mode's `use-orchestrator.md`), each pipeline gets its own
+    file that `main_chat` reads on demand only once it actually routes there —
+    the always-on cost stays a single routing-table line pointing at this
+    directory. Stale files (pipeline renamed/removed/disabled) are cleaned up
+    via the same previously_managed/now_managed index pattern used by
+    `mcp.py`/`external_tools.py` (`scripts/lib/rule_index.py`).
+    """
+    from .io import safe_path, write_checked
+    from .rule_index import (
+        bootstrap_previously_managed,
+        cleanup_stale_managed_files,
+        write_managed_index,
+    )
+
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    managed_index_path = target_dir / ".agent-meta-managed"
+    previously_managed = bootstrap_previously_managed(target_dir, managed_index_path, "*.md")
+    now_managed: set[str] = set()
+
+    for name, pipeline in pipelines.items():
+        if not pipeline.get("enabled", True):
+            continue
+        if not _pipeline_active_for_provider(pipeline, provider):
+            continue
+        block = _generate_pipeline_block(
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+        )
+        if not block:
+            continue
+
+        filename = f"{name}.md"
+        now_managed.add(filename)
+        target_path = safe_path(target_dir, filename)
+        rel_out = str(target_path.relative_to(project_root))
+        content = f"# Pipeline `{name}`\n\n{block}\n"
+
+        if write_checked(target_path, content, log, f"pipelines/{name}", dry_run=dry_run):
+            log.action("WRITE", rel_out, f"pipeline-details/{name}")
+        else:
+            log.skip(rel_out, "unchanged")
+
+    cleanup_stale_managed_files(
+        target_dir, project_root, previously_managed, now_managed, log, dry_run,
+        "pipeline no longer active/enabled",
+    )
+    write_managed_index(managed_index_path, now_managed, dry_run)
