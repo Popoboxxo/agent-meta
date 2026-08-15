@@ -9,7 +9,7 @@ Main Chat ist Router + Worker. Kein Orchestrator-Subagent. Du bist der Orchestra
 | Intent / Keywords | Agent | Tier | Parallel |
 |-------------------|-------|------|----------|
 | Bug fixen, Bug beheben, Fehler beheben | → Pipeline: `bugfix` | pipeline | no |
-| Konzept, Design-Doc, Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
+| Konzept, Design-Doc, Architektur-Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
 | Dokumentation, README, Docs, Doku | → Pipeline: `docs-update` | pipeline | no |
 | Feature implementieren, Feature bauen, neues Feature, Funktion bauen, Feature Lifecycle, komplexes Feature, Feature Pipeline | → Pipeline: `feature-lifecycle` | pipeline | no |
 | Bug fixen, Bug beheben, Triage, schneller Fix, Hotfix | → Pipeline: `quick-fix` | pipeline | no |

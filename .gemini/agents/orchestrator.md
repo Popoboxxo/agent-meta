@@ -39,7 +39,7 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 | Feature implementieren / Feature bauen / neues Feature | `feature-lifecycle` |
 | Bug fixen / Bug beheben / Triage | `quick-fix` |
 | Bug fixen / Bug beheben / Fehler beheben | `bugfix` |
-| Konzept / Design-Doc / Recherche | `concept-development` |
+| Konzept / Design-Doc / Architektur-Recherche | `concept-development` |
 | Refactoring / aufräumen / Cleanup | `refactor` |
 | Dokumentation / README / Docs | `docs-update` |
 
@@ -135,7 +135,7 @@ Features mit >2 Dateien oder Architektur-Impact.
 | Intent / Keywords | Agent | Tier | Parallel |
 |-------------------|-------|------|----------|
 | Bug fixen, Bug beheben, Fehler beheben | → Pipeline: `bugfix` | pipeline | no |
-| Konzept, Design-Doc, Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
+| Konzept, Design-Doc, Architektur-Recherche, Trade-offs | → Pipeline: `concept-development` | pipeline | no |
 | Dokumentation, README, Docs, Doku | → Pipeline: `docs-update` | pipeline | no |
 | Feature implementieren, Feature bauen, neues Feature, Funktion bauen, Feature Lifecycle, komplexes Feature, Feature Pipeline | → Pipeline: `feature-lifecycle` | pipeline | no |
 | Bug fixen, Bug beheben, Triage, schneller Fix, Hotfix | → Pipeline: `quick-fix` | pipeline | no |

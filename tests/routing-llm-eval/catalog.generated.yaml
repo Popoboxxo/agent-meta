@@ -105,10 +105,10 @@ cases:
 - id: kw-concept-development-03
   pipeline: concept-development
   category: keyword
-  task: 'Bitte Recherche: kümmere dich darum.'
+  task: 'Bitte Architektur-Recherche: kümmere dich darum.'
   expected:
   - concept-development
-  source_keyword: Recherche
+  source_keyword: Architektur-Recherche
 - id: kw-concept-development-04
   pipeline: concept-development
   category: keyword
