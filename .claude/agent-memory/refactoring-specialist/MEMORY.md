@@ -1,0 +1,1 @@
+- [sync.py/lib analysis snapshot](project_sync_lib_analysis.md) — 2026-08-11 refactoring-needs baseline for scripts/sync.py + scripts/lib/*, god functions/dup templating engines/circular imports/dead code, re-verify line numbers before acting

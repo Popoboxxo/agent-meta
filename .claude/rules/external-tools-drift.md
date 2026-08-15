@@ -5,6 +5,4 @@
 ---
 
 - `.claude/rules/external-tools-drift.md` (rule) — keinem registrierten Tool zugeordnet
-- `.claude/CLAUDE.md` (other) — keinem registrierten Tool zugeordnet
-- `.claude/settings.json.graphify-bak` (other) — keinem registrierten Tool zugeordnet
 
