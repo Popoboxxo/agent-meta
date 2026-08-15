@@ -303,7 +303,12 @@ def check_plan_producer_coupling(pipelines: dict, roles_config: dict) -> list[st
     for name, pipeline in pipelines.items():
         if not pipeline.get("enabled", True):
             continue
-        for stage in pipeline.get("stages", []):
+        stages = pipeline.get("stages", [])
+        if not isinstance(stages, list):
+            continue  # malformed structure already reported by validate_pipelines()
+        for stage in stages:
+            if not isinstance(stage, dict):
+                continue
             if stage.get("mode") == "plan-driven":
                 plan_driven_pipelines.add(name)
 
@@ -511,6 +516,10 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
 def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_dod: dict) -> str:
     """Replace {{PIPELINE_<NAME>_BLOCK}} in template with provider-optimised notation.
 
+    Also replaces the aggregate {{PIPELINE_DETAIL_BLOCKS}} marker (all active
+    pipelines, one after another) where present — see
+    `generate_pipeline_detail_blocks()`.
+
     Runs *before* standard variable substitution so the placeholder does not
     trigger a "missing variable" warning.
     """
@@ -527,7 +536,35 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
             pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
         )
 
-    return pattern.sub(_replacer, content)
+    content = pattern.sub(_replacer, content)
+    if "{{PIPELINE_DETAIL_BLOCKS}}" in content:
+        content = content.replace(
+            "{{PIPELINE_DETAIL_BLOCKS}}",
+            generate_pipeline_detail_blocks(pipelines, provider, active_dod),
+        )
+    return content
+
+
+def generate_pipeline_detail_blocks(pipelines: dict, provider: str, active_dod: dict) -> str:
+    """Concatenate provider-specific stage-detail blocks for every active pipeline.
+
+    Companion to `generate_pipeline_match_table()` (which only lists signal →
+    pipeline-name rows): this renders the actual stage-by-stage instructions
+    `_generate_pipeline_block()` produces, headed by the pipeline name, for
+    every pipeline that is enabled and active for `provider`.
+    """
+    sections = []
+    for name, pipeline in pipelines.items():
+        if not pipeline.get("enabled", True):
+            continue
+        if not _pipeline_active_for_provider(pipeline, provider):
+            continue
+        block = _generate_pipeline_block(
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+        )
+        if block:
+            sections.append(f"### `{name}`\n{block}")
+    return "\n\n".join(sections)
 
 
 # ---------------------------------------------------------------------------

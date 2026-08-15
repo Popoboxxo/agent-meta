@@ -677,6 +677,109 @@ def test_role_defaults_pipelines_render_no_approval_gate_by_default():
             assert "Abnahme erforderlich" not in block, f"{var_name}/{provider}"
 
 
+def test_generate_pipeline_detail_blocks_aggregates_active_pipelines():
+    from scripts.lib.pipelines import generate_pipeline_detail_blocks
+
+    pipelines = {
+        "p1": {"stages": [{"id": "x", "agent": "developer", "task": "Task A", "mode": "sequential"}]},
+        "p2": {"stages": [{"id": "y", "agent": "git", "task": "Task B", "mode": "sequential"}]},
+    }
+    result = generate_pipeline_detail_blocks(pipelines, "Opencode", active_dod={})
+    assert "`p1`" in result
+    assert "`p2`" in result
+    assert "Task A" in result
+    assert "Task B" in result
+
+
+def test_generate_pipeline_detail_blocks_skips_disabled_and_inactive_provider():
+    from scripts.lib.pipelines import generate_pipeline_detail_blocks
+
+    pipelines = {
+        "disabled": {"enabled": False, "stages": [{"id": "x", "agent": "developer", "task": "Nope", "mode": "sequential"}]},
+        "claude-only": {
+            "providers": {"default": "inactive", "include": ["Claude"]},
+            "stages": [{"id": "y", "agent": "developer", "task": "OnlyClaude", "mode": "sequential"}],
+        },
+    }
+    result = generate_pipeline_detail_blocks(pipelines, "Opencode", active_dod={})
+    assert "Nope" not in result
+    assert "OnlyClaude" not in result
+    assert "disabled" not in result
+    assert "claude-only" not in result
+
+
+def test_inject_pipeline_blocks_replaces_aggregate_marker():
+    from scripts.lib.pipelines import inject_pipeline_blocks
+
+    pipelines = {
+        "p1": {"stages": [{"id": "x", "agent": "developer", "task": "Feature bauen", "mode": "sequential"}]},
+    }
+    content = "before\n{{PIPELINE_DETAIL_BLOCKS}}\nafter"
+    result = inject_pipeline_blocks(content, pipelines, "Opencode", active_dod={})
+    assert "{{PIPELINE_DETAIL_BLOCKS}}" not in result
+    assert "Feature bauen" in result
+    assert "before" in result and "after" in result
+
+
+def test_orchestrator_template_wires_pipeline_detail_blocks_marker():
+    # Regression guard for review finding C1: the aggregate per-pipeline
+    # stage-detail rendering (_generate_pipeline_block via
+    # generate_pipeline_detail_blocks) previously had NO template consumer
+    # anywhere — computed but never substituted into any generated file.
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    content = (repo_root / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
+    assert "{{PIPELINE_DETAIL_BLOCKS}}" in content
+
+
+def test_build_variables_wires_roles_config_into_plan_producer_coupling_check():
+    # Regression guard for review finding C2: validate_pipelines() was being
+    # called from build_variables() with only 2 positional args, so its
+    # optional roles_config-driven plan-producer-coupling check (a real,
+    # tested code path in pipelines.py) never actually ran in production —
+    # a plan-driven pipeline with no declared producer role would silently
+    # pass validation. A custom pipeline with a plan-driven stage and no
+    # producer role declaring `produces.plan.pipeline` for it must surface
+    # a warning end-to-end through build_variables().
+    from pathlib import Path
+
+    from scripts.lib.config import build_variables
+
+    repo_root = Path(__file__).resolve().parents[1]
+    config = {
+        "quality-pipelines": {
+            "custom-pipelines": {
+                "custom-plan-driven": {
+                    "stages": [
+                        {
+                            "id": "implement",
+                            "mode": "plan-driven",
+                            "plan-driven": {"fallback_agent": "developer"},
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    variables, warnings = build_variables(config, repo_root)
+    assert any("custom-plan-driven" in w and "produces.plan.pipeline" in w for w in warnings)
+
+
+def test_check_plan_producer_coupling_survives_malformed_stages_dict():
+    # Regression test discovered while fixing review finding C2: wiring
+    # roles_config through to validate_pipelines() makes
+    # check_plan_producer_coupling() actually run in production for the
+    # first time — it must not crash on the same malformed 'stages' shape
+    # (dict instead of list) that validate_pipelines()'s own loop already
+    # guards against (audit #402/#403).
+    from scripts.lib.pipelines import check_plan_producer_coupling
+
+    pipelines = {"p1": {"stages": {"review": {"loop": {"max_iterations": 5}}}}}
+    warnings = check_plan_producer_coupling(pipelines, {"roles": {}})
+    assert warnings == []
+
+
 def test_feature_lifecycle_pipeline_definition_is_valid():
     import yaml
     from scripts.lib.pipelines import load_quality_pipelines, validate_pipelines

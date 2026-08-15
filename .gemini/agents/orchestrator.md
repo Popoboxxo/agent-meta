@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.8.0
+version: 7.9.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -10,7 +10,7 @@ tools:
 - TodoWrite
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@7.8.0
+generated-from: 1-generic/orchestrator.md@7.9.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -44,6 +44,80 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 | Dokumentation / README / Docs | `docs-update` |
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
+
+## 2a. Pipeline stage detail
+
+Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-driven/approval-gate specifics) — consult before dispatching a matched pipeline's stages:
+
+### `feature-lifecycle`
+Execution mode: parallel_group
+
+1. invoke_subagent("git", "Feature-Branch anlegen") → warten bis abgeschlossen
+
+**implement** — Plan-driven: Agent aus payload.plan_ref (Stage-ID 'implement') übernehmen.
+
+  **Plan-Validierung (vor Delegation):**
+  1. Prüfe: payload.plan_ref-Pfad existiert → sonst fallback_agent = `developer`
+  2. Prüfe: Plan-Frontmatter `pipeline_stages` enthält `implement` → sonst Fehler
+  3. Prüfe: Agent in Stage `implement` ∈ {junior-developer, developer, senior-developer, frontend-component-engineer} → sonst `developer`
+  4. Bei allen Fehlern: `developer` verwenden, Fehler in Status-Payload dokumentieren
+
+
+**validate-and-document** — Parallel dispatch:
+  - invoke_subagent("validator", "DoD-Check")
+  - invoke_subagent("documenter", "CODEBASE_OVERVIEW aktualisieren")
+
+2. invoke_subagent("git", "Commit: feat([REQ-ID]): ... + PR") → warten bis abgeschlossen
+
+### `quick-fix`
+Execution mode: sequential
+
+1. invoke_subagent("developer", "Bugfix") → warten bis abgeschlossen
+2. invoke_subagent("git", "Commit + Push") → warten bis abgeschlossen
+
+### `bugfix`
+Execution mode: loop
+
+1. invoke_subagent("bug-feature-analyzer", "Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen.") → warten bis abgeschlossen
+2. invoke_subagent("developer", "Bugfix implementieren") → warten bis abgeschlossen
+
+**review** — REPEAT_UNTIL Loop:
+  - invoke_subagent("developer", "Code-Qualität, Blast-Radius, SOLID/DRY prüfen")
+  - invoke_subagent("code-reviewer", "Review / Critic feedback")
+  Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+3. invoke_subagent("documenter", "CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
+
+### `concept-development`
+Execution mode: loop
+
+1. invoke_subagent("ideation", "Recherche: Stand der Technik, Optionen, Quellen, Trade-offs") → warten bis abgeschlossen
+
+**concept** — REPEAT_UNTIL Loop:
+  - invoke_subagent("ideation", "Konzept/Design-Doc erstellen und Review-Feedback einarbeiten")
+  - invoke_subagent("concept-reviewer", "Review / Critic feedback")
+  Max iterations: 3 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+2. invoke_subagent("requirements", "Konzept in REQs überführen") → warten bis abgeschlossen
+
+### `refactor`
+Execution mode: loop
+
+1. invoke_subagent("senior-developer", "Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten") → warten bis abgeschlossen
+2. invoke_subagent("developer", "Refactoring implementieren ohne funktionale Änderungen") → warten bis abgeschlossen
+
+**review** — REPEAT_UNTIL Loop:
+  - invoke_subagent("developer", "Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten")
+  - invoke_subagent("code-reviewer", "Review / Critic feedback")
+  Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+3. invoke_subagent("git", "Commit + Push") → warten bis abgeschlossen
+
+### `docs-update`
+Execution mode: sequential
+
+1. invoke_subagent("documenter", "Dokumentation aktualisieren") → warten bis abgeschlossen
+2. invoke_subagent("git", "Commit + Push") → warten bis abgeschlossen
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 (z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:
@@ -198,6 +272,8 @@ SE mode: optional
 
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
 
+| `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts. |
+
 | `developer` | Feature-Implementierung und Bugfixes |
 
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
@@ -215,6 +291,8 @@ SE mode: optional
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
 
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
+
+| `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten. |
 
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
 

@@ -95,4 +95,5 @@ Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:
 1. Pipeline in `config/role-defaults.yaml` hinzufügen
 2. Oder Projekt-spezifisch in `.meta-config/project.yaml` unter `custom-pipelines`
 3. `sync.py` ausführen → Platzhalter werden generiert
-4. Im Orchestrator-Template mit `{{PIPELINE_<NAME>_BLOCK}}` referenzieren
+4. Wird automatisch über `{{PIPELINE_DETAIL_BLOCKS}}` in `agents/1-generic/orchestrator.md` gerendert
+   (aggregiert alle aktiven Pipelines) — für eine einzelne Pipeline gezielt: `{{PIPELINE_<NAME>_BLOCK}}`

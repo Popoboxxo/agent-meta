@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.8.0"
+version: "7.9.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -33,6 +33,12 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 {{PIPELINE_MATCH_TABLE}}
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
+
+## 2a. Pipeline stage detail
+
+Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-driven/approval-gate specifics) — consult before dispatching a matched pipeline's stages:
+
+{{PIPELINE_DETAIL_BLOCKS}}
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 (z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:

@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 7.8.0
+version: 7.9.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@7.8.0
+generated-from: 1-generic/orchestrator.md@7.9.0
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 permission:
@@ -43,6 +43,80 @@ Mode: strict. Fallbacks: meta-feedback=true, main-chat=true, ask-user=false
 | Dokumentation / README / Docs | `docs-update` |
 
 Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest disabled pipelines.
+
+## 2a. Pipeline stage detail
+
+Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-driven/approval-gate specifics) — consult before dispatching a matched pipeline's stages:
+
+### `feature-lifecycle`
+Execution mode: parallel_group
+
+1. task(subagent_type="git", prompt="Feature-Branch anlegen") → warten bis abgeschlossen
+
+**implement** — Plan-driven: Agent aus payload.plan_ref (Stage-ID 'implement') übernehmen.
+
+  **Plan-Validierung (vor Delegation):**
+  1. Prüfe: payload.plan_ref-Pfad existiert → sonst fallback_agent = `developer`
+  2. Prüfe: Plan-Frontmatter `pipeline_stages` enthält `implement` → sonst Fehler
+  3. Prüfe: Agent in Stage `implement` ∈ {junior-developer, developer, senior-developer, frontend-component-engineer} → sonst `developer`
+  4. Bei allen Fehlern: `developer` verwenden, Fehler in Status-Payload dokumentieren
+
+
+**validate-and-document** — Parallel dispatch:
+  - task(subagent_type="validator", prompt="DoD-Check")
+  - task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW aktualisieren")
+
+2. task(subagent_type="git", prompt="Commit: feat([REQ-ID]): ... + PR") → warten bis abgeschlossen
+
+### `quick-fix`
+Execution mode: sequential
+
+1. task(subagent_type="developer", prompt="Bugfix") → warten bis abgeschlossen
+2. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
+
+### `bugfix`
+Execution mode: loop
+
+1. task(subagent_type="bug-feature-analyzer", prompt="Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope → Pipeline stoppen.") → warten bis abgeschlossen
+2. task(subagent_type="developer", prompt="Bugfix implementieren") → warten bis abgeschlossen
+
+**review** — REPEAT_UNTIL Loop:
+  - task(subagent_type="developer", prompt="Code-Qualität, Blast-Radius, SOLID/DRY prüfen")
+  - task(subagent_type="code-reviewer", prompt="Review / Critic feedback")
+  Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+3. task(subagent_type="documenter", prompt="CODEBASE_OVERVIEW und Session-Erkenntnisse aktualisieren") → warten bis abgeschlossen
+
+### `concept-development`
+Execution mode: loop
+
+1. task(subagent_type="ideation", prompt="Recherche: Stand der Technik, Optionen, Quellen, Trade-offs") → warten bis abgeschlossen
+
+**concept** — REPEAT_UNTIL Loop:
+  - task(subagent_type="ideation", prompt="Konzept/Design-Doc erstellen und Review-Feedback einarbeiten")
+  - task(subagent_type="concept-reviewer", prompt="Review / Critic feedback")
+  Max iterations: 3 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+2. task(subagent_type="requirements", prompt="Konzept in REQs überführen") → warten bis abgeschlossen
+
+### `refactor`
+Execution mode: loop
+
+1. task(subagent_type="senior-developer", prompt="Blast-Radius-Analyse: Scope bestimmen, betroffene Dateien identifizieren, Risiken bewerten") → warten bis abgeschlossen
+2. task(subagent_type="developer", prompt="Refactoring implementieren ohne funktionale Änderungen") → warten bis abgeschlossen
+
+**review** — REPEAT_UNTIL Loop:
+  - task(subagent_type="developer", prompt="Refactoring auf Clean Code, SOLID, DRY prüfen und Feedback einarbeiten")
+  - task(subagent_type="code-reviewer", prompt="Review / Critic feedback")
+  Max iterations: 2 → Erfolg pruefen; bei Abbruch User benachrichtigen
+
+3. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
+
+### `docs-update`
+Execution mode: sequential
+
+1. task(subagent_type="documenter", prompt="Dokumentation aktualisieren") → warten bis abgeschlossen
+2. task(subagent_type="git", prompt="Commit + Push") → warten bis abgeschlossen
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 (z.B. `feature-lifecycle` → Stage `implement`), und KEIN Plan existiert:
@@ -197,6 +271,8 @@ SE mode: optional
 
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
 
+| `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts. |
+
 | `developer` | Feature-Implementierung und Bugfixes |
 
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
@@ -214,6 +290,8 @@ SE mode: optional
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
 
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
+
+| `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten. |
 
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
 
