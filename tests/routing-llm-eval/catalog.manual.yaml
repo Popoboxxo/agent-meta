@@ -1,0 +1,174 @@
+# Handgepflegt: Generalisierung, Negativ-Faelle, Ambiguitaet, Keyword-Kollisionen,
+# Doppel-Tabellen-Drift. Wird zur Laufzeit mit catalog.generated.yaml gemergt
+# (siehe run_eval.sh). Gegensatz zu catalog.generated.yaml: diese Datei wird
+# nicht von einem Skript ueberschrieben und darf von Hand erweitert werden.
+#
+# Herkunft der ersten 17 Faelle (Kategorien keyword/generalization/
+# disambiguation/negative/ambiguous): promotet aus dem PoC in
+# .experiments/promptfoo-routing-eval/ (PR #497), 1:1 uebernommen.
+#
+# Die 5 "drift"-Faelle stammen aus dem Konzept
+# docs/concepts/planned/orchestrator-routing-test-suite.md, Abschnitt 4.3:
+# Vokabular, das bei Opencode/Gemini nur in der vollen "Intent routing"-Tabelle
+# (Sec. 3) steht, aber aus der verkuerzten "Pipeline match check"-Tabelle
+# (Sec. 2, max. 3 Keywords je Pipeline) herausfaellt. Bei Claude irrelevant
+# (nur eine Tabelle), der Katalog bleibt aber bewusst provider-agnostisch --
+# der jeweilige Provider-Runner entscheidet, welche Faelle er ausfuehrt.
+#
+# ID-Praefixe: kw-* ist fuer catalog.generated.yaml reserviert (Kollisions-
+# vermeidung). Hier: mkw- (manuell gepflegter Keyword-Fall), gen-
+# (Generalisierung), dis- (Disambiguierung), neg- (Negativ-Fall), amb-
+# (Ambiguitaet), drift- (Doppel-Tabellen-Drift).
+cases:
+  # --- bugfix ---
+  - id: mkw-bugfix-01
+    pipeline: bugfix
+    category: keyword
+    task: "Bitte behebe den Bug in der Login-Funktion, wo Passwörter falsch validiert werden."
+    expected: [bugfix]
+
+  - id: gen-bugfix-01
+    pipeline: bugfix
+    category: generalization
+    task: "Der Sortier-Algorithmus liefert bei negativen Zahlen ein falsches Ergebnis, das muss korrigiert werden."
+    expected: [bugfix]
+
+  - id: mkw-bugfix-02
+    pipeline: bugfix
+    category: keyword
+    task: "Bitte behebe den Rundungsfehler in der Preisberechnung."
+    expected: [bugfix]
+    source_keyword: "Fehler beheben"
+
+  # --- feature-lifecycle ---
+  - id: mkw-feature-lifecycle-01
+    pipeline: feature-lifecycle
+    category: keyword
+    task: "Wir brauchen ein komplett neues Feature: ein Dark-Mode-Umschalter in den Einstellungen."
+    expected: [feature-lifecycle]
+
+  - id: gen-feature-lifecycle-01
+    pipeline: feature-lifecycle
+    category: generalization
+    task: "Wir wollen die Möglichkeit einbauen, dass Nutzer ein eigenes Profilbild hochladen können."
+    expected: [feature-lifecycle]
+
+  # --- docs-update ---
+  - id: mkw-docs-update-01
+    pipeline: docs-update
+    category: keyword
+    task: "Bitte aktualisiere die README mit den neuen Installationsschritten."
+    expected: [docs-update]
+
+  - id: gen-docs-update-01
+    pipeline: docs-update
+    category: generalization
+    task: "Der Leitfaden für Endnutzer beschreibt noch den alten Login-Ablauf, das muss korrigiert werden."
+    expected: [docs-update]
+
+  # --- refactor ---
+  - id: mkw-refactor-01
+    pipeline: refactor
+    category: keyword
+    task: "Räum bitte den Code in diesem Modul auf, da ist viel Duplikation drin."
+    expected: [refactor]
+
+  - id: gen-refactor-01
+    pipeline: refactor
+    category: generalization
+    task: "Diese Funktion ist 400 Zeilen lang und erledigt fünf verschiedene Dinge gleichzeitig, das sollte man aufteilen."
+    expected: [refactor]
+
+  # --- concept-development ---
+  - id: mkw-concept-development-01
+    pipeline: concept-development
+    category: keyword
+    task: "Erstelle ein Konzept-Dokument, das die Trade-offs zwischen den beiden Architektur-Ansätzen abwägt."
+    expected: [concept-development]
+
+  - id: gen-concept-development-01
+    pipeline: concept-development
+    category: generalization
+    task: "Bevor wir loslegen, sollten wir aufschreiben, welche Architekturoptionen es gibt und was für und gegen jede spricht."
+    expected: [concept-development]
+
+  # --- quick-fix: bugfix/quick-fix keyword overlap, disambiguated via urgency framing ---
+  - id: dis-quick-fix-01
+    pipeline: quick-fix
+    category: disambiguation
+    task: "Produktions-Hotfix: die App crasht gerade für alle Nutzer, wir brauchen SOFORT einen schnellen Fix."
+    expected: [quick-fix]
+    source_keyword: "Hotfix"
+
+  - id: dis-quick-fix-02
+    pipeline: quick-fix
+    category: disambiguation
+    task: "Wir müssen die eingehenden Störungsmeldungen triagieren und priorisieren, bevor wir irgendwas fixen."
+    expected: [quick-fix]
+    source_keyword: "Triage"
+
+  # --- negative: no pipeline should fire ---
+  - id: neg-01
+    pipeline: null
+    category: negative
+    task: "Wie ist das Wetter heute in Berlin?"
+    expected: [none]
+
+  - id: neg-02
+    pipeline: null
+    category: negative
+    task: "Führe bitte die Test-Suite aus und sag mir, ob sie durchläuft."
+    expected: [none]
+
+  - id: neg-03
+    pipeline: null
+    category: negative
+    task: "Erklär mir bitte, wie die Authentifizierung in diesem Projekt aktuell funktioniert."
+    expected: [none]
+
+  # --- ambiguous / multi-intent: no single correct answer, only implausible ones ---
+  - id: amb-01
+    pipeline: null
+    category: ambiguous
+    task: "Es gibt einen Bug, den wir dringend fixen und deployen müssen, aber der Code drumherum sollte dabei auch gleich aufgeräumt werden."
+    expected: [bugfix, quick-fix, refactor]
+
+  # --- double-table drift (Konzept Abschnitt 4.3): Vokabular nur in der
+  # vollen Intent-Routing-Tabelle (Sec. 3), nicht in der verkuerzten
+  # Pipeline-match-check-Tabelle (Sec. 2, max. 3 Keywords/Pipeline) bei
+  # Opencode/Gemini. Bei Claude irrelevant (nur eine Tabelle), aber
+  # provider-agnostisch im Katalog gehalten. ---
+  - id: drift-feature-lifecycle-01
+    pipeline: feature-lifecycle
+    category: drift
+    task: "Wir müssen eine neue Funktion bauen, die den Export als CSV ermöglicht."
+    expected: [feature-lifecycle]
+    source_keyword: "Funktion bauen"
+
+  - id: drift-quick-fix-01
+    pipeline: quick-fix
+    category: drift
+    task: "Wir brauchen einen Hotfix, sofort."
+    expected: [quick-fix]
+    source_keyword: "Hotfix"
+
+  - id: drift-refactor-01
+    pipeline: refactor
+    category: drift
+    task: "Bitte den Code in diesem Modul verbessern."
+    expected: [refactor]
+    source_keyword: "Code verbessern"
+
+  - id: drift-docs-update-01
+    pipeline: docs-update
+    category: drift
+    task: "Die Doku ist veraltet, bitte aktualisieren."
+    expected: [docs-update]
+    source_keyword: "Doku"
+
+  - id: drift-concept-development-01
+    pipeline: concept-development
+    category: drift
+    task: "Wäge bitte die Trade-offs zwischen den beiden Ansätzen ab."
+    expected: [concept-development]
+    source_keyword: "Trade-offs"

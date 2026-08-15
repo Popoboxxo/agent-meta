@@ -1,0 +1,174 @@
+# AUTO-GENERIERT von scripts/gen_routing_llm_eval_catalog.py -- nicht von Hand editieren.
+# Quelle: config/role-defaults.yaml -> quality_pipelines[*].signal_keywords,
+# gefiltert nach dem se-focus/se-Praefix-Kriterium aus scripts/lib/config.py
+# (siehe docs/concepts/planned/orchestrator-routing-test-suite.md, Abschnitt 4.1).
+#
+# Ein Testfall pro nicht-kollidierendem signal_keyword ueber alle gefilterten
+# Pipelines. Kollidierende Keywords (aktuell "Bug fixen", "Bug beheben" --
+# geteilt zwischen bugfix/quick-fix) werden NICHT auto-generiert, siehe
+# catalog.manual.yaml fuer ihre disambiguierenden Testfaelle.
+#
+# Regenerieren: python scripts/gen_routing_llm_eval_catalog.py
+
+cases:
+- id: kw-feature-lifecycle-01
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte Feature implementieren: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: Feature implementieren
+- id: kw-feature-lifecycle-02
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte Feature bauen: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: Feature bauen
+- id: kw-feature-lifecycle-03
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte neues Feature: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: neues Feature
+- id: kw-feature-lifecycle-04
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte Funktion bauen: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: Funktion bauen
+- id: kw-feature-lifecycle-05
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte Feature Lifecycle: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: Feature Lifecycle
+- id: kw-feature-lifecycle-06
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte komplexes Feature: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: komplexes Feature
+- id: kw-feature-lifecycle-07
+  pipeline: feature-lifecycle
+  category: keyword
+  task: 'Bitte Feature Pipeline: kümmere dich darum.'
+  expected:
+  - feature-lifecycle
+  source_keyword: Feature Pipeline
+- id: kw-quick-fix-01
+  pipeline: quick-fix
+  category: keyword
+  task: 'Bitte Triage: kümmere dich darum.'
+  expected:
+  - quick-fix
+  source_keyword: Triage
+- id: kw-quick-fix-02
+  pipeline: quick-fix
+  category: keyword
+  task: 'Bitte schneller Fix: kümmere dich darum.'
+  expected:
+  - quick-fix
+  source_keyword: schneller Fix
+- id: kw-quick-fix-03
+  pipeline: quick-fix
+  category: keyword
+  task: 'Bitte Hotfix: kümmere dich darum.'
+  expected:
+  - quick-fix
+  source_keyword: Hotfix
+- id: kw-bugfix-01
+  pipeline: bugfix
+  category: keyword
+  task: 'Bitte Fehler beheben: kümmere dich darum.'
+  expected:
+  - bugfix
+  source_keyword: Fehler beheben
+- id: kw-concept-development-01
+  pipeline: concept-development
+  category: keyword
+  task: 'Bitte Konzept: kümmere dich darum.'
+  expected:
+  - concept-development
+  source_keyword: Konzept
+- id: kw-concept-development-02
+  pipeline: concept-development
+  category: keyword
+  task: 'Bitte Design-Doc: kümmere dich darum.'
+  expected:
+  - concept-development
+  source_keyword: Design-Doc
+- id: kw-concept-development-03
+  pipeline: concept-development
+  category: keyword
+  task: 'Bitte Recherche: kümmere dich darum.'
+  expected:
+  - concept-development
+  source_keyword: Recherche
+- id: kw-concept-development-04
+  pipeline: concept-development
+  category: keyword
+  task: 'Bitte Trade-offs: kümmere dich darum.'
+  expected:
+  - concept-development
+  source_keyword: Trade-offs
+- id: kw-refactor-01
+  pipeline: refactor
+  category: keyword
+  task: 'Bitte Refactoring: kümmere dich darum.'
+  expected:
+  - refactor
+  source_keyword: Refactoring
+- id: kw-refactor-02
+  pipeline: refactor
+  category: keyword
+  task: 'Bitte aufräumen: kümmere dich darum.'
+  expected:
+  - refactor
+  source_keyword: aufräumen
+- id: kw-refactor-03
+  pipeline: refactor
+  category: keyword
+  task: 'Bitte Cleanup: kümmere dich darum.'
+  expected:
+  - refactor
+  source_keyword: Cleanup
+- id: kw-refactor-04
+  pipeline: refactor
+  category: keyword
+  task: 'Bitte Code verbessern: kümmere dich darum.'
+  expected:
+  - refactor
+  source_keyword: Code verbessern
+- id: kw-docs-update-01
+  pipeline: docs-update
+  category: keyword
+  task: 'Bitte Dokumentation: kümmere dich darum.'
+  expected:
+  - docs-update
+  source_keyword: Dokumentation
+- id: kw-docs-update-02
+  pipeline: docs-update
+  category: keyword
+  task: 'Bitte README: kümmere dich darum.'
+  expected:
+  - docs-update
+  source_keyword: README
+- id: kw-docs-update-03
+  pipeline: docs-update
+  category: keyword
+  task: 'Bitte Docs: kümmere dich darum.'
+  expected:
+  - docs-update
+  source_keyword: Docs
+- id: kw-docs-update-04
+  pipeline: docs-update
+  category: keyword
+  task: 'Bitte Doku: kümmere dich darum.'
+  expected:
+  - docs-update
+  source_keyword: Doku
