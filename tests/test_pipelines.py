@@ -721,6 +721,21 @@ def test_inject_pipeline_blocks_replaces_aggregate_marker():
     assert "before" in result and "after" in result
 
 
+def test_use_orchestrator_rule_wires_pipeline_details_dir_marker():
+    # Regression guard for the main-chat-mode lean-detail follow-up: unlike
+    # orchestrator.md (full PIPELINE_DETAIL_BLOCKS inline, fine for the
+    # subagent), use-orchestrator.md is always-loaded in main-chat mode —
+    # it must reference PIPELINE_DETAILS_DIR (one Read-on-demand pointer),
+    # never PIPELINE_DETAIL_BLOCKS (which would inline every pipeline's full
+    # stage detail into the always-on rules file).
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    content = (repo_root / "rules" / "1-generic" / "use-orchestrator.md").read_text(encoding="utf-8")
+    assert "{{PIPELINE_DETAILS_DIR}}" in content
+    assert "{{PIPELINE_DETAIL_BLOCKS}}" not in content
+
+
 def test_orchestrator_template_wires_pipeline_detail_blocks_marker():
     # Regression guard for review finding C1: the aggregate per-pipeline
     # stage-detail rendering (_generate_pipeline_block via
@@ -778,6 +793,102 @@ def test_check_plan_producer_coupling_survives_malformed_stages_dict():
     pipelines = {"p1": {"stages": {"review": {"loop": {"max_iterations": 5}}}}}
     warnings = check_plan_producer_coupling(pipelines, {"roles": {}})
     assert warnings == []
+
+
+def test_resolve_pipeline_details_dir_explicit_override_wins():
+    from scripts.lib.pipelines import resolve_pipeline_details_dir
+
+    pc = {"agents_dir": ".claude/agents", "pipeline_details_dir": ".claude/custom-dir"}
+    assert resolve_pipeline_details_dir(pc, "Claude") == ".claude/custom-dir"
+
+
+def test_resolve_pipeline_details_dir_derives_from_agents_dir_sibling():
+    from scripts.lib.pipelines import resolve_pipeline_details_dir
+
+    pc = {"agents_dir": ".claude/agents"}
+    assert resolve_pipeline_details_dir(pc, "Claude") == ".claude/pipeline-details"
+
+
+def test_resolve_pipeline_details_dir_handles_nested_agents_dir():
+    # Regression guard: a naive f".{provider.lower()}/pipeline-details" would
+    # produce the wrong ".copilot/pipeline-details" for a provider whose
+    # agents_dir nests deeper than the provider-name convention (Copilot:
+    # .github/copilot/agents) — must derive from agents_dir's actual parent.
+    from scripts.lib.pipelines import resolve_pipeline_details_dir
+
+    pc = {"agents_dir": ".github/copilot/agents"}
+    assert resolve_pipeline_details_dir(pc, "Copilot") == ".github/copilot/pipeline-details"
+
+
+def test_resolve_pipeline_details_dir_falls_back_without_agents_dir():
+    from scripts.lib.pipelines import resolve_pipeline_details_dir
+
+    assert resolve_pipeline_details_dir({}, "Gemini") == ".gemini/pipeline-details"
+
+
+def test_sync_pipeline_detail_files_writes_one_file_per_active_pipeline(tmp_path):
+    from scripts.lib.log import SyncLog
+    from scripts.lib.pipelines import sync_pipeline_detail_files
+
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "pipeline-details"
+    pipelines = {
+        "p1": {"stages": [{"id": "x", "agent": "developer", "task": "Task A", "mode": "sequential"}]},
+        "p2": {"stages": [{"id": "y", "agent": "git", "task": "Task B", "mode": "sequential"}]},
+    }
+    sync_pipeline_detail_files(pipelines, "Opencode", target_dir, project_root, {}, SyncLog(), dry_run=False)
+
+    p1_file = target_dir / "p1.md"
+    p2_file = target_dir / "p2.md"
+    assert p1_file.exists()
+    assert p2_file.exists()
+    assert "Task A" in p1_file.read_text(encoding="utf-8")
+    assert "Task B" in p2_file.read_text(encoding="utf-8")
+
+    index_path = target_dir / ".agent-meta-managed"
+    assert set(index_path.read_text(encoding="utf-8").split()) == {"p1.md", "p2.md"}
+
+
+def test_sync_pipeline_detail_files_skips_disabled_and_inactive_provider(tmp_path):
+    from scripts.lib.log import SyncLog
+    from scripts.lib.pipelines import sync_pipeline_detail_files
+
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "pipeline-details"
+    pipelines = {
+        "disabled": {"enabled": False, "stages": [{"id": "x", "agent": "developer", "task": "t", "mode": "sequential"}]},
+        "claude-only": {
+            "providers": {"default": "inactive", "include": ["Claude"]},
+            "stages": [{"id": "y", "agent": "developer", "task": "t", "mode": "sequential"}],
+        },
+    }
+    sync_pipeline_detail_files(pipelines, "Opencode", target_dir, project_root, {}, SyncLog(), dry_run=False)
+
+    assert not (target_dir / "disabled.md").exists()
+    assert not (target_dir / "claude-only.md").exists()
+
+
+def test_sync_pipeline_detail_files_removes_stale_file_when_pipeline_deactivated(tmp_path):
+    from scripts.lib.log import SyncLog
+    from scripts.lib.pipelines import sync_pipeline_detail_files
+
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "pipeline-details"
+    both = {
+        "p1": {"stages": [{"id": "x", "agent": "developer", "task": "Task A", "mode": "sequential"}]},
+        "p2": {"stages": [{"id": "y", "agent": "git", "task": "Task B", "mode": "sequential"}]},
+    }
+    sync_pipeline_detail_files(both, "Opencode", target_dir, project_root, {}, SyncLog(), dry_run=False)
+    assert (target_dir / "p1.md").exists()
+    assert (target_dir / "p2.md").exists()
+
+    only_p1 = {"p1": both["p1"]}
+    sync_pipeline_detail_files(only_p1, "Opencode", target_dir, project_root, {}, SyncLog(), dry_run=False)
+    assert (target_dir / "p1.md").exists()
+    assert not (target_dir / "p2.md").exists()
+
+    index_path = target_dir / ".agent-meta-managed"
+    assert set(index_path.read_text(encoding="utf-8").split()) == {"p1.md"}
 
 
 def test_feature_lifecycle_pipeline_definition_is_valid():

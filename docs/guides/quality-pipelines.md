@@ -81,6 +81,17 @@ quality-pipelines:
           requires_approval: true
 ```
 
+## Stage-Detail-Sichtbarkeit: Full-Inline vs. Lean-Reference
+
+Der gerenderte Stage-Detail-Block (`_generate_pipeline_block`) erreicht Agenten auf zwei Wegen, je nach Orchestrator-Modus:
+
+| Modus | Mechanismus | Wo | Token-Kosten |
+|---|---|---|---|
+| `strict`/`advisory` (dedizierter `orchestrator`-Subagent) | `{{PIPELINE_DETAIL_BLOCKS}}` — alle aktiven Pipelines voll inline | `agents/1-generic/orchestrator.md` | einmalig beim Subagent-Spawn, nicht immer-on |
+| `main-chat` (kein Orchestrator-Subagent) | `{{PIPELINE_DETAILS_DIR}}` — ein Zeiger pro Sync, volle Details in separaten Dateien | `rules/1-generic/use-orchestrator.md` (immer geladen) | eine Zeile always-on, volle Details nur per `Read` bei Bedarf |
+
+Für `main-chat` schreibt `sync_pipeline_detail_files()` (`scripts/lib/pipelines.py`) bei jedem Sync eine `<pipeline-name>.md`-Datei pro aktiver Pipeline nach `<PIPELINE_DETAILS_DIR>/` (Default: Geschwisterverzeichnis von `agents_dir`, z.B. `.claude/pipeline-details/`) — inklusive Stale-Cleanup über einen `.agent-meta-managed`-Index (gleiches Muster wie `mcp.py`/`external_tools.py`, siehe `scripts/lib/rule_index.py`). `main_chat` liest die passende Datei erst, wenn eine Pipeline tatsächlich gematcht wurde — die immer geladene `use-orchestrator.md` wächst dadurch nur um einen fixen Hinweis-Satz, unabhängig von der Anzahl der Pipelines.
+
 ## SE-Kaskade als Pipeline
 
 Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:

@@ -119,8 +119,16 @@ def render_injection_drift_artifacts(
 _INFRA_ROOT_KNOWN_KEYS = [
     "agents_dir", "hooks_dir", "rules_dir", "commands_dir", "skills_dir",
     "snippets_dir", "extension_dir", "artifact_dir", "checkpoint_dir",
-    "settings_file", "pending_tasks_file",
+    "settings_file", "pending_tasks_file", "pipeline_details_dir",
 ]
+# Written by sync_pipeline_detail_files() (scripts/lib/pipelines.py) for
+# every active provider unconditionally — not gated by a has_X capability
+# like hooks_dir/rules_dir/commands_dir, so it doesn't fit the
+# capability_by_key fallback loop below. sync.py derives its path from
+# agents_dir's parent when no explicit `pipeline_details_dir` is configured
+# in ai-providers.yaml, but the basename is always this constant regardless
+# of provider.
+_PIPELINE_DETAILS_DIR_NAME = "pipeline-details"
 # Per-provider hardcoded fallback dirs for capability-gated keys that some
 # providers (Claude, Continue) never store in ai-providers.yaml, relying
 # instead on a literal default in the sync code itself (dir_specs above /
@@ -262,6 +270,7 @@ def scan_injection_drift(
                 for key, fallbacks in _INFRA_ROOT_FALLBACK_DIRS.items():
                     if pc.get(capability_by_key[key], False) and provider in fallbacks:
                         known_names.add(Path(fallbacks[provider]).name)
+                known_names.add(_PIPELINE_DETAILS_DIR_NAME)
                 # settings_local_file's basename varies per provider (e.g.
                 # Continue: config.local.yaml, not settings.local.json).
                 settings_local_val = pc.get("settings_local_file")

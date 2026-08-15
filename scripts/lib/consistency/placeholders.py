@@ -80,6 +80,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     "PIPELINE_MATCH_TABLE", "INTENT_ROUTING_TABLE", "PIPELINE_DETAIL_BLOCKS",
+    "PIPELINE_DETAILS_DIR",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging
