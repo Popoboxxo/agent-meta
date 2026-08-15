@@ -10,6 +10,7 @@ continue-expert.md
 copilot-expert.md
 data-engineer.md
 dependency-auditor.md
+design-system-architect.md
 developer.md
 devops-engineer.md
 docker.md
@@ -19,6 +20,7 @@ effort-estimator.md
 explorer.md
 export-manager.md
 feedback.md
+frontend-component-engineer.md
 gemini-expert.md
 git.md
 ideation.md
