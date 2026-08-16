@@ -132,6 +132,16 @@ def _update_frontmatter_dict(content: str, updates: dict, removes: list | None =
         return content
 
 
+def _insert_after_frontmatter(content: str, comment: str) -> str:
+    """Insert `comment` as the first line of the body, right after the
+    closing frontmatter '---'. No-op (returns content unchanged) if no
+    frontmatter block is found."""
+    fm_block, body = _split_frontmatter(content)
+    if not fm_block:
+        return content
+    return f"{fm_block}\n{comment}{body}"
+
+
 def extract_frontmatter_field(content: str, field: str) -> str | None:
     """Extract a YAML frontmatter field value.
 
@@ -281,12 +291,34 @@ def is_deprecated_template(content: str) -> bool:
 
 
 def build_frontmatter(content: str, name: str, description: str,
-                      generated_from: str | None = None) -> str:
+                      generated_from: str | None = None,
+                      strip_fields: list[str] | None = None) -> str:
     """Replace name and description in YAML frontmatter.
 
     Preserves existing version/based-on fields.
     Emits generated-from field for template traceability.
+
+    strip_fields: frontmatter keys to omit for providers with strict schema
+    validation that reject fields outside their own agent-definition schema
+    (issue #505 — e.g. a strict validation layer in front of an Opencode-
+    shaped agent format rejecting agent-meta's own `version`/`prompt_mode`/
+    `generated-from` bookkeeping fields). Their pre-strip values (including
+    the `generated_from` this call would otherwise have written) are
+    preserved in an `agent-meta-provenance` HTML comment right after the
+    frontmatter, so traceability and version-bump enforcement (Hard
+    Invariant #2) survive the strip. A field absent from the source is
+    silently skipped, not fabricated into the comment.
     """
+    provenance_comment = None
+    if strip_fields:
+        existing_fm = _parse_frontmatter_yaml(content)
+        preserved = {k: existing_fm[k] for k in strip_fields if k in existing_fm}
+        if generated_from and "generated-from" in strip_fields:
+            preserved["generated-from"] = generated_from
+        if preserved:
+            pairs = " ".join(f"{k}={v}" for k, v in preserved.items())
+            provenance_comment = f"<!-- agent-meta-provenance: {pairs} -->"
+
     if _YAML_AVAILABLE:
         removes = []
         updates = {"name": name, "description": description}
@@ -302,11 +334,16 @@ def build_frontmatter(content: str, name: str, description: str,
         existing_hint = _parse_frontmatter_yaml(content).get("hint")
         if isinstance(existing_hint, str) and existing_hint.strip() == (description or "").strip():
             removes.append("hint")
-        return _update_frontmatter_dict(
+        if strip_fields:
+            removes.extend(strip_fields)
+        result = _update_frontmatter_dict(
             content,
             updates=updates,
             removes=removes,
         )
+        if provenance_comment:
+            result = _insert_after_frontmatter(result, provenance_comment)
+        return result
 
     content = re.sub(
         r"(^---\n.*?^name:\s*)(.+?)(\n)",
@@ -1013,9 +1050,24 @@ def transform_agent_content_for_provider(
     log: SyncLog,
 ) -> str:
     from .roles import (        load_roles_config,        resolve_max_tokens,        resolve_memory,        resolve_model,        resolve_permission_mode,        resolve_steps,        resolve_temperature,    )
+    # Opt-in per-provider frontmatter field stripping (issue #505): a
+    # provider/validation layer with a strict agent-definition schema can
+    # reject agent-meta's own bookkeeping fields (version/prompt_mode/
+    # generated-from) as unknown extra inputs. Empty by default for every
+    # shipped provider — fully backward compatible. A project opts in via
+    # the existing project-level `provider-options` block (same mechanism
+    # Continue's generate-prompts/prompt-mode already use, see
+    # providers.py::resolve_provider_options()) — no core agent-meta change
+    # needed per consumer provider quirk. `ai-providers.yaml` itself can
+    # also set `frontmatter_strip_fields` as a provider-wide default.
+    _strip_fields = (
+        config.get('provider-options', {}).get(provider, {}).get('frontmatter-strip-fields')
+        or provider_config.get(provider, {}).get('frontmatter_strip_fields', [])
+    )
     if provider == 'Continue':
         # Continue agents: preserve original frontmatter, inject model/memory, add alwaysApply
-        content = build_frontmatter(content, name, description, generated_from=generated_from)
+        content = build_frontmatter(content, name, description, generated_from=generated_from,
+                                    strip_fields=_strip_fields)
         model = resolve_model(role, config, agent_meta_root,
                               provider=provider, provider_config=provider_config, log=log)
         if not model:
@@ -1062,7 +1114,8 @@ def transform_agent_content_for_provider(
         if fm_end != -1:
             content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
     else:
-        content = build_frontmatter(content, name, description, generated_from=generated_from)
+        content = build_frontmatter(content, name, description, generated_from=generated_from,
+                                    strip_fields=_strip_fields)
 
         if provider == 'Claude':
             model = resolve_model(role, config, agent_meta_root,
@@ -1177,13 +1230,15 @@ def transform_agent_content_for_provider(
                 # Replace tools with validated subset before transformation
                 content = _update_frontmatter_dict(content, {'tools': _opencode_valid_tools})
             content = _transform_frontmatter_for_opencode(
-                content, name, description, model, steps, generated_from, agent_meta_root, temperature
+                content, name, description, model, steps, generated_from, agent_meta_root, temperature,
+                strip_fields=_strip_fields,
             )
 
         elif provider == 'Copilot':
             # Copilot: frontmatter without model/memory/permissionMode/tools
             # Uses IDE-configured models — no per-agent model field
-            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            content = build_frontmatter(content, name, description, generated_from=generated_from,
+                                        strip_fields=_strip_fields)
             content = _remove_frontmatter_fields(content, [
                 'memory', 'permissionMode', 'temperature', 'top_p', 'top_k',
                 'stop_sequences', 'max_output_tokens', 'tools',
@@ -1198,7 +1253,8 @@ def transform_agent_content_for_provider(
 
         elif provider == 'Mammouth':
             # Mammouth Code agent: supports model, permissionMode, and tools fields.
-            content = build_frontmatter(content, name, description, generated_from=generated_from)
+            content = build_frontmatter(content, name, description, generated_from=generated_from,
+                                        strip_fields=_strip_fields)
             model = resolve_model(role, config, agent_meta_root,
                                   provider=provider, provider_config=provider_config, log=log)
             content = inject_model_field(content, model)
@@ -1703,6 +1759,7 @@ def _transform_frontmatter_for_opencode(
     generated_from: str,
     agent_meta_root: Path,
     temperature: str = "",
+    strip_fields: list[str] | None = None,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -1714,11 +1771,30 @@ def _transform_frontmatter_for_opencode(
       steps: <int> (optional)
       permission:             (mapped from template frontmatter tools)
         <key>: allow
+
+    strip_fields: frontmatter keys to omit for providers/validation layers
+    with a strict schema that rejects agent-meta's own bookkeeping fields
+    (issue #505 — a Console Go validator in front of this exact schema
+    rejected `version`/`prompt_mode`/`generated-from` as unknown extra
+    inputs; `prompt_mode` was previously never stripped at all, just
+    implicitly inherited from the source template's frontmatter). Their
+    pre-strip values are preserved in an `agent-meta-provenance` HTML
+    comment so traceability/version-bump enforcement survives the strip.
     """
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
 
     template_fm = _parse_frontmatter_yaml(content)
+    strip_fields = strip_fields or []
+
+    provenance_comment = None
+    if strip_fields:
+        preserved = {k: template_fm[k] for k in strip_fields if k in template_fm}
+        if generated_from and "generated-from" in strip_fields:
+            preserved["generated-from"] = generated_from
+        if preserved:
+            pairs = " ".join(f"{k}={v}" for k, v in preserved.items())
+            provenance_comment = f"<!-- agent-meta-provenance: {pairs} -->"
 
     # Preserve original fields and add/update opencode-specific ones
     updates: dict = {
@@ -1726,9 +1802,9 @@ def _transform_frontmatter_for_opencode(
         "description": description,
         "mode": template_fm.get("mode") or "subagent",
     }
-    if template_fm.get("version"):
+    if template_fm.get("version") and "version" not in strip_fields:
         updates["version"] = template_fm.get("version")
-    if generated_from:
+    if generated_from and "generated-from" not in strip_fields:
         updates["generated-from"] = generated_from
     if model:
         updates["model"] = model
@@ -1775,13 +1851,18 @@ def _transform_frontmatter_for_opencode(
         "maxSteps",
         "memory",
     ]
+    if strip_fields:
+        removes.extend(strip_fields)
 
     content = _update_frontmatter_dict(content, updates, removes=removes)
 
     # Replace body with stripped version
     fm_end = content.find('\n---', 3)
     if fm_end != -1:
-        content = content[:fm_end + 4] + '\n' + body.lstrip('\n')
+        new_body = body.lstrip('\n')
+        if provenance_comment:
+            new_body = f"{provenance_comment}\n{new_body}"
+        content = content[:fm_end + 4] + '\n' + new_body
 
     return content
 

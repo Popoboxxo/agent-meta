@@ -87,6 +87,8 @@ STRICT_CASES = [
     ("#agent-meta:agent=gitx\necho test", 2),  # not a recognized agent -> blocked
     (" #agent-meta:agent=git\ngit status", 0),  # surrounding whitespace is stripped before matching, still exempt
     ("echo '#agent-meta:agent=git'\ngit status", 2),  # sentinel must be the actual first line, not embedded text
+    ("\n#agent-meta:agent=git\ngit status", 0),  # issue #503: leading blank line before the sentinel, still exempt
+    ("\n\n#agent-meta:agent=orchestrator\necho test", 0),  # issue #503: multiple leading blank lines
 ]
 
 
@@ -146,6 +148,12 @@ MUTATION_CASES = [
     ("gh issue create --title x --body \"mentions git push and git commit\"", False),
     ("git checkout -- some/path", True),  # discards working-tree changes -- a real mutation
     ("git stash list", False),
+    # issue #508: statements() didn't split on newlines, so a multi-line
+    # read-only command with no &&/;/| between the lines got flattened by
+    # shlex.split() into one token stream -- the second line's tokens
+    # ('git', 'status', '--short') were misread as positional args to the
+    # first line's 'git branch', which looks like a branch-create mutation.
+    ("git branch --show-current\ngit status --short", False),
 ]
 
 

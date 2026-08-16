@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.2.0
+# version: 2.3.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -72,12 +72,19 @@ inp = d.get('tool_input', {})
 print(inp.get('command', '') if isinstance(inp, dict) else '')
 " 2>/dev/null || echo "")
 
-  # Self-declared agent identity (see note above): the first line of the
-  # command must be exactly '#agent-meta:agent=<name>'. Only orchestrator
-  # and git are recognized delegates for this guard.
-  DECLARED_AGENT=$(printf '%s\n' "$BASH_CMD" | head -n1 | $_PY -c "
+  # Self-declared agent identity (see note above): the first non-blank line
+  # of the command must be exactly '#agent-meta:agent=<name>'. Only
+  # orchestrator and git are recognized delegates for this guard.
+  # `head -n1` alone (pre-#503) grabbed a literal empty first line whenever
+  # BASH_CMD started with a leading newline before the sentinel -- some
+  # delegated agents construct their Bash invocation that way -- so the
+  # sentinel was silently missed and the legitimate mutation got blocked.
+  # Stripping leading whitespace/blank lines before taking "line 1" makes
+  # detection tolerant of that construction.
+  DECLARED_AGENT=$(printf '%s' "$BASH_CMD" | $_PY -c "
 import re, sys
-line = sys.stdin.readline().strip()
+content = sys.stdin.read().lstrip()
+line = content.split('\n', 1)[0].strip()
 m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)$', line)
 print(m.group(1) if m else '')
 " 2>/dev/null || echo "")
@@ -160,7 +167,14 @@ def statements(cmd):
     # parser, but enough to stop scanning past '&&'/';'/'|' boundaries so a
     # mutation keyword in an unrelated later command or a quoted argument
     # doesn't get attributed to an earlier, unrelated 'git' invocation.
-    return re.split(r'&&|\|\||;|\|', command)
+    # Newline is also a statement boundary (issue #508): without it, a
+    # multi-line command with no operator between the lines stayed one
+    # statement string, and shlex.split() then flattened both lines into a
+    # single token stream -- the second line's tokens could get misread as
+    # positional args to the first line's git subcommand (e.g. 'git branch'
+    # followed on the next line by 'git status --short' looked like
+    # 'git branch git status --short', a branch-create mutation).
+    return re.split(r'&&|\|\||;|\||\n', command)
 
 def tokens_of(stmt):
     try:

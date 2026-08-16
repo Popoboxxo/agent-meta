@@ -1575,7 +1575,7 @@ quality_pipelines:
     signal_keywords:
     - Konzept
     - Design-Doc
-    - Recherche
+    - Architektur-Recherche
     - Trade-offs
     stages:
     - id: research
