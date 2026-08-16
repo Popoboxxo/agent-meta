@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.97.0] — 2026-08-16
+
 ### Fixed
 - `hooks/1-generic/orchestrator-guard.sh` (v2.2.0 → v2.3.0): two related BASH_CMD-parsing
   robustness bugs. `statements()` didn't split on newlines (#508) — a multi-line read-only
