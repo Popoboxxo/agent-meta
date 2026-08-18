@@ -248,6 +248,12 @@ The Model Mapping matrix is a detailed translation layer that bridges the gap be
 <!-- author: Agent Meta Admin -->
 Rules are global architectural constraints. This interface allows you to inject project-specific rules that supplement or replace the framework defaults.
 
+### Conventions Overrides
+<!-- help-id: project_instance-conventions_overrides -->
+<!-- last-updated: 2026-08-18 -->
+<!-- author: Agent Meta Admin -->
+Naming and versioning conventions (release versioning/changelog, issue naming) resolved from the selected conventions-preset. This view lets you override individual convention fields per domain on top of the preset. Precedence: convention override > conventions-preset > default. List overrides replace the whole preset list (deep-merge semantics).
+
 ### Advanced
 <!-- help-id: project_instance-advanced -->
 <!-- last-updated: 2026-07-19 -->
@@ -283,6 +289,12 @@ The Model Context Protocol (MCP) registry configures external data connections l
 <!-- last-updated: 2026-07-19 -->
 <!-- author: Agent Meta Admin -->
 Rules Presets bundle collections of architectural and coding standards. These global presets are injected into the agent context.
+
+### Conventions Presets
+<!-- help-id: framework_defaults-conventions_presets -->
+<!-- last-updated: 2026-08-18 -->
+<!-- author: Agent Meta Admin -->
+Conventions Presets define naming and versioning conventions per domain (release versioning/changelog, issue naming). Each preset feeds the `RELEASE_VERSIONING_BLOCK`, `RELEASE_CHANGELOG_BLOCK` and `GIT_ISSUE_NAMING_BLOCK` placeholders in the release/git agent templates. Projects select one via `conventions-preset` and refine it with a `conventions:` override block.
 
 ### Provider Tier Mappings
 <!-- help-id: framework_defaults-tier_mappings -->

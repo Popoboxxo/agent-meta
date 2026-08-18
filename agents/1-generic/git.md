@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.4.0"
+version: "1.5.0"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -82,6 +82,10 @@ Depending on the instruction:
 - `chore/<topic>` — maintenance
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+
+**Issue conventions:**
+
+{{GIT_ISSUE_NAMING_BLOCK}}
 </context>
 
 <tools>

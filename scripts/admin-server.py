@@ -134,6 +134,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "external-tools-registry": "config/external-tools-registry.yaml",
     "dod-presets":       "config/dod-presets.yaml",
     "rules-presets":     "config/rules-presets.yaml",
+    "conventions-presets": "config/conventions-presets.yaml",
     "delegation-syntax": "config/delegation-syntax.yaml",
     "export":            "config/export.yaml",
 }
@@ -3489,6 +3490,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "agent-prompts", "model-overrides", "memory-overrides", "permission-mode-overrides",
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
+            "conventions", "conventions-preset",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
             "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",

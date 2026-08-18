@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.4.3"
+version: "1.5.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 hint: "Versioning, changelog, build artifact, create GitHub release"
 prompt_mode: modern
@@ -41,30 +41,11 @@ Check before every release:
 
 ## 2. Versioning
 
-| Change | Bump | Example |
-|--------|------|---------|
-| Breaking change | MAJOR | Removed commands, incompatible config |
-| New feature | MINOR | New commands, new settings |
-| Bugfix / docs | PATCH | Bugfixes, performance, doc fixes |
-| Alpha/Beta | Suffix | `-alpha.x` / `-beta.x` |
+{{RELEASE_VERSIONING_BLOCK}}
 
 ## 3. CHANGELOG.md format
 
-```markdown
-## [x.y.z] — YYYY-MM-DD
-
-### Added
-- REQ-xxx: [feature description]
-
-### Fixed
-- REQ-xxx: [bugfix description]
-
-### Changed
-- REQ-xxx: [change]
-
-### Removed
-- [what was removed]
-```
+{{RELEASE_CHANGELOG_BLOCK}}
 
 ## 4. Release workflow
 

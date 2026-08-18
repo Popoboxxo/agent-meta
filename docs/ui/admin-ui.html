@@ -1431,6 +1431,7 @@ function buildSidebar() {
         { route: "/project/model-mapping", label: "Model Mapping", icon: "⊞" },
         { route: "/project/dod-overrides", label: "DoD Overrides", icon: "☑" },
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
+        { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/mcp-overrides", label: "MCP Servers", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
@@ -1454,6 +1455,7 @@ function buildSidebar() {
         { route: "/config/mcp-registry", label: "MCP Registry", icon: "🔌" },
         { route: "/config/dod-presets", label: "dod presets", icon: "☑", superOnly: true },
         { route: "/config/rules-presets", label: "rules presets", icon: "⚖", superOnly: true },
+        { route: "/config/conventions-presets", label: "conventions presets", icon: "🏷", superOnly: true },
         { route: "/config/delegation-syntax", label: "delegation", icon: "↬", superOnly: true },
         { route: "/config/export", label: "export", icon: "⇱", superOnly: true },
       ],
@@ -3944,6 +3946,303 @@ async function viewProjectRulesOverrides() {
 }
 
 /* =========================================================================
+ * Views — Conventions presets (Convention Profiles)
+ * ========================================================================= */
+async function viewConventionsPresets() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["conventions-presets.yaml"]));
+  let data;
+  try { data = await api.get("/api/config/conventions-presets"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data.presets = data.presets || {};
+  const presets = data.presets;
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(presets).length} presets`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/conventions-presets", data);
+      toast("conventions-presets saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+
+  // --- small field helpers -------------------------------------------------
+  const fieldRow = (label, control) => el("div", { class: "field", style: "margin-bottom:var(--space-3);" }, [
+    el("label", { class: "field-label" }, [label]),
+    control,
+  ]);
+  const scalarField = (label, obj, key) => {
+    const inp = el("input", { type: "text", style: "min-width:320px;" });
+    inp.value = obj[key] != null ? String(obj[key]) : "";
+    inp.addEventListener("input", () => { obj[key] = inp.value; markDirty(); });
+    return fieldRow(label, inp);
+  };
+  const listField = (label, obj, key) => {
+    obj[key] = Array.isArray(obj[key]) ? obj[key] : [];
+    const ed = tagEditor(obj[key], (next) => { obj[key] = next; markDirty(); });
+    return fieldRow(label, ed);
+  };
+  const bumpRulesField = (versioning) => {
+    versioning.bump_rules = Array.isArray(versioning.bump_rules) ? versioning.bump_rules : [];
+    const holder = el("div");
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Trigger", "Bump", "Example", ""].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    const render = () => {
+      tbody.replaceChildren();
+      versioning.bump_rules.forEach((rule, i) => {
+        if (!rule || typeof rule !== "object") return;
+        const tr = el("tr");
+        for (const k of ["trigger", "bump", "example"]) {
+          const td = el("td");
+          const inp = el("input", { type: "text", style: "width:100%;" });
+          inp.value = rule[k] != null ? String(rule[k]) : "";
+          inp.addEventListener("input", () => { rule[k] = inp.value; markDirty(); });
+          td.appendChild(inp);
+          tr.appendChild(td);
+        }
+        const rmTd = el("td");
+        const rm = el("button", { class: "btn btn-danger", title: "Remove row" }, ["×"]);
+        rm.addEventListener("click", () => { versioning.bump_rules.splice(i, 1); markDirty(); render(); });
+        rmTd.appendChild(rm);
+        tr.appendChild(rmTd);
+        tbody.appendChild(tr);
+      });
+    };
+    render();
+    table.appendChild(tbody);
+    holder.appendChild(table);
+    const addBtn = el("button", { class: "btn", style: "margin-top:var(--space-2);" }, ["+ Add bump rule"]);
+    addBtn.addEventListener("click", () => {
+      versioning.bump_rules.push({ trigger: "", bump: "", example: "" });
+      markDirty(); render();
+    });
+    holder.appendChild(addBtn);
+    return fieldRow("versioning.bump_rules", holder);
+  };
+
+  // --- per-preset editor ---------------------------------------------------
+  for (const [name, preset] of Object.entries(presets)) {
+    if (!preset || typeof preset !== "object") continue;
+    const panel = el("details", { class: "panel" });
+    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [name]));
+
+    // release domain
+    const release = preset.release = (preset.release && typeof preset.release === "object") ? preset.release : {};
+    const relSec = el("div", { class: "panel", style: "margin-top:var(--space-2);" });
+    relSec.appendChild(el("h3", {}, ["release"]));
+    relSec.appendChild(listField("applies_to_roles", release, "applies_to_roles"));
+    const versioning = release.versioning = (release.versioning && typeof release.versioning === "object") ? release.versioning : {};
+    relSec.appendChild(scalarField("versioning.scheme", versioning, "scheme"));
+    relSec.appendChild(scalarField("versioning.tag_format", versioning, "tag_format"));
+    relSec.appendChild(bumpRulesField(versioning));
+    const changelog = release.changelog = (release.changelog && typeof release.changelog === "object") ? release.changelog : {};
+    relSec.appendChild(scalarField("changelog.format", changelog, "format"));
+    relSec.appendChild(listField("changelog.sections", changelog, "sections"));
+    relSec.appendChild(scalarField("changelog.entry_prefix", changelog, "entry_prefix"));
+    panel.appendChild(relSec);
+
+    // issues domain
+    const issues = preset.issues = (preset.issues && typeof preset.issues === "object") ? preset.issues : {};
+    const issSec = el("div", { class: "panel", style: "margin-top:var(--space-2);" });
+    issSec.appendChild(el("h3", {}, ["issues"]));
+    issSec.appendChild(listField("applies_to_roles", issues, "applies_to_roles"));
+    issSec.appendChild(scalarField("title_format", issues, "title_format"));
+    issSec.appendChild(listField("types", issues, "types"));
+    const labels = issues.labels = (issues.labels && typeof issues.labels === "object") ? issues.labels : {};
+    issSec.appendChild(scalarField("labels.namespace", labels, "namespace"));
+    issSec.appendChild(listField("closing_keywords", issues, "closing_keywords"));
+    panel.appendChild(issSec);
+
+    wrap.appendChild(panel);
+  }
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Project Conventions Overrides
+ * ========================================================================= */
+async function viewProjectConventionsOverrides() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Conventions Overrides"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Override individual convention fields on top of the selected conventions-preset. Precedence: conventions override > conventions-preset > default. List overrides replace the whole preset list (deep-merge semantics).",
+  ]));
+
+  const [data, presetsResp] = await Promise.all([
+    loadProject(),
+    api.get("/api/config/conventions-presets").catch(() => null),
+  ]);
+
+  const presets = (presetsResp && presetsResp.presets) ? presetsResp.presets : {};
+  const presetNames = Object.keys(presets);
+  let activePreset = data["conventions-preset"] || "default";
+
+  const overrides = (data.conventions && typeof data.conventions === "object") ? clone(data.conventions) : {};
+
+  const status = el("div", { class: "muted" });
+  wrap.appendChild(status);
+
+  const presetOptions = presetNames.length ? presetNames : ["default"];
+  wrap.appendChild(dropdownField("Conventions preset", presetOptions, activePreset, v => {
+    activePreset = v;
+    render();
+  }));
+
+  const contentWrap = el("div");
+  wrap.appendChild(contentWrap);
+
+  // Leaf fields per domain: [path, label, type]. bump_rules is intentionally
+  // omitted — a whole list of {trigger,bump,example} objects is not a sensible
+  // single-row override; edit it via the preset editor or raw YAML instead.
+  const DOMAIN_FIELDS = {
+    release: [
+      [["versioning", "scheme"], "versioning.scheme", "scalar"],
+      [["versioning", "tag_format"], "versioning.tag_format", "scalar"],
+      [["changelog", "format"], "changelog.format", "scalar"],
+      [["changelog", "sections"], "changelog.sections", "list"],
+      [["changelog", "entry_prefix"], "changelog.entry_prefix", "scalar"],
+    ],
+    issues: [
+      [["title_format"], "title_format", "scalar"],
+      [["types"], "types", "list"],
+      [["labels", "namespace"], "labels.namespace", "scalar"],
+      [["closing_keywords"], "closing_keywords", "list"],
+    ],
+  };
+
+  const getPath = (obj, path) => {
+    let cur = obj;
+    for (const p of path) {
+      if (cur == null || typeof cur !== "object") return undefined;
+      cur = cur[p];
+    }
+    return cur;
+  };
+  const setPath = (obj, path, value) => {
+    let cur = obj;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (cur[path[i]] == null || typeof cur[path[i]] !== "object") cur[path[i]] = {};
+      cur = cur[path[i]];
+    }
+    cur[path[path.length - 1]] = value;
+  };
+  const delPath = (obj, path) => {
+    const chain = [obj];
+    let cur = obj;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (cur[path[i]] == null || typeof cur[path[i]] !== "object") return;
+      cur = cur[path[i]];
+      chain.push(cur);
+    }
+    delete cur[path[path.length - 1]];
+    // Prune now-empty parent objects so no dangling {} survives in project.yaml.
+    for (let i = chain.length - 1; i > 0; i--) {
+      if (Object.keys(chain[i]).length === 0) delete chain[i - 1][path[i - 1]];
+      else break;
+    }
+  };
+
+  const countOverrides = () => {
+    let n = 0;
+    for (const dom of Object.keys(DOMAIN_FIELDS)) {
+      for (const [path] of DOMAIN_FIELDS[dom]) {
+        if (getPath(overrides, [dom, ...path]) !== undefined) n++;
+      }
+    }
+    return n;
+  };
+
+  const render = () => {
+    const presetSpec = presets[activePreset] || presets["default"] || {};
+    status.textContent = `Active preset: ${activePreset}. ${countOverrides()} overrides active.`;
+    status.style.color = "";
+    contentWrap.replaceChildren();
+
+    const fmt = (v) => Array.isArray(v) ? v.join(", ") : (v != null ? String(v) : "");
+
+    for (const domain of Object.keys(DOMAIN_FIELDS)) {
+      const panel = el("div", { class: "panel" });
+      panel.appendChild(el("h2", {}, [domain]));
+      const table = el("table", { class: "data" });
+      table.appendChild(el("thead", {}, [
+        el("tr", {}, ["Field", "Preset Default", "Override", "Active Value"].map(h => el("th", {}, [h]))),
+      ]));
+      const tbody = el("tbody");
+      for (const [path, label, type] of DOMAIN_FIELDS[domain]) {
+        const fullPath = [domain, ...path];
+        const presetVal = getPath(presetSpec, path);
+        const overrideVal = getPath(overrides, fullPath);
+
+        const tr = el("tr");
+        tr.appendChild(el("td", { class: "mono" }, [label]));
+        tr.appendChild(el("td", { class: "muted" }, [fmt(presetVal) || "—"]));
+
+        const overrideTd = el("td");
+        const inp = el("input", {
+          type: "text", style: "min-width:220px;",
+          placeholder: type === "list" ? "comma-separated (replaces list)" : "(no override)",
+        });
+        inp.value = fmt(overrideVal);
+        inp.addEventListener("change", () => {
+          const raw = inp.value.trim();
+          if (raw === "") {
+            delPath(overrides, fullPath);
+          } else if (type === "list") {
+            setPath(overrides, fullPath, raw.split(",").map(s => s.trim()).filter(Boolean));
+          } else {
+            setPath(overrides, fullPath, raw);
+          }
+          render();
+        });
+        overrideTd.appendChild(inp);
+        tr.appendChild(overrideTd);
+
+        const isOverridden = overrideVal !== undefined;
+        const activeVal = isOverridden ? overrideVal : presetVal;
+        const activeTd = el("td");
+        activeTd.appendChild(el("span", { class: `badge ${isOverridden ? "warn" : "ok"}` }, [fmt(activeVal) || "—"]));
+        tr.appendChild(activeTd);
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      panel.appendChild(table);
+      contentWrap.appendChild(panel);
+    }
+  };
+  render();
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try {
+        await saveProjectSection("conventions-preset", activePreset, null);
+        await saveProjectSection("conventions", overrides, status);
+      } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Project Knowledge Engine
  * ========================================================================= */
 const KNOWLEDGE_ALL_LINT_CHECKS = [
@@ -5589,11 +5888,12 @@ async function viewProjectGeneral() {
 
   // Load project.yaml and presets in parallel. Each preset endpoint may fail
   // independently — fall back to the hardcoded list in that case.
-  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp] = await Promise.all([
+  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp, conventionsPresetsResp] = await Promise.all([
     loadProject(),
     api.get("/api/config/dod-presets").catch(() => null),
     api.get("/api/config/rules-presets").catch(() => null),
     api.get("/api/tier-presets/merged").catch(() => null),
+    api.get("/api/config/conventions-presets").catch(() => null),
   ]);
 
   // dod-presets.yaml has either a top-level mapping of preset-name → config,
@@ -5605,9 +5905,10 @@ async function viewProjectGeneral() {
   };
   const dodOptions   = extractPresetKeys(dodPresetsResp, DOD_FALLBACK);
   const rulesOptions = extractPresetKeys(rulesPresetsResp, RULES_FALLBACK);
+  const conventionsOptions = extractPresetKeys(conventionsPresetsResp, ["default", "calver", "conventional-strict"]);
 
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
-  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal", "se-focus": !!data["se-focus"] };
+  const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "conventions-preset": data["conventions-preset"] || "default", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal", "se-focus": !!data["se-focus"] };
 
   const TIER_PRESETS = extractPresetKeys(tierPresetsResp, TIER_FALLBACK);
   // Build label map: project-local presets get a ★ prefix so they stand out
@@ -5752,6 +6053,7 @@ async function viewProjectGeneral() {
       // Triggers live preview update if needed
   };
   panel.appendChild(dropdownField("Tier preset", TIER_PRESETS, top["tier-preset"], onTierPresetChange, TIER_PRESET_LABELS));
+  panel.appendChild(dropdownField("Conventions preset", conventionsOptions, top["conventions-preset"], v => top["conventions-preset"] = v));
   panel.appendChild(checkboxField("SE focus", top["se-focus"], v => { top["se-focus"] = v; }));
 
   wrap.appendChild(panel);
@@ -5846,6 +6148,7 @@ async function viewProjectGeneral() {
           ["project", project],
           ["dod-preset", top["dod-preset"]],
           ["rules-preset", top["rules-preset"]],
+          ["conventions-preset", top["conventions-preset"]],
           ["speech-mode", top["speech-mode"]],
           ["tier-preset", top["tier-preset"]],
           ["se-focus", top["se-focus"]],
@@ -9095,6 +9398,7 @@ async function init() {
   router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
   router.register("/project/dod-overrides", viewProjectDodOverrides);
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
+  router.register("/project/conventions-overrides", viewProjectConventionsOverrides);
   router.register("/project/environments",   viewProjectEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
   router.register("/project/gitignore",       viewProjectGitignore);
@@ -9111,6 +9415,7 @@ async function init() {
   router.register("/config/mcp-registry",      viewMcpRegistry);
   router.register("/config/dod-presets",       viewDodPresets);
   router.register("/config/rules-presets",     viewRulesPresets);
+  router.register("/config/conventions-presets", viewConventionsPresets);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
   router.register("/config-audit",             buildConfigAudit);
@@ -9191,6 +9496,7 @@ init();
     "project/model-mapping": "project_instance-model_mapping",
     "project/dod-overrides": "project_instance-dod_overrides",
     "project/rules-overrides": "project_instance-rules_overrides",
+    "project/conventions-overrides": "project_instance-conventions_overrides",
     "project/advanced": "project_instance-advanced",
     "project/knowledge-engine": "project_instance-knowledge_engine",
     "models": "framework_defaults-models",
@@ -9202,6 +9508,7 @@ init();
     "config/mcp-registry": "framework_defaults-mcp_registry",
     "config/dod-presets": "framework_defaults-dod_presets",
     "config/rules-presets": "framework_defaults-rules_presets",
+    "config/conventions-presets": "framework_defaults-conventions_presets",
     "config/delegation-syntax": "framework_defaults-delegation",
     "config/export": "framework_defaults-export",
     "roles": "workflows-roles_graph",

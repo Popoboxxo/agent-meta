@@ -568,6 +568,16 @@
       },
       "additionalProperties": false
     },
+    "conventions-preset": {
+      "type": "string",
+      "description": "The active naming/versioning conventions preset, matched against config/conventions-presets.yaml. Individual overrides via 'conventions' block. Precedence: conventions > conventions-preset > 'default'.",
+      "default": "default"
+    },
+    "conventions": {
+      "type": "object",
+      "description": "Override individual naming/versioning convention fields on top of the selected conventions-preset. Structure mirrors config/conventions-presets.yaml presets.<name> (release.versioning, release.changelog, issues.*).",
+      "additionalProperties": true
+    },
     "debug-mode": {
       "type": "boolean",
       "description": "When true, sync.py injects a debug block into every generated agent. Active agents announce themselves ([Agent: <name>]), log every delegation (→ Delegiere an: ...), and confirm completion (✓ [Agent: <name>] fertig). Default: false — no change to any agent file.",

@@ -1,6 +1,6 @@
 ---
 name: git
-version: 1.4.0
+version: 1.5.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@1.4.0
+generated-from: 1-generic/git.md@1.5.0
 model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -84,6 +84,10 @@ Depending on the instruction:
 - `chore/<topic>` — maintenance
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+
+**Issue conventions:** **Issue-Titel-Format:** `<type>: <description>` — Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf` (identisch zum Commit-Type-Vokabular, siehe `commit-conventions.md`).
+**Labels:** `type: <type>` (Namespace-Label je Issue-Type).
+**Closing-Keywords:** `Fixes #123`, `Closes #123`, `Resolves #123` im PR/Commit.
 </context>
 
 <tools>

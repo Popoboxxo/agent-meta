@@ -1,6 +1,6 @@
 ---
 name: release
-version: 1.4.3
+version: 1.5.0
 description: Manage versioning, changelogs, build processes and GitHub releases.
 hint: Versioning, changelog, build artifact, create GitHub release
 prompt_mode: modern
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/release.md@1.4.3
+generated-from: 1-generic/release.md@1.5.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-release-ext.md` exists → read and apply immediately.

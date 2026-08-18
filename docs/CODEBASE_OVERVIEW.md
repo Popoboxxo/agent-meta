@@ -900,6 +900,9 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | `A2A_PROTOCOL_BLOCK` | string | A2A-Protokoll-Sektion aus `snippets/orchestrator/a2a-protocol.md` |
 | `CHECKPOINTING_BLOCK` | string | Checkpointing-Sektion aus `snippets/orchestrator/checkpointing.md` |
 | `QUALITY_PIPELINES_BLOCK` | string | Quality-Pipelines-Sektion aus `snippets/orchestrator/quality-pipelines.md` |
+| `RELEASE_VERSIONING_BLOCK` | string | Versionierungs-Tabelle in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
+| `RELEASE_CHANGELOG_BLOCK` | string | CHANGELOG-Format-Codeblock in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
+| `GIT_ISSUE_NAMING_BLOCK` | string | Issue-Naming-Block in `git.md`, gerendert aus `config/conventions-presets.yaml` (Domain `issues`). Nicht gesetzt wenn `git` nicht aktiv |
 
 **Flat-Mode-Flags (statt nested {{#if}}/{{else}}):**
 - Genau ein ORCH_MODE_*-Flag ist `true`, alle anderen `false`

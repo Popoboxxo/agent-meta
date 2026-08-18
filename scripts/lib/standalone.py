@@ -144,6 +144,18 @@ def _standalone_variables(agent_meta_root: Path) -> dict:
     variables.update(_CONDITIONAL_FALSE_FLAGS)
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"] = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+    # Convention blocks: render the 'default' preset so a standalone release/git
+    # persona keeps its versioning table / issue-naming block instead of degrading
+    # to a "not available" safety-net note. active_roles=None => all roles active.
+    from .conventions import render_convention_block, resolve_conventions
+    _conv_log = SyncLog()
+    _resolved = resolve_conventions({}, agent_meta_root)
+    for _domain in ("release", "issues"):
+        _spec = _resolved.get(_domain)
+        if isinstance(_spec, dict):
+            _blocks = render_convention_block(_domain, _spec, None, _conv_log)
+            if _blocks:
+                variables.update(_blocks)
     return variables
 
 
