@@ -124,11 +124,18 @@ def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) 
         actual = get_skill_commit(agent_meta_root, local_path)
         # get_skill_commit returns short hash — compare prefix
         if actual != "unknown" and not pinned.startswith(actual):
-            log.warn(
-                f"repo '{repo_name}': dynamic clone is at {actual}, "
-                f"expected pinned_commit {pinned[:8]} — "
-                f"run: git -C {local_path} checkout {pinned[:8]}"
-            )
+            if _is_ahead_of_pin(repo_dir, pinned):
+                log.info(
+                    local_path,
+                    f"checkout {actual} is ahead of pinned_commit {pinned[:8]} — "
+                    f"local bump kept, consider bumping the registry pin",
+                )
+            else:
+                log.warn(
+                    f"repo '{repo_name}': dynamic clone is at {actual}, "
+                    f"expected pinned_commit {pinned[:8]} — "
+                    f"run: git -C {local_path} checkout {pinned[:8]}"
+                )
 
 
 def get_skill_commit(agent_meta_root: Path, submodule_path: str) -> str:
@@ -180,6 +187,26 @@ def normalize_skill_paths(content: str, skill_base_path: str) -> str:
         content
     )
     return content
+
+
+def _is_ahead_of_pin(repo_dir: Path, pinned_commit: str) -> bool:
+    """True when the checked-out HEAD is a descendant of the pinned commit.
+
+    A consumer that deliberately bumps an external skill repo forward used to get
+    that bump reverted by every sync (issue #513). Such a bump is honored instead
+    of overwritten. Shallow clones cannot answer the ancestry question — the
+    check then returns False and the pin is enforced exactly as before.
+    """
+    probe = subprocess.run(  # noqa: PLW1510
+        ["git", "merge-base", "--is-ancestor", pinned_commit, "HEAD"],
+        cwd=str(repo_dir), capture_output=True,
+    )
+    if probe.returncode != 0:
+        return False
+    head = subprocess.run(  # noqa: PLW1510
+        ["git", "rev-parse", "HEAD"], cwd=str(repo_dir), capture_output=True, text=True,
+    )
+    return head.returncode == 0 and head.stdout.strip() != pinned_commit
 
 
 def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str, repo_cfg: dict, pinned_commit: str, log: SyncLog) -> None:
@@ -257,6 +284,14 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
                 return
             
     if pinned_commit:
+        if _is_ahead_of_pin(target_dir, pinned_commit):
+            log.warning(
+                f"{local_path}: checkout is ahead of pinned_commit {pinned_commit[:8]} — "
+                f"keeping the local bump instead of reverting it.\n"
+                f"  -> Fix: bump 'pinned_commit' for this repo in config/skills-registry.yaml, "
+                f"or run: git -C {target_dir} checkout {pinned_commit[:8]} to go back to the pin"
+            )
+            return
         result = subprocess.run(["git", "checkout", pinned_commit], cwd=str(target_dir), capture_output=True)
         if result.returncode != 0:
             stderr = result.stderr.decode('utf-8', errors='ignore').strip()

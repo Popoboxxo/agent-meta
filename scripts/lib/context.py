@@ -95,6 +95,67 @@ def _split_injected_footer_tail(footer: str) -> tuple[str, str]:
     return footer[:idx], footer[idx:]
 
 
+def _normalize_static_sig(s: str) -> str:
+    """Normalize a static-part signature: drop dates, collapse whitespace."""
+    import re
+
+    s = re.sub(r"\d{4}-\d{2}-\d{2}", "", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+USER_NOTES_HEADING = "## Eigene Notizen"
+
+
+def _user_notes_span(header: str) -> tuple[int, int] | None:
+    """Locate the user-owned notes section inside a context-file header.
+
+    The section starts at the ``## Eigene Notizen`` heading and ends at the next
+    top-level boundary (``## `` heading or a ``---`` rule). Returns character
+    offsets into ``header``, or None when the header has no such section.
+    """
+    lines = header.splitlines(keepends=True)
+    start_line = next(
+        (i for i, line in enumerate(lines) if line.strip() == USER_NOTES_HEADING), None
+    )
+    if start_line is None:
+        return None
+    end_line = len(lines)
+    for j in range(start_line + 1, len(lines)):
+        stripped = lines[j].strip()
+        if stripped.startswith("## ") or stripped == "---":
+            end_line = j
+            break
+    start = sum(len(x) for x in lines[:start_line])
+    end = start + sum(len(x) for x in lines[start_line:end_line])
+    return start, end
+
+
+def _strip_user_notes(header: str) -> str:
+    """Return the header without its user-owned notes section."""
+    span = _user_notes_span(header)
+    if span is None:
+        return header
+    return header[: span[0]] + header[span[1] :]
+
+
+def _preserve_user_notes(new_header: str, existing_header: str) -> str:
+    """Splice the project's own notes section into a freshly rendered header.
+
+    The header is regenerated from the template on every sync, which used to
+    delete everything a user had written under ``## Eigene Notizen`` — the one
+    section the template explicitly promises never to overwrite (issue #515).
+    """
+    new_span = _user_notes_span(new_header)
+    old_span = _user_notes_span(existing_header)
+    if new_span is None or old_span is None:
+        return new_header
+    return (
+        new_header[: new_span[0]]
+        + existing_header[old_span[0] : old_span[1]]
+        + new_header[new_span[1] :]
+    )
+
+
 def _backup_context_file(
     target_path: Path, existing_content: str, rel_label: str, log: SyncLog, dry_run: bool
 ) -> None:
@@ -163,6 +224,12 @@ def _regenerate_static_context(
         log.info(rel_label, "no managed block yet — static regeneration deferred until marker exists")
         return
 
+    # The notes section is user-owned: carry it over verbatim and keep it out of
+    # the drift signature, so editing it neither loses content nor triggers a
+    # spurious "static part differs" backup.
+    new_header = _preserve_user_notes(new_header, existing_header)
+    new_static, existing_static = _strip_user_notes(new_header), _strip_user_notes(existing_header)
+
     if rebuild_footer:
         existing_footer_tmpl, injected_tail = _split_injected_footer_tail(existing_footer)
         if injected_tail:
@@ -173,23 +240,15 @@ def _regenerate_static_context(
             target_footer = new_footer
         # Signature covers header + template footer (ignoring the injected tail,
         # which is owned by the agents step and changes independently).
-        new_sig = new_header + "\x00" + new_footer.rstrip("\n")
-        existing_sig = existing_header + "\x00" + existing_footer_tmpl.rstrip("\n")
+        new_sig = new_static + "\x00" + new_footer.rstrip("\n")
+        existing_sig = existing_static + "\x00" + existing_footer_tmpl.rstrip("\n")
     else:
         target_footer = existing_footer
-        new_sig = new_header
-        existing_sig = existing_header
+        new_sig = new_static
+        existing_sig = existing_static
 
-    def _normalize_sig(s: str) -> str:
-        import re
-        # Remove date strings like 2026-07-27
-        s = re.sub(r"\d{4}-\d{2}-\d{2}", "", s)
-        # Normalize all whitespace (including newlines) to a single space
-        s = re.sub(r"\s+", " ", s).strip()
-        return s
-
-    norm_new = _normalize_sig(new_sig)
-    norm_existing = _normalize_sig(existing_sig)
+    norm_new = _normalize_static_sig(new_sig)
+    norm_existing = _normalize_static_sig(existing_sig)
 
     if norm_existing == norm_new:
         log.skip(rel_label, "static part unchanged")
@@ -1224,7 +1283,9 @@ def sync_claude_md_static(
         log.action("INIT", rel, "templates/configs/CLAUDE.project-template.md")
         if not dry_run:
             target_path.write_text(rendered, encoding="utf-8")
-        _record_static_hash(project_root, rel, new_header, dry_run)
+        _record_static_hash(
+            project_root, rel, _normalize_static_sig(_strip_user_notes(new_header)), dry_run
+        )
         return
 
     _regenerate_static_context(
