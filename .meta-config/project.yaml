@@ -334,3 +334,5 @@ se-focus: false
 debug-mode: false
 allow-committed-secrets: false
 rules: {}
+# The active naming/versioning conventions preset, matched against config/conventions-presets.yaml. Individual overrides via 'conventions' block. Precedence: conventions > conventions-preset > 'default'.
+conventions-preset: default

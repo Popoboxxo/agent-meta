@@ -893,6 +893,31 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         _snippet_text = _snippet_text.replace("{{LANGUAGE}}", str(variables.get("LANGUAGE", "")))
         variables[f"{_var_stem}_BLOCK"] = _snippet_text
 
+    # Convention blocks (RELEASE_VERSIONING_BLOCK, RELEASE_CHANGELOG_BLOCK,
+    # GIT_ISSUE_NAMING_BLOCK): rendered from config/conventions-presets.yaml the
+    # same way the developer snippets above become {{VARIABLE}}s. A role-inactive
+    # domain sets NO variable at all (not even an empty string) — its template is
+    # not generated anyway (Konzept Abschnitt C). build_variables() has no SyncLog
+    # param, so a local one is used for the log.skip()/log.warning() calls here
+    # (log.warning still prints to stderr, so a malformed preset is visible).
+    from .conventions import render_convention_block, resolve_conventions
+
+    _conv_log = SyncLog()
+    _roles_list = config.get("roles")
+    _active_roles = set(_roles_list) if _roles_list is not None else None
+    try:
+        _resolved_conventions = resolve_conventions(config, agent_meta_root)
+    except ValueError as _conv_exc:
+        _conv_log.warning(f"conventions: {_conv_exc} — Konventions-Injektion übersprungen")
+        _resolved_conventions = {}
+    for _domain in ("release", "issues"):
+        _domain_spec = _resolved_conventions.get(_domain)
+        if not isinstance(_domain_spec, dict):
+            continue
+        _blocks = render_convention_block(_domain, _domain_spec, _active_roles, _conv_log)
+        if _blocks:
+            variables.update(_blocks)
+
     return variables, unmapped
 
 

@@ -52,6 +52,9 @@ dod-preset: full
 # Options: "default" (alle Rules geladen), "minimal" (Kernregeln), "silent" (nur auf Anforderung)
 rules-preset: default
 
+# Conventions-Preset steuert Namens-/Versionierungs-Konventionen (release.md, git.md):
+conventions-preset: default  # oder: calver, conventional-strict — siehe config/conventions-presets.yaml
+
 # Einzelne DoD-Kriterien überschreiben (optional / DoD overrides)
 dod:
   req-traceability: true    # REQ-IDs in Commit-Messages & Doku erzwingen / Require REQ-IDs

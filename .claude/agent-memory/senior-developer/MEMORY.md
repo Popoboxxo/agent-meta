@@ -8,3 +8,4 @@
 - [Reflection-Overrides Dead Code](reflection-overrides-deadcode.md) — reflection-pairs.overrides wirken NICHT (reflection.py nicht in config.py verdrahtet); quality-pipelines.overrides wirken dagegen
 - [Tier-Resolution Silent-Empty](tier-resolution-missing-key-silent-empty.md) — resolve_model gibt "" zurück wenn Tier-Key im aktiven Preset fehlt; neue Tiers in ALLE Presets + Provider-Blöcke eintragen
 - [Multi-Provider 3-File-Invariante](multi-provider-three-file-invariant.md) — Provider aus ai-providers.yaml muss auch in capabilities/bootstrap/delegation-syntax stehen, sonst Silent-Downgrade (PAL_* gestrippt); Copilot = konservatives Referenz-Pattern
+- [Neuer _BLOCK-Platzhalter: 2 versteckte Kopplungen](new-block-placeholder-coupling.md) — build_variables _BLOCK-Var braucht auch Eintrag in consistency/placeholders.py _BUILTIN_VARS + standalone.py Fallback

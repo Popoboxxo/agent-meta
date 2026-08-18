@@ -1,6 +1,6 @@
 ---
 name: git
-version: 1.4.0
+version: 1.5.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@1.4.0
+generated-from: 1-generic/git.md@1.5.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-git-ext.md` exists → read and apply immediately.
@@ -82,6 +82,10 @@ Depending on the instruction:
 - `chore/<topic>` — maintenance
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+
+**Issue conventions:** **Issue-Titel-Format:** `<type>: <description>` — Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf` (identisch zum Commit-Type-Vokabular, siehe `commit-conventions.md`).
+**Labels:** `type: <type>` (Namespace-Label je Issue-Type).
+**Closing-Keywords:** `Fixes #123`, `Closes #123`, `Resolves #123` im PR/Commit.
 </context>
 
 <tools>

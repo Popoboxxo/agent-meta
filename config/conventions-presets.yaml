@@ -1,0 +1,92 @@
+# Conventions-Presets — steuern Namens-/Versionierungs-Konventionen je Domain.
+# Projekte wählen via 'conventions-preset' in project.yaml.
+# Einzelne Felder können via 'conventions:' Block überschrieben werden.
+# Precedence: conventions (Projekt-Override) > conventions-preset > default.
+#
+# applies_to_roles: Render-Gate, KEIN Injektions-Mechanismus. Die tatsächliche
+#   Ziel-Rolle ergibt sich ausschließlich daraus, welches Rollen-Template den
+#   Platzhalter referenziert (z.B. {{RELEASE_VERSIONING_BLOCK}} in release.md),
+#   nicht aus diesem Feld. applies_to_roles entscheidet nur, ob der Block
+#   überhaupt berechnet wird: fehlt die hier genannte Rolle in project.yaml
+#   roles:-Allowlist, wird der Block übersprungen (log.skip, kein Fehler).
+#   Syntax ist eine Liste (Forward-Compat für später), v1 unterstützt aber nur
+#   genau EINE Rolle pro Domain — mehr als ein Eintrag ist ein Konfigurations-
+#   fehler, den der Resolver mit klarer Fehlermeldung ablehnt.
+
+presets:
+
+  # Entspricht 1:1 dem heutigen hartkodierten Verhalten von release.md/git.md.
+  # Migrations-Invariante: 'default' MUSS den heutigen Status quo reproduzieren.
+  default:
+    release:
+      applies_to_roles: [release]
+      versioning:
+        scheme: semver
+        tag_format: "v{major}.{minor}.{patch}"
+        bump_rules:
+          - {trigger: "Breaking change", bump: major, example: "Removed commands, incompatible config"}
+          - {trigger: "New feature", bump: minor, example: "New commands, new settings"}
+          - {trigger: "Bugfix / docs", bump: patch, example: "Bugfixes, performance, doc fixes"}
+          - {trigger: "Alpha/Beta", bump: suffix, example: "-alpha.x / -beta.x"}
+      changelog:
+        format: keep-a-changelog
+        sections: [Added, Fixed, Changed, Removed]
+        entry_prefix: "REQ-xxx: "   # bewusst unverändert ggü. heute (siehe Konzept Abschnitt 8)
+    issues:
+      applies_to_roles: [git]
+      # Vokabular wird 1:1 von commit-conventions.md übernommen, nicht neu erfunden.
+      title_format: "{type}: {description}"
+      types: [feat, fix, docs, chore, refactor, test, perf]
+      labels:
+        namespace: "type: {type}"
+      closing_keywords: [Fixes, Closes, Resolves]
+
+  calver:
+    # Für kontinuierlich deployte Services/SaaS ohne externe Library-Konsumenten:
+    # kein SemVer-Versionsvertrag nötig, Datum ist aussagekräftiger als
+    # MAJOR.MINOR.PATCH. Nicht für Libraries/CLIs mit Downstream-Konsumenten.
+    release:
+      applies_to_roles: [release]
+      versioning:
+        scheme: calver
+        tag_format: "{year}.{month}.{patch}"
+        bump_rules:
+          - {trigger: "Neuer Monat seit letztem Release", bump: month, example: "2026.08.0 -> 2026.09.0"}
+          - {trigger: "Fix/Feature im selben Monat", bump: patch, example: "2026.08.0 -> 2026.08.1"}
+      changelog:
+        format: keep-a-changelog
+        sections: [Added, Fixed, Changed, Removed]
+        entry_prefix: ""
+    issues:
+      applies_to_roles: [git]
+      title_format: "{type}: {description}"
+      types: [feat, fix, docs, chore, refactor, test, perf]
+      labels:
+        namespace: "type: {type}"
+      closing_keywords: [Fixes, Closes, Resolves]
+
+  conventional-strict:
+    # Für OSS-Libraries/Packages mit vollautomatisierbarem Release-Flow
+    # (semantic-release/git-cliff-Stil): Changelog wird rein aus Conventional-
+    # Commit-Types generiert, keine manuelle REQ-Verknüpfung. Nicht geeignet,
+    # wenn REQ-Traceability (dod.req-traceability: true) aktiv ist.
+    release:
+      applies_to_roles: [release]
+      versioning:
+        scheme: semver
+        tag_format: "v{major}.{minor}.{patch}"
+        bump_rules:
+          - {trigger: "BREAKING CHANGE footer / '!' nach type", bump: major, example: "feat!: ..."}
+          - {trigger: "feat", bump: minor, example: "feat: add X"}
+          - {trigger: "fix/perf", bump: patch, example: "fix: ..."}
+      changelog:
+        format: angular
+        sections: [Features, "Bug Fixes", "Performance Improvements", "Breaking Changes"]
+        entry_prefix: ""
+    issues:
+      applies_to_roles: [git]
+      title_format: "{type}: {description}"
+      types: [feat, fix, docs, chore, refactor, test, perf, breaking]
+      labels:
+        namespace: "type: {type}"
+      closing_keywords: [Fixes, Closes, Resolves]
