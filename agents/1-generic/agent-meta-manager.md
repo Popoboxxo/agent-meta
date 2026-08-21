@@ -111,6 +111,41 @@ py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml --c
 py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml --create-command deploy
 ```
 
+## 8b. Model Override-All (reversible promo blast)
+
+Blast **every** active agent of one provider onto a single model — e.g. to
+exploit provider discount promos or usage caps. This is the preferred, reversible
+mechanism (do NOT hand-edit per-role `model-overrides` for this).
+
+Mechanism: project.yaml key `model-override-all` (provider → tier/alias/model-ID).
+When a provider key is set, `sync.py` resolves ALL roles of that provider to that
+model, overriding per-role/tier/preset resolution. Remove the key (or the whole
+block) and the previous per-agent settings resume automatically — nothing else to
+clean up.
+
+```yaml
+# .meta-config/project.yaml
+model-override-all:
+  Claude: claude-sonnet-4-6      # blast all Claude agents onto this model
+  Gemini: gemini-2.5-pro
+```
+
+Toggle workflow:
+1. Read current state: `model-override-all` in `.meta-config/project.yaml`.
+2. To enable: set/merge the provider key, then re-sync.
+3. To disable: delete the provider key (or the entire `model-override-all` block), then re-sync.
+4. Always re-run `sync.py` after changing the key so generated agents pick it up.
+
+```bash
+# Enable (merge, keep other providers)
+py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml
+# Disable: remove the key from project.yaml, then re-sync
+```
+
+Admin-UI shortcut: *Project → Model Overrides → "Override All"* bar writes the
+key directly (with a "Zurücksetzen" button to clear it). See skill
+`.claude/skills/model-override-all/SKILL.md`.
+
 ## 9. External skills
 
 Full lifecycle: `rules/2-platform/agent-meta-sync-interface.md` (--add-skill flag).

@@ -3487,7 +3487,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         else:
             raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
         allowed = {
-            "agent-prompts", "model-overrides", "memory-overrides", "permission-mode-overrides",
+            "agent-prompts",             "model-overrides", "model-override-all", "memory-overrides", "permission-mode-overrides",
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "conventions", "conventions-preset",
