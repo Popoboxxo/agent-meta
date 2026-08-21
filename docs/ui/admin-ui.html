@@ -6439,6 +6439,53 @@ async function viewProjectModelOverrides() {
   }
   wrap.appendChild(datalist);
 
+  // --- Override-All bar: reversible global per-provider model blast ---
+  // Writes project.yaml `model-override-all[provider] = model`. sync.py then
+  // resolves EVERY active agent/role of that provider to this single model.
+  // Fully reversible: clearing the provider key makes sync fall back to the
+  // previous per-agent settings automatically — nothing else to clean up.
+  const oaBar = el("div", { class: "btn-row", style: "margin:14px 0;padding:12px;background:var(--panel,#1c2230);border:1px solid var(--border,#2c3344);border-radius:8px;" });
+  const oaProv = el("select");
+  oaProv.appendChild(el("option", { value: "" }, ["Provider wählen…"]));
+  for (const tp of tierProviders) {
+    oaProv.appendChild(el("option", { value: tp.name }, [tp.display_name || tp.name]));
+  }
+  const oaModel = el("input", { type: "text", list: "global-model-list", placeholder: "Modell-ID (z.B. claude-sonnet-4-6)", style: "min-width:240px;" });
+  const oaBtn = el("button", { class: "btn btn-warning", title: "Setzt model-override-all[provider]=model → alle Agenten dieses Providers brennen auf dieses Modell (reversibel)" }, ["Alle Rollen überschreiben"]);
+  const oaClear = el("button", { class: "btn", title: "Entfernt den Provider-Key aus model-override-all → Normal-Auflösung greift wieder" }, ["Zurücksetzen"]);
+  const oaStatus = el("span", { class: "muted", style: "margin-left:8px;" }, []);
+  oaBtn.addEventListener("click", async () => {
+    const prov = oaProv.value;
+    const model = oaModel.value.trim();
+    if (!prov) { oaStatus.textContent = "Override-All: zuerst einen Provider wählen."; return; }
+    if (!model) { oaStatus.textContent = "Override-All: zuerst ein Modell eingeben."; return; }
+    const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
+    cur[prov] = model;
+    try {
+      await saveProjectSection("model-override-all", cur, status);
+      oaStatus.textContent = `${prov} → ${model} aktiv. Reversibel: Zurücksetzen oder Key löschen.`;
+      if (oaProv.value === prov) oaModel.value = model;
+    } catch { oaStatus.textContent = "Fehler beim Speichern von model-override-all."; }
+  });
+  oaClear.addEventListener("click", async () => {
+    const prov = oaProv.value;
+    if (!prov) { oaStatus.textContent = "Zurücksetzen: zuerst einen Provider wählen."; return; }
+    const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
+    delete cur[prov];
+    try {
+      await saveProjectSection("model-override-all", cur, status);
+      oaStatus.textContent = `${prov} entfernt → Normal-Auflösung greift wieder.`;
+      oaModel.value = "";
+    } catch { oaStatus.textContent = "Fehler beim Zurücksetzen von model-override-all."; }
+  });
+  oaBar.appendChild(el("strong", { style: "margin-right:8px;" }, ["Override All:"]));
+  oaBar.appendChild(oaProv);
+  oaBar.appendChild(oaModel);
+  oaBar.appendChild(oaBtn);
+  oaBar.appendChild(oaClear);
+  oaBar.appendChild(oaStatus);
+  wrap.appendChild(oaBar);
+
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
   const rows = [];

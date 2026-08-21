@@ -103,7 +103,20 @@ def resolve_model(
     tier_or_id = ""
     explicit_override = False
 
-    # 1. Provider-specific project override
+    # --- Global per-provider "override all" (highest precedence, reversible) ---
+    # If ``model-override-all[provider]`` is set (non-empty), EVERY role of that
+    # provider is blasted onto this single model. Removing the key (or the whole
+    # block) from project.yaml makes sync fall back to the normal per-agent
+    # resolution automatically — no per-role cleanup required.
+    override_all = project_config.get("model-override-all", {})
+    if isinstance(override_all, dict):
+        raw_all = override_all.get(provider)
+        if raw_all:
+            resolved_all = _resolve_tier_to_model(str(raw_all), provider, provider_config)
+            if log:
+                log.debug(f"{provider}/{role}", f"GLOBAL override-all for provider '{provider}' (reversible): {resolved_all}")
+            return resolved_all
+
     provider_overrides = project_config.get("model-overrides", {})
     provider_specific = provider_overrides.get(provider, {})
     if isinstance(provider_specific, dict) and role in provider_specific:
