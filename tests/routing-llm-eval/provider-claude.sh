@@ -1,33 +1,87 @@
 #!/bin/bash
-# promptfoo-style custom provider: shells out to the real `claude` CLI, using
-# this repo's actual generated .claude/rules/use-orchestrator.md as the
-# system prompt. Tests whether agent-meta's GENERATED routing table (not a
-# description of it) produces correct delegation decisions in a real Claude
-# session.
+# promptfoo-style custom provider: shells out to the real `claude` CLI using an
+# agent-meta GENERATED artifact as system prompt.
 #
-# Generalized from the PoC at .experiments/promptfoo-routing-eval/provider.sh
-# (PR #497) -- same isolation strategy, only the path depth changed (this
-# file lives at the same repo depth: tests/routing-llm-eval/, so REPO_ROOT
-# resolution is unchanged).
+# v2 (issue #535, findings #523):
+#   * --agent <role> : orchestrator keeps its legacy source
+#                      (.claude/rules/use-orchestrator.md, no frontmatter),
+#                      every other role uses .claude/agents/<role>.md WITH
+#                      frontmatter stripped (finding H3: frontmatter would be
+#                      injected as prompt garbage via --system-prompt-file).
+#                      Missing/unknown role => exit 2 (finding W6).
+#   * Structured sidecar identical to provider-opencode.sh v2 (finding B1):
+#     claude -p does not stream structured events, so tool_events stays empty
+#     and the sidecar carries final_text + a marker field "stream": false.
 #
-# Isolation: `claude -p` still auto-discovers CLAUDE.md/.claude/rules from
-# the invoking cwd even with --system-prompt-file (verified in the PoC: run
-# from inside this repo, the model knew the DoD-preset "rapid-prototyping",
-# which only exists in agent-meta/CLAUDE.md, not in use-orchestrator.md).
-# --bare would suppress that but requires ANTHROPIC_API_KEY (no OAuth),
-# which isn't available here. Running from a throwaway tmp dir gets the
-# same isolation without needing an API key.
+# Isolation unchanged: run from a throwaway tmp dir so repo CLAUDE.md /
+# .claude/rules auto-discovery cannot leak into the session (--bare would
+# need ANTHROPIC_API_KEY which OAuth setups do not have).
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROMPT="$1"
+
+ROLE="orchestrator"
+PROMPT=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent)
+      ROLE="$2"
+      shift 2
+      ;;
+    --agent=*)
+      ROLE="${1#*=}"
+      shift
+      ;;
+    *)
+      PROMPT="$1"
+      shift
+      ;;
+  esac
+done
 
 RUN_DIR="$(mktemp -d)"
 trap 'rm -rf "$RUN_DIR"' EXIT
 
-(
+SYSTEM_FILE=""
+if [[ "$ROLE" == "orchestrator" ]]; then
+  SYSTEM_FILE="$REPO_ROOT/.claude/rules/use-orchestrator.md"
+else
+  SRC_AGENT="$REPO_ROOT/.claude/agents/${ROLE}.md"
+  if [[ ! -f "$SRC_AGENT" ]]; then
+    echo "provider-claude: unknown or missing role file: $SRC_AGENT" >&2
+    exit 2
+  fi
+  SYSTEM_FILE="$RUN_DIR/system-prompt.md"
+  # Strip YAML frontmatter (H3): everything from the first '---' line up to
+  # the second '---' line, inclusive. If no frontmatter present, copy as-is.
+  awk 'BEGIN{fm=0; done=0} NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{fm=0; done=1; next} done||!fm{print}' \
+    "$SRC_AGENT" > "$SYSTEM_FILE"
+fi
+
+OUTPUT_TEXT="$(
   cd "$RUN_DIR"
   claude -p \
-    --system-prompt-file "$REPO_ROOT/.claude/rules/use-orchestrator.md" \
-    --model haiku \
+    --system-prompt-file "$SYSTEM_FILE" \
+    --model "${CLAUDE_ROUTING_EVAL_MODEL:-haiku}" \
     "$PROMPT"
-)
+)"
+
+printf '%s\n' "$OUTPUT_TEXT"
+
+# Structured sidecar (B1): claude -p has no event stream; be honest about it.
+if [[ -n "${EVAL_STRUCTURED_OUTPUT:-}" ]]; then
+  printf '%s' "$OUTPUT_TEXT" | ROLE="$ROLE" OUT="$EVAL_STRUCTURED_OUTPUT" python3 -c '
+import json, os, sys
+text = sys.stdin.read()
+payload = {
+    "provider": "claude",
+    "role": os.environ["ROLE"],
+    "stream": False,
+    "final_text": text,
+    "event_counts": {},
+    "tool_events": [],
+    "spawn_attempts": 0,
+}
+with open(os.environ["OUT"], "w", encoding="utf-8") as f:
+    json.dump(payload, f, ensure_ascii=False)
+'
+fi
