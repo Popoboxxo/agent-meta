@@ -1,0 +1,24 @@
+# Review rules index — ui domain
+version: 1
+domain: ui
+rules:
+  - id: UI-01
+    title: Design-token conformance (no hardcoded colors/spacing/fonts)
+    severity_hint: medium
+    standard_ref:
+  - id: UI-02
+    title: Layout consistency (spacing/grid/breakpoints)
+    severity_hint: low
+    standard_ref:
+  - id: UI-03
+    title: Interaction states present (loading/error/empty)
+    severity_hint: medium
+    standard_ref:
+  - id: UI-04
+    title: i18n readiness (no hardcoded user-facing strings)
+    severity_hint: medium
+    standard_ref:
+  - id: UI-05
+    title: Surface WCAG basics (deep audits -> accessibility-specialist)
+    severity_hint: high
+    standard_ref: WCAG-2.2

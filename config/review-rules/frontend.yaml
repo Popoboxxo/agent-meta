@@ -1,0 +1,28 @@
+# Review rules index — frontend domain
+version: 1
+domain: frontend
+rules:
+  - id: FE-01
+    title: Component single-responsibility (no god-components)
+    severity_hint: medium
+    standard_ref:
+  - id: FE-02
+    title: State correctness, no duplicated derived state
+    severity_hint: medium
+    standard_ref:
+  - id: FE-03
+    title: SSR/hydration safety (no window/document during initial render)
+    severity_hint: high
+    standard_ref:
+  - id: FE-04
+    title: Browser API hygiene (cleanup, feature detection)
+    severity_hint: medium
+    standard_ref:
+  - id: FE-05
+    title: Render performance on hot paths
+    severity_hint: medium
+    standard_ref:
+  - id: FE-06
+    title: No inline secrets/keys in client bundles
+    severity_hint: critical
+    standard_ref: CWE-798

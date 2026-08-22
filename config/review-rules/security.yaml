@@ -1,0 +1,28 @@
+# Review rules index — security domain
+version: 1
+domain: security
+rules:
+  - id: SEC-01
+    title: Injection families (SQLi, XSS, command, SSTI)
+    severity_hint: critical
+    standard_ref: OWASP-A03;CWE-89;CWE-79;CWE-78
+  - id: SEC-02
+    title: Hardcoded secrets/credentials
+    severity_hint: critical
+    standard_ref: OWASP-A07;CWE-798
+  - id: SEC-03
+    title: Broken authentication/authorization
+    severity_hint: critical
+    standard_ref: OWASP-A01;OWASP-A07;CWE-287;CWE-862
+  - id: SEC-04
+    title: Cryptographic weaknesses (MD5/SHA1/DES/RC4, weak randomness)
+    severity_hint: high
+    standard_ref: OWASP-A02;CWE-327
+  - id: SEC-05
+    title: Dependency/supply-chain risks
+    severity_hint: high
+    standard_ref: OWASP-A06
+  - id: SEC-06
+    title: SSRF/path traversal/insecure deserialization
+    severity_hint: high
+    standard_ref: OWASP-A08;OWASP-A10;CWE-22;CWE-502;CWE-918

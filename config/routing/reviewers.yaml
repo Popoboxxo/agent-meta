@@ -1,0 +1,26 @@
+# Reviewer routing matrix — consumed by the orchestrator (concept §5.1, review-agent fleet)
+# Path-class patterns dispatch reviewer sets; ambiguous diffs fan out to all matches.
+version: 1
+synthesis: true
+max_parallel: 5
+routes:
+  - match: "**/*.{tsx,jsx,vue,svelte,css,scss}"
+    reviewers:
+      - frontend-reviewer
+      - ui-reviewer
+  - match: "**/migrations/**"
+    reviewers:
+      - database-reviewer
+  - match: "**/*.{sql}"
+    reviewers:
+      - database-reviewer
+  - match: "**/{api,server,controllers,services}/**"
+    reviewers:
+      - backend-reviewer
+  - match: "**/*.{py,ts,js,go,java,rb,php}"
+    reviewers:
+      - security-auditor
+notes: >-
+  security-auditor acts as fallback on any code diff. ui-reviewer delegates deep
+  WCAG work to accessibility-specialist. Report files over ~100 lines go to
+  /tmp/opencode/ and only paths travel the return channel (issue #514).

@@ -1,0 +1,28 @@
+# Review rules index — database domain
+version: 1
+domain: database
+rules:
+  - id: DB-01
+    title: Migration safety (reversible, lock-aware)
+    severity_hint: high
+    standard_ref:
+  - id: DB-02
+    title: N+1 query patterns / missing eager loading
+    severity_hint: medium
+    standard_ref:
+  - id: DB-03
+    title: Injection vectors via string-built SQL
+    severity_hint: critical
+    standard_ref: CWE-89
+  - id: DB-04
+    title: Indexing of hot query paths
+    severity_hint: medium
+    standard_ref:
+  - id: DB-05
+    title: Transaction boundaries and isolation
+    severity_hint: high
+    standard_ref:
+  - id: DB-06
+    title: Schema evolution discipline (no unplanned destructive drops)
+    severity_hint: high
+    standard_ref:

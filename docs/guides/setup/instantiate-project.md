@@ -237,6 +237,10 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/product-manager.md` | `1-generic/product-manager.md` (optional, Backlog, User-Stories, Priorisierung RICE/MoSCoW, Roadmap) |
 | `.claude/agents/proofreader.md` | `1-generic/proofreader.md` (optional, Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung) |
 | `.claude/agents/copyeditor.md` | `1-generic/copyeditor.md` (optional, Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, Konsistenz) |
+| `.claude/agents/frontend-reviewer.md` | `1-generic/frontend-reviewer.md` (optional, Review-Agent-Fleet: Komponenten, State, SSR/Hydration, Browser-APIs) |
+| `.claude/agents/backend-reviewer.md` | `1-generic/backend-reviewer.md` (optional, Review-Agent-Fleet: API-Contracts, Silent Failures, Concurrency) |
+| `.claude/agents/database-reviewer.md` | `1-generic/database-reviewer.md` (optional, Review-Agent-Fleet: Migration-Safety, N+1, Injection, Transaktionen) |
+| `.claude/agents/ui-reviewer.md` | `1-generic/ui-reviewer.md` (optional, Review-Agent-Fleet: Design-Token, Layout-Konsistenz, Interaction-States) |
 
 ---
 

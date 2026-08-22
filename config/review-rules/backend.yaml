@@ -1,0 +1,29 @@
+# Review rules index — backend domain
+# Fleet reviewers may ONLY cite rule_ids defined here or in their template defaults.
+version: 1
+domain: backend
+rules:
+  - id: BE-01
+    title: Silent failure hunt (swallowed exceptions, empty catches)
+    severity_hint: high
+    standard_ref:
+  - id: BE-02
+    title: API contract consistency and versioning
+    severity_hint: medium
+    standard_ref:
+  - id: BE-03
+    title: Concurrency/async pitfalls (races, unawaited promises)
+    severity_hint: high
+    standard_ref:
+  - id: BE-04
+    title: Middleware chain order correctness
+    severity_hint: medium
+    standard_ref:
+  - id: BE-05
+    title: Input validation at system boundaries
+    severity_hint: high
+    standard_ref:
+  - id: BE-06
+    title: Observability without secret leakage
+    severity_hint: medium
+    standard_ref:
