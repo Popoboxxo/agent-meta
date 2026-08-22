@@ -11,7 +11,9 @@ Covers:
 - No-op semantics: absent / None / false entries change nothing.
 
 Tests use the real config files from the repo — no mocking.
-All tests target the Claude provider for deterministic model IDs.
+Most tests target the Claude provider for deterministic model IDs;
+the generation-path regression tests target Continue (the one provider
+whose transform falls back to raw role-defaults when resolution is empty).
 """
 from __future__ import annotations
 
@@ -19,7 +21,9 @@ from pathlib import Path
 
 import pytest
 
+from scripts.lib.agents import transform_agent_content_for_provider
 from scripts.lib.config import _validate_model_inheritance
+from scripts.lib.log import SyncLog
 from scripts.lib.providers import load_providers_config
 from scripts.lib.roles import resolve_model
 
@@ -90,6 +94,52 @@ def test_inherit_only_applies_to_configured_provider() -> None:
     )
     assert resolved == CLAUDE_MODEL_POWERFUL, (
         f"Claude must fall through to Normal preset resolution, got {resolved!r}"
+    )
+
+
+# --- Continue generation path (transform_agent_content_for_provider) --------
+
+
+def _generate_continue_agent(extra: dict | None = None) -> str:
+    """Helper: run the full Continue generation transform for the 'developer' role."""
+    content = (
+        "---\n"
+        "name: template-developer\n"
+        'version: "1.0.0"\n'
+        "description: Feature-Implementierung und Bugfixes\n"
+        "---\n"
+        "\n"
+        "Body content.\n"
+    )
+    project_config: dict = {}
+    if extra:
+        project_config.update(extra)
+    return transform_agent_content_for_provider(
+        content, "Continue", "developer", "developer",
+        "Feature-Implementierung und Bugfixes",
+        "1-generic/developer.md@1.0.0", project_config,
+        REPO_ROOT, REPO_ROOT,
+        REPO_ROOT / ".continue" / "agents" / "developer.md",
+        _PROVIDER_CONFIG, SyncLog(),
+    )
+
+
+def test_continue_generation_path_inherit_keeps_model_empty() -> None:
+    """Regression: with inherit active the Continue generation path must NOT
+    fall back to raw role-defaults — no model: field may be injected."""
+    fm = _generate_continue_agent(
+        {"model-inherit-main-chat": {"Continue": True}},
+    ).split("---")[1]
+    assert "model:" not in fm, f"Inherit must suppress role-defaults fallback, got: {fm!r}"
+
+
+def test_continue_generation_path_without_inherit_uses_role_defaults_fallback() -> None:
+    """Counter-test: WITHOUT inherit the model resolution stays as before —
+    resolve_model() maps role-defaults tier 'balanced' via the Normal preset
+    to a concrete ID, so the raw role-defaults fallback never triggers."""
+    fm = _generate_continue_agent().split("---")[1]
+    assert "model: claude-sonnet-5" in fm, (
+        f"Without inherit the generation path must resolve as before, got: {fm!r}"
     )
 
 
@@ -167,6 +217,43 @@ def test_non_mapping_block_exits_with_error(capsys: pytest.CaptureFixture[str]) 
     assert excinfo.value.code == 1
     stderr = capsys.readouterr().err
     assert "model-inherit-main-chat" in stderr
+
+
+# --- (c) Dead-config warnings (soft, sync continues) ------------------------
+
+
+def test_shadowed_nested_overrides_warn_but_continue(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Per-provider entries under active inherit are dead config: one-line
+    WARNING naming provider + roles, but NO SystemExit."""
+    config = {
+        "model-inherit-main-chat": {"Continue": True},
+        "model-overrides": {"Continue": {"developer": "powerful"}},
+    }
+    _validate_model_inheritance(config, Path("project.yaml"))
+
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.err
+    assert "'Continue'" in captured.err
+    assert "developer" in captured.err
+
+
+def test_shadowed_flat_overrides_warn_for_claude(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Legacy flat role map applies to Claude only — warn when Claude inherit
+    is active; no warning when only another provider inherits."""
+    config = {
+        "model-inherit-main-chat": {"Claude": True},
+        "model-overrides": {"developer": "powerful"},
+    }
+    _validate_model_inheritance(config, Path("project.yaml"))
+    assert "WARNING" in capsys.readouterr().err
+
+    config["model-inherit-main-chat"] = {"Gemini": True}
+    _validate_model_inheritance(config, Path("project.yaml"))
+    assert "WARNING" not in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
