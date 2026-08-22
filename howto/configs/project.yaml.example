@@ -178,6 +178,28 @@ model-overrides:
     developer: balanced
     git: fast
 
+# Main-Chat-Modell erben (pro Provider) / Inherit the main-chat model (per provider)
+# Bei `true` werden alle Agenten des Providers OHNE `model:`-Feld generiert und
+# erben das im Main-Chat aktive Modell — Tier-Preset & model-overrides werden
+# für diesen Provider ignoriert.
+# With `true`, all agents of this provider are generated WITHOUT a `model:`
+# field and inherit the model active in the main chat — tier preset &
+# model-overrides are ignored for that provider.
+# Exklusivität: Pro Provider gilt ENTWEDER `model-inherit-main-chat` ODER
+# `model-override-all` — beides `true` für denselben Provider bricht den Sync
+# mit einem Fehler ab (`false` zählt als nicht gesetzt).
+# Exclusivity: per provider, EITHER `model-inherit-main-chat` OR
+# `model-override-all` — both `true` for the same provider aborts the sync
+# with an error (`false` counts as unset).
+# Reversibel: Block entfernen oder Einträge auf `false` setzen und erneut
+# synchronisieren — die generierten Agenten erhalten wieder ihr reguläres
+# `model:`-Feld.
+# Reversible: remove the block (or set entries to `false`) and re-sync —
+# generated agents get their regular `model:` field back.
+# model-inherit-main-chat:
+#   Claude: true
+#   Gemini: true
+
 # ------------------------------------------------------------------------------
 # 10. Projekt-Variablen / Project Template Variables
 # ------------------------------------------------------------------------------

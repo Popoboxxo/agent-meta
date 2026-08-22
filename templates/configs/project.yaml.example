@@ -113,6 +113,19 @@ project:
 #   developer: powerful
 #
 # Rückwärtskompatibel: haiku / sonnet / opus funktionieren weiterhin für Claude.
+#
+# Main-Chat-Modell erben — Agenten eines Providers bekommen KEIN festes
+# model: in den generierten Agentendateien und erben zur Laufzeit das
+# Modell, das gerade im Main-Chat aktiv ist. Nützlich wenn man das
+# Main-Chat-Modell oft wechselt und die Agenten automatisch folgen sollen.
+# model-inherit-main-chat:
+#   Claude: true             # alle Claude-Agenten erben das Main-Chat-Modell
+#   Gemini: false            # unset — normale Rollen-/Tier-Auflösung greift
+#
+# ACHTUNG: Pro Provider exklusiv zu model-override-all — steht derselbe
+# Provider in BEIDEN Keys, bricht der Sync sofort mit Fehler ab.
+# Reversibel: einfach den Provider-Key (oder den ganzen Block) löschen
+# und neu syncen — die bisherigen pro-Rolle-Einstellungen greifen wieder.
 
 # Definition of Done — einzelne Kriterien überschreiben
 # dod:

@@ -308,6 +308,14 @@
         "description": "Tier, alias or full model ID to blast onto every role of this provider."
       }
     },
+    "model-inherit-main-chat": {
+      "type": "object",
+      "description": "Per-provider main-chat inheritance. When a provider key is set to true, agents of that provider get no model field during sync.py and inherit the main chat model at runtime — overriding all per-role overrides, tiers and presets. Mutually exclusive with model-override-all on the same provider key. Fully reversible: remove the key (or the whole block) and the previous per-agent settings apply again automatically.",
+      "additionalProperties": {
+        "type": "boolean",
+        "description": "Set to true to omit the model field for every agent of this provider so it inherits the main chat model."
+      }
+    },
     "model-overrides": {
       "type": "object",
       "description": "Override the default model tier or model ID per role. Two forms supported: (1) flat role→tier for Claude-only legacy use; (2) provider-keyed blocks for multi-provider control. Provider-specific blocks take precedence over flat values for that provider.",

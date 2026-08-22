@@ -28,6 +28,14 @@ Value is resolved through `_resolve_tier_to_model`, so a tier (`nano`/`fast`/
 `balanced`/`powerful`/`max`), a legacy alias (`haiku`/`sonnet`/`opus`) or a full
 model ID (`claude-sonnet-4-6`) are all accepted.
 
+## Sibling mode: model-inherit-main-chat
+
+`model-inherit-main-chat[provider] = true` makes every role of that provider
+inherit the main chat's model: sync omits the generated `model:` field entirely.
+Per provider this is **hard-exclusive** with `model-override-all` — setting
+both keys for the same provider aborts sync with exit code 1. Toggle it via its
+own Admin-UI switch (*Project → Model Overrides*).
+
 ## project.yaml shape
 
 ```yaml
