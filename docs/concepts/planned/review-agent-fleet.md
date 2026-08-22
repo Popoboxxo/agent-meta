@@ -40,6 +40,12 @@
    refs for database) + minimal fix suggestion.
 5. **P5 — Confidence gate:** findings below confidence threshold are dropped silently;
    report ends with `MERGE_SCORE: <0-100>` so the orchestrator can gate merges.
+6. **P6 — Model-tier assignment:** every fleet role gets an explicit `tier` entry in
+   `config/role-defaults.yaml` at introduction time (no implicit defaults). Proposal:
+   `security-reviewer` + `database-reviewer` → strongest review tier (deep analysis),
+   `frontend-reviewer` / `backend-reviewer` / `ui-reviewer` → standard tier.
+   All remain overridable via the existing chain (`model-overrides` per role,
+   `model-inherit-main-chat`, `model-override-all`).
 
 ## 4. Role matrix
 
@@ -54,22 +60,50 @@
 Existing roles stay responsible for their niche: `code-reviewer` (general quality),
 `accessibility-specialist` (deep WCAG), `e2e-tester` (behavioral).
 
-## 5. Orchestration integration
+## 5. Orchestrator routing (optimization)
 
-- Orchestrator routes by changed-path classes (mirroring platform-detection pattern):
-  `*.tsx/vue/svelte → frontend-reviewer`, migrations/schema files → `database-reviewer`,
-  etc.; ambiguous diffs → parallel dispatch of candidates.
-- All reviewers run in parallel, write reports to files (return-channel protection,
-  cf. issue #514), synthesis merges + dedupes into one PR comment block.
-- Severity schema uniform: `CRITICAL | HIGH | MEDIUM | LOW | CLEAN`.
+### 5.1 Path-based routing matrix (config-driven, not prompt-hardcoded)
+
+New config file `config/routing/reviewers.yaml` — the orchestrator reads class patterns
+from here instead of embedding them in its prompt text:
+
+```yaml
+routes:
+  - match: "**/*.{tsx,jsx,vue,svelte,css,scss}"
+    reviewers: [frontend-reviewer, ui-reviewer]
+  - match: "**/migrations/**"          # + *.sql, schema files
+    reviewers: [database-reviewer]
+  - match: "**/{api,server,controllers,services}/**"
+    reviewers: [backend-reviewer]
+  - match: "**/*.{py,ts,go,java}"      # fallback: always security-scan code diffs
+    reviewers: [security-reviewer]
+synthesis: true                        # merge + dedupe into one report
+max_parallel: 5
+```
+
+- Ambiguous diffs → parallel dispatch of all matched candidates (fan-out).
+- `ui-reviewer` delegates WCAG depth to `accessibility-specialist` per concept §4.
+- Cheap-tier prefilter possible later: routing classifier picks reviewer set before full review.
+
+### 5.2 Routing-eval integration
+
+All new roles enter the existing routing LLM-eval catalog (`tests/routing-llm-eval/`,
+B1 classification) so misrouting is measurable: each new role gets ≥3 catalog cases
+(positive intent, negative intent, ambiguous). CI gate stays non-blocking until stable.
+
+### 5.3 Cost-aware tiering in routing
+
+Routing prefers the lowest sufficient tier per §3 P6; `model-inherit-main-chat` and
+`model-override-all` keep precedence over tier resolution unchanged.
 
 ## 6. Deliverables
 
 1. 5 new/refactored templates in `agents/1-generic/` (+ version bump per conventions)
-2. `config/role-defaults.yaml` entries + CLAUDE.md/howto updates (new-role checklist)
+2. `config/role-defaults.yaml` entries **with explicit tier assignment** (P6) + CLAUDE.md/howto updates (new-role checklist)
 3. Default rules indexes `config/review-rules/{frontend,backend,database,ui,security}.yaml`
-4. pytest: frontmatter/contract checks extended to enforce P1/P4/P5 structurally
-5. Docs: agent-graph regeneration via sync.py
+4. Routing matrix `config/routing/reviewers.yaml` (§5.1) + orchestrator template update to consume it
+5. pytest: frontmatter/contract checks extended to enforce P1/P4/P5/P6 structurally; routing-eval catalog cases for all new roles (§5.2)
+6. Docs: agent-graph regeneration via sync.py
 
 ## 7. Open questions
 
