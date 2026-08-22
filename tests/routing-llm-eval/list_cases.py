@@ -7,8 +7,9 @@ which cannot appear in normal task text, so run_eval.sh can split on it
 without worrying about commas/pipes/colons inside the task string.
 
 Output field order: id, pipeline, category, expected (comma-joined),
-source_keyword, task (task is last since it's the only field that may
-itself contain arbitrary text, including trailing whitespace).
+source_keyword, role, prompt (raw override), expected_any, expected_all,
+forbidden (each comma-joined), task (task is last since it's the only field
+that may itself contain arbitrary text, including trailing whitespace).
 
 Usage:
     python3 list_cases.py [catalog.yaml ...]
@@ -45,7 +46,11 @@ def main(argv: list[str]) -> int:
     paths = (
         [Path(p) for p in argv]
         if argv
-        else [script_dir / "catalog.generated.yaml", script_dir / "catalog.manual.yaml"]
+        else [
+            script_dir / "catalog.generated.yaml",
+            script_dir / "catalog.manual.yaml",
+            script_dir / "catalog.behavior.yaml",
+        ]
     )
 
     seen_ids: dict[str, str] = {}
@@ -68,9 +73,31 @@ def main(argv: list[str]) -> int:
             category = case.get("category", "")
             expected = ",".join(str(e) for e in case.get("expected", []))
             source_keyword = case.get("source_keyword") or ""
+            # Behavioral fields (issue #535): role under test, raw prompt
+            # override, and extended assert criteria. Empty for legacy
+            # routing cases, which keep the equals-grading path.
+            role = case.get("role") or ""
+            prompt = case.get("prompt") or ""
+            expected_any = ",".join(str(e) for e in case.get("expected_any", []))
+            expected_all = ",".join(str(e) for e in case.get("expected_all", []))
+            forbidden = ",".join(str(e) for e in case.get("forbidden", []))
             task = case.get("task", "")
 
-            print(SEP.join([case_id, pipeline, category, expected, source_keyword, task]))
+            # task stays LAST: it is the only field that may contain
+            # arbitrary text including the separator-adjacent whitespace.
+            print(SEP.join([
+                case_id,
+                pipeline,
+                category,
+                expected,
+                source_keyword,
+                role,
+                prompt,
+                expected_any,
+                expected_all,
+                forbidden,
+                task,
+            ]))
     return 0
 
 
