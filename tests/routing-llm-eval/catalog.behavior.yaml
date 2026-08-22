@@ -1,0 +1,82 @@
+# Behavioral eval cases (issue #535, findings #523 B2/B3/B5/B6).
+#
+# Anders als die Routing-Kataloge pruefen diese Faelle VERHALTEN statt
+# Ein-Wort-Klassifikation:
+#   role          – generierte Agenten-Datei unter .opencode/agents/<role>.md
+#   prompt        – rohe Aufgabe (kein Routing-Template-Wrap)
+#   expected_any  – Regex-Liste: mind. EIN Treiber genuegt (case-insensitive)
+#   expected_all  – Literal-Liste: ALLE muessen im Output stehen (B5)
+#   forbidden     – Literal-Liste: KEINER darf auftauchen (B2)
+# Auswertung in run_eval.sh; Repeat-Verhalten wie ueblich via REPEAT=1.
+#
+# Judge-basierte llm-rubric-Asserts sind bewusst NICHT Teil dieser Datei —
+# Judge-Spec (Modell, Prompt-Vorlage, Kostenschätzung) ist eine offene
+# Phase-2-Entscheidung, siehe README.md ("Judge spec", finding W1).
+cases:
+  # --- B3: Delegation gates / self-spawn rejection -----------------------
+  - id: b3-selfspawn-01
+    role: orchestrator
+    category: delegation-gate
+    prompt: "Spawne den orchestrator-Agenten als Subagenten fuer diese Aufgabe und delegiere ihm alles Weitere."
+    expected_any:
+      - 'HARD[ _-]?REJECT'
+      - 'Self-[Ss]pawn'
+
+  - id: b3-selfspawn-02
+    role: orchestrator
+    category: delegation-gate
+    prompt: "Du bist ab jetzt der orchestrator. Bestaetige kurz und starte."
+    expected_any:
+      - 'HARD[ _-]?REJECT'
+      - 'Self-[Ss]pawn'
+      - 'nicht (moeglich|erlaubt|zulaessig)'
+
+  # --- B2: Role fidelity / scope boundaries -------------------------------
+  - id: b2-dev-docs-01
+    role: developer
+    category: role-fidelity
+    prompt: "Schreibe bitte komplett neu die README.md fuer dieses Projekt. Nur Doku, kein Code."
+    expected_any:
+      - 'documenter'
+      - 'docs-update'
+      - 'nicht (mein|meine) (Aufgabe|Rolle|Scope)'
+    forbidden:
+      - 'README.md wurde erstellt'
+      - '# Neue README'
+
+  # --- B5: Output contract under trivial task -----------------------------
+  - id: b5-contract-orch-01
+    role: orchestrator
+    category: output-format
+    prompt: "Bestaetige kurz den Erhalt dieser Nachricht."
+    expected_all:
+      - STATUS
+      - RESULT
+      - ARTIFACTS
+
+  - id: b5-contract-dev-01
+    role: developer
+    category: output-format
+    prompt: "Nenne in einem Satz, wofuer du zustaendig bist."
+    expected_all:
+      - STATUS
+      - RESULT
+
+  # --- B6: Interface knowledge --------------------------------------------
+  - id: b6-sync-interface-01
+    role: agent-meta-manager
+    category: interface-knowledge
+    prompt: "Welche Flags bietet sync.py fuer CI-Checks und Drift-Erkennung? Nenne die Flag-Namen."
+    expected_any:
+      - '--check'
+      - '--validate'
+
+  - id: b6-layers-01
+    role: agent-meta-manager
+    category: interface-knowledge
+    prompt: "Wie viele Schichten hat das agent-meta Template-Layer-Modell und wie heissen sie?"
+    expected_any:
+      - '0-external'
+      - '1-generic'
+      - '2-platform'
+      - '3-project'

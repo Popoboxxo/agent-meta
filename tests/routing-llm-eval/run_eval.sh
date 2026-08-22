@@ -67,27 +67,75 @@ declare -A cat_pass
 
 printf "%-24s %-90s %-25s %-10s\n" "ID" "TASK" "EXPECTED" "RESULT"
 
-while IFS="$SEP" read -r id pipeline category expected_raw source_keyword task <&3; do
+while IFS="$SEP" read -r id pipeline category expected_raw source_keyword role prompt_override expected_any_raw expected_all_raw forbidden_raw task <&3; do
   [[ -z "$id" ]] && continue
   IFS=',' read -ra expected_list <<< "$expected_raw"
-  prompt=$(printf "$PROMPT_TMPL" "$task")
+  # Behavioral cases (#535, finding W2): raw prompt beats the routing
+  # template wrap. Role defaults to orchestrator for legacy cases.
+  if [[ -n "$prompt_override" ]]; then
+    prompt="$prompt_override"
+  else
+    prompt=$(printf "$PROMPT_TMPL" "$task")
+  fi
+  [[ -z "$role" ]] && role="orchestrator"
 
   run_pass=0
   results=()
   for ((i = 1; i <= REPEAT; i++)); do
-    actual=$("$PROVIDER_SCRIPT" "$prompt" </dev/null 2>/dev/null | tr -d '\n')
-    actual_norm=$(echo "$actual" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-    matched=false
-    for exp in "${expected_list[@]}"; do
-      if [[ "$actual_norm" == "$exp" ]]; then
-        matched=true
-        break
-      fi
-    done
+    actual=$("$PROVIDER_SCRIPT" --agent "$role" "$prompt" </dev/null 2>/dev/null | tr -d '\n')
+
+    # Grading: behavioral criteria (any/all/forbidden) take precedence over
+    # the legacy normalized one-word equals match.
+    matched=true
+
+    if [[ -n "$expected_any_raw" ]]; then
+      matched=false
+      IFS=',' read -ra any_list <<< "$expected_any_raw"
+      for pat in "${any_list[@]}"; do
+        if echo "$actual" | grep -qiE "$pat"; then
+          matched=true
+          break
+        fi
+      done
+    fi
+
+    if [[ "$matched" == true && -n "$expected_all_raw" ]]; then
+      IFS=',' read -ra all_list <<< "$expected_all_raw"
+      for lit in "${all_list[@]}"; do
+        if ! grep -qF "$lit" <<< "$actual"; then
+          matched=false
+          break
+        fi
+      done
+    fi
+
+    if [[ "$matched" == true && -n "$forbidden_raw" ]]; then
+      IFS=',' read -ra forb_list <<< "$forbidden_raw"
+      for lit in "${forb_list[@]}"; do
+        if grep -qF "$lit" <<< "$actual"; then
+          matched=false
+          break
+        fi
+      done
+    fi
+
+    if [[ $matched == true && -z "$expected_any_raw$expected_all_raw$forbidden_raw" ]]; then
+      # Legacy path: exact normalized one-word match.
+      actual_norm=$(echo "$actual" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+      matched=false
+      for exp in "${expected_list[@]}"; do
+        if [[ "$actual_norm" == "$exp" ]]; then
+          matched=true
+          break
+        fi
+      done
+      actual="$actual_norm"
+    fi
+
     if [[ "$matched" == true ]]; then
       run_pass=$((run_pass + 1))
     fi
-    results+=("$actual_norm")
+    results+=("$(echo "$actual" | head -c 60)")
   done
 
   cases_total=$((cases_total + 1))
