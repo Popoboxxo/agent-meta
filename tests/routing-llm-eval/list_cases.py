@@ -46,7 +46,11 @@ def main(argv: list[str]) -> int:
     paths = (
         [Path(p) for p in argv]
         if argv
-        else [script_dir / "catalog.generated.yaml", script_dir / "catalog.manual.yaml"]
+        else [
+            script_dir / "catalog.generated.yaml",
+            script_dir / "catalog.manual.yaml",
+            script_dir / "catalog.behavior.yaml",
+        ]
     )
 
     seen_ids: dict[str, str] = {}
@@ -77,6 +81,7 @@ def main(argv: list[str]) -> int:
             expected_any = ",".join(str(e) for e in case.get("expected_any", []))
             expected_all = ",".join(str(e) for e in case.get("expected_all", []))
             forbidden = ",".join(str(e) for e in case.get("forbidden", []))
+            task = case.get("task", "")
 
             # task stays LAST: it is the only field that may contain
             # arbitrary text including the separator-adjacent whitespace.

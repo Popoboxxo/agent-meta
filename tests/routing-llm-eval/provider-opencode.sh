@@ -117,7 +117,7 @@ for line in sys.stdin:
         text = event.get("part", {}).get("text")
         if text is not None:
             final_text = text
-    elif etype != "step_start":
+    elif etype not in ("step_start", "step_finish"):
         tool = event.get("part", {}).get("tool") or event.get("tool")
         tool_events.append({"type": etype, "tool": tool})
         if tool == "task" or etype in ("tool_input", "tool_call"):
