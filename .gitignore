@@ -60,3 +60,4 @@ node_modules/
 
 # local Python virtualenv (never commit)
 .venv/
+.guard-audit.log
