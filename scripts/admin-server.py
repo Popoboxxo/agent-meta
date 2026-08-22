@@ -2594,6 +2594,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         ``model-override-all`` entry with HTTP 409 — the two keys are
         mutually exclusive per provider (same rule the sync-side validation
         in lib/config.py enforces hard-fatal on direct YAML edits).
+
+        Rejects providers missing from the central registry
+        (``load_providers_config``, i.e. config/ai-providers.yaml) with
+        HTTP 400.
         """
         try:
             body = self._read_body()
@@ -2606,6 +2610,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(enabled, bool):
                 return self._send_json(
                     {"error": "enabled must be true or false"}, status=400)
+
+            # Whitelist against known provider keys (same registry the
+            # Models page consumes via config/ai-providers.yaml).
+            self._ensure_lib_on_path()
+            from lib.providers import load_providers_config
+
+            provider_config = load_providers_config(self._agent_meta_root())
+            if not isinstance(provider_config, dict) or provider not in provider_config:
+                return self._send_json(
+                    {"error": f"unknown provider '{provider}'"}, status=400)
 
             project = self.__class__.config_manager.read("project")
             if not isinstance(project, dict):

@@ -1070,8 +1070,12 @@ def transform_agent_content_for_provider(
                                     strip_fields=_strip_fields)
         model = resolve_model(role, config, agent_meta_root,
                               provider=provider, provider_config=provider_config, log=log)
-        if not model:
-            # Continue has no model-tiers mapping; fall back to raw role-defaults value
+        # model-inherit-main-chat: resolve_model() deliberately returns "" so the
+        # agent inherits the main-chat model. That intentional "" must NOT trigger
+        # the role-defaults fallback below (Continue would then never inherit).
+        # Normal empty cases (provider without tiers) still fall back unchanged.
+        inherit_active = bool((config.get('model-inherit-main-chat') or {}).get(provider))
+        if not model and not inherit_active:
             roles_cfg = load_roles_config(agent_meta_root)
             raw = roles_cfg["roles"].get(role, {}).get("model", "")
             if raw:
