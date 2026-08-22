@@ -200,3 +200,59 @@ def test_git_mutation_regex_precision(command, expect_blocked, tmp_path):
         f"command={command!r}: expected exit {expected}, got {result.returncode}\n"
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
+
+
+# --- issue #516: capability-scoped sentinel elevation -------------------
+
+def test_git_sentinel_still_allows_plain_mutation(tmp_path):
+    """Valid `git` sentinel exempts plain git mutations (existing behavior)."""
+    command = "#agent-meta:agent=git\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_orchestrator_sentinel_no_longer_bypasses_git_block(tmp_path):
+    """#516: `orchestrator` sentinel must NOT bypass the git-mutation block."""
+    command = "#agent-meta:agent=orchestrator\ngit commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git" in result.stderr.lower()
+
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit push --force origin main",
+    "#agent-meta:agent=git\n git push -f origin main",
+    "#agent-meta:agent=git\ngit reset --hard HEAD~1",
+    "#agent-meta:agent=git\ngit clean -fd",
+    "#agent-meta:agent=git\ngit stash drop stash@{0}",
+    "#agent-meta:agent=git\ngit stash clear",
+    "#agent-meta:agent=git\ngit filter-branch --tree-filter 'x' HEAD",
+])
+def test_destructive_ops_blocked_even_with_git_sentinel(command, tmp_path):
+    """#516: destructive ops require user approval even with valid sentinel."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+def test_non_git_agent_cannot_use_fake_sentinel_for_destructive(tmp_path):
+    """The exact incident from #516: fake `general-purpose` elevation path is
+    irrelevant — even claiming git, destructive ops stay blocked."""
+    command = "#agent-meta:agent=git\ngit stash pop"
+    # stash pop is NOT in the destructive list (only drop/clear); plain pop
+    # with valid sentinel stays allowed — but a FAKE claim of an unknown
+    # role gets no exemption at all:
+    fake = "#agent-meta:agent=general-purpose\ngit commit -m 'x'"
+    r2 = _run_hook({**_bash_payload(fake), "cwd": tmp_path.as_posix()})
+    assert r2.returncode == 2
+
+
+def test_elevation_attempts_are_audited(tmp_path):
+    """Every sentinel elevation appends to .guard-audit.log (#516)."""
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+    command = "#agent-meta:agent=git\ngit status"
+    _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert audit_file.exists(), "audit log not created"
+    content = audit_file.read_text(encoding="utf-8")
+    assert "role=git" in content
+    assert "git status" in content

@@ -102,3 +102,16 @@ def test_routing_matrix_file_structure():
     assert "synthesis:" in content
     for role in ("frontend-reviewer", "backend-reviewer", "database-reviewer", "ui-reviewer"):
         assert role in content, f"{role} not referenced in routing matrix"
+
+
+# --- issue #514: silent return-channel truncation mitigation ------------
+
+_MITIGATION_ROLES = ("planner", "code-reviewer", "explorer")
+
+
+def test_output_guard_present_in_readonly_heavy_roles():
+    for role in _MITIGATION_ROLES:
+        text = (AGENTS / f"{role}.md").read_text(encoding="utf-8")
+        assert "<output-guard>" in text, f"{role}: output-guard section missing"
+        assert "issue #514" in text, f"{role}: truncation reference missing"
+        assert "chunk" in text.lower(), f"{role}: chunked-continuation rule missing"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.3.0
+# version: 2.4.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -34,6 +34,22 @@
 # boundary against a malicious agent, only a fix for the identification gap.
 # Write/Edit have no such safe channel (a marker would corrupt file
 # content), so they are never exempted under strict mode.
+#
+# Hardening (issue #516): a real-world incident showed a non-git worker
+# self-declaring as `git` via this sentinel to run destructive stash
+# operations. Elevation is therefore capability-scoped and audited:
+#   * `orchestrator` sentinel exempts ONLY from strict-mode main-chat
+#     blocking (Bash) — it NEVER bypasses the git-mutation block.
+#   * `git` sentinel exempts ONLY from the git-mutation block.
+#   * Destructive operations (force push, reset --hard, clean -f, stash
+#     drop/clear, filter-branch/filter-repo, working-tree wipe) are
+#     blocked EVEN with a valid `git` sentinel and require the user to
+#     approve/run them manually.
+#   * Every elevation attempt is appended to .claude/hooks/.guard-audit.log
+#     for post-hoc review.
+# Identity itself remains unverifiable at hook level (provider payload has
+# no agent field) — this is mitigation, not cryptographic trust; see
+# .claude/rules/a2a-delegation-gates.md ("Bekannte Grenzen").
 
 INPUT=$(cat)
 
@@ -88,16 +104,62 @@ line = content.split('\n', 1)[0].strip()
 m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)$', line)
 print(m.group(1) if m else '')
 " 2>/dev/null || echo "")
-
-  if echo "$DECLARED_AGENT" | grep -qiE '^(orchestrator|git)$'; then
-    exit 0
-  fi
 fi
 
-# Determine project root
+# Determine project root (needed by the audit log and config lookup)
 PROJECT_ROOT=$(echo "$INPUT" | $_PY -c "import json,sys; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null || echo "")
 if [ -z "$PROJECT_ROOT" ]; then
   PROJECT_ROOT="$PWD"
+fi
+
+# --- Sentinel elevation: capability-scoped + audited (issue #516) ------
+IS_GIT_SENTINEL=0
+IS_ORCH_SENTINEL=0
+
+if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
+  _ROLE=$(echo "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+  case "$_ROLE" in
+    git|orchestrator)
+      _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
+      mkdir -p "$(dirname "$_AUDIT_LOG")" 2>/dev/null || true
+      printf '%s role=%s cmd=%s\n' \
+        "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_ROLE" \
+        "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)" \
+        >> "$_AUDIT_LOG" 2>/dev/null || true
+      if [ "$_ROLE" = "git" ]; then
+        IS_GIT_SENTINEL=1
+      else
+        IS_ORCH_SENTINEL=1
+      fi
+      ;;
+  esac
+fi
+
+# --- Destructive-operation gate: applies regardless of sentinel --------
+if [ "$TOOL_NAME" = "Bash" ]; then
+  IS_DESTRUCTIVE=$(printf '%s' "$BASH_CMD" | $_PY -c "
+import re, sys
+
+command = sys.stdin.read()
+
+DESTRUCTIVE_PATTERNS = [
+    r'\bpush\b[^|;&]*(--force\b|-f\b|--force-with-lease\b)',
+    r'\breset\b[^|;&]*--hard',
+    r'\bclean\b[^|;&]*-[a-zA-Z]*f',
+    r'\bstash\s+(drop|clear)\b',
+    r'\bfilter-(branch|repo)\b',
+    r'\bcheckout\b[^|;&]*--\s+\.',
+    r'\brestore\b[^|;&]*\s\.\s*$',
+]
+print('true' if any(re.search(p, command) for p in DESTRUCTIVE_PATTERNS) else 'false')
+" 2>/dev/null || echo "false")
+
+  if [ "$IS_DESTRUCTIVE" = "true" ]; then
+    echo "ORCHESTRATOR_GUARD: destructive git operation requires explicit user approval (issue #516)." >&2
+    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+    echo "Ask the user to approve and run this command manually." >&2
+    exit 2
+  fi
 fi
 
 # Check if strict mode is enabled in project.yaml
@@ -143,6 +205,11 @@ except Exception:
 " "$CONFIG_FILE" "$AGENT_META_PROVIDER" 2>/dev/null)
 
   if [ "$STRICT" = "true" ]; then
+    # Orchestrator sentinel exempts only plain Bash calls from strict-mode
+    # main-chat blocking — never Write/Edit, never the git-mutation gate.
+    if [ "$TOOL_NAME" = "Bash" ] && [ "$IS_ORCH_SENTINEL" = "1" ]; then
+      exit 0
+    fi
     echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked." >&2
     echo "Delegate this task to the orchestrator agent." >&2
     exit 2
@@ -216,7 +283,7 @@ for stmt in statements(command):
 print('true' if blocked else 'false')
 " 2>/dev/null || echo "false")
 
-  if [ "$IS_MUTATION" = "true" ]; then
+  if [ "$IS_MUTATION" = "true" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
     echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
     echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
     echo "Delegate git operations to the \`git\` agent." >&2
