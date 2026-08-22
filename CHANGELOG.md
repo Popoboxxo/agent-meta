@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.99.0] — 2026-08-22
+
 ### Added
 - **Review-Agent Fleet** (#530, #531): four domain reviewers (`frontend-reviewer`,
   `backend-reviewer`, `database-reviewer`, `ui-reviewer`) plus `security-auditor` v2.0.0
