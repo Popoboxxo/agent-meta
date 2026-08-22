@@ -1435,6 +1435,62 @@ roles:
       timeout_sec: 600  # Migration processes can be long-running across large codebases.
     short_desc: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
       Wiki migrieren
+  frontend-reviewer:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Frontend-Domain-Review: Komponenten, State, SSR/Hydration,
+      Browser-APIs, Render-Performance.'
+    routing:
+      intent_keywords:
+      - Frontend Review
+      - Komponenten prüfen
+      - React/Vue prüfen
+      parallel: true
+      orchestrator_only: false
+  backend-reviewer:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Backend-Domain-Review: API-Contracts, Silent Failures,
+      Concurrency, Middleware-Ketten.'
+    routing:
+      intent_keywords:
+      - Backend Review
+      - API prüfen
+      - Silent Failures
+      parallel: true
+      orchestrator_only: false
+  database-reviewer:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Datenbank-Domain-Review: Migration-Safety, N+1, Injection-Vektoren,
+      Indexing, Transaktionen.'
+    routing:
+      intent_keywords:
+      - Datenbank Review
+      - Migration prüfen
+      - SQL Review
+      parallel: true
+      orchestrator_only: false
+  ui-reviewer:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'UI-Review: Design-Token-Conformance, Layout-Konsistenz,
+      Interaction-States, i18n-Readiness.'
+    routing:
+      intent_keywords:
+      - UI Review
+      - Design-Token prüfen
+      - UI-Konsistenz
+      parallel: true
+      orchestrator_only: false
 outcome-caching:
   enabled: false
   ttl_seconds: 3600
