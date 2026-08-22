@@ -149,30 +149,34 @@ mindmap
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
-### Specialist Roles (22 agents)
+### Specialist Roles (26 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
 | **accessibility-specialist** | balanced | 0.1.0 | WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen-reader guidelines, color contrast, focus management |
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
+| **backend-reviewer** | balanced | 1.0.0 | Backend domain review: API contracts, silent-failure hunting, concurrency, middleware — evidence-based with MERGE_SCORE |
 | **bug-feature-analyzer** | balanced | 1.1.4 | Triage and classify incoming bug reports and feature requests |
 | **data-engineer** | balanced | 0.1.1 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
 | **database-engineer** | powerful | 1.0.1 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
+| **database-reviewer** | powerful | 1.0.0 | Database domain review: migration safety, N+1, injection vectors (CWE-89), indexing, transactions |
 | **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
 | **devops-engineer** | fast | 1.1.3 | CI/CD pipelines, IaC, container orchestration |
 | **docker** | fast | 1.4.4 | Docker operations: Compose stacks, binary management, test environments |
 | **effort-estimator** | fast | 1.0.3 | Estimates effort for development tasks with complexity scoring |
 | **explorer** | nano | 1.0.1 | Read-only codebase research, dependency and impact mapping |
 | **export-manager** | fast | 1.1.3 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
+| **frontend-reviewer** | balanced | 1.0.0 | Frontend domain review: component design, state, SSR/hydration, browser APIs — evidence-based with MERGE_SCORE |
 | **incident-responder** | powerful | 1.0.0 | Live incident coordination: RCA (5-Whys/Fishbone), severity classification, prioritized hotfixes |
 | **log-analyzer** | balanced | 1.1.3 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
 | **performance-optimizer** | powerful | 1.2.0 | Data-driven Big-O bottleneck identification |
 | **product-manager** | balanced | 0.1.0 | Strategic product management: backlog, user stories, sprint planning, RICE/MoSCoW prioritization, KPI definition |
 | **refactoring-specialist** | balanced | 0.1.1 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
-| **security-auditor** | powerful | 1.2.3 | Static security analysis: OWASP Top 10, secrets, supply-chain |
+| **security-auditor** | powerful | 2.0.0 | Static security analysis: OWASP Top 10 + ASVS/CWE mapping, rules index, two-pass verification, secrets, supply-chain, MERGE_SCORE |
 | **sre-engineer** | balanced | 0.1.0 | Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbooks |
 | **technical-writer** | fast | 0.1.0 | External developer/user-facing docs: API references, getting-started guides, SDK docs, tutorials, CLI help |
+| **ui-reviewer** | balanced | 1.0.0 | UI domain review: design-token conformance, layout consistency, interaction states, i18n readiness (delegates deep WCAG to accessibility-specialist) |
 | **ui-ux-designer** | balanced | 1.1.3 | UI specs, mockups, design systems |
 | **e2e-tester** | balanced | 1.0.0 | End-to-end browser testing via Playwright: user flows, visual regression, accessibility audits |
 
@@ -550,7 +554,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 ```
 agents/
   0-external/                # External skill wrappers (dynamically cloned)
-  1-generic/                 # Universal provider-agnostic templates (56 + 13 SE agents)
+  1-generic/                 # Universal provider-agnostic templates (60 + 13 SE agents)
   2-platform/                # Platform-specific overrides (extends + patches)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts

@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-22 (feat/model-inherit-main-chat: zweiter Super-Override `model-inherit-main-chat`; zuvor v0.92.0: Pfade korrigiert, Knowledge Engine implementiert)
+> Letzte Aktualisierung: 2026-08-22 (feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE; zuvor feat/model-inherit-main-chat)
 
 ---
 
@@ -20,6 +20,7 @@
 12. [Prompt-Modernisierung (Legacy / Hybrid / Modern)](#12-prompt-modernisierung-legacy--hybrid--modern)
 13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
 14. [Knowledge Engine](#14-knowledge-engine)
+15. [Review-Agent-Fleet](#15-review-agent-fleet)
 
 ---
 
@@ -1698,3 +1699,30 @@ if config.get("knowledge-engine", {}).get("enabled"):
 ---
 
 *Ende der Bestandsaufnahme*
+
+---
+
+## 15. Review-Agent-Fleet
+
+> Seit feat/review-agent-fleet (#531) · Konzept: `docs/concepts/planned/review-agent-fleet.md` (#529) · Tracking: #530
+
+Fünf Domain-Reviewer mit einheitlichem Contract (Prinzipien P1–P6):
+
+| Rolle | Tier | Scope | Rules-Index |
+|-------|------|-------|-------------|
+| `frontend-reviewer` | balanced | Komponenten, State, SSR/Hydration, Browser-APIs | FE-01…06 |
+| `backend-reviewer` | balanced | API-Contracts, Silent Failures, Concurrency, Middleware | BE-01…06 |
+| `database-reviewer` | powerful | Migration-Safety, N+1, Injection (CWE-89), Transaktionen | DB-01…06 |
+| `ui-reviewer` | balanced | Design-Token, Layout, Interaction-States, i18n (WCAG-Tiefe → accessibility-specialist) | UI-01…05 |
+| `security-auditor` v2.0.0 | powerful | OWASP Top 10 + ASVS/CWE-Mapping, Secrets, Supply-Chain | SEC-01…06 |
+
+**Gemeinsame Mechanik:** P1 Output-Contract (`STATUS/RESULT/ARTIFACTS` + `MERGE_SCORE: 0-100`) ·
+P2 Two-Pass (Recall → Adversary, Confidence ≥80 %) · P3 Rules-Index (findings nur mit gültiger
+`rule_id` — „suggest, never define") · P4 Evidence-Pflicht (file:line + Snippet + Fix) ·
+P6 explizite Tiers in `config/role-defaults.yaml`.
+
+**Config-Artefakte:** `config/review-rules/{frontend,backend,database,ui,security}.yaml`
+(projekt-eigene Rule-IDs, überschreibbar) · `config/routing/reviewers.yaml`
+(pfadklassen-basiertes Reviewer-Routing für den Orchestrator, Synthesis-Flag, max_parallel).
+
+**Tests:** `tests/test_review_fleet.py` erzwingt P1/P3/P4/P5/P6 strukturell (8 Tests).

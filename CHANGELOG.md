@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+- **Review-Agent Fleet** (#530, #531): four domain reviewers (`frontend-reviewer`,
+  `backend-reviewer`, `database-reviewer`, `ui-reviewer`) plus `security-auditor` v2.0.0
+  refactor onto the fleet contract — rules-index-driven two-pass reviews with evidence
+  schema (rule_id + CWE/OWASP mapping + snippet + fix), ≥80% confidence gate and
+  MERGE_SCORE. Ships default rules indexes (`config/review-rules/*.yaml`), the reviewer
+  routing matrix (`config/routing/reviewers.yaml`) and explicit model tiers per role.
+  Concept and design principles P1–P6: `docs/concepts/planned/review-agent-fleet.md`.
+
 ## [0.98.0] — 2026-08-22
 
 ### Added
