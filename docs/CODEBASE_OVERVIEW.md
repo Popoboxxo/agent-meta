@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-08 (v0.92.0: `howto/`→`docs/guides/`+`docs/se-cascade/`-Pfade korrigiert; Knowledge Engine seit v0.82.0 implementiert, Phase A-C abgeschlossen)
+> Letzte Aktualisierung: 2026-08-22 (feat/model-inherit-main-chat: zweiter Super-Override `model-inherit-main-chat`; zuvor v0.92.0: Pfade korrigiert, Knowledge Engine implementiert)
 
 ---
 
@@ -560,6 +560,10 @@ cheap:
 4. Sonst: versuche `mapping` oder fallback zu `role-defaults.yaml:tiers`
 5. SE-Rollen upgrade: +1 Tier via SE-Prefix (balanced → powerful, etc.)
 
+### Main-Chat-Erbfolge `model-inherit-main-chat` (zweiter Super-Override)
+
+Zweiter Super-Override neben `model-override-all`: project.yaml Key `model-inherit-main-chat:` (Provider→bool). Resolve-Reihenfolge in `lib/roles.py::resolve_model()`: (1) `model-override-all[provider]`, (2) truthy `model-inherit-main-chat[provider]` → Return `""` ⇒ `inject_model_field()` lässt das `model:`-Feld weg ⇒ Agent erbt zur Laufzeit das Main-Chat-Modell. Pro Provider exklusiv zu `model-override-all` — Verstoß bricht den Sync hart ab (`_validate_model_inheritance()` in `lib/config.py`, stderr + Exit 1; `false` zählt als unset). Admin-UI: Toggle-Balken auf der Models-Page + `POST /api/model-inherit` (`_handle_post_model_inherit()` in admin-server.py, HTTP 409 bei Konflikt; Disable entfernt den Provider-Key, leerer Block wird komplett entfernt). Template-Doku: agent-meta-manager v1.13.0 §8b.2.
+
 ### `config/pricing-overlay.yaml` & `config/generated/model-registry.json`
 
 **Pricing Overlay:** Manueller Überschreib-Mechanismus für Preise. API-Preise werden bevorzugt, außer Overlay definiert einen eigenen Preis (z.B. 0.00$ für Zen-Subscriptions). Preise können direkt in der Admin-UI editiert werden.
@@ -944,6 +948,7 @@ Redundante `hint`-Felder werden automatisch aus Agent-Frontmattern gelöscht wen
 | `/api/backups` | `GET` · `POST` | Liste aller Config-Backups lesen / neue Backup erstellen |
 | `/api/backups/<archive>` | `DELETE` | Backup löschen |
 | `/api/backups/restore` | `POST` | Konfiguration aus Backup wiederherstellen |
+| `/api/model-inherit` | `POST` | Main-Chat-Erbfolge pro Provider togglen (`{"provider", "enabled"}`); 409 bei `model-override-all`-Konflikt |
 
 **Neue UI-Pages (Phase 5):**
 
