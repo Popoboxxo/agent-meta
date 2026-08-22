@@ -1,10 +1,10 @@
 ---
 name: agent-meta-manager
-version: 1.13.0
+version: 1.13.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 prompt_mode: modern
-generated-from: 1-generic/agent-meta-manager.md@1.13.0
+generated-from: 1-generic/agent-meta-manager.md@1.13.1
 mode: subagent
 model: opencode-go/ox-alpha-free
 permission:
@@ -175,7 +175,8 @@ Toggle workflow:
 1. Read current state: `model-inherit-main-chat` in `.meta-config/project.yaml`.
 2. To enable/disable: set the provider to `true`/`false`, then re-run `sync.py`.
 3. Re-sync is MANDATORY after every change — generated agents only reflect the key after regeneration.
-4. Check `sync.log` afterwards for `[WARN]`.
+4. Check the sync output afterwards: on conflict, `sync.py` fails fast with an
+   `ERROR:` message on stderr and exit code 1 (no `[WARN]` in `sync.log`).
 
 > ⚠️ **HARD CONFLICT:** `model-inherit-main-chat` and `model-override-all`
 > are mutually exclusive **per provider**. Setting both truthy for the same
