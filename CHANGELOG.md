@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.98.0] — 2026-08-22
+
+### Added
+- **`model-inherit-main-chat` super-override mode** (#524, #525): second super-override
+  alongside `model-override-all` — all agents inherit the main-chat model instead of a
+  fixed model ID (empty `model:` field). Hard per-provider exclusivity against
+  `model-override-all` with fail-fast validation (exit 1). Wired through sync resolution
+  (`scripts/lib/roles.py`, `scripts/lib/config.py`, `scripts/lib/agents.py`), project.yaml
+  schema, Admin-UI toggle and `POST /api/model-inherit` endpoint (provider whitelist),
+  template §8b.2 (`agent-meta-manager` v1.13.x) and skill documentation.
+- `model-override-all` reversible provider blast (#522): pin every agent of a provider to
+  one model via a single project.yaml key (promo/cap mechanism).
+- Configurable naming/release convention profiles (#520, #521): per-project commit,
+  branch and release naming conventions.
+
+### Fixed
+- Review findings for the inherit mode (#525): Continue provider now honors
+  inherit-main-chat instead of falling back to role-defaults; admin endpoint validates
+  provider keys (400/409 on unknown values); warning on silently ignored per-role
+  `model-overrides` under active inherit; corrected conflict-handling note in the
+  manager template; negative test coverage for the Continue fallback path.
+- Bug batch (#519): preserve user content in CLAUDE.md "Own Notes" section, stale
+  skill-repo submodule pin reverted by sync, design-limits documentation.
+
 ## [0.97.0] — 2026-08-16
 
 ### Fixed
