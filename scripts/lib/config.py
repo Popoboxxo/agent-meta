@@ -118,11 +118,24 @@ def load_config(config_path: Path) -> dict:
 
 
 def _validate_config(config: dict, config_path: Path) -> None:
-    """Validate config against agent-meta.schema.json if jsonschema is available.
+    """Validate config before sync.
 
-    Validation errors are printed as warnings — never hard-fails so existing
-    projects without the dependency continue to work unchanged.
+    Two kinds of checks:
+
+    1. Hard-fatal model inheritance checks (_validate_model_inheritance):
+       wrong-typed 'model-inherit-main-chat' entries and per-provider
+       conflicts with 'model-override-all' abort the sync (stderr + exit 1),
+       because resolve_model() would silently prefer override-all and defeat
+       the inheritance feature. Runs unconditionally — stdlib only, does
+       NOT require jsonschema.
+
+    2. Schema validation against agent-meta.schema.json if jsonschema is
+       available. Schema violations are printed as warnings — never
+       hard-fails so existing projects without the dependency continue to
+       work unchanged.
     """
+    _validate_model_inheritance(config, config_path)
+
     if not _JSONSCHEMA_AVAILABLE:
         return
 
@@ -147,6 +160,84 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
     except (ImportError, TypeError, ValueError):
         pass  # jsonschema not installed or validation error — best-effort
+
+
+def _validate_model_inheritance(config: dict, config_path: Path) -> None:
+    """Hard-validate 'model-inherit-main-chat' typing and mutual exclusivity.
+
+    Any violation aborts via SystemExit(1) — same fatal pattern load_config()
+    already uses for YAML/JSON parse errors. Checks:
+
+    1. The block must be a mapping and every provider entry must be a bool.
+       Non-bool values would be silently ignored by resolve_model(), so they
+       are rejected here instead of being swallowed.
+
+    2. 'model-override-all' and 'model-inherit-main-chat' are mutually
+       exclusive per provider: resolve_model() returns on a truthy
+       override-all entry before inheritance is ever consulted, so a truthy
+       value in both for the same provider is a config bug.
+       'false' counts as unset; different providers never conflict.
+    """
+    inherit = config.get("model-inherit-main-chat")
+    if not inherit:  # missing / empty / falsy scalar — nothing to validate
+        return
+
+    if not isinstance(inherit, dict):
+        print(
+            f"ERROR: {config_path}: invalid 'model-inherit-main-chat': "
+            f"expected a mapping of provider -> true/false, "
+            f"got {type(inherit).__name__}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    type_errors = [
+        f"  '{provider}': expected true/false (bool), got {value!r} "
+        f"({type(value).__name__})"
+        for provider, value in sorted(inherit.items())
+        if not isinstance(value, bool)
+    ]
+    if type_errors:
+        print(
+            f"ERROR: {config_path}: invalid 'model-inherit-main-chat' entries "
+            "(every provider entry must be a bool):",
+            file=sys.stderr,
+        )
+        for type_error in type_errors:
+            print(type_error, file=sys.stderr)
+        sys.exit(1)
+
+    override_all = config.get("model-override-all")
+    if not isinstance(override_all, dict):
+        # Wrong types here are covered by the schema warnings below;
+        # resolve_model() ignores non-mapping blocks as well.
+        return
+
+    conflicts = [
+        provider
+        for provider, value in sorted(inherit.items())
+        if value and override_all.get(provider)
+    ]
+    if conflicts:
+        print(
+            f"ERROR: {config_path}: conflicting model configuration for "
+            f"provider(s): {', '.join(conflicts)}.",
+            file=sys.stderr,
+        )
+        for provider in conflicts:
+            print(
+                f"  Provider '{provider}' is set in BOTH 'model-override-all' AND "
+                "'model-inherit-main-chat' — these two keys are mutually exclusive "
+                "per provider.",
+                file=sys.stderr,
+            )
+            print(
+                f"  Fix: delete one of the two keys for '{provider}', e.g. remove "
+                f"the '{provider}: ...' line under 'model-override-all:' OR remove "
+                f"'{provider}' (or the whole block) under 'model-inherit-main-chat:'.",
+                file=sys.stderr,
+            )
+        sys.exit(1)
 
 
 def find_agent_meta_root(script_path: Path) -> Path:

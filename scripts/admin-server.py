@@ -83,6 +83,30 @@ SSE_HEARTBEAT_SECONDS = 15
 # here, so operators can change it without touching Python.
 _FALLBACK_MODEL_SOURCE = "registry"
 VALID_MODEL_SOURCES: tuple[str, ...] = ("registry", "modelsdev")
+# The two mutually exclusive per-provider model blocks in project.yaml.
+# A provider may be truthy-set in at most ONE of them. Sync-side enforcement
+# lives in lib/config.py::_validate_model_inheritance (hard-fatal, SystemExit);
+# the admin-server counterparts below keep UI/section writes from persisting a
+# config that would kill every later sync run.
+MODEL_EXCLUSIVE_BLOCKS: tuple[str, str] = ("model-override-all", "model-inherit-main-chat")
+
+
+def _other_model_block(section: str) -> str:
+    """Return the opposite block of :data:`MODEL_EXCLUSIVE_BLOCKS`."""
+    return MODEL_EXCLUSIVE_BLOCKS[1] if section == MODEL_EXCLUSIVE_BLOCKS[0] else MODEL_EXCLUSIVE_BLOCKS[0]
+
+
+def find_model_block_conflicts(data: Any, other: Any) -> list[str]:
+    """Return providers that would be truthy-set in BOTH exclusive blocks.
+
+    ``data`` is the incoming payload for one block, ``other`` the currently
+    persisted opposite block. Only truthy entries on both sides conflict —
+    ``false`` counts as unset and different providers never conflict,
+    mirroring lib/config.py::_validate_model_inheritance().
+    """
+    if not isinstance(data, dict) or not isinstance(other, dict):
+        return []
+    return [provider for provider, value in data.items() if value and other.get(provider)]
 
 # Framework provider name -> models.dev catalog slug. Mirrors
 # ``PROVIDER_MODELSDEV_MAP`` in ``docs/ui/admin-ui.html`` — keep both in sync.
@@ -1618,6 +1642,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/model-source/batch":
             return self._handle_post_model_source_batch()
 
+        if path == "/api/model-inherit":
+            return self._handle_post_model_inherit()
+
         if path == "/api/models/exclude":
             return self._handle_post_models_exclude()
 
@@ -2547,7 +2574,80 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     if isinstance(v, str) and v in VALID_MODEL_SOURCES
                 },
             })
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_model_inherit(self) -> None:
+        """Toggle main-chat model inheritance for one provider.
+
+        Server-side counterpart of the Models page's second toggle bar
+        (next to the Override-All bar): sets or deletes the provider key in
+        the project.yaml ``model-inherit-main-chat`` block. When enabled,
+        sync.py omits the model field for every agent of that provider so it
+        inherits the main chat model at runtime (lib/roles.py::resolve_model
+        returns "" and inject_model_field() skips the field).
+
+        Body: ``{"provider": "Opencode", "enabled": true}``. Disabling
+        removes the provider key; an empty block is removed entirely.
+
+        Rejects enabling a provider that still has a truthy
+        ``model-override-all`` entry with HTTP 409 — the two keys are
+        mutually exclusive per provider (same rule the sync-side validation
+        in lib/config.py enforces hard-fatal on direct YAML edits).
+        """
+        try:
+            body = self._read_body()
+            if not isinstance(body, dict):
+                return self._send_json({"error": "expected JSON body"}, status=400)
+            provider = str(body.get("provider", "")).strip()
+            enabled = body.get("enabled")
+            if not provider:
+                return self._send_json({"error": "provider required"}, status=400)
+            if not isinstance(enabled, bool):
+                return self._send_json(
+                    {"error": "enabled must be true or false"}, status=400)
+
+            project = self.__class__.config_manager.read("project")
+            if not isinstance(project, dict):
+                project = {}
+
+            if enabled:
+                override_all = project.get("model-override-all")
+                if isinstance(override_all, dict) and override_all.get(provider):
+                    other = _other_model_block("model-inherit-main-chat")
+                    return self._send_json(
+                        {
+                            "error": (
+                                f"conflicting model configuration for provider "
+                                f"'{provider}': '{other}' and "
+                                f"'model-inherit-main-chat' are mutually "
+                                f"exclusive per provider — clear the '{other}' "
+                                f"entry for '{provider}' first."
+                            )
+                        },
+                        status=409,
+                    )
+
+            inherit = project.get("model-inherit-main-chat")
+            if not isinstance(inherit, dict):
+                inherit = {}
+            if enabled:
+                inherit[provider] = True
+            else:
+                inherit.pop(provider, None)
+            if inherit:
+                project["model-inherit-main-chat"] = inherit
+            else:
+                project.pop("model-inherit-main-chat", None)
+            self.__class__.config_manager.write("project", project)
+
+            return self._send_json({
+                "success": True,
+                "provider": provider,
+                "enabled": enabled,
+                "inherit_main_chat": dict(inherit),
+            })
+        except Exception as exc:
             return self._send_json({"error": str(exc)}, status=500)
 
     def _handle_get_model_suggestions(self) -> None:
@@ -3487,7 +3587,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         else:
             raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
         allowed = {
-            "agent-prompts",             "model-overrides", "model-override-all", "memory-overrides", "permission-mode-overrides",
+            "agent-prompts",             "model-overrides", "model-override-all", "model-inherit-main-chat", "memory-overrides", "permission-mode-overrides",
             "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
             "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
             "conventions", "conventions-preset",
@@ -3503,8 +3603,58 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
+        self._guard_model_block_write(section, data, existing)
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write("project", existing))
+
+    def _guard_model_block_write(self, section: str, data: Any, existing: dict) -> None:
+        """Reject section writes that would break the next ``sync.py`` run.
+
+        Guards the two mutually exclusive per-provider model blocks
+        (``MODEL_EXCLUSIVE_BLOCKS``):
+
+        1. Exclusivity: a write whose resulting block would leave a provider
+           truthy-set in BOTH ``model-override-all`` AND
+           ``model-inherit-main-chat`` is rejected with ``ValueError``
+           (mapped to HTTP 400 by :meth:`do_POST`). resolve_model() returns
+           on a truthy override-all entry before inheritance is ever
+           consulted, so a both-set provider is a config bug — sync-side it
+           aborts with SystemExit(1) (lib/config.py::
+           _validate_model_inheritance); here the write itself fails so the
+           Admin UI gets the same guarantee as direct YAML edits.
+        2. Typing: every ``model-inherit-main-chat`` provider entry must be
+           a bool (schema: additionalProperties.type=boolean); non-bool
+           values are silently ignored by resolve_model() and hard-fail the
+           next sync.
+
+        ``false`` counts as unset; different providers never conflict.
+        """
+        if section not in MODEL_EXCLUSIVE_BLOCKS:
+            return
+
+        if section == "model-inherit-main-chat":
+            if not isinstance(data, dict):
+                raise ValueError(
+                    "invalid 'model-inherit-main-chat': expected a mapping "
+                    f"of provider -> true/false, got {type(data).__name__}"
+                )
+            non_bool = sorted(str(k) for k, v in data.items() if not isinstance(v, bool))
+            if non_bool:
+                raise ValueError(
+                    "invalid 'model-inherit-main-chat' entries (every "
+                    f"provider entry must be true/false): {', '.join(non_bool)}"
+                )
+
+        other = _other_model_block(section)
+        conflicts = find_model_block_conflicts(data, existing.get(other))
+        if conflicts:
+            quoted = ", ".join(f"'{p}'" for p in sorted(conflicts))
+            raise ValueError(
+                f"conflicting model configuration for provider(s): {quoted} — "
+                f"'{section}' and '{other}' are mutually exclusive per "
+                "provider. Clear the conflicting "
+                f"'{other}' or '{section}' entry for each listed provider first."
+            )
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
         """Reject a project-override write whose ``permitted-injections`` would

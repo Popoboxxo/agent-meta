@@ -98,7 +98,19 @@ def resolve_model(
     provider_config: dict | None = None,
     log: Optional["SyncLog"] = None,
 ) -> str:
-    """Resolve the model ID for a role and provider using tier presets and registry."""
+    """Resolve the model ID for a role and provider using tier presets and registry.
+
+    Resolution order (highest to lowest):
+    1. Global override: project_config["model-override-all"][provider] —
+       tier/alias/model ID applied to every role of this provider.
+    2. Main-chat inheritance: project_config["model-inherit-main-chat"][provider]
+       truthy → return "" so inject_model_field() omits the model: field and
+       the agent inherits the main-chat model at runtime.
+    Stages 1 and 2 are mutually exclusive per provider; validation of that
+    constraint happens in scripts/lib/config.py::_validate_config(), not here.
+    3. Everything else: per-role overrides, role-defaults, tier-overrides and
+       tier presets, resolved via _resolve_tier_to_model().
+    """
 
     tier_or_id = ""
     explicit_override = False
@@ -116,6 +128,20 @@ def resolve_model(
             if log:
                 log.debug(f"{provider}/{role}", f"GLOBAL override-all for provider '{provider}' (reversible): {resolved_all}")
             return resolved_all
+
+    # model-inherit-main-chat: the agent deliberately gets NO model: field and
+    # inherits the main-chat model at runtime. Returning "" is the established
+    # mechanism — inject_model_field() omits the model: field for an empty
+    # resolved value. Mutually exclusive with model-override-all per provider;
+    # that constraint is validated in config.py::_validate_config().
+    inherit_main_chat = project_config.get("model-inherit-main-chat", {})
+    if isinstance(inherit_main_chat, dict) and inherit_main_chat.get(provider):
+        if log:
+            log.debug(
+                f"{provider}/{role}",
+                f"model-inherit-main-chat active for provider '{provider}': omitting model field (inherits main-chat model)",
+            )
+        return ""
 
     provider_overrides = project_config.get("model-overrides", {})
     provider_specific = provider_overrides.get(provider, {})

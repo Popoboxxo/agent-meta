@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.12.0"
+version: "1.13.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -111,11 +111,17 @@ py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml --c
 py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml --create-command deploy
 ```
 
-## 8b. Model Override-All (reversible promo blast)
+## 8b. Model blast modes (override-all / inherit-main-chat)
 
-Blast **every** active agent of one provider onto a single model — e.g. to
-exploit provider discount promos or usage caps. This is the preferred, reversible
-mechanism (do NOT hand-edit per-role `model-overrides` for this).
+Two sibling keys control the model of **every** agent of one provider at once.
+They are **mutually exclusive per provider** — never set both truthy for the
+same provider (sync.py fails fast, see warning below).
+
+### 8b.1 Override-All (reversible promo blast)
+
+Blast every active agent of one provider onto a single model — e.g. to
+exploit provider discount promos or usage caps. This is the preferred,
+reversible mechanism (do NOT hand-edit per-role `model-overrides` for this).
 
 Mechanism: project.yaml key `model-override-all` (provider → tier/alias/model-ID).
 When a provider key is set, `sync.py` resolves ALL roles of that provider to that
@@ -145,6 +151,40 @@ py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml
 Admin-UI shortcut: *Project → Model Overrides → "Override All"* bar writes the
 key directly (with a "Zurücksetzen" button to clear it). See skill
 `.claude/skills/model-override-all/SKILL.md`.
+
+### 8b.2 Inherit Main-Chat model (`model-inherit-main-chat`)
+
+Instead of pinning a fixed model, let every agent of one provider run on
+whatever model the main chat currently uses. Useful when you switch the main
+chat model often and want agents to follow automatically.
+
+Mechanism: project.yaml key `model-inherit-main-chat` (provider → true/false).
+When a provider is set to `true`, `sync.py` omits the generated agent's
+`model:` field entirely — the agent then inherits the main-chat model at
+runtime. `false` counts as unset (normal per-role/tier resolution applies).
+
+```yaml
+# .meta-config/project.yaml
+model-inherit-main-chat:
+  Claude: true      # all Claude agents inherit the main-chat model
+  Gemini: false     # unset — normal per-role resolution applies
+```
+
+Toggle workflow:
+1. Read current state: `model-inherit-main-chat` in `.meta-config/project.yaml`.
+2. To enable/disable: set the provider to `true`/`false`, then re-run `sync.py`.
+3. Re-sync is MANDATORY after every change — generated agents only reflect the key after regeneration.
+4. Check `sync.log` afterwards for `[WARN]`.
+
+> ⚠️ **HARD CONFLICT:** `model-inherit-main-chat` and `model-override-all`
+> are mutually exclusive **per provider**. Setting both truthy for the same
+> provider aborts `sync.py` immediately with exit code 1 (fail-fast validation
+> in `scripts/lib/config.py::_validate_model_inheritance`). Remove one of the
+> two provider entries before syncing.
+
+Admin/API shortcut: `POST /api/model-inherit` (admin server) toggles the key
+per provider and refuses conflicting writes while `model-override-all` holds a
+truthy entry for that provider.
 
 ## 9. External skills
 

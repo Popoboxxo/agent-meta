@@ -6742,6 +6742,11 @@ async function viewProjectModelOverrides() {
   }
   wrap.appendChild(datalist);
 
+  // Fresh reader over the loaded project data — both model bars (Override-All
+  // and Inherit-Main-Chat) stay mutually consistent because every mutation
+  // writes its result back into `data` immediately.
+  const inheritEntries = () => ((data["model-inherit-main-chat"] && typeof data["model-inherit-main-chat"] === "object") ? data["model-inherit-main-chat"] : {});
+
   // --- Override-All bar: reversible global per-provider model blast ---
   // Writes project.yaml `model-override-all[provider] = model`. sync.py then
   // resolves EVERY active agent/role of that provider to this single model.
@@ -6762,10 +6767,17 @@ async function viewProjectModelOverrides() {
     const model = oaModel.value.trim();
     if (!prov) { oaStatus.textContent = "Override-All: zuerst einen Provider wählen."; return; }
     if (!model) { oaStatus.textContent = "Override-All: zuerst ein Modell eingeben."; return; }
+    // Mutual lock: model-override-all and model-inherit-main-chat are
+    // exclusive per provider — refuse while inheritance is active.
+    if (inheritEntries()[prov]) {
+      oaStatus.textContent = `Gesperrt: '${prov}' erbt das Main-Chat-Modell — erst den Inherit-Toggle ausschalten.`;
+      return;
+    }
     const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
     cur[prov] = model;
     try {
       await saveProjectSection("model-override-all", cur, status);
+      data["model-override-all"] = cur;
       oaStatus.textContent = `${prov} → ${model} aktiv. Reversibel: Zurücksetzen oder Key löschen.`;
       if (oaProv.value === prov) oaModel.value = model;
     } catch { oaStatus.textContent = "Fehler beim Speichern von model-override-all."; }
@@ -6773,10 +6785,16 @@ async function viewProjectModelOverrides() {
   oaClear.addEventListener("click", async () => {
     const prov = oaProv.value;
     if (!prov) { oaStatus.textContent = "Zurücksetzen: zuerst einen Provider wählen."; return; }
+    // Mutual lock: refuse while inheritance is active for this provider.
+    if (inheritEntries()[prov]) {
+      oaStatus.textContent = `Gesperrt: '${prov}' erbt das Main-Chat-Modell — erst den Inherit-Toggle ausschalten.`;
+      return;
+    }
     const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
     delete cur[prov];
     try {
       await saveProjectSection("model-override-all", cur, status);
+      data["model-override-all"] = cur;
       oaStatus.textContent = `${prov} entfernt → Normal-Auflösung greift wieder.`;
       oaModel.value = "";
     } catch { oaStatus.textContent = "Fehler beim Zurücksetzen von model-override-all."; }
@@ -6788,6 +6806,83 @@ async function viewProjectModelOverrides() {
   oaBar.appendChild(oaClear);
   oaBar.appendChild(oaStatus);
   wrap.appendChild(oaBar);
+
+  // --- Inherit-Main-Chat toggle bar: per-provider main-chat inheritance ---
+  // POSTs /api/model-inherit {provider, enabled}; the server writes/removes
+  // the provider key under project.yaml `model-inherit-main-chat`. Enabled
+  // providers get NO model fields — their agents inherit the main-chat model
+  // at runtime (lib/roles.py::resolve_model returns ""). Mutually exclusive
+  // with model-override-all of the SAME provider: blocked here client-side
+  // and enforced again server-side (HTTP 409 with an explanatory message).
+  const inheritBar = el("div", { class: "btn-row", style: "margin:0 0 14px;padding:12px;background:var(--panel,#1c2230);border:1px solid var(--border,#2c3344);border-radius:8px;" });
+  const inhProv = el("select");
+  inhProv.appendChild(el("option", { value: "" }, ["Provider wählen…"]));
+  for (const tp of tierProviders) {
+    inhProv.appendChild(el("option", { value: tp.name }, [tp.display_name || tp.name]));
+  }
+  const overrideAllEntries = () => ((data["model-override-all"] && typeof data["model-override-all"] === "object") ? data["model-override-all"] : {});
+  const inhToggleWrap = el("label", { class: "toggle", style: "margin-left:8px;", title: "Aktiv → Agenten dieses Providers erhalten kein model:-Feld und erben das Modell des Main-Chats" });
+  const inhCb = el("input", { type: "checkbox" });
+  inhToggleWrap.appendChild(inhCb);
+  inhToggleWrap.appendChild(el("span", { class: "slider" }));
+  const inhStatus = el("span", { class: "muted", style: "margin-left:8px;" }, []);
+
+  // Reflect the picked provider's current state; keep the checkbox disabled
+  // until a provider is selected.
+  inhProv.addEventListener("change", () => {
+    const prov = inhProv.value;
+    inhCb.disabled = !prov;
+    if (!prov) { inhCb.checked = false; inhStatus.textContent = ""; return; }
+    inhCb.checked = !!inheritEntries()[prov];
+    if (overrideAllEntries()[prov]) {
+      inhStatus.textContent = `${prov}: Override-All aktiv → Inheritance gesperrt.`;
+    } else {
+      inhStatus.textContent = inheritEntries()[prov]
+        ? `${prov} erbt das Main-Chat-Modell.`
+        : `${prov} nutzt die eigene Modell-Auflösung.`;
+    }
+  });
+
+  inhCb.addEventListener("change", async () => {
+    const prov = inhProv.value;
+    const enabled = inhCb.checked;
+    if (!prov) {
+      inhCb.checked = false;
+      inhStatus.textContent = "Inherit-Toggle: zuerst einen Provider wählen.";
+      return;
+    }
+    // Client-side mutual exclusion against model-override-all of the same
+    // provider — the server re-checks this and answers 409 on conflict.
+    if (enabled && overrideAllEntries()[prov]) {
+      inhCb.checked = false;
+      inhStatus.textContent = `Gesperrt: '${prov}' hat einen model-override-all-Eintrag — zuerst im Override-All-Balken zurücksetzen.`;
+      return;
+    }
+    try {
+      const res = await api.post("/api/model-inherit", { provider: prov, enabled });
+      // Write the authoritative block from the server response back into the
+      // local cache so both bars observe consistent state.
+      data["model-inherit-main-chat"] = (res && typeof res.inherit_main_chat === "object") ? res.inherit_main_chat : {};
+      inhStatus.textContent = enabled
+        ? `${prov} erbt jetzt das Main-Chat-Modell.`
+        : `${prov} nutzt wieder die eigene Modell-Auflösung.`;
+      toast(`model-inherit-main-chat[${prov}] = ${enabled}`, "success");
+    } catch (err) {
+      inhCb.checked = !enabled;
+      inhStatus.textContent = err.status === 409
+        ? `Konflikt: ${err.message}`
+        : `Fehler beim Umschalten von model-inherit-main-chat: ${err.message}`;
+      toast(`model-inherit failed (${prov}): ${err.message}`, "error");
+    }
+  });
+  // Initialize state text/disabled flag for the initial (empty) selection.
+  inhProv.dispatchEvent(new Event("change"));
+
+  inheritBar.appendChild(el("strong", { style: "margin-right:8px;" }, ["Inherit Main-Chat:"]));
+  inheritBar.appendChild(inhProv);
+  inheritBar.appendChild(inhToggleWrap);
+  inheritBar.appendChild(inhStatus);
+  wrap.appendChild(inheritBar);
 
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
