@@ -177,6 +177,14 @@ def _validate_model_inheritance(config: dict, config_path: Path) -> None:
        override-all entry before inheritance is ever consulted, so a truthy
        value in both for the same provider is a config bug.
        'false' counts as unset; different providers never conflict.
+
+    3. Soft check (warning only, sync continues): if inheritance is active
+       for a provider but 'model-overrides' still defines per-role entries
+       for the same provider (nested per-provider mapping or legacy flat
+       role map, the latter applying to Claude only), those entries are
+       dead config — resolve_model() takes the inherit branch before ever
+       consulting them. Each affected provider gets a single-line stderr
+       warning; this never aborts the sync.
     """
     inherit = config.get("model-inherit-main-chat")
     if not inherit:  # missing / empty / falsy scalar — nothing to validate
@@ -208,36 +216,66 @@ def _validate_model_inheritance(config: dict, config_path: Path) -> None:
         sys.exit(1)
 
     override_all = config.get("model-override-all")
-    if not isinstance(override_all, dict):
-        # Wrong types here are covered by the schema warnings below;
-        # resolve_model() ignores non-mapping blocks as well.
-        return
+    if isinstance(override_all, dict):
+        conflicts = [
+            provider
+            for provider, value in sorted(inherit.items())
+            if value and override_all.get(provider)
+        ]
+        if conflicts:
+            print(
+                f"ERROR: {config_path}: conflicting model configuration for "
+                f"provider(s): {', '.join(conflicts)}.",
+                file=sys.stderr,
+            )
+            for provider in conflicts:
+                print(
+                    f"  Provider '{provider}' is set in BOTH 'model-override-all' AND "
+                    "'model-inherit-main-chat' — these two keys are mutually exclusive "
+                    "per provider.",
+                    file=sys.stderr,
+                )
+                print(
+                    f"  Fix: delete one of the two keys for '{provider}', e.g. remove "
+                    f"the '{provider}: ...' line under 'model-override-all:' OR remove "
+                    f"'{provider}' (or the whole block) under 'model-inherit-main-chat:'.",
+                    file=sys.stderr,
+                )
+            sys.exit(1)
 
-    conflicts = [
-        provider
-        for provider, value in sorted(inherit.items())
-        if value and override_all.get(provider)
-    ]
-    if conflicts:
-        print(
-            f"ERROR: {config_path}: conflicting model configuration for "
-            f"provider(s): {', '.join(conflicts)}.",
-            file=sys.stderr,
+    # Soft check (warning only): per-role entries under 'model-overrides'
+    # for a provider with active inheritance are dead config —
+    # resolve_model() returns on the inherit branch before consulting them.
+    overrides = config.get("model-overrides")
+    if isinstance(overrides, dict):
+        shadowed = [
+            (provider, sorted(roles))
+            for provider, roles in sorted(overrides.items())
+            if inherit.get(provider) and isinstance(roles, dict) and roles
+        ]
+        for provider, role_names in shadowed:
+            print(
+                f"  !  WARNING: {config_path}: 'model-inherit-main-chat' is "
+                f"active for provider '{provider}', so the per-role entries "
+                f"under 'model-overrides.{provider}' ({', '.join(role_names)}) "
+                "are ignored — remove them or disable inheritance.",
+                file=sys.stderr,
+            )
+        # Legacy flat shape ('model-overrides.<role>: <tier>') only ever
+        # applies to Claude (see roles.py::resolve_model) — warn when dead.
+        flat_roles = sorted(
+            role
+            for role, value in overrides.items()
+            if inherit.get("Claude") and not isinstance(value, dict)
         )
-        for provider in conflicts:
+        if flat_roles:
             print(
-                f"  Provider '{provider}' is set in BOTH 'model-override-all' AND "
-                "'model-inherit-main-chat' — these two keys are mutually exclusive "
-                "per provider.",
+                f"  !  WARNING: {config_path}: 'model-inherit-main-chat' is "
+                f"active for provider 'Claude', so the flat per-role entries "
+                f"under 'model-overrides' ({', '.join(flat_roles)}) "
+                "are ignored — remove them or disable inheritance.",
                 file=sys.stderr,
             )
-            print(
-                f"  Fix: delete one of the two keys for '{provider}', e.g. remove "
-                f"the '{provider}: ...' line under 'model-override-all:' OR remove "
-                f"'{provider}' (or the whole block) under 'model-inherit-main-chat:'.",
-                file=sys.stderr,
-            )
-        sys.exit(1)
 
 
 def find_agent_meta_root(script_path: Path) -> Path:
