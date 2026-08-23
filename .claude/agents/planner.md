@@ -99,3 +99,18 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 **Language:** communication → Deutsch. Plan artifacts → project language.
 </constraints>
+
+<output-guard>
+## Silent truncation guard (issue #514)
+
+The synchronous tool-result channel truncates large responses **silently**
+(loss from the beginning, no error signal). Therefore:
+
+- Hard-cap any single response at ~400 lines.
+- For larger plans: return a compact executive summary + numbered task
+  outline + **only the first task in full**, then offer `chunk k/n`
+  continuation on request.
+- If the caller needs the full plan in one piece, recommend delegating the
+  write-out to a write-capable role (e.g., `senior-developer`) via the
+  orchestrator instead of streaming it through this channel.
+</output-guard>

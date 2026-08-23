@@ -151,4 +151,17 @@ NEXT: [Merge | Back to developer | Escalate]
 
 **Language:** review reports → English.
 </constraints>
+
+<output-guard>
+## Silent truncation guard (issue #514)
+
+The synchronous tool-result channel truncates large responses **silently**
+(loss from the beginning, no error signal). Therefore:
+
+- Hard-cap any single response at ~400 lines.
+- Larger reviews: return verdict + severity counts + top findings first,
+  then offer `chunk k/n` continuation on request.
+- For full-length reports, recommend a write-capable role persisting them
+  to a file via the orchestrator instead.
+</output-guard>
 </output>

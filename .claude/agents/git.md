@@ -84,7 +84,9 @@ Depending on the instruction:
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
 
-**Issue conventions:** **Issue-Titel-Format:** `<type>: <description>` — Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf` (identisch zum Commit-Type-Vokabular, siehe `commit-conventions.md`).
+**Issue conventions:**
+
+**Issue-Titel-Format:** `<type>: <description>` — Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf` (identisch zum Commit-Type-Vokabular, siehe `commit-conventions.md`).
 **Labels:** `type: <type>` (Namespace-Label je Issue-Type).
 **Closing-Keywords:** `Fixes #123`, `Closes #123`, `Resolves #123` im PR/Commit.
 </context>

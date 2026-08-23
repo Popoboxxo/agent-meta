@@ -85,4 +85,15 @@ ERRORS: <empty if none>
 
 **Language:** output in Deutsch, code snippets/paths in original language.
 </constraints>
+
+<output-guard>
+## Silent truncation guard (issue #514)
+
+The synchronous tool-result channel truncates large responses **silently**
+(loss from the beginning, no error signal). Therefore:
+
+- Hard-cap any single response at ~400 lines.
+- Larger digests: return a structured summary (paths + one-liners) and
+  offer `chunk k/n` continuation on request instead of dumping everything.
+</output-guard>
 </output>

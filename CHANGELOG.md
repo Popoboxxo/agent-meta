@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.100.0] — 2026-08-23
+
+### Added
+- **HACS platform preset** (`feat/hacs-platform`): five `2-platform` agent overrides that
+  extend the generic agents via composition and inject HACS-specific rules — `hacs-developer`
+  (manifest/hacs.json hygiene, Coordinator/Store architecture, Config/Options-Flow, CI,
+  release discipline, debugging checklist), `hacs-code-reviewer` (10-gate checklist),
+  `hacs-tester` (HA-free pytest via fake-package, logic-first then E2E),
+  `hacs-devops-engineer` (`hacs/action` + `hassfest` CI from day one, release triad),
+  `hacs-release` (tag↔manifest sync, `VERSION` only with migrator).
+
 ## [0.99.0] — 2026-08-22
 
 ### Added

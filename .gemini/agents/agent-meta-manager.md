@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.13.0
+version: 1.13.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -14,7 +14,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.13.0
+generated-from: 1-generic/agent-meta-manager.md@1.13.1
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -177,7 +177,8 @@ Toggle workflow:
 1. Read current state: `model-inherit-main-chat` in `.meta-config/project.yaml`.
 2. To enable/disable: set the provider to `true`/`false`, then re-run `sync.py`.
 3. Re-sync is MANDATORY after every change — generated agents only reflect the key after regeneration.
-4. Check `sync.log` afterwards for `[WARN]`.
+4. Check the sync output afterwards: on conflict, `sync.py` fails fast with an
+   `ERROR:` message on stderr and exit code 1 (no `[WARN]` in `sync.log`).
 
 > ⚠️ **HARD CONFLICT:** `model-inherit-main-chat` and `model-override-all`
 > are mutually exclusive **per provider**. Setting both truthy for the same
@@ -241,7 +242,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.97.0 (2026-08-22)
+**Version info:** v0.100.0 (2026-08-23)
 </context>
 
 <tools>

@@ -4,5 +4,7 @@
 
 ---
 
+- `.claude/skills/model-override-all` (skill) — keinem registrierten Tool zugeordnet
+- `.claude/hooks/.guard-audit.log` (hook) — keinem registrierten Tool zugeordnet
 - `.claude/rules/external-tools-drift.md` (rule) — keinem registrierten Tool zugeordnet
 
