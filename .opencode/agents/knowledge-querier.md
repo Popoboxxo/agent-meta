@@ -5,7 +5,7 @@ description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
   Synthese mit Citations. File-Back guter Antworten.
 generated-from: 1-generic/knowledge-querier.md@1.0.1
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   read: allow
   edit: allow

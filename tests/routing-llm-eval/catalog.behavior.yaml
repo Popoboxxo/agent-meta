@@ -67,6 +67,7 @@ cases:
     role: agent-meta-manager
     category: interface-knowledge
     prompt: "Welche Flags bietet sync.py fuer CI-Checks und Drift-Erkennung? Nenne die Flag-Namen."
+    isolation: repo-readonly
     expected_any:
       - '--check'
       - '--validate'
@@ -75,6 +76,7 @@ cases:
     role: agent-meta-manager
     category: interface-knowledge
     prompt: "Wie viele Schichten hat das agent-meta Template-Layer-Modell und wie heissen sie?"
+    isolation: repo-readonly
     expected_any:
       - '0-external'
       - '1-generic'

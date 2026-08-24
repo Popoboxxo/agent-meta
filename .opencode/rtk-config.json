@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "logSavings": true,
   "showUpdateEvery": 10,
   "techniques": {

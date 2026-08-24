@@ -8,7 +8,7 @@ description: ETL/ELT pipeline design, data-layer schema migration, data quality 
 prompt_mode: modern
 generated-from: 1-generic/data-engineer.md@0.1.1
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

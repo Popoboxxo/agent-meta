@@ -7,7 +7,7 @@ description: 'External developer- and user-facing documentation: API references,
 prompt_mode: modern
 generated-from: 1-generic/technical-writer.md@0.1.0
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   read: allow
   edit: allow

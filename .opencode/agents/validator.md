@@ -6,7 +6,7 @@ description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit
 prompt_mode: modern
 generated-from: 1-generic/validator.md@4.1.1
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

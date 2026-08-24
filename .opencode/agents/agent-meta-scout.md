@@ -6,7 +6,7 @@ description: Scouts the AI ecosystem for new skills, agent patterns, rules, and 
 prompt_mode: modern
 generated-from: 1-generic/agent-meta-scout.md@1.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   read: allow
   webfetch: allow

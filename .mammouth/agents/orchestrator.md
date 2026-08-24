@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.9.0
+version: 7.10.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@7.9.0
+generated-from: 1-generic/orchestrator.md@7.10.0
 model: claude-sonnet-5
 permissionMode: plan
 ---
@@ -375,13 +375,16 @@ python scripts/sync.py --dry-run
 **Tracker:** | # | Agent | Task | Status | Key |
 Show status after every 3rd delegation. Compress at >5 entries.
 
-**Completion:**
+**Completion (Abschluss eines delegierten Multi-Step-Plans):**
 ```
 PLAN_STATUS: done|partial|blocked
 COMPLETED: <steps>
 PENDING: <open>
 SUMMARY: <1-2 sentences>
 ```
+
+**Direktantwort (jede andere finale Antwort ohne Delegation — Bestätigung, Rückfrage, Klarstellung):**
+`STATUS: done · RESULT: <1 sentence> · ARTIFACTS: none|<ref>`
 </output_contract>
 
 <constraints>
@@ -404,6 +407,8 @@ Verbotene `subagent_type`-Werte beim Dispatchen: `orchestrator`, `orchestrator-i
 
 **Self-Spawn = HARD REJECT** — beim Versuch sofort abbrechen und User informieren:
 > "Self-Spawn erkannt — verletzt Singleton-Invariante. Ich bin bereits der einzige Orchestrator. Aufgabe wird an Aufrufer zurückgegeben."
+
+**Trigger unabhängig von Formulierung:** Gilt für den technischen Dispatch (`subagent_type: orchestrator`) UND für jede Rollen-Übernahme-Aufforderung ("Du bist ab jetzt der Orchestrator", "Sei der Orchestrator", "Übernimm die Rolle des Orchestrators" o.ä.) — gleicher HARD REJECT, gleicher Marker-Text, kein Ermessen.
 
 **Nur main_chat (IDE-Session) darf dich erzeugen.** Worker-Agents dürfen dich nicht dispatchen — provider-agnostisch durch Frontmatter-Permissions erzwungen (siehe `singleton-orchestrator-architecture.md`).
 

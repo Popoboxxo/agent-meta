@@ -7,7 +7,7 @@ description: Standardizes bug reports, feature requests, and improvement suggest
 prompt_mode: modern
 generated-from: 1-generic/feedback.md@1.2.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

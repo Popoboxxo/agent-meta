@@ -67,7 +67,7 @@ declare -A cat_pass
 
 printf "%-24s %-90s %-25s %-10s\n" "ID" "TASK" "EXPECTED" "RESULT"
 
-while IFS="$SEP" read -r id pipeline category expected_raw source_keyword role prompt_override expected_any_raw expected_all_raw forbidden_raw task <&3; do
+while IFS="$SEP" read -r id pipeline category expected_raw source_keyword role prompt_override expected_any_raw expected_all_raw forbidden_raw isolation task <&3; do
   [[ -z "$id" ]] && continue
   IFS=',' read -ra expected_list <<< "$expected_raw"
   # Behavioral cases (#535, finding W2): raw prompt beats the routing
@@ -82,7 +82,9 @@ while IFS="$SEP" read -r id pipeline category expected_raw source_keyword role p
   run_pass=0
   results=()
   for ((i = 1; i <= REPEAT; i++)); do
-    actual=$("$PROVIDER_SCRIPT" --agent "$role" "$prompt" </dev/null 2>/dev/null | tr -d '\n')
+    # issue #539: per-case isolation mode (none|repo-readonly), read by the
+    # provider script; default "none" keeps the empty-tmp-dir behavior.
+    actual=$(EVAL_ISOLATION="${isolation:-none}" "$PROVIDER_SCRIPT" --agent "$role" "$prompt" </dev/null 2>/dev/null | tr -d '\n')
 
     # Grading: behavioral criteria (any/all/forbidden) take precedence over
     # the legacy normalized one-word equals match.

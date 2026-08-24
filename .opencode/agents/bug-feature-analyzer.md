@@ -6,7 +6,7 @@ description: 'Analyzes and classifies incoming bug reports and feature requests 
 prompt_mode: modern
 generated-from: 1-generic/bug-feature-analyzer.md@1.1.4
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   read: allow
   glob: allow

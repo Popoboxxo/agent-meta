@@ -6,7 +6,7 @@ description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwri
 prompt_mode: modern
 generated-from: 1-generic/e2e-tester.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

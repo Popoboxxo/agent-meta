@@ -6,7 +6,7 @@ description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-sp
 prompt_mode: modern
 generated-from: 1-generic/agent-meta-manager.md@1.13.1
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow
@@ -240,7 +240,7 @@ On request: extend `.meta-config/project.yaml` with an SE block. Explain the var
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.100.0 (2026-08-23)
+**Version info:** v0.100.0 (2026-08-24)
 </context>
 
 <tools>

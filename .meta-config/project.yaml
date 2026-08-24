@@ -300,6 +300,8 @@ quality-pipelines:
     se-cascade:
       enabled: false
   custom-pipelines: {}
+model-override-all:
+  Opencode: opencode-go/ox-alpha-free
 model-overrides:
   Gemini:
     knowledge-curator: gemini-2.0-flash-lite-preview-02-05

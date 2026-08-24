@@ -5,7 +5,7 @@ description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Fr
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 generated-from: 1-generic/knowledge-gardener.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   read: allow
   edit: allow

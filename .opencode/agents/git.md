@@ -5,7 +5,7 @@ description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 generated-from: 1-generic/git.md@1.5.0
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

@@ -7,7 +7,7 @@ description: Last-resort escalation tier. Invoked only after senior-developer ha
 prompt_mode: modern
 generated-from: 1-generic/principal-developer.md@1.0.2
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

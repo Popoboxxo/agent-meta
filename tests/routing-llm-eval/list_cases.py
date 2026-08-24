@@ -8,8 +8,9 @@ without worrying about commas/pipes/colons inside the task string.
 
 Output field order: id, pipeline, category, expected (comma-joined),
 source_keyword, role, prompt (raw override), expected_any, expected_all,
-forbidden (each comma-joined), task (task is last since it's the only field
-that may itself contain arbitrary text, including trailing whitespace).
+forbidden (each comma-joined), isolation (none|repo-readonly, issue #539),
+task (task is last since it's the only field that may itself contain
+arbitrary text, including trailing whitespace).
 
 Usage:
     python3 list_cases.py [catalog.yaml ...]
@@ -81,6 +82,11 @@ def main(argv: list[str]) -> int:
             expected_any = ",".join(str(e) for e in case.get("expected_any", []))
             expected_all = ",".join(str(e) for e in case.get("expected_all", []))
             forbidden = ",".join(str(e) for e in case.get("forbidden", []))
+            # issue #539: per-case opt-in to seed the isolated RUN_DIR with
+            # a read-only copy of the repo tree, for roles whose competence
+            # is reading real repo files (agent-meta-manager, documenter).
+            # Default "none" keeps today's empty-tmp-dir behavior unchanged.
+            isolation = case.get("isolation") or "none"
             task = case.get("task", "")
 
             # task stays LAST: it is the only field that may contain
@@ -96,6 +102,7 @@ def main(argv: list[str]) -> int:
                 expected_any,
                 expected_all,
                 forbidden,
+                isolation,
                 task,
             ]))
     return 0

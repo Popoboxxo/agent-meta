@@ -6,7 +6,7 @@ description: Collect improvement suggestions for agent-meta and submit them as G
 prompt_mode: modern
 generated-from: 1-generic/meta-feedback.md@2.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/ox-alpha-free
 permission:
   bash: allow
   read: allow

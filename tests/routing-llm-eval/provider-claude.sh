@@ -16,6 +16,13 @@
 # Isolation unchanged: run from a throwaway tmp dir so repo CLAUDE.md /
 # .claude/rules auto-discovery cannot leak into the session (--bare would
 # need ANTHROPIC_API_KEY which OAuth setups do not have).
+#
+# v3 (issue #539): EVAL_ISOLATION=repo-readonly (default: none, unchanged
+#   behavior) additionally seeds RUN_DIR with the repo's tracked files
+#   before the system-prompt file is written below, so file-dependent
+#   roles (agent-meta-manager, documenter, ...) can actually find sync.py /
+#   templates / docs instead of starving in tool-call loops until timeout.
+#   See comment at the copy site for why copy-not-mount.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
@@ -40,6 +47,19 @@ done
 
 RUN_DIR="$(mktemp -d)"
 trap 'rm -rf "$RUN_DIR"' EXIT
+
+EVAL_ISOLATION="${EVAL_ISOLATION:-none}"
+if [[ "$EVAL_ISOLATION" == "repo-readonly" ]]; then
+  # issue #539: seed RUN_DIR with the repo's tracked files so file-dependent
+  # roles can find sync.py / templates / docs. `git ls-files` naturally
+  # respects .gitignore (no .git/.venv/node_modules/external -- none of
+  # those are tracked), so the copy stays small without a manual exclude
+  # list. Copy instead of a bind-mount: a non-root read-only bind mount is
+  # not reliably available in this sandbox, and a plain copy already gives
+  # the isolation property that matters here (the role can't corrupt the
+  # real repo, since it never writes to it) without needing root.
+  (cd "$REPO_ROOT" && git ls-files -z | tar --null -T - -cf -) | tar -xf - -C "$RUN_DIR"
+fi
 
 SYSTEM_FILE=""
 if [[ "$ROLE" == "orchestrator" ]]; then

@@ -1,0 +1,1 @@
+- [env: /tmp full + pytest-homeassistant plugin crash](env_tmp_disk_full.md) — use `-p no:homeassistant`, never redirect TMPDIR to `/`, unrelated to code changes
