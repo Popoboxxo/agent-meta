@@ -1,6 +1,6 @@
 # agent-meta — Architecture Overview
 
-> Repo version: **0.92.0** — content last substantively reviewed: 2026-07-20 (predates several releases; a full architecture re-review is due — this header was stuck at 0.57.1/2026-06-07 despite this file's own policy to update it on every major release)
+> Repo version: **0.96.0** — content last substantively reviewed: 2026-08-25
 > Full reference: [ARCHITECTURE.full.md](ARCHITECTURE.full.md)
 
 ---
@@ -16,8 +16,11 @@
 | 5 | [External Skills](docs/architecture/05-external-skills.md) | Submodule → config → wrapper → target project |
 | 6 | [Versioning](docs/architecture/06-versioning.md) | Repo, agent, and snippet versioning |
 | 7 | [SE Cascade](docs/architecture/07-se-cascade.md) | Recursive 6-stage black-box → white-box decomposition |
-| 8 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-based event logging with CLI fallback |
-| 9 | [A2A Protocol](docs/concepts/a2a-handoff-protocol.md) | Structured JSON envelopes for agent-to-agent contracts |
+| 8 | [Preset System](docs/architecture/08-preset-system.md) | Precedence pattern for DoD, tier, rules, conventions presets |
+| 9 | [Quality Pipelines](docs/architecture/09-quality-pipelines.md) | 7 pre-defined workflows (feature-lifecycle, bugfix, refactor, etc.) |
+| 10 | [MCP & Admin UI](docs/architecture/10-mcp-and-admin-ui.md) | MCP server activation and live configuration dashboard |
+| 11 | [Viz-Logging MCP](docs/concepts/viz-logging-mcp.md) | MCP-based event logging with CLI fallback |
+| 12 | [A2A Protocol](docs/concepts/a2a-handoff-protocol.md) | Structured JSON envelopes for agent-to-agent contracts |
 
 ---
 
