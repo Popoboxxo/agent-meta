@@ -115,6 +115,15 @@ from lib.pipelines import (
     sync_pipeline_detail_files,
 )
 from lib.platform import load_platform_config
+from lib.platform_defaults import (
+    adopt_platform_default,
+    apply_platform_defaults,
+    compute_platform_defaults_diff,
+    format_platform_defaults_diff_table,
+    ignore_platform_default,
+    log_platform_defaults_drift,
+    track_platform_default,
+)
 from lib.providers import (
     load_providers_config,
     resolve_providers,
@@ -578,6 +587,16 @@ def main():
     parser.add_argument("--entry", metavar="FILE", default="SKILL.md",
                         help="Entry file within the skill directory (default: SKILL.md)")
 
+    # Platform-defaults inspection + per-key state actions (early-exit utilities)
+    parser.add_argument("--platform-defaults-diff", action="store_true",
+                        help="Show platform-supplied config defaults vs. the active project values")
+    parser.add_argument("--platform-defaults-adopt", metavar="KEY",
+                        help="Remove KEY from project.yaml and follow the platform default again")
+    parser.add_argument("--platform-defaults-ignore", metavar="KEY",
+                        help="Pin KEY against the current platform default (materialize + freeze)")
+    parser.add_argument("--platform-defaults-track", metavar="KEY",
+                        help="Re-track a previously ignored KEY (baseline reset)")
+
     args = parser.parse_args()
     _normalize_check_dry_run(args)
 
@@ -706,6 +725,7 @@ def main():
         project_root = config_resolved.parent
     config_path = Path(args.config).resolve()
     config = load_config(config_path)
+    config = apply_platform_defaults(config, agent_meta_root)
     variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
@@ -722,6 +742,35 @@ def main():
 
     for w in pre_warnings:
         log.warn(w)
+
+    # Platform-defaults utility flags: standalone early-exit actions (no sync).
+    if args.platform_defaults_diff:
+        entries = compute_platform_defaults_diff(config, agent_meta_root, project_root)
+        if not entries:
+            print("  i  Keine Platform-Defaults aktiv — config/platform-defaults.yaml "
+                  "liefert keine Defaults für die aktiven Plattformen "
+                  f"({', '.join(platforms) if platforms else 'keine'}).")
+        else:
+            print(format_platform_defaults_diff_table(entries))
+        return
+
+    if args.platform_defaults_adopt:
+        key = args.platform_defaults_adopt
+        adopt_platform_default(key, project_root, agent_meta_root, args.dry_run)
+        print(f"  i  platform-defaults: '{key}' adopted — follows the live platform default.")
+        return
+
+    if args.platform_defaults_ignore:
+        key = args.platform_defaults_ignore
+        ignore_platform_default(key, project_root, agent_meta_root, args.dry_run)
+        print(f"  i  platform-defaults: '{key}' ignored — pinned against the current platform default.")
+        return
+
+    if args.platform_defaults_track:
+        key = args.platform_defaults_track
+        track_platform_default(key, project_root, agent_meta_root, args.dry_run)
+        print(f"  i  platform-defaults: '{key}' re-tracked — drift comparison re-enabled.")
+        return
 
     if args.fill_defaults:
         mode = "fill-defaults"
@@ -814,6 +863,7 @@ def main():
         # Re-sync context files so AGENTS.md reflects the updated provider list.
         if not args.dry_run:
             config = load_config(config_path)
+            config = apply_platform_defaults(config, agent_meta_root)
             variables, _ = build_variables(config, agent_meta_root, project_root)
             for prov in resolve_providers(config, provider_config):
                 sync_context_for_provider(agent_meta_root, project_root, config,
@@ -840,6 +890,7 @@ def main():
                                     config, log, args.dry_run)
         if not args.dry_run:
             config = load_config(config_path)
+            config = apply_platform_defaults(config, agent_meta_root)
             variables, _ = build_variables(config, agent_meta_root, project_root)
             for prov in resolve_providers(config, provider_config):
                 sync_context_for_provider(agent_meta_root, project_root, config,
@@ -930,6 +981,12 @@ def main():
         fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
         # Reload config after auto-fill to pick up newly written defaults
         config = load_config(config_path)
+        config = apply_platform_defaults(config, agent_meta_root)
+
+        # Platform-defaults drift transparency + state baseline refresh — once
+        # per real sync run (not inside build_variables()). Info-only, never
+        # fails a sync.
+        log_platform_defaults_drift(config, agent_meta_root, project_root, log, args.dry_run)
 
         provider_config = load_providers_config(agent_meta_root)
         providers = resolve_providers(config, provider_config)

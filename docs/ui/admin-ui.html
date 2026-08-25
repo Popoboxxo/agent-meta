@@ -1432,6 +1432,7 @@ function buildSidebar() {
         { route: "/project/dod-overrides", label: "DoD Overrides", icon: "☑" },
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
+        { route: "/project/platform-defaults", label: "Platform Defaults", icon: "🗺" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/mcp-overrides", label: "MCP Servers", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
@@ -1456,6 +1457,7 @@ function buildSidebar() {
         { route: "/config/dod-presets", label: "dod presets", icon: "☑", superOnly: true },
         { route: "/config/rules-presets", label: "rules presets", icon: "⚖", superOnly: true },
         { route: "/config/conventions-presets", label: "conventions presets", icon: "🏷", superOnly: true },
+        { route: "/config/platform-defaults", label: "platform defaults", icon: "🗺", superOnly: true },
         { route: "/config/delegation-syntax", label: "delegation", icon: "↬", superOnly: true },
         { route: "/config/export", label: "export", icon: "⇱", superOnly: true },
       ],
@@ -4243,6 +4245,218 @@ async function viewProjectConventionsOverrides() {
 }
 
 /* =========================================================================
+ * Views — Platform Defaults (super-admin raw editor)
+ * ========================================================================= */
+async function viewPlatformDefaults() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["platform-defaults.yaml"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Per-platform default values for project.yaml keys. A project activates them via `platforms:`. Scalar keys follow project-explicit > platform-default > framework-default; list keys (roles, mcp-servers, …) merge additively. This is NOT a fifth preset system — it fills the selectors of the existing preset systems plus any other key.",
+  ]));
+
+  let data;
+  try { data = await api.get("/api/config/platform-defaults"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  data = (data && typeof data === "object") ? data : {};
+  data.platforms = (data.platforms && typeof data.platforms === "object") ? data.platforms : {};
+
+  const status = el("div", { class: "muted" }, [`${Object.keys(data.platforms).length} platform(s).`]);
+  wrap.appendChild(status);
+  const markDirty = () => {
+    status.textContent = "Unsaved changes.";
+    status.style.color = "var(--accent-yellow)";
+  };
+  const save = async () => {
+    try {
+      await api.put("/api/config/platform-defaults", data);
+      toast("platform-defaults saved", "success");
+      status.textContent = "Saved.";
+      status.style.color = "var(--accent-green)";
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, "error");
+      status.textContent = `Save failed: ${err.message}`;
+      status.style.color = "var(--accent-red)";
+    }
+  };
+
+  const fieldRow = (label, control) => el("div", { class: "field", style: "margin-bottom:var(--space-3);" }, [
+    el("label", { class: "field-label" }, [label]),
+    control,
+  ]);
+
+  const body = el("div");
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: save }, ["Save"]),
+    el("button", { class: "btn", onclick: () => {
+      const name = (prompt("New platform name (e.g. hacs):") || "").trim();
+      if (!name) return;
+      if (data.platforms[name]) { toast("Platform already exists", "warning"); return; }
+      data.platforms[name] = { defaults: {} };
+      markDirty(); render();
+    } }, ["+ Add platform"]),
+  ]));
+  wrap.appendChild(body);
+
+  const render = () => {
+    body.innerHTML = "";
+    const names = Object.keys(data.platforms);
+    if (names.length === 0) {
+      body.appendChild(el("div", { class: "empty" }, [
+        "No platform defaults defined. Use “+ Add platform” to create one.",
+      ]));
+      return;
+    }
+    for (const name of names) {
+      let entry = data.platforms[name];
+      if (!entry || typeof entry !== "object") { entry = data.platforms[name] = {}; }
+      const defaults = entry.defaults = (entry.defaults && typeof entry.defaults === "object") ? entry.defaults : {};
+
+      const panel = el("details", { class: "panel", open: true });
+      panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [name]));
+
+      panel.appendChild(el("button", { class: "btn btn-danger", style: "margin:var(--space-2) 0;", onclick: () => {
+        if (!confirm(`Remove platform “${name}” and all its defaults?`)) return;
+        delete data.platforms[name]; markDirty(); render();
+      } }, ["Remove platform"]));
+
+      for (const key of Object.keys(defaults)) {
+        const val = defaults[key];
+        const rowCtl = el("div", { class: "flex-row", style: "gap:var(--space-2); align-items:center;" });
+        if (Array.isArray(val)) {
+          rowCtl.appendChild(tagEditor(val, (next) => { defaults[key] = next; markDirty(); }));
+        } else {
+          const inp = el("input", { type: "text", style: "min-width:320px;" });
+          inp.value = val != null ? String(val) : "";
+          inp.addEventListener("input", () => { defaults[key] = inp.value; markDirty(); });
+          rowCtl.appendChild(inp);
+        }
+        const rm = el("button", { class: "btn btn-ghost", title: "Remove key", style: "padding:0 8px;" }, ["×"]);
+        rm.addEventListener("click", () => { delete defaults[key]; markDirty(); render(); });
+        rowCtl.appendChild(rm);
+        panel.appendChild(fieldRow(key, rowCtl));
+      }
+
+      panel.appendChild(el("div", { class: "btn-row", style: "margin-top:var(--space-2);" }, [
+        el("button", { class: "btn", onclick: () => {
+          const k = (prompt("New scalar default key (e.g. dod-preset):") || "").trim();
+          if (!k) return;
+          if (k in defaults) { toast("Key already exists", "warning"); return; }
+          defaults[k] = ""; markDirty(); render();
+        } }, ["+ scalar key"]),
+        el("button", { class: "btn", onclick: () => {
+          const k = (prompt("New list default key (e.g. roles, mcp-servers):") || "").trim();
+          if (!k) return;
+          if (k in defaults) { toast("Key already exists", "warning"); return; }
+          defaults[k] = []; markDirty(); render();
+        } }, ["+ list key"]),
+      ]));
+
+      body.appendChild(panel);
+    }
+  };
+  render();
+  return wrap;
+}
+
+/* =========================================================================
+ * Views — Project Platform Defaults (compare / resolve)
+ * ========================================================================= */
+async function viewProjectPlatformDefaults() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Platform Defaults"]));
+  wrap.appendChild(el("p", { class: "muted" }, [
+    "Compare/resolve view for the defaults contributed by the active platforms (`platforms:` in project.yaml). Precedence: project-explicit > platform-default > framework-default. Actions apply immediately server-side (adopt hands control back to the platform, ignore pins the current value, re-track re-enables drift comparison) — there is no batched save here.",
+  ]));
+
+  const fmtVal = (v) => {
+    if (v == null) return "(not set)";
+    if (Array.isArray(v)) return "[" + v.map(String).join(", ") + "]";
+    return String(v);
+  };
+  const STATUS_BADGE = { inherited: "ok", overridden: "warn", ignored: "optional" };
+
+  const status = el("div", { class: "muted" }, ["Loading…"]);
+  wrap.appendChild(status);
+  const contentWrap = el("div");
+  wrap.appendChild(contentWrap);
+
+  const doAction = async (action, key) => {
+    try {
+      status.textContent = `${action}: ${key}…`;
+      await api.post(`/api/platform-defaults/${action}`, { key });
+      toast(`platform-defaults: '${key}' ${action}`, "success");
+      await reload();
+    } catch (err) {
+      toast(`Action failed: ${err.message}`, "error");
+      status.textContent = `Action failed: ${err.message}`;
+    }
+  };
+
+  const render = (data) => {
+    contentWrap.innerHTML = "";
+    const entries = (data && Array.isArray(data.entries)) ? data.entries : [];
+    const platforms = (data && Array.isArray(data.platforms)) ? data.platforms : [];
+
+    if (entries.length === 0) {
+      contentWrap.appendChild(el("div", { class: "empty" }, [
+        platforms.length === 0
+          ? "No active platforms for this project — see `platforms:` in project.yaml and the framework 'platform defaults' editor (/config/platform-defaults)."
+          : `No platform-defaults for the active platform(s) (${platforms.join(", ")}) — define them via the framework 'platform defaults' editor (/config/platform-defaults).`,
+      ]));
+      return;
+    }
+
+    const table = el("table", { class: "data" });
+    table.appendChild(el("thead", {}, [
+      el("tr", {}, ["Key", "Platform-Default (Source)", "Active Value", "Status", "Actions"].map(h => el("th", {}, [h]))),
+    ]));
+    const tbody = el("tbody");
+    for (const e of entries) {
+      const tr = el("tr");
+      tr.appendChild(el("td", { class: "mono" }, [String(e.key)]));
+      tr.appendChild(el("td", { class: "muted" }, [`${fmtVal(e.platform_default)} (${e.source_platform || "—"})`]));
+      tr.appendChild(el("td", {}, [fmtVal(e.active_value)]));
+      const stTd = el("td");
+      stTd.appendChild(el("span", { class: `badge ${STATUS_BADGE[e.status] || "optional"}` }, [e.status]));
+      tr.appendChild(stTd);
+
+      const actTd = el("td", { class: "btn-row" });
+      if (e.status === "inherited") {
+        actTd.appendChild(el("button", { class: "btn", onclick: () => doAction("ignore", e.key) }, ["Ignorieren"]));
+      } else if (e.status === "overridden") {
+        actTd.appendChild(el("button", { class: "btn btn-primary", onclick: () => doAction("adopt", e.key) }, ["Übernehmen"]));
+        actTd.appendChild(el("button", { class: "btn", onclick: () => doAction("ignore", e.key) }, ["Ignorieren"]));
+      } else if (e.status === "ignored") {
+        actTd.appendChild(el("button", { class: "btn", onclick: () => doAction("track", e.key) }, ["Re-Track"]));
+      }
+      tr.appendChild(actTd);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    contentWrap.appendChild(table);
+  };
+
+  const reload = async () => {
+    try {
+      const data = await api.get("/api/platform-defaults/diff");
+      const n = (data.entries || []).length;
+      const overridden = (data.entries || []).filter(e => e.status === "overridden").length;
+      status.textContent = `${n} platform-default key(s), ${overridden} overridden.`;
+      status.style.color = "";
+      render(data);
+    } catch (err) {
+      status.textContent = `Load failed: ${err.message}`;
+      contentWrap.innerHTML = "";
+      contentWrap.appendChild(renderError(err));
+    }
+  };
+
+  await reload();
+  return wrap;
+}
+
+/* =========================================================================
  * Views — Project Knowledge Engine
  * ========================================================================= */
 const KNOWLEDGE_ALL_LINT_CHECKS = [
@@ -5888,12 +6102,13 @@ async function viewProjectGeneral() {
 
   // Load project.yaml and presets in parallel. Each preset endpoint may fail
   // independently — fall back to the hardcoded list in that case.
-  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp, conventionsPresetsResp] = await Promise.all([
+  const [data, dodPresetsResp, rulesPresetsResp, tierPresetsResp, conventionsPresetsResp, platformDefaultsResp] = await Promise.all([
     loadProject(),
     api.get("/api/config/dod-presets").catch(() => null),
     api.get("/api/config/rules-presets").catch(() => null),
     api.get("/api/tier-presets/merged").catch(() => null),
     api.get("/api/config/conventions-presets").catch(() => null),
+    api.get("/api/platform-defaults/diff").catch(() => null),
   ]);
 
   // dod-presets.yaml has either a top-level mapping of preset-name → config,
@@ -5925,6 +6140,21 @@ async function viewProjectGeneral() {
 
   const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
   wrap.appendChild(status);
+
+  // Platform-defaults drift indicator: count ONLY 'overridden' keys (ignored
+  // keys are deliberately pinned = no action needed). Links to the dedicated
+  // compare/resolve page. Hidden when no platform contributes any default.
+  const pdEntries = (platformDefaultsResp && Array.isArray(platformDefaultsResp.entries))
+    ? platformDefaultsResp.entries : [];
+  if (pdEntries.length > 0) {
+    const pdOverridden = pdEntries.filter(e => e.status === "overridden").length;
+    wrap.appendChild(el("a", {
+      href: "#/project/platform-defaults",
+      class: `badge ${pdOverridden ? "warn" : "ok"}`,
+      style: "text-decoration:none; display:inline-block; margin:var(--space-2) 0;",
+      title: "Open the Platform Defaults compare/resolve view",
+    }, [`Platform-Defaults: ${pdOverridden} Key(s) weichen ab`]));
+  }
 
   const panel = el("div", { class: "panel" });
   panel.appendChild(labeledTextField("Project name", project.name, v => project.name = v));
@@ -9541,6 +9771,7 @@ async function init() {
   router.register("/project/dod-overrides", viewProjectDodOverrides);
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/conventions-overrides", viewProjectConventionsOverrides);
+  router.register("/project/platform-defaults", viewProjectPlatformDefaults);
   router.register("/project/environments",   viewProjectEnvironments);
   router.register("/project/advanced",        viewProjectAdvanced);
   router.register("/project/gitignore",       viewProjectGitignore);
@@ -9558,6 +9789,7 @@ async function init() {
   router.register("/config/dod-presets",       viewDodPresets);
   router.register("/config/rules-presets",     viewRulesPresets);
   router.register("/config/conventions-presets", viewConventionsPresets);
+  router.register("/config/platform-defaults", viewPlatformDefaults);
   router.register("/config/delegation-syntax", viewDelegationSyntax);
   router.register("/config/export",            viewExport);
   router.register("/config-audit",             buildConfigAudit);
@@ -9639,6 +9871,7 @@ init();
     "project/dod-overrides": "project_instance-dod_overrides",
     "project/rules-overrides": "project_instance-rules_overrides",
     "project/conventions-overrides": "project_instance-conventions_overrides",
+    "project/platform-defaults": "project_instance-platform_defaults",
     "project/advanced": "project_instance-advanced",
     "project/knowledge-engine": "project_instance-knowledge_engine",
     "models": "framework_defaults-models",
@@ -9651,6 +9884,7 @@ init();
     "config/dod-presets": "framework_defaults-dod_presets",
     "config/rules-presets": "framework_defaults-rules_presets",
     "config/conventions-presets": "framework_defaults-conventions_presets",
+    "config/platform-defaults": "framework_defaults-platform_defaults",
     "config/delegation-syntax": "framework_defaults-delegation",
     "config/export": "framework_defaults-export",
     "roles": "workflows-roles_graph",

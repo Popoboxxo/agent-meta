@@ -159,6 +159,7 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "dod-presets":       "config/dod-presets.yaml",
     "rules-presets":     "config/rules-presets.yaml",
     "conventions-presets": "config/conventions-presets.yaml",
+    "platform-defaults":   "config/platform-defaults.yaml",
     "delegation-syntax": "config/delegation-syntax.yaml",
     "export":            "config/export.yaml",
 }
@@ -1438,6 +1439,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/tier-presets/merged":
             return self._handle_get_tier_presets_merged()
 
+        if path == "/api/platform-defaults/diff":
+            return self._handle_get_platform_defaults_diff()
+
         if path == "/api/model-mapping":
             return self._handle_get_model_mapping()
 
@@ -1665,6 +1669,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/tier-presets/update":
             return self._handle_post_tier_presets_update()
+
+        if path == "/api/platform-defaults/adopt":
+            return self._handle_post_platform_defaults_action("adopt")
+
+        if path == "/api/platform-defaults/ignore":
+            return self._handle_post_platform_defaults_action("ignore")
+
+        if path == "/api/platform-defaults/track":
+            return self._handle_post_platform_defaults_action("track")
 
         if path == "/api/reflection-pairs":
             body = self._read_body()
@@ -2802,6 +2815,99 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
+
+    # ------------------------------------------------------------------ #
+    # Platform defaults (compare / resolve)                              #
+    # ------------------------------------------------------------------ #
+
+    def _platform_defaults_diff(self) -> tuple[list[dict], list[str]]:
+        """Resolve the platform-defaults diff for the active project config.
+
+        Mirrors the CLI ``sync.py --platform-defaults-diff`` path: read the raw
+        project.yaml, run the side-effect-free ``apply_platform_defaults()`` so
+        active values reflect the resolved config, then compute the per-key diff.
+        Returns ``(entries, active_platforms)``.
+        """
+        self._ensure_lib_on_path()
+        from lib.platform_defaults import (  # type: ignore[import]
+            apply_platform_defaults,
+            compute_platform_defaults_diff,
+        )
+
+        agent_meta_root = self._agent_meta_root()
+        project_root = self.__class__.root
+        raw_config = self.__class__.config_manager.read("project")
+        if not isinstance(raw_config, dict):
+            raw_config = {}
+        active = raw_config.get("platforms") or []
+        config = apply_platform_defaults(raw_config, agent_meta_root)
+        entries = compute_platform_defaults_diff(config, agent_meta_root, project_root)
+        return entries, list(active)
+
+    def _handle_get_platform_defaults_diff(self) -> None:
+        """GET /api/platform-defaults/diff — per-key platform-default compare.
+
+        Returns ``{entries: [...], platforms: [...]}``. ``entries`` is the list
+        of ``{key, platform_default, source_platform, active_value, status}``
+        dicts from ``compute_platform_defaults_diff()``; ``platforms`` echoes the
+        active platform layers so the UI can render a meaningful empty state.
+        """
+        try:
+            entries, active = self._platform_defaults_diff()
+            return self._send_json({"entries": entries, "platforms": active})
+        except Exception as exc:  # noqa: BLE001
+            return self._send_json({"error": str(exc)}, status=500)
+
+    def _handle_post_platform_defaults_action(self, action: str) -> None:
+        """POST /api/platform-defaults/{adopt,ignore,track} — key-level actions.
+
+        Body: ``{"key": "<project.yaml key>"}``. The key must be supplied by at
+        least one active platform (i.e. present in the current diff); an unknown
+        key is rejected with 400 rather than silently no-op'ing. After the state
+        transition the recomputed diff is returned so the UI can refresh in place.
+        """
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with a 'key' field")
+        key = body.get("key")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("'key' is required")
+        key = key.strip()
+
+        entries, _active = self._platform_defaults_diff()
+        known = {e["key"] for e in entries}
+        if key not in known:
+            raise ValueError(
+                f"unknown platform-default key: {key!r} "
+                "(not supplied by any active platform)"
+            )
+
+        self._ensure_lib_on_path()
+        from lib.platform_defaults import (  # type: ignore[import]
+            adopt_platform_default,
+            ignore_platform_default,
+            track_platform_default,
+        )
+
+        actions = {
+            "adopt": adopt_platform_default,
+            "ignore": ignore_platform_default,
+            "track": track_platform_default,
+        }
+        fn = actions[action]
+        agent_meta_root = self._agent_meta_root()
+        project_root = self.__class__.root
+        fn(key, project_root, agent_meta_root, dry_run=False)
+
+        updated, active = self._platform_defaults_diff()
+        entry = next((e for e in updated if e["key"] == key), None)
+        return self._send_json({
+            "key": key,
+            "action": action,
+            "entry": entry,
+            "entries": updated,
+            "platforms": active,
+        })
 
     def _agent_meta_root(self) -> Path:
         """Resolve the agent-meta framework root for lib helpers.

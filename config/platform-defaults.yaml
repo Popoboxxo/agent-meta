@@ -1,0 +1,17 @@
+# Platform-Defaults — Default-Werte für project.yaml-Keys je Plattform.
+# Aktiviert via 'platforms:' in .meta-config/project.yaml (bereits bestehender Key).
+#
+# WICHTIG: Dies ist KEIN fünftes Preset-System — es befüllt die SELEKTOREN
+# der bestehenden vier Preset-Systeme (dod-preset, rules-preset, tier-preset,
+# conventions-preset) sowie beliebige andere project.yaml-Keys (Scalars wie
+# Listen), greift aber nie in deren interne feldweise Preset-Definition ein
+# (die dod:/conventions:-Override-Blöcke bleiben unberührt).
+#
+# Precedence Scalar-Keys:  Projekt-expliziter-Wert > Platform-Default > Framework-Hardcoded-Default.
+#   Bei mehreren aktiven Plattformen: letzter Eintrag in 'platforms:' gewinnt bei Scalar-Konflikten.
+# Precedence Listen-Keys:  additiv gemerged — alle Plattform-Listen ∪ Projekt-Liste, dedupliziert.
+#   Ausnahme: 'roles:' — fehlt roles: im Projekt (Sentinel "alle Rollen aktiv"), ist
+#   der Platform-Default für roles: ein No-Op. Additiv wirksam nur, wenn das Projekt
+#   bereits eine eigene explizite roles:-Liste führt (auch [] zählt als explizit).
+
+platforms: {}

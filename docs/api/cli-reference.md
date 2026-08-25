@@ -45,6 +45,17 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--activate-providers [PROVIDER ...]` | Restores the specified providers from backup zips. |
 | `--deactivation-status` | Displays the current deactivation status of all providers. |
 
+## Platform Defaults
+
+Platforms listed in `platforms:` may supply default values for `project.yaml` keys via `config/platform-defaults.yaml` (project-explicit values always win; list keys are merged additively).
+
+| Flag | Description |
+|------|-------------|
+| `--platform-defaults-diff` | Read-only. Prints a table of platform-supplied defaults vs. the active project values with an `inherited`/`overridden`/`ignored` status per key. |
+| `--platform-defaults-adopt KEY` | Removes the explicit `KEY` from `project.yaml` so the project follows the live platform default again. |
+| `--platform-defaults-ignore KEY` | Pins `KEY` against the current platform default (materializes the value if needed and freezes drift signalling). |
+| `--platform-defaults-track KEY` | Re-tracks a previously ignored `KEY` (baseline reset), re-enabling drift comparison. |
+
 ## Backup & Restore
 
 | Flag | Description |

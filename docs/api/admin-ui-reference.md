@@ -254,6 +254,12 @@ Rules are global architectural constraints. This interface allows you to inject 
 <!-- author: Agent Meta Admin -->
 Naming and versioning conventions (release versioning/changelog, issue naming) resolved from the selected conventions-preset. This view lets you override individual convention fields per domain on top of the preset. Precedence: convention override > conventions-preset > default. List overrides replace the whole preset list (deep-merge semantics).
 
+### Platform Defaults
+<!-- help-id: project_instance-platform_defaults -->
+<!-- last-updated: 2026-08-25 -->
+<!-- author: Agent Meta Admin -->
+Compare/resolve view for the project.yaml defaults contributed by the active platform layers (`platforms:`). Rather than editing values directly, each key is shown with its platform default, active value and status (inherited / overridden / ignored) plus per-status actions: adopt (hand control back to the platform), ignore (pin the current value) and re-track (re-enable drift comparison). Precedence: project-explicit > platform-default > framework-default. Actions apply immediately server-side — there is no batched save.
+
 ### Advanced
 <!-- help-id: project_instance-advanced -->
 <!-- last-updated: 2026-07-19 -->
@@ -271,6 +277,12 @@ The Knowledge Engine view configures the opt-in knowledge-base bundle for this p
 <!-- last-updated: 2026-07-19 -->
 <!-- author: Agent Meta Admin -->
 Skills are modular, reusable capability blocks (like 'Web Search', 'Database Query') that can be dynamically attached to agents.
+
+### Platform Defaults
+<!-- help-id: framework_defaults-platform_defaults -->
+<!-- last-updated: 2026-08-25 -->
+<!-- author: Agent Meta Admin -->
+Raw editor for `config/platform-defaults.yaml`, which lets a platform (activated per project via `platforms:`) supply default values for arbitrary project.yaml keys. Scalar keys follow project-explicit > platform-default > framework-default; list keys (roles, mcp-servers, …) merge additively across all active platforms. This is not a fifth preset system — it fills the selectors of the existing preset systems plus any other key, never their internal per-field override blocks. The file starts empty (`platforms: {}`); populating a platform is a deliberate follow-up step.
 
 ### Delegation
 <!-- help-id: framework_defaults-delegation -->

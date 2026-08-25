@@ -48,7 +48,7 @@
     },
     "platforms": {
       "type": "array",
-      "description": "Active platform layers. Agents in agents/2-platform/<platform>-*.md override the generic agents.",
+      "description": "Active platform layers. Agents in agents/2-platform/<platform>-*.md override the generic agents; may also supply project.yaml config defaults via config/platform-defaults.yaml.",
       "items": {
         "type": "string"
       },

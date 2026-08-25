@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.13.1"
+version: "1.14.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -186,6 +186,76 @@ Toggle workflow:
 Admin/API shortcut: `POST /api/model-inherit` (admin server) toggles the key
 per provider and refuses conflicting writes while `model-override-all` holds a
 truthy entry for that provider.
+
+## 8c. Platform-Defaults (per-platform project.yaml defaults)
+
+A platform listed in `platforms:` can supply default values for arbitrary
+project.yaml keys via `config/platform-defaults.yaml`. This is NOT a fifth
+preset system — it fills the *selectors* of the existing preset systems
+(`dod-preset`, `rules-preset`, `tier-preset`, `conventions-preset`) plus any
+other project.yaml key. Precedence: project-explicit > platform-default >
+framework-default. List keys (`roles`, `mcp-servers`, …) merge additively across
+all active platforms. Per-key provenance/status lives in
+`.meta-config/platform-defaults-state.json` (`inherited` / `overridden` /
+`ignored`).
+
+```yaml
+# config/platform-defaults.yaml
+platforms:
+  hacs:
+    defaults:
+      dod-preset: standard        # scalar — classic precedence
+      tier-preset: Advanced
+      roles:                      # list — additive union (No-Op if project has no roles:)
+        - developer
+        - code-reviewer
+```
+
+### Explaining provenance on request
+
+When the user asks "why is `dod-preset` set to `standard`?", read
+`config/platform-defaults.yaml` + `.meta-config/platform-defaults-state.json` and
+explain: source platform, priority (if several active platforms define the key
+with different values — last entry in `platforms:` wins), and current status
+(`inherited` / `overridden` / `ignored`).
+
+### Adopt / ignore / track — HITL only
+
+`--adopt` / `--ignore` / `--track` run ONLY on explicit user request, and always
+after explaining the tradeoff first (mandatory, per the constraint below:
+*"Never change configuration without explaining tradeoffs"*). Example before
+`--platform-defaults-adopt dod-preset`: "This removes your explicit `dod-preset`
+value from project.yaml; you then automatically follow every future change the
+platform `hacs` makes to its default. Proceed?"
+
+```bash
+py {{AGENT_META_REL_PATH}}scripts/sync.py --platform-defaults-diff            # read-only compare table
+py {{AGENT_META_REL_PATH}}scripts/sync.py --platform-defaults-adopt <key>     # hand control back to the platform
+py {{AGENT_META_REL_PATH}}scripts/sync.py --platform-defaults-ignore <key>    # pin the current value
+py {{AGENT_META_REL_PATH}}scripts/sync.py --platform-defaults-track <key>     # re-enable drift comparison
+```
+
+### Adding a new platform with its own defaults
+
+1. Add an entry under `platforms.<name>.defaults` in `config/platform-defaults.yaml`
+   (via the `/config/platform-defaults` admin-UI editor or directly).
+2. Add the platform name to the `platforms:` array of the target project.
+3. Re-run `sync.py`.
+4. Verify with `sync.py --platform-defaults-diff` that the expected defaults arrive.
+
+### Feedback loop (`meta-feedback`, conversational heuristic only)
+
+If, within the same conversation, the user (a) explicitly pins/overrides a key
+against a platform default AND (b) makes a critical/evaluative statement about the
+default itself ("the default doesn't fit here", "this should really be X"),
+PROACTIVELY offer a `meta-feedback` submission as a suggestion. NEVER trigger it
+automatically — the user must confirm the submission explicitly (consistent with
+the HITL principle governing this whole file). This is a soft, non-deterministic
+heuristic, not a tracked signal.
+
+Admin-UI: *Project → Platform Defaults* (compare/resolve view with per-key
+adopt/ignore/re-track buttons); the raw file is edited under *Framework defaults
+→ platform defaults* (`/config/platform-defaults`).
 
 ## 9. External skills
 
