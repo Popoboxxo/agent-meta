@@ -4,7 +4,7 @@
 
 ## Overview
 
-The agent-meta framework includes **five independent preset + override systems** that follow a consistent precedence pattern. Each system allows projects to choose from curated presets, then optionally override specific settings.
+The agent-meta framework includes **four independent preset + override systems** that follow a consistent precedence pattern. Each system allows projects to choose from curated presets, then optionally override specific settings.
 
 **Core Pattern:**
 ```
@@ -29,7 +29,7 @@ flowchart LR
     style Result fill:#c0e8c0
 ```
 
-## Five Preset Systems
+## Four Preset Systems
 
 | System | Config File | Presets | Example |
 |--------|-------------|---------|---------|
@@ -37,7 +37,6 @@ flowchart LR
 | **Tier Presets** | `config/tier-presets.yaml` | cheap, normal, advanced, expensive, expensive-as-hell | Maps agent roles to model tiers (claude-haiku vs claude-opus) |
 | **Rules Presets** | `config/rules-presets.yaml` | lazy, strict, minimal, custom | Controls which rules are auto-loaded into agent contexts |
 | **Conventions Presets** | `config/conventions-presets.yaml` | default, strict-python, gamedev, minimal | Enforces naming, commit style, code organization conventions |
-| **Platform Defaults** | `config/platform-defaults.yaml` | (platform-specific) | Platform-level feature toggles, MCP servers, extensions |
 
 ## Setting a Preset
 

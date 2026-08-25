@@ -99,50 +99,17 @@ These are self-contained copies of core agent personas — no placeholders, no c
 
 ## Core Concepts
 
-### Layer Model
-Agent templates follow a **4-layer override hierarchy** (0-external → 3-project). Each layer can extend or override the previous one, giving you fine-grained control over agent behavior per project or platform.
+Start with the **[Architecture Overview](ARCHITECTURE.md)** for a guided tour of the framework. Then dive into specific topics:
 
-→ [Layer Model](docs/architecture/01-layer-model.md)
-
-### Sync Flow
-`sync.py` is the core generation engine. It reads your `project.yaml`, compiles agent templates, and outputs provider-ready agents. Learn how it coordinates templates, rules, snippets, and external skills.
-
-→ [Sync Flow](docs/architecture/02-sync-flow.md)
-
-### Agent Roles
-**69 pre-built agent roles** across 6 categories: Core Development, Workflow & Framework, Specialist Roles, Knowledge Engine, Provider Experts, and the optional Systems Engineering Cascade. Each has a version, tier assignment, and clear responsibility.
-
-→ [Agent Roles](docs/architecture/03-agent-roles.md)
-
-### Preset System
-The framework includes **five independent preset + override systems** (DoD, Tier, Rules, Conventions, Platform Defaults). Choose a preset, then selectively override settings per project. Precedence: Framework Default < Preset < Project Override.
-
-→ [Preset System](docs/architecture/08-preset-system.md)
-
-### Quality Pipelines
-**7 pre-defined workflows** orchestrate different types of work: feature-lifecycle (full), quick-fix (minimal), bugfix (double review), concept-development, refactor, docs-update, and optional SE-cascade. Pipelines auto-route based on intent keywords.
-
-→ [Quality Pipelines](docs/architecture/09-quality-pipelines.md)
-
-### MCP Servers & Admin UI
-Extend agent capabilities with **7 MCP servers** (honcho for memory, playwright for testing, reqogniloom for requirements, etc.). Live configuration via **Admin UI** dashboard — change presets, enable MCP servers, visualize agents, all in the browser.
-
-→ [MCP & Admin UI](docs/architecture/10-mcp-and-admin-ui.md)
-
-### A2A Handoff Protocol
-Agents communicate via structured JSON envelopes (`protocol_version: 2.0`). The orchestrator validates payloads against schemas, supports FANOUT/PIPELINE/BARRIER patterns, and prevents loops.
-
-→ [A2A Handoff Protocol](docs/concepts/a2a-handoff-protocol.md)
-
-### External Skills
-Register external Git repositories as **skills** in `config/skills-registry.yaml`. `sync.py` clones them on demand and wraps them for seamless integration. Seven approved skills already available (home-organization, opengrid-openscad, reqogniloom family).
-
-→ [External Skills](docs/architecture/05-external-skills.md)
-
-### SE Cascade (Optional)
-Full **Systems Engineering V-model** — from L0 stakeholder requirements to L6 implementation — with recursive black-box → white-box decomposition. 13 dedicated SE agents, optional feature.
-
-→ [SE Cascade](docs/architecture/07-se-cascade.md)
+- **Layer Model** — 4-layer override hierarchy for fine-grained control
+- **Sync Flow** — How `sync.py` generates provider-ready agents
+- **Agent Roles** — 69 pre-built roles across 6 categories
+- **Preset System** — Choose quality levels, model tiers, and rules
+- **Quality Pipelines** — 6 pre-defined orchestration workflows
+- **MCP Servers & Admin UI** — 7 MCP servers and live configuration dashboard
+- **A2A Handoff Protocol** — Structured agent-to-agent communication
+- **External Skills** — Register and use external Git repositories as skills
+- **SE Cascade** — Optional full Systems Engineering V-model
 
 ---
 

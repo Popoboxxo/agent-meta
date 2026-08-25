@@ -38,7 +38,7 @@ flowchart TD
     style G fill:#e8f4f8
 ```
 
-## All Pipelines (7 total)
+## All Pipelines (6 total)
 
 | Pipeline | Stages | Flow | Use Case |
 |----------|--------|------|----------|
@@ -48,7 +48,6 @@ flowchart TD
 | **concept-development** | 3 stages | Research → Concept-Loop (3x ideation/review) → Handoff | Idea refinement, vision sharpening |
 | **refactor** | 4 stages | Analyze → Implement → Review (2x) → Commit | Large-scale refactor with senior review |
 | **docs-update** | 2 stages | Update → Commit | Documentation-only changes |
-| **se-cascade** | 11 stages | L0 stakeholder → L1-L3 requirements/architecture → Decompose → Implement → Validate | Full Systems Engineering V-model (optional) |
 
 ## Triggering a Pipeline
 

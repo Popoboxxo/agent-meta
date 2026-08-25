@@ -10,21 +10,21 @@ MCP servers extend agent capabilities by exposing external tools, APIs, and serv
 
 ```mermaid
 flowchart TD
-    YAML[".meta-config/project.yaml<br/>mcp-servers:"]
-    SYNC["sync.py"]
+    YAML[".meta-config/project.yaml<br/>mcp-servers: [...]"]
+    SYNC["sync.py<br/>(config processor)"]
     REG["config/mcp-registry.yaml<br/>(server definitions)"]
-    MCPJSON[".claude/.mcp.json<br/>(provider-specific)"]
+    AGENTS["Agent Templates<br/>(.claude/agents/*.md)"]
     RUNTIME["Agent Runtime<br/>(Claude Code/Gemini/etc)"]
     TOOL["Tool Invocation<br/>(honcho, playwright, etc)"]
     
     YAML --> SYNC
     REG --> SYNC
-    SYNC -->|Generate| MCPJSON
-    MCPJSON --> RUNTIME
+    SYNC -->|Compile| AGENTS
+    AGENTS --> RUNTIME
     RUNTIME -->|Call| TOOL
     
     style YAML fill:#f0f0f0
-    style MCPJSON fill:#e8f4f8
+    style AGENTS fill:#e8f4f8
     style TOOL fill:#c0e8c0
 ```
 
@@ -61,7 +61,7 @@ Then run:
 python scripts/sync.py
 ```
 
-This generates/updates `.claude/.mcp.json`, `.gemini/.mcp.json`, etc.
+This updates `.meta-config/project.yaml` and regenerates all agent files with the new MCP configuration.
 
 ---
 
@@ -83,11 +83,11 @@ Default URL: `http://localhost:7420`
 ```mermaid
 flowchart LR
     Browser["Web Browser<br/>(localhost:7420)"]
-    AdminUI["Admin UI<br/>(React frontend)"]
-    AdminServer["admin-server.py<br/>(FastAPI backend)"]
+    AdminUI["Admin UI<br/>(vanilla JS, single HTML file)"]
+    AdminServer["admin-server.py<br/>(zero-dependency stdlib HTTP server)"]
     ProjectYAML[".meta-config/project.yaml"]
     SyncPy["sync.py<br/>(on config change)"]
-    Agents[".claude/agents/<br/>.meta-config/"]
+    Agents[".claude/agents/<br/>.gemini/agents/"]
     
     Browser --> AdminUI
     AdminUI --> AdminServer
