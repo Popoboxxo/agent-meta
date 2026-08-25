@@ -708,6 +708,20 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         )
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
+    # COMPACT_MODE: boolean flag derived from context_file.mode (issue #540, C1).
+    # True ONLY when context_file.mode == "compact"; a missing key, an invalid
+    # value or a non-mapping context_file block all fall back to full mode —
+    # safe-side default: context compression must be explicitly opted in.
+    # Deliberately placed AFTER the user-variables loop above so this derived
+    # value always wins over any stale variables.COMPACT_MODE entry in
+    # project.yaml (context_file.mode is the canonical source). Consumed by
+    # generated context templates via {{#if COMPACT_MODE}}, resolved against
+    # the variables dict by TemplateBuilder.resolve_conditionals().
+    _context_file_cfg = config.get("context_file", {})
+    _context_mode = (
+        _context_file_cfg.get("mode") if isinstance(_context_file_cfg, dict) else None
+    )
+    variables["COMPACT_MODE"] = "true" if _context_mode == "compact" else "false"
     # ORCHESTRATOR_MODE: auto-inject from orchestrator block in project.yaml
     orch_config = config.get("orchestrator", {})
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"

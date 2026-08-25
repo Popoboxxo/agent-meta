@@ -730,6 +730,22 @@
       },
       "additionalProperties": false
     },
+    "context_file": {
+      "type": "object",
+      "description": "Generated provider context files (CLAUDE.md, AGENTS.md, ...) behavior. Missing keys fall back to the documented defaults.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Context file density. 'full' = complete managed block with all overviews (current behavior). 'compact' = instruction-preserving compressed output (issue #540); overviews and reference prose are dropped in favor of pointers. Missing or invalid value always resolves to 'full' (safe-side default: compression must be explicitly opted in).",
+          "enum": [
+            "full",
+            "compact"
+          ],
+          "default": "full"
+        }
+      },
+      "additionalProperties": false
+    },
     "lifecycle-triggers": {
       "type": "object",
       "description": "Agent tasks to run automatically on git lifecycle events (commit, merge, version bump, release). Requires lifecycle-check hook to be enabled.",
