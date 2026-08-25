@@ -970,6 +970,12 @@ def _build_managed_block(
         platforms = config.get("platforms", [])
         rule_sources = collect_rule_sources(agent_meta_root, platforms)
 
+        # Compact mode (issue #540): embedded MCP/external-tool sections and
+        # knowledge hints render in the compressed, pointer-based variant.
+        # Native rule artifacts (.claude/rules/*, skills) stay full — they are
+        # lazy-loaded and not part of the always-on context footprint.
+        _compact = local_vars.get("COMPACT_MODE") == "true"
+
         # Loaded before the plain-rules loop (not with the per-server embedding
         # below) so MCP_GUARDRAILS_LIST is available for mcp-guardrails.md's
         # {{MCP_GUARDRAILS_LIST}} placeholder — mirrors sync_rules()'s
@@ -1001,7 +1007,9 @@ def _build_managed_block(
                 for server_name in mcp_active:
                     server_def = mcp_registry.get(server_name)
                     if server_def:
-                        mcp_content = _generate_rule_content(server_name, server_def)
+                        mcp_content = _generate_rule_content(
+                            server_name, server_def, compact=_compact
+                        )
                         embedded_rules.append({"content": mcp_content})
         except ImportError:
             pass
@@ -1021,14 +1029,18 @@ def _build_managed_block(
                     tool_def = tool_registry.get(tool_name)
                     if tool_def and provider not in tool_def.get("provider-skip", []):
                         embedded_rules.append(
-                            {"content": _generate_tool_rule_content(tool_name, tool_def, pc, project_root)}
+                            {"content": _generate_tool_rule_content(
+                                tool_name, tool_def, pc, project_root, compact=_compact
+                            )}
                         )
         except ImportError:
             pass
 
     local_vars["embedded_rules"] = embedded_rules
 
-    local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(config)
+    local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(
+        config, compact=local_vars.get("COMPACT_MODE") == "true"
+    )
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     return builder.build("agents-managed", local_vars)

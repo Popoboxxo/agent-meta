@@ -863,7 +863,12 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
 
     _tb = TemplateBuilder(agent_meta_root / "templates" / "context")
     _table_tpl = _tb.resolve_partials("{{> agents-table }}")
-    variables["AGENT_DELEGATION_TABLE"] = _tb.resolve_loops(_table_tpl, variables).strip()
+    # Conditionals must be resolved HERE (issue #540 B1): AGENT_DELEGATION_TABLE
+    # is injected into agent templates where only strip_inactive_conditional_blocks
+    # runs — its final cleanup deletes leftover {{#if}}/{{else}} markers verbatim,
+    # which would concatenate both table variants instead of picking one.
+    _table_rendered = _tb.resolve_conditionals(_tb.resolve_loops(_table_tpl, variables), variables)
+    variables["AGENT_DELEGATION_TABLE"] = _table_rendered.strip()
 
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented

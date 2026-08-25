@@ -1,14 +1,41 @@
 from __future__ import annotations
+
+import re
 from pathlib import Path
 
 from .roles import load_roles_config
+
+# List separators used by role descriptions. Most short_desc values already
+# enumerate capabilities as comma-separated noun phrases, so splitting on
+# separators and keeping the leading segments yields the highest-signal nouns
+# without any hardcoded per-agent keyword table (issue #540 B1).
+_KEYWORD_SPLIT_RE = re.compile(r",|;| und | bzw\. | oder ")
+_EGG_MARKER_RE = re.compile(r"\[[^\]]*\]\s*")
+
+
+def derive_keywords(description: str, max_keywords: int = 3, max_length: int = 100) -> str:
+    """Derive up to ``max_keywords`` noun phrases from an agent description.
+
+    Compact agent-directory rows show ``name | max 3 keywords`` instead of the
+    full description sentence (issue #540 B1). Keywords are derived from the
+    description at generation time — first sentence only, split on list
+    separators, first segments kept. No per-agent hardcoded list.
+    """
+    text = _EGG_MARKER_RE.sub("", description or "").strip()
+    if not text:
+        return ""
+    # First sentence only — trailing prose ("...", "…") must not leak in.
+    text = re.split(r"(?:\.\s|\.\.\.|…)", text)[0].strip()
+    segments = (s.strip(" .…—-\u2014") for s in _KEYWORD_SPLIT_RE.split(text))
+    keys = [s for s in segments if s]
+    return ", ".join(keys[:max_keywords])[:max_length].rstrip()
 
 
 def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict) -> list[dict]:
     """Return a list of dictionaries with agent data.
 
     Reads roles from config/role-defaults.yaml and respects workflow_tier and feature flags.
-    Returns: list of dicts with 'name' and 'short_desc'.
+    Returns: list of dicts with 'name', 'short_desc' and derived 'keywords'.
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
@@ -42,7 +69,11 @@ def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict)
         desc = role_info.get("short_desc", role_info.get("description", ""))
         active_agents_data.append({
             "name": role_name,
-            "short_desc": desc
+            "short_desc": desc,
+            # Consumed by the compact branch of templates/context/partials/
+            # agents-table.md ({{#if COMPACT_MODE}}); computed unconditionally
+            # so the loop expansion never leaves a literal {{keywords}} behind.
+            "keywords": derive_keywords(desc),
         })
 
     return active_agents_data

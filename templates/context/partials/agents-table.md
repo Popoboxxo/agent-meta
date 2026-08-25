@@ -3,6 +3,7 @@ name: "Agent Table"
 ---
 | Agent | Core Capabilities |
 |-------|-------------------|
-{{#each active_agents}}
+{{#if COMPACT_MODE}}{{#each active_agents}}| `{{name}}` | {{keywords}} |
+{{/each}}{{else}}{{#each active_agents}}
 | `{{name}}` | {{short_desc}} |
-{{/each}}
+{{/each}}{{/if}}

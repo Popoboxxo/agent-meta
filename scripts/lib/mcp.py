@@ -134,12 +134,19 @@ def build_mcp_guardrails_list(registry: dict, active_servers: list[str]) -> str:
 # Rule content generation
 # ---------------------------------------------------------------------------
 
-def _generate_rule_content(server_name: str, server_def: dict) -> str:
-    """Build Markdown rule content for one MCP server from registry definition."""
-    lines: list[str] = []
+def _generate_rule_content(server_name: str, server_def: dict, compact: bool = False) -> str:
+    """Build Markdown rule content for one MCP server from registry definition.
 
+    compact=True renders the listen-only variant for embedded context files
+    (issue #540 B3): title + one-line purpose + tool allow/block lists +
+    connection type as a single pointer line. The Agent-Hinweise prose and the
+    generator footer are dropped — both are OVERVIEW/METADATEN per
+    docs/guides/context-block-inventory.md. The block lists themselves are
+    INSTRUKTION and are NEVER dropped in either mode. Native rule artifacts
+    (.claude/rules/mcp-*.md etc., the lazy channel) keep the full variant.
+    """
     desc = server_def.get("description", server_name)
-    lines += [f"# MCP: {server_name}", "", f"> {desc}", "", "---", ""]
+    lines: list[str] = [f"# MCP: {server_name}", "", f"> {desc}", "", "---", ""]
 
     tools = server_def.get("tools", {})
     allowed = tools.get("allowed", [])
@@ -156,27 +163,34 @@ def _generate_rule_content(server_name: str, server_def: dict) -> str:
         lines.append("")
 
     hint = (server_def.get("agent-hint") or "").strip()
-    if hint:
+    if hint and not compact:
         lines += ["## Agent-Hinweise", "", hint, ""]
 
     conn = server_def.get("connection", {})
     if conn:
         conn_type = conn.get("type", "")
-        lines += ["## Verbindungstyp", ""]
-        lines.append(f"- Typ: `{conn_type}`")
-        if conn_type == "sse":
-            lines.append(f"- URL: `{conn.get('url', '')}` — Wert aus `secrets.local.yaml`")
-        elif conn_type == "stdio":
-            cmd = conn.get("command", "")
-            args = " ".join(str(a) for a in conn.get("args", []))
-            lines.append(f"- Kommando: `{cmd} {args}`")
-        lines.append("")
+        if compact:
+            # Single METADATA line instead of a URL/command block; details stay
+            # discoverable in the registry.
+            lines.append(f"**Verbindungstyp:** `{conn_type}` — Details: `config/mcp-registry.yaml`.")
+            lines.append("")
+        else:
+            lines += ["## Verbindungstyp", ""]
+            lines.append(f"- Typ: `{conn_type}`")
+            if conn_type == "sse":
+                lines.append(f"- URL: `{conn.get('url', '')}` — Wert aus `secrets.local.yaml`")
+            elif conn_type == "stdio":
+                cmd = conn.get("command", "")
+                args = " ".join(str(a) for a in conn.get("args", []))
+                lines.append(f"- Kommando: `{cmd} {args}`")
+            lines.append("")
 
-    lines += [
-        "---",
-        "",
-        "*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*",
-    ]
+    if not compact:
+        lines += [
+            "---",
+            "",
+            "*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*",
+        ]
     return "\n".join(lines) + "\n"
 
 
