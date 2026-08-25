@@ -15,8 +15,7 @@ Phase B adds end-to-end coverage for the compression itself:
     (the core safety contract of the whole feature)
   - compact mode must shrink AGENTS.md while every mandatory instruction
     anchor survives (CRITICAL GATE, Branch-Guard, Sprachregeln, MCP
-    prohibition lists, keywords directory table). Bootstrap coverage (B6)
-  is added with the bootstrap commit.
+    prohibition lists, short-form bootstrap, keywords directory table)
 """
 
 import shutil
@@ -90,6 +89,7 @@ def test_if_conditional_resolves_against_derived_flag():
 # Phase B unit tests — generator-side keyword derivation (B1)
 # ---------------------------------------------------------------------------
 
+from scripts.lib.bootstrap import BootstrapEngine  # noqa: E402
 from scripts.lib.delegation_table import derive_keywords  # noqa: E402
 
 
@@ -260,6 +260,33 @@ def test_agent_delegation_table_resolves_conditionals_both_modes():
     assert "| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |" in compact_table
 
 
+def test_bootstrap_full_contains_enumerations(tmp_path):
+    (tmp_path / "a.md").write_text("---\ndescription: A\n---\nbody", encoding="utf-8")
+    (tmp_path / "b.md").write_text("---\ndescription: B\n---\nbody", encoding="utf-8")
+    engine = BootstrapEngine()
+    text = engine.generate_gemini_bootstrap_instructions(tmp_path)
+    assert 'define_subagent(name="a", ...)' in text
+    assert "- `a.md` → registriere als `a`" in text
+
+
+def test_bootstrap_compact_is_short_form_without_enumeration(tmp_path):
+    (tmp_path / "a.md").write_text("---\ndescription: A\n---\nbody", encoding="utf-8")
+    engine = BootstrapEngine()
+    text = engine.generate_gemini_bootstrap_instructions(
+        tmp_path, compact=True, agents_label=".gemini/agents")
+    assert "registriere jeden Agenten unter seinem Dateinamen (ohne `.md`) via `define_subagent`" in text
+    assert ".gemini/agents" in text
+    assert "NICHT in der Runtime" in text  # warning anchor preserved
+    assert "define_subagent(name=" not in text
+    assert len(text.splitlines()) <= 10
+
+
+def test_bootstrap_compact_skips_empty_dir(tmp_path):
+    engine = BootstrapEngine()
+    assert engine.generate_gemini_bootstrap_instructions(
+        tmp_path, compact=True, agents_label=".gemini/agents") == ""
+
+
 # ---------------------------------------------------------------------------
 # Phase B integration — full pipeline against the real templates
 # ---------------------------------------------------------------------------
@@ -289,6 +316,16 @@ def _render_context(mode: str, workdir: Path) -> str:
         sync_context_for_provider(
             REPO_ROOT, workdir, config, variables, log,
             dry_run=False, provider=provider, provider_config=provider_config,
+        )
+    if mode == "compact":
+        # The bootstrap block lives in the AGENTS.md injected footer and is
+        # written by the agents step (B6 wiring) — run it like sync.py does.
+        from lib.agents import sync_agents_for_provider
+
+        gemini_vars = {**variables, "PIPELINE_DETAILS_DIR": ".gemini/pipeline-details"}
+        sync_agents_for_provider(
+            REPO_ROOT, workdir, config, gemini_vars, log,
+            dry_run=False, provider="Gemini", provider_config=provider_config,
         )
     return (workdir / "AGENTS.md").read_text(encoding="utf-8")
 
@@ -324,8 +361,7 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project):
 
     # Must shrink substantially (baseline 1082 lines; embedded rules stay by
     # design, so the realistic floor is well above the <400 plan stretch goal).
-    # Threshold covers both stages: before and after the bootstrap compression.
-    assert len(lines) < len(committed_lines) * 0.85
+    assert len(lines) < len(committed_lines) * 0.75
 
     for anchor in _MANDATORY_ANCHORS:
         assert anchor in compact, f"mandatory anchor missing in compact render: {anchor}"
@@ -345,6 +381,12 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project):
     # Knowledge hints reduced to the pointer form.
     assert "### Knowledge-Workflows" not in compact
     assert "`knowledge/wiki/index.md`" in compact
+
+    # Bootstrap block uses the short form (B6): instruction core preserved,
+    # per-agent enumeration gone.
+    assert "registriere jeden Agenten unter seinem Dateinamen (ohne `.md`) via `define_subagent`" in compact
+    assert "NICHT in der Runtime" in compact
+    assert "define_subagent(name=" not in compact
 
     # graphify section reduced to title + pointer lines.
     assert "Beziehungsfragen. Bei Bedarf" not in compact

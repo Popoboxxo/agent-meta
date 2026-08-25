@@ -1578,7 +1578,11 @@ def sync_agents_for_provider(
 
     # Gemini Bootstrap: inject session-start instructions into GEMINI.md (Issue #277)
     if provider == "Gemini":
-        _inject_gemini_bootstrap(provider, target_dir, agent_meta_root, project_root, pc, log, dry_run)
+        _inject_gemini_bootstrap(
+            provider, target_dir, agent_meta_root, project_root, pc, log, dry_run,
+            compact=variables.get("COMPACT_MODE") == "true",
+            agents_label=pc.get('agents_dir', '.gemini/agents'),
+        )
 
     # Continue Bootstrap: update .continue/config.yaml with agent entries (Issue #277)
     if provider == "Continue":
@@ -1600,6 +1604,8 @@ def _inject_gemini_bootstrap(
     pc: dict[str, str],
     log: SyncLog,
     dry_run: bool,
+    compact: bool = False,
+    agents_label: str = ".gemini/agents",
 ) -> None:
     from .bootstrap import BootstrapEngine
 
@@ -1609,7 +1615,9 @@ def _inject_gemini_bootstrap(
     if bootstrap_config.get("action") != "inject-bootstrap-instructions":
         return
 
-    bootstrap_instructions = bootstrap_engine.generate_gemini_bootstrap_instructions(target_dir)
+    bootstrap_instructions = bootstrap_engine.generate_gemini_bootstrap_instructions(
+        target_dir, compact=compact, agents_label=agents_label
+    )
     if not bootstrap_instructions:
         return
 
