@@ -44,3 +44,37 @@ Zeilenbereiche zum Vergleich nach Phase B (Details und Klassifizierung: `docs/gu
 |---|---:|---|
 | AGENTS.md Zeilen | 1082 | <200 inkl. B6; <400 Zwischenziel ohne B6 |
 | Token-Last pro Run (AGENTS.md) | ~11k | <2k |
+
+## Nachher (Phase D2)
+
+### Default/full-Modus
+
+Gemessen am 2026-08-25 auf `feat/context-compression` @ `6ea6a8a8` nach Phase A/C1/B/C.
+Der Default ist `full` (fehlender `context_file.mode`-Key → safe-side FULL), daher
+ist der Output byte-identisch zur Vorher-Messung — erwartungsgemäß keine Differenz:
+
+| Datei | Zeilen | Bytes | Tokens (~) | Δ vs. Vorher |
+|---|---:|---:|---:|---|
+| CLAUDE.md | 151 | 5437 | 1359 | ±0 |
+| AGENTS.md | 1082 | 44004 | 11001 | ±0 |
+| MAMMOUTH.md | 173 | 10378 | 2594 | ±0 |
+| **TOTAL** | **1406** | **59819** | **14954** | **±0** |
+
+### compact-Modus (real gerendert)
+
+Einmalig real gemessen: temporär `context_file.mode: compact` gesetzt, `sync.py`
+gelaufen, gemessen, zurückgesetzt (Working Tree danach wieder clean).
+Entspricht dem Sollwert aus den B-Ergebnissen (**AGENTS.md ≈779 Zeilen** ✓):
+
+| Datei | Zeilen | Bytes | Tokens (~) | Δ Zeilen | Δ Tokens (~) |
+|---|---:|---:|---:|---:|---:|
+| CLAUDE.md | 100 | 4165 | 1041 | −34% | −23% |
+| AGENTS.md | 779 | 31681 | 7920 | −28% | −28% |
+| MAMMOUTH.md | 122 | 9106 | 2276 | −29% | −12% |
+| **TOTAL** | **1001** | **44952** | **11237** | **−28,8%** | **−24,9%** |
+
+Interpretation: Der Restfuß von ~779 Zeilen ist durch die bewusst behaltenen
+Embedded Rules (Instruktionen = Gold, Plan-Fix 2) und den komprimiert
+erhaltenen Bootstrap-/MCP-Kern bestimmt. Die Plan-Streckziele (<200 inkl. B6,
+<400 Zwischenziel) gelten für die Folgeterritorien (#192 Phase 2: channel:skill-
+Umzug der Referenz-Doku), nicht für Phase B dieses Plans.

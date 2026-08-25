@@ -14,8 +14,9 @@ Phase B adds end-to-end coverage for the compression itself:
   - full mode must stay BYTE-IDENTICAL to the committed generated files
     (the core safety contract of the whole feature)
   - compact mode must shrink AGENTS.md while every mandatory instruction
-    anchor survives (CRITICAL GATE, Branch-Guard, Sprachregeln, MCP
-    prohibition lists, short-form bootstrap, keywords directory table)
+    anchor survives (CRITICAL GATE, Branch-Guard, Commit-Konventionen,
+    Sprachregeln, MCP prohibition lists incl. honcho/playwright/reqogniloom
+    core bans, short-form bootstrap, keywords directory table)
 """
 
 import shutil
@@ -340,9 +341,13 @@ def seeded_project(tmp_path):
 _MANDATORY_ANCHORS = (
     "CRITICAL GATE",
     "# Branch-Guard",
+    "# Commit-Konventionen",         # commit conventions section survives
+    "Conventional Commits (feat, fix, chore)",  # concrete convention statement
     "# Sprachregeln",
     "`delete_conclusion`",           # honcho prohibitions
+    "`set_config`",                  # honcho prohibitions
     "`browser_run_code_unsafe`",     # playwright prohibitions
+    "`browser_evaluate`",            # playwright prohibitions
     "`workspace.delete`",            # reqogniloom prohibitions
 )
 
@@ -397,3 +402,69 @@ def test_compact_mode_render_is_idempotent(seeded_project):
     first = _render_context("compact", seeded_project)
     second = _render_context("compact", seeded_project)
     assert first == second
+
+
+# ---------------------------------------------------------------------------
+# Phase D (D3b) — provider matrix: Compact×Claude and Compact×Opencode
+# ---------------------------------------------------------------------------
+
+
+def _compact_variables():
+    config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
+    config["context_file"] = {"mode": "compact"}
+    variables, _ = build_variables(config, REPO_ROOT)
+    return config, variables
+
+
+def test_540_d3b_compact_claude_renders_managed_block_without_placeholders(tmp_path):
+    # Compact×Claude leg of the provider matrix (issue #540 plan D3b): the
+    # CLAUDE.md managed block must render cleanly in compact mode — no crash,
+    # intact managed markers, zero unresolved {{PLACEHOLDER}} tokens.
+    import sys
+
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from lib.context import sync_context_for_provider
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+
+    shutil.copy(REPO_ROOT / "CLAUDE.md", tmp_path / "CLAUDE.md")
+
+    config, variables = _compact_variables()
+    provider_config = load_providers_config(REPO_ROOT)
+    log = SyncLog()
+    sync_context_for_provider(
+        REPO_ROOT, tmp_path, config, variables, log,
+        dry_run=False, provider="Claude", provider_config=provider_config,
+    )
+    claude_md = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "<!-- agent-meta:managed-begin -->" in claude_md
+    assert "<!-- agent-meta:managed-end -->" in claude_md
+    block = claude_md.split("<!-- agent-meta:managed-begin -->", 1)[1]
+    block = block.split("<!-- agent-meta:managed-end -->", 1)[0]
+    assert "{{" not in block and "}}" not in block
+
+
+def test_540_d3b_opencode_compact_embeds_rules_inline_rather_than_separating(
+        seeded_project):
+    # Compact×Opencode leg of the provider matrix (issue #540 plan D3b).
+    # Opencode declares has_rules:false — rules MUST stay embedded in
+    # AGENTS.md (in compact form), never fall back to a native rules dir or
+    # the pointer-only separation variant used by has_rules providers.
+    compact = _render_context("compact", seeded_project)
+
+    # Embedded rule bodies survive inline (instruction anchors are real
+    # rule-file content, not pointers).
+    assert "# Branch-Guard" in compact
+    assert "Verwende Conventional Commits (feat, fix, chore)." in compact
+    assert "## Regeln" in compact
+
+    # The separation pointer (used when rules live natively per provider)
+    # must NOT appear.
+    assert "Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen." \
+        not in compact
+
+    # Embeds arrive in their COMPACT form, not the full variant.
+    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." in compact
+    assert "## Agent-Hinweise" not in compact
