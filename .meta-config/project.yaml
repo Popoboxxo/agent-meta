@@ -259,6 +259,18 @@ test-repo:
   path: ../agent-meta-test
   env-var: AGENT_META_TEST_REPO
 max-parallel-agents: 4
+context_file:
+  # Instruction-preserving compression of the generated context files (#540).
+  # OVERVIEW/reference prose collapses to pointers; every INSTRUCTION anchor
+  # (CRITICAL GATE, Branch-Guard, Commit conventions, MCP prohibitions, embedded
+  # rule bodies) stays verbatim in both modes.
+  mode: compact
+  # AGENTS.md floor is ~570 lines and cannot reach max_lines (250): Opencode
+  # declares has_rules:false, so the 14 generic rule bodies plus the MCP
+  # allowed/blocked tool lists MUST stay embedded — that is ~300 lines of pure
+  # INSTRUCTION, not compressible without semantic loss. Acknowledged rather
+  # than faked down (see docs/plans/issue-540-baseline.md, Iteration 2).
+  oversize_acknowledged: true
 orchestrator:
   enabled: true
   strict: true

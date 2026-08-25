@@ -60,11 +60,11 @@ ist der Output byte-identisch zur Vorher-Messung — erwartungsgemäß keine Dif
 | MAMMOUTH.md | 173 | 10378 | 2594 | ±0 |
 | **TOTAL** | **1406** | **59819** | **14954** | **±0** |
 
-### compact-Modus (real gerendert)
+### compact-Modus — Iteration 1 (Phase B, nur Nicht-Rules-Fläche)
 
 Einmalig real gemessen: temporär `context_file.mode: compact` gesetzt, `sync.py`
 gelaufen, gemessen, zurückgesetzt (Working Tree danach wieder clean).
-Entspricht dem Sollwert aus den B-Ergebnissen (**AGENTS.md ≈779 Zeilen** ✓):
+Ergebnis aus den B-Ergebnissen (**AGENTS.md ≈779 Zeilen**):
 
 | Datei | Zeilen | Bytes | Tokens (~) | Δ Zeilen | Δ Tokens (~) |
 |---|---:|---:|---:|---:|---:|
@@ -73,8 +73,94 @@ Entspricht dem Sollwert aus den B-Ergebnissen (**AGENTS.md ≈779 Zeilen** ✓):
 | MAMMOUTH.md | 122 | 9106 | 2276 | −29% | −12% |
 | **TOTAL** | **1001** | **44952** | **11237** | **−28,8%** | **−24,9%** |
 
-Interpretation: Der Restfuß von ~779 Zeilen ist durch die bewusst behaltenen
-Embedded Rules (Instruktionen = Gold, Plan-Fix 2) und den komprimiert
-erhaltenen Bootstrap-/MCP-Kern bestimmt. Die Plan-Streckziele (<200 inkl. B6,
-<400 Zwischenziel) gelten für die Folgeterritorien (#192 Phase 2: channel:skill-
-Umzug der Referenz-Doku), nicht für Phase B dieses Plans.
+Iteration 1 fasste die als OVERVIEW klassifizierten Platform-Rules
+(`sync-interface`, `architecture`, `conventions`) noch NICHT an — sie wurden als
+„#192 Phase-2-Territorium" zurückgestellt. Damit wurde das Plan-Soll (<200/<400)
+verfehlt.
+
+### compact-Modus — Iteration 2 (nach Einbeziehung #192-Phase-2-Territorium, Nutzer-Entscheidung)
+
+Auf ausdrückliche Nutzer-Entscheidung wurde die zurückgestellte OVERVIEW-Fläche
+der drei agent-meta-Platform-Rules jetzt einbezogen — **dichte-only**: nur die
+bereits als OVERVIEW klassifizierten Sektionen (Schichten-Modell, Composition-
+Syntax, Platzhalter-Escape, Smart-Context-Changelog, Naming/Bleed/Change-
+Checklists) werden im Embed durch einen Pointer ersetzt; alle INSTRUKTION-Anteile
+(Hard Invariants, Branch-Guard-Erweiterung, Abhängigkeitsprinzip) bleiben in
+BEIDEN Modi verbatim. Compact ist jetzt im Repo aktiv committet (nicht nur die
+Config — der generierte Output liegt mit im Commit):
+
+| Datei | Zeilen | Bytes | Tokens (~) | Δ Zeilen vs. voll | Δ Tokens vs. voll |
+|---|---:|---:|---:|---:|---:|
+| CLAUDE.md | 100 | 4165 | 1041 | −34% | −23% |
+| AGENTS.md | 570 | 23751 | 5937 | −47% | −46% |
+| MAMMOUTH.md | 122 | 9106 | 2276 | −29% | −12% |
+| **TOTAL** | **792** | **37022** | **9254** | **−44%** | **−38%** |
+
+**Wurde `<200`/`<400` erreicht? Nein — ehrliche Begründung (kein Ziel-Retrofit):**
+
+AGENTS.md hat einen harten Floor von **~570 Zeilen**, der NICHT weiter senkbar
+ist ohne Instruktions-Verlust:
+
+- **Opencode `has_rules: false`** (`config/ai-providers.yaml`): Regeln haben bei
+  Opencode keinen nativen Kanal → die 14 Generic-Rule-Bodies (~150 Z, alle
+  INSTRUKTION) MÜSSEN embedded in AGENTS.md bleiben.
+- **MCP-Tool-Listen** (Erlaubt/Verboten, reqogniloom allein ~77 Z) sind
+  INSTRUKTION (Allow/Deny-Listen steuern Tool-Nutzung) → bleiben.
+- Zusammen ~300 Zeilen reine INSTRUKTION + Agent-Directory (60, dichte
+  Keyword-Zeilen, routing-relevant) + Bootstrap-Kern + Projekt-Metadaten.
+
+Die Plan-Streckziele `<200` (inkl. B6) und `<400` setzten implizit voraus, dass
+die embedded Rules verschwinden könnten — das ist bei einem `has_rules:false`-
+Provider architekturell ausgeschlossen. Für die `has_rules:true`-Provider
+(Claude/Continue/Copilot/Mammouth) liegen die Regeln nativ/lazy und CLAUDE.md
+erreicht bereits 100 Zeilen. Der ehrliche Endstand: **AGENTS.md 570 (−47%)**,
+Test-Schwelle in `tests/test_context_compact_mode.py` auf diesen gemessenen
+Floor gesetzt (relativ zum Full-Render, mit Begründungs-Kommentar), NICHT ans
+Ergebnis geschönt.
+
+### Provider-Matrix (Iteration 2, alle 6 Provider real gerendert)
+
+`config/ai-providers.yaml` kennt 6 Provider. Compact wurde für JEDEN real
+gerendert (Test: `test_540_compact_matrix_*`, auch für die in `project.yaml`
+inaktiven Continue/Copilot):
+
+| Provider | Context-File | has_rules | Compact-Wirkung | Marker-frei |
+|---|---|---|---|---|
+| Claude | CLAUDE.md | true | Rules nativ (`.claude/skills/*` lazy, FULL); Compact wirkt auf Directory/Knowledge-Hints | ✓ |
+| Gemini | AGENTS.md (geteilt) | true→embed¹ | Rules embedded compact (3 Platform-Rules → Pointer) | ✓ |
+| Opencode | AGENTS.md (geteilt) | false | Rules embedded compact — MÜSSEN embedded bleiben | ✓ |
+| Continue | .continue/rules/project-context.md | true | Rules nativ (FULL); Compact wirkt auf Managed-Block-Rest | ✓ |
+| Copilot | .github/copilot/COPILOT.md | true | Rules nativ (FULL); Compact wirkt auf Managed-Block-Rest | ✓ |
+| Mammouth | MAMMOUTH.md | true | Rules nativ (FULL); Compact wirkt auf Rest | ✓ |
+
+¹ Gemini `has_rules:true`, teilt sich aber AGENTS.md mit Opencode
+(`has_rules:false`) → `context.py` erzwingt embed für beide (Ping-Pong-
+Vermeidung). Die drei Platform-Rules bleiben für alle `has_rules:true`-Provider
+in ihrem nativen Rules-/Skill-Kanal FULL — verifiziert (Test
+`test_540_compact_native_rules_providers_keep_platform_rules_full`): Compaction
+ist embed-only, kein Semantik-Verlust im nativen Kanal.
+
+### D4 — Smoke-Test (committeter compact-Output)
+
+Committete Dateien wie ein Agent gelesen: alle Pflicht-Anker auffindbar —
+`CRITICAL GATE`, `# Branch-Guard`, `# Commit-Konventionen`/`Conventional
+Commits`, `# Sprachregeln`, MCP-Verbote (`delete_conclusion`,
+`browser_run_code_unsafe`, `workspace.delete`), `## Regeln`, `## Agent
+Directory`, `orchestrator`-Routing. CLAUDE.md: `AI ROUTING`, `orchestrator`,
+`Knowledge Engine`. Keine Leftover-Template-Marker in CLAUDE.md/AGENTS.md/
+MAMMOUTH.md.
+
+### Mechanismus (D-Entscheidung)
+
+Rohe `{{#if COMPACT_MODE}}`-Marker im Rohtext einer Rule-Quelldatei funktionieren
+NICHT (empirisch verifiziert): `strip_inactive_conditional_blocks`
+(`scripts/lib/config.py`) verarbeitet nur eine Whitelist von Variablennamen —
+`COMPACT_MODE` ist nicht dabei —, und die finale Orphan-Cleanup strippt die
+Marker verbatim, sodass BEIDE Branches erhalten bleiben. Zudem läuft dieselbe
+Funktion im NATIVE-Rules-Pfad (`scripts/lib/rules.py`); eine Whitelist-Erweiterung
+würde native Rules für Claude/Mammouth fälschlich komprimieren. Gewählt wurde
+daher eine dedizierte Transform-Funktion `compact_embedded_rule()` in
+`scripts/lib/context.py`, die NUR im Embedded-Loop (Opencode/Gemini AGENTS.md)
+läuft — analog zum bestehenden `compact=`-Parameter-Pattern (MCP, External-Tools,
+Knowledge, Bootstrap). Sie behält Preamble + eine Allowlist von INSTRUKTION-
+Sektionen verbatim und ersetzt den Rest durch einen Pointer.

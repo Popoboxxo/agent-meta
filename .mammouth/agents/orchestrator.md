@@ -247,111 +247,58 @@ SE mode: optional
 |-------|----------------|------|----------|
 | Agent | Core Capabilities |
 |-------|-------------------|
-
-| `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader... |
-
-| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anl... |
-
-| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken |
-
-| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen. |
-
-| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und k... |
-
-| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf... |
-
-| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität... |
-
-| `concept-reviewer` | Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, ... |
-
-| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu... |
-
-| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K... |
-
-| `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineag... |
-
-| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und ... |
-
-| `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts. |
-
-| `developer` | Feature-Implementierung und Bugfixes |
-
-| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes, Observability. |
-
-| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erste... |
-
-| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen |
-
-| `e2e-tester` | E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright |
-
-| `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kali... |
-
-| `explorer` | Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symb... |
-
-| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion. |
-
-| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I... |
-
-| `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten. |
-
-| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe... |
-
-| `git` | Commits, Branches, Tags, Push/Pull und alle Git-Operationen |
-
+| `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation |
+| `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback |
+| `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules |
+| `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
+| `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
+| `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf |
+| `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität |
+| `concept-reviewer` | Konzept-Critic: reviewt Design-Docs, Konzepte auf Vollständigkeit, Logik |
+| `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu |
+| `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K |
+| `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks |
+| `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und |
+| `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts |
+| `developer` | Feature-Implementierung, Bugfixes |
+| `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes |
+| `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management |
+| `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README |
+| `e2e-tester` | E2E-Tests, visuelle Regression, Accessibility-Audits via Playwright |
+| `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ, LLM-Kali |
+| `explorer` | Read-only Codebase-Recherche, Dependency, Impact-Mapping |
+| `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray |
+| `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I |
+| `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten |
+| `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe |
+| `git` | Commits, Branches, Tags |
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
-
-| `incident-responder` | Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schri... |
-
-| `intern-developer` | [EASTER EGG / GAG] Der übereifrige Praktikant |
-
+| `incident-responder` | Live-Incident-Koordination: korreliert Logs, Metriken, führt Runbook-Schri |
+| `intern-developer` | Der übereifrige Praktikant |
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
-
-| `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun... |
-
-| `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e... |
-
-| `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-L... |
-
-| `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali... |
-
-| `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links... |
-
-| `knowledge-migrator` | Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren |
-
+| `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun |
+| `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e |
+| `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6), log.md (Chronologisches Event-L |
+| `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali |
+| `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims |
+| `knowledge-migrator` | Vorhandene Projektinhalte aufräumen, OKF-konform ins Knowledge Wiki migrieren |
 | `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten |
-
-| `log-analyzer` | System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla... |
-
-| `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko... |
-
+| `log-analyzer` | System, Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla |
+| `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko |
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
-
-| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu... |
-
+| `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu |
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
-
-| `performance-optimizer` | Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung. |
-
+| `performance-optimizer` | Big-O Bottleneck-Identifikation, datengetriebene Performance-Optimierung |
 | `planner` | Umsetzungsplanung |
-
 | `principal-developer` | Last-Resort-Eskalationsstufe |
-
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
-
-| `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler... |
-
-| `release` | Versioning, Changelog, Build-Artifact, GitHub Release erstellen |
-
+| `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |
+| `release` | Versioning, Changelog, Build-Artifact |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-
-| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting... |
-
-| `technical-writer` | Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte... |
-
+| `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs |
+| `technical-writer` | Externe entwickler, nutzergerichtete Doku: API-Referenzen, Getting-Starte |
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
-
-| `ui-ux-designer` | UI-Spezifikationen, Mockups und Design-Systeme erstellen. |
-
+| `ui-ux-designer` | UI-Spezifikationen, Mockups, Design-Systeme erstellen |
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
 Parallel: max 4. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->

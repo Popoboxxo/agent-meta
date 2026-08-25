@@ -7,42 +7,7 @@
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-## Tech-Stack
-
-- **Runtime:** Python 3.x
-- **Sprache:** Python 3, Markdown, YAML
-- **Key-Dependencies:** - Python: `>=3.8`
-
-## Architektur
-
-```
-agents/
-  0-external/       # Wrapper-Template für externe Skills
-  1-generic/        # Universelle Agent-Templates
-  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
-scripts/
-  sync.py           # Agent-Generator
-  admin-server.py   # Lokaler Admin-UI developer/)
-external/           # Git Submodule (externe Skill-Repos)
-docs/guides/        # Anleitungen und Beispiel-Config
-docs/ui/            # UI Assets
-  architecture/     # Architektur-Diagramme (Mermaid)
-  admin-ui.html     # Admin-UI Frontend
-tests/              # Test-Suite (automated, manual, orchestration)
-
-```
-
-**Entry-Point:**
-```
-scripts/sync.py — Haupt-CLI für Agent-Generierung
-```
-
-**Besondere Patterns:**
-- Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
-- Platzhalter {{VARIABLE}} werden von sync.py substituiert
-- Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
-- Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
-
+> Tech-Stack, Architektur & Build-Befehle: discoverable via Repo (Manifeste, CI-Configs).
 
 ## Code-Konventionen
 
@@ -51,22 +16,6 @@ scripts/sync.py — Haupt-CLI für Agent-Generierung
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 
-
-## Build & Development
-
-```bash
-# Build
-python scripts/sync.py
-
-# Tests
-python3 scripts/sync.py --validate
-
-# Dev-Stack starten
-(kein Dev-Stack)
-
-# Nach Änderungen neu laden
-(kein Dev-Stack)
-```
 
 ## Anforderungs-Kategorien
 
@@ -84,7 +33,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
 
-Generiert von agent-meta v0.100.0 — `2026-08-24`
+Generiert von agent-meta v0.100.0 — `2026-08-25`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 

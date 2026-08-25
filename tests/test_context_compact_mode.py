@@ -247,7 +247,12 @@ def test_agent_delegation_table_resolves_conditionals_both_modes():
 
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
 
-    variables, _ = build_variables(config, REPO_ROOT)
+    # Force full explicitly: the repo's own project.yaml now ships
+    # context_file.mode=compact, so the derived config would otherwise render
+    # the dense table on the "full" leg too.
+    full_config = dict(config)
+    full_config["context_file"] = {"mode": "full"}
+    variables, _ = build_variables(full_config, REPO_ROOT)
     full_table = variables["AGENT_DELEGATION_TABLE"]
     assert "{{#if" not in full_table and "{{else}}" not in full_table
     assert "\n\n| `" in full_table  # legacy blank-line-separated layout
@@ -306,8 +311,10 @@ def _render_context(mode: str, workdir: Path) -> str:
     from lib.providers import load_providers_config
 
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
-    if mode == "compact":
-        config["context_file"] = {"mode": "compact"}
+    # Force the mode explicitly for BOTH legs: the repo's own project.yaml now
+    # ships context_file.mode=compact, so relying on the config default would
+    # make the "full" leg silently render compact.
+    config["context_file"] = {"mode": mode}
     variables, _ = build_variables(config, REPO_ROOT)
     provider_config = load_providers_config(REPO_ROOT)
     log = SyncLog()
@@ -352,21 +359,46 @@ _MANDATORY_ANCHORS = (
 )
 
 
-def test_full_mode_output_is_byte_identical_to_committed_file(seeded_project):
-    # THE safety contract of issue #540: with mode unset (= full) the
-    # regenerated AGENTS.md must equal the committed generated artifact
-    # byte-for-byte. Any template change that leaks into full mode fails here.
-    assert _render_context("full", seeded_project) == (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+def test_committed_agents_md_equals_compact_render(seeded_project):
+    # THE freshness contract of issue #540 Iteration 2: this repo now ships in
+    # compact mode (.meta-config/project.yaml → context_file.mode: compact), so
+    # the committed AGENTS.md MUST equal a fresh compact render byte-for-byte.
+    # Guards against the Iteration-1 failure mode: config flipped to compact but
+    # the generated output never re-committed (stale full artifact left behind).
+    assert _render_context("compact", seeded_project) == (
+        REPO_ROOT / "AGENTS.md"
+    ).read_text(encoding="utf-8")
 
 
-def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project):
-    committed_lines = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8").splitlines()
-    compact = _render_context("compact", seeded_project)
+def test_full_render_is_larger_than_compact_render(seeded_project, tmp_path):
+    # Compression is real: rendering the SAME seed in full vs compact mode must
+    # yield a strictly larger full output. Mode-independent (does not compare to
+    # the committed file, which is itself compact now).
+    full = _render_context("full", seeded_project)
+    compact_seed = tmp_path / "AGENTS.md"
+    shutil.copy(REPO_ROOT / "AGENTS.md", compact_seed)
+    compact = _render_context("compact", tmp_path)
+    # Full carries the OVERVIEW mass the paper flags as discoverable; the delta
+    # is the whole point of #540.
+    assert len(full.splitlines()) > len(compact.splitlines()) * 1.6
+
+
+def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tmp_path):
+    full = _render_context("full", seeded_project)
+    full_lines = full.splitlines()
+    compact_seed = tmp_path / "AGENTS.md"
+    shutil.copy(REPO_ROOT / "AGENTS.md", compact_seed)
+    compact = _render_context("compact", tmp_path)
     lines = compact.splitlines()
 
-    # Must shrink substantially (baseline 1082 lines; embedded rules stay by
-    # design, so the realistic floor is well above the <400 plan stretch goal).
-    assert len(lines) < len(committed_lines) * 0.75
+    # Compact must shrink substantially vs the full render of the same seed.
+    # Realistic floor (~570 lines) is well ABOVE the plan's <400/<200 stretch
+    # goals: Opencode declares has_rules:false, so ~300 lines of embedded
+    # INSTRUCTION (14 generic rule bodies + MCP allowed/blocked tool lists) can
+    # never leave AGENTS.md without semantic loss. The threshold reflects that
+    # measured floor honestly rather than a goal retrofit — see
+    # docs/plans/issue-540-baseline.md Iteration 2.
+    assert len(lines) < len(full_lines) * 0.6
 
     for anchor in _MANDATORY_ANCHORS:
         assert anchor in compact, f"mandatory anchor missing in compact render: {anchor}"
@@ -468,3 +500,128 @@ def test_540_d3b_opencode_compact_embeds_rules_inline_rather_than_separating(
     # Embeds arrive in their COMPACT form, not the full variant.
     assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." in compact
     assert "## Agent-Hinweise" not in compact
+
+
+# ---------------------------------------------------------------------------
+# Phase D (Iteration 2) — full six-provider compact matrix
+#
+# Extends D3b (Claude×Opencode only) to every provider in ai-providers.yaml,
+# including the ones not active in this repo's project.yaml (Continue, Copilot).
+# Guards three invariants at once:
+#   1. compact render never leaves an unresolved template marker in any file,
+#   2. has_rules:true providers keep the three agent-meta platform rules FULL
+#      in their native rules/skill channel (compaction is embed-only),
+#   3. has_rules:false Opencode embeds those rules in the COMPACT variant.
+# ---------------------------------------------------------------------------
+
+_ALL_PROVIDERS = ("Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth")
+_LEFTOVER_MARKERS = ("{{#if", "{{else}}", "{{/if}}", "{{#each", "{{/each}}",
+                     "{{#unless", "{{/unless}}", "{{>")
+# OVERVIEW section headings dropped from the three platform rules in compact
+# embed mode — their presence proves the FULL (uncompacted) rule body.
+_PLATFORM_RULE_FULL_MARKERS = {
+    "sync-interface": "## Neue Funktionen",
+    "architecture": "## Schichten-Modell",
+    "conventions": "## Change Checklist",
+}
+
+
+def _render_provider_context(provider: str, workdir: Path):
+    """Render one provider's context file in compact mode into workdir.
+
+    Returns the (relative context-file path, rendered text). Seeds a minimal
+    file with an empty managed block so the update path (not just INIT) runs.
+    """
+    import sys
+
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from lib.context import sync_context_for_provider
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+
+    provider_config = load_providers_config(REPO_ROOT)
+    config, variables = _compact_variables()
+
+    context_file = provider_config[provider]["context_file"]
+    target = workdir / context_file
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "# seed\n\n<!-- agent-meta:managed-begin -->\n<!-- agent-meta:managed-end -->\n",
+        encoding="utf-8",
+    )
+    sync_context_for_provider(
+        REPO_ROOT, workdir, config, variables, SyncLog(),
+        dry_run=False, provider=provider, provider_config=provider_config,
+    )
+    return context_file, target.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("provider", _ALL_PROVIDERS)
+def test_540_compact_matrix_no_leftover_markers(provider, tmp_path):
+    # Every provider's compact context file must render without a single
+    # unresolved handlebars marker — the failure mode raw {{#if COMPACT_MODE}}
+    # source markers produced (both branches kept, markers stripped verbatim).
+    _cf, out = _render_provider_context(provider, tmp_path)
+    for marker in _LEFTOVER_MARKERS:
+        assert marker not in out, f"{provider}: leftover template marker {marker!r}"
+
+
+@pytest.mark.parametrize("provider", ("Claude", "Continue", "Copilot", "Mammouth"))
+def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, tmp_path):
+    # has_rules:true providers receive the three agent-meta platform rules via
+    # their native rules/skill channel — compaction is embed-only, so those
+    # files must stay FULL here (design: native rule artifacts are lazy-loaded,
+    # not part of the always-on footprint that compact mode trims).
+    import sys
+
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config
+    from lib.rules import sync_rules
+
+    provider_config = load_providers_config(REPO_ROOT)
+    config, variables = _compact_variables()
+    pc = provider_config[provider]
+    rules_dir = pc.get("rules_dir", ".claude/rules")
+
+    sync_rules(
+        REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False, variables=variables,
+        rules_dir=rules_dir, provider=provider, provider_config=provider_config,
+    )
+
+    for name, full_marker in _PLATFORM_RULE_FULL_MARKERS.items():
+        skill = tmp_path / pc["skills_dir"] / name / "SKILL.md"
+        rule = tmp_path / rules_dir / f"{name}.md"
+        path = skill if skill.exists() else rule
+        assert path.exists(), f"{provider}: {name} not rendered natively"
+        text = path.read_text(encoding="utf-8")
+        assert full_marker in text, (
+            f"{provider}: native {name} was compacted (missing {full_marker!r}) "
+            f"— compaction must be embed-only"
+        )
+
+
+def test_540_compact_opencode_embeds_platform_rules_compacted(seeded_project):
+    # The has_rules:false counterpart: Opencode embeds the three platform rules
+    # in AGENTS.md, and there they MUST arrive compacted — INSTRUCTION anchors
+    # kept, OVERVIEW sections replaced by a pointer line.
+    compact = _render_context("compact", seeded_project)
+
+    # INSTRUCTION anchors survive verbatim.
+    assert "## Branch-Guard-Erweiterung für agent-meta" in compact  # sync-interface
+    assert "## Abhängigkeitsprinzip" in compact                     # architecture
+    assert "## Hard Invariants" in compact                          # conventions
+
+    # OVERVIEW sections are gone.
+    assert "## Neue Funktionen: Smart Context Regeneration" not in compact
+    assert "## Schichten-Modell" not in compact
+    assert "## Change Checklist" not in compact
+
+    # Pointer lines to the full references are present.
+    assert "`.claude/skills/sync-interface/SKILL.md`" in compact
+    assert "`docs/architecture/01-layer-model.md`" in compact
+    assert "`.claude/skills/conventions/SKILL.md`" in compact
