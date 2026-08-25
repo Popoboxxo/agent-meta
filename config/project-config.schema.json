@@ -742,6 +742,22 @@
             "compact"
           ],
           "default": "full"
+        },
+        "max_lines": {
+          "type": "integer",
+          "description": "Soft size limit for generated provider context files. The consistency check (sync.py --validate / consistency-check.py) emits a WARNING when a generated file exceeds this many lines without context_file.oversize_acknowledged. Default: 250.",
+          "default": 250,
+          "minimum": 1
+        },
+        "oversize_acknowledged": {
+          "type": "boolean",
+          "description": "Explicit acknowledgment that oversized generated context files are accepted. When true, the >max_lines size warning is suppressed for all providers. Default: false.",
+          "default": false
+        },
+        "auto_generate": {
+          "type": "boolean",
+          "description": "Declares whether provider context files may be regenerated automatically on every sync. Recommended: false for newly scaffolded projects (regenerate deliberately instead of on every run). Currently declarative only — sync.py still regenerates managed blocks unconditionally; enforcement is planned as issue #540 Fix 5.",
+          "default": true
         }
       },
       "additionalProperties": false
