@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.101.0-beta.2] — 2026-08-26
+
+### Fixed
+- **Admin UI usability and documentation improvements** (#545): enhanced user experience
+  and updated documentation for the Admin interface.
+- **Admin UI critical bugfixes** (#545): resolved agent template resolution bug, fixed
+  pricing overlay display for opencode-go models, corrected conventions-overrides rendering,
+  and added missing confirmation dialogs.
+
 ## [0.101.0-beta.1] — 2026-08-26
 
 ### Added
