@@ -5,7 +5,9 @@
 **Plattform:** {{PLATFORM}}
 **Beschreibung:** {{PROJECT_DESCRIPTION}}
 
-## Tech-Stack
+{{#if COMPACT_MODE}}> Tech-Stack, Architektur & Build-Befehle: discoverable via Repo (Manifeste, CI-Configs).
+
+{{else}}## Tech-Stack
 
 - **Runtime:** {{RUNTIME}}
 - **Sprache:** {{LANGUAGE}}
@@ -25,11 +27,11 @@
 **Besondere Patterns:**
 {{KEY_PATTERNS}}
 
-## Code-Konventionen
+{{/if}}## Code-Konventionen
 
 {{CODE_CONVENTIONS}}
 
-## Build & Development
+{{#if COMPACT_MODE}}{{else}}## Build & Development
 
 ```bash
 # Build
@@ -45,7 +47,7 @@
 {{DEV_STACK_RELOAD}}
 ```
 
-## Anforderungs-Kategorien
+{{/if}}## Anforderungs-Kategorien
 
 Kategorien für `docs/REQUIREMENTS.md`:
 

@@ -1578,7 +1578,11 @@ def sync_agents_for_provider(
 
     # Gemini Bootstrap: inject session-start instructions into GEMINI.md (Issue #277)
     if provider == "Gemini":
-        _inject_gemini_bootstrap(provider, target_dir, agent_meta_root, project_root, pc, log, dry_run)
+        _inject_gemini_bootstrap(
+            provider, target_dir, agent_meta_root, project_root, pc, log, dry_run,
+            compact=variables.get("COMPACT_MODE") == "true",
+            agents_label=pc.get('agents_dir', '.gemini/agents'),
+        )
 
     # Continue Bootstrap: update .continue/config.yaml with agent entries (Issue #277)
     if provider == "Continue":
@@ -1600,6 +1604,8 @@ def _inject_gemini_bootstrap(
     pc: dict[str, str],
     log: SyncLog,
     dry_run: bool,
+    compact: bool = False,
+    agents_label: str = ".gemini/agents",
 ) -> None:
     from .bootstrap import BootstrapEngine
 
@@ -1609,7 +1615,9 @@ def _inject_gemini_bootstrap(
     if bootstrap_config.get("action") != "inject-bootstrap-instructions":
         return
 
-    bootstrap_instructions = bootstrap_engine.generate_gemini_bootstrap_instructions(target_dir)
+    bootstrap_instructions = bootstrap_engine.generate_gemini_bootstrap_instructions(
+        target_dir, compact=compact, agents_label=agents_label
+    )
     if not bootstrap_instructions:
         return
 
@@ -1925,8 +1933,14 @@ def _make_slim_body(content: str) -> str:
     return "\n".join(out)
 
 
-def build_knowledge_engine_hints(config: dict) -> str:
-    """Generate the Knowledge Engine instructions block if enabled in config."""
+def build_knowledge_engine_hints(config: dict, compact: bool = False) -> str:
+    """Generate the Knowledge Engine instructions block if enabled in config.
+
+    compact=True reduces the block to a pointer (bundle path + wiki index +
+    schema) per the target rule "discoverable via ls/Read → out of the context
+    file" (issue #540 B8). The path table and the agent/workflow prose are
+    OVERVIEW and discoverable inside the bundle itself.
+    """
     lines = []
     ke_config = config.get("knowledge-engine", {})
     if ke_config.get("enabled", False):
@@ -1934,6 +1948,16 @@ def build_knowledge_engine_hints(config: dict) -> str:
         domain = ke_config.get("domain", "research")
         wiki = f"{bundle}/wiki"
         sources = f"{bundle}/sources"
+
+        if compact:
+            lines.append("## Knowledge Engine")
+            lines.append("")
+            lines.append(
+                f"Aktiviert (Domäne: **{domain}**). Bundle: `{bundle}/` — "
+                f"Index: `{wiki}/index.md`, Schema/Workflows: `{bundle}/schema.md`, "
+                f"immutable Sources: `{sources}/` (LLM liest, modifiziert NIEMALS)."
+            )
+            return "\n".join(lines)
 
         lines.append("## Knowledge Engine")
         lines.append("")

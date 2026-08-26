@@ -40,6 +40,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 _AGENT_META_ROOT = _SCRIPTS_DIR.parent
 
 from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
+from lib.consistency.context_size import check_context_file_size
 from lib.consistency.crossrefs import (
     check_changelog_mentions_new_files,
     check_orchestrator_table,
@@ -186,6 +187,10 @@ def run_checks(
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))
         findings.extend(check_ui_help_mappings(_AGENT_META_ROOT))
         findings.extend(check_readme_docs_index(_AGENT_META_ROOT))
+
+        # Context size guard (issue #540, C2): warn on oversized generated
+        # provider context files without acknowledgment (WARNING only).
+        findings.extend(check_context_file_size(root))
 
         # Changelog check: only meaningful when checking changed/new files
         new_files = get_new_files_vs_main(root)

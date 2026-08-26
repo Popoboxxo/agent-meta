@@ -5910,6 +5910,18 @@ async function viewProjectGeneral() {
   const project = (data.project && typeof data.project === "object") ? clone(data.project) : {};
   const top = { "dod-preset": data["dod-preset"] || "", "rules-preset": data["rules-preset"] || "", "conventions-preset": data["conventions-preset"] || "default", "speech-mode": data["speech-mode"] || "", "tier-preset": data["tier-preset"] || "Normal", "se-focus": !!data["se-focus"] };
 
+  // context_file: generated provider context file (CLAUDE.md/AGENTS.md/...) density
+  // and size-guard settings (issue #540). Missing keys fall back to the documented
+  // schema defaults (config/project-config.schema.json) so an untouched project.yaml
+  // renders the same values sync.py itself would assume.
+  const contextFileSrc = (data.context_file && typeof data.context_file === "object") ? data.context_file : {};
+  const contextFile = {
+    mode: contextFileSrc.mode || "full",
+    max_lines: Number.isInteger(contextFileSrc.max_lines) ? contextFileSrc.max_lines : 250,
+    oversize_acknowledged: !!contextFileSrc.oversize_acknowledged,
+    auto_generate: contextFileSrc.auto_generate !== false,
+  };
+
   const TIER_PRESETS = extractPresetKeys(tierPresetsResp, TIER_FALLBACK);
   // Build label map: project-local presets get a ★ prefix so they stand out
   // visually in the dropdown. Global presets render unchanged.
@@ -6057,6 +6069,35 @@ async function viewProjectGeneral() {
   panel.appendChild(checkboxField("SE focus", top["se-focus"], v => { top["se-focus"] = v; }));
 
   wrap.appendChild(panel);
+
+  // --- Context File (issue #540: compression / size guard) ---
+  const cfPanel = el("div", { class: "panel", style: "margin-top: var(--space-4);" });
+  cfPanel.appendChild(el("h2", {}, ["Context File (CLAUDE.md / AGENTS.md / ...)"]));
+  cfPanel.appendChild(el("p", { class: "muted" }, [
+    "Density and size-guard for sync.py-generated provider context files. 'compact' keeps every INSTRUCTION anchor (CRITICAL GATE, Branch-Guard, MCP prohibitions, ...) verbatim and collapses OVERVIEW/reference prose to pointers.",
+  ]));
+  cfPanel.appendChild(dropdownField(
+    "Mode", ["full", "compact"], contextFile.mode,
+    v => { contextFile.mode = v; },
+    null,
+    "full = current behavior (default). compact = ~30-50% smaller, see docs/plans/issue-540-baseline.md.",
+  ));
+  cfPanel.appendChild(labeledTextField(
+    "Max lines (soft limit)", String(contextFile.max_lines),
+    v => { const n = parseInt(v, 10); contextFile.max_lines = Number.isFinite(n) && n > 0 ? n : 250; },
+    "sync.py --validate warns when a generated context file exceeds this many lines without acknowledgment below.",
+  ));
+  cfPanel.appendChild(checkboxField(
+    "Oversize acknowledged", contextFile.oversize_acknowledged,
+    v => { contextFile.oversize_acknowledged = v; },
+    "Suppresses the size-guard warning for all providers — set this deliberately, not to silence a real regression.",
+  ));
+  cfPanel.appendChild(checkboxField(
+    "Auto-generate", contextFile.auto_generate,
+    v => { contextFile.auto_generate = v; },
+    "Declarative only (sync.py still regenerates managed blocks on every run regardless — see issue #540 Fix 5, not yet enforced).",
+  ));
+  wrap.appendChild(cfPanel);
   wrap.appendChild(rulesMatrix);
 
   // Submodule Protection Section
@@ -6152,6 +6193,7 @@ async function viewProjectGeneral() {
           ["speech-mode", top["speech-mode"]],
           ["tier-preset", top["tier-preset"]],
           ["se-focus", top["se-focus"]],
+          ["context_file", contextFile],
         ], status);
       } catch { /* toast already shown */ }
     } }, ["Save"]),

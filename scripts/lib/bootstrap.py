@@ -174,11 +174,36 @@ class BootstrapEngine:
                 return line.split(":", 1)[1].strip().strip('"')
         return "No description available"
 
-    def generate_gemini_bootstrap_instructions(self, agents_dir: Path) -> str:
-        """Generate human-readable bootstrap instructions for Gemini GEMINI.md injection."""
+    def generate_gemini_bootstrap_instructions(
+        self, agents_dir: Path, compact: bool = False,
+        agents_label: str = ".gemini/agents",
+    ) -> str:
+        """Generate human-readable bootstrap instructions for Gemini GEMINI.md injection.
+
+        compact=True (issue #540 B6) replaces the explicit per-agent enumeration
+        (~106 of ~124 lines; discoverable via ``ls <agents_label>``) with a short
+        form. The instruction core — session-start obligation, define_subagent
+        registration and the runtime warning — is preserved in both modes.
+        """
         agents = sorted(agents_dir.glob("*.md"))
         if not agents:
             return ""
+
+        if compact:
+            return "\n".join(
+                [
+                    "",
+                    "## Agent Bootstrap — Session-Start Pflicht",
+                    "",
+                    "Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.",
+                    f"Lies alle `.md`-Dateien in `{agents_label}` und registriere jeden Agenten "
+                    "unter seinem Dateinamen (ohne `.md`) via `define_subagent`.",
+                    "Erst danach: Bearbeite User-Anfragen (Delegation an Orchestrator etc.).",
+                    "",
+                    "> **Ohne diese Registrierung existieren die Agenten NICHT in der Runtime**",
+                    "> und der Orchestrator kann nicht delegieren.",
+                ]
+            )
 
         lines = [
             "",

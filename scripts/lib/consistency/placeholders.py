@@ -67,6 +67,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "SE_ENABLED", "SE_BASE_DIR", "VALIDATOR_ENABLED", "REFLECTION_PAIRS_ENABLED",
     "QUALITY_PIPELINES_ENABLED", "MAX_ITERATIONS", "DEVELOPER_TIERS_ENABLED",
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
+    # Context density flag (derived from context_file.mode by build_variables, issue #540)
+    "COMPACT_MODE",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)

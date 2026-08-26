@@ -730,6 +730,38 @@
       },
       "additionalProperties": false
     },
+    "context_file": {
+      "type": "object",
+      "description": "Generated provider context files (CLAUDE.md, AGENTS.md, ...) behavior. Missing keys fall back to the documented defaults.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Context file density. 'full' = complete managed block with all overviews (current behavior). 'compact' = instruction-preserving compressed output (issue #540); overviews and reference prose are dropped in favor of pointers. Missing or invalid value always resolves to 'full' (safe-side default: compression must be explicitly opted in).",
+          "enum": [
+            "full",
+            "compact"
+          ],
+          "default": "full"
+        },
+        "max_lines": {
+          "type": "integer",
+          "description": "Soft size limit for generated provider context files. The consistency check (sync.py --validate / consistency-check.py) emits a WARNING when a generated file exceeds this many lines without context_file.oversize_acknowledged. Default: 250.",
+          "default": 250,
+          "minimum": 1
+        },
+        "oversize_acknowledged": {
+          "type": "boolean",
+          "description": "Explicit acknowledgment that oversized generated context files are accepted. When true, the >max_lines size warning is suppressed for all providers. Default: false.",
+          "default": false
+        },
+        "auto_generate": {
+          "type": "boolean",
+          "description": "Declares whether provider context files may be regenerated automatically on every sync. Recommended: false for newly scaffolded projects (regenerate deliberately instead of on every run). Currently declarative only — sync.py still regenerates managed blocks unconditionally; enforcement is planned as issue #540 Fix 5.",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
     "lifecycle-triggers": {
       "type": "object",
       "description": "Agent tasks to run automatically on git lifecycle events (commit, merge, version bump, release). Requires lifecycle-check hook to be enabled.",

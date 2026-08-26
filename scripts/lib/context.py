@@ -897,6 +897,67 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
     return f"### {title}\n{summary}\n{details}"
 
 
+# Compact-mode section filter for the three agent-meta platform rules whose
+# OVERVIEW-classified sections (layer model, composition syntax, changelog-style
+# feature docs, reference checklists) are discoverable elsewhere. This pulls the
+# #192-Phase-2 territory into #540's density work on an explicit user decision:
+# only OVERVIEW density is reduced, INSTRUCTION sections stay embedded verbatim
+# in BOTH modes (#540 non-goal: density only, no semantic change). Keyed by the
+# *output* stem (2-platform prefix stripped by collect_rule_sources), because the
+# embedded loop reads the raw source file (agent-meta-<name>.md) but preset/keep
+# logic is expressed against the output name (<name>.md).
+_COMPACT_PLATFORM_RULES = {
+    "sync-interface": {
+        "keep": ("## Branch-Guard-Erweiterung für agent-meta", "## Warum"),
+        "pointer": (
+            "Details (Smart Context Regeneration, `--check`, `context-hashes.json`, "
+            "Provider-Context-Lifecycle): `.claude/skills/sync-interface/SKILL.md`."
+        ),
+    },
+    "architecture": {
+        "keep": ("## Abhängigkeitsprinzip",),
+        "pointer": (
+            "Details (Schichten-Modell, Composition-Syntax, Platzhalter-Escape): "
+            "`docs/architecture/01-layer-model.md`."
+        ),
+    },
+    "conventions": {
+        "keep": ("## Hard Invariants",),
+        "pointer": (
+            "Details (Naming-Konvention, Instruction-Bleed-Checkliste, "
+            "Adding-New-Role/Placeholder, Change-Checklist): "
+            "`.claude/skills/conventions/SKILL.md`."
+        ),
+    },
+}
+
+
+def compact_embedded_rule(output_stem: str, content: str) -> str:
+    """Collapse OVERVIEW sections of a known platform rule to a pointer (compact mode).
+
+    The preamble (content before the first ``## `` heading, including the rule's
+    ``# `` title) and every H2 section named in the rule's ``keep`` list survive
+    verbatim — these are the INSTRUCTION parts that must stay identical in both
+    modes (issue #540 non-goal: density only, no semantic change). All other H2
+    sections are dropped and replaced by a single pointer line to the full
+    reference. Rules not in the table pass through unchanged, so full mode (which
+    never calls this) and every other embedded rule are unaffected.
+    """
+    spec = _COMPACT_PLATFORM_RULES.get(output_stem)
+    if not spec:
+        return content
+    keep_set = set(spec["keep"])
+    kept: list[str] = []
+    keep_current = True  # preamble before the first H2 is always instruction/title
+    for line in content.splitlines():
+        if line.startswith("## "):
+            keep_current = line.strip() in keep_set
+        if keep_current:
+            kept.append(line)
+    body = "\n".join(kept).rstrip()
+    return f"{body}\n\n{spec['pointer']}"
+
+
 def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
@@ -970,6 +1031,12 @@ def _build_managed_block(
         platforms = config.get("platforms", [])
         rule_sources = collect_rule_sources(agent_meta_root, platforms)
 
+        # Compact mode (issue #540): embedded MCP/external-tool sections and
+        # knowledge hints render in the compressed, pointer-based variant.
+        # Native rule artifacts (.claude/rules/*, skills) stay full — they are
+        # lazy-loaded and not part of the always-on context footprint.
+        _compact = local_vars.get("COMPACT_MODE") == "true"
+
         # Loaded before the plain-rules loop (not with the per-server embedding
         # below) so MCP_GUARDRAILS_LIST is available for mcp-guardrails.md's
         # {{MCP_GUARDRAILS_LIST}} placeholder — mirrors sync_rules()'s
@@ -979,7 +1046,7 @@ def _build_managed_block(
         mcp_active = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
         local_vars["MCP_GUARDRAILS_LIST"] = build_mcp_guardrails_list(mcp_registry, mcp_active)
 
-        for src_path, _ in rule_sources:
+        for src_path, output_name in rule_sources:
             rule_stem = src_path.stem
             opts = rule_options.get(rule_stem, {})
             prov_opt = opts.get(provider.lower())
@@ -987,12 +1054,16 @@ def _build_managed_block(
                 continue
             if opts.get("embed") is False:
                 continue
-                
+
             layer = src_path.parts[-2]
             rel_source = f"rules/{layer}/{src_path.name}"
             rule_content = src_path.read_text(encoding="utf-8")
             rule_content = substitute(rule_content, local_vars, rel_source, log)
             rule_content = strip_inactive_conditional_blocks(rule_content, local_vars)
+            if _compact:
+                # Density-only compaction of the agent-meta platform rules whose
+                # OVERVIEW sections are discoverable elsewhere (#540 + #192 P2).
+                rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
             embedded_rules.append({"content": rule_content})
         
         try:
@@ -1001,7 +1072,9 @@ def _build_managed_block(
                 for server_name in mcp_active:
                     server_def = mcp_registry.get(server_name)
                     if server_def:
-                        mcp_content = _generate_rule_content(server_name, server_def)
+                        mcp_content = _generate_rule_content(
+                            server_name, server_def, compact=_compact
+                        )
                         embedded_rules.append({"content": mcp_content})
         except ImportError:
             pass
@@ -1021,14 +1094,18 @@ def _build_managed_block(
                     tool_def = tool_registry.get(tool_name)
                     if tool_def and provider not in tool_def.get("provider-skip", []):
                         embedded_rules.append(
-                            {"content": _generate_tool_rule_content(tool_name, tool_def, pc, project_root)}
+                            {"content": _generate_tool_rule_content(
+                                tool_name, tool_def, pc, project_root, compact=_compact
+                            )}
                         )
         except ImportError:
             pass
 
     local_vars["embedded_rules"] = embedded_rules
 
-    local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(config)
+    local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(
+        config, compact=local_vars.get("COMPACT_MODE") == "true"
+    )
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     return builder.build("agents-managed", local_vars)

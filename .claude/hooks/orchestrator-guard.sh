@@ -205,9 +205,16 @@ except Exception:
 " "$CONFIG_FILE" "$AGENT_META_PROVIDER" 2>/dev/null)
 
   if [ "$STRICT" = "true" ]; then
-    # Orchestrator sentinel exempts only plain Bash calls from strict-mode
+    # Orchestrator OR git sentinel exempts a Bash call from strict-mode
     # main-chat blocking — never Write/Edit, never the git-mutation gate.
-    if [ "$TOOL_NAME" = "Bash" ] && [ "$IS_ORCH_SENTINEL" = "1" ]; then
+    # Both are recognized delegates (see IS_GIT_SENTINEL/IS_ORCH_SENTINEL
+    # assignment above); omitting the git sentinel here made every
+    # `#agent-meta:agent=git`-declared Bash call in a strict-mode project
+    # fail with exit 2 even though it is an authorized delegate identity —
+    # tests/test_orchestrator_guard_hook.py::test_strict_mode_sentinel_exemption
+    # already documented and asserted the git-exempt behavior; this hook
+    # just never implemented it.
+    if [ "$TOOL_NAME" = "Bash" ] && { [ "$IS_ORCH_SENTINEL" = "1" ] || [ "$IS_GIT_SENTINEL" = "1" ]; }; then
       exit 0
     fi
     echo "ORCHESTRATOR_GUARD: STRICT MODE is active. Direct $TOOL_NAME calls in the main chat are blocked." >&2

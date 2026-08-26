@@ -213,12 +213,42 @@ def resolve_active_external_tools(
 # Rule content generation
 # ---------------------------------------------------------------------------
 
-def _generate_tool_rule_content(name: str, tool_def: dict, pc: dict, project_root: Path) -> str:
-    """Build Markdown rule content for one external tool from its registry def."""
-    lines: list[str] = []
+def _generate_tool_rule_content(
+    name: str, tool_def: dict, pc: dict, project_root: Path, compact: bool = False
+) -> str:
+    """Build Markdown rule content for one external tool from its registry def.
 
+    compact=True reduces the section to title + purpose line + a single pointer
+    naming the hook wrappers and permitted injections (issue #540 B8). The
+    full rule-content body is reference prose that stays discoverable via the
+    registry/skill artifacts; native artifacts keep the full variant.
+    """
     desc = (tool_def.get("description") or name).strip()
-    lines += [f"# External Tool: {name}", "", f"> {desc}", "", "---", ""]
+    lines: list[str] = [f"# External Tool: {name}", "", f"> {desc}", "", "---", ""]
+
+    if compact:
+        hooks = tool_def.get("hooks", [])
+        injections = tool_def.get("permitted-injections", [])
+        pointers: list[str] = []
+        if isinstance(hooks, list) and hooks:
+            wrapped = ", ".join(f"`{EXTERNAL_HOOKS_DIR}/{stem}.sh`" for stem in hooks)
+            pointers.append(f"Hook-Wrapper: {wrapped}")
+        if isinstance(injections, list) and injections:
+            inj_parts = []
+            for entry in injections:
+                resolved = resolve_injection_path(entry, pc, project_root)
+                rel = (
+                    resolved.relative_to(project_root.resolve())
+                    if resolved.is_relative_to(project_root.resolve())
+                    else resolved
+                )
+                inj_parts.append(f"`{rel}` ({entry['kind']})")
+            if inj_parts:
+                pointers.append(f"Injektionen: {', '.join(inj_parts)}")
+        lines.append("Details/Registrierung: `config/external-tools-registry.yaml`.")
+        if pointers:
+            lines.append(" · ".join(pointers))
+        return "\n".join(lines) + "\n"
 
     body = (tool_def.get("rule-content") or "").strip()
     if body:

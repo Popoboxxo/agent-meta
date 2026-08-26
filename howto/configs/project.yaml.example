@@ -49,7 +49,12 @@ platforms: []
 dod-preset: full
 
 # Rules-Preset steuert die Ladelogik der System-Regeln (alwaysApply & embedding):
-# Options: "default" (alle Rules geladen), "minimal" (Kernregeln), "silent" (nur auf Anforderung)
+# Options: "default" (alle Rules immer geladen), "minimal" (Kernregeln aktiv,
+#   situative Rules auf Anforderung), "silent" (nur auf Anforderung),
+#   "lazy" (echter Lazy-Load-Kanal für Claude: Rule-Bodies werden als Skills
+#   unter .claude/skills/<name>/SKILL.md abgelegt — nur Name + Description
+#   landen im System-Prompt, der Body wird bei Bedarf nachgeladen; Kernregeln
+#   wie branch-guard/commit-conventions bleiben always-on)
 rules-preset: default
 
 # Conventions-Preset steuert Namens-/Versionierungs-Konventionen (release.md, git.md):
@@ -117,6 +122,27 @@ gitignore:
   local: true       # persönliche/lokale Dateien gitignoren (.claude/settings.local.json, sync.log, etc.)
   generated: false  # generierte Ordner (.claude/agents/, etc.) in .gitignore aufnehmen (false = im Git committen)
   settings: false   # Provider-Settings (settings.json, GEMINI.md, etc.) gitignoren
+
+# Generierte Provider-Contextfiles (CLAUDE.md, AGENTS.md, ...) steuern
+# / Control generated provider context files (issue #540):
+context_file:
+  # Dichte des generierten Managed Blocks:
+  #   "full"    = vollständiger Block mit allen Overviews (Default, bisheriges Verhalten)
+  #   "compact" = instruktions-erhaltende Komprimierung; Overview-/Referenz-Fläche
+  #               wird durch Pointer ersetzt. Fehlender Key → immer "full" (Safe-Side).
+  mode: full
+
+  # Weiches Zeilen-Limit: Der Konsistenz-Check warnt (kein Fehler), wenn ein
+  # generiertes Contextfile diese Zeilenzahl überschreitet.
+  max_lines: 250
+
+  # Bewusste Freigabe überhöhter Contextfiles — unterdrückt die >max_lines-Warnung:
+  oversize_acknowledged: false
+
+  # Empfohlen für NEUE Projekte: Contextfiles nicht bei jedem Sync automatisch
+  # neu generieren. (Hinweis: wird derzeit noch nicht von sync.py ausgewertet —
+  # siehe Issue #540, Fix 5. Bestehende Projekte bleiben unverändert.)
+  # auto_generate: false
 
 # Sicherheitsprüfungen: Abbrechen wenn Secrets in committeten Dateien erkannt werden (Default: false)
 # Allow sync to write files containing secrets to committed paths (NOT recommended)
