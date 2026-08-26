@@ -2988,6 +2988,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
                         "description": description,
                         "targets": targets,
+                        "group": attrs.get("group"),
                     })
         return {"roles": roles, "count": len(roles)}
 
@@ -4311,6 +4312,26 @@ class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
     """
 
     daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        """Suppress tracebacks for routine client disconnects.
+
+        Browsers routinely open speculative/keep-alive connections and abort
+        them mid-read (tab close, navigation, SSE stream torn down) — that
+        surfaces here as ConnectionAbortedError/ConnectionResetError/
+        BrokenPipeError/TimeoutError raised while socketserver is still
+        reading the request line, before a request handler even runs. That
+        is expected traffic noise, not a server bug; printing a full
+        traceback for every one of them (the default handle_error behavior)
+        drowns out real errors. Anything else still gets the normal
+        traceback so actual bugs stay visible.
+        """
+        exc_type = sys.exc_info()[0]
+        if exc_type is not None and issubclass(
+            exc_type, (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, TimeoutError)
+        ):
+            return
+        super().handle_error(request, client_address)
 
 
 class AdminServer:

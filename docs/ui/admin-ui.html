@@ -5966,6 +5966,19 @@ async function viewProjectGeneral() {
   matrixHead.appendChild(matrixHint);
   rulesMatrix.appendChild(matrixHead);
 
+  rulesMatrix.appendChild(el("p", { class: "field-help", style: "margin:0 0 var(--space-2);" }, [
+    "One row per rule, evaluated for the preset selected below. ",
+    el("strong", {}, ["apply"]), " = alwaysApply (Claude/Continue always load the rule), ",
+    el("strong", {}, ["emb"]), " = embed (Opencode includes the rule in its managed block), ",
+    el("strong", {}, ["ovr"]), " = a project-level override exists for this rule, ",
+    el("strong", {}, ["eff"]), " = the effective apply/embed after merging preset + override. ",
+    "Icons: ", el("span", { style: "color:var(--accent-green)" }, ["✓"]), " on, ",
+    el("span", { style: "color:var(--accent-red)" }, ["✗"]), " off, ",
+    el("span", { style: "color:var(--text-muted)" }, ["—"]), "/", el("span", { style: "color:var(--text-muted)" }, ["·"]), " preset default (nothing set), ",
+    el("span", { style: "color:var(--accent-yellow);font-weight:bold" }, ["★"]), " overridden. ",
+    "Click a row to toggle a project override for that rule (creates one if none exists, removes it if one does).",
+  ]));
+
   const matrixTable = el("table", { class: "data-table", style: "font-size:0.82em;" });
   const thead = el("thead");
   const gHeadRow = el("tr", { style: "border-bottom:2px solid var(--border-color);" });
@@ -6080,7 +6093,7 @@ async function viewProjectGeneral() {
     "Mode", ["full", "compact"], contextFile.mode,
     v => { contextFile.mode = v; },
     null,
-    "full = current behavior (default). compact = ~30-50% smaller, see docs/plans/issue-540-baseline.md.",
+    "full = current behavior (default, every rule fully spelled out). compact = ~30-50% smaller: INSTRUCTION anchors stay verbatim, OVERVIEW/reference prose collapses to pointer sentences. Only affects the shared AGENTS.md (Opencode + Gemini) — providers with native rule files (Claude, Continue, Copilot, Mammouth) are unaffected.",
   ));
   cfPanel.appendChild(labeledTextField(
     "Max lines (soft limit)", String(contextFile.max_lines),
@@ -6285,6 +6298,21 @@ async function viewProjectProviders() {
 
   // Provider Options — per-provider collapsible KV editors
   optPanel.appendChild(el("h3", { style: "margin-top:var(--space-4); margin-bottom:var(--space-2); font-size:13px; color:var(--text-secondary);" }, ["Provider options"]));
+  optPanel.appendChild(el("p", { class: "field-help", style: "margin-top:0; margin-bottom:var(--space-3);" }, [
+    "Per-provider key/value settings written to ",
+    el("code", {}, ["project.yaml"]),
+    " under ",
+    el("code", {}, ["provider-options.<provider>"]),
+    ". sync.py only recognizes a small set of specific keys per provider — unrecognized keys are stored but have no effect. Known keys today: ",
+    el("code", {}, ["frontmatter-strip-fields"]),
+    " (any provider — drops the listed agent-meta bookkeeping fields from generated frontmatter, e.g. for providers with a strict agent-schema); ",
+    el("code", {}, ["generate-prompts"]),
+    " / ",
+    el("code", {}, ["prompt-mode"]),
+    " (Continue only — emits invokable slash-commands under ",
+    el("code", {}, [".continue/prompts/"]),
+    ", ", el("code", {}, ["prompt-mode: \"full\"|\"slim\""]), ").",
+  ]));
 
   // Determine provider names: union of providers from API + keys already in providerOptions
   const providerNames = new Set([
@@ -6362,15 +6390,21 @@ async function viewProjectRoles() {
 
   // Load names + descriptions in parallel. Hierarchy is the authoritative
   // source for descriptions; /api/roles is the alphabetically sorted list.
-  const [data, allRoles, hierarchy] = await Promise.all([
+  // /api/pipelines feeds the consistency check below (which agents does
+  // every enabled pipeline actually need).
+  const [data, allRoles, hierarchy, pipelinesEnvelope] = await Promise.all([
     loadProject(),
     api.get("/api/roles").catch(() => []),
     api.get("/api/agents/hierarchy").catch(() => ({ roles: [] })),
+    api.get("/api/pipelines").catch(() => ({ pipelines: {} })),
   ]);
 
   const descByName = new Map();
+  const groupByName = new Map();
   for (const r of (hierarchy.roles || [])) {
-    if (r && r.name) descByName.set(r.name, r.description || "");
+    if (!r || !r.name) continue;
+    descByName.set(r.name, r.description || "");
+    if (r.group) groupByName.set(r.name, r.group);
   }
   const roleNames = allRoles.map(r => r.name);
   const knownSet  = new Set(roleNames);
@@ -6382,6 +6416,91 @@ async function viewProjectRoles() {
 
   const status = el("div", { class: "muted" }, [`${active.length} roles selected.`]);
   wrap.appendChild(status);
+
+  // --- Groups: bulk-select every role sharing a `group:` tag from
+  // role-defaults.yaml (e.g. "se", "knowledge") in one click, instead of
+  // dragging each one over individually.
+  const groups = new Map(); // group name -> role names[]
+  for (const [name, group] of groupByName) {
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(name);
+  }
+  const groupRow = el("div", { class: "btn-row", style: "flex-wrap:wrap;" });
+  // Re-renders the group buttons' labels/pressed-state after active[]
+  // changes. Called on init and after every mutation (group click, drag/drop,
+  // arrow buttons, consistency-check "+ Add") so the buttons never go stale.
+  const renderGroupPanel = () => {
+    groupRow.replaceChildren();
+    for (const [groupName, members] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const allIn = members.every(n => active.includes(n));
+      const btn = el("button", { class: "btn btn-sm", title: members.join(", ") },
+        [`${allIn ? "− Remove" : "+ Add"} ${groupName} (${members.length})`]);
+      btn.addEventListener("click", () => {
+        if (allIn) {
+          for (const n of members) { const idx = active.indexOf(n); if (idx >= 0) active.splice(idx, 1); }
+        } else {
+          for (const n of members) if (!active.includes(n)) active.push(n);
+        }
+        render();
+      });
+      groupRow.appendChild(btn);
+    }
+  };
+  if (groups.size > 0) {
+    const groupPanel = el("div", { class: "panel", style: "margin-bottom:var(--space-3);" });
+    groupPanel.appendChild(el("h2", { style: "margin-top:0; font-size:13px;" }, ["Groups"]));
+    groupPanel.appendChild(el("p", { class: "field-help", style: "margin-top:0;" }, [
+      "Bulk-select every role tagged with the same ", el("code", {}, ["group:"]), " in role-defaults.yaml.",
+    ]));
+    groupPanel.appendChild(groupRow);
+    wrap.appendChild(groupPanel);
+    renderGroupPanel();
+  }
+
+  // --- Pipeline consistency check: every agent referenced by an ENABLED
+  // pipeline's stages should realistically be an active role, or that
+  // pipeline will hand off to a role this project never activated.
+  const pipelines = (pipelinesEnvelope && pipelinesEnvelope.pipelines && typeof pipelinesEnvelope.pipelines === "object")
+    ? pipelinesEnvelope.pipelines : {};
+  const agentsNeededBy = new Map(); // agent name -> pipeline names[] that need it
+  for (const [pName, pipeline] of Object.entries(pipelines)) {
+    if (!pipeline || pipeline.enabled === false) continue;
+    for (const stage of (Array.isArray(pipeline.stages) ? pipeline.stages : [])) {
+      const agent = stage && stage.agent;
+      if (!agent) continue;
+      if (!agentsNeededBy.has(agent)) agentsNeededBy.set(agent, []);
+      agentsNeededBy.get(agent).push(pName);
+    }
+  }
+  const consistencyPanel = el("div", { class: "panel", style: "margin-bottom:var(--space-3);" });
+  const renderConsistency = () => {
+    consistencyPanel.replaceChildren();
+    const missing = [...agentsNeededBy.entries()].filter(([agent]) => !active.includes(agent));
+    if (missing.length === 0) return; // nothing to show — every enabled pipeline's agents are active
+    consistencyPanel.appendChild(el("h2", { style: "margin-top:0; font-size:13px; color:var(--accent-yellow);" }, ["⚠ Pipeline consistency"]));
+    consistencyPanel.appendChild(el("p", { class: "field-help", style: "margin-top:0;" }, [
+      "These agents are referenced by an enabled pipeline's stages but are not in Active — that pipeline will fail to hand off to them.",
+    ]));
+    const list = el("ul", { style: "margin:0 0 var(--space-2); padding-left:20px;" });
+    for (const [agent, pNames] of missing) {
+      const li = el("li", {}, [
+        el("span", { class: "mono" }, [agent]),
+        ` — needed by ${pNames.join(", ")} `,
+      ]);
+      const addBtn = el("button", { class: "btn btn-sm" }, ["+ Add"]);
+      addBtn.addEventListener("click", () => { active.push(agent); render(); });
+      li.appendChild(addBtn);
+      list.appendChild(li);
+    }
+    consistencyPanel.appendChild(list);
+    const addAllBtn = el("button", { class: "btn btn-sm btn-warning" }, [`+ Add all ${missing.length}`]);
+    addAllBtn.addEventListener("click", () => {
+      for (const [agent] of missing) if (!active.includes(agent)) active.push(agent);
+      render();
+    });
+    consistencyPanel.appendChild(addAllBtn);
+  };
+  wrap.appendChild(consistencyPanel);
 
   // Two-column layout: Available ↔ Active
   const grid = el("div", {
@@ -6496,6 +6615,8 @@ async function viewProjectRoles() {
     }
 
     status.textContent = `${active.length} roles selected.`;
+    renderGroupPanel();
+    renderConsistency();
   };
   render();
 
@@ -6554,7 +6675,7 @@ async function viewProjectOrchestrator() {
     "Whitelist",
     nativeExt.whitelist,
     v => { nativeExt.whitelist = v; orch["native-extensions"] = nativeExt; },
-    "Ist die Whitelist nicht leer, sind ausschließlich die dort gelisteten Skills/Plugins erlaubt — alles andere wird automatisch gesperrt, unabhängig vom generellen Erlaubt-Statement. Leer = kein Filter."
+    "Empty (default) = no filter, native extensions run freely (subject to Enabled above). Non-empty = allow-only: ONLY the skill/plugin identifiers listed here may run — everything else is blocked, even with Enabled checked. Entries must match a skill/plugin's own identifier exactly (e.g. the directory name under .claude/skills/<name>/) — there is no autocomplete or validation here, a typo silently blocks that extension instead of whitelisting it."
   ));
   wrap.appendChild(nePanel);
 
@@ -6788,6 +6909,35 @@ async function viewProjectModelOverrides() {
   // and Inherit-Main-Chat) stay mutually consistent because every mutation
   // writes its result back into `data` immediately.
   const inheritEntries = () => ((data["model-inherit-main-chat"] && typeof data["model-inherit-main-chat"] === "object") ? data["model-inherit-main-chat"] : {});
+  const overrideAllEntries = () => ((data["model-override-all"] && typeof data["model-override-all"] === "object") ? data["model-override-all"] : {});
+
+  // model-override-all and model-inherit-main-chat are mutually exclusive per
+  // provider (an agent can't both "burn on one model" and "inherit the
+  // main-chat model" at once). These two helpers are the single place both
+  // bars call to mutate either side, so the "resolve conflict" quick-actions
+  // below can call straight through without duplicating the save logic.
+  const clearOverrideAll = async (prov) => {
+    const cur = { ...overrideAllEntries() };
+    delete cur[prov];
+    await saveProjectSection("model-override-all", cur, status);
+    data["model-override-all"] = cur;
+  };
+  const setInherit = async (prov, enabled) => {
+    const res = await api.post("/api/model-inherit", { provider: prov, enabled });
+    data["model-inherit-main-chat"] = (res && typeof res.inherit_main_chat === "object") ? res.inherit_main_chat : {};
+  };
+
+  // --- shared provider selection: both bars below act on ONE provider at a
+  // time. Keeping two independently-selected dropdowns in sync avoids the
+  // "resolve the conflict in bar A, but bar B still shows the OLD provider"
+  // confusion — picking a provider in either bar selects it in both.
+  let selectedProvider = "";
+  const onProviderPicked = (prov) => {
+    selectedProvider = prov;
+    if (oaProv.value !== prov) oaProv.value = prov;
+    if (inhProv.value !== prov) inhProv.value = prov;
+    refreshBoth();
+  };
 
   // --- Override-All bar: reversible global per-provider model blast ---
   // Writes project.yaml `model-override-all[provider] = model`. sync.py then
@@ -6796,50 +6946,51 @@ async function viewProjectModelOverrides() {
   // previous per-agent settings automatically — nothing else to clean up.
   const oaBar = el("div", { class: "btn-row", style: "margin:14px 0;padding:12px;background:var(--panel,#1c2230);border:1px solid var(--border,#2c3344);border-radius:8px;" });
   const oaProv = el("select");
-  oaProv.appendChild(el("option", { value: "" }, ["Provider wählen…"]));
+  oaProv.appendChild(el("option", { value: "" }, ["Select provider…"]));
   for (const tp of tierProviders) {
     oaProv.appendChild(el("option", { value: tp.name }, [tp.display_name || tp.name]));
   }
-  const oaModel = el("input", { type: "text", list: "global-model-list", placeholder: "Modell-ID (z.B. claude-sonnet-4-6)", style: "min-width:240px;" });
-  const oaBtn = el("button", { class: "btn btn-warning", title: "Setzt model-override-all[provider]=model → alle Agenten dieses Providers brennen auf dieses Modell (reversibel)" }, ["Alle Rollen überschreiben"]);
-  const oaClear = el("button", { class: "btn", title: "Entfernt den Provider-Key aus model-override-all → Normal-Auflösung greift wieder" }, ["Zurücksetzen"]);
+  oaProv.addEventListener("change", () => onProviderPicked(oaProv.value));
+  const oaModel = el("input", { type: "text", list: "global-model-list", placeholder: "Model ID (e.g. claude-sonnet-4-6)", style: "min-width:240px;" });
+  const oaBtn = el("button", { class: "btn btn-warning", title: "Sets model-override-all[provider]=model → every agent of this provider burns on this one model (reversible)" }, ["Override all roles"]);
+  const oaClear = el("button", { class: "btn", title: "Removes the provider key from model-override-all → normal per-agent resolution applies again" }, ["Reset"]);
   const oaStatus = el("span", { class: "muted", style: "margin-left:8px;" }, []);
+  const applyOverrideAll = async (prov, model) => {
+    const cur = { ...overrideAllEntries() };
+    cur[prov] = model;
+    await saveProjectSection("model-override-all", cur, status);
+    data["model-override-all"] = cur;
+  };
   oaBtn.addEventListener("click", async () => {
     const prov = oaProv.value;
     const model = oaModel.value.trim();
-    if (!prov) { oaStatus.textContent = "Override-All: zuerst einen Provider wählen."; return; }
-    if (!model) { oaStatus.textContent = "Override-All: zuerst ein Modell eingeben."; return; }
-    // Mutual lock: model-override-all and model-inherit-main-chat are
-    // exclusive per provider — refuse while inheritance is active.
+    if (!prov) { oaStatus.textContent = "Override all: pick a provider first."; return; }
+    if (!model) { oaStatus.textContent = "Override all: enter a model first."; return; }
+    // Mutual lock: refuse while inheritance is active for this provider — but
+    // offer a one-click way out instead of sending the user to the other bar.
     if (inheritEntries()[prov]) {
-      oaStatus.textContent = `Gesperrt: '${prov}' erbt das Main-Chat-Modell — erst den Inherit-Toggle ausschalten.`;
+      renderLocked(oaStatus, `Locked: '${prov}' currently inherits the main-chat model.`, "Disable inherit & override", async () => {
+        await setInherit(prov, false);
+        await applyOverrideAll(prov, model);
+        oaStatus.textContent = `${prov} → ${model} active (inherit disabled). Reversible: click Reset or delete the key.`;
+        refreshBoth();
+      });
       return;
     }
-    const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
-    cur[prov] = model;
     try {
-      await saveProjectSection("model-override-all", cur, status);
-      data["model-override-all"] = cur;
-      oaStatus.textContent = `${prov} → ${model} aktiv. Reversibel: Zurücksetzen oder Key löschen.`;
+      await applyOverrideAll(prov, model);
+      oaStatus.textContent = `${prov} → ${model} active. Reversible: click Reset or delete the key.`;
       if (oaProv.value === prov) oaModel.value = model;
-    } catch { oaStatus.textContent = "Fehler beim Speichern von model-override-all."; }
+    } catch { oaStatus.textContent = "Failed to save model-override-all."; }
   });
   oaClear.addEventListener("click", async () => {
     const prov = oaProv.value;
-    if (!prov) { oaStatus.textContent = "Zurücksetzen: zuerst einen Provider wählen."; return; }
-    // Mutual lock: refuse while inheritance is active for this provider.
-    if (inheritEntries()[prov]) {
-      oaStatus.textContent = `Gesperrt: '${prov}' erbt das Main-Chat-Modell — erst den Inherit-Toggle ausschalten.`;
-      return;
-    }
-    const cur = (data["model-override-all"] && typeof data["model-override-all"] === "object") ? { ...data["model-override-all"] } : {};
-    delete cur[prov];
+    if (!prov) { oaStatus.textContent = "Reset: pick a provider first."; return; }
     try {
-      await saveProjectSection("model-override-all", cur, status);
-      data["model-override-all"] = cur;
-      oaStatus.textContent = `${prov} entfernt → Normal-Auflösung greift wieder.`;
+      await clearOverrideAll(prov);
+      oaStatus.textContent = `${prov} removed → normal per-agent resolution applies again.`;
       oaModel.value = "";
-    } catch { oaStatus.textContent = "Fehler beim Zurücksetzen von model-override-all."; }
+    } catch { oaStatus.textContent = "Failed to reset model-override-all."; }
   });
   oaBar.appendChild(el("strong", { style: "margin-right:8px;" }, ["Override All:"]));
   oaBar.appendChild(oaProv);
@@ -6858,73 +7009,99 @@ async function viewProjectModelOverrides() {
   // and enforced again server-side (HTTP 409 with an explanatory message).
   const inheritBar = el("div", { class: "btn-row", style: "margin:0 0 14px;padding:12px;background:var(--panel,#1c2230);border:1px solid var(--border,#2c3344);border-radius:8px;" });
   const inhProv = el("select");
-  inhProv.appendChild(el("option", { value: "" }, ["Provider wählen…"]));
+  inhProv.appendChild(el("option", { value: "" }, ["Select provider…"]));
   for (const tp of tierProviders) {
     inhProv.appendChild(el("option", { value: tp.name }, [tp.display_name || tp.name]));
   }
-  const overrideAllEntries = () => ((data["model-override-all"] && typeof data["model-override-all"] === "object") ? data["model-override-all"] : {});
-  const inhToggleWrap = el("label", { class: "toggle", style: "margin-left:8px;", title: "Aktiv → Agenten dieses Providers erhalten kein model:-Feld und erben das Modell des Main-Chats" });
+  inhProv.addEventListener("change", () => onProviderPicked(inhProv.value));
+  const inhToggleWrap = el("label", { class: "toggle", style: "margin-left:8px;", title: "On → agents of this provider get no model: field and inherit the main-chat's model instead" });
   const inhCb = el("input", { type: "checkbox" });
   inhToggleWrap.appendChild(inhCb);
   inhToggleWrap.appendChild(el("span", { class: "slider" }));
   const inhStatus = el("span", { class: "muted", style: "margin-left:8px;" }, []);
 
+  // Renders a lock message with an inline one-click resolution button —
+  // replaces the old "go fix the OTHER bar yourself" plain-text message.
+  const renderLocked = (statusEl, message, actionLabel, onFix) => {
+    statusEl.replaceChildren();
+    statusEl.appendChild(document.createTextNode(message + " "));
+    const fixBtn = el("button", { class: "btn btn-sm", style: "margin-left:4px;" }, [actionLabel]);
+    fixBtn.addEventListener("click", async () => {
+      fixBtn.disabled = true;
+      try { await onFix(); }
+      catch (err) { statusEl.textContent = `Failed: ${err.message}`; }
+    });
+    statusEl.appendChild(fixBtn);
+  };
+
   // Reflect the picked provider's current state; keep the checkbox disabled
   // until a provider is selected.
-  inhProv.addEventListener("change", () => {
+  const refreshInhStatus = () => {
     const prov = inhProv.value;
     inhCb.disabled = !prov;
     if (!prov) { inhCb.checked = false; inhStatus.textContent = ""; return; }
     inhCb.checked = !!inheritEntries()[prov];
     if (overrideAllEntries()[prov]) {
-      inhStatus.textContent = `${prov}: Override-All aktiv → Inheritance gesperrt.`;
+      renderLocked(inhStatus, `${prov}: Override-All is active → inherit is locked.`, "Reset override & inherit", async () => {
+        await clearOverrideAll(prov);
+        await setInherit(prov, true);
+        refreshBoth();
+      });
     } else {
       inhStatus.textContent = inheritEntries()[prov]
-        ? `${prov} erbt das Main-Chat-Modell.`
-        : `${prov} nutzt die eigene Modell-Auflösung.`;
+        ? `${prov} inherits the main-chat model.`
+        : `${prov} uses its own model resolution.`;
     }
-  });
+  };
+  inhProv.addEventListener("change", refreshInhStatus);
+
+  const refreshBoth = () => { refreshInhStatus(); };
 
   inhCb.addEventListener("change", async () => {
     const prov = inhProv.value;
     const enabled = inhCb.checked;
     if (!prov) {
       inhCb.checked = false;
-      inhStatus.textContent = "Inherit-Toggle: zuerst einen Provider wählen.";
+      inhStatus.textContent = "Inherit toggle: pick a provider first.";
       return;
     }
     // Client-side mutual exclusion against model-override-all of the same
     // provider — the server re-checks this and answers 409 on conflict.
     if (enabled && overrideAllEntries()[prov]) {
       inhCb.checked = false;
-      inhStatus.textContent = `Gesperrt: '${prov}' hat einen model-override-all-Eintrag — zuerst im Override-All-Balken zurücksetzen.`;
+      renderLocked(inhStatus, `Locked: '${prov}' has a model-override-all entry.`, "Reset override & inherit", async () => {
+        await clearOverrideAll(prov);
+        await setInherit(prov, true);
+        inhCb.checked = true;
+        refreshBoth();
+      });
       return;
     }
     try {
-      const res = await api.post("/api/model-inherit", { provider: prov, enabled });
-      // Write the authoritative block from the server response back into the
-      // local cache so both bars observe consistent state.
-      data["model-inherit-main-chat"] = (res && typeof res.inherit_main_chat === "object") ? res.inherit_main_chat : {};
+      await setInherit(prov, enabled);
       inhStatus.textContent = enabled
-        ? `${prov} erbt jetzt das Main-Chat-Modell.`
-        : `${prov} nutzt wieder die eigene Modell-Auflösung.`;
+        ? `${prov} now inherits the main-chat model.`
+        : `${prov} uses its own model resolution again.`;
       toast(`model-inherit-main-chat[${prov}] = ${enabled}`, "success");
     } catch (err) {
       inhCb.checked = !enabled;
       inhStatus.textContent = err.status === 409
-        ? `Konflikt: ${err.message}`
-        : `Fehler beim Umschalten von model-inherit-main-chat: ${err.message}`;
+        ? `Conflict: ${err.message}`
+        : `Failed to toggle model-inherit-main-chat: ${err.message}`;
       toast(`model-inherit failed (${prov}): ${err.message}`, "error");
     }
   });
   // Initialize state text/disabled flag for the initial (empty) selection.
-  inhProv.dispatchEvent(new Event("change"));
+  refreshInhStatus();
 
   inheritBar.appendChild(el("strong", { style: "margin-right:8px;" }, ["Inherit Main-Chat:"]));
   inheritBar.appendChild(inhProv);
   inheritBar.appendChild(inhToggleWrap);
   inheritBar.appendChild(inhStatus);
   wrap.appendChild(inheritBar);
+  wrap.appendChild(el("p", { class: "field-help", style: "margin-top:-4px;" }, [
+    "Override All and Inherit Main-Chat are mutually exclusive per provider — picking a provider in either bar selects it in both.",
+  ]));
 
   // Flatten existing model-overrides into editable rows.
   const existing = (data["model-overrides"] && typeof data["model-overrides"] === "object") ? data["model-overrides"] : {};
@@ -7282,11 +7459,15 @@ async function viewBackups() {
     el("button", { class: "btn", onclick: async () => {
       const label = prompt("Optional label for backup:");
       if (label === null) return;
+      const body = el("p", { style: "font-size:1.1em; text-align:center; padding:var(--space-4) 0;" },
+        ["⏳ Creating backup — agent-meta config + provider folders. This can take a while for large projects, please wait…"]);
+      showModal("Backup in progress", body, []);
+      status.textContent = "Creating backup…";
       try {
-        status.textContent = "Creating backup…";
         await api.post("/api/backups/create", { label });
-        load();
-      } catch(e) { alert("Error: " + e); load(); }
+      } catch(e) { alert("Error: " + e); }
+      hideModal();
+      load();
     }}, ["Create Backup"])
   ]);
   wrap.appendChild(controls);
