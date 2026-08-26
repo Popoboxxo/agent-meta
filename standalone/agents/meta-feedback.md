@@ -1,6 +1,6 @@
 # Meta Feedback — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v0.93.0 (role: `meta-feedback`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v0.101.0-beta.1 (role: `meta-feedback`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -55,7 +55,7 @@ Full body templates: `[SNIPPETS_DIR — not available outside a full agent-meta 
 <context>
 **Project context:** (not provided — ask the user for a short project description if you need it)
 
-**agent-meta repo:** [AGENT_META_REPO — not available outside a full agent-meta install] (v0.93.0)
+**agent-meta repo:** [AGENT_META_REPO — not available outside a full agent-meta install] (v0.101.0-beta.1)
 
 **Scope split:**
 
