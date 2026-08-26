@@ -559,7 +559,14 @@ def test_fetch_anthropic_models_respects_blacklist():
     assert "claude-fable-5" not in ids
     assert "claude-opus-4-1-20250805" not in ids
     assert "claude-haiku-4-5-20251001" in ids
-    assert "claude-opus-4-8" in ids
+    # claude-opus-4-8 was superseded by claude-opus-5 in the live
+    # platform.claude.com models doc (verified 2026-08-26) -- this asserts
+    # against the LIVE catalog (fetch_anthropic_models() discards the
+    # curated fallback entirely on any successful live fetch, by design),
+    # so the expected id must track upstream reality, not agent-meta's own
+    # tier-preset defaults elsewhere in this repo (those may lag
+    # intentionally and are a separate concern from this test).
+    assert "claude-opus-5" in ids
 
 
 def test_fetch_anthropic_models_pricing_shape():

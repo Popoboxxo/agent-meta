@@ -91,11 +91,19 @@ def test_behavioral_cases_have_role_and_asserts():
 
 def test_routing_cases_keep_equals_semantics():
     """Legacy routing cases (kw-/mkw-/gen-/dis-/neg-/amb-/drift-) grade by
-    exact normalized one-word match on `pipeline`."""
+    exact normalized one-word match on `pipeline` — except `neg-`/`amb-`
+    cases, which by construction have no single correct pipeline (neg-:
+    none should match; amb-: several are equally valid) and grade on
+    `expected: [...]` instead; `pipeline: null` there is correct data, not
+    a missing field."""
     for name, case in _all_cases():
         cid = str(case.get("id", ""))
-        if cid.split("-")[0] in ("kw", "mkw", "gen", "dis", "neg", "amb", "drift"):
+        prefix = cid.split("-")[0]
+        if prefix in ("kw", "mkw", "gen", "dis", "drift"):
             assert case.get("pipeline"), f"{cid}: routing case without pipeline"
+            assert not case.get("prompt"), f"{cid}: legacy case must use task wrap"
+        elif prefix in ("neg", "amb"):
+            assert case.get("expected"), f"{cid}: {prefix} case without expected"
             assert not case.get("prompt"), f"{cid}: legacy case must use task wrap"
 
 
