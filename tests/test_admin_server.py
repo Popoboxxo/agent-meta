@@ -23,6 +23,11 @@ from unittest import mock
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADMIN_SERVER_PATH = _PROJECT_ROOT / "scripts" / "admin-server.py"
+# `lib.agents` (used by `_template_path`) is imported lazily, at call time, from
+# whatever `<test-root>/scripts` happens to be — tests that exercise it against
+# a throwaway temp root (which has no scripts/lib of its own) need the REAL
+# scripts/lib importable up front, not resolved through the fake root.
+sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
 
 
 def _load_admin_server():
@@ -216,6 +221,155 @@ class TestTemplatePathSecurity(unittest.TestCase):
             handler = self._make_handler(Path(tmp))
             path = handler._template_path("code-reviewer")
             self.assertTrue(str(path).endswith(os.path.join("1-generic", "code-reviewer.md")))
+
+    def test_resolves_override_only_from_active_platform(self) -> None:
+        """A role with SEVERAL same-named 2-platform overrides must resolve
+        to the one belonging to THIS project's active platform — not
+        whichever file glob() happens to list first. Regression test for a
+        bug where `_template_path` globbed agents/2-platform/*.md across
+        every platform on disk, so Save could silently overwrite an
+        unrelated, inactive platform's agent file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generic = root / "agents" / "1-generic"
+            platform = root / "agents" / "2-platform"
+            generic.mkdir(parents=True)
+            platform.mkdir(parents=True)
+            (generic / "developer.md").write_text("---\nname: developer\n---\ngeneric body", encoding="utf-8")
+            # Two platforms both override "developer" — only "agent-meta" is
+            # active for this project; "sharkord"'s override must be ignored.
+            (platform / "sharkord-developer.md").write_text("---\nname: developer\n---\nsharkord body", encoding="utf-8")
+            (platform / "agent-meta-developer.md").write_text("---\nname: developer\n---\nagent-meta body", encoding="utf-8")
+
+            handler = self._make_handler(root)
+            admin_server.AdminRequestHandler.config_manager = mock.Mock(
+                read=mock.Mock(return_value={"platforms": ["agent-meta"]})
+            )
+            try:
+                path = handler._template_path("developer")
+            finally:
+                del admin_server.AdminRequestHandler.config_manager
+            self.assertEqual(path.name, "agent-meta-developer.md")
+
+    def test_falls_back_to_generic_when_no_platform_is_active(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generic = root / "agents" / "1-generic"
+            platform = root / "agents" / "2-platform"
+            generic.mkdir(parents=True)
+            platform.mkdir(parents=True)
+            (generic / "developer.md").write_text("---\nname: developer\n---\ngeneric body", encoding="utf-8")
+            (platform / "sharkord-developer.md").write_text("---\nname: developer\n---\nsharkord body", encoding="utf-8")
+
+            handler = self._make_handler(root)
+            admin_server.AdminRequestHandler.config_manager = mock.Mock(
+                read=mock.Mock(return_value={"platforms": []})
+            )
+            try:
+                path = handler._template_path("developer")
+            finally:
+                del admin_server.AdminRequestHandler.config_manager
+            self.assertTrue(str(path).endswith(os.path.join("1-generic", "developer.md")))
+
+
+# --------------------------------------------------------------------------- #
+# Pricing overlay merge                                                       #
+# --------------------------------------------------------------------------- #
+
+
+class TestApplyPricingOverlay(unittest.TestCase):
+    """config/pricing-overlay.yaml key formats are inconsistent across
+    providers: most use bare model ids matching models.dev directly, but
+    opencode-go's ids are prefixed with "opencode-go/" (that prefix is the
+    real, runnable model id for this framework's `model:` field). Regression
+    coverage for the resulting id-format mismatch in the live models.dev
+    merge path."""
+
+    def _make_handler(self, root: Path, pricing_yaml: str):
+        (root / "config").mkdir(parents=True, exist_ok=True)
+        (root / "config" / "pricing-overlay.yaml").write_text(pricing_yaml, encoding="utf-8")
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        return handler
+
+    def test_prefixed_overlay_key_matches_bare_models_dev_id(self) -> None:
+        pricing_yaml = (
+            "prices:\n"
+            "  opencode-go:\n"
+            "    opencode-go/minimax-m3:\n"
+            "      input: 0.0\n"
+            "      output: 0.0\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root, pricing_yaml)
+            providers = {
+                "opencode-go": {
+                    "name": "OpenCode Go",
+                    "models": {
+                        # models.dev's own live catalog uses the bare id —
+                        # no "opencode-go/" prefix.
+                        "minimax-m3": {"id": "minimax-m3", "cost": {"input": 5.0, "output": 15.0}},
+                    },
+                },
+            }
+            merged = handler._apply_pricing_overlay(providers)
+            models = merged["opencode-go"]["models"]
+            # Patched in place under the bare id — no duplicate prefixed key.
+            self.assertEqual(set(models.keys()), {"minimax-m3"})
+            self.assertEqual(models["minimax-m3"]["cost"], {"input": 0.0, "output": 0.0})
+            self.assertEqual(models["minimax-m3"]["_costSource"], "overlay")
+
+    def test_bare_overlay_key_still_matches_bare_models_dev_id(self) -> None:
+        """Non-prefixed providers (anthropic, gemini, ...) must keep working
+        exactly as before — this is not opencode-go-specific behavior."""
+        pricing_yaml = (
+            "prices:\n"
+            "  anthropic:\n"
+            "    claude-sonnet-4-6:\n"
+            "      input: 3.0\n"
+            "      output: 15.0\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root, pricing_yaml)
+            providers = {
+                "anthropic": {
+                    "name": "Anthropic",
+                    "models": {
+                        "claude-sonnet-4-6": {"id": "claude-sonnet-4-6", "cost": {"input": 99.0, "output": 99.0}},
+                    },
+                },
+            }
+            merged = handler._apply_pricing_overlay(providers)
+            model = merged["anthropic"]["models"]["claude-sonnet-4-6"]
+            self.assertEqual(model["cost"], {"input": 3.0, "output": 15.0})
+            self.assertEqual(model["_costSource"], "overlay")
+
+    def test_overlay_key_matching_neither_form_is_ignored(self) -> None:
+        pricing_yaml = (
+            "prices:\n"
+            "  opencode-go:\n"
+            "    opencode-go/nonexistent-model:\n"
+            "      input: 1.0\n"
+            "      output: 2.0\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root, pricing_yaml)
+            providers = {
+                "opencode-go": {
+                    "name": "OpenCode Go",
+                    "models": {
+                        "minimax-m3": {"id": "minimax-m3", "cost": {"input": 5.0, "output": 15.0}},
+                    },
+                },
+            }
+            merged = handler._apply_pricing_overlay(providers)
+            models = merged["opencode-go"]["models"]
+            self.assertEqual(set(models.keys()), {"minimax-m3"})
+            self.assertNotIn("_costSource", models["minimax-m3"])
+            self.assertEqual(models["minimax-m3"]["cost"], {"input": 5.0, "output": 15.0})
 
 
 # --------------------------------------------------------------------------- #

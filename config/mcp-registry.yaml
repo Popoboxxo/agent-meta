@@ -95,7 +95,7 @@ mcp-servers:
       - --mcp
     secrets: []
   a2a-handoff:
-    description: 'A2A Handoff Protocol tools: Schema-Validierung und Route-Resolution'
+    description: 'A2A Handoff Protocol tools: schema validation and route resolution'
     category: agent-meta
     enabled-by-default: true
     tools:
@@ -267,7 +267,7 @@ mcp-servers:
     - MCP_REQOGNILOOM_USER_ID
     - MCP_REQOGNILOOM_WORKSPACE_ID
   playwright:
-    description: Playwright MCP Server für Browser-Automation und E2E-Tests
+    description: Playwright MCP Server for browser automation and E2E tests
     category: testing
     enabled-by-default: false
     tools:

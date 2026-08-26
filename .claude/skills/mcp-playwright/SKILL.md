@@ -5,7 +5,7 @@ description: "Use when calling Playwright MCP browser tools — allowed-tool lis
 
 # MCP: playwright
 
-> Playwright MCP Server für Browser-Automation und E2E-Tests
+> Playwright MCP Server for browser automation and E2E tests
 
 ---
 

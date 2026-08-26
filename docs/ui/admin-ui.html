@@ -1983,9 +1983,12 @@ async function viewRoles() {
       dg.setEdges(initialEdges);
     });
     clearBtn.addEventListener("click", () => {
-      dg.edges = [];
-      dg._render();
-      toast("Cleared edges", "info");
+      if (!dg.edges.length) return;
+      confirmDestructive(`Clear all ${dg.edges.length} delegation edge(s) from the graph?`, () => {
+        dg.edges = [];
+        dg._render();
+        toast("Cleared edges", "info");
+      }, { confirmLabel: "Clear edges" });
     });
   }, 0);
 
@@ -2809,10 +2812,10 @@ async function viewProjectExternalToolsOverrides() {
           style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
                + "border-radius:4px; background:rgba(180,83,9,0.1);",
         });
-        banner.appendChild(el("strong", {}, [`${allFindings.length} undeklarierte Artefakte gefunden`]));
+        banner.appendChild(el("strong", {}, [`${allFindings.length} undeclared artifact(s) found`]));
         const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
         allFindings.slice(0, 10).forEach((f) => {
-          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "kein Tool zugeordnet"}`]));
+          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "no tool assigned"}`]));
         });
         banner.appendChild(list);
         wrap.appendChild(banner);
@@ -4188,7 +4191,12 @@ async function viewProjectConventionsOverrides() {
       const tbody = el("tbody");
       for (const [path, label, type] of DOMAIN_FIELDS[domain]) {
         const fullPath = [domain, ...path];
-        const presetVal = getPath(presetSpec, path);
+        // presetSpec is the FULL multi-domain preset object ({release:{...},
+        // issues:{...}}) — path is domain-relative (e.g. ["versioning",
+        // "scheme"]), so the lookup needs the domain prefix too, same as the
+        // override lookup below. Without it this always misses one level
+        // and every "Preset Default" cell rendered "—" regardless of preset.
+        const presetVal = getPath(presetSpec, fullPath);
         const overrideVal = getPath(overrides, fullPath);
 
         const tr = el("tr");
@@ -6131,7 +6139,7 @@ async function viewProjectGeneral() {
     editor.value = spResp.text === "False" || spResp.text === "false" ? "" : (spResp.text || "");
     
     const toggleBtn = el("button", { class: "btn", style: "margin-right: var(--space-2);" }, [isEnabled ? "Disable Protection" : "Enable Protection"]);
-    toggleBtn.onclick = async () => {
+    const applyToggle = async () => {
       try {
         await api.put("/api/submodule-protection", {
           enabled: !isEnabled,
@@ -6141,6 +6149,20 @@ async function viewProjectGeneral() {
         setTimeout(() => router.resolve(), 500);
       } catch (e) {
         toast(e.message, "error");
+      }
+    };
+    toggleBtn.onclick = () => {
+      // Disabling is safety-critical (submodule-boundary enforcement, see
+      // .claude/rules/submodule-protection.md) — confirm it like every other
+      // destructive action in this app. Re-enabling needs no confirmation.
+      if (isEnabled) {
+        confirmDestructive(
+          "Disable submodule protection? This removes the guardrail that enforces the .agent-meta/ submodule boundary.",
+          applyToggle,
+          { confirmLabel: "Disable Protection" },
+        );
+      } else {
+        applyToggle();
       }
     };
     
@@ -7576,8 +7598,13 @@ async function viewProviderDeactivation() {
   deactAllBtn.addEventListener("click", () => {
     confirmDestructive("Deactivate ALL providers? This will zip and remove all provider directories.", async () => {
       deactAllBtn.disabled = true;
-      try { await api.post("/api/provider-deactivation/deactivate", { providers: [] });
-      router.resolve(); } catch { /* ignore */ }
+      try {
+        await api.post("/api/provider-deactivation/deactivate", { providers: [] });
+        router.resolve();
+      } catch (err) {
+        toast(`Deactivate ALL failed: ${err.message}`, "error");
+        deactAllBtn.disabled = false;
+      }
     });
   });
   bulkRow.appendChild(deactAllBtn);
@@ -7586,8 +7613,13 @@ async function viewProviderDeactivation() {
   actAllBtn.addEventListener("click", () => {
     confirmDestructive("Activate ALL providers from backups?", async () => {
       actAllBtn.disabled = true;
-      try { await api.post("/api/provider-deactivation/activate", { providers: [] });
-      router.resolve(); } catch { /* ignore */ }
+      try {
+        await api.post("/api/provider-deactivation/activate", { providers: [] });
+        router.resolve();
+      } catch (err) {
+        toast(`Activate ALL failed: ${err.message}`, "error");
+        actAllBtn.disabled = false;
+      }
     }, { confirmLabel: "Activate" });
   });
   bulkRow.appendChild(actAllBtn);
@@ -9528,17 +9560,27 @@ async function viewTierPresets() {
         const providerSpecificTiers = ((preset.providers || {})[pName] || {}).tiers || {};
         TIERS.forEach(tier => {
           let fullId;
+          let unmapped = false;
           if (providerSpecificTiers[tier]) {
             fullId = providerSpecificTiers[tier];
           } else if (presetTiers) {
-            fullId = presetTiers[tier] || tier;
+            fullId = presetTiers[tier];
+            if (!fullId) { fullId = tier; unmapped = true; }
           } else {
             const mappedTier = mapping[tier] || tier;
-            fullId = providerTiers[mappedTier] || mappedTier;
+            fullId = providerTiers[mappedTier];
+            if (!fullId) { fullId = mappedTier; unmapped = true; }
           }
           const short = (typeof fullId === "string" && fullId.includes("/")) ? fullId.split("/").pop() : fullId;
           const td = el("td", {});
-          td.appendChild(el("span", { class: "badge mono", title: String(fullId) }, [String(short || "-")]));
+          // An unmapped tier falls back to the TIER'S OWN NAME (e.g. "ultra")
+          // as a placeholder — render it visibly distinct from a real model
+          // id badge, or it silently reads as an actual resolved model.
+          if (unmapped) {
+            td.appendChild(el("span", { class: "muted", style: "font-style:italic;", title: `Tier "${tier}" is not mapped for this preset/provider — no fallback model configured.` }, ["(unmapped)"]));
+          } else {
+            td.appendChild(el("span", { class: "badge mono", title: String(fullId) }, [String(short || "-")]));
+          }
           tr.appendChild(td);
         });
 

@@ -2022,10 +2022,29 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 # Override path: real models.dev provider — patch matching models only.
                 provider_node = dict(merged[provider_key])
                 models = dict(provider_node.get("models", {}))
+                overlay_prefix = f"{provider_key}/"
                 for model_id, price in model_entries.items():
-                    if model_id not in models:
+                    # config/pricing-overlay.yaml key format is inconsistent
+                    # across providers: anthropic/gemini/mammouth use bare ids
+                    # matching models.dev directly, but opencode-go's ids are
+                    # prefixed with "opencode-go/" (that prefix IS the real,
+                    # runnable model id for this framework's `model:` config
+                    # field — model-registry.json's own `id` matches it, and
+                    # the legacy /models-legacy view resolves correctly off of
+                    # that). The live models.dev catalog itself only knows the
+                    # bare id, so try both before giving up — without this,
+                    # every opencode-go override silently no-ops and the UI
+                    # falls back to models.dev's own (inapplicable, since
+                    # opencode-go is a flat-fee gateway with no real per-token
+                    # cost) pricing guess instead of our curated $0 override.
+                    resolved_id = model_id if model_id in models else None
+                    if resolved_id is None and model_id.startswith(overlay_prefix):
+                        bare_id = model_id[len(overlay_prefix):]
+                        if bare_id in models:
+                            resolved_id = bare_id
+                    if resolved_id is None:
                         continue
-                    model = dict(models[model_id])
+                    model = dict(models[resolved_id])
                     cost = dict(model.get("cost") or {})
                     if price.get("input") is not None:
                         cost["input"] = price["input"]
@@ -2033,7 +2052,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         cost["output"] = price["output"]
                     model["cost"] = cost
                     model["_costSource"] = "overlay"
-                    models[model_id] = model
+                    models[resolved_id] = model
                 provider_node["models"] = models
                 merged[provider_key] = provider_node
             elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
@@ -3951,17 +3970,42 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         })
 
     def _template_path(self, role: str) -> Path | None:
-        """Resolve the platform-specific template path for a role."""
+        """Resolve the template path sync.py would actually use for this role.
+
+        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
+        sync.py itself uses (1-generic < 2-platform < 3-project, scoped to
+        this project's own active ``platforms`` list, in list order). A
+        previous version of this method globbed ALL of
+        ``agents/2-platform/*.md`` for any file ending in ``-{role}``,
+        regardless of whether that platform was even active for this
+        project — with several platforms shipping a same-named override
+        (e.g. ``sharkord-developer.md``, ``homeassistant-developer.md``,
+        ``agent-meta-developer.md``), the glob's filesystem-order-dependent
+        first match could silently load AND SAVE an unrelated platform's
+        file while telling the user "Loaded developer.md".
+        """
         if not role or any(c in role for c in ("/", "\\", "..")):
             raise SecurityError(f"invalid role name: {role!r}")
         safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
         if safe != role:
             raise SecurityError(f"invalid role name: {role!r}")
-        candidate = self._agent_meta_root() / "agents" / "1-generic" / f"{role}.md"
-        # Also check 2-platform for platform-specific overrides.
-        for entry in (self._agent_meta_root() / "agents" / "2-platform").glob("*.md"):
-            if entry.stem.endswith(f"-{role}"):
-                return entry
+        agent_meta_root = self._agent_meta_root()
+        candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
+        try:
+            project_root = self.__class__.root
+            sys.path.insert(0, str(project_root / "scripts"))
+            sys.path.insert(0, str(project_root / ".agent-meta" / "scripts"))
+            from lib.agents import collect_sources  # type: ignore[import]
+            project_config = self.__class__.config_manager.read("project") or {}
+            active_platforms = project_config.get("platforms", [])
+            overrides, _ = collect_sources(agent_meta_root, active_platforms)
+            resolved = overrides.get(role)
+            if resolved is not None:
+                return resolved
+        except Exception:  # noqa: BLE001
+            # Fall through to the plain generic-template path — better to
+            # edit the generic base than to error out of the Templates page.
+            pass
         return candidate
 
     def _stream_events(self) -> None:
