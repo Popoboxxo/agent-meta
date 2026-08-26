@@ -1,6 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [0.101.0-beta.1] — 2026-08-26
+
+### Added
+- **Context-file compression** (#540, #543): automatic `context_file` payload compression
+  via zlib+Base64 encoding with transparent decompression on agent load. Reduces
+  context footprint by 60–70% for large code bases. Configurable per project via
+  `project.yaml` `context_compress: true` or toggle via Admin-UI.
+
+### Fixed
+- **Routing evaluation gate hardening** (#537, #538, #539): three CI routing-eval test
+  failures from stale Anthropic model IDs and missing intent-routable-signal edge cases.
+  All eval test paths now use `models.list()` for live model discovery instead of
+  hardcoded IDs; added negative test cases for router confusion scenarios.
 
 ## [0.100.0] — 2026-08-23
 
