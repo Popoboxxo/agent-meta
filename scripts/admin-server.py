@@ -3608,7 +3608,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
             "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",
-            "external-tools", "external-tools-registry",
+            "external-tools", "external-tools-registry", "context_file",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
