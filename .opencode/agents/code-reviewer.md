@@ -6,7 +6,7 @@ description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analys
 prompt_mode: modern
 generated-from: 1-generic/code-reviewer.md@1.2.2
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/kimi-k2.6
 permission:
   read: allow
   bash: allow

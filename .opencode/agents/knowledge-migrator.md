@@ -5,7 +5,7 @@ description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge 
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 generated-from: 1-generic/knowledge-migrator.md@1.0.0
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

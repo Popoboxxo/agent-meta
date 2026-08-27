@@ -7,7 +7,7 @@ description: '[EASTER EGG / GAG AGENT — not for production] The eternally enth
 prompt_mode: modern
 generated-from: 1-generic/intern-developer.md@1.0.0
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

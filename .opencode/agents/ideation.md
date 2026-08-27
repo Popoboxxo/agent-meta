@@ -6,7 +6,7 @@ description: Use when an idea needs scoping and thoughts need sorting before a c
 prompt_mode: modern
 generated-from: 1-generic/ideation.md@1.7.0
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

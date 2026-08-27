@@ -6,7 +6,7 @@ description: Data-driven identification and resolution of Big-O bottlenecks usin
 prompt_mode: modern
 generated-from: 1-generic/performance-optimizer.md@1.2.0
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/kimi-k2.6
 permission:
   read: allow
   edit: allow

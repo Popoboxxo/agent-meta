@@ -6,7 +6,7 @@ description: Use when a concept, REQ, or bug needs to be turned into a concrete,
 prompt_mode: modern
 generated-from: 1-generic/planner.md@1.0.2
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

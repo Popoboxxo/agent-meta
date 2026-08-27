@@ -5,7 +5,7 @@ description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-St
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 generated-from: 1-generic/knowledge-curator.md@1.0.0
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

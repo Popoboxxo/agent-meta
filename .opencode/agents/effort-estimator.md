@@ -5,7 +5,7 @@ description: Estimates effort for development tasks based on task type and LLM c
 prompt_mode: modern
 generated-from: 1-generic/effort-estimator.md@1.0.3
 mode: subagent
-model: opencode-go/ox-alpha-free
+model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

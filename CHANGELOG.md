@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.101.0-beta.3] — 2026-08-27
+
+### Changed
+- **Build and version sync** (#latest): rebuilt agent templates via sync.py.
+
 ## [0.101.0-beta.2] — 2026-08-26
 
 ### Fixed

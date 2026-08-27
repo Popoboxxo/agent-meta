@@ -33,7 +33,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
  Opencode->AGENTS.md |
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.101.0-beta.1` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.101.0-beta.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
