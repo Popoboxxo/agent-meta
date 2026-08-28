@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.101.0-beta.2 — `2026-08-26`
+> Generiert von agent-meta v0.101.0-beta.3 — `2026-08-28`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -29,7 +29,18 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-> Tech-Stack, Architektur & Build-Befehle: discoverable via Repo (Manifeste, CI-Configs).
+> Stack: Python 3.x · Python 3, Markdown, YAML · Deps: - Python: `>=3.8`
+
+> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+
+**Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
+
+**Besondere Patterns:**
+- Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
+- Platzhalter {{VARIABLE}} werden von sync.py substituiert
+- Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
+- Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
+
 
 ## Code-Konventionen
 
@@ -38,6 +49,8 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
 
+
+> Build: `python scripts/sync.py` · Test: `python3 scripts/sync.py --validate` · Dev: `(kein Dev-Stack)` · Reload: `(kein Dev-Stack)`
 
 ## Anforderungs-Kategorien
 
@@ -57,7 +70,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
 
-Generiert von agent-meta v0.101.0-beta.2 — `2026-08-27`
+Generiert von agent-meta v0.101.0-beta.3 — `2026-08-28`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Du bist im `main-chat` Modus. Du agierst direkt als Router und Worker (siehe `use-orchestrator.md`).
 

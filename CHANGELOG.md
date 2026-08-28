@@ -17,10 +17,11 @@
 ## [0.101.0-beta.1] — 2026-08-26
 
 ### Added
-- **Context-file compression** (#540, #543): automatic `context_file` payload compression
-  via zlib+Base64 encoding with transparent decompression on agent load. Reduces
-  context footprint by 60–70% for large code bases. Configurable per project via
-  `project.yaml` `context_compress: true` or toggle via Admin-UI.
+- **Context-file compression** (#540, #543): automatic `context_file` density control via
+  `context_file.mode: compact` — instruction-preserving compression that keeps stack,
+  build and entry-point values inline while collapsing overviews to pointers. Reduces
+  context footprint by ~40–50% for large code bases. Configurable per project via
+  `project.yaml` `context_file.mode` or toggle via Admin-UI.
 
 ### Fixed
 - **Routing evaluation gate hardening** (#537, #538, #539): three CI routing-eval test

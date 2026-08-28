@@ -5,7 +5,14 @@
 **Plattform:** {{PLATFORM}}
 **Beschreibung:** {{PROJECT_DESCRIPTION}}
 
-{{#if COMPACT_MODE}}> Tech-Stack, Architektur & Build-Befehle: discoverable via Repo (Manifeste, CI-Configs).
+{{#if COMPACT_MODE}}> Stack: {{RUNTIME}} · {{LANGUAGE}} · Deps: {{SYSTEM_DEPENDENCIES}}
+
+> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+
+**Entry-Point:** `{{ENTRY_POINT_PATTERN}}`
+
+**Besondere Patterns:**
+{{KEY_PATTERNS}}
 
 {{else}}## Tech-Stack
 
@@ -31,7 +38,9 @@
 
 {{CODE_CONVENTIONS}}
 
-{{#if COMPACT_MODE}}{{else}}## Build & Development
+{{#if COMPACT_MODE}}> Build: `{{BUILD_COMMAND}}` · Test: `{{TEST_COMMAND}}` · Dev: `{{DEV_STACK_START}}` · Reload: `{{DEV_STACK_RELOAD}}`
+
+{{else}}## Build & Development
 
 ```bash
 # Build
