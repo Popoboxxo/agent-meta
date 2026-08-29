@@ -235,6 +235,49 @@ def test_destructive_ops_blocked_even_with_git_sentinel(command, tmp_path):
     assert "user approval" in result.stderr
 
 
+# --- issue #542: newline-aware destructive patterns ----------------------
+
+# Multi-line commands whose LATER lines merely mention push/--force/-f etc.
+# as TEXT must not trip the destructive gate (issue #542): the old character
+# classes ([^|;&]*, \s+) crossed line boundaries, so a keyword on one line
+# and a flag on a later line were read as one destructive git invocation.
+# Each case pairs a keyword with its flag on DIFFERENT lines -- same-line
+# text mentions remain a documented limitation (best-effort keyword gate).
+DESTRUCTIVE_TEXT_FALSE_POSITIVES = [
+    "git status\necho \"ready to push\"\necho \"reminder: never use --force on shared branches\"",
+    # heredoc-style echo: keyword and flag on separate body lines
+    "git status\ncat <<'EOF'\nplan: push the feature branch\nnote: avoid --force on main\nEOF",
+    "git status\necho \"will reset soon\"\necho \"then go --hard on cleanup\"",
+    "git status\necho \"clean up the mess\"\necho \"flag -f means force\"",
+    "git status\ncat <<'EOF'\ntodo: stash\ndrop obsolete patches\nEOF",
+    "git status\necho see checkout docs\n-- .",
+    "git status\necho restore notes\n.",
+]
+
+
+@pytest.mark.parametrize("command", DESTRUCTIVE_TEXT_FALSE_POSITIVES)
+def test_destructive_gate_ignores_text_across_lines(command, tmp_path):
+    """#542: destructive patterns must not match across line boundaries."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"command={command!r}: text mention on a later line must not trip the "
+        f"destructive gate\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+@pytest.mark.parametrize("command", [
+    "git push --force origin main",
+    # real destructive op as the second line of a multi-line command must
+    # still be caught (newline scoping must not weaken detection)
+    "git status\ngit push --force origin main",
+])
+def test_real_force_push_still_blocked_in_multiline(command, tmp_path):
+    """#542: detection of real destructive ops survives newline scoping."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
 def test_non_git_agent_cannot_use_fake_sentinel_for_destructive(tmp_path):
     """The exact incident from #516: fake `general-purpose` elevation path is
     irrelevant — even claiming git, destructive ops stay blocked."""
@@ -256,3 +299,46 @@ def test_elevation_attempts_are_audited(tmp_path):
     content = audit_file.read_text(encoding="utf-8")
     assert "role=git" in content
     assert "git status" in content
+
+
+# --- issue #542: newline-aware destructive patterns ----------------------
+
+# Multi-line commands whose LATER lines merely mention push/--force/-f etc.
+# as TEXT must not trip the destructive gate (issue #542): the old character
+# classes ([^|;&]*, \s+) crossed line boundaries, so a keyword on one line
+# and a flag on a later line were read as one destructive git invocation.
+# Each case pairs a keyword with its flag on DIFFERENT lines -- same-line
+# text mentions remain a documented limitation (best-effort keyword gate).
+DESTRUCTIVE_TEXT_FALSE_POSITIVES = [
+    "git status\necho \"ready to push\"\necho \"reminder: never use --force on shared branches\"",
+    # heredoc-style echo: keyword and flag on separate body lines
+    "git status\ncat <<'EOF'\nplan: push the feature branch\nnote: avoid --force on main\nEOF",
+    "git status\necho \"will reset soon\"\necho \"then go --hard on cleanup\"",
+    "git status\necho \"clean up the mess\"\necho \"flag -f means force\"",
+    "git status\ncat <<'EOF'\ntodo: stash\ndrop obsolete patches\nEOF",
+    "git status\necho see checkout docs\n-- .",
+    "git status\necho restore notes\n.",
+]
+
+
+@pytest.mark.parametrize("command", DESTRUCTIVE_TEXT_FALSE_POSITIVES)
+def test_destructive_gate_ignores_text_across_lines(command, tmp_path):
+    """#542: destructive patterns must not match across line boundaries."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"command={command!r}: text mention on a later line must not trip the "
+        f"destructive gate\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+@pytest.mark.parametrize("command", [
+    "git push --force origin main",
+    # real destructive op as the second line of a multi-line command must
+    # still be caught (newline scoping must not weaken detection)
+    "git status\ngit push --force origin main",
+])
+def test_real_force_push_still_blocked_in_multiline(command, tmp_path):
+    """#542: detection of real destructive ops survives newline scoping."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
