@@ -5,6 +5,7 @@
 | Skill | Wann |
 |---|---|
 | sync-interface | sync.py, Templates/Rules ändern |
+| admin-ui | Admin-Server/UI betreiben (Lifecycle, Token, Ports) |
 | architecture | Templates/Overrides/Placeholder ändern |
 | conventions | Vor Commits in agents/, config/, scripts/lib |
 | submodule-protection | .agent-meta/, external/, .gitmodules |

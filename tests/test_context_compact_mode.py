@@ -532,6 +532,7 @@ _PLATFORM_RULE_FULL_MARKERS = {
     "sync-interface": "## Neue Funktionen",
     "architecture": "## Schichten-Modell",
     "conventions": "## Change Checklist",
+    "admin-ui": "## Troubleshooting",
 }
 
 
@@ -624,13 +625,16 @@ def test_540_compact_opencode_embeds_platform_rules_compacted(seeded_project):
     assert "## Branch-Guard-Erweiterung für agent-meta" in compact  # sync-interface
     assert "## Abhängigkeitsprinzip" in compact                     # architecture
     assert "## Hard Invariants" in compact                          # conventions
+    assert "## Host-Bindung + Token-Regeln" in compact              # admin-ui
 
     # OVERVIEW sections are gone.
     assert "## Neue Funktionen: Smart Context Regeneration" not in compact
     assert "## Schichten-Modell" not in compact
     assert "## Change Checklist" not in compact
+    assert "## Troubleshooting" not in compact                      # admin-ui
 
     # Pointer lines to the full references are present.
     assert "`.claude/skills/sync-interface/SKILL.md`" in compact
     assert "`docs/architecture/01-layer-model.md`" in compact
     assert "`.claude/skills/conventions/SKILL.md`" in compact
+    assert "`.claude/skills/admin-ui/SKILL.md`" in compact
