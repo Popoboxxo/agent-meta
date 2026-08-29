@@ -418,6 +418,39 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
 .modal-close { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; }
 
 /* =====================================================================
+ * Token prompt overlay (remote admin token login)
+ * ===================================================================== */
+.token-prompt-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9100;
+}
+.token-prompt-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  width: min(420px, 92vw);
+  padding: var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.token-prompt-box h2 { margin: 0; font-size: 16px; }
+.token-prompt-msg { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.token-prompt-input {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.token-prompt-input:focus { outline: none; border-color: var(--accent-blue); }
+.token-prompt-error { margin: 0; color: var(--accent-red); font-size: 12px; min-height: 16px; }
+.token-prompt-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+
+/* =====================================================================
  * Role cards (Phase 3)
  * ===================================================================== */
 .role-grid {
@@ -803,22 +836,124 @@ document.getElementById("modal-overlay").addEventListener("click", (ev) => {
 });
 
 /* =========================================================================
+ * Admin token transport (remote auth)
+ * ========================================================================= */
+const TOKEN_STORAGE_KEY = "agent-meta-admin-token";
+
+function getToken() {
+  try { return sessionStorage.getItem(TOKEN_STORAGE_KEY) || null; } catch { return null; }
+}
+function setToken(token) {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch { /* sessionStorage unavailable — ignore */ }
+}
+
+// Ingest a ?token= query param (e.g. a CLI-provided deep link), persist it to
+// sessionStorage, then scrub it from the URL so it never lands in history,
+// logs or referrers. Runs once at module load — before any network call.
+(function ingestUrlToken() {
+  const token = new URLSearchParams(window.location.search).get("token");
+  if (!token) return;
+  setToken(token);
+  const url = new URL(window.location.href);
+  url.searchParams.delete("token");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+})();
+
+// --- Token prompt overlay ------------------------------------------------
+let activeTokenPrompt = null;
+
+function promptForToken(errorMessage) {
+  // De-duplicate concurrent 401s: all awaiters share a single open prompt.
+  if (activeTokenPrompt) return activeTokenPrompt;
+  activeTokenPrompt = new Promise((resolve) => {
+    const box = el("div", { class: "token-prompt-box" }, [
+      el("h2", {}, ["Admin token required"]),
+      el("p", { class: "token-prompt-msg" }, [errorMessage || "This admin UI is protected by an access token. Enter it to continue."]),
+      el("input", { class: "token-prompt-input", type: "password", placeholder: "Admin token", autocomplete: "off" }),
+      el("p", { class: "token-prompt-error" }, [""]),
+      el("div", { class: "token-prompt-actions" }, [
+        el("button", { class: "btn btn-primary" }, ["Continue"]),
+        el("button", { class: "btn" }, ["Cancel"]),
+      ]),
+    ]);
+    const overlay = el("div", { class: "token-prompt-overlay" }, [box]);
+    document.body.appendChild(overlay);
+
+    const input = box.querySelector(".token-prompt-input");
+    const errorEl = box.querySelector(".token-prompt-error");
+    const [continueBtn, cancelBtn] = box.querySelectorAll(".token-prompt-actions button");
+
+    const finish = (token) => { overlay.remove(); resolve(token); };
+
+    continueBtn.addEventListener("click", () => {
+      const value = input.value.trim();
+      if (!value) { errorEl.textContent = "Enter a token."; return; }
+      finish(value);
+    });
+    cancelBtn.addEventListener("click", () => finish(null));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") continueBtn.click();
+      if (ev.key === "Escape") finish(null);
+    });
+    overlay.addEventListener("click", (ev) => { if (ev.target === overlay) finish(null); });
+    input.focus();
+  }).finally(() => { activeTokenPrompt = null; });
+  return activeTokenPrompt;
+}
+
+// Central auth-aware fetch: injects the Bearer token when present and, on a
+// 401, prompts for a token and retries until the request succeeds or the
+// user cancels. When no token is configured server-side, nothing is injected
+// and the request passes through untouched (loopback behaviour unchanged).
+async function authFetch(url, options = {}) {
+  const opts = { ...options };
+  opts.headers = new Headers(options.headers || {});
+  const existingToken = getToken();
+  if (existingToken) opts.headers.set("Authorization", "Bearer " + existingToken);
+
+  let res = await fetch(url, opts);
+  if (res.status !== 401) return res;
+
+  let lastError = "";
+  while (true) {
+    const newToken = await promptForToken(lastError);
+    if (newToken === null) {
+      // User cancelled — surface the original 401 to the caller.
+      throw new APIError(res.status, await safeJson(res));
+    }
+    opts.headers.set("Authorization", "Bearer " + newToken);
+    res = await fetch(url, opts);
+    if (res.status !== 401) {
+      // Persist only after the server accepted the token — never store a
+      // rejected token in sessionStorage.
+      setToken(newToken);
+      return res;
+    }
+    // Server rejected the token — do not persist it, let the user try again.
+    lastError = "Invalid token. Please try again.";
+  }
+}
+
+/* =========================================================================
  * API client
  * ========================================================================= */
 class API {
   constructor(base = "") { this.base = base; }
   async get(path) {
-    const res = await fetch(this.base + path);
+    const res = await authFetch(this.base + path);
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.json();
   }
   async getText(path) {
-    const res = await fetch(this.base + path);
+    const res = await authFetch(this.base + path);
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.text();
   }
   async put(path, body) {
-    const res = await fetch(this.base + path, {
+    const res = await authFetch(this.base + path, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -827,7 +962,7 @@ class API {
     return res.json();
   }
   async post(path, body = {}) {
-    const res = await fetch(this.base + path, {
+    const res = await authFetch(this.base + path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -836,12 +971,17 @@ class API {
     return res.json();
   }
   async delete(path) {
-    const res = await fetch(this.base + path, { method: "DELETE" });
+    const res = await authFetch(this.base + path, { method: "DELETE" });
     if (!res.ok) throw new APIError(res.status, await safeJson(res));
     return res.json();
   }
   streamEvents(path, onEvent) {
-    const source = new EventSource(this.base + path);
+    // EventSource cannot carry Authorization headers, so the token travels as
+    // a query parameter — the server accepts both (see _check_token).
+    let url = this.base + path;
+    const token = getToken();
+    if (token) url += (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token);
+    const source = new EventSource(url);
     // Surface persistent reconnect failures as a toast so the user knows the
     // live event stream is broken. The browser auto-reconnects transiently,
     // but if it gives up (readyState === CLOSED) we should not stay silent.
@@ -9846,7 +9986,18 @@ init();
 <script>
 // --- 3-State Help System ---
 (async function() {
-  const helpDocs = await fetch('/api/help').then(r => r.json()).catch(() => ({}));
+  // This classic script runs before the module script, so re-read the token
+  // from the URL query directly (and fall back to sessionStorage) rather than
+  // relying on the module's ingestUrlToken() which has not run yet.
+  const token = (function () {
+    try {
+      const urlTok = new URLSearchParams(window.location.search).get("token");
+      if (urlTok) return urlTok;
+      return sessionStorage.getItem("agent-meta-admin-token") || "";
+    } catch { return ""; }
+  })();
+  const headers = token ? { "Authorization": "Bearer " + token } : {};
+  const helpDocs = await fetch('/api/help', { headers }).then(r => r.json()).catch(() => ({}));
   if (Object.keys(helpDocs).length === 0) return;
 
   let helpState = parseInt(localStorage.getItem('agent-meta-help-state') || '0');

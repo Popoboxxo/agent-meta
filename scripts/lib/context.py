@@ -929,6 +929,14 @@ _COMPACT_PLATFORM_RULES = {
             "`.claude/skills/conventions/SKILL.md`."
         ),
     },
+    "admin-ui": {
+        "keep": ("## Host-Bindung + Token-Regeln", "## Token-Distribution"),
+        "pointer": (
+            "Details (Zwei Modi, Server-Lifecycle, Flags, Port-Matrix, "
+            "Token-Persistenz, Diagnose-Folge, Known Issues, Troubleshooting): "
+            "`.claude/skills/admin-ui/SKILL.md`."
+        ),
+    },
 }
 
 

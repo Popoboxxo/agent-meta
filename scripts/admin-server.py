@@ -1211,9 +1211,22 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Allow", "GET, PUT, POST, DELETE, OPTIONS")
         self.end_headers()
 
+    def _is_public_get_path(self) -> bool:
+        """Return True for GET paths served without token auth.
+
+        The admin UI shell (``/``) and its favicon are static, self-contained
+        public assets — they carry no secrets and must load *before* the
+        client can present the token login overlay. Every ``/api/*`` endpoint
+        remains token-gated (and, for mutations, origin-checked).
+        """
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        return path in ("/", "/favicon.png")
+
     def do_GET(self) -> None:
         try:
-            self._check_token()
+            if not self._is_public_get_path():
+                self._check_token()
             self._dispatch_get()
         except AuthError as exc:
             self._send_json(

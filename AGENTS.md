@@ -33,7 +33,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
  Opencode->AGENTS.md |
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v0.101.0-beta.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v0.101.0-beta.3` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 ## Regeln
@@ -155,6 +155,7 @@ Regeln für den Umgang mit allen Git-Submodulen (`.agent-meta/`, `external/*/`, 
 | Skill | Wann |
 |---|---|
 | sync-interface | sync.py, Templates/Rules ändern |
+| admin-ui | Admin-Server/UI betreiben (Lifecycle, Token, Ports) |
 | architecture | Templates/Overrides/Placeholder ändern |
 | conventions | Vor Commits in agents/, config/, scripts/lib |
 | submodule-protection | .agent-meta/, external/, .gitmodules |
@@ -184,6 +185,33 @@ Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 
 Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 
+
+
+# agent-meta — Admin-Server / Admin-UI Betriebswissen
+
+Betriebswissen für `scripts/admin-server.py` — den zero-dependency HTTP-Server
+(Python stdlib + PyYAML), der die visuelle Konfigurations-Oberfläche von
+agent-meta (`docs/ui/admin-ui.html`) ausliefert und REST/SSE-Endpunkte über die
+YAML/JSON-Configs des Frameworks bereitstellt.
+
+## Host-Bindung + Token-Regeln
+
+- **Default: Loopback** (`127.0.0.1`) → kein Token nötig.
+- **Non-loopback** (`--host 0.0.0.0`) → Token **erzwungen** (fail-closed: der
+  Server verweigert den Start ohne Token).
+- Token-Auflösung (Priorität): `--admin-token` > Env `ADMIN_UI_TOKEN` >
+  `admin-ui.token` in `project.yaml` > `admin-ui.token-file`.
+
+## Token-Distribution
+
+- `Authorization: Bearer <token>` Header — für alle `/api/*`-Requests.
+- `?token=<token>` Query-Parameter — Bequemlichkeit für den Browser: die UI
+  übernimmt das Token nach `sessionStorage` und entfernt es aus der URL (kein
+  `localStorage`, kein Verbleib in der History).
+- Die UI-Shell (`/`, `/favicon.png`) ist public; jeder `/api/*`-Endpoint ist
+  token-gated, Mutationen zusätzlich origin-geprüft (CSRF/DNS-Rebinding).
+
+Details (Zwei Modi, Server-Lifecycle, Flags, Port-Matrix, Token-Persistenz, Diagnose-Folge, Known Issues, Troubleshooting): `.claude/skills/admin-ui/SKILL.md`.
 
 
 # agent-meta — Schichten-Architektur

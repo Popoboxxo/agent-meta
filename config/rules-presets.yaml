@@ -100,6 +100,9 @@ presets:
     sync-interface:
       channel: skill
       skill-description: "Use when running sync.py, changing agent templates or rules in agent-meta — covers CLI flags, branch policy for syncs, --check/context-hashes drift detection."
+    admin-ui:
+      channel: skill
+      skill-description: "Use when operating the admin-server/admin-ui in agent-meta — lifecycle, host binding, token auth, port matrix, troubleshooting."
     architecture:
       channel: skill
       skill-description: "Use when adding or changing agent templates, platform overrides, project extensions or placeholders in agent-meta — covers the 0/1/2/3 layer model, composition syntax and placeholder escaping."

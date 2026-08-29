@@ -288,6 +288,9 @@ The extensive documentation for Agent-Meta has been reorganized into the `docs/`
 - Setup, CI integration, feature guides, and reflection loops.
 - MCP configurations and quality pipelines.
 
+### Admin UI How-Tos (`docs/howto/`)
+- **[Remote Access to the Admin UI](docs/howto/admin-ui-remote-access.md)**: Expose `admin-server.py` beyond localhost with token authentication — lifecycle, flags, ports, troubleshooting.
+
 ### API & Framework Reference (`docs/api/`)
 Detailed definitions of all core functions, CLI commands, and framework mappings:
 - **[CLI Reference](docs/api/cli-reference.md)**: Full list of all `sync.py` flags and operations.
