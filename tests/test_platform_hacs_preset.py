@@ -30,6 +30,11 @@ Tiers (mirroring audit Section 7.2):
                        so {{platform.hacs.*}} substitution is exercised):
                        sync_agents_for_provider + sync_rules.
 
+Addendum (Issue #534, Release-Naming-Best-Practice): Tier-2 content-contract
+tests pin the release-naming block across the skill source and the
+hacs-release / hacs-developer agent anchors (section header, vX.Y.Zb<N>
+beta-tag example, anchor presence, example consistency skill ↔ agents).
+
 Encoding of the "temp project + sync.py run" (Tier 3): pytest builds the
 consumer project (project config dict with platforms/roles/rules plus
 .claude/platform-config.yaml overrides) inside tmp_path and invokes the lib
@@ -493,6 +498,105 @@ class TestTier2CollectionAndRoleMapping:
         )
         assert opts.get("channel") == "skill"
         assert (opts.get("skill-description") or "").strip()  # English one-liner per convention
+
+
+# ---------------------------------------------------------------------------
+# Tier 2b — Release-Naming-Best-Practice block (skill source + agent anchors)
+# ---------------------------------------------------------------------------
+
+_STABLE_TAG_EXAMPLE = "v1.2.3"
+_BETA_TAG_EXAMPLE = "v1.3.0b0"
+
+_HACS_RULE = _REPO_ROOT / "rules" / "2-platform" / "hacs-integration-development.md"
+_HACS_RELEASE_AGENT = _REPO_ROOT / "agents" / "2-platform" / "hacs-release.md"
+_HACS_DEVELOPER_AGENT = _REPO_ROOT / "agents" / "2-platform" / "hacs-developer.md"
+
+
+class TestTier2ReleaseNamingBlock:
+    """Release-Naming contract across the skill source and the agent anchors.
+
+    The naming block lives in the skill (single source of truth, iron-rule
+    style: Regel | Begründung | Fehlerklasse) and is mirrored as compact
+    always-on anchors in hacs-release.md (full anchor) and hacs-developer.md
+    (one-line tag format in workflow step 6). The literal examples
+    v1.2.3 / v1.3.0b0 must stay consistent across all three files.
+    """
+
+    def test_req534_tier2_rule_has_release_naming_section_with_six_rules(self):
+        """REQ-534: skill carries the Release-Naming section, iron-rule table + sources."""
+        content = _HACS_RULE.read_text(encoding="utf-8")
+        assert "## Release-Naming-Best-Practice" in content
+
+        section = content.split("## Release-Naming-Best-Practice", 1)[1]
+        section = section.split("\n## ", 1)[0]  # cut at the next top-level section
+
+        # Iron-rule table shape: header + 6 data rows (Regel|Begründung|Fehlerklasse).
+        assert "| Regel | Begründung | Fehlerklasse bei Verstoß |" in section
+        data_rows = [
+            line for line in section.splitlines()
+            if line.startswith("| ") and "Regel | Begründung" not in line
+        ]
+        assert len(data_rows) == 6, f"expected 6 naming rules, found {len(data_rows)}"
+
+        # All six rule topics present (tag format, bare semver, beta/pre-release,
+        # immutability + promotion, release-notes structure, semver discipline).
+        for marker in (
+            "vMAJOR.MINOR.PATCH",
+            "bare SemVer",
+            "vX.Y.Zb<N>",
+            "pre-release",
+            "nie verschieben, löschen, wiederverwenden",
+            "Summary",
+            "💥 Breaking changes",
+            "Full-Changelog-Link",
+            "MAJOR",
+            "unique_id",
+        ):
+            assert marker in section, f"naming section missing marker: {marker}"
+
+        # Research sources documented as URL list inside the section.
+        for url in (
+            "https://hacs.xyz/docs/publish/start",
+            "https://hacs.xyz/docs/use/entities/switch",
+            "https://developers.home-assistant.io/docs/versioning",
+            "https://semver.org/",
+        ):
+            assert url in section, f"naming section missing source: {url}"
+
+    def test_req534_tier2_rule_has_tag_examples_in_workflow_step6(self):
+        """REQ-534: workflow step 6 (Release-Dreiklang) names stable + beta tag examples."""
+        content = _HACS_RULE.read_text(encoding="utf-8")
+        assert _STABLE_TAG_EXAMPLE in content
+        assert _BETA_TAG_EXAMPLE in content
+        # Beta manifest sync example (tag suffix ↔ manifest version).
+        assert '"version": "1.3.0b0"' in content
+
+    def test_req534_tier2_release_agent_carries_naming_anchor(self):
+        """REQ-534: hacs-release agent carries the always-on Release-Naming anchor."""
+        content = _HACS_RELEASE_AGENT.read_text(encoding="utf-8")
+        assert "Release-Naming" in content
+        assert _STABLE_TAG_EXAMPLE in content
+        assert _BETA_TAG_EXAMPLE in content
+        assert '"version": "1.3.0b0"' in content
+        assert "pre-release" in content.lower()
+        assert "nie verschieben, löschen oder wiederverwenden" in content
+
+    def test_req534_tier2_developer_step6_names_tag_format(self):
+        """REQ-534: hacs-developer workflow step 6 (Release-Dreiklang) got the tag-format line."""
+        content = _HACS_DEVELOPER_AGENT.read_text(encoding="utf-8")
+        assert "Release-Dreiklang" in content
+        assert _BETA_TAG_EXAMPLE in content
+
+    def test_req534_tier2_beta_tag_example_consistent_across_skill_and_agents(self):
+        """REQ-534: the same vX.Y.Zb<N> example (v1.3.0b0) appears in skill AND both agents."""
+        texts = {
+            "skill": _HACS_RULE.read_text(encoding="utf-8"),
+            "hacs-release": _HACS_RELEASE_AGENT.read_text(encoding="utf-8"),
+            "hacs-developer": _HACS_DEVELOPER_AGENT.read_text(encoding="utf-8"),
+        }
+        for name, text in texts.items():
+            assert _BETA_TAG_EXAMPLE in text, f"{name} is missing the beta tag example"
+            assert re.search(r"v\d+\.\d+\.\d+b\d+", text), f"{name} lacks a vX.Y.Zb<N>-style example"
 
 
 # ---------------------------------------------------------------------------
