@@ -276,3 +276,42 @@ Model after `tests/test_sync_check_flag.py` (sys.path bootstrap, lines 8–13). 
 | new rule file | — | — | rules carry no version frontmatter (precedent: `sharkord-sdk.md:1-2`) |
 
 **(Correction):** versions updated to the actually implemented state — `hacs-developer` landed at **1.1.1** and `hacs-tester` at **1.0.2** due to fix iterations during implementation (frontmatter values verified); the plan above originally targeted 1.1.0 / 1.0.1.
+
+---
+
+## 11. Addendum: Release-Naming-Best-Practice (Issue #534, gleicher Branch)
+
+> **Type:** Content-Ergänzung auf dem implementierten Preset (kein Architektur-Input des Audits). Der Abschnitt ergänzt die eisernen Regeln *Releases* um Format- und Lifecycle-Details für Tags/`manifest.version`/GitHub-Releases. Quellen-Zitate Englisch (Original-Doku), Rest Deutsch (Sprachregeln interne Doku).
+
+### 11.1 Inhalt: 6 Regeln (eiserne-Regeln-Stil: Regel | Begründung | Fehlerklasse)
+
+| # | Regel | Leit-Fehlerklasse |
+|---|---|---|
+| 1 | Tag-Format Stable `vMAJOR.MINOR.PATCH`; `v`-Prefix **nur** im Tag | `v` im `manifest.version` → `Invalid version` |
+| 2 | `manifest.version` = bare SemVer ohne `v`, exakt dem Tag-Suffix entsprechend | Update-Erkennung/Sortierung kaputt (AwesomeVersion, PEP-440) |
+| 3 | Beta-Tags `vX.Y.Zb<N>` (z.B. `v1.3.0b0`), GitHub-Release als **pre-release** flaggen, `manifest.version` = Tag-Suffix (`v1.3.0b0` ↔ `"version": "1.3.0b0"`) | Beta ohne Flag → alle User bekommen die Beta via Update-Check |
+| 4 | Promotion beta→stable = neuer Release, nie Tag mutieren; Tags/Releases immutable (nie verschieben, löschen, wiederverwenden) | Tag-Reset → User bleiben auf Alt-Stand (HACS cacht Versionen) |
+| 5 | Release-Notes-Mindeststruktur: Summary + ✨ New features + 💥 Breaking changes (je mit Migration-Hinweis; Pflicht bei MAJOR wegen Migrator-Regel) + Full-Changelog-Link | User aktualisieren ohne Migrationshinweis → Setup bricht |
+| 6 | SemVer-Disziplin: MAJOR = Breaking (`unique_id`-/Entity-Änderungen **immer** breaking), MINOR = Feature, PATCH = Fix; `v0.x` nicht ohne Hinweis „stabil" | Entity-Änderung als MINOR/PATCH → User verlieren Entities stillschweigend |
+
+### 11.2 Betroffene Dateien (Implementierung)
+
+| Datei | Änderung | Version |
+|---|---|---|
+| `rules/2-platform/hacs-integration-development.md` | Neuer Abschnitt „Release-Naming-Best-Practice" (6-Regeln-Tabelle + Quellen-Liste); Tag-Beispiele (`v1.2.3` / `v1.3.0b0`) im Workflow-Schritt 6 | — (Rules tragen kein Version-Frontmatter) |
+| `agents/2-platform/hacs-release.md` | Always-on-Anker „Release-Naming" (4 Bullets) im bestehenden `<persona>`-Patch; `description` erweitert | 1.0.0 → **1.0.1** (Patch) |
+| `agents/2-platform/hacs-developer.md` | Einzeilige Tag-Format-Ergänzung im Workflow-Schritt 6 (Release-Dreiklang) | 1.1.1 → **1.1.2** (Patch) |
+| `tests/test_platform_hacs_preset.py` | Neue Tier-2b-Klasse `TestTier2ReleaseNamingBlock`: Section-Header + 6-Regeln-Tabelle, `vX.Y.Zb<N>`-Beispiele, Anker im Release-Agenten, Beispiel-Konsistenz Skill ↔ Agenten | — |
+| `docs/guides/setup/instantiate-project.md` | Abschnitt „Release-Naming-Best-Practice" im HACS-Kapitel (Zusammenfassung + Quellen) | — |
+| `docs/plans/hacs-platform-preset-audit.md` | Dieser Abschnitt 11 | — |
+
+Kompositionshinweis (Instruction-Bleed-Checkliste): beide Agent-Patches sind additiv (`append-after` auf `<persona>` bzw. bestehende Liste), die Base-Sections werden nicht umdefiniert — Bleed-Risiko gering.
+
+### 11.3 Quellen
+
+- <https://hacs.xyz/docs/publish/start> — „If the repository uses GitHub releases, the tag name from the latest release is used to set the remote version. Just publishing tags is not enough, you need to publish releases."; `homeassistant`-Key kann HA-Betas via `b0`-Suffix erlauben.
+- <https://hacs.xyz/docs/use/entities/switch> — HACS 2.0 Pre-Release-Mechanik: GitHub pre-release-Flag → Entity `switch.<repo>_pre_release` (default OFF); Beispiel-Tags `v1.0.0`, `v2.0.0b0`.
+- <https://developers.home-assistant.io/docs/versioning> — HA nutzt PEP-440-Suffixe (`b<N>` für Beta); Versionsvergleiche via AwesomeVersion, nicht String-Parsing.
+- <https://semver.org/#is-v123-a-semantic-version> — FAQ: `v1.2.3` ist keine Semantic Version; der `v`-Prefix ist reine Tag-Konvention.
+- <https://github.com/hacs/integration/releases> — Vorbild für die Release-Notes-Struktur (What's Changed / ✨ New features / 💥 Breaking changes / Full Changelog); HACS zeigt die letzten Releases in der Update-Auswahl.
+- Praxisbeispiel: `boschshc-hass` — zwei Release-Trains (Beta als Pre-Release, Promotion manuell).
