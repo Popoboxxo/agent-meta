@@ -1,0 +1,55 @@
+# platform-configs/hacs.defaults.yaml
+# =============================================================================
+# Default configuration for the "hacs" platform.
+#
+# These values are injected into rules/2-platform/hacs-*.md and
+# agents/2-platform/hacs-*.md as {{platform.hacs.*}} placeholders
+# during sync.
+#
+# OVERRIDE in your project by creating .claude/platform-config.yaml:
+#
+#   platform:
+#     hacs:
+#       dev_instance_url: "http://homeassistant.local:8123"
+#       integration_repo_url: "https://github.com/your-org/your-integration"
+#       reference_repo_url: "https://github.com/home-assistant/core"
+#       project_skills: "hacs-integration-development,hacs-integration-review"
+#
+# Empty string ("") = required field — sync.py emits [WARN] if not overridden.
+# Non-empty value   = sensible default that works out of the box.
+# =============================================================================
+
+platform:
+  hacs:
+
+    # -------------------------------------------------------------------------
+    # Repository layout
+    # -------------------------------------------------------------------------
+
+    # Path to the custom components directory inside the integration repo
+    # (relative to the integration repo root)
+    custom_components_path: "custom_components"
+
+    # -------------------------------------------------------------------------
+    # Live references (required — project specific, no working default)
+    # -------------------------------------------------------------------------
+
+    # URL of the integration repo developed in this project
+    # Used by the 7-step workflow (step 1: Ist-Analyse live per API)
+    integration_repo_url: ""
+
+    # URL of the second reference repo (e.g. home-assistant/core for
+    # frontend/entity semantics, or a sibling integration for patterns)
+    reference_repo_url: ""
+
+    # Comma-separated names of the two project skills
+    # (development + review counterpart), e.g. "hacs-integration-development,hacs-integration-review"
+    project_skills: ""
+
+    # -------------------------------------------------------------------------
+    # Dev instance
+    # -------------------------------------------------------------------------
+
+    # Base URL of the development Home Assistant instance (without trailing slash)
+    # Used for pre-release E2E and the post-release HACS-update test (workflow step 7)
+    dev_instance_url: ""

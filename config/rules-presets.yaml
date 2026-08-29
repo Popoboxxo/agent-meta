@@ -145,3 +145,8 @@ presets:
     tool-graphify:
       channel: skill
       skill-description: "Use when asking architecture or file-relationship questions with graphify — hooks and permitted injections."
+    # Key = stripped output stem (rules.py:141 strips the platform prefix
+    # "hacs-" from rules/2-platform/hacs-integration-development.md).
+    integration-development:
+      channel: skill
+      skill-description: "Use when developing a HACS custom integration — 7-step workflow from live Ist-Analyse to release and dev-instance verification."
