@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-22 (feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE; zuvor feat/model-inherit-main-chat)
+> Letzte Aktualisierung: 2026-08-29 (fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz — Per-Modell-Registry-ID-Resolver, modelsdev→Registry-Degrade, Negative-Cache; zuvor feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE)
 
 ---
 
@@ -920,10 +920,10 @@ Template-Inhalte für SE-Mode, A2A-Protokoll, Checkpointing und Quality-Pipeline
 **hint/description-Deduplication:**
 Redundante `hint`-Felder werden automatisch aus Agent-Frontmattern gelöscht wenn identisch mit `description` (Zeile 220-227 in agents.py). AGENT_HINTS wird immer aus Quell-Templates gebaut (nicht aus generierten Dateien), daher keine Token-Verschwendung.
 
-### `scripts/admin-server.py` & `docs/admin-ui.html` (Phase 5: CRUD + Reflection + Model Mapping)
+### `scripts/admin-server.py` & `docs/ui/admin-ui.html` (Phase 5: CRUD + Reflection + Model Mapping)
 
 **Zweck:** Interaktive webbasierte Admin UI für Modell-Management, Provider-Config, Tier-Presets, Pricing, Quality Pipelines, Reflection Pairs, Prompt Modes und Agent→Model-Mapping.
-**Architektur:** Single-File Frontend (`docs/admin-ui.html`, Vanilla JS, Zero Dependencies) + Python-Backend (`scripts/admin-server.py`).
+**Architektur:** Single-File Frontend (`docs/ui/admin-ui.html`, Vanilla JS, Zero Dependencies) + Python-Backend (`scripts/admin-server.py`).
 
 **Bestehende Sektionen (REQ-MOD-01):**
 
@@ -982,6 +982,66 @@ Die Auflösungslogik ist identisch mit der in `scripts/lib/agents.py` (`_compose
 2. **Enable/Disable/Blacklist Row Buttons** statt Inline-Checkboxen → weniger Jitter, bessere UX
 3. **Datalist-Filtering** in Provider-Mappings → zeigt nur verfügbare Modelle per Provider
 4. **Resolved View Tab** → Users sehen aktuell aufgelöste Modelle VOR Bearbeitung
+
+### Admin-UI Model-Loading-Chain (fix/admin-ui-model-loading, 2026-08-29)
+
+**Zweck:** Resiliente Modell- und Preisladung für alle Provider in der Admin-UI. Behobene Defekte: stiller models.dev-Fetch-Fehler ohne Fallback (OpenCode-Datalists blieben leer), Bare-ID-Persistenz im Overlay-Import (importierte Preise unsichtbar in `/api/models`), fehlendes `opencode-go/`-Präfix bei Suggestions sowie All-Provider-"Soup" bei nicht zuordenbaren Providern. Audit-Report: `docs/plans/audit-admin-ui-model-loading.md`.
+
+**Data-Flow:**
+
+```
+model-registry.json ← sync.py --update-models (scripts/lib/model_discovery.py)
+      │
+      ├─> _collect_models() ─────────── /api/models · /api/models/active
+      └─> _load_models_dev_data() ───── /api/models-dev · /api/model-suggestions
+            (SDK-Snapshot → Live-API → Stale-Cache → Negative-Cache)
+      │
+      v
+docs/ui/admin-ui.html (Registry-/models.dev-Tabellen, per-Provider Datalists)
+      │
+      v
+scripts/lib/roles.py resolve_model() — persistiert gewählte Tier-IDs VERBATIM
+in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
+(OpenCode: `opencode-go/<raw>`, Claude: bare).
+```
+
+**Kernfunktionen (`scripts/admin-server.py`):**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `_normalized_model_id` | `(model_id: str) → str` (Modul-Level) | Drift-toleranter Vergleichsschlüssel für `curation.disabled`: lowercase, Namespace-Strip (letztes `/`-Segment), Punkte→Striche (`claude-opus-4-1` ≡ `anthropic/claude-opus-4.1`). Nur für den Disabled-Check — served IDs werden nie umgeschrieben. Bewusster Trade-off: Namespace-Strip matched den Tail über alle Provider (Curation-Intent ist modell-level) |
+| `_collect_models` | `(self) → list[dict]` | Merged Registry + `pricing-overlay.yaml` per `(provider, model_id)`, wendet `disabled` über normalisierte IDs an; speist `/api/models` und `/api/models/active` |
+| `_load_models_dev_data` | `(self, force_refresh: bool = False) → dict` | models.dev-Katalog (class-level cached). Normale Reihenfolge: frischer Cache (SDK: forever, API: 1h) → SDK-Snapshot (`node_modules/@opencode-ai/models`) → Live-API (`https://models.dev/catalog.json`) → Stale-Cache → Negative-Cache. Totale Failure → `{"source": "error", "error": <reason>, "providers": {}, "models": {}}` |
+| `_MODELS_DEV_ERROR_TTL_SECONDS` | `= 60.0` (Klassenkonstante) | Negative-Cache-TTL: ein unerreichbares Netzwerk kann nicht jeden Request in einen frischen 30-s-Blocking-Fetch verwandeln; die Auslieferung eines abgelaufenen Stale-Cache stampft ebenfalls den Negative-Cache; erfolgreicher Load räumt ihn ab |
+| `_resolve_registry_model_id` | `(self, provider_slug: str, raw_id: str, ids_by_provider: dict[str, set[str]] \| None = None) → str` | **Per-Modell**-Registry-ID-Auflösung (Registry-Konventionen sind per Modell, nicht per Provider): bare ID existiert → bare; `<slug>/<raw>` existiert → namespaced; sonst namespaced nur wenn ALLE Registry-IDs des Providers namespaced sind (Unanimity-Fallback). Keine hartcodierten Providernamen — nicht synchronisierte opencode-go-Modelle bleiben lauffähig, Mixed-Convention-Provider (anthropic: bare kanonisch + `anthropic/…`-OpenRouter-Extras) defaulten auf bare |
+| `_registry_model_ids_by_provider` | `(self) → dict[str, set[str]]` | Mappt Registry-Provider-Slug → Set seiner Registry-IDs (gleiche Quelle wie `_collect_models()`), damit Resolver-Ergebnis und Overlay-Lookup immer übereinstimmen |
+| `_suggestions_from_registry` | `(self, provider_name: str) → list[dict]` | Registry-Suggestions nur für die über die Tier-Werte zuordenbaren Slugs; ohne zuordenbaren Slug → `[]` (statt vorher ALLER aktiven Modelle — Cross-Provider-Soup) |
+| `_suggestions_from_models_dev` | `(self, provider_name: str) → list[dict]` | models.dev-Suggestions mit per-Modell aufgelösten, registry-konformen IDs (`_resolve_registry_model_id`); `provider`-Feld trägt den models.dev-Slug als Namespace-Info |
+| `_handle_get_model_suggestions` | `(self) → None` | `/api/model-suggestions?provider=<name>` — zieht ausschließlich aus der konfigurierten Quelle; Degrade `modelsdev` → Registry (ersetzender Fail-over, nie ein Mix beider Kataloge) wenn Katalog unerreichbar/Node leer; reportet die effektive Quelle. Registry-only-Provider (Mammouth, Continue) werden erzwungen |
+| `_handle_post_models_dev_import` | `(self) → None` | Persistiert Overlay-Keys unter dem EXAKTEN Registry-ID via `_resolve_registry_model_id` (per Modell, kein Blanket-Präfix); Backup nur bei existierender `pricing-overlay.yaml` (First-Import-Crash `FileNotFoundError` → 500 behoben) |
+| `_handle_post_models_dev_refresh` | `(self) → None` | ↻-Endpoint; `force_refresh=True` umgeht alle Caches und versucht die **Live-API zuerst**, SDK-Snapshot nur als Offline-Fallback |
+
+**Endpunkte (Model-Loading):**
+
+| Endpunkt | Methoden | Zweck |
+|----------|----------|-------|
+| `/api/models` | `GET` | Registry-Modelle inkl. Overlay-Preise |
+| `/api/models/active` | `GET` | Aktive Modelle (Curation angewandt) |
+| `/api/models/update` | `POST` | `sync.py --update-models` bzw. GitHub-Download bei Submodule-Override |
+| `/api/models/enable` · `/disable` · `/exclude` | `POST` | Curation-Flags pro Modell |
+| `/api/models-dev` | `GET` | models.dev-Katalog (Source: `sdk`/`api`/`error` inkl. Fetch-Failure-Reason) |
+| `/api/models-dev/refresh` | `POST` | Force-Refresh (API-First) |
+| `/api/models-dev/import` | `POST` | Modell inkl. Preise in `pricing-overlay.yaml` importieren (registry-konforme Keys) |
+| `/api/model-source` | `GET` · `POST` | Per-Provider Model-Source-Map (`model-source-preference` in `project.yaml`) lesen/setzen |
+| `/api/model-suggestions` | `GET` | Suggestions pro Provider mit effektiver Source-Angabe |
+
+**UI-Fallbacks (`docs/ui/admin-ui.html`):**
+- `modelsDevRowsAsRegistryRows()` → Registry-Fallback-Zeilen (Flag `_registryFallback`, Warn-Badge "registry fallback") statt Zeilen-Wipe, wenn der models.dev-Node fehlt
+- `getEffectiveModelsDevRows()` → ersetzt fehlende/leere Katalog-Nodes durch Registry-Zeilen (Source-Badge "registry (models.dev offline)"); Kandidaten-Provider-IDs inkludieren konfigurierte Provider ohne Katalog-Node; Provider-Name-Auflösung im Filter-Strip/Header-Select dereferenziert keine fehlenden Nodes mehr
+- Ehrliche Empty-States: bei `source === "error"` zeigt die models.dev-Tabelle den Server-Reason + Remediation-Hinweise statt der generischen "no data"-Meldung
+- Provider-Tier-Overrides-Datalist hängt die aktuell persistierten Override-Werte als Optionen an (konsistent mit Tier-Editor und Tier-Presets)
+
+**Tests:** `tests/test_admin_server.py` (19 neue Regression-Tests: Per-Modell-Präfix-Resolution, Mixed-Convention-Registry-Resolution inkl. Import-E2E, Degrade `modelsdev`→Registry, Import-Overlay-Keys, Disabled-Normalisierung, Negative-Cache/Stale-Stamping/Force-Refresh) · `tests/browser/test_models_page.py` (2 neue Browser-Tests: registry-runnable OpenCode-Kandidaten ohne Anthropic-Leak, Registry-Tabelle rendert trotz modelsdev-Override).
 
 ### `scripts/viz-logger.py` & `scripts/viz-logger-mcp.mjs` & `scripts/lib/viz.py`
 

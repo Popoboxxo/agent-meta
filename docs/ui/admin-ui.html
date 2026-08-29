@@ -7434,6 +7434,12 @@ async function viewProjectProviderTierOverrides() {
   const tierProviders = providers.filter(p => p.has_model_tiers);
   const tierNames = ["nano", "fast", "balanced", "powerful", "max", "ultra"];
 
+  // Flatten existing overrides BEFORE building the datalists — the current
+  // values are appended to each provider's datalist (same pattern as the
+  // ai-providers tier editor and Tier Presets views) so they remain
+  // selectable even when the suggestions source fails or returns nothing.
+  const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
+
   // Per-provider datalists keyed by framework provider name (e.g. "Claude").
   // Candidates come EXCLUSIVELY from the provider's centrally-configured
   // source via GET /api/model-suggestions -- the single source of truth also
@@ -7452,14 +7458,27 @@ async function viewProjectProviderTierOverrides() {
     let dl = document.getElementById(dlId);
     if (!dl) { dl = el("datalist", { id: dlId }); document.body.appendChild(dl); }
     else { dl.innerHTML = ""; }
+
+    const addedIds = new Set();
     suggestions.forEach(m => {
       const label = m.name ? `${m.name} (${m.provider})` : m.id;
       dl.appendChild(el("option", { value: m.id }, [label]));
+      addedIds.add(m.id);
     });
+
+    // Existing override values for this provider that the suggestion set
+    // doesn't cover (e.g. after a degraded/failed suggestions load).
+    const provOverrides = existing[tp.name];
+    if (provOverrides && typeof provOverrides === "object") {
+      Object.values(provOverrides).forEach(val => {
+        if (val && !addedIds.has(val)) {
+          dl.appendChild(el("option", { value: val }, [`${val} (current)`]));
+          addedIds.add(val);
+        }
+      });
+    }
   }));
 
-  // Flatten existing
-  const existing = (data["provider-tier-overrides"] && typeof data["provider-tier-overrides"] === "object") ? data["provider-tier-overrides"] : {};
   const rows = [];
   for (const [prov, tierMap] of Object.entries(existing)) {
     if (!tierMap || typeof tierMap !== "object") continue;
@@ -8537,11 +8556,21 @@ async function viewModels() {
   // =========================================================================
   /** Convert models.dev catalog entries for `mdId` into rows shaped like
    * registry entries, so a provider overridden to "modelsdev" can still be
-   * rendered inside the registry table (instead of just disappearing). */
+   * rendered inside the registry table (instead of just disappearing).
+   * When the models.dev node is unavailable (fetch failure, stale snapshot,
+   * provider vanished upstream), fall back to the provider's registry rows
+   * instead of returning [] — the latter silently wiped the provider from
+   * BOTH tables whenever the catalog could not be loaded, leaving an empty
+   * table with a misleading "No models in registry" hint. */
   function modelsDevRowsAsRegistryRows(provName, mdId) {
     const providerNode = state.modelsDev && state.modelsDev.providers && state.modelsDev.providers[mdId];
-    if (!providerNode) return [];
-    return Object.values(providerNode.models || {}).map(m => {
+    const mdModels = providerNode ? Object.values(providerNode.models || {}) : [];
+    if (mdModels.length === 0) {
+      return state.registry
+        .filter(m => m.provider === mdId)
+        .map(m => ({ ...m, _registryFallback: true }));
+    }
+    return mdModels.map(m => {
       const inputCost = (m.cost && m.cost.input) || 0;
       const outputCost = (m.cost && m.cost.output) || 0;
       return {
@@ -8701,6 +8730,13 @@ async function viewModels() {
       tr.appendChild(el("td", { style: `color:${hc};font-weight:bold;` }, [cf.toFixed(2), el("span", { class: "badge optional", style: "margin-left:var(--space-2);" }, ["Calc"])]));
 
       const st = el("td");
+      if (m._registryFallback) {
+        st.appendChild(el("span", {
+          class: "badge warn",
+          style: "margin-right:var(--space-1);",
+          title: "models.dev data unavailable — showing model-registry.json rows as fallback",
+        }, ["registry fallback"]));
+      }
       if (m._fromModelsDev) {
         // Synthetic row sourced live from models.dev via the per-provider
         // override -- it isn't a real model-registry.json entry, so there's
@@ -8771,19 +8807,36 @@ async function viewModels() {
           }));
       }
       const p = d.providers[pid];
-      if (!p || !p.models) return [];
-      return Object.values(p.models).map(m => ({
+      const mdModels = (p && p.models) ? Object.values(p.models) : [];
+      if (mdModels.length === 0) {
+        // Catalog node unavailable (fetch failure / stale snapshot) or the
+        // provider has no models upstream — fall back to registry rows so
+        // the provider doesn't silently vanish from the table.
+        return state.registry
+          .filter(m => m.provider === pid)
+          .map(m => ({
+            id: m.id,
+            name: m.name || m.id,
+            cost: { input: m.input_cost, output: m.output_cost },
+            limit: {},
+            _providerId: pid,
+            _providerName: provName || pid,
+            _curated: false,
+            _fromRegistry: false,
+            _registryFallback: true,
+          }));
+      }
+      return mdModels.map(m => ({
         ...m, _providerId: pid, _providerName: p.name || provName || pid, _curated: p.source === "curated",
       }));
     }
 
-    // Candidate provider ids: real models.dev ids (e.g. "anthropic") plus
-    // curated ids synthesized server-side from pricing-overlay.yaml (e.g.
-    // "mammouth" — see admin-server.py _apply_pricing_overlay). A provider
-    // whose per-provider override is "registry" is no longer hidden here —
-    // getEffectiveModelsDevRows() substitutes registry-sourced rows for it
-    // instead, so the provider stays visible with the correct data.
-    const allProviderIdsRaw = Object.keys(d.providers).sort();
+    // Safe display name for a provider id — the catalog node may be missing
+    // (error payload / stale snapshot), in which case the reverse mapping or
+    // the raw id is used instead of dereferencing undefined.
+    const mdProviderName = (pid) =>
+      (d.providers[pid] && d.providers[pid].name) || mdIdToProvName[pid] || pid;
+
     // Map configured agent-meta provider names → the provider id they'd
     // appear under in d.providers (models.dev id via PROVIDER_MAP, or the
     // lowercased name for a curated/registry-only provider like Mammouth).
@@ -8792,6 +8845,20 @@ async function viewModels() {
         .map(name => PROVIDER_MAP[name] || (REGISTRY_ONLY.has(name) ? name.toLowerCase() : null))
         .filter(Boolean)
     );
+
+    // Candidate provider ids: real models.dev ids (e.g. "anthropic") plus
+    // curated ids synthesized server-side from pricing-overlay.yaml (e.g.
+    // "mammouth" — see admin-server.py _apply_pricing_overlay). Configured
+    // providers MISSING from the catalog (fetch failure, stale snapshot) are
+    // also candidates so getEffectiveModelsDevRows() can render their
+    // registry-fallback rows instead of the providers silently vanishing. A
+    // provider whose per-provider override is "registry" is no longer hidden
+    // here — getEffectiveModelsDevRows() substitutes registry-sourced rows
+    // for it instead, so the provider stays visible with the correct data.
+    const allProviderIdsRaw = [...new Set([
+      ...Object.keys(d.providers),
+      ...configuredProviderIds,
+    ])].sort();
 
     const allProviderIds = state.showAllProviders
       ? allProviderIdsRaw
@@ -8816,10 +8883,9 @@ async function viewModels() {
     strip.appendChild(allBtn);
 
     configuredFirst.forEach(pid => {
-      const p = d.providers[pid];
       const count = getEffectiveModelsDevRows(pid).length;
       const active = state.filterProvider === pid;
-      const btn = el("button", { class: "badge" + (active ? " active" : ""), style: "font-weight:600;" }, [p.name + " (" + count + ")"]);
+      const btn = el("button", { class: "badge" + (active ? " active" : ""), style: "font-weight:600;" }, [mdProviderName(pid) + " (" + count + ")"]);
       btn.addEventListener("click", () => { state.filterProvider = pid; render(); });
       strip.appendChild(btn);
     });
@@ -8828,8 +8894,7 @@ async function viewModels() {
       const sel = el("select", { style: "margin-left:var(--space-1);padding:2px 4px;background:var(--bg2);color:var(--fg);border:1px solid var(--border);border-radius:3px;max-width:180px;" });
       sel.appendChild(el("option", { value: "" }, ["Other providers (" + otherProviders.length + ")"]));
       otherProviders.forEach(pid => {
-        const p = d.providers[pid];
-        const opt = el("option", { value: pid }, [p.name + " (" + getEffectiveModelsDevRows(pid).length + ")"]);
+        const opt = el("option", { value: pid }, [mdProviderName(pid) + " (" + getEffectiveModelsDevRows(pid).length + ")"]);
         if (state.filterProvider === pid) opt.selected = true;
         sel.appendChild(opt);
       });
@@ -8883,6 +8948,16 @@ async function viewModels() {
     });
 
     if (allModels.length === 0) {
+      if (d.source === "error") {
+        // The catalog itself failed to load — say so (with the server-provided
+        // reason) instead of the generic "no data" message, and point at the
+        // registry fallback / remediation options.
+        parent.appendChild(el("div", { class: "empty" }, [
+          "models.dev catalog unavailable" + (d.error ? " (" + d.error + ")" : "") +
+          ". Configured providers fall back to model-registry.json rows where possible — check connectivity, press ↻ to retry, or switch the provider source to registry above.",
+        ]));
+        return;
+      }
       if (!state.showAllProviders && !configuredHasData) {
         parent.appendChild(el("div", { class: "empty" }, [
           'No models.dev data for configured providers. Toggle "Show all providers" to browse the full catalog.'
@@ -8916,7 +8991,7 @@ async function viewModels() {
     const thead = el("thead");
     thead.appendChild(el("tr", {}, [
       el("th", {}, ["Provider", el("br"), mkHeaderSelect(
-        allProviderIds.map(pid => ({ id: pid, label: (d.providers[pid].name || pid) + " (" + getEffectiveModelsDevRows(pid).length + ")" })),
+        allProviderIds.map(pid => ({ id: pid, label: mdProviderName(pid) + " (" + getEffectiveModelsDevRows(pid).length + ")" })),
         state.filterProvider,
         v => { state.filterProvider = v; render(); }
       )]),
@@ -8968,10 +9043,12 @@ async function viewModels() {
       // badge ok / badge warn pattern so both tables communicate provenance
       // the same way. Replaces the former strikethrough/opacity hack.
       const srcTd = el("td");
-      if (d.source === "error") {
-        srcTd.appendChild(el("span", { class: "badge", style: "color:var(--accent-red);border-color:rgba(248,81,73,0.4);" }, ["unavailable"]));
+      if (m._registryFallback) {
+        srcTd.appendChild(el("span", { class: "badge warn", title: "models.dev catalog unavailable — row sourced from model-registry.json fallback" }, ["registry (models.dev offline)"]));
       } else if (m._fromRegistry) {
         srcTd.appendChild(el("span", { class: "badge warn", title: "Per-provider override: sourced from model-registry.json" }, ["registry (override)"]));
+      } else if (d.source === "error") {
+        srcTd.appendChild(el("span", { class: "badge", style: "color:var(--accent-red);border-color:rgba(248,81,73,0.4);" }, ["unavailable"]));
       } else if (m._curated) {
         srcTd.appendChild(el("span", { class: "badge warn", title: "Not available in models.dev — registry only" }, ["Registry (curated)"]));
       } else if (m._costSource === "overlay") {
