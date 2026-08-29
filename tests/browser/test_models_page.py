@@ -364,3 +364,80 @@ def test_legacy_models_page(browser_ctx, admin_server):
         expect(page.get_by_role("button", name="Refresh via sync.py")).to_be_visible()
     finally:
         page.close()
+
+
+def test_provider_tier_overrides_datalist_has_opencode_prefixed_ids(browser_ctx, admin_server):
+    """Regression: OpenCode autocomplete candidates must be registry-runnable
+    ids. models.dev reports BARE ids (e.g. "kimi-k2.7-code"), but the runnable
+    config id for this framework is namespaced ("opencode-go/kimi-k2.7-code")
+    and sync persists tier values verbatim into the `model:` frontmatter.
+
+    The assertion holds in BOTH server modes — online (modelsdev source with
+    the prefix re-applied server-side) and offline/degraded (registry source,
+    whose ids are namespaced by discovery) — so it cannot silently pass on a
+    source change.
+    """
+    ctx, url = browser_ctx
+    page = ctx.new_page()
+    try:
+        page.goto(f"{url}/#/project/provider-tier-overrides", wait_until="networkidle")
+        page.wait_for_timeout(2000)
+
+        expect(page.get_by_role("heading", name="Project — Provider Tier Overrides")).to_be_visible()
+
+        # Per-provider datalists keyed by framework provider name.
+        opencode_options = page.locator("#pto-dl-Opencode option")
+        expect(opencode_options.first).to_be_attached(timeout=5000)
+
+        values = [opencode_options.nth(i).get_attribute("value") for i in range(opencode_options.count())]
+        values = [v for v in values if v]
+        assert values, "OpenCode datalist must not be empty"
+
+        prefixed = [v for v in values if v.startswith("opencode-go/")]
+        assert prefixed, (
+            "OpenCode datalist candidates must carry the runnable 'opencode-go/' "
+            f"prefix; got: {values[:10]}"
+        )
+
+        # Regression (B1, mixed id conventions): anthropic carries bare
+        # canonical ids AND prefixed OpenRouter extras — a provider-wide
+        # prefix heuristic produced non-runnable 'anthropic/claude-*'
+        # candidates for canonical Claude models. Claude datalist values must
+        # therefore stay bare in every server mode.
+        claude_options = page.locator("#pto-dl-Claude option")
+        expect(claude_options.first).to_be_attached(timeout=5000)
+        claude_values = [claude_options.nth(i).get_attribute("value") for i in range(claude_options.count())]
+        claude_values = [v for v in claude_values if v]
+        assert claude_values, "Claude datalist must not be empty"
+        assert not any(v.startswith("anthropic/") for v in claude_values), (
+            "Claude datalist candidates must be bare canonical ids, got: "
+            f"{claude_values[:10]}"
+        )
+
+        # The other providers' datalists exist too (sanity).
+        for provider in ["Mammouth"]:
+            expect(page.locator(f"#pto-dl-{provider} option").first).to_be_attached(timeout=5000)
+    finally:
+        page.close()
+
+
+def test_registry_table_survives_modelsdev_provider_override(browser_ctx, admin_server):
+    """Regression: providers whose effective source is "modelsdev" must not
+    wipe the registry table when the models.dev catalog is usable — their
+    rows are substituted from the models.dev data (flagged via the Status
+    cell), while registry-sourced providers keep their normal rows."""
+    ctx, url = browser_ctx
+    page = ctx.new_page()
+    try:
+        page.goto(f"{url}/#/models", wait_until="networkidle")
+        page.wait_for_timeout(1000)
+
+        # Registry table is the default view; Claude + Opencode are persisted
+        # as "modelsdev" in model-source-preference, so their rows come from
+        # the live catalog. The table must still render rows.
+        rows = page.locator("table.data tbody tr")
+        expect(rows.first).to_be_visible(timeout=5000)
+        row_count = rows.count()
+        assert row_count > 0, "Registry table must render rows even with modelsdev-overridden providers"
+    finally:
+        page.close()

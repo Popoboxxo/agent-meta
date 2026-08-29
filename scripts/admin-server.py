@@ -108,6 +108,32 @@ def find_model_block_conflicts(data: Any, other: Any) -> list[str]:
         return []
     return [provider for provider, value in data.items() if value and other.get(provider)]
 
+
+def _normalized_model_id(model_id: str) -> str:
+    """Normalize a model id for drift-tolerant curation matching.
+
+    Registry id formats changed across discovery generations (bare vs.
+    provider-prefixed, dash vs. dot version separators), so curation entries
+    written against an older registry would silently stop matching with a
+    plain equality check (e.g. ``claude-opus-4-1`` vs. the current
+    ``anthropic/claude-opus-4.1``). The comparison key strips any
+    ``<provider>/`` namespace (keeping only the last ``/``-segment),
+    lowercases and maps dots to dashes, so both spellings above normalize
+    to ``claude-opus-4-1``. Used ONLY for the ``curation.disabled`` check —
+    surfaced model ids are never rewritten.
+
+    Accepted trade-off: stripping the namespace makes a disabled entry match
+    the same tail id under EVERY provider (``openai/gpt-4o`` also disables a
+    hypothetical bare ``gpt-4o`` of another provider). Curation intent is
+    model-level ("disable this model everywhere"), so this cross-provider
+    overreach is deliberate; distinct models keep distinct tails (e.g.
+    ``4.1`` vs ``4.1:batch``), which the tail-preserving comparison keeps
+    apart.
+    """
+    tail = str(model_id).strip().lower().rsplit("/", 1)[-1]
+    return tail.replace(".", "-")
+
+
 # Framework provider name -> models.dev catalog slug. Mirrors
 # ``PROVIDER_MODELSDEV_MAP`` in ``docs/ui/admin-ui.html`` — keep both in sync.
 # Providers absent here (e.g. Mammouth, Continue) have no models.dev catalog
@@ -1817,7 +1843,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
 
         curation = self._load_curation()
-        disabled_ids = set(curation.get("disabled", []))
+        # Tolerant comparison (see _normalized_model_id): curation entries
+        # written against older registry id formats must keep matching.
+        disabled_ids = {
+            _normalized_model_id(x) for x in curation.get("disabled", [])
+            if isinstance(x, str) and x
+        }
 
         for m in models:
             provider = m.get("provider", "")
@@ -1849,7 +1880,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             m["output_source"] = output_source
             m["cost_factor"] = cost_factor
             m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
-            m["enabled"] = model_id not in disabled_ids
+            m["enabled"] = _normalized_model_id(model_id) not in disabled_ids
             # Blacklisted ids are filtered during discovery and never appear in
             # the registry; surfaced models are therefore always non-blacklisted.
             m["blacklisted"] = False
@@ -1882,30 +1913,71 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Models.dev integration (SDK primary, API fallback)                  #
     # ------------------------------------------------------------------ #
 
-    def _load_models_dev_data(self) -> dict:
-        cache = getattr(self.__class__, '_models_dev_cache', None)
-        cache_ts = getattr(self.__class__, '_models_dev_cache_ts', 0)
+    def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
+        """Load the models.dev catalog payload (class-level cached).
 
-        if cache and cache.get('source') == 'sdk':
-            return cache
-        if cache and cache.get('source') == 'api' and (time.time() - cache_ts) < 3600:
-            return cache
+        Normal resolution order: fresh in-memory cache → SDK snapshot
+        (``node_modules/@opencode-ai/models``) → live models.dev API → stale
+        cache → short-TTL negative cache of the last total failure. An
+        explicit ``force_refresh`` (the UI's ↻ button) bypasses all caches
+        and reverses API/SDK precedence so a refresh actually reaches the
+        network even when a stale SDK snapshot exists.
 
-        sdk_data = self._load_from_sdk_snapshot()
-        if sdk_data:
-            self.__class__._models_dev_cache = sdk_data
-            self.__class__._models_dev_cache_ts = time.time()
-            return sdk_data
+        A total failure returns ``{"source": "error", "error": <reason>,
+        "providers": {}, "models": {}}`` and is negative-cached for
+        ``_MODELS_DEV_ERROR_TTL_SECONDS`` so an unreachable network cannot
+        turn every request into a fresh 30 s blocking fetch attempt.
+        """
+        cls = self.__class__
+        now = time.time()
 
-        api_data = self._load_from_models_dev_api()
-        if api_data:
-            self.__class__._models_dev_cache = api_data
-            self.__class__._models_dev_cache_ts = time.time()
-            return api_data
+        if not force_refresh:
+            cache = getattr(cls, '_models_dev_cache', None)
+            cache_ts = getattr(cls, '_models_dev_cache_ts', 0)
+            if cache and cache.get('source') == 'sdk':
+                return cache
+            if cache and cache.get('source') == 'api' and (now - cache_ts) < 3600:
+                return cache
+            error_cache = getattr(cls, '_models_dev_error', None)
+            if (isinstance(error_cache, tuple) and len(error_cache) == 2
+                    and (now - error_cache[1]) < self._MODELS_DEV_ERROR_TTL_SECONDS):
+                return error_cache[0]
 
-        if cache:
-            return cache
-        return {"source": "error", "error": "No data available", "providers": {}, "models": {}}
+        if force_refresh:
+            # Explicit refresh: live data wins over the (potentially stale)
+            # bundled SDK snapshot; the snapshot is the offline fallback.
+            loaded = self._load_from_models_dev_api()
+            if not loaded:
+                loaded = self._load_from_sdk_snapshot()
+        else:
+            loaded = self._load_from_sdk_snapshot()
+            if not loaded:
+                loaded = self._load_from_models_dev_api()
+
+        if loaded:
+            cls._models_dev_cache = loaded
+            cls._models_dev_cache_ts = time.time()
+            if hasattr(cls, '_models_dev_error'):
+                delattr(cls, '_models_dev_error')
+            return loaded
+
+        # Total failure — serve any stale cache before reporting the error,
+        # and stamp it as the negative-cache entry so subsequent requests
+        # within the TTL re-serve the stale payload WITHOUT re-attempting the
+        # (up to 30 s blocking) fetch.
+        stale = getattr(cls, '_models_dev_cache', None)
+        if stale:
+            cls._models_dev_error = (stale, time.time())
+            return stale
+        detail = getattr(cls, '_models_dev_last_fetch_error', '') or 'No data available'
+        error_payload = {"source": "error", "error": detail, "providers": {}, "models": {}}
+        cls._models_dev_error = (error_payload, time.time())
+        return error_payload
+
+    # Negative-cache TTL for a total models.dev load failure (seconds). Keeps
+    # an unreachable network from re-attempting a 30 s-timeout fetch on every
+    # single request while still retrying soon enough to recover on its own.
+    _MODELS_DEV_ERROR_TTL_SECONDS = 60.0
 
     def _load_from_sdk_snapshot(self) -> dict | None:
         try:
@@ -1955,7 +2027,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "providers": data.get("providers", {}),
                 "models": data.get("models", {}),
             }
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            self.__class__._models_dev_last_fetch_error = f"SDK snapshot read failed: {exc}"
             return None
 
     def _load_from_models_dev_api(self) -> dict | None:
@@ -1967,13 +2040,19 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             with urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
 
+            # Success — clear any stale failure reason so the error payload
+            # never reports an ancient message after a later recovery.
+            self.__class__._models_dev_last_fetch_error = ""
             return {
                 "source": "api",
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "providers": data.get("providers", {}),
                 "models": data.get("models", {}),
             }
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # Record WHY the fetch failed so the error payload returned to the
+            # UI can explain itself instead of a bare "No data available".
+            self.__class__._models_dev_last_fetch_error = f"models.dev fetch failed: {exc}"
             return None
 
     # Provider keys in ``config/pricing-overlay.yaml`` that never have a real
@@ -2112,10 +2191,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_post_models_dev_refresh(self) -> None:
         try:
-            for attr in ('_models_dev_cache', '_models_dev_cache_ts'):
+            for attr in ('_models_dev_cache', '_models_dev_cache_ts', '_models_dev_error'):
                 if hasattr(self.__class__, attr):
                     delattr(self.__class__, attr)
-            return self._send_json(self._load_models_dev_data())
+            # force_refresh=True tries the live API BEFORE the local SDK
+            # snapshot, so pressing ↻ actually re-fetches even when a stale
+            # bundled snapshot exists (the normal load path prefers the
+            # snapshot by design — "SDK primary, API fallback").
+            return self._send_json(self._load_models_dev_data(force_refresh=True))
         except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
@@ -2148,14 +2231,24 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(prov, dict):
                 prov = {}
                 prices[provider_id] = prov
-            prov[model_id] = {"input": float(input_cost) if input_cost is not None else 0.0,
-                              "output": float(output_cost) if output_cost is not None else 0.0}
+            # Persist the overlay key under the EXACT registry id
+            # _collect_models() looks the price up by (per-model resolution,
+            # see _resolve_registry_model_id): anthropic's canonical models
+            # are bare, its OpenRouter extras are namespaced, and opencode-go
+            # is namespaced throughout — a blanket per-provider rule would
+            # make imported prices silently invisible in /api/models.
+            overlay_key = self._resolve_registry_model_id(provider_id, model_id)
+            prov[overlay_key] = {"input": float(input_cost) if input_cost is not None else 0.0,
+                                 "output": float(output_cost) if output_cost is not None else 0.0}
 
-            # Atomic write with backup
-            self.__class__.config_manager._backup(pricing_path)
+            # Atomic write with backup. Only back up an EXISTING file —
+            # _backup() reads the original, so a first-ever import (no
+            # pricing-overlay.yaml yet) would otherwise fail with a 500.
+            if pricing_path.exists():
+                self.__class__.config_manager._backup(pricing_path)
             pricing_path.write_text(yaml.dump(pricing, default_flow_style=False, allow_unicode=True, sort_keys=False),
                                     encoding="utf-8")
-            return self._send_json({"success": True, "provider": provider_id, "model_id": model_id})
+            return self._send_json({"success": True, "provider": provider_id, "model_id": overlay_key})
         except Exception as exc:  # noqa: BLE001
             return self._send_json({"error": str(exc)}, status=500)
 
@@ -2461,12 +2554,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
         """Registry-sourced model suggestions for ``provider_name``.
 
-        Mirrors the registry-fallback logic the Admin UI used client-side:
-        the provider's tier values pin down which registry provider slug(s)
+        The provider's tier values pin down which registry provider slug(s)
         (e.g. ``opencode-go``, ``anthropic``) belong to this framework
         provider, and only active (non-disabled) models for those slugs are
-        returned. When no slug can be inferred, all active models are offered
-        (matches the previous UI behaviour).
+        returned. When no slug can be inferred, ``[]`` is returned — the
+        previous behaviour of offering ALL active models flooded datalists
+        with cross-provider ids that would corrupt the config if selected
+        (e.g. Gemini's bare ``gemini-*`` tier ids do not exist in a registry
+        that only carries anthropic + opencode-go entries).
         """
         models = [m for m in self._collect_models() if m.get("enabled")]
         tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
@@ -2481,22 +2576,88 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 for m in models:
                     if m.get("id") == model_id:
                         registry_slugs.add(m.get("provider"))
-        selected = [m for m in models if m.get("provider") in registry_slugs] if registry_slugs else models
+        if not registry_slugs:
+            return []
+        selected = [m for m in models if m.get("provider") in registry_slugs]
         return [
             {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
             for m in selected
         ]
 
+    def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
+        """Map every registry provider slug to the set of its registry ids.
+
+        Reads the SAME registry source ``_collect_models()`` uses (override
+        registry when present, framework registry otherwise), so ids resolved
+        through :meth:`_resolve_registry_model_id` always line up with the
+        ids ``_collect_models`` looks the pricing overlay up by.
+        """
+        out: dict[str, set[str]] = {}
+        try:
+            collected = self._collect_models()
+        except Exception:  # noqa: BLE001
+            return out
+        for m in collected:
+            provider = str(m.get("provider") or "")
+            model_id = str(m.get("id") or "")
+            if provider and model_id:
+                out.setdefault(provider, set()).add(model_id)
+        return out
+
+    def _resolve_registry_model_id(
+        self,
+        provider_slug: str,
+        raw_id: str,
+        ids_by_provider: dict[str, set[str]] | None = None,
+    ) -> str:
+        """Resolve the registry-conform id for a bare models.dev model id.
+
+        Registry id conventions are PER MODEL, not per provider: anthropic
+        carries bare canonical ids (``claude-opus-5``) AND namespaced
+        OpenRouter extras (``anthropic/claude-opus-4.8-fast``), while
+        opencode-go namespaces every id. Resolution order:
+
+        1. the bare id exists in the registry for this provider → bare;
+        2. the namespaced ``<slug>/<raw>`` id exists → namespaced;
+        3. neither exists (model not synced into the registry yet) →
+           namespaced only when EVERY registry id of this provider is
+           namespaced (unanimous convention), else bare — a not-yet-synced
+           opencode-go model stays runnable (``opencode-go/<raw>``) while a
+           mixed-convention provider (anthropic) defaults to the canonical
+           bare form.
+
+        No provider names are hardcoded; the convention is derived entirely
+        from the registry. Callers resolving many ids should pass
+        ``ids_by_provider`` (from :meth:`_registry_model_ids_by_provider`)
+        to avoid re-reading the registry per model. The resolved id is what
+        ``_collect_models()`` looks the pricing overlay up by and what
+        ``roles.py::_resolve_tier_to_model`` persists verbatim into the
+        ``model:`` frontmatter — both consumers need the exact registry id.
+        """
+        if ids_by_provider is None:
+            ids_by_provider = self._registry_model_ids_by_provider()
+        ids = ids_by_provider.get(provider_slug, set())
+        if raw_id in ids:
+            return raw_id
+        namespaced = f"{provider_slug}/{raw_id}"
+        if namespaced in ids:
+            return namespaced
+        fully_namespaced = bool(ids) and all(i.startswith(f"{provider_slug}/") for i in ids)
+        return namespaced if fully_namespaced else raw_id
+
     def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
         """models.dev-sourced model suggestions for ``provider_name``.
 
-        Returns ``[]`` for providers without a models.dev catalog slug. Ids
-        are always the raw models.dev id (1:1, no namespace prefix) so the
-        Admin UI dropdown shows exactly what models.dev reports, and so the
-        value persisted on save (model-tiers / tier-preset / provider-tier
-        overrides) is the same raw id, unchanged. The ``provider`` field
-        still carries the models.dev slug (e.g. ``opencode-go``) purely as
-        namespace info for display -- it is never re-applied as a prefix.
+        Returns ``[]`` for providers without a models.dev catalog slug.
+        Suggestion ids match the registry's PER-MODEL id convention (see
+        :meth:`_resolve_registry_model_id`): bare models.dev ids stay 1:1
+        where the registry is bare (anthropic, google, github-copilot) and
+        get the ``<slug>/`` prefix where the registry is namespaced
+        (currently opencode-go) — the value persisted on save (model-tiers /
+        tier-preset / provider-tier overrides) must be the runnable config
+        id, and ``roles.py::_resolve_tier_to_model`` passes it through
+        verbatim. The ``provider`` field always carries the models.dev slug
+        (e.g. ``opencode-go``) as namespace info for display.
         """
         slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
         if not slug:
@@ -2506,12 +2667,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         node = providers.get(slug)
         if not isinstance(node, dict):
             return []
+        ids_by_provider = self._registry_model_ids_by_provider()
         out: list[dict] = []
         for m in (node.get("models") or {}).values():
             raw_id = m.get("id")
             if not raw_id:
                 continue
-            out.append({"id": raw_id, "name": m.get("name") or raw_id, "provider": slug})
+            suggestion_id = self._resolve_registry_model_id(slug, str(raw_id), ids_by_provider)
+            out.append({"id": suggestion_id, "name": m.get("name") or raw_id, "provider": slug})
         return out
 
     def _handle_get_model_source(self) -> None:
@@ -2721,6 +2884,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # honest, effective source back to the caller.
             if source == "modelsdev" and provider in PROVIDER_MODELSDEV_SLUGS:
                 models = self._suggestions_from_models_dev(provider)
+                if not models:
+                    # The models.dev catalog is unavailable (network failure,
+                    # stale SDK snapshot) or has no models for this provider's
+                    # slug. Degrade to registry suggestions instead of serving
+                    # a silently empty dropdown, and report the honest,
+                    # effective source back to the caller — mirroring the
+                    # registry-only provider forcing below. This is a
+                    # fail-over that REPLACES the result, never a mix of both
+                    # catalogs in one response.
+                    source = "registry"
+                    models = self._suggestions_from_registry(provider)
             else:
                 source = "registry"
                 models = self._suggestions_from_registry(provider)
