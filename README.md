@@ -98,6 +98,7 @@ mindmap
       sync.py Template Compilation
       Context Compaction V2
       Single-Tree XML Architecture
+      Platform Presets: agent-meta, Home Assistant, Sharkord, HACS
     Knowledge Engine
       OKF-Compliant Scaffolding
       Domain Presets
@@ -116,7 +117,7 @@ mindmap
       External Skills
 ```
 
-## Agent Roster — 69 Generic Agents
+## Agent Roster — 73 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -140,7 +141,7 @@ mindmap
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
 | **planner** | balanced | 1.0.1 | Turns concepts/REQs/bugs into concrete, ordered implementation plans |
-| **release** | balanced | 1.4.3 | Versioning, changelogs, build processes, GitHub releases |
+| **release** | balanced | 1.5.0 | Versioning, changelogs, build processes, GitHub releases |
 | **ideation** | balanced | 1.7.0 | Idea exploration, vision sharpening, concept concretization |
 | **feedback** | fast | 1.2.3 | Standardizes bug reports and feature requests as GitHub issues |
 | **agent-meta-manager** | balanced | 1.12.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
@@ -149,7 +150,7 @@ mindmap
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
-### Specialist Roles (26 agents)
+### Specialist Roles (30 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -157,21 +158,25 @@ mindmap
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
 | **backend-reviewer** | balanced | 1.0.0 | Backend domain review: API contracts, silent-failure hunting, concurrency, middleware — evidence-based with MERGE_SCORE |
 | **bug-feature-analyzer** | balanced | 1.1.4 | Triage and classify incoming bug reports and feature requests |
+| **copyeditor** | balanced | 0.2.0 | Copyediting pass: style, sentence structure, word repetition, narrative flow, content consistency — categorized findings report, no silent rewrites |
 | **data-engineer** | balanced | 0.1.1 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
 | **database-engineer** | powerful | 1.0.1 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
 | **database-reviewer** | powerful | 1.0.0 | Database domain review: migration safety, N+1, injection vectors (CWE-89), indexing, transactions |
+| **design-system-architect** | balanced | 0.1.0 | Translates a UI design-system schema into project-bound design-token artifacts (CSS custom properties/Tailwind config): color harmony, design-time contrast gate, spacing/breakpoints, variant contracts, motion tokens |
 | **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
 | **devops-engineer** | fast | 1.1.3 | CI/CD pipelines, IaC, container orchestration |
 | **docker** | fast | 1.4.4 | Docker operations: Compose stacks, binary management, test environments |
 | **effort-estimator** | fast | 1.0.3 | Estimates effort for development tasks with complexity scoring |
 | **explorer** | nano | 1.0.1 | Read-only codebase research, dependency and impact mapping |
 | **export-manager** | fast | 1.1.3 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
+| **frontend-component-engineer** | balanced | 0.1.0 | Builds production-ready UI components from screen spec (ui-ux-designer) plus token/variant contract (design-system-architect): props contract, state handling, a11y baseline |
 | **frontend-reviewer** | balanced | 1.0.0 | Frontend domain review: component design, state, SSR/hydration, browser APIs — evidence-based with MERGE_SCORE |
 | **incident-responder** | powerful | 1.0.0 | Live incident coordination: RCA (5-Whys/Fishbone), severity classification, prioritized hotfixes |
 | **log-analyzer** | balanced | 1.1.3 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
 | **performance-optimizer** | powerful | 1.2.0 | Data-driven Big-O bottleneck identification |
 | **product-manager** | balanced | 0.1.0 | Strategic product management: backlog, user stories, sprint planning, RICE/MoSCoW prioritization, KPI definition |
+| **proofreader** | balanced | 0.2.0 | Proofreading pass: spelling, grammar, punctuation — no style/structure/content changes, categorized findings report |
 | **refactoring-specialist** | balanced | 0.1.1 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
 | **security-auditor** | powerful | 2.0.0 | Static security analysis: OWASP Top 10 + ASVS/CWE mapping, rules index, two-pass verification, secrets, supply-chain, MERGE_SCORE |
 | **sre-engineer** | balanced | 0.1.0 | Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbooks |
@@ -234,15 +239,71 @@ Introduced in v0.83.0, the Knowledge Engine brings semantic codebase management 
 
 ## Platform Overrides (2-platform/)
 
-Overrides provide platform-specific customizations. Two modes:
-- **Full-replacement** (no `extends:`) — completely replaces the generic agent
-- **Composition** (`extends:` + `patches:`) — adds/modifies sections
+Platforms bundle role overrides, rules, and variable defaults for a specific target domain. Two modes:
 
-| Platform | Overrides | Mode |
-|----------|-----------|------|
-| agent-meta | developer, claude-expert, continue-expert, copilot-expert, gemini-expert, opencode-expert, mammouth-expert | composition |
-| Home Assistant | developer, documenter, log-analyzer | composition |
-| Sharkord | developer, docker, release | composition |
+- **Full-replacement** (no `extends:`) — completely replaces the generic agent
+- **Composition** (`extends:` + `patches:`) — patches the generic agent at sync time
+
+Activating a platform via `platforms: [name]` in `.meta-config/project.yaml` makes `sync.py`:
+
+- Compose `agents/2-platform/<platform>-<role>.md` onto the matching generic roles
+- Collect platform rules and skills from `rules/2-platform/<platform>-*.md`
+- Load `platform-configs/<platform>.defaults.yaml` and substitute `{{platform.<name>.*}}` placeholders (project-specific overrides via `.claude/platform-config.yaml`)
+
+| Platform | Roles | Mode |
+|----------|-------|------|
+| agent-meta | developer, claude-expert, continue-expert, copilot-expert, gemini-expert, opencode-expert, mammouth-expert | full-replacement |
+| Home Assistant | developer, documenter, log-analyzer | full-replacement |
+| Sharkord | developer, docker, release | full-replacement |
+| HACS | developer, tester, code-reviewer, devops-engineer, release | composition |
+
+### HACS Platform Preset
+
+Preset for developing Home Assistant custom integrations distributed via the [Home Assistant Community Store](https://hacs.xyz). Five composition-based roles on top of their generic templates:
+
+| Platform agent | Version | Base template |
+|----------------|---------|---------------|
+| `hacs-developer` | 1.1.2 | developer 4.0.1 |
+| `hacs-tester` | 1.0.2 | tester 2.1.4 |
+| `hacs-code-reviewer` | 1.0.0 | code-reviewer 1.2.2 |
+| `hacs-devops-engineer` | 1.0.0 | devops-engineer 1.1.3 |
+| `hacs-release` | 1.0.1 | release 1.5.0 |
+
+**Skill `hacs-integration-development`** (source: `rules/2-platform/hacs-integration-development.md`; delivered as lazy-loaded skill `integration-development` on Claude, embedded as a rule on other providers):
+
+- Mandatory 7-step workflow: live analysis of the repos and dev instance per API → concept → HA-free logic modules → build → tests green → release triple (commit → tag → GitHub release) → post-release dev-instance test and old-entity cleanup
+- 15 iron rules with rationale and failure class, across Releases, Entities, Architecture, Flows, and Privacy
+- Meta-file skeletons: `hacs.json`, `manifest.json`, `strings.json` + translations, `.github/workflows/validate.yml`
+- Debugging checklist for "it doesn't work" (7 steps)
+- pytest trick: unit-test integration logic without a Home Assistant installation (fake `homeassistant` package in `sys.modules`)
+
+**Platform variables** (5, defined in `platform-configs/hacs.defaults.yaml`): `custom_components_path` ships a working default; the other 4 are required — `integration_repo_url`, `reference_repo_url`, `project_skills`, `dev_instance_url` — and sync emits a `[WARN]` for each until the project overrides it in `.claude/platform-config.yaml`.
+
+**Release naming best practice** (full reference in the skill, always-on anchor in `hacs-release`):
+
+- Stable tags `vX.Y.Z` ↔ bare SemVer in `manifest.json` (`v1.2.3` ↔ `"version": "1.2.3"`) — the `v` prefix belongs only to the tag
+- Beta tags `vX.Y.Zb<N>` (e.g. `v1.3.0b0`) with the GitHub release flagged as pre-release
+- Tags and releases are immutable — promoting beta to stable means a new release, never mutating the tag
+- SemVer discipline: MAJOR = breaking (`unique_id`/entity changes are always breaking), MINOR = feature, PATCH = fix
+
+Activation:
+
+```yaml
+# .meta-config/project.yaml
+platforms: [hacs]
+```
+
+```yaml
+# .claude/platform-config.yaml (project overrides for the required variables)
+platform:
+  hacs:
+    dev_instance_url: "http://homeassistant.local:8123"
+    integration_repo_url: "https://github.com/your-org/your-integration"
+    reference_repo_url: "https://github.com/home-assistant/core"
+    project_skills: "hacs-integration-development,hacs-integration-review"
+```
+
+See [docs/guides/setup/instantiate-project.md](docs/guides/setup/instantiate-project.md) for the full walkthrough and [docs/architecture/01-layer-model.md](docs/architecture/01-layer-model.md) for the platform-config layer model.
 
 ## External Skills (0-external/)
 
@@ -287,6 +348,7 @@ The extensive documentation for Agent-Meta has been reorganized into the `docs/`
 ### Guides & How-Tos (`docs/guides/`)
 - Setup, CI integration, feature guides, and reflection loops.
 - MCP configurations and quality pipelines.
+- **[Project Instantiation](docs/guides/setup/instantiate-project.md)**: Set up a new project from agent-meta — multi-provider config plus HACS platform preset activation and the release-naming best practice.
 
 ### Admin UI How-Tos (`docs/howto/`)
 - **[Remote Access to the Admin UI](docs/howto/admin-ui-remote-access.md)**: Expose `admin-server.py` beyond localhost with token authentication — lifecycle, flags, ports, troubleshooting.
@@ -302,8 +364,12 @@ Detailed definitions of all core functions, CLI commands, and framework mappings
 ### Architecture & UI (`docs/ui/`)
 - **[Agent Graph Visualization](docs/ui/agent-graph.html)**: Interactive node-graph of agent delegations.
 - **[Admin UI](docs/ui/admin-ui.html)**: The web-frontend for `admin-server.py`.
+- **[Layer Model](docs/architecture/01-layer-model.md)**: 0–3 layer model and platform config — `{{platform.*}}` substitution via `platform-configs/` defaults and `.claude/platform-config.yaml` overrides (HACS example).
 - **[Viz API](docs/api/viz-api.md)**: Architecture documentation for the Viz Server.
 - **[Viz Event Schema](docs/api/viz-event-schema.md)**: JSON schema for Viz events.
+
+### Plans & Audits (`docs/plans/`)
+- **[HACS Platform Preset Audit](docs/plans/hacs-platform-preset-audit.md)**: Layer-by-layer audit of the HACS preset (agents, skill, platform config, rules, tests, docs) with path:line evidence.
 
 ### Systems Engineering Cascade (`docs/se-cascade/`)
 - V-Model documentation and workflow specifications for the SE cascade.
@@ -558,7 +624,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 agents/
   0-external/                # External skill wrappers (dynamically cloned)
   1-generic/                 # Universal provider-agnostic templates (60 + 13 SE agents)
-  2-platform/                # Platform-specific overrides (extends + patches)
+  2-platform/                # Platform-specific overrides (full-replacement or composition)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts
   skills-registry.yaml       # External skill repos
@@ -593,7 +659,7 @@ external/                    # Dynamically cloned skill repositories (gitignored
 schemas/                     # A2A handoff JSON schemas
 speech/                      # Speech mode rule files
 templates/                   # Shared template fragments (composition system)
-platform-configs/            # Platform-specific variable overrides
+platform-configs/            # Platform variable defaults ({{platform.*}} substitution)
 knowledge/                   # Knowledge Engine wiki bundle (when enabled)
 howto/
   setup/                     # First steps, instantiation, upgrade

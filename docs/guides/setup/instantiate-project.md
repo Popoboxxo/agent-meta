@@ -266,6 +266,92 @@ Das Legacy-Feld `"ai-provider": "Claude"` (String) wird weiterhin unterstützt �
 
 ---
 
+## Plattform aktivieren — Beispiel HACS
+
+Projekte, die Home-Assistant-Custom-Components für **HACS** entwickeln, aktivieren
+den HACS-Preset mit einem Eintrag in `.meta-config/project.yaml`:
+
+```json
+"platforms": ["hacs"]
+```
+
+### Was der Sync dann generiert
+
+| Ausgangsdatei (agent-meta) | Output im Projekt |
+|----------------------------|-------------------|
+| `agents/2-platform/hacs-{developer,code-reviewer,devops-engineer,release,tester}.md` | Wird via `role_from_platform_file` auf die gleichnamige generische Rolle komponiert — `.claude/agents/developer.md`, `code-reviewer.md`, `devops-engineer.md`, `release.md`, `tester.md` bekommen die HACS-Persona-Abschnitte injiziert (Composition `extends` + `patches`; die Meta-Keys stehen danach nicht mehr im Output-Frontmatter). Die Dateinamen bleiben generisch. |
+| `rules/2-platform/hacs-integration-development.md` | `.claude/rules/integration-development.md` bzw. als Skill (siehe unten) — **nur** wenn `hacs` in `platforms` steht. Ohne die Plattform wird die Rule nicht eingesammelt. |
+| `platform-configs/hacs.defaults.yaml` | Wird eingelesen und als `{{platform.hacs.*}}`-Werte in die HACS-Agents und -Rules substituiert. |
+
+### Skill `integration-development`
+
+Die Rule wird zusätzlich als **Skill** ausgeliefert (Preset-Key `integration-development`
+in `rules-presets.yaml` — der Plattform-Präfix `hacs-` wird beim Einsammeln gestrippt):
+
+- **Claude:** lazy geladen als `.claude/skills/integration-development/SKILL.md`
+  (generiertes Frontmatter `name`/`description`).
+- **Andere Provider** (z.B. Opencode): kein Skill-Channel — die Rule fällt auf den
+  normalen Rules-Pfad zurück (Opencode: eingebettet in `AGENTS.md`).
+
+### Release-Naming-Best-Practice
+
+Der HACS-Preset enthält einen verbindlichen Release-Naming-Block: vollständige
+Referenz im Skill `integration-development` (Abschnitt „Release-Naming-Best-Practice",
+eiserne-Regeln-Stil mit Begründung/Fehlerklasse) plus Always-on-Anker im generierten
+`release`-Agenten. Zusammengefasst:
+
+| Thema | Regel |
+|---|---|
+| Tag-Format | Stable `vMAJOR.MINOR.PATCH`, Beta `vX.Y.Zb<N>` (z.B. `v1.3.0b0`) — der `v`-Prefix gehört **nur** in den Tag |
+| `manifest.version` | Bare SemVer ohne `v`, exakt dem Tag-Suffix entsprechend (`v1.2.3` ↔ `"version": "1.2.3"`, `v1.3.0b0` ↔ `"version": "1.3.0b0"`) |
+| Pre-Releases | Beta-Releases im GitHub-Release als **pre-release** flaggen — sonst bekommen alle User die Beta via Update-Check (HACS 2.0: `switch.<repo>_pre_release`, default OFF) |
+| Immutabilität | Tags/Releases nie verschieben, löschen oder wiederverwenden (HACS cacht Versionen); Promotion beta→stable = neuer Release, nie Tag mutieren |
+| Release-Notes | Summary + ✨ New features + 💥 Breaking changes (je mit Migration-Hinweis, Pflicht bei MAJOR) + Full-Changelog-Link; optional `CHANGELOG.md` |
+| SemVer-Disziplin | MAJOR = Breaking (`unique_id`-/Entity-Änderungen sind IMMER breaking), MINOR = Feature, PATCH = Fix; `v0.x` nicht ohne Hinweis als „stabil" deklarieren |
+
+Quellen:
+
+- <https://hacs.xyz/docs/publish/start> — „If the repository uses GitHub releases, the tag name from the latest release is used to set the remote version. Just publishing tags is not enough, you need to publish releases."
+- <https://hacs.xyz/docs/use/entities/switch> — HACS 2.0 Pre-Release-Mechanik; Beispiel-Tags `v1.0.0`, `v2.0.0b0`
+- <https://developers.home-assistant.io/docs/versioning> — HA nutzt PEP-440-Suffixe (`b<N>` für Betas); Versionsvergleich via AwesomeVersion
+- <https://semver.org/#is-v123-a-semantic-version> — `v1.2.3` ist keine Semantic Version (`v`-Prefix ist reine Tag-Konvention)
+- <https://github.com/hacs/integration/releases> — Vorbild für die Release-Notes-Struktur
+
+### Platform-Defaults und Pflichtwerte
+
+`platform-configs/hacs.defaults.yaml` definiert fünf Keys:
+
+| Key | Default | Bedeutung |
+|-----|---------|-----------|
+| `custom_components_path` | `custom_components` | Working-Default (funktioniert out of the box) |
+| `integration_repo_url` | `""` (Pflicht) | Live-Referenz: das Integrations-Repo des Projekts |
+| `reference_repo_url` | `""` (Pflicht) | Live-Referenz: zweites Repo (z.B. home-assistant/core) |
+| `project_skills` | `""` (Pflicht) | Komma-separiert: die beiden Projekt-Skills |
+| `dev_instance_url` | `""` (Pflicht) | Dev-Home-Assistant-Instanz für Dev-Test und HACS-Update-Test |
+
+**Override anlegen** — `.claude/platform-config.yaml` im Projekt-Root:
+
+```yaml
+platform:
+  hacs:
+    dev_instance_url: "http://homeassistant.local:8123"
+    integration_repo_url: "https://github.com/your-org/your-integration"
+    reference_repo_url: "https://github.com/home-assistant/core"
+    project_skills: "hacs-integration-development,hacs-integration-review"
+```
+
+**Warn-Semantik in `sync.log`:**
+
+- Definierter, aber leerer (Pflicht-)Key → der Key wird zum **Leerstring** substituiert
+  und `[WARN]` erscheint, bis das Projekt den Wert override't.
+- Undefinierter Key (nicht in Defaults, nicht im Override) → der literale
+  `{{platform.hacs.*}}`-Platzhalter bleibt im Output stehen (mit Warnung).
+
+Danach `sync.log` prüfen (Schritt 4 oben) und erneut syncen, bis die HACS-Warnungen
+verschwunden sind.
+
+---
+
 ## Projektspezifische Anpassungen
 
 ### Einfache Werte → config.json

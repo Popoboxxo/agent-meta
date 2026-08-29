@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-29 (fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz — Per-Modell-Registry-ID-Resolver, modelsdev→Registry-Degrade, Negative-Cache; zuvor feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE)
+> Letzte Aktualisierung: 2026-08-29 (feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz — Per-Modell-Registry-ID-Resolver, modelsdev→Registry-Degrade, Negative-Cache; zuvor feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE)
 
 ---
 
@@ -21,6 +21,7 @@
 13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
 14. [Knowledge Engine](#14-knowledge-engine)
 15. [Review-Agent-Fleet](#15-review-agent-fleet)
+16. [HACS Platform Preset](#16-hacs-platform-preset)
 
 ---
 
@@ -1786,3 +1787,71 @@ P6 explizite Tiers in `config/role-defaults.yaml`.
 (pfadklassen-basiertes Reviewer-Routing für den Orchestrator, Synthesis-Flag, max_parallel).
 
 **Tests:** `tests/test_review_fleet.py` erzwingt P1/P3/P4/P5/P6 strukturell (8 Tests).
+
+---
+
+## 16. HACS Platform Preset
+
+> Seit feat/hacs-platform-preset (#534) · Audit/Contract: `docs/plans/hacs-platform-preset-audit.md` · Tests: `tests/test_platform_hacs_preset.py` (23 Testfälle, alle grün)
+
+**Aktivierung im Konsumenten-Projekt:** `platforms: [hacs]` in `project.yaml`. Der Sync
+generiert daraus: (1) 5 HACS-Agent-Overrides, die via `role_from_platform_file`
+(`agents.py:496-501`) auf die generischen Rollen komponiert werden — die Output-Dateien
+bleiben generisch benannt (`developer.md`, `code-reviewer.md`, `devops-engineer.md`,
+`release.md`, `tester.md`); (2) die Platform-Rule `hacs-integration-development.md`,
+auto-collectet **nur** bei aktiver `hacs`-Plattform, Output-Stem mit gestripptem
+Plattform-Präfix; (3) den Skill `integration-development` via `channel: skill`
+(Claude-only, lazy → `.claude/skills/integration-development/SKILL.md`; andere Provider
+fallen auf den normalen Rules-Pfad zurück — Opencode: embedded in `AGENTS.md`).
+
+### Neue Artefakte
+
+| Artefakt | Zweck |
+|----------|-------|
+| `platform-configs/hacs.defaults.yaml` | Platform-Defaults: 5 Keys als `{{platform.hacs.*}}`-Platzhalter-Quelle (Tabelle unten) |
+| `rules/2-platform/hacs-integration-development.md` | Skill-Quell-Rule **ohne Frontmatter**: 7-Schritte-Workflow (Ist-Analyse live per API → Konzept → HA-freie Logik → Build → Tests grün → Release-Dreiklang → erst danach Dev-Test & Alt-Cleanup), eiserne Regeln mit Begründung/Fehlerklasse, Meta-Datei-Skelette (hacs.json/manifest.json/translations/CI — händisch, kein Generator), Test-Trick (pytest ohne HA via Fake-Package), Debugging-Checkliste, Live-Referenz-Block mit allen 5 `{{platform.hacs.*}}`-Platzhaltern |
+| `config/rules-presets.yaml` → `presets.lazy.integration-development` | Preset-Key = **gestrippter Output-Stem** (`collect_rule_sources` stript den `hacs-`-Präfix, `rules.py:141`) — nicht der literale Dateiname; `channel: skill` + englische `skill-description` |
+| `tests/test_platform_hacs_preset.py` | Regression-Suite: 19 Testfunktionen → 23 Testfälle (1 parametrisiert ×5), 3 Tiers |
+
+### Agent-Override-Verkettung (Composition, `extends` + `patches`)
+
+| Datei (`agents/2-platform/`) | `name:` | Version | `based-on` |
+|---|---|---|---|
+| `hacs-developer.md` | `developer` | 1.1.1 | `1-generic/developer.md@4.0.1` |
+| `hacs-code-reviewer.md` | `code-reviewer` | 1.0.0 | `1-generic/code-reviewer.md@1.2.2` |
+| `hacs-devops-engineer.md` | `devops-engineer` | 1.0.0 | `1-generic/devops-engineer.md@1.1.3` |
+| `hacs-release.md` | `release` | 1.0.0 | `1-generic/release.md@1.5.0` |
+| `hacs-tester.md` | `tester` | 1.0.2 | `1-generic/tester.md@2.1.4` |
+
+Die Meta-Keys `extends`/`patches` werden aus dem generierten Output-Frontmatter
+gestrippt (`agents.py:910-911`); Composition ist Build-Zeit, der Output enthält das
+Vollbild. Patch-Ops: ausschließlich `append-after` auf `<persona>`/`<context>`-Anker
+(`prompt_mode: modern`).
+
+### Keys in `platform-configs/hacs.defaults.yaml`
+
+| Key | Default | Semantik |
+|-----|---------|----------|
+| `custom_components_path` | `custom_components` | Working-Default |
+| `integration_repo_url` | `""` | Pflicht — Live-Referenz Integrations-Repo |
+| `reference_repo_url` | `""` | Pflicht — Live-Referenz zweites Repo (z.B. home-assistant/core) |
+| `project_skills` | `""` | Pflicht — komma-separierte Projekt-Skills |
+| `dev_instance_url` | `""` | Pflicht — Dev-HA-Instanz (Dev-Test, HACS-Update-Test) |
+
+**Warn-Semantik (sync.log):** definierter, aber leerer (Pflicht-)Key → Leerstring
+substituiert + `[WARN]` bis zum Projekt-Override; **undefinierter** Key → literaler
+`{{platform.hacs.*}}`-Platzhalter bleibt + Warnung. Override-Mechanik:
+`.claude/platform-config.yaml` (geladen einmal für alle Plattformen; Defaults zuerst,
+Projekt-Override gewinnt — Details in `scripts/lib/platform.py` bzw.
+[Layer Model](architecture/01-layer-model.md#platform-config--platform-substitution)).
+
+### Test-Suite (`tests/test_platform_hacs_preset.py`)
+
+| Tier | Fokus |
+|------|-------|
+| 1 — Config-Load | `load_platform_config()`: Defaults-Datei, Projekt-Override, Flatten, fehlende Datei → skip silently, Required-Empty-Warns; `substitute_platform()` |
+| 2 — Collection | `collect_rule_sources`/`collect_command_sources`/`collect_hook_sources` gate `hacs-*`-Dateien auf `platforms:[hacs]` (inkl. Negativ-Test ohne Plattform); `role_from_platform_file` Mapping; Preset-Resolution auf gestripptem Stem |
+| 3 — Temp-Project | Minimaler Konsumenten-Projekt-Sync (pytest tmp_path, hermetisch) über dieselben Lib-Entry-Points wie der sync.py-Hauptpfad: Composition angewandt, Skill geroutet (`integration-development`), Platzhalter substituiert, ohne Plattform → kein HACS-Output |
+
+Ausführen: `python -m pytest tests/test_platform_hacs_preset.py -q` (lokal mit
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`).

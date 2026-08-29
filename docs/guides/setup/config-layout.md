@@ -94,10 +94,19 @@ variables:
 **Versioniert:** Im Projekt-Repo
 **Editierbar:** Ja — für plattformspezifische Werte
 
-Nur relevant wenn `platforms: ["homeassistant"]` oder ähnliches in `project.yaml` gesetzt ist.
+Nur relevant wenn `platforms: ["hacs"]`, `platforms: ["homeassistant"]` oder ähnliches in `project.yaml` gesetzt ist.
 Überschreibt `{{platform.*}}`-Platzhalter aus den Platform-Defaults.
 
-Siehe [platform-config.md](platform-config.md) für Details.
+Die Werte kommen aus zwei Quellen: den Platform-Defaults im agent-meta-Submodul
+(`platform-configs/<platform>.defaults.yaml`, z.B. `hacs.defaults.yaml` oder
+`homeassistant.defaults.yaml`) und dieser Override-Datei. Merge: Defaults zuerst,
+Projekt-Override gewinnt. `""` in der Defaults-Datei markiert ein Pflichtfeld —
+`sync.py` warnt in `sync.log`, bis du den Wert hier setzt.
+
+Die vollständige Mechanik (Pfad-Layout, Flatten zu `{{platform.<platform>.<key>}}`,
+Substitutions-Semantik für definierte/undefinierte Keys) ist im
+[Layer Model](../../architecture/01-layer-model.md#platform-config--platform-substitution)
+dokumentiert.
 
 ---
 
