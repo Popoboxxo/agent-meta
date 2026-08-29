@@ -6,7 +6,6 @@ description: Reads .meta-config/export.yaml and routes structured JSON payloads 
 prompt_mode: modern
 generated-from: 1-generic/export-manager.md@1.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

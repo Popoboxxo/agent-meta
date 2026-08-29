@@ -6,7 +6,6 @@ description: Use when a concept or design doc needs a structural review before r
 prompt_mode: modern
 generated-from: 1-generic/concept-reviewer.md@1.0.3
 mode: subagent
-model: opencode-go/kimi-k2.6
 permission:
   read: allow
   glob: allow

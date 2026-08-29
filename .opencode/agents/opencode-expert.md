@@ -6,7 +6,6 @@ description: 'Absoluter Analyse-Experte für die Plattform Opencode: Funktionswe
   Anpassung von agent-meta.'
 generated-from: 2-platform/agent-meta-opencode-expert.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

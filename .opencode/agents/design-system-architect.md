@@ -8,7 +8,6 @@ description: 'Translates a UI design-system schema into real, project-bound desi
 prompt_mode: modern
 generated-from: 1-generic/design-system-architect.md@0.1.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

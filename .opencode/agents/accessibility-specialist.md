@@ -7,7 +7,6 @@ description: WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, s
 prompt_mode: modern
 generated-from: 1-generic/accessibility-specialist.md@0.1.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

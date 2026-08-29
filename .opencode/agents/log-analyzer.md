@@ -7,7 +7,6 @@ description: 'Analyzes system and application logs: frequency clustering, severi
 prompt_mode: modern
 generated-from: 1-generic/log-analyzer.md@1.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

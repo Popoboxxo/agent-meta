@@ -6,7 +6,6 @@ description: CI/CD pipelines, Infrastructure as Code, container orchestration, o
 prompt_mode: modern
 generated-from: 1-generic/devops-engineer.md@1.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

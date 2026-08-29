@@ -5,7 +5,6 @@ description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisc
   Event-Log, OKF §7) im Knowledge Wiki.
 generated-from: 1-generic/knowledge-indexer.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

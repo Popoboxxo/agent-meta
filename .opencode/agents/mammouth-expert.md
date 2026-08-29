@@ -6,7 +6,6 @@ description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funkti
   Anpassung von agent-meta.'
 generated-from: 2-platform/agent-meta-mammouth-expert.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

@@ -5,7 +5,6 @@ description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, k
   Links, fehlende OKF-Frontmatter, Index-Staleness.'
 generated-from: 1-generic/knowledge-linter.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

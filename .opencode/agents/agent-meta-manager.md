@@ -6,7 +6,6 @@ description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-sp
 prompt_mode: modern
 generated-from: 1-generic/agent-meta-manager.md@1.13.1
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

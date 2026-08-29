@@ -6,7 +6,6 @@ description: 'Absoluter Analyse-Experte für die Plattform Claude Code: Funktion
   von agent-meta.'
 generated-from: 2-platform/agent-meta-claude-expert.md@1.0.0
 mode: subagent
-model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow

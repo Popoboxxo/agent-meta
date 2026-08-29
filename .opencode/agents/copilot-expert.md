@@ -6,7 +6,6 @@ description: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funkt
   Anpassung von agent-meta.'
 generated-from: 2-platform/agent-meta-copilot-expert.md@1.0.0
 mode: subagent
-model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow
