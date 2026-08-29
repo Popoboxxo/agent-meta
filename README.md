@@ -141,7 +141,7 @@ mindmap
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
 | **planner** | balanced | 1.0.1 | Turns concepts/REQs/bugs into concrete, ordered implementation plans |
-| **release** | balanced | 1.4.3 | Versioning, changelogs, build processes, GitHub releases |
+| **release** | balanced | 1.5.0 | Versioning, changelogs, build processes, GitHub releases |
 | **ideation** | balanced | 1.7.0 | Idea exploration, vision sharpening, concept concretization |
 | **feedback** | fast | 1.2.3 | Standardizes bug reports and feature requests as GitHub issues |
 | **agent-meta-manager** | balanced | 1.12.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
@@ -150,7 +150,7 @@ mindmap
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
-### Specialist Roles (26 agents)
+### Specialist Roles (30 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -158,21 +158,25 @@ mindmap
 | **api-specialist** | balanced | 1.1.3 | API design, OpenAPI specs, contract-first development |
 | **backend-reviewer** | balanced | 1.0.0 | Backend domain review: API contracts, silent-failure hunting, concurrency, middleware — evidence-based with MERGE_SCORE |
 | **bug-feature-analyzer** | balanced | 1.1.4 | Triage and classify incoming bug reports and feature requests |
+| **copyeditor** | balanced | 0.2.0 | Copyediting pass: style, sentence structure, word repetition, narrative flow, content consistency — categorized findings report, no silent rewrites |
 | **data-engineer** | balanced | 0.1.1 | ETL/ELT pipelines, data-layer schema migration, data-quality checks, lineage analysis, pipeline monitoring |
 | **database-engineer** | powerful | 1.0.1 | Relational schema design, backwards-compatible migrations, query optimization, index strategy |
 | **database-reviewer** | powerful | 1.0.0 | Database domain review: migration safety, N+1, injection vectors (CWE-89), indexing, transactions |
+| **design-system-architect** | balanced | 0.1.0 | Translates a UI design-system schema into project-bound design-token artifacts (CSS custom properties/Tailwind config): color harmony, design-time contrast gate, spacing/breakpoints, variant contracts, motion tokens |
 | **dependency-auditor** | balanced | 1.0.0 | Supply-chain hygiene: SBOM analysis, license compatibility, version drift, outdated/vulnerable packages |
 | **devops-engineer** | fast | 1.1.3 | CI/CD pipelines, IaC, container orchestration |
 | **docker** | fast | 1.4.4 | Docker operations: Compose stacks, binary management, test environments |
 | **effort-estimator** | fast | 1.0.3 | Estimates effort for development tasks with complexity scoring |
 | **explorer** | nano | 1.0.1 | Read-only codebase research, dependency and impact mapping |
 | **export-manager** | fast | 1.1.3 | Routes JSON payloads to Markdown/Confluence/Jira-Xray/Notion |
+| **frontend-component-engineer** | balanced | 0.1.0 | Builds production-ready UI components from screen spec (ui-ux-designer) plus token/variant contract (design-system-architect): props contract, state handling, a11y baseline |
 | **frontend-reviewer** | balanced | 1.0.0 | Frontend domain review: component design, state, SSR/hydration, browser APIs — evidence-based with MERGE_SCORE |
 | **incident-responder** | powerful | 1.0.0 | Live incident coordination: RCA (5-Whys/Fishbone), severity classification, prioritized hotfixes |
 | **log-analyzer** | balanced | 1.1.3 | Log analysis: frequency clustering, RFC 5424 severity classification |
 | **openscad-developer** | balanced | 1.1.3 | Parametric 3D models in OpenSCAD |
 | **performance-optimizer** | powerful | 1.2.0 | Data-driven Big-O bottleneck identification |
 | **product-manager** | balanced | 0.1.0 | Strategic product management: backlog, user stories, sprint planning, RICE/MoSCoW prioritization, KPI definition |
+| **proofreader** | balanced | 0.2.0 | Proofreading pass: spelling, grammar, punctuation — no style/structure/content changes, categorized findings report |
 | **refactoring-specialist** | balanced | 0.1.1 | Systematic large-scale code transformation with safety nets: Strangler Fig, incremental refactoring, legacy modernization |
 | **security-auditor** | powerful | 2.0.0 | Static security analysis: OWASP Top 10 + ASVS/CWE mapping, rules index, two-pass verification, secrets, supply-chain, MERGE_SCORE |
 | **sre-engineer** | balanced | 0.1.0 | Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbooks |
