@@ -6,7 +6,6 @@ description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and 
 prompt_mode: modern
 generated-from: 1-generic/requirements.md@1.4.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

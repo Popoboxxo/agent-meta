@@ -8,7 +8,6 @@ description: Builds production-ready UI components from a screen spec (ui-ux-des
 prompt_mode: modern
 generated-from: 1-generic/frontend-component-engineer.md@0.1.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   bash: allow
   read: allow

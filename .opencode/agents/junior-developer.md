@@ -6,7 +6,6 @@ description: 'Fast, well-scoped code changes: 1-2 files, no architecture impact.
 prompt_mode: modern
 generated-from: 1-generic/junior-developer.md@1.2.1
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

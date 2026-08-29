@@ -6,7 +6,6 @@ description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and sess
 prompt_mode: modern
 generated-from: 1-generic/documenter.md@1.4.3
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   edit: allow

@@ -6,7 +6,6 @@ description: 'Docker operations: Compose stacks, binary management, test environ
 prompt_mode: modern
 generated-from: 1-generic/docker.md@1.4.4
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   bash: allow
   read: allow

@@ -6,7 +6,6 @@ description: API design, OpenAPI specifications, contract-first development. Cre
 prompt_mode: modern
 generated-from: 1-generic/api-specialist.md@1.1.3
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow

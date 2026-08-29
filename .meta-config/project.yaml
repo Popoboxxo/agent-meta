@@ -304,6 +304,8 @@ quality-pipelines:
       enabled: false
   custom-pipelines: {}
 model-override-all: {}
+model-inherit-main-chat:
+  Opencode: true
 model-overrides:
   Gemini:
     knowledge-curator: gemini-2.0-flash-lite-preview-02-05

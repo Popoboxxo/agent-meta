@@ -6,7 +6,6 @@ description: Complex features, architecture decisions, hard bugs and cross-cutti
 prompt_mode: modern
 generated-from: 1-generic/senior-developer.md@1.2.3
 mode: subagent
-model: opencode-go/kimi-k2.6
 permission:
   bash: allow
   read: allow

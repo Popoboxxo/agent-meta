@@ -6,7 +6,6 @@ description: Read-only codebase research, dependency and impact mapping, file an
 prompt_mode: modern
 generated-from: 1-generic/explorer.md@1.0.1
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
   read: allow
   glob: allow

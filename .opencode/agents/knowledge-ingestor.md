@@ -5,7 +5,6 @@ description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstelle
   Cross-References pflegen.
 generated-from: 1-generic/knowledge-ingestor.md@1.0.0
 mode: subagent
-model: opencode-go/deepseek-v4-pro
 permission:
   read: allow
   edit: allow
