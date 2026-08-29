@@ -380,7 +380,7 @@ def test_full_render_is_larger_than_compact_render(seeded_project, tmp_path):
     compact = _render_context("compact", tmp_path)
     # Full carries the OVERVIEW mass the paper flags as discoverable; the delta
     # is the whole point of #540.
-    assert len(full.splitlines()) > len(compact.splitlines()) * 1.6
+    assert len(full.splitlines()) > len(compact.splitlines()) * 1.3
 
 
 def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tmp_path):
@@ -398,7 +398,7 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     # never leave AGENTS.md without semantic loss. The threshold reflects that
     # measured floor honestly rather than a goal retrofit — see
     # docs/plans/issue-540-baseline.md Iteration 2.
-    assert len(lines) < len(full_lines) * 0.6
+    assert len(full_lines) > len(lines) * 1.3
 
     for anchor in _MANDATORY_ANCHORS:
         assert anchor in compact, f"mandatory anchor missing in compact render: {anchor}"
@@ -406,6 +406,15 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     # Overviews are gone (discoverable via ls/find).
     for overview in ("## Architektur", "## Tech-Stack", "## Build & Development"):
         assert overview not in compact, f"overview still present: {overview}"
+
+    # Issue #546 value retention: compact no longer DELETES stack/build/entry —
+    # it keeps them as dense inline lines (lossless density, not lossy pointers).
+    assert "> Stack: Python 3.x" in compact                    # RUNTIME value
+    assert "> Build: `python scripts/sync.py`" in compact       # BUILD_COMMAND value
+    assert "`python3 scripts/sync.py --validate`" in compact    # TEST_COMMAND value
+    assert "**Entry-Point:** `scripts/sync.py — Haupt-CLI" in compact  # ENTRY_POINT_PATTERN
+    assert "**Besondere Patterns:**" in compact                 # KEY_PATTERNS section
+    assert "> Struktur: `.meta-config/project.yaml`" in compact # PROJECT_STRUCTURE pointer
 
     # MCP sections collapsed to listen-only.
     assert "## Agent-Hinweise" not in compact
