@@ -1,2 +1,3 @@
 orchestrator-guard.sh
+pre-release-check.sh
 viz-log.sh
