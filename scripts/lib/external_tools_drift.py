@@ -215,6 +215,16 @@ def scan_injection_drift(
                     continue
                 if child.name in managed:
                     continue
+                # A subdirectory that carries its OWN '.agent-meta-managed'
+                # index (e.g. hooks/release-gates/, sync_release_gates() —
+                # issue #558) is a nested, self-managed sync.py output, not a
+                # foreign injection — its content is scoped by that sidecar
+                # index the same way this dir's own .agent-meta-managed
+                # scopes plain files. Deliberately generic (checks for the
+                # sentinel file, not a hardcoded dir name) so any future
+                # nested-managed hook subdirectory is covered too.
+                if child.is_dir() and (child / ".agent-meta-managed").exists():
+                    continue
                 if child.resolve() in permitted_by_kind[kind]:
                     continue
                 provider_findings.append({

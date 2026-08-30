@@ -588,6 +588,29 @@
       },
       "additionalProperties": false
     },
+    "release-gates": {
+      "type": "object",
+      "description": "Configure the pre-release-check.sh gate scripts (hooks/*/release-gates/*.sh, issue #558) — a plugin-style dispatcher, not a fixed enum. Keys are gate script file stems: the three built-ins ('artifact-freshness', 'docker-image-scan', 'action-pin-validation', defaulted per dod-preset — see config/dod-presets.yaml) plus any project-authored custom gate dropped into <hooks_dir>/release-gates/. Precedence: this block (highest) > dod-preset default > the gate script's own 'enabled_by_default' header.",
+      "additionalProperties": {
+        "description": "Per-gate config. Either a bare boolean shorthand for 'enabled', or an object form. 'enabled' is read by sync.py to bake the gate script's default; any other object keys are opaque to the framework — reserved for that specific gate script to read itself (env var, own project.yaml parsing, etc.).",
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "Shorthand for {enabled: <this value>}."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable/disable this gate, overriding the dod-preset default."
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
     "conventions-preset": {
       "type": "string",
       "description": "The active naming/versioning conventions preset, matched against config/conventions-presets.yaml. Individual overrides via 'conventions' block. Precedence: conventions > conventions-preset > 'default'.",
