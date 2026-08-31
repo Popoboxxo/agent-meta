@@ -281,6 +281,7 @@ Alle `{{VARIABLE}}` in jeder Agenten-Datei werden mit Werten aus `variables` ers
 | `{{AGENT_HINTS}}` | Agenten-Tabelle aus `hint`-Feldern der Templates |
 | `{{AI_PROVIDER}}` | Aktive Provider aus `ai-providers` (kommagetrennt) |
 | `{{PREFIX}}` | Aus `project.prefix` |
+| `{{PROMPT_INJECTION_DEFENSE_BLOCK}}` | Kanonischer Prompt-Injection-Defense-Hinweis aus `snippets/security/prompt-injection-defense.md`, injiziert in Rollen die externe/Drittanbieter-Inhalte lesen |
 
 Unbekannte Variablen (kein Wert in Config):
 - Platzhalter bleibt unverändert sichtbar

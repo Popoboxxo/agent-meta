@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.2.3"
+version: "1.3.0"
 description: "Complex features, architecture decisions, hard bugs and cross-cutting refactorings. Analyzes before implementing and documents decisions."
 hint: "High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements"
 prompt_mode: modern
@@ -115,6 +115,7 @@ NEXT: [Review | Tests | Commit]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No unverified assumptions about callers — verify blast radius via Grep
 - No silent behavior changes — name breaking changes explicitly
 - No default exports

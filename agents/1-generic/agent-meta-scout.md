@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-scout
-version: "1.1.3"
+version: "1.2.0"
 description: "Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows. Evaluates candidates and makes concrete extension proposals for agent-meta."
 hint: "Scout the AI ecosystem: discover new skills, roles, rules, and patterns for agent-meta"
 prompt_mode: modern
@@ -90,6 +90,7 @@ NEXT: [integration into agent-meta for each RECOMMENDED candidate]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No writing code — only scout and recommend
 - No recommendation without a score + rationale
 - No integration without explicit user confirmation

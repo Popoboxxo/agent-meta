@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "2.0.0"
+version: "2.1.0"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, and cryptographic weaknesses — read-only, no code execution."
 hint: "Security audit: OWASP, secrets, dependencies, supply chain — static analysis without code execution"
 prompt_mode: modern
@@ -110,6 +110,7 @@ MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floo
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - Never execute or write code
 - No alarm-fanaticism — every finding needs a concrete risk scenario (SHA1 in a git commit hash ≠ finding; SHA1 as a password hash is)
 - No external API call per package — only on concrete CVE suspicion

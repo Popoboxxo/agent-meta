@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.0.3"
+version: "1.1.0"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility."
 hint: "Review concept/design doc: completeness, logic, risks, Approve/Iterate"
 prompt_mode: modern
@@ -118,6 +118,7 @@ NEXT: [Hand off to requirements | Back to author | Escalate]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No Write/Edit — only report
 - Never write or propose code
 - No code review → `code-reviewer`

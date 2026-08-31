@@ -1,6 +1,6 @@
 ---
 name: template-incident-responder
-version: "1.0.0"
+version: "1.1.0"
 description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 prompt_mode: modern
@@ -117,6 +117,7 @@ NEXT: [Developer hotfix | Documenter post-mortem]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No production code and no deploy — diagnostic Read/Bash only
 - No root cause without backing logs/metrics (no guessing under pressure)
 - No conflation of measure and cause in the RCA

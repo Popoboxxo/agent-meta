@@ -1,6 +1,6 @@
 ---
 name: template-e2e-tester
-version: "1.0.0"
+version: "1.1.0"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
@@ -119,6 +119,7 @@ On failed tests or audit violations: return structured findings (affected flow, 
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No unit tests — those belong to `tester`
 - No scope creep: no implementation fixes to production code, only tests and findings
 - No production data in tests (no real user data, secrets, personal data)
