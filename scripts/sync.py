@@ -92,14 +92,14 @@ from lib.deactivation import (
     resolve_deactivation_targets,
     update_deactivation_config,
 )
-from lib.dod import resolve_dod
+from lib.dod import resolve_dod, resolve_release_gates
 from lib.extensions import create_extension, update_extensions
 from lib.external_tools import (
     generate_external_tool_artifacts,
     render_injection_drift_artifacts,
     scan_injection_drift,
 )
-from lib.hooks import create_hook, sync_hooks
+from lib.hooks import create_hook, sync_hooks, sync_release_gates
 from lib.io import SyncError, safe_path, write_checked
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import generate_initial_index, generate_initial_log, generate_schema
@@ -365,7 +365,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.commands import sync_commands_for_provider
     from lib.config import build_variables
     from lib.context import sync_context_for_provider, sync_snippets_for_provider
-    from lib.hooks import sync_hooks
+    from lib.dod import resolve_release_gates
+    from lib.hooks import sync_hooks, sync_release_gates
     from lib.providers import load_providers_config, resolve_providers
     from lib.rules import sync_rules, sync_speech_mode
     from lib.skills import sync_external_skills_for_provider
@@ -406,6 +407,9 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         if pc["has_hooks"]:
             sync_hooks(agent_meta_root, test_repo_path, config, log, dry_run,
                        provider=provider, provider_config=provider_config)
+            sync_release_gates(agent_meta_root, test_repo_path, config, log, dry_run,
+                                provider=provider, provider_config=provider_config,
+                                release_gates_resolved=resolve_release_gates(config, agent_meta_root))
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
                                        dry_run, provider, provider_config=provider_config,
@@ -1170,6 +1174,9 @@ def main():
             if pc.get("has_hooks", False):
                 sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                            provider=provider, provider_config=provider_config)
+                sync_release_gates(agent_meta_root, project_root, config, log, args.dry_run,
+                                    provider=provider, provider_config=provider_config,
+                                    release_gates_resolved=resolve_release_gates(config, agent_meta_root))
             else:
                 log.info("hooks", f"skipped for {provider} — not supported")  # noqa: PLE1205
             if pc.get("has_commands", False):

@@ -466,7 +466,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **se-test-loop** | se-test-engineer | se-testreviewer | 3 |
 | **se-dev-review-loop** | se-developer | code-reviewer | 3 |
 
-## Hooks (5 hooks, propagated to all providers)
+## Hooks (6 hooks, propagated to all providers)
 
 | Hook | Trigger | Effect |
 |------|---------|--------|
@@ -475,6 +475,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | `lifecycle-check.sh` | Post-commit | Detects Git events (release-tag, merge), writes pending-tasks.md for triggered agents |
 | `sync-on-config-change.sh` | PostToolUse | Triggers sync.py re-run when `.meta-config/project.yaml` changes (detects via Write/Edit tools) |
 | `viz-log.sh` | Events | Logs agent events to viz event file for dashboard tracking |
+| `pre-release-check.sh` | Manual (release agent) | Dispatcher for mechanized, plugin-style pre-release gates (runs every `*.sh` in its `release-gates/` subdirectory: 3 built-ins — artifact freshness, Docker base image CVE scan, GitHub Action pin validation — plus any project-authored custom gate) — see `docs/RELEASE_GATES.md` |
 
 ## MCP Servers (7 servers)
 

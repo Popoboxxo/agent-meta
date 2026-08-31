@@ -1,5 +1,13 @@
 # DoD presets. Override via 'dod-preset' or per-field 'dod' in project.yaml.
 # Precedence: dod > dod-preset > full.
+#
+# 'release-gates' (per preset, optional): default enabled/disabled state for
+# the built-in pre-release-check.sh gate scripts (hooks/1-generic/release-gates/).
+# NOT part of the flat 'dod' block — resolved separately via
+# scripts/lib/dod.py::resolve_release_gates() and overridden at the project
+# level via the top-level 'release-gates:' key in project.yaml (see
+# config/project-config.schema.json), not via 'dod:'. Gate names here map 1:1
+# to hooks/1-generic/release-gates/<name>.sh file stems.
 
 presets:
   full:                 # enterprise / regulated
@@ -8,18 +16,30 @@ presets:
     codebase-overview: true
     security-audit: false
     se-required: "false"
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
 
   standard:             # tests, no REQs / overview
     req-traceability: false
     tests-required: true
     codebase-overview: false
     security-audit: false
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
 
   rapid-prototyping:    # minimal overhead
     req-traceability: false
     tests-required: false
     codebase-overview: false
     security-audit: false
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
 
   spec-optional:        # SE available, not mandatory
     req-traceability: false
@@ -27,6 +47,10 @@ presets:
     codebase-overview: false
     security-audit: false
     se-required: "false"
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
 
   spec-driven:          # SE recommended for complex features
     req-traceability: true
@@ -34,6 +58,10 @@ presets:
     codebase-overview: false
     security-audit: false
     se-required: "recommended"
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
 
   spec-certified:       # regulated environments
     req-traceability: true
@@ -41,3 +69,7 @@ presets:
     codebase-overview: true
     security-audit: true
     se-required: "true"
+    release-gates:
+      artifact-freshness: true
+      docker-image-scan: true
+      action-pin-validation: true
