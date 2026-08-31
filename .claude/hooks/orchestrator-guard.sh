@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.4.1
+# version: 2.6.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -51,18 +51,31 @@
 # no agent field) — this is mitigation, not cryptographic trust; see
 # .claude/rules/a2a-delegation-gates.md ("Bekannte Grenzen").
 #
-# Destructive-gate scope note (issue #542): the destructive patterns below
-# are intended to detect REAL git subcommand invocations, not arbitrary
-# text. They are line-scoped: keyword and flag must sit on the same line
-# (no crossing of newline boundaries via [^|;&\n]* or [ \t]+), so a
-# multi-line command whose later lines merely mention "push", "--force",
-# "-f" etc. as text is no longer blocked. Known limitation (deliberate,
-# best-effort keyword gate): a keyword and its flag inside the SAME text
-# argument/line (e.g. a one-line heredoc body `echo "push --force later"`
-# or unquoted echo text) still matches — full tokenized subcommand parsing
-# (Mutation-Gate style) would be needed to close that, tracked as a
-# potential follow-up; not attempted here to keep the #516 incident
-# semantics and test coverage stable.
+# Destructive-gate scope note (issues #542/#551/#590/#591/#602): the
+# destructive gate now shares ONE tokenizer with the mutation gate (the
+# `parse_git` / `is_destructive` / `is_mutation` functions in the Python
+# heredoc below) instead of matching raw regexes against the whole command
+# string. It only inspects tokens of
+# real `git <subcommand>` invocations, which closes several prior gaps:
+#   * #602: destructive keywords inside an unrelated command's quoted text
+#     argument (e.g. `gh issue create --body "git push --force ..."`,
+#     `echo "reset --hard"`) no longer match — they are not `git` tokens.
+#   * #590: a leading `+` on a push refspec (`git push origin +main`) forces
+#     a non-fast-forward push like --force and is now detected, while a plain
+#     `HEAD:main` refspec (no `+`) is not treated as destructive.
+#   * #591: global `-c key=val` / `--config key=val` options are consumed
+#     together with their value token, so the real subcommand is still found
+#     (previously `-c core.pager=x push` hid `push`); additionally
+#     `core.pager` / `core.editor` config keys are flagged as inherently
+#     destructive (arbitrary-command execution / RCE) regardless of the
+#     subcommand.
+# Known limitation (issue #592, deliberate — best-effort convention gate,
+# not a security boundary): command substitution and indirection such as
+# `$(...)`, backticks, `xargs`, or `eval` can still smuggle a git mutation
+# past the tokenizer, because the hook does not execute or fully parse the
+# shell. Closing this would require a real shell interpreter, which is
+# disproportionate for a convention tool; documented in
+# .claude/rules/branch-guard.md ("Bekannte Grenzen").
 
 INPUT=$(cat)
 
@@ -148,38 +161,207 @@ if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
   esac
 fi
 
-# --- Destructive-operation gate: applies regardless of sentinel --------
+# --- Unified git-statement scan (issue #551): ONE tokenizer feeds BOTH ---
+# gates. The destructive gate (below) applies regardless of sentinel; the
+# mutation gate (further down) applies only in non-strict mode for non-git
+# callers. Classifying once, with the same tokenizer, keeps the two gates
+# consistent and fixes the raw-regex gaps #590/#591/#602 (see header note).
+# The scan prints exactly one word: 'destructive', 'mutation', or 'none'
+# ('destructive' takes precedence when a statement is both). On any Python
+# error it falls back to 'none' (fail-open, matching the prior gates).
+_GIT_SCAN="none"
 if [ "$TOOL_NAME" = "Bash" ]; then
-  IS_DESTRUCTIVE=$(printf '%s' "$BASH_CMD" | $_PY -c "
-import re, sys
+  _GIT_SCAN=$(printf '%s' "$BASH_CMD" | $_PY -c "
+import re, shlex, sys
 
 command = sys.stdin.read()
 
-# Issue #542: keyword and flag must sit on the SAME line. [^|;&]* matched
-# across newlines (a later line's "--force"/"-f"/"--hard" text got glued to
-# an earlier line's keyword), and \s+ in the stash/checkout/restore patterns
-# also matched \n. Line-scoped character classes ([^|;&\n], [ \t]) fix that;
-# \bfilter-(branch|repo)\b is a single token with no spanning component and
-# needs no change. Same-line text mentions remain a known limitation (see
-# header note).
-DESTRUCTIVE_PATTERNS = [
-    r'\bpush\b[^|;&\n]*(--force\b|-f\b|--force-with-lease\b)',
-    r'\breset\b[^|;&\n]*--hard',
-    r'\bclean\b[^|;&\n]*-[a-zA-Z]*f',
-    r'\bstash[ \t]+(drop|clear)\b',
-    r'\bfilter-(branch|repo)\b',
-    r'\bcheckout\b[^|;&\n]*--[ \t]+\.',
-    r'\brestore\b[^|;&\n]*[ \t]\.[ \t]*$',
-]
-print('true' if any(re.search(p, command) for p in DESTRUCTIVE_PATTERNS) else 'false')
-" 2>/dev/null || echo "false")
+MUTATING = {
+    'commit', 'push', 'add', 'rm', 'merge', 'rebase', 'reset', 'restore',
+    'tag',
+}
+STASH_MUTATING = {'pop', 'drop', 'clear'}
 
-  if [ "$IS_DESTRUCTIVE" = "true" ]; then
-    echo "ORCHESTRATOR_GUARD: destructive git operation requires explicit user approval (issue #516)." >&2
-    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
-    echo "Ask the user to approve and run this command manually." >&2
-    exit 2
-  fi
+# Global git options (before the subcommand) that consume a following value
+# token; if not skipped WITH their value, the value is misread as the
+# subcommand (issue #591, e.g. 'git -C path push' would see 'path').
+GLOBAL_OPTS_WITH_VALUE = {
+    '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path',
+    '--super-prefix',
+    # Same subcommand-hiding class as '-c' (issue #551): both take a separate
+    # value token in space-form and would otherwise mask the real subcommand
+    # (e.g. 'git --config-env x=Y push --force' / 'git --attr-source t push
+    # --force' hid 'push').
+    '--config-env', '--attr-source',
+}
+# Config keys whose value git hands to the shell -> arbitrary command
+# execution / RCE (issue #591). Flagged destructive regardless of the
+# subcommand, so 'git -c core.pager=<cmd> status' is still blocked. Keys are
+# compared case-insensitively (git config section/name are case-insensitive),
+# so every entry here must be lowercase. 'alias.*' is handled by prefix below.
+RCE_CONFIG_KEYS = {
+    'core.pager', 'core.editor', 'core.sshcommand', 'core.fsmonitor',
+    'core.hookspath', 'sequence.editor', 'credential.helper',
+}
+
+
+def statements(cmd):
+    # Best-effort split on shell control operators AND newlines (issue #508):
+    # stops scanning past '&&'/';'/'|'/newline so a mutation keyword in an
+    # unrelated later command or a quoted argument is not attributed to an
+    # earlier 'git' invocation, and multi-line commands are not flattened.
+    return re.split(r'&&|\|\||;|\||\n', cmd)
+
+
+def tokens_of(stmt):
+    try:
+        return shlex.split(stmt)
+    except ValueError:
+        return stmt.split()
+
+
+def parse_git(rest):
+    # Consume leading global options (including '-c key=val' with its value,
+    # issue #591) and return (subcmd or None, args, config_keys). config_keys
+    # collects the KEY part of every -c/--config pair for RCE inspection.
+    config_keys = []
+    j, n = 0, len(rest)
+    while j < n:
+        t = rest[j]
+        if t in ('-c', '--config'):
+            if j + 1 < n:
+                config_keys.append(rest[j + 1].split('=', 1)[0])
+                j += 2
+            else:
+                j += 1
+            continue
+        if t.startswith('--config='):
+            config_keys.append(t[len('--config='):].split('=', 1)[0])
+            j += 1
+            continue
+        # '--config-env <name>=<envvar>' (git >=2.31): the KEY is the <name>
+        # part, same RCE surface as '-c' (issue #551). Consume its value token
+        # and record the key for RCE inspection.
+        if t == '--config-env':
+            if j + 1 < n:
+                config_keys.append(rest[j + 1].split('=', 1)[0])
+                j += 2
+            else:
+                j += 1
+            continue
+        if t.startswith('--config-env='):
+            config_keys.append(t[len('--config-env='):].split('=', 1)[0])
+            j += 1
+            continue
+        if t in GLOBAL_OPTS_WITH_VALUE:
+            j += 2
+            continue
+        if t.startswith('-'):
+            j += 1
+            continue
+        break
+    if j >= n:
+        return None, [], config_keys
+    return rest[j], rest[j + 1:], config_keys
+
+
+def has_short_flag(args, ch):
+    # True if any short-flag cluster (single dash, not '--') contains `ch`,
+    # e.g. has_short_flag(['-fu'], 'f') -> True. Shared by the push and clean
+    # branches of is_destructive (issue #551, dedup of the old inline check).
+    return any(
+        a.startswith('-') and not a.startswith('--') and ch in a
+        for a in args
+    )
+
+
+def is_destructive(subcmd, args, config_keys):
+    # RCE via config applies regardless of the subcommand (issue #591). Keys
+    # are matched case-insensitively; 'alias.<name>=<cmd>' is an RCE vector too
+    # (git runs the alias body via the shell), matched by prefix.
+    for k in config_keys:
+        kl = k.lower()
+        if kl in RCE_CONFIG_KEYS or kl.startswith('alias.'):
+            return True
+    if subcmd is None:
+        return False
+    positionals = [a for a in args if not a.startswith('-')]
+    if subcmd == 'push':
+        for a in args:
+            if a in ('-f', '--force') or a.startswith('--force-with-lease'):
+                return True
+        # short-flag cluster containing 'f' (e.g. -fu)
+        if has_short_flag(args, 'f'):
+            return True
+        # '--mirror' / '--delete' / '-d' delete remote refs -> irreversible
+        # ref loss, blocked even with a git sentinel (issue #551, cf. #590).
+        if '--mirror' in args or '--delete' in args:
+            return True
+        if has_short_flag(args, 'd'):
+            return True
+        # leading '+' on a refspec forces a non-fast-forward push (issue #590);
+        # a plain 'HEAD:main' (no '+') is a normal fast-forward push.
+        return any(p.startswith('+') for p in positionals)
+    if subcmd == 'reset':
+        return '--hard' in args
+    if subcmd == 'clean':
+        if '--force' in args:
+            return True
+        return has_short_flag(args, 'f')
+    if subcmd == 'stash':
+        return bool(args) and args[0] in ('drop', 'clear')
+    if subcmd in ('filter-branch', 'filter-repo'):
+        return True
+    if subcmd == 'checkout':
+        if '--' in args:
+            k = args.index('--')
+            return '.' in args[k + 1:]
+        return False
+    if subcmd == 'restore':
+        return '.' in positionals
+    return False
+
+
+def is_mutation(subcmd, args):
+    if subcmd is None:
+        return False
+    if subcmd == 'branch':
+        positional = [a for a in args if not a.startswith('-')]
+        mutating_flags = {'-d', '-D', '-m', '-M', '--delete', '--move', '--copy', '-c', '-C'}
+        return bool(positional) or bool(set(args) & mutating_flags)
+    if subcmd == 'checkout':
+        return bool(args) and not all(a.startswith('-') for a in args)
+    if subcmd == 'stash':
+        return bool(args) and args[0] in STASH_MUTATING
+    return subcmd in MUTATING
+
+
+destructive = False
+mutation = False
+for stmt in statements(command):
+    toks = tokens_of(stmt)
+    for i, tok in enumerate(toks):
+        if tok != 'git' and not tok.endswith('/git'):
+            continue
+        subcmd, args, config_keys = parse_git(toks[i + 1:])
+        if is_destructive(subcmd, args, config_keys):
+            destructive = True
+        if is_mutation(subcmd, args):
+            mutation = True
+        break
+    if destructive:
+        break
+
+print('destructive' if destructive else ('mutation' if mutation else 'none'))
+" 2>/dev/null || echo "none")
+fi
+
+# --- Destructive-operation gate: applies regardless of sentinel --------
+if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
+  echo "ORCHESTRATOR_GUARD: destructive git operation requires explicit user approval (issue #516)." >&2
+  echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+  echo "Ask the user to approve and run this command manually." >&2
+  exit 2
 fi
 
 # Check if strict mode is enabled in project.yaml
@@ -243,79 +425,15 @@ except Exception:
   fi
 fi
 
-# Non-strict mode: still block direct git mutations in Bash calls
-if [ "$TOOL_NAME" = "Bash" ]; then
-  IS_MUTATION=$(printf '%s' "$BASH_CMD" | $_PY -c "
-import re, shlex, sys
-
-command = sys.stdin.read()
-
-MUTATING = {
-    'commit', 'push', 'add', 'rm', 'merge', 'rebase', 'reset', 'restore',
-    'tag',
-}
-STASH_MUTATING = {'pop', 'drop', 'clear'}
-
-def statements(cmd):
-    # Best-effort split on shell control operators. Not a full shell
-    # parser, but enough to stop scanning past '&&'/';'/'|' boundaries so a
-    # mutation keyword in an unrelated later command or a quoted argument
-    # doesn't get attributed to an earlier, unrelated 'git' invocation.
-    # Newline is also a statement boundary (issue #508): without it, a
-    # multi-line command with no operator between the lines stayed one
-    # statement string, and shlex.split() then flattened both lines into a
-    # single token stream -- the second line's tokens could get misread as
-    # positional args to the first line's git subcommand (e.g. 'git branch'
-    # followed on the next line by 'git status --short' looked like
-    # 'git branch git status --short', a branch-create mutation).
-    return re.split(r'&&|\|\||;|\||\n', command)
-
-def tokens_of(stmt):
-    try:
-        return shlex.split(stmt)
-    except ValueError:
-        return stmt.split()
-
-blocked = False
-for stmt in statements(command):
-    toks = tokens_of(stmt)
-    for i, tok in enumerate(toks):
-        if tok != 'git' and not tok.endswith('/git'):
-            continue
-        rest = toks[i + 1:]
-        j = 0
-        while j < len(rest) and rest[j].startswith('-'):
-            j += 1
-        if j >= len(rest):
-            break
-        subcmd = rest[j]
-        args = rest[j + 1:]
-        if subcmd == 'branch':
-            positional = [a for a in args if not a.startswith('-')]
-            mutating_flags = {'-d', '-D', '-m', '-M', '--delete', '--move', '--copy', '-c', '-C'}
-            if positional or (set(args) & mutating_flags):
-                blocked = True
-        elif subcmd == 'checkout':
-            if args and not all(a.startswith('-') for a in args):
-                blocked = True
-        elif subcmd == 'stash':
-            if args and args[0] in STASH_MUTATING:
-                blocked = True
-        elif subcmd in MUTATING:
-            blocked = True
-        break
-    if blocked:
-        break
-
-print('true' if blocked else 'false')
-" 2>/dev/null || echo "false")
-
-  if [ "$IS_MUTATION" = "true" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
-    echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
-    echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
-    echo "Delegate git operations to the \`git\` agent." >&2
-    exit 2
-  fi
+# Non-strict mode: still block direct git mutations in Bash calls. Reuses
+# the unified scan (issue #551) computed above — the destructive gate has
+# already exited for 'destructive'; a 'mutation' result is a plain git
+# mutation that a non-git caller must delegate to the `git` agent.
+if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
+  echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
+  echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+  echo "Delegate git operations to the \`git\` agent." >&2
+  exit 2
 fi
 
 exit 0

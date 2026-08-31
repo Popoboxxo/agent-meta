@@ -278,6 +278,114 @@ def test_real_force_push_still_blocked_in_multiline(command, tmp_path):
     assert "user approval" in result.stderr
 
 
+# --- issue #590: '+'-refspec force push (token-aware) --------------------
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit push origin +main",
+    "#agent-meta:agent=git\ngit push origin +refs/heads/main:main",
+])
+def test_plus_refspec_push_is_destructive(command, tmp_path):
+    """#590: a leading '+' on the refspec forces a non-fast-forward push, the
+    same effect as --force, and must be blocked even with a git sentinel."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit push origin main",
+    # a ':' refspec without a leading '+' is a normal fast-forward push
+    "#agent-meta:agent=git\ngit push origin HEAD:main",
+])
+def test_plain_push_is_not_destructive(command, tmp_path):
+    """#590 counter-check: a push without a leading '+' on the refspec is a
+    plain mutation (git sentinel exempts it), not a destructive op."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_plus_in_non_git_text_arg_not_blocked(tmp_path):
+    """#590 counter-check: a '+' inside a non-git command's quoted text
+    argument must not be read as a refspec (#602 tokenization)."""
+    command = 'gh issue create --title x --body "push origin +main please"'
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #591: `-c key=val` consumption + core.pager/editor RCE ---------
+
+def test_config_pager_rce_is_destructive(tmp_path):
+    """#591: `-c core.pager=<cmd>` executes an arbitrary shell command; it is
+    blocked even with a git sentinel."""
+    command = "#agent-meta:agent=git\ngit -c core.pager=touch\\ pwned push"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit -c core.pager= status",
+    "#agent-meta:agent=git\ngit -c core.editor= status",
+])
+def test_config_pager_editor_flagged_even_readonly(command, tmp_path):
+    """#591: core.pager / core.editor are inherently suspicious regardless of
+    the subcommand (even a read-only `status`)."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_config_value_does_not_hide_subcommand(tmp_path):
+    """#591: `-c key=val` must be consumed together with its value token so the
+    real subcommand (here `commit`) is still detected as a mutation. Before the
+    fix the skip-loop stopped at `user.name=x` and never inspected `commit`."""
+    command = "git -c user.name=x commit -m y"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git" in result.stderr.lower()
+
+
+def test_config_commit_is_mutation_not_destructive(tmp_path):
+    """#591 counter-check: `-c user.name=x commit` is a plain mutation, so a
+    valid git sentinel exempts it (it is not destructive)."""
+    command = "#agent-meta:agent=git\ngit -c user.name=x commit -m y"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_harmless_config_status_not_blocked(tmp_path):
+    """#591 counter-check: `-c color.ui=false status` is read-only despite the
+    `-c` option and must not be blocked."""
+    command = "git -c color.ui=false status"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #602: tokenized destructive gate (no raw-string substring) -----
+
+@pytest.mark.parametrize("command", [
+    'gh issue create --title x --body "git push --force on main"',
+    'echo "reset --hard"',
+    'echo "git clean -fd is dangerous"',
+    'echo "git filter-branch rewrites history"',
+])
+def test_git_keywords_in_text_args_not_destructive(command, tmp_path):
+    """#602: destructive keywords inside a non-git command's quoted text
+    argument must not trip the destructive gate (raw-substring false positive)."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"command={command!r}: keyword in a text argument must not be treated "
+        f"as a git invocation\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+def test_real_force_push_still_blocked(tmp_path):
+    """#602 counter-check: a genuine `git push --force` is still destructive."""
+    command = "git push --force origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
 def test_non_git_agent_cannot_use_fake_sentinel_for_destructive(tmp_path):
     """The exact incident from #516: fake `general-purpose` elevation path is
     irrelevant — even claiming git, destructive ops stay blocked."""
@@ -301,44 +409,81 @@ def test_elevation_attempts_are_audited(tmp_path):
     assert "git status" in content
 
 
-# --- issue #542: newline-aware destructive patterns ----------------------
+# --- issue #551 F1: --config-env / --attr-source subcommand hiding --------
 
-# Multi-line commands whose LATER lines merely mention push/--force/-f etc.
-# as TEXT must not trip the destructive gate (issue #542): the old character
-# classes ([^|;&]*, \s+) crossed line boundaries, so a keyword on one line
-# and a flag on a later line were read as one destructive git invocation.
-# Each case pairs a keyword with its flag on DIFFERENT lines -- same-line
-# text mentions remain a documented limitation (best-effort keyword gate).
-DESTRUCTIVE_TEXT_FALSE_POSITIVES = [
-    "git status\necho \"ready to push\"\necho \"reminder: never use --force on shared branches\"",
-    # heredoc-style echo: keyword and flag on separate body lines
-    "git status\ncat <<'EOF'\nplan: push the feature branch\nnote: avoid --force on main\nEOF",
-    "git status\necho \"will reset soon\"\necho \"then go --hard on cleanup\"",
-    "git status\necho \"clean up the mess\"\necho \"flag -f means force\"",
-    "git status\ncat <<'EOF'\ntodo: stash\ndrop obsolete patches\nEOF",
-    "git status\necho see checkout docs\n-- .",
-    "git status\necho restore notes\n.",
-]
-
-
-@pytest.mark.parametrize("command", DESTRUCTIVE_TEXT_FALSE_POSITIVES)
-def test_destructive_gate_ignores_text_across_lines(command, tmp_path):
-    """#542: destructive patterns must not match across line boundaries."""
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit --config-env x=Y push --force origin main",
+    "#agent-meta:agent=git\ngit --attr-source tree push --force origin main",
+])
+def test_global_opt_value_does_not_hide_force_push(command, tmp_path):
+    """#551: --config-env (git>=2.31) / --attr-source (git>=2.40) take a
+    separate value token in space-form; if not consumed WITH their value the
+    value masks the real 'push' subcommand, and the force push bypasses the
+    destructive gate (same class as the original '-c' bug #591). Must stay
+    blocked even with a valid git sentinel."""
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
-    assert result.returncode == 0, (
-        f"command={command!r}: text mention on a later line must not trip the "
-        f"destructive gate\nstdout: {result.stdout}\nstderr: {result.stderr}"
-    )
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
 
 
 @pytest.mark.parametrize("command", [
-    "git push --force origin main",
-    # real destructive op as the second line of a multi-line command must
-    # still be caught (newline scoping must not weaken detection)
-    "git status\ngit push --force origin main",
+    "git --config-env x=Y commit -m y",
+    "git --attr-source tree commit -m y",
 ])
-def test_real_force_push_still_blocked_in_multiline(command, tmp_path):
-    """#542: detection of real destructive ops survives newline scoping."""
+def test_global_opt_value_does_not_hide_mutation(command, tmp_path):
+    """#551 control: the real 'commit' subcommand behind a --config-env /
+    --attr-source value token is still detected as a plain mutation."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git" in result.stderr.lower()
+
+
+def test_config_env_rce_key_is_destructive(tmp_path):
+    """#551: '--config-env core.pager=ENV' carries the same RCE key surface as
+    '-c core.pager='; the KEY is extracted from NAME=ENVVAR and flagged
+    destructive regardless of the (read-only) subcommand."""
+    command = "#agent-meta:agent=git\ngit --config-env core.pager=EVIL status"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+# --- issue #551 F2: mirror / delete push destroys remote refs ------------
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit push --mirror origin",
+    "#agent-meta:agent=git\ngit push --delete origin old-branch",
+    "#agent-meta:agent=git\ngit push -d origin old-branch",
+])
+def test_ref_deleting_push_is_destructive(command, tmp_path):
+    """#551: --mirror / --delete / -d delete remote refs (irreversible loss);
+    they stay blocked even with a valid git sentinel, like force push (#590)."""
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+def test_plain_push_still_not_ref_deleting(tmp_path):
+    """#551 F2 counter-check: a normal push (no --mirror/--delete/-d) with a
+    git sentinel stays exempt — F2 must not over-block."""
+    command = "#agent-meta:agent=git\ngit push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #551 F3: extended RCE config keys -----------------------------
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\ngit -c core.sshCommand=EVIL fetch",
+    "#agent-meta:agent=git\ngit -c core.hooksPath=/tmp/evil status",
+    "#agent-meta:agent=git\ngit -c credential.helper=EVIL status",
+    "#agent-meta:agent=git\ngit -c sequence.editor=EVIL status",
+    "#agent-meta:agent=git\ngit -c alias.x=EVIL status",
+])
+def test_extended_rce_config_keys_are_destructive(command, tmp_path):
+    """#551: sshCommand / hooksPath / credential.helper / sequence.editor /
+    alias.* are RCE vectors and must be flagged destructive regardless of the
+    (even read-only) subcommand, matched case-insensitively."""
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 2, f"stderr={result.stderr}"
     assert "user approval" in result.stderr
