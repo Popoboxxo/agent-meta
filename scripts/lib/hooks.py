@@ -58,30 +58,40 @@ def parse_hook_metadata(script_content: str) -> dict:
 
 
 def collect_hook_sources(
-    agent_meta_root: Path, platforms: list[str]
+    agent_meta_root: Path, platforms: list[str], subdir: str = ""
 ) -> list[tuple[Path, str]]:
     """Collect hook scripts from 0-external, 1-generic and 2-platform layers.
 
     Returns list of (source_path, output_filename) tuples.
     Layer priority (highest wins for same output filename):
       2-platform  >  1-generic  >  0-external
+
+    ``subdir``: restrict collection to a subdirectory within each layer
+    (e.g. "release-gates" for hooks/1-generic/release-gates/*.sh). The glob
+    itself is non-recursive (`*.sh`, not `**/*.sh`), so the default (no
+    subdir) never picks up files that live in a subdirectory — release-gate
+    scripts are never double-collected as regular top-level hooks.
     """
     seen: dict[str, Path] = {}
 
+    def _layer_dir(layer: str) -> Path:
+        base = agent_meta_root / HOOKS_DIR / layer
+        return base / subdir if subdir else base
+
     # 0-external
-    ext_dir = agent_meta_root / HOOKS_DIR / "0-external"
+    ext_dir = _layer_dir("0-external")
     if ext_dir.exists():
         for f in sorted(ext_dir.glob("*.sh")):
             seen[f.name] = f
 
     # 1-generic
-    generic_dir = agent_meta_root / HOOKS_DIR / "1-generic"
+    generic_dir = _layer_dir("1-generic")
     if generic_dir.exists():
         for f in sorted(generic_dir.glob("*.sh")):
             seen[f.name] = f
 
     # 2-platform (strip platform prefix, e.g. sharkord-dod-push-check.sh → dod-push-check.sh)
-    platform_dir = agent_meta_root / HOOKS_DIR / "2-platform"
+    platform_dir = _layer_dir("2-platform")
     if platform_dir.exists():
         for platform in platforms:
             for f in sorted(platform_dir.glob(f"{platform}-*.sh")):
@@ -213,6 +223,11 @@ def sync_hooks(
 
     Stale managed hooks (tracked in <hooks_dir>/.agent-meta-managed) are deleted.
     Project-owned hook scripts (not in .agent-meta-managed) are never touched.
+
+    Note: hooks/1-generic/pre-release-check.sh is a plain top-level hook like
+    any other (copied here as-is, no special-cased placeholders). It is a
+    pure dispatcher for the release-gates/ plugin directory — see
+    sync_release_gates() below for the gate scripts it runs at release time.
     """
     pc = (provider_config or {}).get(provider, {})
     hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
@@ -347,6 +362,120 @@ def sync_hooks(
                     f"the hook will fail at runtime. "
                     f"Re-run sync.py to deploy the missing hook file."
                 )
+
+
+RELEASE_GATES_SUBDIR = "release-gates"
+
+
+def sync_release_gates(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
+    release_gates_resolved: dict | None = None,
+) -> None:
+    """Copy release-gate plugin scripts to <hooks_dir>/release-gates/.
+
+    Plugin architecture (issue #558): hooks/1-generic/pre-release-check.sh is
+    a pure dispatcher — at runtime it globs and runs every *.sh file
+    alongside it in release-gates/, with no framework-side registry. This
+    function only deploys the framework-shipped ("built-in") gate scripts
+    from hooks/*/release-gates/ (same 0-external / 1-generic / 2-platform
+    layering as collect_hook_sources() uses for regular hooks).
+
+    Projects extend the pipeline by dropping their own *.sh files directly
+    into <hooks_dir>/release-gates/ — those are NEVER touched here (not
+    added to .agent-meta-managed), exactly like project-owned hooks created
+    via create_hook(). The dispatcher picks them up automatically, no
+    framework change required.
+
+    Each shipped gate script may reference a single sync-time placeholder,
+    ``{{RELEASE_GATE_ENABLED_DEFAULT}}``, baked to "true"/"false" from
+    ``release_gates_resolved`` (output of dod.resolve_release_gates()):
+    project.yaml `release-gates.<name>.enabled` > dod-preset default > that
+    gate script's own `enabled_by_default` header (fallback when the name is
+    in neither source).
+    """
+    pc = (provider_config or {}).get(provider, {})
+    hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
+
+    platforms = config.get("platforms", [])
+    sources = collect_hook_sources(agent_meta_root, platforms, subdir=RELEASE_GATES_SUBDIR)
+
+    target_dir = project_root / hooks_dir_rel / RELEASE_GATES_SUBDIR
+    managed_index_path = target_dir / ".agent-meta-managed"
+
+    previously_managed: set[str] = set()
+    if managed_index_path.exists():
+        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                previously_managed.add(line.strip())
+
+    if not sources and not previously_managed:
+        return  # nothing shipped, nothing to clean up — leave any project-owned gates alone
+
+    now_managed: set[str] = set()
+    resolved = release_gates_resolved or {}
+
+    if not dry_run and sources:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    for source_path, output_name in sources:
+        target_path = safe_path(target_dir, output_name)
+        source_content = source_path.read_text(encoding="utf-8")
+        # Same sync-time-placeholder pattern as {{AGENT_META_PROVIDER}} in
+        # sync_hooks() — no-op for scripts that don't reference it.
+        source_content = source_content.replace("{{AGENT_META_PROVIDER}}", provider)
+        meta = parse_hook_metadata(source_content)
+        gate_stem = Path(output_name).stem
+
+        enabled_default = resolved.get(gate_stem)
+        if enabled_default is None:
+            enabled_default = meta.get("enabled_by_default", "false").lower() == "true"
+        source_content = source_content.replace(
+            "{{RELEASE_GATE_ENABLED_DEFAULT}}",
+            "true" if enabled_default else "false",
+        )
+
+        # Provider filter: skip gate script if it declares a specific provider that doesn't match
+        gate_provider = meta.get("provider", "")
+        if gate_provider and gate_provider != provider:
+            log.skip(str(target_path.relative_to(project_root)),
+                     f"provider-specific release gate ({gate_provider} only)")
+            continue
+
+        now_managed.add(output_name)
+        rel_out = str(target_path.relative_to(project_root))
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
+                log.action("COPY", rel_out, rel_source)
+            else:
+                log.skip(rel_out, "unchanged")
+        except Exception as exc:
+            log.warning(f"Failed to deploy release gate {rel_out}: {exc}")
+            continue
+
+    # Remove stale shipped gate scripts — never touches project-owned custom
+    # gates (not tracked in .agent-meta-managed in the first place).
+    if target_dir.exists():
+        for existing in sorted(target_dir.glob("*.sh")):
+            if existing.name not in now_managed and existing.name in previously_managed:
+                log.action("DELETE", str(existing.relative_to(project_root)),
+                           "release gate removed from agent-meta sources")
+                if not dry_run:
+                    existing.unlink()
+
+    if not dry_run and now_managed:
+        managed_index_path.parent.mkdir(parents=True, exist_ok=True)
+        managed_index_path.write_text(
+            "\n".join(sorted(now_managed)) + "\n", encoding="utf-8"
+        )
 
 
 def create_hook(

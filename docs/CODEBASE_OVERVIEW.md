@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-29 (feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz — Per-Modell-Registry-ID-Resolver, modelsdev→Registry-Degrade, Negative-Cache; zuvor feat/review-agent-fleet: 5 Domain-Reviewer mit Rules-Index/Two-Pass/MERGE_SCORE)
+> Letzte Aktualisierung: 2026-08-31 (feat/issue-558-pre-release-gates: Mechanized Pre-Release Gates — Plugin-Architektur für Pre-Release-Checks mit 3 eingebauten Gates (artifact-freshness, docker-image-scan, action-pin-validation), konfigurierbar via release-gates: in project.yaml und dod-presets, sync.py wiring via hooks.py::sync_release_gates() + dod.py::resolve_release_gates(), release.md v1.6.0 Integration; zuvor feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz)
 
 ---
 
@@ -15,9 +15,9 @@
 7. [Howto-Dokumentation](#7-howto-dokumentation)
 8. [Model Discovery & Curation (REQ-MOD-01)](#8-model-discovery--curation-req-mod-01)
 9. [Scripts](#9-scripts)
-10. [Provider Abstraction Layer (PAL)](#10-provider-abstraction-layer-pal)
-11. [A2A-Handoff-Protokoll](#11-a2a-handoff-protokoll)
-12. [Prompt-Modernisierung (Legacy / Hybrid / Modern)](#12-prompt-modernisierung-legacy--hybrid--modern)
+10. [Release Gates — Mechanized Pre-Release Checks (Issue #558)](#10-release-gates--mechanized-pre-release-checks-issue-558)
+11. [Provider Abstraction Layer (PAL)](#11-provider-abstraction-layer-pal)
+12. [A2A-Handoff-Protokoll](#12-a2a-handoff-protokoll)
 13. [Singleton-Orchestrator-Guard](#13-singleton-orchestrator-guard)
 14. [Knowledge Engine](#14-knowledge-engine)
 15. [Review-Agent-Fleet](#15-review-agent-fleet)
@@ -1105,7 +1105,214 @@ in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
 
 ---
 
-## 10. Provider Abstraction Layer (PAL)
+## 10. Release Gates — Mechanized Pre-Release Checks (Issue #558)
+
+> **Status:** Vollständig implementiert (Branch feat/issue-558-pre-release-gates)
+> **Dokumentation:** `docs/RELEASE_GATES.md` (Vollständige Benutzer- und Entwickler-Dokumentation)
+> **Konzept:** Plugin-Architektur für Pre-Release-Checks mit eingebauten Gates und benutzerdefinierten Erweiterungen
+
+### 10.1 Architektur: Dispatcher + Plugin-Verzeichnis
+
+**`hooks/1-generic/pre-release-check.sh` (v2.0.0):**
+
+Reiner Dispatcher ohne Gate-Logik. Führt zur Laufzeit jedes `*.sh`-Script in seinem eigenen `release-gates/`-Unterverzeichnis aus, sammelt Exit-Codes und liefert am Ende Exit 1 bei Fehlschlag, sonst Exit 0.
+
+**Verzeichnisstruktur (Consumer-Projekt nach `sync.py`):**
+```
+<hooks_dir>/                                    (z.B. .claude/hooks)
+  pre-release-check.sh                         (Dispatcher, agent-meta-managed)
+  release-gates/
+    artifact-freshness.sh                      (eingebaut, agent-meta-managed)
+    docker-image-scan.sh                       (eingebaut, agent-meta-managed)
+    action-pin-validation.sh                   (eingebaut, agent-meta-managed)
+    my-project-custom-check.sh                 (projekteigen — sync.py fasst nicht an)
+```
+
+**Schlüsselmerkmale:**
+- Dispatcher ist namenlos gegenüber Gates (keine Registry, nur Glob + Exec)
+- Jedes Gate-Script entscheidet selbst über Aktivierung und Voraussetzungen
+- Projekteigene Gates werden via direktes Ablegen in `release-gates/` hinzugefügt (kein Framework-Änderung nötig)
+- Gates sind **nicht** native Hook-Events — `pre-release-check.sh` wird explizit vom `release`-Agent aufgerufen (siehe `agents/1-generic/release.md`, Workflow-Schritt "Mechanized pre-release gates")
+
+### 10.2 Die drei eingebauten Gates
+
+**1. `artifact-freshness.sh`**
+- Prüft ob generierte Artefakte nach Quelländerungen neu gebaut wurden
+- Konfiguriert via `.agent-meta/generated-artifacts.yaml` (Projekt-Konsument)
+- Quelle-mtime vs. Artefakt-mtime Vergleich (Git-Fallback)
+
+**2. `docker-image-scan.sh`**
+- Scannt Dockerfile Base-Images mit Trivy auf HIGH/CRITICAL-CVEs
+- Voraussetzung: `Dockerfile` vorhanden + `trivy` installiert
+- Env-Var `PRE_RELEASE_DOCKERFILE_PATH` zur Pfad-Konfiguration
+
+**3. `action-pin-validation.sh`**
+- Prüft ob gepinnte GitHub Actions in `.github/workflows/*.yml` noch auf existierende Refs zeigen
+- Verhindert Supply-Chain-Risiken durch gelöschte/rebasierte Tags
+- Voraussetzung: `gh` CLI installiert und authentifiziert
+
+**Graceful Skipping:** Jedes Gate überspringt sich selbst (Exit 0, `[SKIP]`-Log) wenn deaktiviert oder eine Voraussetzung fehlt.
+
+### 10.3 Konfiguration: 3-stufige Auflösung
+
+**Ablauf (höchste zu niedrigste Priorität):**
+
+1. **Project Override** — `.meta-config/project.yaml: release-gates:`
+   ```yaml
+   release-gates:
+     artifact-freshness: { enabled: true }
+     docker-image-scan: { enabled: true, dockerfile: Dockerfile }
+     action-pin-validation: { enabled: false }
+     custom-gate: { enabled: true }          # projekteigenames Gate
+   ```
+
+2. **Preset-Default** — `config/dod-presets.yaml: presets.<dod-preset>.release-gates:`
+   - Nur für die 3 eingebauten Gate-Namen definiert
+   - Beispiel `spec-certified` Preset: alle 3 Gates `enabled: true`
+   - Andere Presets (rapid-prototyping, standard, etc.): alle 3 Gates `enabled: false`
+
+3. **Gate-Script's `enabled_by_default` Header** — Fallback wenn Name in keiner anderen Quelle vorhanden
+
+**Beispiel-Auflösung:**
+- Gate `artifact-freshness` im `spec-driven` Preset: `enabled: false` (Preset-Default)
+- Projekt überschreibt: `release-gates.artifact-freshness.enabled: true` → Effektiv `true`
+- Andere Gates der gleichen Quelle werden ignoriert
+
+### 10.4 Integration in Scripts
+
+**`scripts/lib/dod.py::resolve_release_gates()` (neu)**
+
+```python
+def resolve_release_gates(config: dict, agent_meta_root: Path) -> dict[str, bool]:
+    """Resolve enabled/disabled defaults for release-gate scripts.
+    
+    Returns: dict[gate_name] → bool
+    """
+```
+
+Führt die 3-stufige Auflösung durch, wird von `sync.py` aufgerufen.
+
+**`scripts/lib/hooks.py::sync_release_gates()` (neu)**
+
+```python
+def sync_release_gates(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
+    release_gates_resolved: dict | None = None,
+) -> None:
+```
+
+Kopiert die 3 eingebauten Gate-Scripts aus `hooks/1-generic/release-gates/` nach `<hooks_dir>/release-gates/`, mit Platzhalter-Substitution:
+- Sync-Zeit-Platzhalter `{{RELEASE_GATE_ENABLED_DEFAULT}}` wird mit Preset-Default ersetzt (keine One-off-Override, sondern Fallback)
+- Projekteigene Gates (nicht in `.agent-meta-managed`) werden nie angefasst
+
+**Integration in `scripts/sync.py`:**
+- `resolve_release_gates()` aufgerufen nach `resolve_dod()`
+- Ergebnis via `release_gates_resolved` an `sync_release_gates()` übergeben
+- Nur für Provider mit `has_hooks: true` durchgeführt (Claude, Mammouth)
+
+### 10.5 Release-Agent Integration
+
+**`agents/1-generic/release.md` (v1.5.0 → v1.6.0)**
+
+Neuer Workflow-Schritt vor Tag/Push:
+
+```
+0. Mechanized pre-release gates
+   └─> Wenn .claude/hooks/pre-release-check.sh existiert:
+       - Ausführung per Bash
+       - Exit ≠ 0 → Release blockiert, fehlgeschlagene Gates auflisten
+       - Exit 0 → Release fortsetzt
+```
+
+Falls Hook fehlt (Provider ohne Hook-Support oder noch nicht synced): Schritt wird übersprungen (rein additiv).
+
+### 10.6 Konfiguration in `config/dod-presets.yaml`
+
+**Struktur (neu):**
+
+```yaml
+presets:
+  full:
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
+  standard:
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
+  spec-certified:
+    release-gates:
+      artifact-freshness: true    # Strenge QA-Anforderung
+      docker-image-scan: true
+      action-pin-validation: true
+  rapid-prototyping:
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
+  # ... weitere Presets
+```
+
+Alle Presets enthalten explizit ein `release-gates:` Feld (leere oder gefüllte Defaults), so dass `resolve_release_gates()` deterministisch arbeitet.
+
+### 10.7 One-Off-Override per Umgebungsvariable
+
+Jedes eingebaute Gate-Script liest `PRE_RELEASE_GATE_ENABLED` zur Laufzeit:
+
+```bash
+PRE_RELEASE_GATE_ENABLED=true bash .claude/hooks/release-gates/docker-image-scan.sh
+```
+
+Nur wirksam für direktes Script-Aufrufen, nicht beim Dispatcher-Aufruf.
+
+### 10.8 Projekteigene Gates schreiben
+
+Minimal-Beispiel (`.claude/hooks/release-gates/no-todo-in-changelog.sh`):
+
+```bash
+#!/bin/bash
+set -u
+cd "${PROJECT_ROOT:-$PWD}" || exit 1
+
+if [ -f CHANGELOG.md ] && grep -q "TODO" CHANGELOG.md; then
+  echo "[FAIL] no-todo-in-changelog: CHANGELOG.md enthält noch TODO-Marker"
+  exit 1
+fi
+echo "[INFO] no-todo-in-changelog: OK"
+exit 0
+```
+
+**Vertrag für alle Gate-Scripts:**
+- Exit `0` = bestanden oder übersprungen
+- Exit ungleich `0` = fehlgeschlagen, blockiert Release
+- Eigenständig lauffähig (`bash release-gates/mein-check.sh`)
+- Metadata-Header (optional für projekteigene Gates)
+- Env-Var `PRE_RELEASE_GATE_ENABLED` respektieren (optional)
+
+**Keine Sync-Zeit-Injektion** — projekteigene Gates sind statisch, `{{RELEASE_GATE_ENABLED_DEFAULT}}` funktioniert nur bei eingebauten Gates.
+
+### 10.9 Referenzen
+
+- **Vollständige Dokumentation:** `docs/RELEASE_GATES.md` (Deutsch, 327 Zeilen)
+  - Architektür-Überblick
+  - Alle 3 Gate-Implementierungen im Detail
+  - Konfiguration & Precedence
+  - 2 komplette Anwendungsbeispiele (Django+Docker, Next.js+CDN)
+  - Manuelles Testen
+- **Template-Repository:** Diese Repo (`agent-meta`)
+- **Konzept-Issue:** GitHub #558
+
+---
+
+## 11. Provider Abstraction Layer (PAL)
 
 Der Provider Abstraction Layer (PAL) isoliert generische Agent-Templates von provider-spezifischer Delegationssyntax. Er verhindert "Syntax Leaks" und handhabt provider-spezifische Bootstrap-Mechanismen.
 
@@ -1314,7 +1521,7 @@ BootstrapEngine.run_bootstrap(...)                    # Continue: config.yaml
 
 ---
 
-## 11. A2A-Handoff-Protokoll
+## 12. A2A-Handoff-Protokoll
 
 > **Status:** Vollständig implementiert (Phasen 1–4) — 22 Dateien, 818 Zeilen
 > **Basiert auf:** [GitHub Issue #212](https://github.com/Popoboxxo/agent-meta/issues/212) — W3C ANP White Paper
@@ -1820,7 +2027,7 @@ fallen auf den normalen Rules-Pfad zurück — Opencode: embedded in `AGENTS.md`
 | `hacs-developer.md` | `developer` | 1.1.1 | `1-generic/developer.md@4.0.1` |
 | `hacs-code-reviewer.md` | `code-reviewer` | 1.0.0 | `1-generic/code-reviewer.md@1.2.2` |
 | `hacs-devops-engineer.md` | `devops-engineer` | 1.0.0 | `1-generic/devops-engineer.md@1.1.3` |
-| `hacs-release.md` | `release` | 1.0.0 | `1-generic/release.md@1.5.0` |
+| `hacs-release.md` | `release` | 1.0.0 | `1-generic/release.md@1.6.0` |
 | `hacs-tester.md` | `tester` | 1.0.2 | `1-generic/tester.md@2.1.4` |
 
 Die Meta-Keys `extends`/`patches` werden aus dem generierten Output-Frontmatter

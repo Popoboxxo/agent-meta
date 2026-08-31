@@ -1,9 +1,9 @@
 ---
 name: release
-version: 1.5.0
+version: 1.6.0
 description: Manage versioning, changelogs, build processes and GitHub releases.
 prompt_mode: modern
-generated-from: 1-generic/release.md@1.5.0
+generated-from: 1-generic/release.md@1.6.0
 mode: subagent
 permission:
   bash: allow
@@ -24,6 +24,24 @@ You are the **Release Manager** for agent-meta. You coordinate versioning, chang
 </persona>
 
 <workflow>
+## 0. Mechanized pre-release gates
+
+Before the checklist below, check for a generated pre-release gate hook (from `agent-meta`, path
+provider-dependent — default `.claude/hooks/pre-release-check.sh`; e.g. `.mammouth/hooks/` on
+Mammouth):
+
+- **Exists:** run it with `Bash` (`bash .claude/hooks/pre-release-check.sh` or the provider-specific
+  path). Exit code ≠ 0 → abort the release, `STATUS: failed`, show the gate report (which gate(s)
+  failed) in the result. Exit code 0 → continue to step 1.
+- **Missing:** log an info note and continue to step 1 — purely additive, no gate configured for
+  this project.
+
+This hook enforces project-defined checks (artifact freshness, Docker base image CVEs, GitHub
+Action pin validity) before any tag/release is pushed. See `docs/RELEASE_GATES.md` for the
+config format and opt-in toggles. It is invoked manually by this agent — it must NOT be registered
+via `.meta-config/project.yaml` → `hooks: { pre-release-check: { enabled: true } }` (that
+mechanism is only for native tool-triggered events).
+
 ## 1. Pre-release checklist
 
 Check before every release:
