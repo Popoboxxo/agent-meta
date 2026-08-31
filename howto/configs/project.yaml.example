@@ -68,6 +68,22 @@ dod:
   security-audit: false     # Security-Audit vor Release verlangen / Require security audit before release
   se-required: "false"      # SE-Kaskade Bindungsstärke / SE cascade requirement ("false", "recommended", "true")
 
+# Release-Gates: pre-release-check.sh Dispatcher (hooks/*/release-gates/*.sh, issue #558).
+# Plugin-Architektur, kein festes Enum — Keys sind Gate-Skript-Dateinamen (ohne .sh).
+# Die drei eingebauten Gates ('artifact-freshness', 'docker-image-scan',
+# 'action-pin-validation') haben je Preset einen Default in config/dod-presets.yaml;
+# dieser Block überschreibt das projektspezifisch mit höchster Präzedenz.
+# Zwei Formen möglich: bare bool ODER Objekt-Form mit 'enabled' + eigenen Gate-Keys.
+# / Release gate toggles: plugin-style, not a fixed enum. Keys are gate script file
+# stems. Accepts either a bare boolean or an object form ({enabled: bool, ...}) —
+# extra keys in the object form are opaque, reserved for that gate script to read.
+# release-gates:
+#   artifact-freshness: true
+#   docker-image-scan:
+#     enabled: true
+#     dockerfile: Dockerfile          # gate-spezifischer Key, wird vom Gate-Skript gelesen
+#   my-custom-gate: false             # projekteigenes Gate: hooks/*/release-gates/my-custom-gate.sh
+
 # ------------------------------------------------------------------------------
 # 4. Agenten-Rollenauswahl / Agent Role Whitelist
 # ------------------------------------------------------------------------------

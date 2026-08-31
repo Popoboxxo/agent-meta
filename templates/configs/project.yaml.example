@@ -131,6 +131,11 @@ project:
 # dod:
 #   security-audit: true
 
+# Release-Gates — pre-release-check.sh Dispatcher, überschreibt dod-preset-Defaults
+# release-gates:
+#   docker-image-scan: true
+#   my-custom-gate: false            # z.B. hooks/*/release-gates/my-custom-gate.sh
+
 variables:
   # --- Projekt-Identität ---
   PROJECT_NAME: mein-projekt
