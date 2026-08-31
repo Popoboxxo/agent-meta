@@ -1,6 +1,6 @@
 ---
 name: log-analyzer
-version: "1.0.1"
+version: "1.1.0"
 based-on: "1-generic/log-analyzer.md@1.1.1"
 description: "Home Assistant Log-Analyzer — spezialisiert auf home-assistant.log, Komponenten-Fehler, Integrations-Probleme, Templates und Zigbee/MQTT-Diagnose."
 hint: "HA-Log-Analyse: Integrations-Fehler, Template-Errors, Zigbee/MQTT-Diagnose, Severity-Klassifikation"
@@ -198,6 +198,7 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No free-text findings — always finding-card structure
 - No direct delegation to `git` for issues — always via `feedback`
 - No alert fanaticism — every finding needs frequency + impact
