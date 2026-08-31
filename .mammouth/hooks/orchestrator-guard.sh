@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.4.0
+# version: 2.4.1
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -50,6 +50,19 @@
 # Identity itself remains unverifiable at hook level (provider payload has
 # no agent field) — this is mitigation, not cryptographic trust; see
 # .claude/rules/a2a-delegation-gates.md ("Bekannte Grenzen").
+#
+# Destructive-gate scope note (issue #542): the destructive patterns below
+# are intended to detect REAL git subcommand invocations, not arbitrary
+# text. They are line-scoped: keyword and flag must sit on the same line
+# (no crossing of newline boundaries via [^|;&\n]* or [ \t]+), so a
+# multi-line command whose later lines merely mention "push", "--force",
+# "-f" etc. as text is no longer blocked. Known limitation (deliberate,
+# best-effort keyword gate): a keyword and its flag inside the SAME text
+# argument/line (e.g. a one-line heredoc body `echo "push --force later"`
+# or unquoted echo text) still matches — full tokenized subcommand parsing
+# (Mutation-Gate style) would be needed to close that, tracked as a
+# potential follow-up; not attempted here to keep the #516 incident
+# semantics and test coverage stable.
 
 INPUT=$(cat)
 
@@ -142,14 +155,21 @@ import re, sys
 
 command = sys.stdin.read()
 
+# Issue #542: keyword and flag must sit on the SAME line. [^|;&]* matched
+# across newlines (a later line's "--force"/"-f"/"--hard" text got glued to
+# an earlier line's keyword), and \s+ in the stash/checkout/restore patterns
+# also matched \n. Line-scoped character classes ([^|;&\n], [ \t]) fix that;
+# \bfilter-(branch|repo)\b is a single token with no spanning component and
+# needs no change. Same-line text mentions remain a known limitation (see
+# header note).
 DESTRUCTIVE_PATTERNS = [
-    r'\bpush\b[^|;&]*(--force\b|-f\b|--force-with-lease\b)',
-    r'\breset\b[^|;&]*--hard',
-    r'\bclean\b[^|;&]*-[a-zA-Z]*f',
-    r'\bstash\s+(drop|clear)\b',
+    r'\bpush\b[^|;&\n]*(--force\b|-f\b|--force-with-lease\b)',
+    r'\breset\b[^|;&\n]*--hard',
+    r'\bclean\b[^|;&\n]*-[a-zA-Z]*f',
+    r'\bstash[ \t]+(drop|clear)\b',
     r'\bfilter-(branch|repo)\b',
-    r'\bcheckout\b[^|;&]*--\s+\.',
-    r'\brestore\b[^|;&]*\s\.\s*$',
+    r'\bcheckout\b[^|;&\n]*--[ \t]+\.',
+    r'\brestore\b[^|;&\n]*[ \t]\.[ \t]*$',
 ]
 print('true' if any(re.search(p, command) for p in DESTRUCTIVE_PATTERNS) else 'false')
 " 2>/dev/null || echo "false")
