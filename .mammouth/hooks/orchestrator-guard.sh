@@ -266,7 +266,7 @@ def parse_git(rest):
 
 
 def has_short_flag(args, ch):
-    # True if any short-flag cluster (single dash, not '--') contains `ch`,
+    # True if any short-flag cluster (single dash, not '--') contains 'ch',
     # e.g. has_short_flag(['-fu'], 'f') -> True. Shared by the push and clean
     # branches of is_destructive (issue #551, dedup of the old inline check).
     return any(
