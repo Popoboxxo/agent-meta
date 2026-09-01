@@ -1282,8 +1282,26 @@ class ServiceContext:
     into the HTTP handler for framework state.
     """
 
-    def __init__(self, handler_cls: type) -> None:
+    def __init__(self, handler_cls: type, handler: AdminRequestHandler | None = None) -> None:
         self._handler_cls = handler_cls
+        self._handler = handler
+
+    @property
+    def handler(self) -> AdminRequestHandler | None:
+        """The live handler instance, when a service was built for one request.
+
+        Services route calls to methods that unit tests monkeypatch on the
+        handler *instance* (notably ``_load_models_dev_data``, the models.dev
+        cache/network seam) through this reference so those mocks still take
+        effect after the logic moved into a service (issue #572)."""
+        return self._handler
+
+    @property
+    def handler_cls(self) -> type:
+        """The AdminRequestHandler class itself — used by :class:`ModelsService`
+        as the store for its process-wide models.dev cache (the attributes the
+        unit tests seed and reset directly)."""
+        return self._handler_cls
 
     @property
     def root(self) -> Path:
@@ -1296,6 +1314,10 @@ class ServiceContext:
     @property
     def mode(self) -> str:
         return self._handler_cls.mode
+
+    @property
+    def version(self) -> str:
+        return self._handler_cls.version
 
     def agent_meta_root(self) -> Path:
         """Resolve the agent-meta framework root for lib helpers.
@@ -1316,6 +1338,11 @@ class ServiceContext:
         lib = self.root / "scripts" / "lib"
         if str(lib) not in sys.path:
             sys.path.insert(0, str(lib))
+
+    def role_defaults_path(self) -> Path:
+        """Resolve ``config/role-defaults.yaml`` for either layout — shared by
+        the template, pipeline and reflection services."""
+        return resolve_asset(self.root, "config", "role-defaults.yaml")
 
 
 class AuditService:
@@ -1482,6 +1509,1372 @@ class _NullDeactivationLog:
     def error(self, *a: Any) -> None: ...
 
 
+class TemplateService:
+    """Agent-template discovery, resolution, reading and writing — the template
+    business domain extracted from :class:`AdminRequestHandler` (issue #572).
+
+    Methods return plain data (or raise) and the handler keeps thin wrappers
+    that format the HTTP response.
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def find_schema_path(self) -> Path:
+        return resolve_asset(self._ctx.root, "config", "project-config.schema.json")
+
+    def template_path(self, role: str) -> Path | None:
+        """Resolve the template path sync.py would actually use for this role.
+
+        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
+        sync.py itself uses (1-generic < 2-platform < 3-project, scoped to this
+        project's own active ``platforms`` list, in list order). Globbing all of
+        ``agents/2-platform/*.md`` instead would let an unrelated but
+        same-named platform override (e.g. ``sharkord-developer.md``) be loaded
+        AND saved in filesystem order — see the original method's history.
+        """
+        if not role or any(c in role for c in ("/", "\\", "..")):
+            raise SecurityError(f"invalid role name: {role!r}")
+        safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
+        if safe != role:
+            raise SecurityError(f"invalid role name: {role!r}")
+        agent_meta_root = self._ctx.agent_meta_root()
+        candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
+        try:
+            project_root = self._ctx.root
+            _ensure_scripts_on_path(project_root)
+            from lib.agents import collect_sources  # type: ignore[import]
+            project_config = self._ctx.config_manager.read("project") or {}
+            active_platforms = project_config.get("platforms", [])
+            overrides, _ = collect_sources(agent_meta_root, active_platforms)
+            resolved = overrides.get(role)
+            if resolved is not None:
+                return resolved
+        except Exception:  # noqa: BLE001
+            # Fall through to the plain generic-template path — better to edit
+            # the generic base than to error out of the Templates page.
+            pass
+        return candidate
+
+    def read_template_description(self, role: str) -> str:
+        """Read the ``description`` from a generated template's frontmatter."""
+        try:
+            path = self.template_path(role)
+        except SecurityError:
+            return ""
+        if not path or not path.exists():
+            return ""
+        with path.open("r", encoding="utf-8") as fh:
+            text = fh.read()
+        if not text.startswith("---"):
+            return ""
+        try:
+            _, front, _ = text.split("---", 2)
+            front_data = yaml.safe_load(front) or {}
+            desc = front_data.get("description")
+            if isinstance(desc, str):
+                return desc.strip()
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return ""
+
+    def list_agent_templates(self) -> dict:
+        """Return the agent templates available for generation (top-level
+        ``agents/1-generic`` first, then the submodule layout)."""
+        templates_dir = resolve_asset(self._ctx.root, "agents", "1-generic")
+        if not templates_dir.is_dir():
+            return {"templates": [], "available": False}
+        names = sorted(
+            p.stem for p in templates_dir.glob("*.md")
+            if p.is_file() and not p.name.startswith("_")
+        )
+        return {"templates": names, "available": True}
+
+    def build_agent_hierarchy(self) -> dict:
+        """Derive a lightweight role hierarchy from ``config/role-defaults.yaml``.
+
+        Falls back to an empty list when the file is missing (project-admin mode
+        without super-admin configs). Each role entry carries name/tier/model/
+        memory/parallel/permission_mode, a never-empty ``description`` (falls
+        back to the template frontmatter) and ``targets`` (delegation targets).
+        """
+        role_defaults_path = self._ctx.role_defaults_path()
+        roles: list[dict] = []
+
+        if role_defaults_path.exists():
+            with role_defaults_path.open("r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh) or {}
+            raw = data.get("roles") or data
+            if isinstance(raw, dict):
+                for name, attrs in raw.items():
+                    if not isinstance(attrs, dict):
+                        continue
+                    handoff = attrs.get("handoff") or {}
+                    targets_raw = handoff.get("target_roles") if isinstance(handoff, dict) else None
+                    targets: list[str] = []
+                    if isinstance(targets_raw, list):
+                        targets = [str(t) for t in targets_raw if isinstance(t, str) and t]
+
+                    description = attrs.get("description") or ""
+                    if not description:
+                        description = self.read_template_description(name)
+                    if not description:
+                        description = f"{name} agent (no description)"
+
+                    roles.append({
+                        "name": name,
+                        "tier": (attrs.get("workflow_tier")
+                                 or attrs.get("tier")
+                                 or attrs.get("workflow-tier")
+                                 or "optional"),
+                        "model": attrs.get("model"),
+                        "memory": attrs.get("memory"),
+                        "parallel": bool(attrs.get("parallel", False)),
+                        "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
+                        "description": description,
+                        "targets": targets,
+                        "group": attrs.get("group"),
+                    })
+        return {"roles": roles, "count": len(roles)}
+
+    def write_template(self, role: str, body: Any) -> dict:
+        """Validate and atomically write a template back to disk, returning the
+        result payload. Raises ValueError/FileNotFoundError for the handler to
+        map to 400/404."""
+        if body is None:
+            raise ValueError("empty body")
+        # Frontend sends JSON ``{"content": "..."}``; a bare string body is
+        # tolerated for backward compatibility with plain-text clients.
+        if isinstance(body, dict):
+            content = body.get("content")
+        elif isinstance(body, str):
+            content = body
+        else:
+            content = None
+        if not isinstance(content, str):
+            raise ValueError("expected 'content' field with template text")  # noqa: TRY004
+        path = self.template_path(role)
+        if not path:
+            raise FileNotFoundError(f"template not found: {role}")
+        cm = self._ctx.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, path)
+        return {
+            "status": "saved",
+            "role": role,
+            "backup": backup,
+            "bytes": len(content.encode("utf-8")),
+        }
+
+
+class RoleDefaultsEditor:
+    """Formatting-preserving editor for ``config/role-defaults.yaml``, shared by
+    :class:`PipelineService` and :class:`ReflectionService` (issue #572).
+
+    ``update_section`` replaces a single top-level section in place with a
+    fine-grained, child-aware edit so untouched inner keys, list items and
+    comments keep their original formatting; only new/changed children are
+    re-serialised. ``load`` returns the parsed document (``{}`` when absent).
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def load(self) -> dict:
+        """Return the parsed role-defaults document, or ``{}`` if missing/blank."""
+        path = self._ctx.role_defaults_path()
+        if not path.exists():
+            return {}
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _indent_yaml_dump(value: Any, indent: int) -> list[str]:
+        """Dump ``value`` to YAML and prefix every line with ``indent`` spaces."""
+        raw = yaml.dump(
+            value,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        if not raw.endswith("\n"):
+            raw += "\n"
+        out: list[str] = []
+        for line in raw.splitlines(keepends=True):
+            if line == "\n":
+                out.append("\n")
+            else:
+                out.append(" " * indent + line)
+        return out
+    @staticmethod
+    def _format_yaml_list_item(item: Any, indent: int, value_indent: int) -> list[str]:
+        """Format a list item (``- key: value``) preserving nested indentation.
+
+        ``indent`` is the column of the ``-`` marker; ``value_indent`` is the
+        column used for the item's body lines.
+        """
+        lines = RoleDefaultsEditor._indent_yaml_dump(item, value_indent)
+        if not lines:
+            return [(" " * indent) + "- \n"]
+        # The first dumped line already has ``value_indent`` spaces; replace
+        # them with the list marker at ``indent``.
+        first_content = lines[0][value_indent:]
+        lines[0] = (" " * indent) + "- " + first_content
+        return lines
+    @staticmethod
+    def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
+        """Return the indentation used for a child mapping/list body.
+
+        Falls back to ``base_indent + 2`` when the body is empty.
+        """
+        for line in body_lines:
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                continue
+            indent = len(line) - len(stripped)
+            if indent > base_indent:
+                return indent
+        return base_indent + 2
+    @staticmethod
+    def _trailing_blank_lines(lines: list[str]) -> list[str]:
+        """Return only the trailing blank/whitespace lines of a block."""
+        last = -1
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip() not in ("", "\n"):
+                last = i
+                break
+        if last == -1:
+            return lines[:]
+        return lines[last + 1 :]
+    @staticmethod
+    def _extract_list_item_id(lines: list[str]) -> str | None:
+        """Parse a single YAML list item and return its ``id`` field, if any."""
+        try:
+            data = yaml.safe_load("".join(lines))
+            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+                return data[0].get("id")
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return None
+    @staticmethod
+    def _split_dict_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level mapping keys inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and not stripped.startswith("-") and ":" in stripped:
+                key_name = stripped.split(":", 1)[0]
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind < base_indent:
+                        break
+                    if ind == base_indent and not l.lstrip().startswith("-"):
+                        break
+                    i += 1
+                children.append({"type": "dict", "key": key_name, "start": start, "end": i})
+            else:
+                i += 1
+        return children
+    @staticmethod
+    def _split_list_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level list items inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and stripped.startswith("- "):
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind <= base_indent:
+                        break
+                    i += 1
+                children.append({"start": start, "end": i})
+            else:
+                i += 1
+        return children
+    @staticmethod
+    def _splice_appended_children(
+        new_lines: list[str], tail: list[str], appended_new: list[str]
+    ) -> None:
+        """Attach freshly appended children to ``new_lines`` in-place.
+
+        New children are spliced in *after* the existing content but *before*
+        ``tail`` — the trailing blank/comment lines that were captured with the
+        section body but usually head the *following* top-level section (e.g.
+        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
+        Placing new keys after that tail would glue them onto the comment line
+        (the section-body regex drops the final newline before the next key),
+        silently commenting the new key out. Newline boundaries are enforced so
+        a new key can never land on the same physical line as a trailing comment.
+
+        When there are no new children the tail is appended verbatim, preserving
+        the exact byte layout of update-only and delete writes.
+        """
+        if not appended_new:
+            new_lines.extend(tail)
+            return
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines[-1] = new_lines[-1] + "\n"
+        new_lines.extend(appended_new)
+        if tail:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines[-1] = new_lines[-1] + "\n"
+            new_lines.extend(tail)
+    def _build_role_defaults_section_body(
+        self, key: str, value: Any, body_lines: list[str]
+    ) -> str:
+        """Rebuild the body of a top-level ``role-defaults.yaml`` section.
+
+        Dict sections (e.g. ``quality_pipelines``) are edited child-by-child.
+        Children whose parsed value equals the new value keep their original
+        formatting; only changed or new children are re-serialised. List
+        sections with an ``id`` field (e.g. ``reflection_pairs``) are matched
+        by id using the same rule. Comments and blank lines that are not part
+        of a child block are preserved unchanged.
+        """
+        base_indent = 2
+        value_indent = self._infer_child_value_indent(body_lines, base_indent)
+
+        def _scalar_dump(v: Any) -> str:
+            return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
+
+        def _build_dict_child(k: str, v: Any, child: dict | None) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if isinstance(v, (dict, list)):
+                    header = body_lines[child["start"]]
+                    child_value_indent = self._infer_child_value_indent(
+                        body_lines[child["start"] + 1 : child["end"]], base_indent
+                    )
+                    value_lines = self._indent_yaml_dump(v, child_value_indent)
+                    return [header] + value_lines + trailing
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n"
+                    ] + trailing
+            else:
+                if isinstance(v, (dict, list)):
+                    header = " " * base_indent + k + ":\n"
+                    value_lines = self._indent_yaml_dump(v, value_indent)
+                    return [header] + value_lines + ["\n"]
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n",
+                        "\n",
+                    ]
+
+        def _build_list_child(item: dict, child: dict | None) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + trailing
+            else:
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + ["\n"]
+
+        def _assigned_indices(children: list[dict]) -> set[int]:
+            indices: set[int] = set()
+            for child in children:
+                indices.update(range(child["start"], child["end"]))
+            return indices
+
+        if isinstance(value, dict):
+            children = self._split_dict_children(body_lines, base_indent)
+            old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
+            # Line indices that belong to deleted children must be skipped so
+            # that deleting a pipeline actually removes it from the written YAML.
+            deleted_indices: set[int] = set()
+            for old_key, old_child in old_by_key.items():
+                if old_key not in value:
+                    deleted_indices.update(range(old_child["start"], old_child["end"]))
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for k, v in value.items():
+                child = old_by_key.get(k)
+                if child:
+                    new_lines.extend(
+                        body_lines[i]
+                        for i in range(pos, child["start"])
+                        if i not in deleted_indices
+                    )
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed.get(k) if isinstance(parsed, dict) else None
+                    except Exception:  # noqa: BLE001
+                        old_value = None
+                    if old_value == v:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_dict_child(k, v, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_dict_child(k, v, None))
+            tail = [
+                body_lines[i]
+                for i in range(pos, len(body_lines))
+                if i not in deleted_indices
+            ]
+            self._splice_appended_children(new_lines, tail, appended_new)
+            return "".join(new_lines)
+
+        if isinstance(value, list) and key == "reflection_pairs":
+            children = self._split_list_children(body_lines, base_indent)
+            old_by_id: dict[str, dict] = {}
+            for child in children:
+                item_id = self._extract_list_item_id(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if item_id:
+                    old_by_id[item_id] = child
+
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                item_id = item.get("id")
+                child = old_by_id.get(item_id) if item_id else None
+                if child:
+                    new_lines.extend(body_lines[pos : child["start"]])
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed[0] if isinstance(parsed, list) and parsed else None
+                    except Exception:  # noqa: BLE001
+                        old_value = None
+                    if old_value == item:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_list_child(item, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_list_child(item, None))
+            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
+            return "".join(new_lines)
+
+        # Fallback for any other shape: replace the whole body with a fresh dump.
+        snippet = yaml.dump(
+            {key: value},
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        lines = snippet.splitlines(keepends=True)
+        if lines and lines[0].startswith(key + ":"):
+            return "".join(lines[1:])
+        return snippet
+
+    def update_section(self, key: str, value: Any) -> dict:
+        """Replace one top-level section of ``role-defaults.yaml`` in-place.
+
+        Uses a fine-grained, child-aware edit so that untouched inner keys,
+        list items, and comments keep their original formatting. Only new or
+        changed children are re-serialised with PyYAML. Falls back to a full
+        block dump when the section is missing or its structure is unexpected.
+        Backup + atomic-replace rules mirror :class:`ConfigManager`.
+        """
+        import re
+
+        path = self._ctx.role_defaults_path()
+        original_text = path.read_text(encoding="utf-8") if path.exists() else ""
+        text = original_text.replace("\r\n", "\n")
+
+        # Skip the actual write if the parsed content is unchanged.
+        try:
+            parsed_original = yaml.safe_load(original_text) or {}
+        except Exception:  # noqa: BLE001
+            parsed_original = {}
+        if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
+            return {
+                "status": "unchanged",
+                "key": key,
+                "path": str(path.relative_to(self._ctx.root)),
+                "backup": None,
+            }
+
+        block_re = re.compile(
+            rf"^{re.escape(key)}:\s*(?:\n|$)"
+            rf"(?P<body>.*?)"
+            rf"(?=\n^[A-Za-z0-9_\-]+:\s*(?:\n|$)|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        match = block_re.search(text)
+        if not match:
+            snippet = yaml.dump(
+                {key: value},
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            new_text = text.rstrip("\n") + "\n\n" + snippet
+        else:
+            section_start = match.start()
+            section_end = match.end()
+            header = text[section_start : match.start("body")]
+            body_lines = match.group("body").splitlines(keepends=True)
+            new_body = self._build_role_defaults_section_body(key, value, body_lines)
+            new_text = text[:section_start] + header + new_body + text[section_end:]
+
+        cm = self._ctx.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, path)
+        return {
+            "status": "saved",
+            "key": key,
+            "path": str(path.relative_to(self._ctx.root)),
+            "backup": backup,
+        }
+
+
+class PipelineService:
+    """Quality-pipeline CRUD + help, backed by :class:`RoleDefaultsEditor`
+    (issue #572)."""
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+        self._editor = RoleDefaultsEditor(ctx)
+
+    def read_pipelines(self) -> dict:
+        """Return the ``quality_pipelines`` block in a stable envelope shape."""
+        pipelines = self._editor.load().get("quality_pipelines") or {}
+        if not isinstance(pipelines, dict):
+            pipelines = {}
+        return {"pipelines": pipelines}
+
+    def read_single_pipeline(self, name: str) -> dict:
+        """Return a single pipeline by name or raise."""
+        pipelines = self.read_pipelines().get("pipelines", {})
+        if name not in pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        return {"pipeline": pipelines[name]}
+
+    def write_pipelines(self, pipelines: dict) -> dict:
+        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``."""
+        return self._editor.update_section("quality_pipelines", pipelines)
+
+    def write_single_pipeline(self, name: str, pipeline: dict) -> dict:
+        """Create or update a single pipeline by name."""
+        all_pipelines = self.read_pipelines().get("pipelines", {})
+        all_pipelines[name] = pipeline
+        result = self.write_pipelines(all_pipelines)
+        result["pipeline"] = pipeline
+        result["name"] = name
+        return result
+
+    def delete_pipeline(self, name: str) -> dict:
+        """Delete a single pipeline by name."""
+        all_pipelines = self.read_pipelines().get("pipelines", {})
+        if name not in all_pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        del all_pipelines[name]
+        result = self.write_pipelines(all_pipelines)
+        result["deleted"] = name
+        return result
+
+    def pipeline_help(self) -> dict:
+        """Return comprehensive help documentation for the pipelines API."""
+        pipeline_names = list(self.read_pipelines().get("pipelines", {}).keys())
+        return {
+            "help": {
+                "title": "Quality Pipelines API",
+                "version": self._ctx.version,
+                "description": (
+                    "Quality Pipelines define multi-stage workflows for agent orchestration. "
+                    "Each pipeline consists of sequential, parallel, loop, or conditional stages "
+                    "that delegate work to specific agents."
+                ),
+                "endpoints": {
+                    "GET /api/pipelines": {
+                        "description": "List all pipelines with their full stage definitions.",
+                        "response": '{"pipelines": {"<name>": {...}}}',
+                    },
+                    "GET /api/pipelines?help": {
+                        "description": "Show this help documentation.",
+                        "response": '{"help": {...}}',
+                    },
+                    "GET /api/pipelines/<name>": {
+                        "description": "Get a single pipeline by name.",
+                        "response": '{"pipeline": {...}}',
+                        "example": f"/api/pipelines/{pipeline_names[0]}" if pipeline_names else "/api/pipelines/standard-feature",
+                    },
+                    "PUT /api/pipelines": {
+                        "description": "Replace ALL pipelines (whole-file replace with backup).",
+                        "body": '{"pipelines": {"<name>": {...}}}',
+                        "warning": "This replaces the entire quality_pipelines block. Use with care.",
+                    },
+                    "PUT /api/pipelines/<name>": {
+                        "description": "Create or update a single pipeline by name.",
+                        "body": '{"description": "...", "stages": [...], "on_error": "..."}',
+                    },
+                    "DELETE /api/pipelines/<name>": {
+                        "description": "Delete a single pipeline by name.",
+                        "response": '{"deleted": "<name>"}',
+                    },
+                },
+                "pipeline_structure": {
+                    "description": "string — human-readable description of the pipeline",
+                    "on_error": "enum: escalate_to_orchestrator | skip | abort | retry",
+                    "stages": [
+                        {
+                            "id": "string — unique stage identifier within the pipeline",
+                            "agent": "string — role name of the agent to delegate to",
+                            "task": "string — task description for the agent",
+                            "mode": "enum: sequential | parallel_group | fanout | loop | conditional | agent_decision",
+                            "loop": {
+                                "description": "Only required when mode=loop",
+                                "generator": "string — agent that produces output",
+                                "critic": "string — agent that reviews output",
+                                "max_iterations": "integer — loop limit (default 3)",
+                            },
+                            "condition": {
+                                "description": "Only required when mode=conditional",
+                                "type": "agent_decision",
+                                "agent": "string — agent making the decision",
+                            },
+                            "parallel_group": {
+                                "description": "Only required when mode=parallel_group",
+                                "items": [{"agent": "string", "task": "string"}],
+                            },
+                        }
+                    ],
+                },
+                "stage_modes_explained": {
+                    "sequential": "Run one agent after another in sequence.",
+                    "parallel_group": "Run multiple agents in parallel (fixed list).",
+                    "fanout": "Split work across N independent instances of the same agent.",
+                    "loop": "Generator→Critic loop for iterative refinement (e.g. implement→review).",
+                    "conditional": "Agent decides which path to take next.",
+                    "agent_decision": "Similar to conditional — agent makes a programmatic decision.",
+                },
+                "available_pipelines": pipeline_names,
+            },
+        }
+
+
+class ReflectionService:
+    """Reflection-pair CRUD, backed by :class:`RoleDefaultsEditor` (issue #572)."""
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+        self._editor = RoleDefaultsEditor(ctx)
+
+    def read_reflection_pairs(self) -> dict:
+        """Return the ``reflection_pairs`` block (always a list, empty if absent)."""
+        pairs = self._editor.load().get("reflection_pairs") or []
+        if not isinstance(pairs, list):
+            pairs = []
+        return {"reflection_pairs": pairs}
+
+    def read_reflection_pair(self, pair_id: str) -> dict:
+        """Return a single reflection pair by ``id`` or raise."""
+        for pair in self.read_reflection_pairs().get("reflection_pairs", []):
+            if isinstance(pair, dict) and pair.get("id") == pair_id:
+                return {"reflection_pair": pair}
+        raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+
+    def write_reflection_pairs(self, pairs: list) -> dict:
+        """Replace ONLY the ``reflection_pairs`` key in ``role-defaults.yaml``."""
+        result = self._editor.update_section("reflection_pairs", pairs)
+        result["reflection_pairs"] = pairs
+        result["count"] = len(pairs)
+        return result
+
+    def ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
+        """Return a valid id for a reflection pair, generating one if missing."""
+        if pair_id:
+            pair["id"] = pair_id
+            return pair_id
+        if not pair.get("id"):
+            existing = self.read_reflection_pairs().get("reflection_pairs", [])
+            base = pair.get("generator", "pair") + "-" + pair.get("critic", "critic")
+            idx = 1
+            candidate = f"{base}-{idx}"
+            old_ids = {p.get("id") for p in existing if isinstance(p, dict)}
+            while candidate in old_ids:
+                idx += 1
+                candidate = f"{base}-{idx}"
+            pair["id"] = candidate
+        return pair["id"]
+
+    def write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
+        """Create or update a single reflection pair by id."""
+        self.ensure_pair_id(pair, pair_id)
+        pairs = self.read_reflection_pairs().get("reflection_pairs", [])
+        found = False
+        for i, existing in enumerate(pairs):
+            if isinstance(existing, dict) and existing.get("id") == pair_id:
+                pairs[i] = pair
+                found = True
+                break
+        if not found:
+            pairs.append(pair)
+        result = self.write_reflection_pairs(pairs)
+        result["reflection_pair"] = pair
+        return result
+
+    def delete_reflection_pair(self, pair_id: str) -> dict:
+        """Delete a single reflection pair by id."""
+        pairs = self.read_reflection_pairs().get("reflection_pairs", [])
+        new_pairs = [p for p in pairs if not (isinstance(p, dict) and p.get("id") == pair_id)]
+        if len(new_pairs) == len(pairs):
+            raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+        result = self.write_reflection_pairs(new_pairs)
+        result["deleted"] = pair_id
+        return result
+
+class ModelsService:
+    """Model registry + pricing overlay + curation, the models.dev catalog
+    (SDK snapshot / live API with class-level caching), provider/tier model
+    resolution and suggestions — the model business domain extracted from
+    :class:`AdminRequestHandler` (issue #572).
+
+    The models.dev cache stays on the handler class (``ctx.handler_cls``):
+    it is process-wide state the unit tests seed and reset directly, and the
+    ``_MODELS_DEV_ERROR_TTL_SECONDS`` constant likewise lives on the handler.
+    """
+
+    # Overlay provider keys with no real models.dev catalog entry; kept in
+    # sync with ``REGISTRY_ONLY`` in ``docs/ui/admin-ui.html``.
+    CURATED_ONLY_PROVIDER_KEYS: ClassVar[set[str]] = {"mammouth", "continue"}
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def _curation_root(self) -> Path:
+        """Return the project root that owns ``config/model-curation.yaml``.
+
+        Mirrors the layout-resolution used elsewhere in this handler: prefers
+        the top-level checkout (``<root>/config/``) and falls back to the
+        submodule layout (``<root>/.agent-meta/config/``) when the framework
+        is embedded in a target repo.
+        """
+        # ``resolve_asset(root, "config")`` selects the layout by the presence of
+        # the ``config/`` directory; its parent is the framework root that
+        # ``load_curation``/``save_curation`` expect.
+        return resolve_asset(self._ctx.root, "config").parent
+    def _load_curation(self) -> dict:
+        """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
+
+        The import is performed lazily (and ``sys.path`` is extended on demand)
+        to mirror the pattern used by ``_load_viz_config`` at module level:
+        the admin server must keep starting even when the ``lib`` package is
+        not on ``sys.path`` at process boot.
+        """
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.curation import load_curation  # type: ignore[import]
+        curation = load_curation(str(self._curation_root()))
+        # ``load_curation`` already normalises shape; ensure keys exist for
+        # downstream callers regardless of any future schema changes.
+        curation.setdefault("blacklist", [])
+        curation.setdefault("disabled", [])
+        return curation
+    def _save_curation(self, curation: dict) -> None:
+        """Persist a curation document via ``scripts.lib.curation.save_curation``."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.curation import save_curation  # type: ignore[import]
+        save_curation(str(self._curation_root()), curation)
+    def _collect_models(self) -> list[dict]:
+        """Resolve the model registry + pricing overlay + curation into the
+        enriched ``models`` list that powers both ``/api/models`` and
+        ``/api/models/active``.
+
+        Each entry exposes the legacy pricing fields (``input_cost``,
+        ``output_cost``, ``cost_factor`` …) plus the new curation flags:
+
+        * ``enabled``     — ``True`` unless the id is in ``curation.disabled``.
+        * ``blacklisted`` — always ``False`` here. Blacklisted ids are filtered
+          out during registry generation, so a blacklisted model never reaches
+          this code path; the field is included for response-shape stability.
+        """
+        # Resolve the config dir once (submodule-aware) so registry + overlay
+        # always share the same layout, even when either file is absent.
+        config_dir = resolve_asset(self._ctx.root, "config")
+        registry_path = config_dir / "generated" / "model-registry.json"
+        pricing_path = config_dir / "pricing-overlay.yaml"
+
+        override_registry = Path(self._ctx.root) / ".meta-config" / "generated" / "model-registry.json"
+        
+        models: list[dict] = []
+        if override_registry.exists():
+            models = json.loads(override_registry.read_text(encoding="utf-8")).get("models", [])
+        elif registry_path.exists():
+            models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
+
+        pricing: dict = {}
+        if pricing_path.exists():
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+
+        curation = self._load_curation()
+        # Tolerant comparison (see _normalized_model_id): curation entries
+        # written against older registry id formats must keep matching.
+        disabled_ids = {
+            _normalized_model_id(x) for x in curation.get("disabled", [])
+            if isinstance(x, str) and x
+        }
+
+        for m in models:
+            provider = m.get("provider", "")
+            model_id = m.get("id", "")
+            model_name = m.get("name") or model_id
+
+            api_input = m.get("input_cost_api", 0.0)
+            api_output = m.get("output_cost_api", 0.0)
+
+            provider_prices = prices.get(provider, {}) if isinstance(prices, dict) else {}
+            model_prices = provider_prices.get(model_id, {}) if isinstance(provider_prices, dict) else {}
+
+            overlay_input = model_prices.get("input") if isinstance(model_prices, dict) else None
+            overlay_output = model_prices.get("output") if isinstance(model_prices, dict) else None
+
+            input_cost = overlay_input if overlay_input is not None else api_input
+            output_cost = overlay_output if overlay_output is not None else api_output
+
+            input_source = "Overlay" if overlay_input is not None else "API"
+            output_source = "Overlay" if overlay_output is not None else "API"
+
+            # Blended cost per 1M tokens (30% input, 70% output)
+            cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
+
+            m["name"] = model_name
+            m["input_cost"] = input_cost
+            m["output_cost"] = output_cost
+            m["input_source"] = input_source
+            m["output_source"] = output_source
+            m["cost_factor"] = cost_factor
+            m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
+            m["enabled"] = _normalized_model_id(model_id) not in disabled_ids
+            # Blacklisted ids are filtered during discovery and never appear in
+            # the registry; surfaced models are therefore always non-blacklisted.
+            m["blacklisted"] = False
+
+        return models
+    def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
+        """Load the models.dev catalog payload (class-level cached).
+
+        Normal resolution order: fresh in-memory cache → SDK snapshot
+        (``node_modules/@opencode-ai/models``) → live models.dev API → stale
+        cache → short-TTL negative cache of the last total failure. An
+        explicit ``force_refresh`` (the UI's ↻ button) bypasses all caches
+        and reverses API/SDK precedence so a refresh actually reaches the
+        network even when a stale SDK snapshot exists.
+
+        A total failure returns ``{"source": "error", "error": <reason>,
+        "providers": {}, "models": {}}`` and is negative-cached for
+        ``_MODELS_DEV_ERROR_TTL_SECONDS`` so an unreachable network cannot
+        turn every request into a fresh 30 s blocking fetch attempt.
+        """
+        cls = self._ctx.handler_cls
+        now = time.time()
+
+        if not force_refresh:
+            cache = getattr(cls, '_models_dev_cache', None)
+            cache_ts = getattr(cls, '_models_dev_cache_ts', 0)
+            if cache and cache.get('source') == 'sdk':
+                return cache
+            if cache and cache.get('source') == 'api' and (now - cache_ts) < 3600:
+                return cache
+            error_cache = getattr(cls, '_models_dev_error', None)
+            if (isinstance(error_cache, tuple) and len(error_cache) == 2
+                    and (now - error_cache[1]) < self._ctx.handler_cls._MODELS_DEV_ERROR_TTL_SECONDS):
+                return error_cache[0]
+
+        if force_refresh:
+            # Explicit refresh: live data wins over the (potentially stale)
+            # bundled SDK snapshot; the snapshot is the offline fallback.
+            loaded = self._load_from_models_dev_api()
+            if not loaded:
+                loaded = self._load_from_sdk_snapshot()
+        else:
+            loaded = self._load_from_sdk_snapshot()
+            if not loaded:
+                loaded = self._load_from_models_dev_api()
+
+        if loaded:
+            cls._models_dev_cache = loaded
+            cls._models_dev_cache_ts = time.time()
+            if hasattr(cls, '_models_dev_error'):
+                delattr(cls, '_models_dev_error')
+            return loaded
+
+        # Total failure — serve any stale cache before reporting the error,
+        # and stamp it as the negative-cache entry so subsequent requests
+        # within the TTL re-serve the stale payload WITHOUT re-attempting the
+        # (up to 30 s blocking) fetch.
+        stale = getattr(cls, '_models_dev_cache', None)
+        if stale:
+            cls._models_dev_error = (stale, time.time())
+            return stale
+        detail = getattr(cls, '_models_dev_last_fetch_error', '') or 'No data available'
+        error_payload = {"source": "error", "error": detail, "providers": {}, "models": {}}
+        cls._models_dev_error = (error_payload, time.time())
+        return error_payload
+    def _load_from_sdk_snapshot(self) -> dict | None:
+        try:
+            snapshot_path = resolve_asset(self._ctx.root, "node_modules",
+                                          "@opencode-ai", "models", "dist", "snapshot.js")
+            if not snapshot_path.exists():
+                return None
+
+            content = snapshot_path.read_text(encoding="utf-8")
+            prefix = 'JSON.parse("'
+            start = content.find(prefix)
+            if start == -1:
+                return None
+            start += len(prefix)
+            # Find closing ") before \nexport
+            end = content.find('")' + '\nexport', start)
+            if end == -1:
+                # Fallback: find last ") before export
+                export_pos = content.find('\nexport const providers', start)
+                if export_pos == -1:
+                    return None
+                end = content.rfind('")', start, export_pos)
+                if end == -1:
+                    return None
+
+            json_str = content[start:end]
+            # Unescape JS string: \" → "  \\ → \
+            json_str = json_str.replace('\\\\', '\x00bs\x00')
+            json_str = json_str.replace('\\"', '"')
+            json_str = json_str.replace('\x00bs\x00', '\\')
+            data = json.loads(json_str)
+
+            generated_at = ""
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("export const generatedAt = "):
+                    quote_start = stripped.find('"')
+                    if quote_start != -1:
+                        quote_end = stripped.find('"', quote_start + 1)
+                        if quote_end != -1:
+                            generated_at = stripped[quote_start + 1:quote_end]
+                    break
+
+            return {
+                "source": "sdk",
+                "generated_at": generated_at,
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception as exc:  # noqa: BLE001
+            self._ctx.handler_cls._models_dev_last_fetch_error = f"SDK snapshot read failed: {exc}"
+            return None
+    def _load_from_models_dev_api(self) -> dict | None:
+        try:
+            from urllib.request import Request, urlopen
+
+            req = Request("https://models.dev/catalog.json",
+                          headers={"User-Agent": "agent-meta-admin/1.0"})
+            with urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            # Success — clear any stale failure reason so the error payload
+            # never reports an ancient message after a later recovery.
+            self._ctx.handler_cls._models_dev_last_fetch_error = ""
+            return {
+                "source": "api",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception as exc:  # noqa: BLE001
+            # Record WHY the fetch failed so the error payload returned to the
+            # UI can explain itself instead of a bare "No data available".
+            self._ctx.handler_cls._models_dev_last_fetch_error = f"models.dev fetch failed: {exc}"
+            return None
+    def _apply_pricing_overlay(self, providers: dict) -> dict:
+        """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
+
+        Two behaviors, mirroring how ``_collect_models`` already merges the
+        overlay into the Legacy registry view:
+
+        * **Override** — if the overlay's provider key matches a real
+          models.dev provider id (e.g. ``anthropic``), matching model ids get
+          their ``cost.input``/``cost.output`` replaced by the overlay value.
+          Overridden models are tagged ``_costSource: "overlay"`` so the UI
+          can surface provenance.
+        * **Curated** — if the overlay's provider key is listed in
+          ``CURATED_ONLY_PROVIDER_KEYS`` (no real models.dev catalog entry,
+          e.g. Mammouth — a flat-fee multi-model gateway with no public
+          per-token pricing), a synthetic provider node is added with
+          ``source: "curated"`` so the models.dev live view can render it
+          with a provenance badge instead of the previous strikethrough
+          workaround.
+
+        Returns a new dict; ``providers`` is not mutated in place (the caller
+        may hold a reference to the cached models.dev payload).
+        """
+        config_dir = resolve_asset(self._ctx.root, "config")
+        pricing_path = config_dir / "pricing-overlay.yaml"
+        if not pricing_path.exists():
+            return providers
+
+        try:
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        except Exception:  # noqa: BLE001
+            return providers
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+        if not isinstance(prices, dict):
+            return providers
+
+        merged = dict(providers)
+        for provider_key, provider_prices in prices.items():
+            if not isinstance(provider_prices, dict):
+                continue
+            model_entries = {
+                k: v for k, v in provider_prices.items()
+                if not k.startswith("_") and isinstance(v, dict)
+            }
+            if not model_entries:
+                continue
+
+            if provider_key in merged:
+                # Override path: real models.dev provider — patch matching models only.
+                provider_node = dict(merged[provider_key])
+                models = dict(provider_node.get("models", {}))
+                overlay_prefix = f"{provider_key}/"
+                for model_id, price in model_entries.items():
+                    # config/pricing-overlay.yaml key format is inconsistent
+                    # across providers: anthropic/gemini/mammouth use bare ids
+                    # matching models.dev directly, but opencode-go's ids are
+                    # prefixed with "opencode-go/" (that prefix IS the real,
+                    # runnable model id for this framework's `model:` config
+                    # field — model-registry.json's own `id` matches it, and
+                    # the legacy /models-legacy view resolves correctly off of
+                    # that). The live models.dev catalog itself only knows the
+                    # bare id, so try both before giving up — without this,
+                    # every opencode-go override silently no-ops and the UI
+                    # falls back to models.dev's own (inapplicable, since
+                    # opencode-go is a flat-fee gateway with no real per-token
+                    # cost) pricing guess instead of our curated $0 override.
+                    resolved_id = model_id if model_id in models else None
+                    if resolved_id is None and model_id.startswith(overlay_prefix):
+                        bare_id = model_id[len(overlay_prefix):]
+                        if bare_id in models:
+                            resolved_id = bare_id
+                    if resolved_id is None:
+                        continue
+                    model = dict(models[resolved_id])
+                    cost = dict(model.get("cost") or {})
+                    if price.get("input") is not None:
+                        cost["input"] = price["input"]
+                    if price.get("output") is not None:
+                        cost["output"] = price["output"]
+                    model["cost"] = cost
+                    model["_costSource"] = "overlay"
+                    models[resolved_id] = model
+                provider_node["models"] = models
+                merged[provider_key] = provider_node
+            elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
+                # Curated path: no real models.dev slug for this provider.
+                curated_models = {}
+                for model_id, price in model_entries.items():
+                    curated_models[model_id] = {
+                        "id": model_id,
+                        "name": price.get("name") or model_id,
+                        "cost": {"input": price.get("input"), "output": price.get("output")},
+                    }
+                merged[provider_key] = {
+                    "name": provider_prices.get("_name") or provider_key.capitalize(),
+                    "models": curated_models,
+                    "source": "curated",
+                }
+            # else: overlay key doesn't match a real provider and isn't on
+            # the curated allow-list — inert legacy data, ignored.
+        return merged
+    def _read_model_source_prefs(self) -> dict:
+        """Load the per-provider model-source map from ``project.yaml``.
+
+        Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
+        any entries whose value is not a recognised source. Missing/invalid
+        section yields ``{}`` (every provider then defaults to the central
+        ``default-model-source`` from ``config/ai-providers.yaml``, see
+        ``_default_model_source``).
+        """
+        project = self._ctx.config_manager.read("project") or {}
+        prefs = project.get("model-source-preference") if isinstance(project, dict) else None
+        if not isinstance(prefs, dict):
+            return {}
+        return {
+            str(k): v for k, v in prefs.items()
+            if isinstance(v, str) and v in VALID_MODEL_SOURCES
+        }
+    def _default_model_source(self) -> str:
+        """Read the framework-wide default model source from
+        ``config/ai-providers.yaml`` -> ``default-model-source``.
+
+        Falls back to ``_FALLBACK_MODEL_SOURCE`` when the file or key is
+        missing (older projects synced before this key existed) or the value
+        is not one of ``VALID_MODEL_SOURCES``.
+        """
+        try:
+            path = self._ai_providers_path()
+            if not path.exists():
+                return _FALLBACK_MODEL_SOURCE
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            value = data.get("default-model-source") if isinstance(data, dict) else None
+            if isinstance(value, str) and value in VALID_MODEL_SOURCES:
+                return value
+            return _FALLBACK_MODEL_SOURCE
+        except Exception:  # noqa: BLE001
+            return _FALLBACK_MODEL_SOURCE
+    def _resolve_model_source(self, provider_name: str) -> str:
+        """Resolve the effective source for ``provider_name`` (per-provider
+        override from ``project.yaml``, or the central default when unset)."""
+        return self._read_model_source_prefs().get(provider_name, self._default_model_source())
+    def _provider_model_tiers(self, provider_name: str) -> dict:
+        """Return the ``model-tiers`` map for ``provider_name`` from
+        ``ai-providers.yaml`` (``{}`` when absent)."""
+        path = self._ai_providers_path()
+        if not path.exists():
+            return {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        providers = data.get("providers") or {}
+        conf = providers.get(provider_name) or {} if isinstance(providers, dict) else {}
+        tiers = conf.get("model-tiers") or {} if isinstance(conf, dict) else {}
+        return tiers if isinstance(tiers, dict) else {}
+    def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
+        """Registry-sourced model suggestions for ``provider_name``.
+
+        The provider's tier values pin down which registry provider slug(s)
+        (e.g. ``opencode-go``, ``anthropic``) belong to this framework
+        provider, and only active (non-disabled) models for those slugs are
+        returned. When no slug can be inferred, ``[]`` is returned — the
+        previous behaviour of offering ALL active models flooded datalists
+        with cross-provider ids that would corrupt the config if selected
+        (e.g. Gemini's bare ``gemini-*`` tier ids do not exist in a registry
+        that only carries anthropic + opencode-go entries).
+        """
+        models = [m for m in self._collect_models() if m.get("enabled")]
+        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
+        registry_slugs: set = set()
+        for model_id in tier_vals:
+            if "/" in model_id:
+                prefix = model_id.split("/", 1)[0]
+                for m in models:
+                    if str(m.get("id", "")).startswith(prefix + "/"):
+                        registry_slugs.add(m.get("provider"))
+            else:
+                for m in models:
+                    if m.get("id") == model_id:
+                        registry_slugs.add(m.get("provider"))
+        if not registry_slugs:
+            return []
+        selected = [m for m in models if m.get("provider") in registry_slugs]
+        return [
+            {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
+            for m in selected
+        ]
+    def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
+        """Map every registry provider slug to the set of its registry ids.
+
+        Reads the SAME registry source ``_collect_models()`` uses (override
+        registry when present, framework registry otherwise), so ids resolved
+        through :meth:`_resolve_registry_model_id` always line up with the
+        ids ``_collect_models`` looks the pricing overlay up by.
+        """
+        out: dict[str, set[str]] = {}
+        try:
+            collected = self._collect_models()
+        except Exception:  # noqa: BLE001
+            return out
+        for m in collected:
+            provider = str(m.get("provider") or "")
+            model_id = str(m.get("id") or "")
+            if provider and model_id:
+                out.setdefault(provider, set()).add(model_id)
+        return out
+    def _resolve_registry_model_id(
+        self,
+        provider_slug: str,
+        raw_id: str,
+        ids_by_provider: dict[str, set[str]] | None = None,
+    ) -> str:
+        """Resolve the registry-conform id for a bare models.dev model id.
+
+        Registry id conventions are PER MODEL, not per provider: anthropic
+        carries bare canonical ids (``claude-opus-5``) AND namespaced
+        OpenRouter extras (``anthropic/claude-opus-4.8-fast``), while
+        opencode-go namespaces every id. Resolution order:
+
+        1. the bare id exists in the registry for this provider → bare;
+        2. the namespaced ``<slug>/<raw>`` id exists → namespaced;
+        3. neither exists (model not synced into the registry yet) →
+           namespaced only when EVERY registry id of this provider is
+           namespaced (unanimous convention), else bare — a not-yet-synced
+           opencode-go model stays runnable (``opencode-go/<raw>``) while a
+           mixed-convention provider (anthropic) defaults to the canonical
+           bare form.
+
+        No provider names are hardcoded; the convention is derived entirely
+        from the registry. Callers resolving many ids should pass
+        ``ids_by_provider`` (from :meth:`_registry_model_ids_by_provider`)
+        to avoid re-reading the registry per model. The resolved id is what
+        ``_collect_models()`` looks the pricing overlay up by and what
+        ``roles.py::_resolve_tier_to_model`` persists verbatim into the
+        ``model:`` frontmatter — both consumers need the exact registry id.
+        """
+        if ids_by_provider is None:
+            ids_by_provider = self._registry_model_ids_by_provider()
+        ids = ids_by_provider.get(provider_slug, set())
+        if raw_id in ids:
+            return raw_id
+        namespaced = f"{provider_slug}/{raw_id}"
+        if namespaced in ids:
+            return namespaced
+        fully_namespaced = bool(ids) and all(i.startswith(f"{provider_slug}/") for i in ids)
+        return namespaced if fully_namespaced else raw_id
+    def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
+        """models.dev-sourced model suggestions for ``provider_name``.
+
+        Returns ``[]`` for providers without a models.dev catalog slug.
+        Suggestion ids match the registry's PER-MODEL id convention (see
+        :meth:`_resolve_registry_model_id`): bare models.dev ids stay 1:1
+        where the registry is bare (anthropic, google, github-copilot) and
+        get the ``<slug>/`` prefix where the registry is namespaced
+        (currently opencode-go) — the value persisted on save (model-tiers /
+        tier-preset / provider-tier overrides) must be the runnable config
+        id, and ``roles.py::_resolve_tier_to_model`` passes it through
+        verbatim. The ``provider`` field always carries the models.dev slug
+        (e.g. ``opencode-go``) as namespace info for display.
+        """
+        slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
+        if not slug:
+            return []
+        data = (self._ctx.handler or self)._load_models_dev_data()
+        providers = self._apply_pricing_overlay(dict(data.get("providers", {})))
+        node = providers.get(slug)
+        if not isinstance(node, dict):
+            return []
+        ids_by_provider = self._registry_model_ids_by_provider()
+        out: list[dict] = []
+        for m in (node.get("models") or {}).values():
+            raw_id = m.get("id")
+            if not raw_id:
+                continue
+            suggestion_id = self._resolve_registry_model_id(slug, str(raw_id), ids_by_provider)
+            out.append({"id": suggestion_id, "name": m.get("name") or raw_id, "provider": slug})
+        return out
+    def _ai_providers_path(self) -> Path:
+        """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
+        return resolve_asset(self._ctx.root, "config", "ai-providers.yaml")
+    def _list_providers(self) -> list[dict]:
+        """Return the configured AI providers with their model tiers/aliases."""
+        path = self._ai_providers_path()
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        providers = data.get("providers") or {}
+        if not isinstance(providers, dict):
+            return []
+        out: list[dict] = []
+        for name, conf in providers.items():
+            if not isinstance(conf, dict):
+                continue
+            tiers = conf.get("model-tiers") or {}
+            aliases = conf.get("model-aliases") or {}
+            if not isinstance(tiers, dict):
+                tiers = {}
+            if not isinstance(aliases, dict):
+                aliases = {}
+            out.append({
+                "name": name,
+                "display_name": conf.get("display-name") or name,
+                "has_model_tiers": bool(tiers),
+                "model_tiers": tiers,
+                "model_aliases": aliases,
+            })
+        out.sort(key=lambda p: p["name"].lower())
+        return out
+    def _list_platforms(self) -> list[dict]:
+        """Return distinct platform prefixes derived from ``agents/2-platform/``."""
+        names: set[str] = {"agent-meta", "generic"}
+        known_roles = sorted(
+            (r["name"] for r in self._list_roles()),
+            key=len,
+            reverse=True,
+        )
+        platform_dir = resolve_asset(self._ctx.root, "agents", "2-platform")
+        if platform_dir.is_dir():
+            for entry in platform_dir.glob("*.md"):
+                stem = entry.stem
+                if "-" not in stem:
+                    continue
+                prefix = None
+                for role in known_roles:
+                    suffix = f"-{role}"
+                    if stem.endswith(suffix) and len(stem) > len(suffix):
+                        prefix = stem[: -len(suffix)]
+                        break
+                if prefix is None:
+                    prefix = stem.rsplit("-", 1)[0]
+                if prefix:
+                    names.add(prefix)
+        return [{"name": n} for n in sorted(names, key=str.lower)]
+    def _list_roles(self) -> list[dict]:
+        """Return the role names declared in ``role-defaults.yaml``."""
+        hierarchy = TemplateService(self._ctx).build_agent_hierarchy()
+        rolenames = sorted(
+            (r.get("name") for r in hierarchy.get("roles") or [] if r.get("name")),
+            key=str.lower,
+        )
+        return [{"name": n} for n in rolenames]
+
 class AdminRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler — dispatches to GET/PUT/POST routes.
 
@@ -1591,10 +2984,22 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _service_context(self) -> ServiceContext:
         """Build a :class:`ServiceContext` that reads this handler's shared
         collaborators live (see ServiceContext for the live-read rationale)."""
-        return ServiceContext(self.__class__)
+        return ServiceContext(self.__class__, self)
 
     def _audit_service(self) -> AuditService:
         return AuditService(self._service_context())
+
+    def _template_service(self) -> TemplateService:
+        return TemplateService(self._service_context())
+
+    def _pipeline_service(self) -> PipelineService:
+        return PipelineService(self._service_context())
+
+    def _reflection_service(self) -> ReflectionService:
+        return ReflectionService(self._service_context())
+
+    def _models_service(self) -> ModelsService:
+        return ModelsService(self._service_context())
 
     # ------------------------------------------------------------------ #
     # CSRF / DNS-rebinding protection                                    #
@@ -2239,119 +3644,20 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         })
 
     def _curation_root(self) -> Path:
-        """Return the project root that owns ``config/model-curation.yaml``.
-
-        Mirrors the layout-resolution used elsewhere in this handler: prefers
-        the top-level checkout (``<root>/config/``) and falls back to the
-        submodule layout (``<root>/.agent-meta/config/``) when the framework
-        is embedded in a target repo.
-        """
-        # ``resolve_asset(root, "config")`` selects the layout by the presence of
-        # the ``config/`` directory; its parent is the framework root that
-        # ``load_curation``/``save_curation`` expect.
-        return resolve_asset(self.__class__.root, "config").parent
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._curation_root()
 
     def _load_curation(self) -> dict:
-        """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
-
-        The import is performed lazily (and ``sys.path`` is extended on demand)
-        to mirror the pattern used by ``_load_viz_config`` at module level:
-        the admin server must keep starting even when the ``lib`` package is
-        not on ``sys.path`` at process boot.
-        """
-        root = self.__class__.root
-        _ensure_scripts_on_path(root)
-        from lib.curation import load_curation  # type: ignore[import]
-        curation = load_curation(str(self._curation_root()))
-        # ``load_curation`` already normalises shape; ensure keys exist for
-        # downstream callers regardless of any future schema changes.
-        curation.setdefault("blacklist", [])
-        curation.setdefault("disabled", [])
-        return curation
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_curation()
 
     def _save_curation(self, curation: dict) -> None:
-        """Persist a curation document via ``scripts.lib.curation.save_curation``."""
-        root = self.__class__.root
-        _ensure_scripts_on_path(root)
-        from lib.curation import save_curation  # type: ignore[import]
-        save_curation(str(self._curation_root()), curation)
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._save_curation(curation)
 
     def _collect_models(self) -> list[dict]:
-        """Resolve the model registry + pricing overlay + curation into the
-        enriched ``models`` list that powers both ``/api/models`` and
-        ``/api/models/active``.
-
-        Each entry exposes the legacy pricing fields (``input_cost``,
-        ``output_cost``, ``cost_factor`` …) plus the new curation flags:
-
-        * ``enabled``     — ``True`` unless the id is in ``curation.disabled``.
-        * ``blacklisted`` — always ``False`` here. Blacklisted ids are filtered
-          out during registry generation, so a blacklisted model never reaches
-          this code path; the field is included for response-shape stability.
-        """
-        # Resolve the config dir once (submodule-aware) so registry + overlay
-        # always share the same layout, even when either file is absent.
-        config_dir = resolve_asset(self.__class__.root, "config")
-        registry_path = config_dir / "generated" / "model-registry.json"
-        pricing_path = config_dir / "pricing-overlay.yaml"
-
-        override_registry = Path(self.__class__.root) / ".meta-config" / "generated" / "model-registry.json"
-        
-        models: list[dict] = []
-        if override_registry.exists():
-            models = json.loads(override_registry.read_text(encoding="utf-8")).get("models", [])
-        elif registry_path.exists():
-            models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
-
-        pricing: dict = {}
-        if pricing_path.exists():
-            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
-        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
-
-        curation = self._load_curation()
-        # Tolerant comparison (see _normalized_model_id): curation entries
-        # written against older registry id formats must keep matching.
-        disabled_ids = {
-            _normalized_model_id(x) for x in curation.get("disabled", [])
-            if isinstance(x, str) and x
-        }
-
-        for m in models:
-            provider = m.get("provider", "")
-            model_id = m.get("id", "")
-            model_name = m.get("name") or model_id
-
-            api_input = m.get("input_cost_api", 0.0)
-            api_output = m.get("output_cost_api", 0.0)
-
-            provider_prices = prices.get(provider, {}) if isinstance(prices, dict) else {}
-            model_prices = provider_prices.get(model_id, {}) if isinstance(provider_prices, dict) else {}
-
-            overlay_input = model_prices.get("input") if isinstance(model_prices, dict) else None
-            overlay_output = model_prices.get("output") if isinstance(model_prices, dict) else None
-
-            input_cost = overlay_input if overlay_input is not None else api_input
-            output_cost = overlay_output if overlay_output is not None else api_output
-
-            input_source = "Overlay" if overlay_input is not None else "API"
-            output_source = "Overlay" if overlay_output is not None else "API"
-
-            # Blended cost per 1M tokens (30% input, 70% output)
-            cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
-
-            m["name"] = model_name
-            m["input_cost"] = input_cost
-            m["output_cost"] = output_cost
-            m["input_source"] = input_source
-            m["output_source"] = output_source
-            m["cost_factor"] = cost_factor
-            m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
-            m["enabled"] = _normalized_model_id(model_id) not in disabled_ids
-            # Blacklisted ids are filtered during discovery and never appear in
-            # the registry; surfaced models are therefore always non-blacklisted.
-            m["blacklisted"] = False
-
-        return models
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._collect_models()
 
     def _handle_get_models(self) -> None:
         """Return all registered models with curation + pricing metadata."""
@@ -2382,65 +3688,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
-        """Load the models.dev catalog payload (class-level cached).
-
-        Normal resolution order: fresh in-memory cache → SDK snapshot
-        (``node_modules/@opencode-ai/models``) → live models.dev API → stale
-        cache → short-TTL negative cache of the last total failure. An
-        explicit ``force_refresh`` (the UI's ↻ button) bypasses all caches
-        and reverses API/SDK precedence so a refresh actually reaches the
-        network even when a stale SDK snapshot exists.
-
-        A total failure returns ``{"source": "error", "error": <reason>,
-        "providers": {}, "models": {}}`` and is negative-cached for
-        ``_MODELS_DEV_ERROR_TTL_SECONDS`` so an unreachable network cannot
-        turn every request into a fresh 30 s blocking fetch attempt.
-        """
-        cls = self.__class__
-        now = time.time()
-
-        if not force_refresh:
-            cache = getattr(cls, '_models_dev_cache', None)
-            cache_ts = getattr(cls, '_models_dev_cache_ts', 0)
-            if cache and cache.get('source') == 'sdk':
-                return cache
-            if cache and cache.get('source') == 'api' and (now - cache_ts) < 3600:
-                return cache
-            error_cache = getattr(cls, '_models_dev_error', None)
-            if (isinstance(error_cache, tuple) and len(error_cache) == 2
-                    and (now - error_cache[1]) < self._MODELS_DEV_ERROR_TTL_SECONDS):
-                return error_cache[0]
-
-        if force_refresh:
-            # Explicit refresh: live data wins over the (potentially stale)
-            # bundled SDK snapshot; the snapshot is the offline fallback.
-            loaded = self._load_from_models_dev_api()
-            if not loaded:
-                loaded = self._load_from_sdk_snapshot()
-        else:
-            loaded = self._load_from_sdk_snapshot()
-            if not loaded:
-                loaded = self._load_from_models_dev_api()
-
-        if loaded:
-            cls._models_dev_cache = loaded
-            cls._models_dev_cache_ts = time.time()
-            if hasattr(cls, '_models_dev_error'):
-                delattr(cls, '_models_dev_error')
-            return loaded
-
-        # Total failure — serve any stale cache before reporting the error,
-        # and stamp it as the negative-cache entry so subsequent requests
-        # within the TTL re-serve the stale payload WITHOUT re-attempting the
-        # (up to 30 s blocking) fetch.
-        stale = getattr(cls, '_models_dev_cache', None)
-        if stale:
-            cls._models_dev_error = (stale, time.time())
-            return stale
-        detail = getattr(cls, '_models_dev_last_fetch_error', '') or 'No data available'
-        error_payload = {"source": "error", "error": detail, "providers": {}, "models": {}}
-        cls._models_dev_error = (error_payload, time.time())
-        return error_payload
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_models_dev_data(force_refresh)
 
     # Negative-cache TTL for a total models.dev load failure (seconds). Keeps
     # an unreachable network from re-attempting a 30 s-timeout fetch on every
@@ -2448,190 +3697,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     _MODELS_DEV_ERROR_TTL_SECONDS = 60.0
 
     def _load_from_sdk_snapshot(self) -> dict | None:
-        try:
-            snapshot_path = resolve_asset(self.__class__.root, "node_modules",
-                                          "@opencode-ai", "models", "dist", "snapshot.js")
-            if not snapshot_path.exists():
-                return None
-
-            content = snapshot_path.read_text(encoding="utf-8")
-            prefix = 'JSON.parse("'
-            start = content.find(prefix)
-            if start == -1:
-                return None
-            start += len(prefix)
-            # Find closing ") before \nexport
-            end = content.find('")' + '\nexport', start)
-            if end == -1:
-                # Fallback: find last ") before export
-                export_pos = content.find('\nexport const providers', start)
-                if export_pos == -1:
-                    return None
-                end = content.rfind('")', start, export_pos)
-                if end == -1:
-                    return None
-
-            json_str = content[start:end]
-            # Unescape JS string: \" → "  \\ → \
-            json_str = json_str.replace('\\\\', '\x00bs\x00')
-            json_str = json_str.replace('\\"', '"')
-            json_str = json_str.replace('\x00bs\x00', '\\')
-            data = json.loads(json_str)
-
-            generated_at = ""
-            for line in content.splitlines():
-                stripped = line.strip()
-                if stripped.startswith("export const generatedAt = "):
-                    quote_start = stripped.find('"')
-                    if quote_start != -1:
-                        quote_end = stripped.find('"', quote_start + 1)
-                        if quote_end != -1:
-                            generated_at = stripped[quote_start + 1:quote_end]
-                    break
-
-            return {
-                "source": "sdk",
-                "generated_at": generated_at,
-                "providers": data.get("providers", {}),
-                "models": data.get("models", {}),
-            }
-        except Exception as exc:  # noqa: BLE001
-            self.__class__._models_dev_last_fetch_error = f"SDK snapshot read failed: {exc}"
-            return None
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_from_sdk_snapshot()
 
     def _load_from_models_dev_api(self) -> dict | None:
-        try:
-            from urllib.request import Request, urlopen
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_from_models_dev_api()
 
-            req = Request("https://models.dev/catalog.json",
-                          headers={"User-Agent": "agent-meta-admin/1.0"})
-            with urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            # Success — clear any stale failure reason so the error payload
-            # never reports an ancient message after a later recovery.
-            self.__class__._models_dev_last_fetch_error = ""
-            return {
-                "source": "api",
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "providers": data.get("providers", {}),
-                "models": data.get("models", {}),
-            }
-        except Exception as exc:  # noqa: BLE001
-            # Record WHY the fetch failed so the error payload returned to the
-            # UI can explain itself instead of a bare "No data available".
-            self.__class__._models_dev_last_fetch_error = f"models.dev fetch failed: {exc}"
-            return None
-
-    # Provider keys in ``config/pricing-overlay.yaml`` that never have a real
-    # models.dev catalog entry (subscription/flat-fee gateways with no public
-    # per-token pricing). Mirrors ``REGISTRY_ONLY`` in
-    # ``docs/ui/admin-ui.html`` — keep both lists in sync. Any other overlay
-    # key that doesn't match a live models.dev provider id is treated as
-    # inert legacy data and ignored here (e.g. a naming mismatch), so we
-    # never fabricate a phantom provider for real catalog entries.
-    CURATED_ONLY_PROVIDER_KEYS = {"mammouth", "continue"}  # noqa: RUF012
 
     def _apply_pricing_overlay(self, providers: dict) -> dict:
-        """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
-
-        Two behaviors, mirroring how ``_collect_models`` already merges the
-        overlay into the Legacy registry view:
-
-        * **Override** — if the overlay's provider key matches a real
-          models.dev provider id (e.g. ``anthropic``), matching model ids get
-          their ``cost.input``/``cost.output`` replaced by the overlay value.
-          Overridden models are tagged ``_costSource: "overlay"`` so the UI
-          can surface provenance.
-        * **Curated** — if the overlay's provider key is listed in
-          ``CURATED_ONLY_PROVIDER_KEYS`` (no real models.dev catalog entry,
-          e.g. Mammouth — a flat-fee multi-model gateway with no public
-          per-token pricing), a synthetic provider node is added with
-          ``source: "curated"`` so the models.dev live view can render it
-          with a provenance badge instead of the previous strikethrough
-          workaround.
-
-        Returns a new dict; ``providers`` is not mutated in place (the caller
-        may hold a reference to the cached models.dev payload).
-        """
-        config_dir = resolve_asset(self.__class__.root, "config")
-        pricing_path = config_dir / "pricing-overlay.yaml"
-        if not pricing_path.exists():
-            return providers
-
-        try:
-            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
-        except Exception:  # noqa: BLE001
-            return providers
-        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
-        if not isinstance(prices, dict):
-            return providers
-
-        merged = dict(providers)
-        for provider_key, provider_prices in prices.items():
-            if not isinstance(provider_prices, dict):
-                continue
-            model_entries = {
-                k: v for k, v in provider_prices.items()
-                if not k.startswith("_") and isinstance(v, dict)
-            }
-            if not model_entries:
-                continue
-
-            if provider_key in merged:
-                # Override path: real models.dev provider — patch matching models only.
-                provider_node = dict(merged[provider_key])
-                models = dict(provider_node.get("models", {}))
-                overlay_prefix = f"{provider_key}/"
-                for model_id, price in model_entries.items():
-                    # config/pricing-overlay.yaml key format is inconsistent
-                    # across providers: anthropic/gemini/mammouth use bare ids
-                    # matching models.dev directly, but opencode-go's ids are
-                    # prefixed with "opencode-go/" (that prefix IS the real,
-                    # runnable model id for this framework's `model:` config
-                    # field — model-registry.json's own `id` matches it, and
-                    # the legacy /models-legacy view resolves correctly off of
-                    # that). The live models.dev catalog itself only knows the
-                    # bare id, so try both before giving up — without this,
-                    # every opencode-go override silently no-ops and the UI
-                    # falls back to models.dev's own (inapplicable, since
-                    # opencode-go is a flat-fee gateway with no real per-token
-                    # cost) pricing guess instead of our curated $0 override.
-                    resolved_id = model_id if model_id in models else None
-                    if resolved_id is None and model_id.startswith(overlay_prefix):
-                        bare_id = model_id[len(overlay_prefix):]
-                        if bare_id in models:
-                            resolved_id = bare_id
-                    if resolved_id is None:
-                        continue
-                    model = dict(models[resolved_id])
-                    cost = dict(model.get("cost") or {})
-                    if price.get("input") is not None:
-                        cost["input"] = price["input"]
-                    if price.get("output") is not None:
-                        cost["output"] = price["output"]
-                    model["cost"] = cost
-                    model["_costSource"] = "overlay"
-                    models[resolved_id] = model
-                provider_node["models"] = models
-                merged[provider_key] = provider_node
-            elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
-                # Curated path: no real models.dev slug for this provider.
-                curated_models = {}
-                for model_id, price in model_entries.items():
-                    curated_models[model_id] = {
-                        "id": model_id,
-                        "name": price.get("name") or model_id,
-                        "cost": {"input": price.get("input"), "output": price.get("output")},
-                    }
-                merged[provider_key] = {
-                    "name": provider_prices.get("_name") or provider_key.capitalize(),
-                    "models": curated_models,
-                    "source": "curated",
-                }
-            # else: overlay key doesn't match a real provider and isn't on
-            # the curated allow-list — inert legacy data, ignored.
-        return merged
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._apply_pricing_overlay(providers)
 
     def _handle_get_models_dev(self) -> None:
         try:
@@ -2975,185 +4051,36 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _read_model_source_prefs(self) -> dict:
-        """Load the per-provider model-source map from ``project.yaml``.
-
-        Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
-        any entries whose value is not a recognised source. Missing/invalid
-        section yields ``{}`` (every provider then defaults to the central
-        ``default-model-source`` from ``config/ai-providers.yaml``, see
-        ``_default_model_source``).
-        """
-        project = self.__class__.config_manager.read("project") or {}
-        prefs = project.get("model-source-preference") if isinstance(project, dict) else None
-        if not isinstance(prefs, dict):
-            return {}
-        return {
-            str(k): v for k, v in prefs.items()
-            if isinstance(v, str) and v in VALID_MODEL_SOURCES
-        }
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._read_model_source_prefs()
 
     def _default_model_source(self) -> str:
-        """Read the framework-wide default model source from
-        ``config/ai-providers.yaml`` -> ``default-model-source``.
-
-        Falls back to ``_FALLBACK_MODEL_SOURCE`` when the file or key is
-        missing (older projects synced before this key existed) or the value
-        is not one of ``VALID_MODEL_SOURCES``.
-        """
-        try:
-            path = self._ai_providers_path()
-            if not path.exists():
-                return _FALLBACK_MODEL_SOURCE
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            value = data.get("default-model-source") if isinstance(data, dict) else None
-            if isinstance(value, str) and value in VALID_MODEL_SOURCES:
-                return value
-            return _FALLBACK_MODEL_SOURCE
-        except Exception:  # noqa: BLE001
-            return _FALLBACK_MODEL_SOURCE
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._default_model_source()
 
     def _resolve_model_source(self, provider_name: str) -> str:
-        """Resolve the effective source for ``provider_name`` (per-provider
-        override from ``project.yaml``, or the central default when unset)."""
-        return self._read_model_source_prefs().get(provider_name, self._default_model_source())
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._resolve_model_source(provider_name)
 
     def _provider_model_tiers(self, provider_name: str) -> dict:
-        """Return the ``model-tiers`` map for ``provider_name`` from
-        ``ai-providers.yaml`` (``{}`` when absent)."""
-        path = self._ai_providers_path()
-        if not path.exists():
-            return {}
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        providers = data.get("providers") or {}
-        conf = providers.get(provider_name) or {} if isinstance(providers, dict) else {}
-        tiers = conf.get("model-tiers") or {} if isinstance(conf, dict) else {}
-        return tiers if isinstance(tiers, dict) else {}
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._provider_model_tiers(provider_name)
 
     def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
-        """Registry-sourced model suggestions for ``provider_name``.
-
-        The provider's tier values pin down which registry provider slug(s)
-        (e.g. ``opencode-go``, ``anthropic``) belong to this framework
-        provider, and only active (non-disabled) models for those slugs are
-        returned. When no slug can be inferred, ``[]`` is returned — the
-        previous behaviour of offering ALL active models flooded datalists
-        with cross-provider ids that would corrupt the config if selected
-        (e.g. Gemini's bare ``gemini-*`` tier ids do not exist in a registry
-        that only carries anthropic + opencode-go entries).
-        """
-        models = [m for m in self._collect_models() if m.get("enabled")]
-        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
-        registry_slugs: set = set()
-        for model_id in tier_vals:
-            if "/" in model_id:
-                prefix = model_id.split("/", 1)[0]
-                for m in models:
-                    if str(m.get("id", "")).startswith(prefix + "/"):
-                        registry_slugs.add(m.get("provider"))
-            else:
-                for m in models:
-                    if m.get("id") == model_id:
-                        registry_slugs.add(m.get("provider"))
-        if not registry_slugs:
-            return []
-        selected = [m for m in models if m.get("provider") in registry_slugs]
-        return [
-            {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
-            for m in selected
-        ]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._suggestions_from_registry(provider_name)
 
     def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
-        """Map every registry provider slug to the set of its registry ids.
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._registry_model_ids_by_provider()
 
-        Reads the SAME registry source ``_collect_models()`` uses (override
-        registry when present, framework registry otherwise), so ids resolved
-        through :meth:`_resolve_registry_model_id` always line up with the
-        ids ``_collect_models`` looks the pricing overlay up by.
-        """
-        out: dict[str, set[str]] = {}
-        try:
-            collected = self._collect_models()
-        except Exception:  # noqa: BLE001
-            return out
-        for m in collected:
-            provider = str(m.get("provider") or "")
-            model_id = str(m.get("id") or "")
-            if provider and model_id:
-                out.setdefault(provider, set()).add(model_id)
-        return out
-
-    def _resolve_registry_model_id(
-        self,
-        provider_slug: str,
-        raw_id: str,
-        ids_by_provider: dict[str, set[str]] | None = None,
-    ) -> str:
-        """Resolve the registry-conform id for a bare models.dev model id.
-
-        Registry id conventions are PER MODEL, not per provider: anthropic
-        carries bare canonical ids (``claude-opus-5``) AND namespaced
-        OpenRouter extras (``anthropic/claude-opus-4.8-fast``), while
-        opencode-go namespaces every id. Resolution order:
-
-        1. the bare id exists in the registry for this provider → bare;
-        2. the namespaced ``<slug>/<raw>`` id exists → namespaced;
-        3. neither exists (model not synced into the registry yet) →
-           namespaced only when EVERY registry id of this provider is
-           namespaced (unanimous convention), else bare — a not-yet-synced
-           opencode-go model stays runnable (``opencode-go/<raw>``) while a
-           mixed-convention provider (anthropic) defaults to the canonical
-           bare form.
-
-        No provider names are hardcoded; the convention is derived entirely
-        from the registry. Callers resolving many ids should pass
-        ``ids_by_provider`` (from :meth:`_registry_model_ids_by_provider`)
-        to avoid re-reading the registry per model. The resolved id is what
-        ``_collect_models()`` looks the pricing overlay up by and what
-        ``roles.py::_resolve_tier_to_model`` persists verbatim into the
-        ``model:`` frontmatter — both consumers need the exact registry id.
-        """
-        if ids_by_provider is None:
-            ids_by_provider = self._registry_model_ids_by_provider()
-        ids = ids_by_provider.get(provider_slug, set())
-        if raw_id in ids:
-            return raw_id
-        namespaced = f"{provider_slug}/{raw_id}"
-        if namespaced in ids:
-            return namespaced
-        fully_namespaced = bool(ids) and all(i.startswith(f"{provider_slug}/") for i in ids)
-        return namespaced if fully_namespaced else raw_id
+    def _resolve_registry_model_id(self, provider_slug: str, raw_id: str, ids_by_provider: dict[str, set[str]] | None = None) -> str:
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._resolve_registry_model_id(provider_slug, raw_id, ids_by_provider)
 
     def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
-        """models.dev-sourced model suggestions for ``provider_name``.
-
-        Returns ``[]`` for providers without a models.dev catalog slug.
-        Suggestion ids match the registry's PER-MODEL id convention (see
-        :meth:`_resolve_registry_model_id`): bare models.dev ids stay 1:1
-        where the registry is bare (anthropic, google, github-copilot) and
-        get the ``<slug>/`` prefix where the registry is namespaced
-        (currently opencode-go) — the value persisted on save (model-tiers /
-        tier-preset / provider-tier overrides) must be the runnable config
-        id, and ``roles.py::_resolve_tier_to_model`` passes it through
-        verbatim. The ``provider`` field always carries the models.dev slug
-        (e.g. ``opencode-go``) as namespace info for display.
-        """
-        slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
-        if not slug:
-            return []
-        data = self._load_models_dev_data()
-        providers = self._apply_pricing_overlay(dict(data.get("providers", {})))
-        node = providers.get(slug)
-        if not isinstance(node, dict):
-            return []
-        ids_by_provider = self._registry_model_ids_by_provider()
-        out: list[dict] = []
-        for m in (node.get("models") or {}).values():
-            raw_id = m.get("id")
-            if not raw_id:
-                continue
-            suggestion_id = self._resolve_registry_model_id(slug, str(raw_id), ids_by_provider)
-            out.append({"id": suggestion_id, "name": m.get("name") or raw_id, "provider": slug})
-        return out
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._suggestions_from_models_dev(provider_name)
 
     def _handle_get_model_source(self) -> None:
         """Return the central per-provider model-source map (single source of
@@ -3627,647 +4554,68 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
 
     def _find_schema_path(self) -> Path:
-        return resolve_asset(self.__class__.root, "config", "project-config.schema.json")
+        """Delegates to :meth:`TemplateService.find_schema_path` (issue #572)."""
+        return self._template_service().find_schema_path()
 
     def _build_agent_hierarchy(self) -> dict:
-        """Derive a lightweight role hierarchy directly from
-        ``config/role-defaults.yaml``. Falls back to an empty list if the file
-        is missing (project-admin mode without super-admin configs).
-
-        Each role entry includes:
-          * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
-            ``permission_mode``
-          * ``description`` — never empty (falls back to template frontmatter
-            ``description`` field if the role-defaults entry is missing/empty)
-          * ``targets`` — list of delegation target role names from
-            ``handoff.target_roles`` (or ``[]`` if not declared)
-        """
-        role_defaults_path = self._role_defaults_path()
-        roles: list[dict] = []
-
-        if role_defaults_path.exists():
-            with role_defaults_path.open("r", encoding="utf-8") as fh:
-                data = yaml.safe_load(fh) or {}
-            raw = data.get("roles") or data
-            if isinstance(raw, dict):
-                for name, attrs in raw.items():
-                    if not isinstance(attrs, dict):
-                        continue
-                    handoff = attrs.get("handoff") or {}
-                    targets_raw = handoff.get("target_roles") if isinstance(handoff, dict) else None
-                    targets: list[str] = []
-                    if isinstance(targets_raw, list):
-                        targets = [str(t) for t in targets_raw if isinstance(t, str) and t]
-
-                    description = attrs.get("description") or ""
-                    if not description:
-                        description = self._read_template_description(name)
-                    if not description:
-                        description = f"{name} agent (no description)"
-
-                    roles.append({
-                        "name": name,
-                        "tier": (attrs.get("workflow_tier")
-                                 or attrs.get("tier")
-                                 or attrs.get("workflow-tier")
-                                 or "optional"),
-                        "model": attrs.get("model"),
-                        "memory": attrs.get("memory"),
-                        "parallel": bool(attrs.get("parallel", False)),
-                        "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
-                        "description": description,
-                        "targets": targets,
-                        "group": attrs.get("group"),
-                    })
-        return {"roles": roles, "count": len(roles)}
+        """Delegates to :meth:`TemplateService.build_agent_hierarchy` (issue #572)."""
+        return self._template_service().build_agent_hierarchy()
 
     def _role_defaults_path(self) -> Path:
-        """Resolve the path to ``role-defaults.yaml`` for either layout."""
-        return resolve_asset(self.__class__.root, "config", "role-defaults.yaml")
+        """Resolve the path to ``role-defaults.yaml`` for either layout.
+
+        Delegates to :meth:`ServiceContext.role_defaults_path` (issue #572) —
+        the single resolver shared with the template/pipeline/reflection code.
+        """
+        return self._service_context().role_defaults_path()
 
     def _read_pipelines(self) -> dict:
-        """Return the ``quality_pipelines`` block from ``role-defaults.yaml``
-        in a stable envelope shape: ``{"pipelines": {...}}``. Returns an empty
-        dict if the file does not exist or the key is absent."""
-        path = self._role_defaults_path()
-        if not path.exists():
-            return {"pipelines": {}}
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        pipelines = data.get("quality_pipelines") or {}
-        if not isinstance(pipelines, dict):
-            pipelines = {}
-        return {"pipelines": pipelines}
+        """Delegates to :meth:`PipelineService.read_pipelines` (issue #572)."""
+        return self._pipeline_service().read_pipelines()
 
     def _read_single_pipeline(self, name: str) -> dict:
-        """Return a single pipeline by name or raise."""
-        pipelines = self._read_pipelines().get("pipelines", {})
-        if name not in pipelines:
-            raise FileNotFoundError(f"pipeline not found: {name}")
-        return {"pipeline": pipelines[name]}
-
-    @staticmethod
-    def _indent_yaml_dump(value: Any, indent: int) -> list[str]:
-        """Dump ``value`` to YAML and prefix every line with ``indent`` spaces."""
-        raw = yaml.dump(
-            value,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-        if not raw.endswith("\n"):
-            raw += "\n"
-        out: list[str] = []
-        for line in raw.splitlines(keepends=True):
-            if line == "\n":
-                out.append("\n")
-            else:
-                out.append(" " * indent + line)
-        return out
-
-    @staticmethod
-    def _format_yaml_list_item(item: Any, indent: int, value_indent: int) -> list[str]:
-        """Format a list item (``- key: value``) preserving nested indentation.
-
-        ``indent`` is the column of the ``-`` marker; ``value_indent`` is the
-        column used for the item's body lines.
-        """
-        lines = AdminRequestHandler._indent_yaml_dump(item, value_indent)
-        if not lines:
-            return [(" " * indent) + "- \n"]
-        # The first dumped line already has ``value_indent`` spaces; replace
-        # them with the list marker at ``indent``.
-        first_content = lines[0][value_indent:]
-        lines[0] = (" " * indent) + "- " + first_content
-        return lines
-
-    @staticmethod
-    def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
-        """Return the indentation used for a child mapping/list body.
-
-        Falls back to ``base_indent + 2`` when the body is empty.
-        """
-        for line in body_lines:
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                continue
-            indent = len(line) - len(stripped)
-            if indent > base_indent:
-                return indent
-        return base_indent + 2
-
-    @staticmethod
-    def _trailing_blank_lines(lines: list[str]) -> list[str]:
-        """Return only the trailing blank/whitespace lines of a block."""
-        last = -1
-        for i in range(len(lines) - 1, -1, -1):
-            if lines[i].strip() not in ("", "\n"):
-                last = i
-                break
-        if last == -1:
-            return lines[:]
-        return lines[last + 1 :]
-
-    @staticmethod
-    def _extract_list_item_id(lines: list[str]) -> str | None:
-        """Parse a single YAML list item and return its ``id`` field, if any."""
-        try:
-            data = yaml.safe_load("".join(lines))
-            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
-                return data[0].get("id")
-        except Exception:  # noqa: BLE001, S110
-            pass
-        return None
-
-    @staticmethod
-    def _split_dict_children(body_lines: list[str], base_indent: int) -> list[dict]:
-        """Locate top-level mapping keys inside a section body."""
-        children: list[dict] = []
-        i = 0
-        n = len(body_lines)
-        while i < n:
-            line = body_lines[i]
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                i += 1
-                continue
-            indent = len(line) - len(stripped)
-            if indent < base_indent:
-                break
-            if indent == base_indent and not stripped.startswith("-") and ":" in stripped:
-                key_name = stripped.split(":", 1)[0]
-                start = i
-                i += 1
-                while i < n:
-                    l = body_lines[i]
-                    if l.strip() in ("", "\n"):
-                        i += 1
-                        continue
-                    ind = len(l) - len(l.lstrip())
-                    if ind < base_indent:
-                        break
-                    if ind == base_indent and not l.lstrip().startswith("-"):
-                        break
-                    i += 1
-                children.append({"type": "dict", "key": key_name, "start": start, "end": i})
-            else:
-                i += 1
-        return children
-
-    @staticmethod
-    def _split_list_children(body_lines: list[str], base_indent: int) -> list[dict]:
-        """Locate top-level list items inside a section body."""
-        children: list[dict] = []
-        i = 0
-        n = len(body_lines)
-        while i < n:
-            line = body_lines[i]
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                i += 1
-                continue
-            indent = len(line) - len(stripped)
-            if indent < base_indent:
-                break
-            if indent == base_indent and stripped.startswith("- "):
-                start = i
-                i += 1
-                while i < n:
-                    l = body_lines[i]
-                    if l.strip() in ("", "\n"):
-                        i += 1
-                        continue
-                    ind = len(l) - len(l.lstrip())
-                    if ind <= base_indent:
-                        break
-                    i += 1
-                children.append({"start": start, "end": i})
-            else:
-                i += 1
-        return children
-
-    @staticmethod
-    def _splice_appended_children(
-        new_lines: list[str], tail: list[str], appended_new: list[str]
-    ) -> None:
-        """Attach freshly appended children to ``new_lines`` in-place.
-
-        New children are spliced in *after* the existing content but *before*
-        ``tail`` — the trailing blank/comment lines that were captured with the
-        section body but usually head the *following* top-level section (e.g.
-        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
-        Placing new keys after that tail would glue them onto the comment line
-        (the section-body regex drops the final newline before the next key),
-        silently commenting the new key out. Newline boundaries are enforced so
-        a new key can never land on the same physical line as a trailing comment.
-
-        When there are no new children the tail is appended verbatim, preserving
-        the exact byte layout of update-only and delete writes.
-        """
-        if not appended_new:
-            new_lines.extend(tail)
-            return
-        if new_lines and not new_lines[-1].endswith("\n"):
-            new_lines[-1] = new_lines[-1] + "\n"
-        new_lines.extend(appended_new)
-        if tail:
-            if new_lines and not new_lines[-1].endswith("\n"):
-                new_lines[-1] = new_lines[-1] + "\n"
-            new_lines.extend(tail)
-
-    def _build_role_defaults_section_body(
-        self, key: str, value: Any, body_lines: list[str]
-    ) -> str:
-        """Rebuild the body of a top-level ``role-defaults.yaml`` section.
-
-        Dict sections (e.g. ``quality_pipelines``) are edited child-by-child.
-        Children whose parsed value equals the new value keep their original
-        formatting; only changed or new children are re-serialised. List
-        sections with an ``id`` field (e.g. ``reflection_pairs``) are matched
-        by id using the same rule. Comments and blank lines that are not part
-        of a child block are preserved unchanged.
-        """
-        base_indent = 2
-        value_indent = self._infer_child_value_indent(body_lines, base_indent)
-
-        def _scalar_dump(v: Any) -> str:
-            return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
-
-        def _build_dict_child(k: str, v: Any, child: dict | None) -> list[str]:
-            if child:
-                trailing = self._trailing_blank_lines(
-                    body_lines[child["start"] : child["end"]]
-                )
-                if isinstance(v, (dict, list)):
-                    header = body_lines[child["start"]]
-                    child_value_indent = self._infer_child_value_indent(
-                        body_lines[child["start"] + 1 : child["end"]], base_indent
-                    )
-                    value_lines = self._indent_yaml_dump(v, child_value_indent)
-                    return [header] + value_lines + trailing
-                else:
-                    return [
-                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n"
-                    ] + trailing
-            else:
-                if isinstance(v, (dict, list)):
-                    header = " " * base_indent + k + ":\n"
-                    value_lines = self._indent_yaml_dump(v, value_indent)
-                    return [header] + value_lines + ["\n"]
-                else:
-                    return [
-                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n",
-                        "\n",
-                    ]
-
-        def _build_list_child(item: dict, child: dict | None) -> list[str]:
-            if child:
-                trailing = self._trailing_blank_lines(
-                    body_lines[child["start"] : child["end"]]
-                )
-                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
-                return value_lines + trailing
-            else:
-                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
-                return value_lines + ["\n"]
-
-        def _assigned_indices(children: list[dict]) -> set[int]:
-            indices: set[int] = set()
-            for child in children:
-                indices.update(range(child["start"], child["end"]))
-            return indices
-
-        if isinstance(value, dict):
-            children = self._split_dict_children(body_lines, base_indent)
-            old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
-            # Line indices that belong to deleted children must be skipped so
-            # that deleting a pipeline actually removes it from the written YAML.
-            deleted_indices: set[int] = set()
-            for old_key, old_child in old_by_key.items():
-                if old_key not in value:
-                    deleted_indices.update(range(old_child["start"], old_child["end"]))
-            new_lines: list[str] = []
-            pos = 0
-            appended_new: list[str] = []
-            for k, v in value.items():
-                child = old_by_key.get(k)
-                if child:
-                    new_lines.extend(
-                        body_lines[i]
-                        for i in range(pos, child["start"])
-                        if i not in deleted_indices
-                    )
-                    old_block = body_lines[child["start"] : child["end"]]
-                    try:
-                        parsed = yaml.safe_load("".join(old_block))
-                        old_value = parsed.get(k) if isinstance(parsed, dict) else None
-                    except Exception:  # noqa: BLE001
-                        old_value = None
-                    if old_value == v:
-                        new_lines.extend(old_block)
-                    else:
-                        new_lines.extend(_build_dict_child(k, v, child))
-                    pos = child["end"]
-                else:
-                    appended_new.extend(_build_dict_child(k, v, None))
-            tail = [
-                body_lines[i]
-                for i in range(pos, len(body_lines))
-                if i not in deleted_indices
-            ]
-            self._splice_appended_children(new_lines, tail, appended_new)
-            return "".join(new_lines)
-
-        if isinstance(value, list) and key == "reflection_pairs":
-            children = self._split_list_children(body_lines, base_indent)
-            old_by_id: dict[str, dict] = {}
-            for child in children:
-                item_id = self._extract_list_item_id(
-                    body_lines[child["start"] : child["end"]]
-                )
-                if item_id:
-                    old_by_id[item_id] = child
-
-            new_lines: list[str] = []
-            pos = 0
-            appended_new: list[str] = []
-            for item in value:
-                if not isinstance(item, dict):
-                    continue
-                item_id = item.get("id")
-                child = old_by_id.get(item_id) if item_id else None
-                if child:
-                    new_lines.extend(body_lines[pos : child["start"]])
-                    old_block = body_lines[child["start"] : child["end"]]
-                    try:
-                        parsed = yaml.safe_load("".join(old_block))
-                        old_value = parsed[0] if isinstance(parsed, list) and parsed else None
-                    except Exception:  # noqa: BLE001
-                        old_value = None
-                    if old_value == item:
-                        new_lines.extend(old_block)
-                    else:
-                        new_lines.extend(_build_list_child(item, child))
-                    pos = child["end"]
-                else:
-                    appended_new.extend(_build_list_child(item, None))
-            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
-            return "".join(new_lines)
-
-        # Fallback for any other shape: replace the whole body with a fresh dump.
-        snippet = yaml.dump(
-            {key: value},
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-        lines = snippet.splitlines(keepends=True)
-        if lines and lines[0].startswith(key + ":"):
-            return "".join(lines[1:])
-        return snippet
-
-    def _update_role_defaults_section(self, key: str, value: Any) -> dict:
-        """Replace one top-level section of ``role-defaults.yaml`` in-place.
-
-        Uses a fine-grained, child-aware edit so that untouched inner keys,
-        list items, and comments keep their original formatting. Only new or
-        changed children are re-serialised with PyYAML. Falls back to a full
-        block dump when the section is missing or its structure is unexpected.
-        Backup + atomic-replace rules mirror :class:`ConfigManager`.
-        """
-        import re
-
-        path = self._role_defaults_path()
-        original_text = path.read_text(encoding="utf-8") if path.exists() else ""
-        text = original_text.replace("\r\n", "\n")
-
-        # Skip the actual write if the parsed content is unchanged.
-        try:
-            parsed_original = yaml.safe_load(original_text) or {}
-        except Exception:  # noqa: BLE001
-            parsed_original = {}
-        if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
-            return {
-                "status": "unchanged",
-                "key": key,
-                "path": str(path.relative_to(self.root)),
-                "backup": None,
-            }
-
-        block_re = re.compile(
-            rf"^{re.escape(key)}:\s*(?:\n|$)"
-            rf"(?P<body>.*?)"
-            rf"(?=\n^[A-Za-z0-9_\-]+:\s*(?:\n|$)|\Z)",
-            re.MULTILINE | re.DOTALL,
-        )
-        match = block_re.search(text)
-        if not match:
-            snippet = yaml.dump(
-                {key: value},
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-            new_text = text.rstrip("\n") + "\n\n" + snippet
-        else:
-            section_start = match.start()
-            section_end = match.end()
-            header = text[section_start : match.start("body")]
-            body_lines = match.group("body").splitlines(keepends=True)
-            new_body = self._build_role_defaults_section_body(key, value, body_lines)
-            new_text = text[:section_start] + header + new_body + text[section_end:]
-
-        cm = self.__class__.config_manager
-        if path.exists():
-            backup = cm._backup(path)
-            cm._prune_backups(path)
-        else:
-            backup = None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(new_text, encoding="utf-8")
-        os.replace(tmp, path)
-        return {
-            "status": "saved",
-            "key": key,
-            "path": str(path.relative_to(self.root)),
-            "backup": backup,
-        }
+        """Delegates to :meth:`PipelineService.read_single_pipeline` (issue #572)."""
+        return self._pipeline_service().read_single_pipeline(name)
 
     def _write_pipelines(self, pipelines: dict) -> dict:
-        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``."""
-        return self._update_role_defaults_section("quality_pipelines", pipelines)
+        """Delegates to :meth:`PipelineService.write_pipelines` (issue #572)."""
+        return self._pipeline_service().write_pipelines(pipelines)
 
     def _write_single_pipeline(self, name: str, pipeline: dict) -> dict:
-        """Create or update a single pipeline by name."""
-        all_pipelines = self._read_pipelines().get("pipelines", {})
-        all_pipelines[name] = pipeline
-        result = self._write_pipelines(all_pipelines)
-        result["pipeline"] = pipeline
-        result["name"] = name
-        return result
+        """Delegates to :meth:`PipelineService.write_single_pipeline` (issue #572)."""
+        return self._pipeline_service().write_single_pipeline(name, pipeline)
 
     def _delete_pipeline(self, name: str) -> dict:
-        """Delete a single pipeline by name."""
-        all_pipelines = self._read_pipelines().get("pipelines", {})
-        if name not in all_pipelines:
-            raise FileNotFoundError(f"pipeline not found: {name}")
-        del all_pipelines[name]
-        result = self._write_pipelines(all_pipelines)
-        result["deleted"] = name
-        return result
-
-    def _write_reflection_pairs(self, pairs: list) -> dict:
-        """Replace ONLY the ``reflection_pairs`` key in ``role-defaults.yaml``."""
-        result = self._update_role_defaults_section("reflection_pairs", pairs)
-        result["reflection_pairs"] = pairs
-        result["count"] = len(pairs)
-        return result
+        """Delegates to :meth:`PipelineService.delete_pipeline` (issue #572)."""
+        return self._pipeline_service().delete_pipeline(name)
 
     def _pipeline_help(self) -> dict:
-        """Return comprehensive help documentation for the pipelines API."""
-        pipeline_names = list(self._read_pipelines().get("pipelines", {}).keys())
-        return {
-            "help": {
-                "title": "Quality Pipelines API",
-                "version": self.__class__.version,
-                "description": (
-                    "Quality Pipelines define multi-stage workflows for agent orchestration. "
-                    "Each pipeline consists of sequential, parallel, loop, or conditional stages "
-                    "that delegate work to specific agents."
-                ),
-                "endpoints": {
-                    "GET /api/pipelines": {
-                        "description": "List all pipelines with their full stage definitions.",
-                        "response": '{"pipelines": {"<name>": {...}}}',
-                    },
-                    "GET /api/pipelines?help": {
-                        "description": "Show this help documentation.",
-                        "response": '{"help": {...}}',
-                    },
-                    "GET /api/pipelines/<name>": {
-                        "description": "Get a single pipeline by name.",
-                        "response": '{"pipeline": {...}}',
-                        "example": f"/api/pipelines/{pipeline_names[0]}" if pipeline_names else "/api/pipelines/standard-feature",
-                    },
-                    "PUT /api/pipelines": {
-                        "description": "Replace ALL pipelines (whole-file replace with backup).",
-                        "body": '{"pipelines": {"<name>": {...}}}',
-                        "warning": "This replaces the entire quality_pipelines block. Use with care.",
-                    },
-                    "PUT /api/pipelines/<name>": {
-                        "description": "Create or update a single pipeline by name.",
-                        "body": '{"description": "...", "stages": [...], "on_error": "..."}',
-                    },
-                    "DELETE /api/pipelines/<name>": {
-                        "description": "Delete a single pipeline by name.",
-                        "response": '{"deleted": "<name>"}',
-                    },
-                },
-                "pipeline_structure": {
-                    "description": "string — human-readable description of the pipeline",
-                    "on_error": "enum: escalate_to_orchestrator | skip | abort | retry",
-                    "stages": [
-                        {
-                            "id": "string — unique stage identifier within the pipeline",
-                            "agent": "string — role name of the agent to delegate to",
-                            "task": "string — task description for the agent",
-                            "mode": "enum: sequential | parallel_group | fanout | loop | conditional | agent_decision",
-                            "loop": {
-                                "description": "Only required when mode=loop",
-                                "generator": "string — agent that produces output",
-                                "critic": "string — agent that reviews output",
-                                "max_iterations": "integer — loop limit (default 3)",
-                            },
-                            "condition": {
-                                "description": "Only required when mode=conditional",
-                                "type": "agent_decision",
-                                "agent": "string — agent making the decision",
-                            },
-                            "parallel_group": {
-                                "description": "Only required when mode=parallel_group",
-                                "items": [{"agent": "string", "task": "string"}],
-                            },
-                        }
-                    ],
-                },
-                "stage_modes_explained": {
-                    "sequential": "Run one agent after another in sequence.",
-                    "parallel_group": "Run multiple agents in parallel (fixed list).",
-                    "fanout": "Split work across N independent instances of the same agent.",
-                    "loop": "Generator→Critic loop for iterative refinement (e.g. implement→review).",
-                    "conditional": "Agent decides which path to take next.",
-                    "agent_decision": "Similar to conditional — agent makes a programmatic decision.",
-                },
-                "available_pipelines": pipeline_names,
-            },
-        }
+        """Delegates to :meth:`PipelineService.pipeline_help` (issue #572)."""
+        return self._pipeline_service().pipeline_help()
 
     def _read_reflection_pairs(self) -> dict:
-        """Return the ``reflection_pairs`` block from ``role-defaults.yaml``.
-
-        Envelope shape: ``{"reflection_pairs": [...]}``. The list is always
-        returned (empty if absent).
-        """
-        path = self._role_defaults_path()
-        if not path.exists():
-            return {"reflection_pairs": []}
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        pairs = data.get("reflection_pairs") or []
-        if not isinstance(pairs, list):
-            pairs = []
-        return {"reflection_pairs": pairs}
+        """Delegates to :meth:`ReflectionService.read_reflection_pairs` (issue #572)."""
+        return self._reflection_service().read_reflection_pairs()
 
     def _read_reflection_pair(self, pair_id: str) -> dict:
-        """Return a single reflection pair by ``id`` or raise."""
-        for pair in self._read_reflection_pairs().get("reflection_pairs", []):
-            if isinstance(pair, dict) and pair.get("id") == pair_id:
-                return {"reflection_pair": pair}
-        raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+        """Delegates to :meth:`ReflectionService.read_reflection_pair` (issue #572)."""
+        return self._reflection_service().read_reflection_pair(pair_id)
+
+    def _write_reflection_pairs(self, pairs: list) -> dict:
+        """Delegates to :meth:`ReflectionService.write_reflection_pairs` (issue #572)."""
+        return self._reflection_service().write_reflection_pairs(pairs)
 
     def _ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
-        """Return a valid id for a reflection pair, generating one if missing."""
-        if pair_id:
-            pair["id"] = pair_id
-            return pair_id
-        if not pair.get("id"):
-            existing = self._read_reflection_pairs().get("reflection_pairs", [])
-            base = pair.get("generator", "pair") + "-" + pair.get("critic", "critic")
-            idx = 1
-            candidate = f"{base}-{idx}"
-            old_ids = {p.get("id") for p in existing if isinstance(p, dict)}
-            while candidate in old_ids:
-                idx += 1
-                candidate = f"{base}-{idx}"
-            pair["id"] = candidate
-        return pair["id"]
+        """Delegates to :meth:`ReflectionService.ensure_pair_id` (issue #572)."""
+        return self._reflection_service().ensure_pair_id(pair, pair_id)
 
     def _write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
-        """Create or update a single reflection pair by id."""
-        self._ensure_pair_id(pair, pair_id)
-        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
-        found = False
-        for i, existing in enumerate(pairs):
-            if isinstance(existing, dict) and existing.get("id") == pair_id:
-                pairs[i] = pair
-                found = True
-                break
-        if not found:
-            pairs.append(pair)
-        result = self._write_reflection_pairs(pairs)
-        result["reflection_pair"] = pair
-        return result
+        """Delegates to :meth:`ReflectionService.write_reflection_pair` (issue #572)."""
+        return self._reflection_service().write_reflection_pair(pair_id, pair)
 
     def _delete_reflection_pair(self, pair_id: str) -> dict:
-        """Delete a single reflection pair by id."""
-        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
-        new_pairs = [p for p in pairs if not (isinstance(p, dict) and p.get("id") == pair_id)]
-        if len(new_pairs) == len(pairs):
-            raise FileNotFoundError(f"reflection pair not found: {pair_id}")
-        result = self._write_reflection_pairs(new_pairs)
-        result["deleted"] = pair_id
-        return result
+        """Delegates to :meth:`ReflectionService.delete_reflection_pair` (issue #572)."""
+        return self._reflection_service().delete_reflection_pair(pair_id)
 
 
     def _deep_merge(self, base: Any, override: Any) -> Any:
@@ -4383,112 +4731,25 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except SyncError as exc:
                 raise ValueError(str(exc)) from exc
 
-    def _read_template_description(self, role: str) -> str:
-        """Read the description from a generated agent template's frontmatter."""
-        try:
-            path = self._template_path(role)
-        except SecurityError:
-            return ""
-        if not path or not path.exists():
-            return ""
-        with path.open("r", encoding="utf-8") as fh:
-            text = fh.read()
-        if not text.startswith("---"):
-            return ""
-        try:
-            _, front, _ = text.split("---", 2)
-            front_data = yaml.safe_load(front) or {}
-            desc = front_data.get("description")
-            if isinstance(desc, str):
-                return desc.strip()
-        except Exception:  # noqa: BLE001, S110
-            pass
-        return ""
-
     def _list_agent_templates(self) -> dict:
-        """Return the list of agent templates available for generation.
-
-        Searches the top-level ``agents/1-generic`` first and falls back to the
-        submodule layout ``.agent-meta/agents/1-generic`` when agent-meta is
-        embedded in a target project.
-        """
-        templates_dir = resolve_asset(self.__class__.root, "agents", "1-generic")
-        if not templates_dir.is_dir():
-            return {"templates": [], "available": False}
-        names = sorted(
-            p.stem for p in templates_dir.glob("*.md")
-            if p.is_file() and not p.name.startswith("_")
-        )
-        return {"templates": names, "available": True}
+        """Delegates to :meth:`TemplateService.list_agent_templates` (issue #572)."""
+        return self._template_service().list_agent_templates()
 
     def _ai_providers_path(self) -> Path:
-        """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
-        return resolve_asset(self.__class__.root, "config", "ai-providers.yaml")
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._ai_providers_path()
 
     def _list_providers(self) -> list[dict]:
-        """Return the configured AI providers with their model tiers/aliases."""
-        path = self._ai_providers_path()
-        if not path.exists():
-            return []
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        providers = data.get("providers") or {}
-        if not isinstance(providers, dict):
-            return []
-        out: list[dict] = []
-        for name, conf in providers.items():
-            if not isinstance(conf, dict):
-                continue
-            tiers = conf.get("model-tiers") or {}
-            aliases = conf.get("model-aliases") or {}
-            if not isinstance(tiers, dict):
-                tiers = {}
-            if not isinstance(aliases, dict):
-                aliases = {}
-            out.append({
-                "name": name,
-                "display_name": conf.get("display-name") or name,
-                "has_model_tiers": bool(tiers),
-                "model_tiers": tiers,
-                "model_aliases": aliases,
-            })
-        out.sort(key=lambda p: p["name"].lower())
-        return out
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_providers()
 
     def _list_platforms(self) -> list[dict]:
-        """Return distinct platform prefixes derived from ``agents/2-platform/``."""
-        names: set[str] = {"agent-meta", "generic"}
-        known_roles = sorted(
-            (r["name"] for r in self._list_roles()),
-            key=len,
-            reverse=True,
-        )
-        platform_dir = resolve_asset(self.__class__.root, "agents", "2-platform")
-        if platform_dir.is_dir():
-            for entry in platform_dir.glob("*.md"):
-                stem = entry.stem
-                if "-" not in stem:
-                    continue
-                prefix = None
-                for role in known_roles:
-                    suffix = f"-{role}"
-                    if stem.endswith(suffix) and len(stem) > len(suffix):
-                        prefix = stem[: -len(suffix)]
-                        break
-                if prefix is None:
-                    prefix = stem.rsplit("-", 1)[0]
-                if prefix:
-                    names.add(prefix)
-        return [{"name": n} for n in sorted(names, key=str.lower)]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_platforms()
 
     def _list_roles(self) -> list[dict]:
-        """Return the role names declared in ``role-defaults.yaml``."""
-        hierarchy = self._build_agent_hierarchy()
-        rolenames = sorted(
-            (r.get("name") for r in hierarchy.get("roles") or [] if r.get("name")),
-            key=str.lower,
-        )
-        return [{"name": n} for n in rolenames]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_roles()
 
     def _audit_paths(self) -> list[Path]:
         """Return the set of config/agent files to audit."""
@@ -4563,78 +4824,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return self._send_bytes(path.read_bytes(), "text/markdown; charset=utf-8")
 
     def _write_template(self, role: str) -> None:
-        """Write an agent template back to disk."""
+        """Write an agent template back to disk.
+
+        HTTP glue only — validation and the atomic write live in
+        :meth:`TemplateService.write_template` (issue #572).
+        """
         body = self._read_body()
-        if body is None:
-            raise ValueError("empty body")
-        # Frontend sends JSON: {"content": "..."}. Accept the parsed dict and
-        # extract the content field. A bare string body is tolerated for
-        # backward compatibility with plain-text clients.
-        if isinstance(body, dict):
-            content = body.get("content")
-        elif isinstance(body, str):
-            content = body
-        else:
-            content = None
-        if not isinstance(content, str):
-            raise ValueError("expected 'content' field with template text")  # noqa: TRY004
-        path = self._template_path(role)
-        if not path:
-            raise FileNotFoundError(f"template not found: {role}")
-        cm = self.__class__.config_manager
-        if path.exists():
-            backup = cm._backup(path)
-            cm._prune_backups(path)
-        else:
-            backup = None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(content, encoding="utf-8")
-        os.replace(tmp, path)
-        return self._send_json({
-            "status": "saved",
-            "role": role,
-            "backup": backup,
-            "bytes": len(content.encode("utf-8")),
-        })
+        return self._send_json(self._template_service().write_template(role, body))
 
     def _template_path(self, role: str) -> Path | None:
-        """Resolve the template path sync.py would actually use for this role.
-
-        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
-        sync.py itself uses (1-generic < 2-platform < 3-project, scoped to
-        this project's own active ``platforms`` list, in list order). A
-        previous version of this method globbed ALL of
-        ``agents/2-platform/*.md`` for any file ending in ``-{role}``,
-        regardless of whether that platform was even active for this
-        project — with several platforms shipping a same-named override
-        (e.g. ``sharkord-developer.md``, ``homeassistant-developer.md``,
-        ``agent-meta-developer.md``), the glob's filesystem-order-dependent
-        first match could silently load AND SAVE an unrelated platform's
-        file while telling the user "Loaded developer.md".
-        """
-        if not role or any(c in role for c in ("/", "\\", "..")):
-            raise SecurityError(f"invalid role name: {role!r}")
-        safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
-        if safe != role:
-            raise SecurityError(f"invalid role name: {role!r}")
-        agent_meta_root = self._agent_meta_root()
-        candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
-        try:
-            project_root = self.__class__.root
-            _ensure_scripts_on_path(project_root)
-            from lib.agents import collect_sources  # type: ignore[import]
-            project_config = self.__class__.config_manager.read("project") or {}
-            active_platforms = project_config.get("platforms", [])
-            overrides, _ = collect_sources(agent_meta_root, active_platforms)
-            resolved = overrides.get(role)
-            if resolved is not None:
-                return resolved
-        except Exception:  # noqa: BLE001
-            # Fall through to the plain generic-template path — better to
-            # edit the generic base than to error out of the Templates page.
-            pass
-        return candidate
+        """Delegates to :meth:`TemplateService.template_path` (issue #572)."""
+        return self._template_service().template_path(role)
 
     def _stream_events(self) -> None:
         """SSE endpoint that streams configuration change events."""
