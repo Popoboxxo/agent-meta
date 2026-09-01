@@ -76,6 +76,11 @@ Jedes Hook-Skript beginnt mit Metadaten-Kommentaren:
 | `description` | Text | Kurzbeschreibung |
 | `enabled_by_default` | `true`/`false` | Nur Dokumentation — sync.py ignoriert dieses Feld; Opt-in via Config |
 
+**Ausführbarkeits-Bit (issue #601):** von `sync.py` generierte Hook-Kopien in `<hooks_dir>/*.sh`
+haben absichtlich **kein** `+x` (`chmod 755`) — sie werden ausschließlich über
+`bash <hooks_dir>/<datei>.sh` aufgerufen (siehe `settings.json`-Eintrag unten), nie direkt
+ausgeführt. Kein `chmod +x` nötig, kein Bug.
+
 ---
 
 ## Hook aktivieren (Projekt Opt-in)
@@ -149,7 +154,9 @@ Claude Code führt Hooks als Shell-Befehle aus. Das Skript:
 - Empfängt JSON-Kontext via **stdin**
 - Gibt Feedback via **stdout/stderr** (wird Claude als Kontext angezeigt)
 - **Exit 0**: Tool-Aufruf erlaubt
-- **Exit 2**: Tool-Aufruf blockiert (stdout wird Claude angezeigt)
+- **Exit 2**: Tool-Aufruf blockiert — **nur stderr** wird Claude als Blockierungsgrund angezeigt,
+  stdout wird bei Exit 2 ignoriert (issue #396/#593 — jeder Hook in diesem Repo schreibt seine
+  Block-Begründung deshalb konsequent nach stderr, siehe `orchestrator-guard.sh`-Header-Kommentar)
 - **Anderer Exit-Code ≠ 0**: Fehler (wird geloggt)
 
 **Stdin-Format (Claude Code):**

@@ -478,6 +478,94 @@ def sync_release_gates(
         )
 
 
+HOOK_LIB_SUBDIR = "lib"
+
+
+def sync_hook_lib(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
+) -> None:
+    """Copy shared hook helper scripts to <hooks_dir>/lib/.
+
+    Issue #601: several hook scripts duplicated the same JSON-parsing
+    Python heredoc. hooks/1-generic/lib/hook_common.sh centralizes the
+    common helpers (JSON field extraction, python3/python resolution,
+    credential redaction, audit-log append+rotation) as functions the
+    individual hook scripts `source`. This is plain library code, not a
+    hook — never registered in settings.json, no `event`/`matcher`
+    metadata expected on its files.
+
+    Same 0-external / 1-generic / 2-platform layering as
+    collect_hook_sources() (via the ``subdir`` parameter), same
+    always-copied / .agent-meta-managed-tracked / never-touch-project-owned-
+    files pattern as sync_release_gates(). Security-boundary hooks
+    (orchestrator-guard.sh, dod-push-check.sh) fail CLOSED if this file is
+    missing when they try to source it (issue #595) — so this function
+    must run in the same sync pass as sync_hooks(), never independently.
+    """
+    pc = (provider_config or {}).get(provider, {})
+    hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
+
+    platforms = config.get("platforms", [])
+    sources = collect_hook_sources(agent_meta_root, platforms, subdir=HOOK_LIB_SUBDIR)
+
+    target_dir = project_root / hooks_dir_rel / HOOK_LIB_SUBDIR
+    managed_index_path = target_dir / ".agent-meta-managed"
+
+    previously_managed: set[str] = set()
+    if managed_index_path.exists():
+        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                previously_managed.add(line.strip())
+
+    if not sources and not previously_managed:
+        return  # nothing shipped, nothing to clean up
+
+    now_managed: set[str] = set()
+
+    if not dry_run and sources:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    for source_path, output_name in sources:
+        target_path = safe_path(target_dir, output_name)
+        source_content = source_path.read_text(encoding="utf-8")
+
+        now_managed.add(output_name)
+        rel_out = str(target_path.relative_to(project_root))
+        rel_source = str(source_path.relative_to(agent_meta_root))
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
+                log.action("COPY", rel_out, rel_source)
+            else:
+                log.skip(rel_out, "unchanged")
+        except Exception as exc:
+            log.warning(f"Failed to deploy hook lib file {rel_out}: {exc}")
+            continue
+
+    # Remove stale shipped lib files — never touches project-owned files
+    # dropped directly into <hooks_dir>/lib/ (not tracked here).
+    if target_dir.exists():
+        for existing in sorted(target_dir.glob("*.sh")):
+            if existing.name not in now_managed and existing.name in previously_managed:
+                log.action("DELETE", str(existing.relative_to(project_root)),
+                           "hook lib file removed from agent-meta sources")
+                if not dry_run:
+                    existing.unlink()
+
+    if not dry_run and now_managed:
+        managed_index_path.parent.mkdir(parents=True, exist_ok=True)
+        managed_index_path.write_text(
+            "\n".join(sorted(now_managed)) + "\n", encoding="utf-8"
+        )
+
+
 def create_hook(
     project_root: Path,
     name: str,

@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: viz-log
-# version: 1.0.0
+# version: 1.1.0
 # event: PreToolUse
 # description: Automatically logs all tool calls to .meta-viz/events.jsonl for session visualization
 # enabled_by_default: false
@@ -9,6 +9,11 @@
 # It is ONLY copied and enabled when viz.mode is "dynamic" or "full".
 # When viz.mode is "off" or "static", sync.py removes this hook automatically.
 
+set -uo pipefail
+
+# Not a security boundary (best-effort session-visualization logging only)
+# — fails open (exit 0) if python3 is unavailable, same as before (issue
+# #595 only hardens the two hooks that are actual security controls).
 command -v python3 &>/dev/null || exit 0
 
 read -r -d '' _VIZ_LOG <<'PYEOF'

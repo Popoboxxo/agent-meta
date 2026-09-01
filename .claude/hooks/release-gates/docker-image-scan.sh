@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: docker-image-scan
-# version: 1.0.0
+# version: 1.1.0
 # event: Manual
 # description: Pre-release gate — scans Docker base images (FROM lines) with trivy for HIGH/CRITICAL CVEs before release
 # enabled_by_default: false
@@ -11,7 +11,7 @@
 # self-skip (disabled, or prerequisites missing). Exit non-zero = fail,
 # blocks the release.
 
-set -u
+set -uo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 cd "$PROJECT_ROOT" || exit 1
@@ -57,7 +57,7 @@ images=$(grep -iE '^FROM\s' "$DOCKERFILE" | awk '{print $2}')
 HAD_FAILURE=false
 while IFS= read -r image; do
   [ -z "$image" ] && continue
-  if echo "$stage_names" | grep -qxF "$image"; then
+  if printf '%s' "$stage_names" | grep -qxF "$image"; then
     continue  # reference to an earlier build stage, not a pullable image
   fi
   echo "[INFO] $GATE_NAME: scanning $image"

@@ -118,3 +118,109 @@ def test_push_of_nonexistent_ref_falls_back_to_branch_guard(repo_on_main):
     # fail closed, keep the Branch-Guard active.
     result = _run_hook(repo_on_main, "git push origin does-not-exist")
     assert result.returncode == 2
+
+
+# --- issue #593: block-reason messages must go to stderr, not stdout ------
+
+def test_branch_guard_block_reason_goes_to_stderr(repo_on_main):
+    result = _run_hook(repo_on_main, "git push")
+    assert result.returncode == 2
+    assert "Branch-Guard" in result.stderr
+    assert "Branch-Guard" not in result.stdout
+
+
+# --- issue #595: fail CLOSED (not open) when python3 is unavailable -------
+
+def test_fails_closed_without_python3(repo_on_main, tmp_path):
+    """Manipulating PATH to hide python3 must BLOCK the push (exit 2, with
+    a clear stderr reason), not silently allow it through -- the opposite
+    of the pre-#595 behavior (`command -v python3 || exit 0`)."""
+    minimal_bin = tmp_path / "minimal-bin"
+    minimal_bin.mkdir()
+    for tool in ("bash", "cat", "dirname", "mkdir", "date", "printf", "tr",
+                 "head", "sed", "grep", "basename", "sh", "mv", "wc", "tail",
+                 "chmod", "git"):
+        found = shutil.which(tool)
+        if found:
+            (minimal_bin / tool).symlink_to(found)
+
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git push"},
+        "cwd": repo_on_main.as_posix(),
+    }
+    env = {"PATH": str(minimal_bin)}
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(repo_on_main),
+        env=env,
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "python3" in result.stderr.lower()
+
+
+# --- issue #594: SHA-keyed result cache + timeout --------------------------
+
+@pytest.fixture
+def repo_on_feature_branch(tmp_path):
+    """A repo on a non-main feature branch (so the Branch-Guard never
+    triggers), with a committed .meta-config/project.yaml the hook can
+    discover via its upward directory walk."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run = lambda *args: subprocess.run(  # noqa: E731
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+    )
+    run("init", "-q")
+    run("config", "user.email", "test@example.com")
+    run("config", "user.name", "Test")
+    run("checkout", "-q", "-b", "feat/x")
+    (repo / "f.txt").write_text("x", encoding="utf-8")
+    run("add", "f.txt")
+    run("commit", "-q", "-m", "init")
+    return repo
+
+
+def _run_hook_with_config(repo: Path, command: str, project_yaml: str) -> subprocess.CompletedProcess:
+    (repo / ".meta-config").mkdir(exist_ok=True)
+    (repo / ".meta-config" / "project.yaml").write_text(project_yaml, encoding="utf-8")
+    return _run_hook(repo, command)
+
+
+def test_second_push_of_same_commit_hits_cache(repo_on_feature_branch):
+    project_yaml = "variables:\n  TEST_COMMAND: \"echo running && exit 0\"\n"
+    first = _run_hook_with_config(repo_on_feature_branch, "git push origin feat/x", project_yaml)
+    assert first.returncode == 0, f"stdout={first.stdout!r} stderr={first.stderr!r}"
+    assert "running" in first.stdout
+
+    second = _run_hook(repo_on_feature_branch, "git push origin feat/x")
+    assert second.returncode == 0
+    assert "cached" in second.stdout.lower()
+    assert "running" not in second.stdout  # test command was NOT re-run
+
+
+def test_cache_invalidated_by_new_commit(repo_on_feature_branch):
+    project_yaml = "variables:\n  TEST_COMMAND: \"echo running && exit 0\"\n"
+    first = _run_hook_with_config(repo_on_feature_branch, "git push origin feat/x", project_yaml)
+    assert first.returncode == 0
+
+    subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "second"],
+                    cwd=str(repo_on_feature_branch), capture_output=True, text=True, check=True)
+    second = _run_hook(repo_on_feature_branch, "git push origin feat/x")
+    assert second.returncode == 0
+    assert "cached" not in second.stdout.lower()
+    assert "running" in second.stdout  # test command WAS re-run for the new commit
+
+
+def test_hanging_test_command_is_killed_by_timeout(repo_on_feature_branch):
+    project_yaml = (
+        "variables:\n"
+        "  TEST_COMMAND: \"sleep 5\"\n"
+        "  TEST_TIMEOUT: \"1\"\n"
+    )
+    result = _run_hook_with_config(repo_on_feature_branch, "git push origin feat/x", project_yaml)
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "TIMED OUT" in result.stderr
