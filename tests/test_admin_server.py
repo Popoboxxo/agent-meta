@@ -120,6 +120,81 @@ class TestBackupCreation(unittest.TestCase):
             backups = list((root / ".meta-config").glob("project.yaml.bak.*"))
             self.assertLessEqual(len(backups), admin_server.MAX_BACKUPS)
 
+    def test_backup_timestamp_is_timezone_aware_utc(self) -> None:
+        """Issue #589: backup stamps must be UTC, not naive local time —
+        unambiguous across instances/hosts in different timezones."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            mgr = admin_server.ConfigManager(root, mode="project_admin")
+            mgr.write("project", {"version": 1})
+            mgr.write("project", {"version": 2})
+            backups = list((root / ".meta-config").glob("project.yaml.bak.*"))
+            self.assertEqual(len(backups), 1)
+            stamp = backups[0].name.split(".bak.", 1)[1]
+            self.assertTrue(stamp.endswith("_UTC"), f"stamp {stamp!r} must end with _UTC")
+            # e.g. "20260831_154230_UTC" -> the datetime portion must parse.
+            from datetime import datetime as _dt  # noqa: PLC0415
+            _dt.strptime(stamp[:-len("_UTC")], "%Y%m%d_%H%M%S")
+
+
+class TestProjectYamlPermissions(unittest.TestCase):
+    """Issue #589: project.yaml can hold a plaintext admin token — writes
+    must restrict it to owner-only, and startup should warn if it isn't."""
+
+    def test_write_sets_owner_only_permissions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            mgr = admin_server.ConfigManager(root, mode="project_admin")
+            mgr.write("project", {"admin-ui": {"token": "secret123"}})
+            path = root / ".meta-config" / "project.yaml"
+            mode = path.stat().st_mode & 0o777
+            self.assertEqual(mode, 0o600)
+
+    def test_super_admin_config_files_are_not_forced_to_0600(self) -> None:
+        """SUPER_ADMIN_FILES (config/*.yaml) are framework templates meant to
+        be git-committed/shared — only PROJECT_FILES (.meta-config/*) hold
+        per-instance secrets and get the owner-only restriction."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "config").mkdir()
+            mgr = admin_server.ConfigManager(root, mode="super_admin")
+            mgr.write("role-defaults", {"roles": []})
+            path = root / "config" / "role-defaults.yaml"
+            mode = path.stat().st_mode & 0o777
+            self.assertNotEqual(mode, 0o600)
+
+    def test_warns_on_world_readable_project_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            path = root / ".meta-config" / "project.yaml"
+            path.write_text("admin-ui:\n  token: secret\n", encoding="utf-8")
+            os.chmod(path, 0o644)  # world-readable
+            with mock.patch("sys.stderr") as stderr_mock:
+                admin_server._warn_if_world_readable(path)
+            written = "".join(c.args[0] for c in stderr_mock.write.call_args_list if c.args)
+            self.assertIn("WARNING", written)
+            self.assertIn("chmod 600", written)
+
+    def test_no_warning_for_owner_only_project_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            path = root / ".meta-config" / "project.yaml"
+            path.write_text("admin-ui:\n  token: secret\n", encoding="utf-8")
+            os.chmod(path, 0o600)
+            with mock.patch("sys.stderr") as stderr_mock:
+                admin_server._warn_if_world_readable(path)
+            written = "".join(c.args[0] for c in stderr_mock.write.call_args_list if c.args)
+            self.assertNotIn("WARNING", written)
+
+    def test_missing_file_does_not_warn_or_raise(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".meta-config" / "project.yaml"
+            admin_server._warn_if_world_readable(path)  # must not raise
+
 
 # --------------------------------------------------------------------------- #
 # Security checks                                                             #
@@ -446,6 +521,402 @@ class TestBindHostEnforcement(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Token verification (_verify_token / _check_token) — issue #569             #
+# --------------------------------------------------------------------------- #
+
+
+class TestVerifyToken(unittest.TestCase):
+    """``_verify_token`` is the single constant-time comparison primitive
+    backing all token checks. It must reject missing/empty input and use
+    ``hmac.compare_digest`` rather than ``==`` (timing-attack defence)."""
+
+    def test_matching_tokens_return_true(self) -> None:
+        self.assertTrue(admin_server._verify_token("secret123", "secret123"))
+
+    def test_mismatched_tokens_return_false(self) -> None:
+        self.assertFalse(admin_server._verify_token("wrong", "secret123"))
+
+    def test_missing_provided_returns_false(self) -> None:
+        self.assertFalse(admin_server._verify_token(None, "secret123"))
+        self.assertFalse(admin_server._verify_token("", "secret123"))
+
+    def test_missing_expected_returns_false(self) -> None:
+        self.assertFalse(admin_server._verify_token("secret123", None))
+        self.assertFalse(admin_server._verify_token("secret123", ""))
+
+    def test_uses_constant_time_comparison(self) -> None:
+        """Regression guard: a naive ``==`` swap would still pass the
+        matching/mismatching tests above but silently reintroduce a timing
+        side-channel — assert the actual primitive used."""
+        with mock.patch.object(admin_server.hmac, "compare_digest",
+                                wraps=admin_server.hmac.compare_digest) as spy:
+            admin_server._verify_token("abc", "abc")
+        spy.assert_called_once_with(b"abc", b"abc")
+
+
+class TestCheckToken(unittest.TestCase):
+    """``AdminRequestHandler._check_token`` gates every non-public endpoint.
+    Covers Bearer-header and query-parameter extraction, and the no-token
+    (loopback-only) bypass."""
+
+    def _make_handler(self, *, admin_token: str | None, path: str = "/api/status",
+                       headers: dict[str, str] | None = None) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.admin_token = admin_token
+        handler.headers = headers or {}
+        handler.path = path
+        return handler
+
+    def tearDown(self) -> None:
+        admin_server.AdminRequestHandler.admin_token = None
+
+    def test_no_token_configured_is_noop(self) -> None:
+        handler = self._make_handler(admin_token=None)
+        # Must not raise even without any Authorization header.
+        handler._check_token()
+
+    def test_missing_token_raises_auth_error(self) -> None:
+        handler = self._make_handler(admin_token="secret123")
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token()
+
+    def test_malformed_bearer_prefix_raises_auth_error(self) -> None:
+        handler = self._make_handler(
+            admin_token="secret123",
+            headers={"Authorization": "Basic secret123"},
+        )
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token()
+
+    def test_mismatched_bearer_token_raises_auth_error(self) -> None:
+        handler = self._make_handler(
+            admin_token="secret123",
+            headers={"Authorization": "Bearer wrong-token"},
+        )
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token()
+
+    def test_valid_bearer_token_passes(self) -> None:
+        handler = self._make_handler(
+            admin_token="secret123",
+            headers={"Authorization": "Bearer secret123"},
+        )
+        handler._check_token()  # must not raise
+
+    def test_query_param_token_rejected_by_default(self) -> None:
+        """Bearer-only by default (issue #577) — a valid ``?token=`` alone,
+        without ``allow_query_token=True``, must NOT authenticate."""
+        handler = self._make_handler(
+            admin_token="secret123",
+            path="/api/status?token=secret123",
+        )
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token()
+
+    def test_valid_query_param_token_passes_when_explicitly_allowed(self) -> None:
+        """The ``allow_query_token`` opt-in exists solely for ``/api/events``
+        (EventSource cannot set an Authorization header) — verified here at
+        the ``_check_token`` unit level."""
+        handler = self._make_handler(
+            admin_token="secret123",
+            path="/api/events?token=secret123",
+        )
+        handler._check_token(allow_query_token=True)  # must not raise
+
+    def test_mismatched_query_param_token_raises_auth_error_when_allowed(self) -> None:
+        handler = self._make_handler(
+            admin_token="secret123",
+            path="/api/events?token=wrong",
+        )
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token(allow_query_token=True)
+
+
+class TestQueryTokenRejectedOnApiEndpoints(unittest.TestCase):
+    """End-to-end (do_GET-level) regression coverage for issue #577: the
+    ``?token=`` bypass must be closed for every ``/api/*`` route except the
+    documented ``/api/events`` SSE carve-out."""
+
+    def _make_handler(self, *, admin_token: str, path: str) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.admin_token = admin_token
+        handler.headers = {}
+        handler.path = path
+        return handler
+
+    def tearDown(self) -> None:
+        admin_server.AdminRequestHandler.admin_token = None
+
+    def test_regular_api_path_rejects_query_token(self) -> None:
+        handler = self._make_handler(admin_token="secret123", path="/api/health?token=secret123")
+        self.assertFalse(handler._is_sse_events_path())
+        with self.assertRaises(admin_server.AuthError):
+            handler._check_token(allow_query_token=handler._is_sse_events_path())
+
+    def test_sse_events_path_accepts_query_token(self) -> None:
+        handler = self._make_handler(admin_token="secret123", path="/api/events?token=secret123")
+        self.assertTrue(handler._is_sse_events_path())
+        handler._check_token(allow_query_token=handler._is_sse_events_path())  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# CSRF / DNS-rebinding checks (_check_origin) — issues #569, #588             #
+# --------------------------------------------------------------------------- #
+
+
+class TestCheckOrigin(unittest.TestCase):
+    """``AdminRequestHandler._check_origin`` defends mutating requests
+    against CSRF (cross-origin form/XHR) and DNS rebinding. Contract:
+
+    - Origin header present  → must match an allowed ``http://<host>:<port>``.
+    - Origin header absent   → only the Host header is checked (curl/CLI).
+    - In both cases the Host header must match an allowed ``<host>:<port>``.
+    """
+
+    def _make_handler(self, *, headers: dict[str, str] | None = None,
+                       bind_host: str = "127.0.0.1", bind_port: int = 7420,
+                       allowed_hosts: tuple[str, ...] | None = None) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.bind_host = bind_host
+        admin_server.AdminRequestHandler.bind_port = bind_port
+        admin_server.AdminRequestHandler.allowed_hosts = (
+            allowed_hosts if allowed_hosts is not None else admin_server.DEFAULT_ALLOWED_HOSTS
+        )
+        handler.headers = headers or {}
+        return handler
+
+    def test_missing_origin_matching_host_passes(self) -> None:
+        """curl/CLI case: no Origin header, Host matches the bind host."""
+        handler = self._make_handler(headers={"Host": "127.0.0.1:7420"})
+        handler._check_origin()  # must not raise
+
+    def test_missing_origin_mismatched_host_raises_security_error(self) -> None:
+        """A forged request with a spoofed Host and no Origin must still be
+        rejected — omitting Origin is not a bypass for the Host check."""
+        handler = self._make_handler(headers={"Host": "evil.example.com:7420"})
+        with self.assertRaises(admin_server.SecurityError):
+            handler._check_origin()
+
+    def test_missing_host_header_raises_security_error(self) -> None:
+        handler = self._make_handler(headers={})
+        with self.assertRaises(admin_server.SecurityError):
+            handler._check_origin()
+
+    def test_matching_origin_and_host_passes(self) -> None:
+        handler = self._make_handler(headers={
+            "Origin": "http://127.0.0.1:7420",
+            "Host": "127.0.0.1:7420",
+        })
+        handler._check_origin()  # must not raise
+
+    def test_mismatched_origin_raises_security_error(self) -> None:
+        handler = self._make_handler(headers={
+            "Origin": "http://evil.example.com:7420",
+            "Host": "127.0.0.1:7420",
+        })
+        with self.assertRaises(admin_server.SecurityError):
+            handler._check_origin()
+
+    def test_empty_origin_string_raises_security_error(self) -> None:
+        """An explicit but empty Origin header is present-but-invalid — it
+        must not be treated the same as a fully absent header."""
+        handler = self._make_handler(headers={
+            "Origin": "",
+            "Host": "127.0.0.1:7420",
+        })
+        with self.assertRaises(admin_server.SecurityError):
+            handler._check_origin()
+
+    def test_dns_rebinding_forged_host_rejected_even_with_matching_origin(self) -> None:
+        """DNS-rebinding scenario: attacker page's JS sets a same-origin
+        Origin header for its own (rebound) hostname, but the Host header on
+        the actual TCP connection still reveals the real target. Neither
+        header alone may authorize the request — only bind host/port pairs
+        from ``allowed_hosts``/the actual bind host are accepted."""
+        handler = self._make_handler(headers={
+            "Origin": "http://attacker-controlled.example:7420",
+            "Host": "attacker-controlled.example:7420",
+        })
+        with self.assertRaises(admin_server.SecurityError):
+            handler._check_origin()
+
+
+# --------------------------------------------------------------------------- #
+# Centralized error handling (_handle_error) — issue #581                    #
+# --------------------------------------------------------------------------- #
+
+
+class TestHandleError(unittest.TestCase):
+    """``_handle_error`` must log the full exception server-side and return
+    only a generic, client-safe body — never the raw exception text (file
+    paths, internal state, library internals)."""
+
+    def _make_handler(self) -> Any:
+        return admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+
+    def test_returns_500_and_generic_body(self) -> None:
+        handler = self._make_handler()
+        exc = ValueError("/etc/shadow could not be read by user 'admin'")
+        status, body = handler._handle_error(exc, "ERR_TEST")
+        self.assertEqual(status, 500)
+        self.assertEqual(body, {"error": "ERR_TEST", "message": "Internal server error"})
+        self.assertNotIn("/etc/shadow", json.dumps(body))
+
+    def test_default_error_code_is_err_internal(self) -> None:
+        handler = self._make_handler()
+        _, body = handler._handle_error(ValueError("boom"))
+        self.assertEqual(body["error"], "ERR_INTERNAL")
+
+    def test_logs_full_exception_detail_server_side(self) -> None:
+        handler = self._make_handler()
+        exc = RuntimeError("/home/user/secret-project/config.yaml: line 12")
+        with mock.patch.object(admin_server.logger, "error") as log_mock:
+            handler._handle_error(exc, "ERR_TEST")
+        log_mock.assert_called_once()
+        # The raw exception detail must reach the server-side log...
+        logged_args = log_mock.call_args
+        self.assertIn(exc, logged_args.args)
+        self.assertTrue(logged_args.kwargs.get("exc_info"))
+
+
+class TestHandlerErrorResponsesDoNotLeakExceptionText(unittest.TestCase):
+    """Regression coverage: representative HTTP handlers must not echo raw
+    exception text into their 500 response body (issue #581)."""
+
+    def tearDown(self) -> None:
+        admin_server.AdminRequestHandler.config_manager = None  # type: ignore[assignment]
+
+    def test_get_backups_500_body_has_no_raw_exception_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+            admin_server.AdminRequestHandler.root = root
+            admin_server.AdminRequestHandler.config_manager = mock.Mock(
+                read=mock.Mock(return_value={})
+            )
+            sensitive = "/var/secret/internal-state-leak.yaml: permission denied"
+            captured: dict[str, Any] = {}
+
+            def _fake_send_json(payload, status=200, **kwargs):
+                captured["payload"] = payload
+                captured["status"] = status
+
+            handler._send_json = _fake_send_json  # type: ignore[method-assign]
+
+            import lib.backup  # type: ignore[import]  # noqa: PLC0415
+            with mock.patch.object(lib.backup, "list_backups",
+                                    side_effect=RuntimeError(sensitive)):
+                handler._handle_get_backups()
+
+            self.assertEqual(captured["status"], 500)
+            body_text = json.dumps(captured["payload"])
+            self.assertNotIn(sensitive, body_text)
+            self.assertNotIn("/var/secret", body_text)
+            self.assertEqual(captured["payload"], {
+                "error": "ERR_BACKUPS", "message": "Internal server error",
+            })
+
+
+# --------------------------------------------------------------------------- #
+# sys.path stability (_ensure_scripts_on_path) — issue #584                  #
+# --------------------------------------------------------------------------- #
+
+
+class TestReadBodySizeLimit(unittest.TestCase):
+    """``_read_body`` must reject oversized requests before reading them into
+    memory (issue #585)."""
+
+    def _make_handler(self, *, content_length: int, rfile: Any = None) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        handler.headers = {"Content-Length": str(content_length)}
+        handler.rfile = rfile
+        return handler
+
+    def test_body_within_limit_is_read_normally(self) -> None:
+        import io  # noqa: PLC0415
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        handler = self._make_handler(
+            content_length=len(payload), rfile=io.BytesIO(payload))
+        self.assertEqual(handler._read_body(), {"ok": True})
+
+    def test_oversized_content_length_raises_before_reading(self) -> None:
+        class _ExplodingRfile:
+            def read(self, n):
+                raise AssertionError("rfile.read() must not be called for an oversized body")
+
+        handler = self._make_handler(
+            content_length=admin_server.MAX_BODY_SIZE + 1,
+            rfile=_ExplodingRfile(),
+        )
+        with self.assertRaises(admin_server.PayloadTooLargeError):
+            handler._read_body()
+
+    def test_content_length_exactly_at_limit_is_accepted(self) -> None:
+        import io  # noqa: PLC0415
+        # Exactly MAX_BODY_SIZE bytes of padding around valid-enough JSON is
+        # wasteful to construct; use a small payload but assert the *check*
+        # itself uses "> MAX_BODY_SIZE" (strictly greater), not ">=".
+        payload = json.dumps({"a": "b"}).encode("utf-8")
+        handler = self._make_handler(content_length=len(payload), rfile=io.BytesIO(payload))
+        self.assertLessEqual(len(payload), admin_server.MAX_BODY_SIZE)
+        self.assertEqual(handler._read_body(), {"a": "b"})
+
+    def test_put_returns_413_for_oversized_body(self) -> None:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.admin_token = None
+        handler.headers = {"Content-Length": str(admin_server.MAX_BODY_SIZE + 1)}
+
+        def _raise_check_origin():
+            return None
+
+        handler._check_origin = _raise_check_origin  # type: ignore[method-assign]
+
+        def _raise_too_large():
+            raise admin_server.PayloadTooLargeError("request body of 999 bytes exceeds the limit")
+
+        handler._dispatch_put = _raise_too_large  # type: ignore[method-assign]
+
+        captured: dict[str, Any] = {}
+
+        def _fake_send_json(payload, status=200, **kwargs):
+            captured["payload"] = payload
+            captured["status"] = status
+
+        handler._send_json = _fake_send_json  # type: ignore[method-assign]
+        handler.do_PUT()
+        self.assertEqual(captured["status"], 413)
+        self.assertEqual(captured["payload"]["error"], "payload_too_large")
+
+
+class TestEnsureScriptsOnPath(unittest.TestCase):
+    """``_ensure_scripts_on_path`` must not grow ``sys.path`` unboundedly
+    across repeated calls (e.g. once per HTTP request in the real server)."""
+
+    def setUp(self) -> None:
+        self._orig_sys_path = list(sys.path)
+
+    def tearDown(self) -> None:
+        sys.path[:] = self._orig_sys_path
+
+    def test_repeated_calls_do_not_grow_sys_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            admin_server._ensure_scripts_on_path(root)
+            length_after_first_call = len(sys.path)
+            for _ in range(50):
+                admin_server._ensure_scripts_on_path(root)
+            self.assertEqual(len(sys.path), length_after_first_call)
+
+    def test_both_layout_paths_are_present_exactly_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for _ in range(5):
+                admin_server._ensure_scripts_on_path(root)
+            self.assertEqual(sys.path.count(str(root / "scripts")), 1)
+            self.assertEqual(sys.path.count(str(root / ".agent-meta" / "scripts")), 1)
+
+
+# --------------------------------------------------------------------------- #
 # SyncExecutor                                                                #
 # --------------------------------------------------------------------------- #
 
@@ -474,6 +945,60 @@ class TestSyncExecutorDryRun(unittest.TestCase):
             result = executor.dry_run()
             self.assertFalse(result["success"])
             self.assertIn("sync.py not found", result["output"])
+
+
+# --------------------------------------------------------------------------- #
+# consistency-check.py path resolution — issue #587                          #
+# --------------------------------------------------------------------------- #
+
+
+class TestRunConsistencyCheckPathResolution(unittest.TestCase):
+    """``_run_consistency_check`` must resolve the script path the same
+    layout-aware way every other asset lookup does (``resolve_asset``), so it
+    keeps working when agent-meta is embedded as a submodule under
+    ``.agent-meta/`` (project_admin mode)."""
+
+    def _make_handler(self, root: Path) -> Any:
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        return handler
+
+    def test_super_admin_layout_resolves_top_level_script(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "scripts" / "consistency-check.py").write_text("# stub", encoding="utf-8")
+            handler = self._make_handler(root)
+
+            fake_result = mock.Mock(stdout='{"findings": [], "summary": {}}', stderr="")
+            with mock.patch("subprocess.run", return_value=fake_result) as run_mock:
+                result = handler._run_consistency_check()
+
+            self.assertEqual(result, {"findings": [], "summary": {}})
+            invoked_args = run_mock.call_args[0][0]
+            self.assertEqual(invoked_args[1], str(root / "scripts" / "consistency-check.py"))
+
+    def test_project_admin_submodule_layout_resolves_agent_meta_script(self) -> None:
+        """Regression test: the OLD hardcoded ``"scripts/consistency-check.py"``
+        does not exist at all in submodule mode — only
+        ``.agent-meta/scripts/consistency-check.py`` does."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            submodule_scripts = root / ".agent-meta" / "scripts"
+            submodule_scripts.mkdir(parents=True)
+            (submodule_scripts / "consistency-check.py").write_text("# stub", encoding="utf-8")
+            # No top-level "scripts/consistency-check.py" — this is exactly
+            # the project_admin submodule layout where the old hardcoded
+            # relative path used to fail.
+            handler = self._make_handler(root)
+
+            fake_result = mock.Mock(stdout='{"findings": [], "summary": {}}', stderr="")
+            with mock.patch("subprocess.run", return_value=fake_result) as run_mock:
+                result = handler._run_consistency_check()
+
+            self.assertEqual(result, {"findings": [], "summary": {}})
+            invoked_args = run_mock.call_args[0][0]
+            self.assertEqual(invoked_args[1], str(submodule_scripts / "consistency-check.py"))
 
 
 # --------------------------------------------------------------------------- #
