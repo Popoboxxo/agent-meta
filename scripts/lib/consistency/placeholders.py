@@ -73,6 +73,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)
     "BROWSER_VERIFICATION_BLOCK", "LANGUAGE_BEST_PRACTICES_BLOCK",
+    # Security shared blocks (loaded from snippets/security/*.md by build_variables)
+    "PROMPT_INJECTION_DEFENSE_BLOCK",
     # Convention blocks (rendered from config/conventions-presets.yaml by build_variables)
     "RELEASE_VERSIONING_BLOCK", "RELEASE_CHANGELOG_BLOCK", "GIT_ISSUE_NAMING_BLOCK",
     # SE cascade variables (from role-defaults.yaml se_variables)

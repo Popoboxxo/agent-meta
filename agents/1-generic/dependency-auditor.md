@@ -1,6 +1,6 @@
 ---
 name: template-dependency-auditor
-version: "1.0.0"
+version: "1.1.0"
 description: "Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL matrix), version drift, outdated and deprecated packages. Categorizes dependency findings by risk and files them via the feedback agent — not application security."
 hint: "Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue"
 prompt_mode: modern
@@ -104,6 +104,7 @@ NEXT: [Feedback issue | Developer upgrade]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No code execution, install, or change — read and analyze manifests only
 - No application-security checks (OWASP, injection, auth) → that is `security-auditor`
 - No findings without a manifest reference (file:line) and a concrete risk scenario

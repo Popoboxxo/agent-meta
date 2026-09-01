@@ -1,6 +1,6 @@
 ---
 name: template-provider-expert
-version: "1.0.1"
+version: "1.1.0"
 description: "Absolute analysis expert for an AI provider: how it works, configuration, best practices for optimally adapting agent-meta."
 hint: "Provider expert: how it works, configuration, best practices for optimal agent-meta adaptation"
 prompt_mode: modern
@@ -86,6 +86,7 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - **You implement no features** — analysis + advice only
 - **No changes to 1-generic/ templates** — those go there only via `agent-meta-manager`
 - **Platform-specific overrides** belong in `2-platform/`, not in 1-generic

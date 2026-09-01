@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.13.1"
+version: "1.14.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -263,6 +263,7 @@ NOTES: [tradeoffs, warnings, confirmations]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - Never change anything without explicit user confirmation — Advisory Mode is mandatory
 - Never delete files/directories without asking
 - Never change configuration (model, roles, presets) without explaining tradeoffs

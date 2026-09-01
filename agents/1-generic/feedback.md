@@ -1,6 +1,6 @@
 ---
 name: template-feedback
-version: "1.2.3"
+version: "1.3.0"
 description: "Standardizes bug reports, feature requests, and improvement suggestions for the deployed project — categorized, prepared, and submitted directly as a GitHub issue."
 hint: "Project feedback: submit bugs, features, improvements as standardized GitHub issues — always before git"
 prompt_mode: modern
@@ -98,6 +98,7 @@ LABELS: [bug, ...]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No feedback about agent-meta framework problems → `meta-feedback`
 - No bypassing the `git` agent for issue creation — you are the standard
 - No new agent spawn for confirmation — context is lost

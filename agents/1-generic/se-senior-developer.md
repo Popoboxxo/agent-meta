@@ -1,6 +1,6 @@
 ---
 name: se-senior-developer
-version: 1.1.0
+version: 1.2.0
 description: Implements complex SE leaf nodes. Pre-analyzes interfaces before coding. Persists output.
 hint: "Complex SE leaf nodes: cross-cutting, boundary, security/performance-critical, 5+ interfaces."
 tools:
@@ -118,6 +118,7 @@ FILES_CHANGED: <Liste>
 ```
 
 ## Don'ts
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - Kein Code vor Interface Analysis
 - Keine unilateralen Interface-Änderungen
 - Keine Annahmen über Caller — Blast-Radius via Grep prüfen

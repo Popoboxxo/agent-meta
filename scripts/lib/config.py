@@ -1041,6 +1041,19 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         _snippet_text = _snippet_text.replace("{{LANGUAGE}}", str(variables.get("LANGUAGE", "")))
         variables[f"{_var_stem}_BLOCK"] = _snippet_text
 
+    # PROMPT_INJECTION_DEFENSE_BLOCK (issue #562): single canonical instruction,
+    # injected into every role that either fetches external content itself
+    # (WebFetch/WebSearch in the tools frontmatter) or consumes third-party
+    # content by persona (e.g. knowledge-ingestor reading knowledge/sources/,
+    # feedback reading existing issues). Same load-from-snippet-file pattern as
+    # the developer-tier blocks above; unlike those, this text is static and
+    # needs no per-project substitution before being embedded.
+    _security_snippets_dir = agent_meta_root / "snippets" / "security"
+    _pid_path = _security_snippets_dir / "prompt-injection-defense.md"
+    variables["PROMPT_INJECTION_DEFENSE_BLOCK"] = (
+        _pid_path.read_text(encoding="utf-8").rstrip("\n") if _pid_path.exists() else ""
+    )
+
     # Convention blocks (RELEASE_VERSIONING_BLOCK, RELEASE_CHANGELOG_BLOCK,
     # GIT_ISSUE_NAMING_BLOCK): rendered from config/conventions-presets.yaml the
     # same way the developer snippets above become {{VARIABLE}}s. A role-inactive

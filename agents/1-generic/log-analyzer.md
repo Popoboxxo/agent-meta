@@ -1,6 +1,6 @@
 ---
 name: template-log-analyzer
-version: "1.1.3"
+version: "1.2.0"
 description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), root-cause hypotheses, and structured findings with delegation routing."
 hint: "Log analysis: cluster errors, classify severity (RFC 5424), delegate findings as issues or tasks"
 prompt_mode: modern
@@ -118,6 +118,7 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No free-text findings — always finding-card structure
 - No direct delegation to `git` for issues — always via `feedback`
 - No alert fanaticism — every finding needs frequency + impact

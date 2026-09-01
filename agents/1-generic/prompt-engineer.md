@@ -1,6 +1,6 @@
 ---
 name: template-prompt-engineer
-version: "1.3.1"
+version: "1.4.0"
 description: "The ultimate expert for prompt engineering. Designs, reviews, and optimizes agent definitions based on best practices (OpenAI, Lakera)."
 hint: "Design or review prompts and agents"
 prompt_mode: modern
@@ -98,6 +98,7 @@ REVIEW_NOTES: [open points]
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - No generic improvements — always framework-specific
 - No provider names in 1-generic/ templates
 - No ignoring conditional guards during the port

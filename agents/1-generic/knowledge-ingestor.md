@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.0.0"
+version: "1.1.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -85,6 +85,7 @@ Dein `output_contract` ist `knowledge-ingest-v1` — an `knowledge-indexer` weit
 {{/if}}
 ## Don'ts
 
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - KEINE Seiten löschen — nur ergänzen/aktualisieren
 - KEIN `index.md`/`log.md` selbst schreiben — delegiere an `knowledge-indexer`
 - KEINE Widersprüche stillschweigend überschreiben — explizit vermerken

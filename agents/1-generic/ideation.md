@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.7.0"
+version: "1.8.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -112,6 +112,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 </output_contract>
 
 <constraints>
+{{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - Do not assign formal REQ-IDs
 - No implementation details before idea clarity
 - Do not judge or block ideas immediately
