@@ -40,8 +40,10 @@ from __future__ import annotations
 import argparse
 import json
 import hmac
+import logging
 import os
 import queue
+import stat
 import subprocess
 import sys
 import threading
@@ -61,6 +63,19 @@ except ImportError:  # pragma: no cover
 
 
 # --------------------------------------------------------------------------- #
+# Logging                                                                     #
+# --------------------------------------------------------------------------- #
+
+# Full exception details (stack traces, file paths, library internals) are
+# logged server-side only — never sent to HTTP clients, see
+# ``AdminRequestHandler._handle_error`` (issue #581). No handler is attached
+# here on purpose: Python's logging "handler of last resort" already prints
+# WARNING+ to stderr, which matches this script's existing stderr-only
+# diagnostic convention without adding a second, competing output path.
+logger = logging.getLogger("agent_meta.admin_server")
+
+
+# --------------------------------------------------------------------------- #
 # Constants                                                                   #
 # --------------------------------------------------------------------------- #
 
@@ -68,6 +83,13 @@ DEFAULT_PORT = 7420
 DEFAULT_HOST = "127.0.0.1"
 MAX_BACKUPS = 5
 SSE_HEARTBEAT_SECONDS = 15
+# Upper bound on a single PUT/POST request body (issue #585). Every current
+# use case — model config edits, pricing overlays, pipeline/reflection-pair
+# definitions — is well under 1 MB; 10 MB leaves generous headroom while
+# still bounding memory allocation per request (``_read_body`` would
+# otherwise call ``self.rfile.read(length)`` with an attacker/client-supplied
+# ``Content-Length``, unbounded).
+MAX_BODY_SIZE = 10 * 1024 * 1024  # 10 MB
 
 # --- Centralized per-provider model-source preference ---------------------- #
 # A provider's model dropdowns/suggestions are served EXCLUSIVELY from one
@@ -228,6 +250,24 @@ def resolve_asset(root: Path, *parts: str) -> Path:
     return primary
 
 
+def _ensure_scripts_on_path(root: Path) -> None:
+    """Idempotently make ``lib.*`` importable for both directory layouts.
+
+    Many handler methods perform a deferred ``from lib.<module> import ...``
+    (kept lazy so the server still starts when ``lib`` isn't needed for a
+    given request) and need one of two directories on ``sys.path`` first:
+    ``<root>/scripts`` (super-admin layout) or ``<root>/.agent-meta/scripts``
+    (project-admin/submodule layout). ``root`` is constant for the lifetime
+    of a running server, so re-inserting the same two paths on every single
+    request — as every call site used to do — makes ``sys.path`` grow without
+    bound (issue #584). Skip paths already present instead.
+    """
+    for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
+        str_candidate = str(candidate)
+        if str_candidate not in sys.path:
+            sys.path.insert(0, str_candidate)
+
+
 # --------------------------------------------------------------------------- #
 # Viz / MCP sub-server manager                                               #
 # --------------------------------------------------------------------------- #
@@ -267,8 +307,7 @@ def _load_viz_config(root: Path) -> dict:
     if not config_path.exists():
         return _viz_defaults()
     try:
-        sys.path.insert(0, str(root / "scripts"))
-        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        _ensure_scripts_on_path(root)
         from lib.config import load_config
         config = load_config(config_path)
         viz_cfg = config.get("viz") or {}
@@ -311,8 +350,7 @@ def _load_admin_ui_config(root: Path) -> dict:
             "port":          DEFAULT_PORT,
         }
     try:
-        sys.path.insert(0, str(root / "scripts"))
-        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        _ensure_scripts_on_path(root)
         from lib.config import load_config
         config = load_config(config_path)
         admin_cfg = config.get("admin-ui") or {}
@@ -634,6 +672,10 @@ class AuthError(Exception):
     """Raised when token authentication fails. Mapped to HTTP 401."""
 
 
+class PayloadTooLargeError(Exception):
+    """Raised when a request body exceeds ``MAX_BODY_SIZE``. Mapped to HTTP 413."""
+
+
 def _verify_token(provided: str | None, expected: str | None) -> bool:
     """Constant-time token comparison using hmac.compare_digest."""
     if not provided or not expected:
@@ -664,6 +706,30 @@ def _resolve_admin_token(
         except OSError:
             pass
     return None
+
+
+def _warn_if_world_readable(path: Path) -> None:
+    """Print a stderr warning if ``path`` is readable by group or other.
+
+    ``.meta-config/project.yaml`` can hold a plaintext admin token
+    (``admin-ui.token``); with a typical ``022`` umask a freshly created file
+    is world-readable, letting any other local user read the token (issue
+    #589). Best-effort / non-fatal: startup must not break on platforms or
+    filesystems without POSIX permission bits.
+    """
+    if not path.exists():
+        return
+    try:
+        mode = path.stat().st_mode
+    except OSError:
+        return
+    if mode & (stat.S_IRWXG | stat.S_IRWXO):
+        print(
+            f"  !  WARNING: {path} is readable by group/other users "
+            f"(mode {oct(mode & 0o777)}). It may contain a plaintext admin "
+            f"token — run: chmod 600 {path}",
+            file=sys.stderr,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -813,6 +879,20 @@ class ConfigManager:
             # fails — that would surface as confusing diff noise on the next run.
             tmp_path.unlink(missing_ok=True)
             raise
+
+        if key in PROJECT_FILES:
+            # PROJECT_FILES (``.meta-config/*.yaml``) are per-instance runtime
+            # config that can hold plaintext secrets (``admin-ui.token``,
+            # MCP/external-tool credentials) — unlike SUPER_ADMIN_FILES
+            # (``config/*.yaml``), which are framework templates meant to be
+            # git-committed and shared. Restrict to owner-only (issue #589);
+            # best-effort — not fatal on platforms/filesystems without POSIX
+            # permission bits (e.g. some Windows/FAT mounts).
+            try:
+                os.chmod(path, 0o600)
+            except OSError:  # pragma: no cover - platform-dependent
+                pass
+
         return {
             "status": "saved",
             "key": key,
@@ -826,8 +906,14 @@ class ConfigManager:
 
     @staticmethod
     def _backup(path: Path) -> str:
-        """Create a timestamped backup copy of ``path`` next to the original."""
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # noqa: DTZ005
+        """Create a timestamped backup copy of ``path`` next to the original.
+
+        Uses UTC (issue #589) — a naive local-time timestamp is ambiguous
+        across instances/hosts in different timezones (which backup is
+        newer? sorting by filename breaks if clocks/timezones drift), and
+        silently shifts if the host timezone ever changes.
+        """
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_UTC")
         backup_path = path.with_suffix(path.suffix + f".bak.{stamp}")
         backup_path.write_bytes(path.read_bytes())
         return str(backup_path.name)
@@ -1148,6 +1234,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0") or 0)
         if length <= 0:
             return None
+        if length > MAX_BODY_SIZE:
+            # Reject BEFORE calling self.rfile.read(length) — that call would
+            # itself allocate/buffer up to `length` bytes, so checking first
+            # is what actually bounds memory use (issue #585: an oversized
+            # or forged Content-Length must not reach read()).
+            raise PayloadTooLargeError(
+                f"request body of {length} bytes exceeds the "
+                f"{MAX_BODY_SIZE}-byte limit"
+            )
         raw = self.rfile.read(length)
         if not raw:
             return None
@@ -1157,15 +1252,44 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise ValueError(f"invalid JSON body: {exc}") from exc
 
     # ------------------------------------------------------------------ #
+    # Centralized error handling                                         #
+    # ------------------------------------------------------------------ #
+
+    def _handle_error(self, exc: Exception, error_code: str = "ERR_INTERNAL") -> tuple[int, dict[str, str]]:
+        """Log an unexpected exception with full detail and return a generic,
+        client-safe (status, body) pair.
+
+        Raw exception text (absolute file paths, internal variable/function
+        names, library-internal details such as ``yaml.YAMLError`` file
+        positions) must never reach an HTTP client — it helps an attacker map
+        the server's filesystem and architecture (issue #581). Callers pass a
+        short, stable ``error_code`` (e.g. ``"ERR_MODEL_FETCH"``) so client-side
+        error handling / support requests can still distinguish failure modes
+        without any leaked detail.
+        """
+        logger.error("%s: %s", error_code, exc, exc_info=True)
+        return 500, {"error": error_code, "message": "Internal server error"}
+
+    # ------------------------------------------------------------------ #
     # CSRF / DNS-rebinding protection                                    #
     # ------------------------------------------------------------------ #
 
-    def _check_token(self) -> None:
+    def _check_token(self, *, allow_query_token: bool = False) -> None:
         """Verify the admin token when token auth is configured.
 
-        Extracts token from:
-          1. ``Authorization: Bearer <token>`` header
-          2. ``?token=<token>`` query parameter
+        Extracts token from ``Authorization: Bearer <token>`` header. The
+        ``?token=<token>`` query parameter is accepted **only** when
+        ``allow_query_token=True`` is passed explicitly.
+
+        Bearer-only is the default for every ``/api/*`` endpoint (issue #577):
+        query parameters leak into proxy/reverse-proxy access logs, browser
+        history and ``Referer`` headers, none of which are under this
+        server's control. The single exception is ``/api/events`` (SSE) —
+        the browser ``EventSource`` API cannot set custom headers, so that
+        one read-only, non-mutating endpoint keeps the query-parameter path
+        via an explicit opt-in from its caller. See
+        ``docs/howto/admin-ui-remote-access.md`` for the remote-access
+        migration note.
 
         When no token is configured (AdminRequestHandler.admin_token is None),
         this is a no-op — the server is loopback-only and auth is not required.
@@ -1183,12 +1307,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             if _verify_token(provided, expected):
                 return
 
-        # Extract token from query parameter (convenience for browser access)
-        parsed = urlparse(self.path)
-        query_params = parse_qs(parsed.query)
-        token_list = query_params.get("token", [])
-        if token_list and _verify_token(token_list[0], expected):
-            return
+        if allow_query_token:
+            # Extract token from query parameter — only reachable for the
+            # explicitly opted-in SSE endpoint, see docstring above.
+            parsed = urlparse(self.path)
+            query_params = parse_qs(parsed.query)
+            token_list = query_params.get("token", [])
+            if token_list and _verify_token(token_list[0], expected):
+                return
 
         raise AuthError("invalid or missing admin token")
 
@@ -1200,6 +1326,18 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         - Even if a hostile site DNS-rebinds to ``127.0.0.1``, the ``Host``
           header on the forged request will not match the bind ``host:port``,
           so the request is rejected (DNS-rebinding defence).
+
+        Contract (see issue #588):
+          - Origin header **present**: must match one of
+            ``http://<allowed-host>:<bind-port>`` exactly. An empty string is
+            treated as *present but invalid* (rejected), not as absent.
+          - Origin header **absent**: only the Host header is checked. This
+            is intentional — curl/wget and other non-browser CLI clients do
+            not send an Origin header, and this path must remain usable for
+            local admin scripting.
+          - In both cases the Host header must match ``<allowed-host>:<bind-port>``
+            (or the actual bind host:port). A missing/malformed Host header is
+            rejected.
         """
         expected_port = self.__class__.bind_port
         expected_host = self.__class__.bind_host
@@ -1249,10 +1387,25 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         return path in ("/", "/favicon.png")
 
+    def _is_sse_events_path(self) -> bool:
+        """Return True for the live-event SSE stream endpoint.
+
+        The only ``/api/*`` route allowed to authenticate via the ``?token=``
+        query parameter (issue #577) — the browser ``EventSource`` API has no
+        way to set an ``Authorization`` header, so header-only auth would
+        make the live dashboard unusable for remote/token-protected setups.
+        Read-only (GET, no state mutation), so this narrow carve-out does not
+        reintroduce a CSRF/leak risk equivalent to the general query-token
+        removal.
+        """
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        return path == "/api/events"
+
     def do_GET(self) -> None:
         try:
             if not self._is_public_get_path():
-                self._check_token()
+                self._check_token(allow_query_token=self._is_sse_events_path())
             self._dispatch_get()
         except AuthError as exc:
             self._send_json(
@@ -1271,7 +1424,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # a confusing double traceback — bail out silently.
             return
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
-            self._send_json({"error": "internal", "detail": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_INTERNAL")
+            self._send_json(body, status=status)
 
     def do_PUT(self) -> None:
         try:
@@ -1286,6 +1440,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except PayloadTooLargeError as exc:
+            self._send_json({"error": "payload_too_large", "detail": str(exc)}, status=413)
         except ValueError as exc:
             self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except FileNotFoundError as exc:
@@ -1294,7 +1450,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # See ``do_GET`` — silently bail on dead client socket.
             return
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
-            self._send_json({"error": "internal", "detail": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_INTERNAL")
+            self._send_json(body, status=status)
 
     def do_POST(self) -> None:
         try:
@@ -1309,13 +1466,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
         except SecurityError as exc:
             self._send_json({"error": "forbidden", "detail": str(exc)}, status=403)
+        except PayloadTooLargeError as exc:
+            self._send_json({"error": "payload_too_large", "detail": str(exc)}, status=413)
         except ValueError as exc:
             self._send_json({"error": "bad_request", "detail": str(exc)}, status=400)
         except ConnectionError:
             # See ``do_GET`` — silently bail on dead client socket.
             return
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
-            self._send_json({"error": "internal", "detail": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_INTERNAL")
+            self._send_json(body, status=status)
 
     def do_DELETE(self) -> None:
         try:
@@ -1335,7 +1495,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except ConnectionError:
             return
         except Exception as exc:  # pragma: no cover  # noqa: BLE001
-            self._send_json({"error": "internal", "detail": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_INTERNAL")
+            self._send_json(body, status=status)
 
     # ------------------------------------------------------------------ #
     # GET routes                                                         #
@@ -1790,9 +1951,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         not on ``sys.path`` at process boot.
         """
         root = self.__class__.root
-        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
-            if candidate.exists() and str(candidate) not in sys.path:
-                sys.path.insert(0, str(candidate))
+        _ensure_scripts_on_path(root)
         from lib.curation import load_curation  # type: ignore[import]
         curation = load_curation(str(self._curation_root()))
         # ``load_curation`` already normalises shape; ensure keys exist for
@@ -1804,9 +1963,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _save_curation(self, curation: dict) -> None:
         """Persist a curation document via ``scripts.lib.curation.save_curation``."""
         root = self.__class__.root
-        for candidate in (root / "scripts", root / ".agent-meta" / "scripts"):
-            if candidate.exists() and str(candidate) not in sys.path:
-                sys.path.insert(0, str(candidate))
+        _ensure_scripts_on_path(root)
         from lib.curation import save_curation  # type: ignore[import]
         save_curation(str(self._curation_root()), curation)
 
@@ -1893,7 +2050,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             models = self._collect_models()
             return self._send_json({"models": models})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS")
+            return self._send_json(body, status=status)
 
     def _handle_get_models_active(self) -> None:
         """Return only models that are currently active.
@@ -1907,7 +2065,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             models = [m for m in self._collect_models() if m.get("enabled")]
             return self._send_json({"models": models})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_ACTIVE")
+            return self._send_json(body, status=status)
 
     # ------------------------------------------------------------------ #
     # Models.dev integration (SDK primary, API fallback)                  #
@@ -2187,7 +2346,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             data['providers'] = providers
             return self._send_json(data)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_DEV")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_dev_refresh(self) -> None:
         try:
@@ -2200,7 +2360,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # snapshot by design — "SDK primary, API fallback").
             return self._send_json(self._load_models_dev_data(force_refresh=True))
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_DEV_REFRESH")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_dev_import(self) -> None:
         """Import a model from models.dev into pricing-overlay.yaml."""
@@ -2250,7 +2411,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                                     encoding="utf-8")
             return self._send_json({"success": True, "provider": provider_id, "model_id": overlay_key})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_DEV_IMPORT")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_update(self) -> None:
         """Trigger sync.py --update-models or download from GitHub if submodule override."""
@@ -2276,7 +2438,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 res = self.__class__.sync_executor._run(["--update-models"])
                 return self._send_json(res)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_UPDATE")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_clear_override(self) -> None:
         """Clear the downloaded override model registry."""
@@ -2287,7 +2450,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 target_file.unlink()
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_CLEAR_OVERRIDE")
+            return self._send_json(body, status=status)
 
     def _read_id_list(self) -> list[str]:
         """Parse the request body and return a deduplicated list of model ids.
@@ -2353,7 +2517,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "total": len(blacklist),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_EXCLUDE")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_disable(self) -> None:
         """Add model ids to the curation ``disabled`` list (soft exclusion).
@@ -2386,7 +2551,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "total": len(disabled),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_DISABLE")
+            return self._send_json(body, status=status)
 
     def _handle_post_models_enable(self) -> None:
         """Remove model ids from the curation ``disabled`` list.
@@ -2419,7 +2585,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "total": len(new_disabled),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODELS_ENABLE")
+            return self._send_json(body, status=status)
 
     def _handle_post_pricing_update(self) -> None:
         """Update pricing-overlay.yaml with new prices from UI."""
@@ -2463,7 +2630,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_PRICING_UPDATE")
+            return self._send_json(body, status=status)
 
     def _handle_post_pricing_reset(self) -> None:
         try:
@@ -2490,7 +2658,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                             
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_PRICING_RESET")
+            return self._send_json(body, status=status)
 
     # ------------------------------------------------------------------ #
     # Centralized per-provider model-source preference                    #
@@ -2686,7 +2855,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "default": self._default_model_source(),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_SOURCE")
+            return self._send_json(body, status=status)
 
     def _handle_post_model_source(self) -> None:
         """Set one provider's model source and persist it centrally to
@@ -2724,7 +2894,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 },
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_SOURCE")
+            return self._send_json(body, status=status)
 
     def _handle_post_model_source_batch(self) -> None:
         """Set the model source for multiple providers in a single write.
@@ -2770,7 +2941,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 },
             })
         except Exception as exc:
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_SOURCE_BATCH")
+            return self._send_json(body, status=status)
 
     def _handle_post_model_inherit(self) -> None:
         """Toggle main-chat model inheritance for one provider.
@@ -2857,7 +3029,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "inherit_main_chat": dict(inherit),
             })
         except Exception as exc:
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_INHERIT")
+            return self._send_json(body, status=status)
 
     def _handle_get_model_suggestions(self) -> None:
         """Return the model suggestions for one provider, drawn EXCLUSIVELY
@@ -2900,7 +3073,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 models = self._suggestions_from_registry(provider)
             return self._send_json({"provider": provider, "source": source, "models": models})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_SUGGESTIONS")
+            return self._send_json(body, status=status)
 
     def _handle_get_ai_providers(self) -> None:
         try:
@@ -2910,7 +3084,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             return self._send_json(data)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_AI_PROVIDERS")
+            return self._send_json(body, status=status)
 
     def _handle_post_ai_providers_update(self) -> None:
         try:
@@ -2922,7 +3097,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_AI_PROVIDERS_UPDATE")
+            return self._send_json(body, status=status)
 
     def _handle_get_tier_presets(self) -> None:
         try:
@@ -2932,7 +3108,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             return self._send_json(data)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_TIER_PRESETS")
+            return self._send_json(body, status=status)
 
     def _handle_get_tier_presets_merged(self) -> None:
         """Return merged tier presets: global + project-local.
@@ -2978,7 +3155,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
             return self._send_json(merged)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_TIER_PRESETS_MERGED")
+            return self._send_json(body, status=status)
 
     def _handle_post_tier_presets_update(self) -> None:
         try:
@@ -3007,7 +3185,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_TIER_PRESETS_UPDATE")
+            return self._send_json(body, status=status)
 
     def _agent_meta_root(self) -> Path:
         """Resolve the agent-meta framework root for lib helpers.
@@ -3131,7 +3310,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
             return self._send_json({"providers": provider_names, "roles": rows})
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_MODEL_MAPPING")
+            return self._send_json(body, status=status)
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
@@ -3888,8 +4068,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         sync operations, not just this panel.
         """
         root = self.__class__.root
-        sys.path.insert(0, str(root / "scripts"))
-        sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+        _ensure_scripts_on_path(root)
         from lib.external_tools import _validate_permitted_injections  # type: ignore[import]
         from lib.io import SyncError  # type: ignore[import]
 
@@ -4066,11 +4245,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         import json
         import subprocess
         import sys
+        # Was hardcoded as the relative "scripts/consistency-check.py", which
+        # only resolves in super_admin mode. In project_admin (submodule)
+        # mode the script actually lives under ".agent-meta/scripts/" — use
+        # the same layout-aware resolution every other asset lookup in this
+        # file uses instead of a second, inconsistent hardcoded path (#587).
+        check_script = resolve_asset(self.__class__.root, "scripts", "consistency-check.py")
         try:
             r = subprocess.run(  # noqa: PLW1510
-                [sys.executable, "scripts/consistency-check.py", "--json"], 
-                cwd=str(self.__class__.root), 
-                capture_output=True, 
+                [sys.executable, str(check_script), "--json"],
+                cwd=str(self.__class__.root),
+                capture_output=True,
                 text=True
             )
             # consistency-check.py --json prints pure JSON to stdout regardless of exit code
@@ -4082,9 +4267,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "findings": [],
                 "summary": {"total": 0, "errors": 0, "warnings": 0}
             }
-        except Exception as e:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            _, body = self._handle_error(exc, "ERR_CONSISTENCY_CHECK")
             return {
-                "error": str(e),
+                "error": body["error"],
                 "findings": [],
                 "summary": {"total": 0, "errors": 0, "warnings": 0}
             }
@@ -4180,8 +4366,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
         try:
             project_root = self.__class__.root
-            sys.path.insert(0, str(project_root / "scripts"))
-            sys.path.insert(0, str(project_root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(project_root)
             from lib.agents import collect_sources  # type: ignore[import]
             project_config = self.__class__.config_manager.read("project") or {}
             active_platforms = project_config.get("platforms", [])
@@ -4231,8 +4416,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """Return undeclared external-tool artifacts per active provider."""
         project_root = self.__class__.root
         try:
-            sys.path.insert(0, str(project_root / "scripts"))
-            sys.path.insert(0, str(project_root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(project_root)
             from lib.external_tools import scan_injection_drift  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
@@ -4248,7 +4432,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
             return {"findings": findings}
         except Exception as exc:  # noqa: BLE001
-            return {"error": str(exc)}
+            _, body = self._handle_error(exc, "ERR_INJECTION_DRIFT")
+            return body
 
     # ------------------------------------------------------------------ #
     # Provider deactivation handlers                                      #
@@ -4258,8 +4443,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """Return current provider deactivation status."""
         root = self.__class__.root
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.deactivation import get_deactivation_status  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
@@ -4267,7 +4451,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             provider_config = load_providers_config(root)
             return get_deactivation_status(root, project_config, provider_config)
         except Exception as exc:  # noqa: BLE001
-            return {"error": str(exc)}
+            _, body = self._handle_error(exc, "ERR_DEACTIVATION_STATUS")
+            return body
 
     def _get_submodule_protection_status(self) -> dict:
         """Return Submodule Protection status (Framework Default vs Project Override)."""
@@ -4364,8 +4549,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             providers = []
 
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.deactivation import (  # type: ignore[import]
                 deactivate_providers,
                 get_deactivation_status,
@@ -4391,7 +4575,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "status": get_deactivation_status(root, project_config, provider_config),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_DEACTIVATE_PROVIDERS")
+            return self._send_json(body, status=status)
 
     def _handle_activate_providers(self) -> None:
         """Activate providers: restore from backup zips."""
@@ -4402,8 +4587,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             providers = []
 
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.deactivation import (  # type: ignore[import]
                 activate_providers,
                 get_deactivation_status,
@@ -4429,7 +4613,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "status": get_deactivation_status(root, project_config, provider_config),
             })
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_ACTIVATE_PROVIDERS")
+            return self._send_json(body, status=status)
 
     # ------------------------------------------------------------------ #
     # Backup handlers                                                    #
@@ -4438,8 +4623,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _handle_get_backups(self) -> None:
         root = self.__class__.root
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.backup import list_backups  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
@@ -4447,7 +4631,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             provider_config = load_providers_config(root)
             return self._send_json(list_backups(root, project_config, provider_config))
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_BACKUPS")
+            return self._send_json(body, status=status)
 
     def _handle_create_backup(self) -> None:
         root = self.__class__.root
@@ -4456,8 +4641,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         label = body.get("label", None)
         
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.backup import create_backup  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
@@ -4476,7 +4660,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
             return self._send_json(result)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_CREATE_BACKUP")
+            return self._send_json(body, status=status)
 
     def _handle_restore_backup(self) -> None:
         root = self.__class__.root
@@ -4489,8 +4674,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         force = body.get("force", False)
 
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.backup import restore_backup  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
 
@@ -4509,7 +4693,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
             return self._send_json(result)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_RESTORE_BACKUP")
+            return self._send_json(body, status=status)
 
     def _handle_delete_backup(self, archive_name: str) -> None:
         root = self.__class__.root
@@ -4517,8 +4702,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return self._send_json({"error": "archive_name is required"}, status=400)
 
         try:
-            sys.path.insert(0, str(root / "scripts"))
-            sys.path.insert(0, str(root / ".agent-meta" / "scripts"))
+            _ensure_scripts_on_path(root)
             from lib.backup import delete_backup  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
@@ -4532,7 +4716,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             result = delete_backup(root, archive_name, project_config, log)
             return self._send_json(result)
         except Exception as exc:  # noqa: BLE001
-            return self._send_json({"error": str(exc)}, status=500)
+            status, body = self._handle_error(exc, "ERR_DELETE_BACKUP")
+            return self._send_json(body, status=status)
 
 
 class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
@@ -4603,6 +4788,7 @@ class AdminServer:
         self.host = host
         self.port = port
         self.mode = detect_mode(self.root)
+        _warn_if_world_readable(self.root / ".meta-config" / "project.yaml")
         # Always create the watcher instance so the SSE endpoint can subscribe;
         # the background polling thread is only started when enabled (see start()).
         self.watcher: ConfigWatcher = ConfigWatcher(self.root)
@@ -4629,8 +4815,7 @@ class AdminServer:
         config_path = self.root / ".meta-config" / "project.yaml"
         if config_path.exists():
             try:
-                sys.path.insert(0, str(self.root / "scripts"))
-                sys.path.insert(0, str(self.root / ".agent-meta" / "scripts"))
+                _ensure_scripts_on_path(self.root)
                 from lib.config import load_config  # type: ignore[import]
                 config = load_config(config_path)
                 if "agent-meta-version" in config:

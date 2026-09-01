@@ -977,7 +977,9 @@ class API {
   }
   streamEvents(path, onEvent) {
     // EventSource cannot carry Authorization headers, so the token travels as
-    // a query parameter — the server accepts both (see _check_token).
+    // a query parameter — the server only accepts this on /api/events, its
+    // one documented exception to the Bearer-only rule (see _check_token,
+    // issue #577).
     let url = this.base + path;
     const token = getToken();
     if (token) url += (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token);

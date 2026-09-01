@@ -165,6 +165,13 @@ admin-ui:
   management (Docker secrets, password managers, …).
 - `admin-ui.allowed-hosts` is an array of hostnames/IPs; it extends the default
   loopback set `["127.0.0.1", "localhost", "::1"]`.
+- **File permissions.** `.meta-config/project.yaml` (and the other
+  `.meta-config/*.yaml` runtime configs) may hold this token in plaintext. The
+  server writes it with `0o600` (owner read/write only) whenever it saves the
+  file via the Admin UI, and warns on stderr at startup if the file is
+  group/other-readable (e.g. left over from a manual edit under a `022`
+  umask). If you edit the file by hand outside the Admin UI, set the
+  permissions yourself: `chmod 600 .meta-config/project.yaml`.
 
 ---
 
@@ -189,15 +196,22 @@ to `sessionStorage` after the server accepted it.
 How the token travels afterwards:
 
 1. Regular requests (`/api/*`) send `Authorization: Bearer <token>` — injected
-   by the UI's central fetch wrapper. The server accepts the header **or** a
-   `?token=` query parameter (constant-time comparison, no plain `==`).
+   by the UI's central fetch wrapper. **As of issue #577, this is the only
+   accepted transport for every `/api/*` endpoint except `/api/events`** — the
+   server no longer honors a `?token=` query parameter there (constant-time
+   comparison, no plain `==`, applies either way). See
+   [Migrating from `?token=`](#migrating-from-token-breaking-change) below if
+   you have scripts or reverse-proxy setups relying on the old query-param
+   behavior.
 2. `GET /` and `GET /favicon.png` are public and load before authentication.
-   Every `/api/*` endpoint is token-gated; mutations (`PUT`/`POST`/`DELETE`)
-   additionally enforce the origin/Host check (CORS + DNS-rebinding defence).
-3. The live-events stream (`/api/events`, SSE) is the exception: browsers'
-   `EventSource` cannot set `Authorization` headers, so the UI appends the
-   token as `?token=` to the SSE URL. See [Security](#10-security-considerations)
-   for why this matters.
+   Every other `/api/*` endpoint is token-gated (Bearer header only); mutations
+   (`PUT`/`POST`/`DELETE`) additionally enforce the origin/Host check (CORS +
+   DNS-rebinding defence).
+3. The live-events stream (`/api/events`, SSE) is the **sole, deliberate
+   exception**: browsers' `EventSource` cannot set `Authorization` headers, so
+   the UI appends the token as `?token=` to the SSE URL, and the server accepts
+   it only on this one read-only route. See
+   [Security](#10-security-considerations) for why this matters.
 
 **Full remote operation needs `--allowed-hosts`.** Mutating requests are
 rejected with `403` when the browser's `Origin`/`Host` header does not match an
@@ -216,12 +230,18 @@ mutations require the host to be allowed.
 
 ## 8. Accessing from the command line
 
-With a token configured, API calls need the `Authorization` header (or the
-`?token=` query parameter — the server accepts both):
+With a token configured, API calls need the `Authorization` header — as of
+issue #577 this is the **only** accepted transport for `/api/*` (except the
+SSE endpoint, see [Section 7](#7-accessing-from-a-browser)):
 
 ```bash
 curl -H "Authorization: Bearer <your-token>" http://<host>:7420/api/mode
-curl "http://<host>:7420/api/mode?token=<your-token>"
+```
+
+The old query-parameter form no longer authenticates and now returns `401`:
+
+```bash
+curl "http://<host>:7420/api/mode?token=<your-token>"   # 401 — no longer accepted
 ```
 
 Without a token (or with a wrong one) you get a `401`:
@@ -320,6 +340,31 @@ reach the UI via `--allowed-hosts` (or `admin-ui.allowed-hosts`), see
   - If possible, prefer the login overlay over handing out deep links
     (`?token=`) — the overlay keeps the token out of URLs entirely, except for
     the SSE connection described above.
+
+### Migrating from `?token=` (breaking change)
+
+**Issue #577 removed the `?token=` query-parameter fallback for every
+`/api/*` endpoint except `/api/events`.** This is a deliberate, accepted
+breaking change: query strings are routinely recorded by proxy/reverse-proxy
+access logs, browser history and `Referer` headers — none of which are under
+this server's control — while `Authorization` headers are not.
+
+If you relied on the old behavior, update:
+
+- **`curl`/shell scripts:** replace `?token=<token>` with
+  `-H "Authorization: Bearer <token>"` (see [Section 8](#8-accessing-from-the-command-line)).
+- **Reverse-proxy setups:** if a proxy in front of the Admin UI previously
+  injected or forwarded `?token=`, switch it to inject the `Authorization`
+  header instead.
+- **Custom integrations / bookmarks:** any tooling that called `/api/*`
+  endpoints with `?token=` directly (not via the shipped UI) must switch to
+  the `Authorization: Bearer` header — it will otherwise start receiving `401`
+  responses after upgrading.
+- **The browser UI itself needs no changes** — the login overlay and the
+  `?token=` deep link on `GET /` (which was never gated, see
+  [Section 7](#7-accessing-from-a-browser)) both already store the token and
+  send it as `Authorization: Bearer` for all subsequent `/api/*` calls. Only
+  the SSE stream (`/api/events`) keeps using `?token=`, unchanged.
 
 ---
 
