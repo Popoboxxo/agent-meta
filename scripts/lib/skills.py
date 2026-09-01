@@ -368,8 +368,8 @@ def sync_external_skills_for_provider(
     Skill files are copied into the provider-specific skills_dir so that every
     active provider gets its own self-contained skill reference tree.
     """
-    from .agents import AGENTS_DIR, EXTERNAL_DIR, SKILL_WRAPPER
-    from .config import substitute
+    from .frontmatter import AGENTS_DIR, EXTERNAL_DIR, SKILL_WRAPPER
+    from .variables import substitute
 
     pc = provider_config.get(provider, {})
     agents_dir_rel = pc.get('agents_dir', '.claude/agents')
@@ -490,7 +490,7 @@ def sync_external_skills_for_provider(
         agent_target = safe_path(agents_dir, f"{role}.md")
 
         # Apply provider-specific transformations (Opencode, Continue, etc.)
-        from .agents import transform_agent_content_for_provider
+        from .provider_transform import transform_agent_content_for_provider
         agent_content = transform_agent_content_for_provider(
             content=agent_content,
             provider=provider,

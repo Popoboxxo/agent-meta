@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agents import collect_sources, extract_frontmatter_field
+from .frontmatter import collect_sources, extract_frontmatter_field
 from .io import write_checked
 from .log import SyncLog
 from .providers import load_providers_config
@@ -686,7 +686,7 @@ def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> st
     """
     if agent_meta_root is not None:
         try:
-            from .agents import load_provider_tools_config
+            from .frontmatter import load_provider_tools_config
             cfg = load_provider_tools_config(agent_meta_root)
             terminal_map = cfg.get("terminal_tool", {})
             if provider in terminal_map:
