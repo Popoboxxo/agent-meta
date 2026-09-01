@@ -11,4 +11,4 @@
 - [Neuer _BLOCK-Platzhalter: 2 versteckte Kopplungen](new-block-placeholder-coupling.md) — build_variables _BLOCK-Var braucht auch Eintrag in consistency/placeholders.py _BUILTIN_VARS + standalone.py Fallback
 - [Admin-Server God-Object-Split (#572)](admin-server-god-object-split.md) — DONE: alle 6 Services (Auth/Audit/Template/Pipeline/Reflection/Models) + RoleDefaultsEditor + ServiceContext; Delegation-Pattern, Tests unverändert grün
 - [Admin-Server Test-Run Gotcha](admin-server-test-run-gotcha.md) — Tests brauchen -p no:homeassistant (OpenSSL `lib` kollidiert mit scripts/lib); full ~6.5min, admin-only ~0.4s
-- [Wave 6 sync-core Split](wave6-sync-core-split.md) — #565 variables.py + #561 agents.py-Split (frontmatter/provider_transform/agent_sync) DONE, SCC 8→3; #563 deferiert (Subparser bräche CLI); AST-Cycle-Detector in scratchpad
+- [Wave 6 sync-core Split](wave6-sync-core-split.md) — #565 variables.py + #561 agents.py-Split (frontmatter/provider_transform/agent_sync) DONE, SCC 8→3; #563 DONE (Dispatch-Table+_SyncContext, main 490→10 Z., 4/5 Kriterien, Subparser-Kriterium unmöglich ohne CLI-Bruch)

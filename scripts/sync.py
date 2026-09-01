@@ -453,7 +453,35 @@ def _normalize_check_dry_run(args) -> None:
         args.dry_run = True
 
 
-def main():
+class _SyncContext:
+    """Mutable state shared across the CLI dispatch chain.
+
+    Built once by :func:`_build_context` after the config is loaded. Each mode
+    handler reads the fields it needs and writes back the two fields the common
+    tail depends on: ``mode`` (always) and ``config`` (only handlers that reload
+    it). Threading state through one object -- instead of a long local-variable
+    tail -- is what makes the individual handlers independently unit-testable.
+    """
+
+    def __init__(self, *, args, log, agent_meta_root: Path, project_root: Path,
+                 config: dict, config_path: Path, variables: dict,
+                 platforms: list, source_version: str, viz_cfg: dict) -> None:
+        self.args = args
+        self.log = log
+        self.agent_meta_root = agent_meta_root
+        self.project_root = project_root
+        self.config = config
+        self.config_path = config_path
+        self.variables = variables
+        self.platforms = platforms
+        self.source_version = source_version
+        self.viz_cfg = viz_cfg
+        self.mode: str | None = None
+
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Construct the sync.py CLI argument parser (flag-based interface)."""
     parser = argparse.ArgumentParser(
         description="Sync agent-meta agents into a project."
     )
@@ -583,26 +611,28 @@ def main():
                         help="Agent role name for the generated wrapper agent")
     parser.add_argument("--entry", metavar="FILE", default="SKILL.md",
                         help="Entry file within the skill directory (default: SKILL.md)")
+    return parser
 
-    args = parser.parse_args()
-    _normalize_check_dry_run(args)
 
-    script_path = Path(__file__).resolve()
-    agent_meta_root = find_agent_meta_root(script_path)
+def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
+    """Run the pre-config CLI modes and build the shared sync context.
 
-    log = SyncLog()
-
+    Returns ``None`` when an early-return mode handled the invocation (the
+    caller should then simply return), otherwise a populated
+    :class:`_SyncContext`. Preserves the original linear order of the
+    early-return modes, --setup fall-through and config auto-detection.
+    """
     if args.clear_cache:
         from lib.cache import CACHE_FILE, invalidate
         invalidate(CACHE_FILE)
         print("Outcome cache cleared.")
-        return
+        return None
 
     if args.update_models:
         from lib.model_discovery import discover_models
         print("  i  Updating model registry...")
         discover_models()
-        return
+        return None
 
     if args.render_standalone:
         from lib.standalone import write_standalone_files
@@ -616,7 +646,7 @@ def main():
                     print(f"  {path}")
                 sys.exit(1)
             print(f"  OK  standalone/ is up to date ({len(result['unchanged'])} file(s))")
-            return
+            return None
         verb = "would write" if args.dry_run else "wrote"
         remove_verb = "would remove" if args.dry_run else "removed"
         for path in result["written"]:
@@ -628,7 +658,7 @@ def main():
         print(f"\nSUMMARY\n-------\n{len(result['written'])} written  |  "
               f"{len(result['removed'])} removed  |  "
               f"{len(result['unchanged'])} unchanged  |  {len(result['roles'])} role(s)")
-        return
+        return None
 
     if args.admin_only:
         admin_script = agent_meta_root / "scripts" / "admin-server.py"
@@ -642,7 +672,7 @@ def main():
              "--root", str(agent_meta_root)],
             check=False,
         )
-        return
+        return None
 
     if args.dry_run:
         print("DRY-RUN — no files will be written\n")
@@ -667,7 +697,7 @@ def main():
                   args.source, args.role, args.entry, log, args.dry_run)
         log.write(agent_meta_root / LOGFILE, EXTERNAL_SKILLS_CONFIG,
                   read_version(agent_meta_root), mode, [], args.dry_run)
-        return
+        return None
 
     if args.setup:
         from lib.setup import run_setup_wizard
@@ -682,7 +712,7 @@ def main():
             args.init = True
             print("\n  Starte --init Sync mit der neuen Konfiguration...\n")
         else:
-            return
+            return None
 
     # All other modes require --config (or auto-detect)
     if not args.config:
@@ -701,7 +731,7 @@ def main():
                 args.config = str(target_config)
                 args.init = True
             else:
-                return
+                return None
 
     config_resolved = Path(args.config).resolve()
     config_parent_name = config_resolved.parent.name
@@ -729,598 +759,871 @@ def main():
     for w in pre_warnings:
         log.warn(w)
 
-    if args.fill_defaults:
-        mode = "fill-defaults"
-        fill_defaults(config_path, agent_meta_root, log, args.dry_run)
+    return _SyncContext(
+        args=args, log=log, agent_meta_root=agent_meta_root,
+        project_root=project_root, config=config, config_path=config_path,
+        variables=variables, platforms=platforms,
+        source_version=source_version, viz_cfg=viz_cfg,
+    )
 
-    elif args.audit_config:
-        mode = "audit-config"
-        report = audit_config(agent_meta_root, config_path)
-        print(format_report(report))
-        if args.apply:
-            if args.dry_run:
-                log.info("audit-config",  # noqa: PLE1205
-                         f"--apply skipped (dry-run): would disable "
-                         f"{len(report.deprecated_roles)} deprecated role(s)")
-            else:
-                changed = apply_audit(report, config_path)
-                if changed:
-                    log.info("audit-config",  # noqa: PLE1205
-                             f"commented out {changed} deprecated role line(s) in "
-                             f"{config_path}")
-                else:
-                    log.info("audit-config",  # noqa: PLE1205
-                             "no changes applied (nothing to disable)")
 
-    elif args.only_variables:
-        mode = "only-variables"
-        provider_config = load_providers_config(agent_meta_root)
-        providers = resolve_providers(config, provider_config)
-        only_variables(project_root, variables, log, args.dry_run,
-                       providers=providers, provider_config=provider_config)
+def _handle_fill_defaults(ctx: _SyncContext) -> None:
+    """Handle --fill-defaults."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    config_path = ctx.config_path
 
-    elif args.create_ext:
-        mode = f"create-ext:{args.create_ext}"
-        role_map = build_role_map(agent_meta_root)
-        roles = list(role_map.keys()) if args.create_ext == "all" else [args.create_ext]
-        for role in roles:
-            create_extension(project_root, config, variables, role, log, args.dry_run,
-                             agent_meta_root=agent_meta_root)
+    mode = "fill-defaults"
+    fill_defaults(config_path, agent_meta_root, log, args.dry_run)
 
-    elif args.update_ext:
-        mode = "update-ext"
-        update_extensions(project_root, variables, log, args.dry_run,
-                          agent_meta_root=agent_meta_root)
+    ctx.mode = mode
 
-    elif args.create_rule:
-        mode = f"create-rule:{args.create_rule}"
-        create_rule(project_root, args.create_rule, log, args.dry_run)
 
-    elif args.create_hook:
-        mode = f"create-hook:{args.create_hook}"
-        create_hook(project_root, args.create_hook, log, args.dry_run)
+def _handle_audit_config(ctx: _SyncContext) -> None:
+    """Handle --audit-config (with optional --apply)."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    config = ctx.config
+    config_path = ctx.config_path
 
-    elif args.create_command:
-        mode = f"create-command:{args.create_command}"
-        create_command(project_root, args.create_command, log, args.dry_run)
-
-    elif args.viz_only:
-        mode = "viz-only"
-        # Override viz config
-        if "viz" not in config:
-            config["viz"] = {}
-        config["viz"]["enabled"] = True
-        generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
-
-    elif args.viz_cleanup:
-        mode = "viz-cleanup"
-        viz_cfg = config.get("viz", {})
-        retention = viz_cfg.get("report", {}).get("retention_days", 7)
-        cleanup_old_sessions(project_root, retention_days=retention,
-                             log=log, dry_run=args.dry_run)
-
-    elif args.deactivation_status:
-        mode = "deactivation-status"
-        provider_config = load_providers_config(agent_meta_root)
-        status = get_deactivation_status(project_root, config, provider_config)
-        import json as _json
-        print(_json.dumps(status, indent=2, ensure_ascii=False))
-
-    elif args.deactivate_providers is not None:
-        mode = "deactivate-providers"
-        provider_config = load_providers_config(agent_meta_root)
-        targets = args.deactivate_providers if args.deactivate_providers else ["all"]
-        results = deactivate_providers(
-            project_root, targets, provider_config, config, log, args.dry_run
-        )
-        # Update project.yaml so resolve_providers() reflects the change.
-        deactivated_list = resolve_deactivation_targets(targets, provider_config)
-        update_deactivation_config(config_path, provider_config, deactivated_list,
-                                    config, log, args.dry_run)
-        # Re-sync context files so AGENTS.md reflects the updated provider list.
-        if not args.dry_run:
-            config = load_config(config_path)
-            variables, _ = build_variables(config, agent_meta_root, project_root)
-            for prov in resolve_providers(config, provider_config):
-                sync_context_for_provider(agent_meta_root, project_root, config,
-                                          variables, log, args.dry_run,
-                                          prov, provider_config)
-        import json as _json
-        print(_json.dumps(results, indent=2, ensure_ascii=False))
-
-    elif args.activate_providers is not None:
-        mode = "activate-providers"
-        provider_config = load_providers_config(agent_meta_root)
-        targets = args.activate_providers if args.activate_providers else []
-        results = activate_providers(
-            project_root, targets, provider_config, config, log, args.dry_run
-        )
-        # Update project.yaml: remove activated providers from deactivation list.
-        dc = config.get("provider-deactivation", {})
-        current = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
-        if not targets:
-            remaining = []  # activate all → clear deactivation
-        else:
-            remaining = sorted(current - set(resolve_deactivation_targets(targets, provider_config)))
-        update_deactivation_config(config_path, provider_config, remaining,
-                                    config, log, args.dry_run)
-        if not args.dry_run:
-            config = load_config(config_path)
-            variables, _ = build_variables(config, agent_meta_root, project_root)
-            for prov in resolve_providers(config, provider_config):
-                sync_context_for_provider(agent_meta_root, project_root, config,
-                                          variables, log, args.dry_run,
-                                          prov, provider_config)
-        import json as _json
-        print(_json.dumps(results, indent=2, ensure_ascii=False))
-
-    elif args.backup is not None:
-        mode = "backup"
-        provider_config = load_providers_config(agent_meta_root)
-        targets = args.backup if args.backup else None
-        result = create_backup(
-            project_root, targets, provider_config, config, log,
-            label=args.label,
-            dry_run=args.dry_run,
-            source_version=source_version,
-        )
-        import json as _json
-        print(_json.dumps(result, indent=2, ensure_ascii=False))
-
-    elif args.restore:
-        mode = "restore"
-        provider_config = load_providers_config(agent_meta_root)
-        result = restore_backup(
-            project_root, args.restore, provider_config, config, log,
-            providers=args.restore_providers,
-            force=args.force,
-            dry_run=args.dry_run,
-        )
-        import json as _json
-        print(_json.dumps(result, indent=2, ensure_ascii=False))
-
-    elif args.list_backups:
-        mode = "list-backups"
-        provider_config = load_providers_config(agent_meta_root)
-        result = list_backups(project_root, config, provider_config)
-        import json as _json
-        print(_json.dumps(result, indent=2, ensure_ascii=False))
-
-    elif args.delete_backup:
-        mode = "delete-backup"
-        result = delete_backup(project_root, args.delete_backup, config, log, args.dry_run)
-        import json as _json
-        print(_json.dumps(result, indent=2, ensure_ascii=False))
-
-    elif args.prune_backups:
-        mode = "prune-backups"
-        result = prune_backups(project_root, config, log, args.dry_run)
-        import json as _json
-        print(_json.dumps(result, indent=2, ensure_ascii=False))
-
-    elif args.validate:
-        mode = "validate"
+    mode = "audit-config"
+    report = audit_config(agent_meta_root, config_path)
+    print(format_report(report))
+    if args.apply:
         if args.dry_run:
-            print("DRY-RUN — validation will not write files\n")
+            log.info("audit-config",  # noqa: PLE1205
+                     f"--apply skipped (dry-run): would disable "
+                     f"{len(report.deprecated_roles)} deprecated role(s)")
+        else:
+            changed = apply_audit(report, config_path)
+            if changed:
+                log.info("audit-config",  # noqa: PLE1205
+                         f"commented out {changed} deprecated role line(s) in "
+                         f"{config_path}")
+            else:
+                log.info("audit-config",  # noqa: PLE1205
+                         "no changes applied (nothing to disable)")
 
-        # Consistency checks always run (no test repo required). These validate
-        # agent templates, cross-references, dual-tree parity and handoff
-        # contracts against the agent-meta sources themselves.
-        consistency_errors = _run_consistency_checks(agent_meta_root)
+    ctx.config = config
+    ctx.mode = mode
 
-        # Config-audit staleness check (issue #560): full-replacement
-        # 2-platform overrides pin their generic base via `based-on:
-        # "1-generic/<role>.md@<version>"` but do not automatically inherit
-        # later changes to that base -- including security-relevant workflow
-        # steps. Warn loudly when the pin has fallen 1+ major versions behind
-        # the current generic template so drift can't silently accumulate.
-        _stale_overrides = audit_config(agent_meta_root, config_path).by_category(
-            "stale_platform_overrides"
-        )
-        for _stale in _stale_overrides:
-            log.warning(f"config-audit [P1] stale-override: {_stale.message}")
 
-        from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
-        from lib.consistency.report import print_report
-        from lib.providers import load_providers_config as _load_pc
+def _handle_only_variables(ctx: _SyncContext) -> None:
+    """Handle --only-variables."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    variables = ctx.variables
 
-        _provider_config = _load_pc(agent_meta_root)
-        _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
-        if _strict_findings:
-            print_report(_strict_findings, project_root, changed_only=False)
+    mode = "only-variables"
+    provider_config = load_providers_config(agent_meta_root)
+    providers = resolve_providers(config, provider_config)
+    only_variables(project_root, variables, log, args.dry_run,
+                   providers=providers, provider_config=provider_config)
 
-        test_repo_path = resolve_test_repo_path(config, project_root, log)
-        if test_repo_path is None or not test_repo_path.exists():
-            reason = (f"configured path {test_repo_path} does not exist"
-                      if test_repo_path else
-                      "not configured (set test-repo.path in .meta-config/project.yaml "
-                      "or AGENT_META_TEST_REPO)")
-            log.info("test-repo",  # noqa: PLE1205
-                     f"Skipping test-repo sync validation — {reason}. "
-                     "Consistency checks still ran.")
-            sys.exit(1 if consistency_errors else 0)
-        success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
-        if not success or consistency_errors:
-            sys.exit(1)
+    ctx.config = config
+    ctx.mode = mode
 
-    else:
-        # Auto-fill missing config fields with defaults (silent mode — only logs additions)
-        fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
-        # Reload config after auto-fill to pick up newly written defaults
+
+def _handle_create_ext(ctx: _SyncContext) -> None:
+    """Handle --create-ext ROLE."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    variables = ctx.variables
+
+    mode = f"create-ext:{args.create_ext}"
+    role_map = build_role_map(agent_meta_root)
+    roles = list(role_map.keys()) if args.create_ext == "all" else [args.create_ext]
+    for role in roles:
+        create_extension(project_root, config, variables, role, log, args.dry_run,
+                         agent_meta_root=agent_meta_root)
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_update_ext(ctx: _SyncContext) -> None:
+    """Handle --update-ext."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    variables = ctx.variables
+
+    mode = "update-ext"
+    update_extensions(project_root, variables, log, args.dry_run,
+                      agent_meta_root=agent_meta_root)
+
+    ctx.mode = mode
+
+
+def _handle_create_rule(ctx: _SyncContext) -> None:
+    """Handle --create-rule NAME."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+
+    mode = f"create-rule:{args.create_rule}"
+    create_rule(project_root, args.create_rule, log, args.dry_run)
+
+    ctx.mode = mode
+
+
+def _handle_create_hook(ctx: _SyncContext) -> None:
+    """Handle --create-hook NAME."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+
+    mode = f"create-hook:{args.create_hook}"
+    create_hook(project_root, args.create_hook, log, args.dry_run)
+
+    ctx.mode = mode
+
+
+def _handle_create_command(ctx: _SyncContext) -> None:
+    """Handle --create-command NAME."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+
+    mode = f"create-command:{args.create_command}"
+    create_command(project_root, args.create_command, log, args.dry_run)
+
+    ctx.mode = mode
+
+
+def _handle_viz_only(ctx: _SyncContext) -> None:
+    """Handle --viz-only."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "viz-only"
+    # Override viz config
+    if "viz" not in config:
+        config["viz"] = {}
+    config["viz"]["enabled"] = True
+    generate_viz(agent_meta_root, project_root, config, log, args.dry_run)
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_viz_cleanup(ctx: _SyncContext) -> None:
+    """Handle --viz-cleanup."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+    config = ctx.config
+    viz_cfg = ctx.viz_cfg
+
+    mode = "viz-cleanup"
+    viz_cfg = config.get("viz", {})
+    retention = viz_cfg.get("report", {}).get("retention_days", 7)
+    cleanup_old_sessions(project_root, retention_days=retention,
+                         log=log, dry_run=args.dry_run)
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_deactivation_status(ctx: _SyncContext) -> None:
+    """Handle --deactivation-status."""
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "deactivation-status"
+    provider_config = load_providers_config(agent_meta_root)
+    status = get_deactivation_status(project_root, config, provider_config)
+    import json as _json
+    print(_json.dumps(status, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_deactivate_providers(ctx: _SyncContext) -> None:
+    """Handle --deactivate-providers."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    config_path = ctx.config_path
+    variables = ctx.variables
+
+    mode = "deactivate-providers"
+    provider_config = load_providers_config(agent_meta_root)
+    targets = args.deactivate_providers if args.deactivate_providers else ["all"]
+    results = deactivate_providers(
+        project_root, targets, provider_config, config, log, args.dry_run
+    )
+    # Update project.yaml so resolve_providers() reflects the change.
+    deactivated_list = resolve_deactivation_targets(targets, provider_config)
+    update_deactivation_config(config_path, provider_config, deactivated_list,
+                                config, log, args.dry_run)
+    # Re-sync context files so AGENTS.md reflects the updated provider list.
+    if not args.dry_run:
         config = load_config(config_path)
+        variables, _ = build_variables(config, agent_meta_root, project_root)
+        for prov in resolve_providers(config, provider_config):
+            sync_context_for_provider(agent_meta_root, project_root, config,
+                                      variables, log, args.dry_run,
+                                      prov, provider_config)
+    import json as _json
+    print(_json.dumps(results, indent=2, ensure_ascii=False))
 
-        provider_config = load_providers_config(agent_meta_root)
-        providers = resolve_providers(config, provider_config)
-        mode = "init" if args.init else "sync"
-        log.info("providers", "active: " + ", ".join(providers))  # noqa: PLE1205
-        # Log resolved DoD
-        preset_name = config.get("dod-preset", "full") or "full"
-        dod_resolved = resolve_dod(config, agent_meta_root)
-        dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
-        log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")  # noqa: PLE1205
-        # Log resolved rules-preset
-        rules_preset_name = config.get("rules-preset", "default")
-        rules_resolved = resolve_rules(config, agent_meta_root)
-        if rules_resolved:
-            rules_summary = ", ".join(
-                f"{r}: {'+'.join(k for k, v in opts.items() if v is not False and v != 'skip') or 'alwaysApply=false'}"
-                for r, opts in rules_resolved.items()
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_activate_providers(ctx: _SyncContext) -> None:
+    """Handle --activate-providers."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    config_path = ctx.config_path
+    variables = ctx.variables
+
+    mode = "activate-providers"
+    provider_config = load_providers_config(agent_meta_root)
+    targets = args.activate_providers if args.activate_providers else []
+    results = activate_providers(
+        project_root, targets, provider_config, config, log, args.dry_run
+    )
+    # Update project.yaml: remove activated providers from deactivation list.
+    dc = config.get("provider-deactivation", {})
+    current = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
+    if not targets:
+        remaining = []  # activate all → clear deactivation
+    else:
+        remaining = sorted(current - set(resolve_deactivation_targets(targets, provider_config)))
+    update_deactivation_config(config_path, provider_config, remaining,
+                                config, log, args.dry_run)
+    if not args.dry_run:
+        config = load_config(config_path)
+        variables, _ = build_variables(config, agent_meta_root, project_root)
+        for prov in resolve_providers(config, provider_config):
+            sync_context_for_provider(agent_meta_root, project_root, config,
+                                      variables, log, args.dry_run,
+                                      prov, provider_config)
+    import json as _json
+    print(_json.dumps(results, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_backup(ctx: _SyncContext) -> None:
+    """Handle --backup."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    source_version = ctx.source_version
+
+    mode = "backup"
+    provider_config = load_providers_config(agent_meta_root)
+    targets = args.backup if args.backup else None
+    result = create_backup(
+        project_root, targets, provider_config, config, log,
+        label=args.label,
+        dry_run=args.dry_run,
+        source_version=source_version,
+    )
+    import json as _json
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_restore(ctx: _SyncContext) -> None:
+    """Handle --restore."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "restore"
+    provider_config = load_providers_config(agent_meta_root)
+    result = restore_backup(
+        project_root, args.restore, provider_config, config, log,
+        providers=args.restore_providers,
+        force=args.force,
+        dry_run=args.dry_run,
+    )
+    import json as _json
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_list_backups(ctx: _SyncContext) -> None:
+    """Handle --list-backups."""
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "list-backups"
+    provider_config = load_providers_config(agent_meta_root)
+    result = list_backups(project_root, config, provider_config)
+    import json as _json
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_delete_backup(ctx: _SyncContext) -> None:
+    """Handle --delete-backup."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "delete-backup"
+    result = delete_backup(project_root, args.delete_backup, config, log, args.dry_run)
+    import json as _json
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_prune_backups(ctx: _SyncContext) -> None:
+    """Handle --prune-backups."""
+    args = ctx.args
+    log = ctx.log
+    project_root = ctx.project_root
+    config = ctx.config
+
+    mode = "prune-backups"
+    result = prune_backups(project_root, config, log, args.dry_run)
+    import json as _json
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_validate(ctx: _SyncContext) -> None:
+    """Handle --validate (may sys.exit; falls through on full success)."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    config_path = ctx.config_path
+
+    mode = "validate"
+    if args.dry_run:
+        print("DRY-RUN — validation will not write files\n")
+
+    # Consistency checks always run (no test repo required). These validate
+    # agent templates, cross-references, dual-tree parity and handoff
+    # contracts against the agent-meta sources themselves.
+    consistency_errors = _run_consistency_checks(agent_meta_root)
+
+    # Config-audit staleness check (issue #560): full-replacement
+    # 2-platform overrides pin their generic base via `based-on:
+    # "1-generic/<role>.md@<version>"` but do not automatically inherit
+    # later changes to that base -- including security-relevant workflow
+    # steps. Warn loudly when the pin has fallen 1+ major versions behind
+    # the current generic template so drift can't silently accumulate.
+    _stale_overrides = audit_config(agent_meta_root, config_path).by_category(
+        "stale_platform_overrides"
+    )
+    for _stale in _stale_overrides:
+        log.warning(f"config-audit [P1] stale-override: {_stale.message}")
+
+    from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
+    from lib.consistency.report import print_report
+    from lib.providers import load_providers_config as _load_pc
+
+    _provider_config = _load_pc(agent_meta_root)
+    _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
+    if _strict_findings:
+        print_report(_strict_findings, project_root, changed_only=False)
+
+    test_repo_path = resolve_test_repo_path(config, project_root, log)
+    if test_repo_path is None or not test_repo_path.exists():
+        reason = (f"configured path {test_repo_path} does not exist"
+                  if test_repo_path else
+                  "not configured (set test-repo.path in .meta-config/project.yaml "
+                  "or AGENT_META_TEST_REPO)")
+        log.info("test-repo",  # noqa: PLE1205
+                 f"Skipping test-repo sync validation — {reason}. "
+                 "Consistency checks still ran.")
+        sys.exit(1 if consistency_errors else 0)
+    success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
+    if not success or consistency_errors:
+        sys.exit(1)
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+def _handle_sync(ctx: _SyncContext) -> None:
+    """Default handler: full sync / --init."""
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    config_path = ctx.config_path
+    variables = ctx.variables
+    platforms = ctx.platforms
+    viz_cfg = ctx.viz_cfg
+
+    # Auto-fill missing config fields with defaults (silent mode — only logs additions)
+    fill_defaults(config_path, agent_meta_root, log, args.dry_run, silent=True)
+    # Reload config after auto-fill to pick up newly written defaults
+    config = load_config(config_path)
+
+    provider_config = load_providers_config(agent_meta_root)
+    providers = resolve_providers(config, provider_config)
+    mode = "init" if args.init else "sync"
+    log.info("providers", "active: " + ", ".join(providers))  # noqa: PLE1205
+    # Log resolved DoD
+    preset_name = config.get("dod-preset", "full") or "full"
+    dod_resolved = resolve_dod(config, agent_meta_root)
+    dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
+    log.info("DoD", f"preset '{preset_name}' -> {dod_summary}")  # noqa: PLE1205
+    # Log resolved rules-preset
+    rules_preset_name = config.get("rules-preset", "default")
+    rules_resolved = resolve_rules(config, agent_meta_root)
+    if rules_resolved:
+        rules_summary = ", ".join(
+            f"{r}: {'+'.join(k for k, v in opts.items() if v is not False and v != 'skip') or 'alwaysApply=false'}"
+            for r, opts in rules_resolved.items()
+        )
+        log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")  # noqa: PLE1205
+    else:
+        log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")  # noqa: PLE1205
+    # Load platform-config variables ({{platform.*}} placeholders)
+    platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
+    if platform_vars is not None:
+        log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")  # noqa: PLE1205
+    is_claude = "Claude" in providers
+    claude_pc = provider_config.get("Claude", {})
+    gitignore_cfg = config.get("gitignore", {})
+    base_gitignore_entries: list[str] = []
+    exceptions = gitignore_cfg.get("exceptions", [])
+    def _should_ignore(path: str, category_default: bool) -> bool:
+        return not category_default if path in exceptions else category_default
+
+    if is_claude:
+        cat_local = gitignore_cfg.get("local", True)
+        local_candidates = claude_pc.get("gitignore_entries", [
+            ".claude/settings.local.json",
+            ".claude/agent-memory-local/",
+            "CLAUDE.personal.md",
+            "sync.log",
+        ])
+        for _p in local_candidates:
+            if _should_ignore(_p, cat_local):
+                base_gitignore_entries.append(_p)
+
+        cat_gen = gitignore_cfg.get("generated", False)
+        for _prov in providers:
+            _pc = provider_config.get(_prov, {})
+            for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
+                _d = _pc.get(_dir_key)
+                if _d and _should_ignore(_d + "/", cat_gen):
+                    base_gitignore_entries.append(_d + "/")
+            if _pc.get("has_commands") and _pc.get("commands_dir"):
+                _c = _pc["commands_dir"]
+                if _should_ignore(_c + "/", cat_gen):
+                    base_gitignore_entries.append(_c + "/")
+
+        cat_set = gitignore_cfg.get("settings", False)
+        for _prov in providers:
+            _pc = provider_config.get(_prov, {})
+            _sf = _pc.get("settings_file")
+            if _sf and _should_ignore(_sf, cat_set):
+                base_gitignore_entries.append(_sf)
+            _ctx = _pc.get("context_file")
+            if _ctx and _ctx != "CLAUDE.md" and _should_ignore(_ctx, cat_set):
+                base_gitignore_entries.append(_ctx)
+
+        custom_entries = gitignore_cfg.get("custom_entries", [])
+        if custom_entries:
+            base_gitignore_entries.extend(custom_entries)
+    if is_claude:
+        sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
+    init_settings_json(agent_meta_root, project_root, log, args.dry_run,
+                       providers=providers, provider_config=provider_config,
+                       variables=variables)
+    init_settings_local_json(agent_meta_root, project_root, log, args.dry_run,
+                             providers=providers, provider_config=provider_config,
+                             variables=variables)
+    # Auto-generated env scripts — always gitignored (may contain defaults/secrets).
+    env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
+                     ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
+    sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
+    # Per-provider sync
+    debug_mode = config.get("debug-mode", False)
+    if debug_mode:
+        log.info("debug-mode", "active — injecting debug block into all agents")  # noqa: PLE1205
+    allow_committed_secrets = config.get("allow-committed-secrets", False)
+    mcp_gitignore_extras: list[str] = []
+    for provider in providers:
+        pc = provider_config[provider]
+        log.provider_header(provider)
+        if not is_provider_active(config, provider):
+            log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")  # noqa: PLE1205
+            continue
+        # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
+        # takes precedence over the global orchestrator.mode for this provider's
+        # generated agents/rules only. Build a shallow copy of `variables` with the
+        # recomputed ORCH_MODE_* flags — the shared `variables` dict is never mutated.
+        _orch_config = config.get("orchestrator", {})
+        _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+        if _provider_override and _provider_override.get("mode") is not None:
+            provider_variables = dict(variables)
+            provider_variables.update(
+                _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
             )
-            log.info("rules", f"preset '{rules_preset_name}' -> {rules_summary}")  # noqa: PLE1205
         else:
-            log.info("rules", f"preset '{rules_preset_name}' -> all alwaysApply (default)")  # noqa: PLE1205
-        # Load platform-config variables ({{platform.*}} placeholders)
-        platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
-        if platform_vars is not None:
-            log.info("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")  # noqa: PLE1205
-        is_claude = "Claude" in providers
-        claude_pc = provider_config.get("Claude", {})
-        gitignore_cfg = config.get("gitignore", {})
-        base_gitignore_entries: list[str] = []
-        exceptions = gitignore_cfg.get("exceptions", [])
-        def _should_ignore(path: str, category_default: bool) -> bool:
-            return not category_default if path in exceptions else category_default
+            provider_variables = variables
+        sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
+                                  log, args.dry_run, provider, provider_config)
+    # Cleanup legacy files for removed providers
+    all_known_providers = provider_config.keys()
+    active_context_files = set()
+    for prov in providers:
+        if prov == "providers": continue
+        if is_provider_active(config, prov):
+            pc = provider_config.get(prov, {})
+            c_file = pc.get("context_file", f"{prov.upper()}.md")
+            if c_file == "CLAUDE.md" and prov != "Claude":
+                c_file = "AGENTS.md"
+            active_context_files.add(c_file)
 
-        if is_claude:
-            cat_local = gitignore_cfg.get("local", True)
-            local_candidates = claude_pc.get("gitignore_entries", [
-                ".claude/settings.local.json",
-                ".claude/agent-memory-local/",
-                "CLAUDE.personal.md",
-                "sync.log",
-            ])
-            for _p in local_candidates:
-                if _should_ignore(_p, cat_local):
-                    base_gitignore_entries.append(_p)
+    for prov in all_known_providers:
+        if prov == "providers": continue # Skip the top-level key if present
+        if prov not in providers or not is_provider_active(config, prov):
+            pc = provider_config.get(prov, {})
 
-            cat_gen = gitignore_cfg.get("generated", False)
-            for _prov in providers:
-                _pc = provider_config.get(_prov, {})
-                for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
-                    _d = _pc.get(_dir_key)
-                    if _d and _should_ignore(_d + "/", cat_gen):
-                        base_gitignore_entries.append(_d + "/")
-                if _pc.get("has_commands") and _pc.get("commands_dir"):
-                    _c = _pc["commands_dir"]
-                    if _should_ignore(_c + "/", cat_gen):
-                        base_gitignore_entries.append(_c + "/")
+            # Default paths if missing from config
+            a_dir = pc.get("agents_dir", f".{prov.lower()}/agents")
+            c_file = pc.get("context_file", f"{prov.upper()}.md")
+            if c_file == "CLAUDE.md" and prov != "Claude":
+                # E.g. Opencode uses AGENTS.md, fallback
+                c_file = "AGENTS.md"
 
-            cat_set = gitignore_cfg.get("settings", False)
-            for _prov in providers:
-                _pc = provider_config.get(_prov, {})
-                _sf = _pc.get("settings_file")
-                if _sf and _should_ignore(_sf, cat_set):
-                    base_gitignore_entries.append(_sf)
-                _ctx = _pc.get("context_file")
-                if _ctx and _ctx != "CLAUDE.md" and _should_ignore(_ctx, cat_set):
-                    base_gitignore_entries.append(_ctx)
-            
-            custom_entries = gitignore_cfg.get("custom_entries", [])
-            if custom_entries:
-                base_gitignore_entries.extend(custom_entries)
-        if is_claude:
-            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
-            init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
-        init_settings_json(agent_meta_root, project_root, log, args.dry_run,
-                           providers=providers, provider_config=provider_config,
-                           variables=variables)
-        init_settings_local_json(agent_meta_root, project_root, log, args.dry_run,
-                                 providers=providers, provider_config=provider_config,
-                                 variables=variables)
-        # Auto-generated env scripts — always gitignored (may contain defaults/secrets).
-        env_gitignore = [".meta-config/env.ps1", ".meta-config/env.sh",
-                         ".meta-config/env.unset.ps1", ".meta-config/env.unset.sh"]
-        sync_secrets_template(agent_meta_root, project_root, config, log, args.dry_run)
-        # Per-provider sync
-        debug_mode = config.get("debug-mode", False)
-        if debug_mode:
-            log.info("debug-mode", "active — injecting debug block into all agents")  # noqa: PLE1205
-        allow_committed_secrets = config.get("allow-committed-secrets", False)
-        mcp_gitignore_extras: list[str] = []
-        for provider in providers:
-            pc = provider_config[provider]
-            log.provider_header(provider)
-            if not is_provider_active(config, provider):
-                log.info("deactivation", f"provider '{provider}' is deactivated — skipping all output")  # noqa: PLE1205
-                continue
-            # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
-            # takes precedence over the global orchestrator.mode for this provider's
-            # generated agents/rules only. Build a shallow copy of `variables` with the
-            # recomputed ORCH_MODE_* flags — the shared `variables` dict is never mutated.
-            _orch_config = config.get("orchestrator", {})
-            _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
-            if _provider_override and _provider_override.get("mode") is not None:
-                provider_variables = dict(variables)
-                provider_variables.update(
-                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
-                )
-            else:
-                provider_variables = variables
-            sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
-                                      log, args.dry_run, provider, provider_config)
-        # Cleanup legacy files for removed providers
-        all_known_providers = provider_config.keys()
-        active_context_files = set()
-        for prov in providers:
-            if prov == "providers": continue
-            if is_provider_active(config, prov):
-                pc = provider_config.get(prov, {})
-                c_file = pc.get("context_file", f"{prov.upper()}.md")
-                if c_file == "CLAUDE.md" and prov != "Claude":
-                    c_file = "AGENTS.md"
-                active_context_files.add(c_file)
+            agents_dir = project_root / a_dir
+            context_file = project_root / c_file
 
-        for prov in all_known_providers:
-            if prov == "providers": continue # Skip the top-level key if present
-            if prov not in providers or not is_provider_active(config, prov):
-                pc = provider_config.get(prov, {})
-                
-                # Default paths if missing from config
-                a_dir = pc.get("agents_dir", f".{prov.lower()}/agents")
-                c_file = pc.get("context_file", f"{prov.upper()}.md")
-                if c_file == "CLAUDE.md" and prov != "Claude":
-                    # E.g. Opencode uses AGENTS.md, fallback
-                    c_file = "AGENTS.md"
-                
-                agents_dir = project_root / a_dir
-                context_file = project_root / c_file
-                
-                if agents_dir.exists():
-                    log.action("DELETE", str(agents_dir.relative_to(project_root)), f"provider {prov} removed")
-                    if not args.dry_run:
-                        import shutil
-                        shutil.rmtree(agents_dir)
-                if context_file.exists() and c_file not in active_context_files:
-                    log.action("DELETE", str(context_file.relative_to(project_root)), f"provider {prov} removed")
-                    if not args.dry_run:
-                        context_file.unlink()
-
-                # Cleanup parent provider directory if empty
-                prov_dir_name = f".{prov.lower()}"
-                if prov == "Copilot":
-                    prov_dir_name = ".github/copilot"
-                prov_dir = project_root / prov_dir_name
-                if prov_dir.exists() and not args.dry_run:
+            if agents_dir.exists():
+                log.action("DELETE", str(agents_dir.relative_to(project_root)), f"provider {prov} removed")
+                if not args.dry_run:
                     import shutil
-                    try:
-                        remaining_files = [f for f in prov_dir.rglob("*") if f.is_file()]
-                        if not remaining_files:
-                            shutil.rmtree(prov_dir)
-                            log.action("DELETE", str(prov_dir.relative_to(project_root)), f"empty provider directory {prov} pruned")
-                    except Exception:
-                        pass
+                    shutil.rmtree(agents_dir)
+            if context_file.exists() and c_file not in active_context_files:
+                log.action("DELETE", str(context_file.relative_to(project_root)), f"provider {prov} removed")
+                if not args.dry_run:
+                    context_file.unlink()
 
-        for provider in providers:
-            pc = provider_config[provider]
-            if not is_provider_active(config, provider):
-                continue
-            
-            _orch_config = config.get("orchestrator", {})
-            _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
-            if _provider_override and _provider_override.get("mode") is not None:
-                provider_variables = dict(variables)
-                provider_variables.update(
-                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
-                )
-            else:
-                provider_variables = variables
+            # Cleanup parent provider directory if empty
+            prov_dir_name = f".{prov.lower()}"
+            if prov == "Copilot":
+                prov_dir_name = ".github/copilot"
+            prov_dir = project_root / prov_dir_name
+            if prov_dir.exists() and not args.dry_run:
+                import shutil
+                try:
+                    remaining_files = [f for f in prov_dir.rglob("*") if f.is_file()]
+                    if not remaining_files:
+                        shutil.rmtree(prov_dir)
+                        log.action("DELETE", str(prov_dir.relative_to(project_root)), f"empty provider directory {prov} pruned")
+                except Exception:
+                    pass
 
-            # PIPELINE_DETAILS_DIR + on-demand pipeline stage-detail files —
-            # the lean, always-on-token-saving counterpart to
-            # PIPELINE_DETAIL_BLOCKS (which inlines every pipeline's full
-            # stage detail directly into orchestrator.md; fine for the
-            # ORCH_MODE_STRICT/ADVISORY subagent, too expensive for
-            # main-chat mode's always-loaded use-orchestrator.md / embedded
-            # context file). One file per active pipeline; main_chat Read()s
-            # the relevant one only once it actually routes there. Computed
-            # centrally here (not inside sync_rules()) so it also reaches
-            # providers without a native rules_dir (e.g. Opencode), whose
-            # rules content is embedded into the context file instead
-            # (sync_context_for_provider / _build_managed_block).
-            pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
-            provider_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
-            pipelines_for_details = apply_overrides(
-                load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+    for provider in providers:
+        pc = provider_config[provider]
+        if not is_provider_active(config, provider):
+            continue
+
+        _orch_config = config.get("orchestrator", {})
+        _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
+        if _provider_override and _provider_override.get("mode") is not None:
+            provider_variables = dict(variables)
+            provider_variables.update(
+                _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
             )
-            if pipelines_for_details:
-                sync_pipeline_detail_files(
-                    pipelines_for_details, provider, project_root / pipeline_details_dir,
-                    project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,
-                )
-
-            sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
-                                     log, args.dry_run, provider, provider_config,
-                                     platform_vars=platform_vars,
-                                     debug_mode=debug_mode)
-            if provider == "Continue":
-                sync_prompts_for_continue(agent_meta_root, project_root, config,
-                                          provider_variables, log, args.dry_run,
-                                          provider_config=provider_config)
-            if pc.get("has_rules", False):
-                sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
-                           platform_vars=platform_vars, variables=provider_variables,
-                           rules_dir=pc.get("rules_dir"), provider=provider,
-                           provider_config=provider_config)
-                sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
-                                 rules_dir=pc.get("rules_dir"))
-            # MCP: generate rule files + provider configs + collect gitignore entries
-            try:
-                mcp_extras = generate_mcp_artifacts(
-                    agent_meta_root, project_root, config, provider_config,
-                    log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
-                    allow_committed_secrets=allow_committed_secrets,
-                )
-            except SyncError as exc:
-                print(f"\n  !!  MCP sync aborted: {exc}", file=sys.stderr)
-                sys.exit(1)
-            for entry in mcp_extras:
-                if entry not in mcp_gitignore_extras:
-                    mcp_gitignore_extras.append(entry)
-            # External tools: generate rule files for active locally-installed CLI tools
-            try:
-                generate_external_tool_artifacts(
-                    agent_meta_root, project_root, config, provider_config,
-                    log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
-                )
-            except SyncError as exc:
-                print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
-                sys.exit(1)
-            if pc.get("has_hooks", False):
-                sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
-                           provider=provider, provider_config=provider_config)
-                sync_hook_lib(agent_meta_root, project_root, config, log, args.dry_run,
-                              provider=provider, provider_config=provider_config)
-                sync_release_gates(agent_meta_root, project_root, config, log, args.dry_run,
-                                    provider=provider, provider_config=provider_config,
-                                    release_gates_resolved=resolve_release_gates(config, agent_meta_root))
-            else:
-                log.info("hooks", f"skipped for {provider} — not supported")  # noqa: PLE1205
-            if pc.get("has_commands", False):
-                sync_commands_for_provider(agent_meta_root, project_root, config, log,
-                                           args.dry_run, provider,
-                                           provider_config=provider_config,
-                                           variables=variables)
-            # Sync snippets and external skills per provider
-            sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
-                                       provider, provider_config)
-            sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
-                                              log, args.dry_run, provider, provider_config)
-        # External-tool injection governance: once per sync run (not per
-        # provider) — diffs each active provider's managed dirs against
-        # permitted-injections, warns on anything undeclared.
-        try:
-            drift = scan_injection_drift(agent_meta_root, project_root, config, provider_config)
-            render_injection_drift_artifacts(drift, project_root, provider_config, log, args.dry_run)
-        except SyncError as exc:
-            print(f"\n  !!  External-tool injection drift scan aborted: {exc}", file=sys.stderr)
-            sys.exit(1)
-        # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
-        try:
-            sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)
-        except SyncError as exc:
-            print(f"\n  !!  Knowledge Engine sync aborted: {exc}", file=sys.stderr)
-            sys.exit(1)
-        # Provider isolation: hard-block cross-provider directory access
-        isolation_mode = config.get("provider-isolation")
-        if isolation_mode != "disabled":
-            sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
         else:
-            log.skip("provider-isolation", "disabled in project.yaml")
-        # Check pinned commits + warn for unknown/unapproved skills in project config
-        ext_config = load_external_skills_config(agent_meta_root)
-        check_pinned_commits(ext_config, agent_meta_root, log)
-        if "external-skills" in config:
-            known_skills = set(ext_config.get("skills", {}).keys())
-            known_repos = set(ext_config.get("repos", {}).keys())
-            for skill_name in config["external-skills"]:
-                if skill_name in known_repos:
-                    # It's a repo (e.g. awesome-claude-code) — implicit dependency, not a skill entry
-                    log.info("external-skills", f"'{skill_name}' is a framework repo (not a skill) — OK")
-                elif skill_name not in known_skills:
-                    log.warning(f"external-skills: '{skill_name}' not found in skills-registry.yaml (neither skills nor repos) -- skipping")
-                elif not ext_config["skills"][skill_name].get("approved", False):
-                    log.warning(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
-        # Update .gitignore managed block: base entries + per-provider entries + skill entries
-        # Collect gitignore_entries from all active non-Claude providers
-        extra_provider_entries: list[str] = []
-        for _p in providers:
-            if _p == "Claude":
-                continue  # already in base_gitignore_entries
-            _pc = provider_config.get(_p, {})
-            if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
-                log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
-            extra_provider_entries.extend(_pc.get("gitignore_entries", []))
-        # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
-        viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
-        if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
-            viz_gitignore = viz_gitignore_entries()
-            base_gitignore_entries.extend(viz_gitignore)
+            provider_variables = variables
 
-        if is_claude:
-            skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config, provider_config)
-            all_gitignore_entries = (
-                base_gitignore_entries + extra_provider_entries
-                + skill_gitignore_entries + mcp_gitignore_extras
-                + env_gitignore
+        # PIPELINE_DETAILS_DIR + on-demand pipeline stage-detail files —
+        # the lean, always-on-token-saving counterpart to
+        # PIPELINE_DETAIL_BLOCKS (which inlines every pipeline's full
+        # stage detail directly into orchestrator.md; fine for the
+        # ORCH_MODE_STRICT/ADVISORY subagent, too expensive for
+        # main-chat mode's always-loaded use-orchestrator.md / embedded
+        # context file). One file per active pipeline; main_chat Read()s
+        # the relevant one only once it actually routes there. Computed
+        # centrally here (not inside sync_rules()) so it also reaches
+        # providers without a native rules_dir (e.g. Opencode), whose
+        # rules content is embedded into the context file instead
+        # (sync_context_for_provider / _build_managed_block).
+        pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
+        provider_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
+        pipelines_for_details = apply_overrides(
+            load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+        )
+        if pipelines_for_details:
+            sync_pipeline_detail_files(
+                pipelines_for_details, provider, project_root / pipeline_details_dir,
+                project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,
             )
-            ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     exact_entries=all_gitignore_entries)
-        elif extra_provider_entries or mcp_gitignore_extras:
-            # No Claude active but other providers have gitignore entries to manage
-            ensure_gitignore_entries(project_root, log, args.dry_run,
-                                     gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
-        # Lightweight config-audit summary at the end of a normal sync. Full
-        # reporting stays opt-in via --audit-config; here we emit one log line
-        # per non-empty category so projects do not silently keep stale or
-        # broken config. Severity mapping mirrors --audit-config:
-        #   roles_without_template    → ERROR
-        #   templates_without_default → INFO
-        #   deprecated_roles          → WARN (auto-fixable via --apply)
-        #   orphaned_pipelines        → WARN
-        # The audit itself must never break a sync — wrapped in try/except.
+        sync_agents_for_provider(agent_meta_root, project_root, config, provider_variables,
+                                 log, args.dry_run, provider, provider_config,
+                                 platform_vars=platform_vars,
+                                 debug_mode=debug_mode)
+        if provider == "Continue":
+            sync_prompts_for_continue(agent_meta_root, project_root, config,
+                                      provider_variables, log, args.dry_run,
+                                      provider_config=provider_config)
+        if pc.get("has_rules", False):
+            sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
+                       platform_vars=platform_vars, variables=provider_variables,
+                       rules_dir=pc.get("rules_dir"), provider=provider,
+                       provider_config=provider_config)
+            sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
+                             rules_dir=pc.get("rules_dir"))
+        # MCP: generate rule files + provider configs + collect gitignore entries
         try:
-            _audit_report = audit_config(agent_meta_root, config_path)
+            mcp_extras = generate_mcp_artifacts(
+                agent_meta_root, project_root, config, provider_config,
+                log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+                allow_committed_secrets=allow_committed_secrets,
+            )
+        except SyncError as exc:
+            print(f"\n  !!  MCP sync aborted: {exc}", file=sys.stderr)
+            sys.exit(1)
+        for entry in mcp_extras:
+            if entry not in mcp_gitignore_extras:
+                mcp_gitignore_extras.append(entry)
+        # External tools: generate rule files for active locally-installed CLI tools
+        try:
+            generate_external_tool_artifacts(
+                agent_meta_root, project_root, config, provider_config,
+                log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+            )
+        except SyncError as exc:
+            print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
+            sys.exit(1)
+        if pc.get("has_hooks", False):
+            sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
+                       provider=provider, provider_config=provider_config)
+            sync_hook_lib(agent_meta_root, project_root, config, log, args.dry_run,
+                          provider=provider, provider_config=provider_config)
+            sync_release_gates(agent_meta_root, project_root, config, log, args.dry_run,
+                                provider=provider, provider_config=provider_config,
+                                release_gates_resolved=resolve_release_gates(config, agent_meta_root))
+        else:
+            log.info("hooks", f"skipped for {provider} — not supported")  # noqa: PLE1205
+        if pc.get("has_commands", False):
+            sync_commands_for_provider(agent_meta_root, project_root, config, log,
+                                       args.dry_run, provider,
+                                       provider_config=provider_config,
+                                       variables=variables)
+        # Sync snippets and external skills per provider
+        sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
+                                   provider, provider_config)
+        sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
+                                          log, args.dry_run, provider, provider_config)
+    # External-tool injection governance: once per sync run (not per
+    # provider) — diffs each active provider's managed dirs against
+    # permitted-injections, warns on anything undeclared.
+    try:
+        drift = scan_injection_drift(agent_meta_root, project_root, config, provider_config)
+        render_injection_drift_artifacts(drift, project_root, provider_config, log, args.dry_run)
+    except SyncError as exc:
+        print(f"\n  !!  External-tool injection drift scan aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+    # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
+    try:
+        sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)
+    except SyncError as exc:
+        print(f"\n  !!  Knowledge Engine sync aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+    # Provider isolation: hard-block cross-provider directory access
+    isolation_mode = config.get("provider-isolation")
+    if isolation_mode != "disabled":
+        sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
+    else:
+        log.skip("provider-isolation", "disabled in project.yaml")
+    # Check pinned commits + warn for unknown/unapproved skills in project config
+    ext_config = load_external_skills_config(agent_meta_root)
+    check_pinned_commits(ext_config, agent_meta_root, log)
+    if "external-skills" in config:
+        known_skills = set(ext_config.get("skills", {}).keys())
+        known_repos = set(ext_config.get("repos", {}).keys())
+        for skill_name in config["external-skills"]:
+            if skill_name in known_repos:
+                # It's a repo (e.g. awesome-claude-code) — implicit dependency, not a skill entry
+                log.info("external-skills", f"'{skill_name}' is a framework repo (not a skill) — OK")
+            elif skill_name not in known_skills:
+                log.warning(f"external-skills: '{skill_name}' not found in skills-registry.yaml (neither skills nor repos) -- skipping")
+            elif not ext_config["skills"][skill_name].get("approved", False):
+                log.warning(f"external-skills: '{skill_name}' is not approved by meta-maintainer -- skipping")
+    # Update .gitignore managed block: base entries + per-provider entries + skill entries
+    # Collect gitignore_entries from all active non-Claude providers
+    extra_provider_entries: list[str] = []
+    for _p in providers:
+        if _p == "Claude":
+            continue  # already in base_gitignore_entries
+        _pc = provider_config.get(_p, {})
+        if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
+            log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
+        extra_provider_entries.extend(_pc.get("gitignore_entries", []))
+    # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
+    viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
+    if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
+        viz_gitignore = viz_gitignore_entries()
+        base_gitignore_entries.extend(viz_gitignore)
 
-            _missing = _audit_report.by_category("roles_without_template")
-            if _missing:
-                _names = ", ".join(sorted({i.role for i in _missing if i.role}))
-                # SyncLog has no .error() level — emit as WARN with explicit
-                # [ERROR] severity tag to keep parity with --audit-config output.
-                log.warning(
-                    "config-audit [ERROR]: "
-                    f"{len(_missing)} role(s) without generic template: {_names}. "
-                    "Run: python scripts/sync.py --audit-config"
-                )
+    if is_claude:
+        skill_gitignore_entries = _collect_skill_gitignore_entries(config, ext_config, provider_config)
+        all_gitignore_entries = (
+            base_gitignore_entries + extra_provider_entries
+            + skill_gitignore_entries + mcp_gitignore_extras
+            + env_gitignore
+        )
+        ensure_gitignore_entries(project_root, log, args.dry_run,
+                                 exact_entries=all_gitignore_entries)
+    elif extra_provider_entries or mcp_gitignore_extras:
+        # No Claude active but other providers have gitignore entries to manage
+        ensure_gitignore_entries(project_root, log, args.dry_run,
+                                 gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
-            _templ_noref = _audit_report.by_category("templates_without_default")
-            if _templ_noref:
-                _names = ", ".join(sorted({i.role for i in _templ_noref if i.role}))
-                log.info(  # noqa: PLE1205
-                    "config-audit",
-                    f"{len(_templ_noref)} template(s) without role-defaults entry: {_names}."
-                )
+    # Lightweight config-audit summary at the end of a normal sync. Full
+    # reporting stays opt-in via --audit-config; here we emit one log line
+    # per non-empty category so projects do not silently keep stale or
+    # broken config. Severity mapping mirrors --audit-config:
+    #   roles_without_template    → ERROR
+    #   templates_without_default → INFO
+    #   deprecated_roles          → WARN (auto-fixable via --apply)
+    #   orphaned_pipelines        → WARN
+    # The audit itself must never break a sync — wrapped in try/except.
+    try:
+        _audit_report = audit_config(agent_meta_root, config_path)
 
-            _depr = _audit_report.deprecated_roles
-            if _depr:
-                log.warning(
-                    "config-audit: "
-                    f"{len(_depr)} deprecated role(s) still in project.yaml: "
-                    f"{', '.join(_depr)}. "
-                    "Run: python scripts/sync.py --audit-config --apply"
-                )
+        _missing = _audit_report.by_category("roles_without_template")
+        if _missing:
+            _names = ", ".join(sorted({i.role for i in _missing if i.role}))
+            # SyncLog has no .error() level — emit as WARN with explicit
+            # [ERROR] severity tag to keep parity with --audit-config output.
+            log.warning(
+                "config-audit [ERROR]: "
+                f"{len(_missing)} role(s) without generic template: {_names}. "
+                "Run: python scripts/sync.py --audit-config"
+            )
 
-            _orphans = _audit_report.by_category("orphaned_pipelines")
-            if _orphans:
-                _names = ", ".join(sorted({i.role for i in _orphans if i.role}))
-                log.warning(
-                    "config-audit: "
-                    f"{len(_orphans)} orphaned pipeline reference(s): {_names}. "
-                    "Run: python scripts/sync.py --audit-config"
-                )
-        except Exception as exc:  # noqa: BLE001
-            # Audit must never break a sync — degrade gracefully.
-            log.info("config-audit", f"skipped (error: {exc})")  # noqa: PLE1205
+        _templ_noref = _audit_report.by_category("templates_without_default")
+        if _templ_noref:
+            _names = ", ".join(sorted({i.role for i in _templ_noref if i.role}))
+            log.info(  # noqa: PLE1205
+                "config-audit",
+                f"{len(_templ_noref)} template(s) without role-defaults entry: {_names}."
+            )
+
+        _depr = _audit_report.deprecated_roles
+        if _depr:
+            log.warning(
+                "config-audit: "
+                f"{len(_depr)} deprecated role(s) still in project.yaml: "
+                f"{', '.join(_depr)}. "
+                "Run: python scripts/sync.py --audit-config --apply"
+            )
+
+        _orphans = _audit_report.by_category("orphaned_pipelines")
+        if _orphans:
+            _names = ", ".join(sorted({i.role for i in _orphans if i.role}))
+            log.warning(
+                "config-audit: "
+                f"{len(_orphans)} orphaned pipeline reference(s): {_names}. "
+                "Run: python scripts/sync.py --audit-config"
+            )
+    except Exception as exc:  # noqa: BLE001
+        # Audit must never break a sync — degrade gracefully.
+        log.info("config-audit", f"skipped (error: {exc})")  # noqa: PLE1205
+
+    ctx.config = config
+    ctx.mode = mode
+
+
+# Ordered (predicate, handler) table. Order mirrors the original if/elif
+# chain exactly -- the first matching predicate wins, so flag precedence is
+# preserved. The default (no predicate matches) is _handle_sync.
+_MODE_HANDLERS = [
+    (lambda a: a.fill_defaults, _handle_fill_defaults),
+    (lambda a: a.audit_config, _handle_audit_config),
+    (lambda a: a.only_variables, _handle_only_variables),
+    (lambda a: a.create_ext, _handle_create_ext),
+    (lambda a: a.update_ext, _handle_update_ext),
+    (lambda a: a.create_rule, _handle_create_rule),
+    (lambda a: a.create_hook, _handle_create_hook),
+    (lambda a: a.create_command, _handle_create_command),
+    (lambda a: a.viz_only, _handle_viz_only),
+    (lambda a: a.viz_cleanup, _handle_viz_cleanup),
+    (lambda a: a.deactivation_status, _handle_deactivation_status),
+    (lambda a: a.deactivate_providers is not None, _handle_deactivate_providers),
+    (lambda a: a.activate_providers is not None, _handle_activate_providers),
+    (lambda a: a.backup is not None, _handle_backup),
+    (lambda a: a.restore, _handle_restore),
+    (lambda a: a.list_backups, _handle_list_backups),
+    (lambda a: a.delete_backup, _handle_delete_backup),
+    (lambda a: a.prune_backups, _handle_prune_backups),
+    (lambda a: a.validate, _handle_validate),
+]
+
+
+def _dispatch(ctx: _SyncContext) -> None:
+    """Select and run the mode handler matching the parsed CLI flags."""
+    for predicate, handler in _MODE_HANDLERS:
+        if predicate(ctx.args):
+            handler(ctx)
+            return
+    _handle_sync(ctx)
+
+
+def _run_common_tail(ctx: _SyncContext) -> None:
+    """Shared post-dispatch tail: env scripts, viz, AST, log write,
+    --check exit code, --admin server and the restart notice.
+
+    Every dispatch branch that does not exit early falls through here.
+    """
+    args = ctx.args
+    log = ctx.log
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    viz_cfg = ctx.viz_cfg
+    platforms = ctx.platforms
+    source_version = ctx.source_version
+    mode = ctx.mode
 
     # Environment script generation: produce platform-specific setup scripts
     # (.ps1 / .sh) from the environments: section in project.yaml.
@@ -1393,6 +1696,24 @@ def main():
         print("Default-Agenten in die Laufzeitumgebung geladen werden!")
         print("Danach kann der agent-meta-manager unterstützen.")
         print("=" * 80 + "\n")
+
+
+def main() -> None:
+    """Parse CLI args and drive the sync: early modes, dispatch, common tail."""
+    parser = _build_arg_parser()
+    args = parser.parse_args()
+    _normalize_check_dry_run(args)
+
+    script_path = Path(__file__).resolve()
+    agent_meta_root = find_agent_meta_root(script_path)
+    log = SyncLog()
+
+    ctx = _build_context(args, agent_meta_root, log)
+    if ctx is None:
+        return
+
+    _dispatch(ctx)
+    _run_common_tail(ctx)
 
 
 if __name__ == "__main__":
