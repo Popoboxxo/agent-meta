@@ -1,10 +1,12 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 2.6.0
+# version: 3.0.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
 # enabled_by_default: true
+
+set -uo pipefail
 
 # This hook is always active (enabled_by_default: true).
 # It self-checks whether orchestrator.strict mode is enabled in project.yaml.
@@ -79,20 +81,29 @@
 
 INPUT=$(cat)
 
-# Try python first, then python3
-_PY=""
-if command -v python >/dev/null 2>&1; then
-  _PY="python"
-elif command -v python3 >/dev/null 2>&1; then
-  _PY="python3"
+# --- Shared helper lib + fail-closed python check (issue #595) ---------
+# This hook is a security boundary (blocks strict-mode/destructive/mutation
+# git calls) — unlike the informational/automation hooks in this repo, it
+# must NOT silently allow the action through just because a required
+# dependency is missing. Both a missing lib/hook_common.sh (deployment bug)
+# and a missing python3/python interpreter (PATH manipulation) now fail
+# CLOSED (exit 2) instead of fail-open (exit 0).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if ! source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null; then
+  echo "ORCHESTRATOR_GUARD: required helper $SCRIPT_DIR/lib/hook_common.sh is missing or unreadable." >&2
+  echo "Failing closed (issue #595) — re-run sync.py to redeploy the hooks/lib/ directory." >&2
+  exit 2
 fi
 
-if [ -z "$_PY" ]; then
-  # No Python available — cannot parse JSON/YAML; allow through to avoid breakage
-  exit 0
+if ! hook_have_python; then
+  echo "ORCHESTRATOR_GUARD: no python/python3 interpreter found on PATH." >&2
+  echo "Failing closed (issue #595) — this guard cannot evaluate strict-mode/destructive-op checks without one." >&2
+  echo "Install python3 or restore PATH to unblock this guard." >&2
+  exit 2
 fi
+_PY="$(hook_python_bin)"
 
-TOOL_NAME=$(echo "$INPUT" | $_PY -c "import json,sys; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null || echo "")
+TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
 # If no tool name: startup or other events — allow through
 if [ -z "$TOOL_NAME" ]; then
@@ -106,13 +117,9 @@ case "$TOOL_NAME" in
 esac
 
 BASH_CMD=""
+DECLARED_AGENT=""
 if [ "$TOOL_NAME" = "Bash" ]; then
-  BASH_CMD=$(echo "$INPUT" | $_PY -c "
-import json, sys
-d = json.load(sys.stdin)
-inp = d.get('tool_input', {})
-print(inp.get('command', '') if isinstance(inp, dict) else '')
-" 2>/dev/null || echo "")
+  BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
 
   # Self-declared agent identity (see note above): the first non-blank line
   # of the command must be exactly '#agent-meta:agent=<name>'. Only
@@ -123,17 +130,17 @@ print(inp.get('command', '') if isinstance(inp, dict) else '')
   # sentinel was silently missed and the legitimate mutation got blocked.
   # Stripping leading whitespace/blank lines before taking "line 1" makes
   # detection tolerant of that construction.
-  DECLARED_AGENT=$(printf '%s' "$BASH_CMD" | $_PY -c "
+  DECLARED_AGENT=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
 import re, sys
 content = sys.stdin.read().lstrip()
 line = content.split('\n', 1)[0].strip()
-m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)$', line)
+m = re.match(r'^#agent-meta:agent=([A-Za-z0-9_-]+)\$', line)
 print(m.group(1) if m else '')
 " 2>/dev/null || echo "")
 fi
 
 # Determine project root (needed by the audit log and config lookup)
-PROJECT_ROOT=$(echo "$INPUT" | $_PY -c "import json,sys; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null || echo "")
+PROJECT_ROOT=$(hook_json_get "$INPUT" "cwd")
 if [ -z "$PROJECT_ROOT" ]; then
   PROJECT_ROOT="$PWD"
 fi
@@ -143,15 +150,18 @@ IS_GIT_SENTINEL=0
 IS_ORCH_SENTINEL=0
 
 if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
-  _ROLE=$(echo "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+  _ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
   case "$_ROLE" in
     git|orchestrator)
+      # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
+      # credential-shaped substrings before writing (issue #596), hardens
+      # the log file to 600 permissions on every write (issue #596), and
+      # caps unbounded growth via truncate-oldest rotation (issue #597).
       _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
-      mkdir -p "$(dirname "$_AUDIT_LOG")" 2>/dev/null || true
-      printf '%s role=%s cmd=%s\n' \
+      _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
         "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_ROLE" \
-        "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)" \
-        >> "$_AUDIT_LOG" 2>/dev/null || true
+        "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
+      hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
       if [ "$_ROLE" = "git" ]; then
         IS_GIT_SENTINEL=1
       else
@@ -171,7 +181,7 @@ fi
 # error it falls back to 'none' (fail-open, matching the prior gates).
 _GIT_SCAN="none"
 if [ "$TOOL_NAME" = "Bash" ]; then
-  _GIT_SCAN=$(printf '%s' "$BASH_CMD" | $_PY -c "
+  _GIT_SCAN=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
 import re, shlex, sys
 
 command = sys.stdin.read()
@@ -359,7 +369,7 @@ fi
 # --- Destructive-operation gate: applies regardless of sentinel --------
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
   echo "ORCHESTRATOR_GUARD: destructive git operation requires explicit user approval (issue #516)." >&2
-  echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+  echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Ask the user to approve and run this command manually." >&2
   exit 2
 fi
@@ -431,7 +441,7 @@ fi
 # mutation that a non-git caller must delegate to the `git` agent.
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
   echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
-  echo "Detected command: $(echo "$BASH_CMD" | head -c 200)" >&2
+  echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Delegate git operations to the \`git\` agent." >&2
   exit 2
 fi

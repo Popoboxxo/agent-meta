@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: artifact-freshness
-# version: 1.0.0
+# version: 1.1.0
 # event: Manual
 # description: Pre-release gate — blocks release if a generated artifact is older than the source it was built from (config: .agent-meta/generated-artifacts.yaml)
 # enabled_by_default: false
@@ -110,12 +110,26 @@ def git_mtime(pattern):
         pass
     return None
 
+def resolve_mtime(pattern):
+    # issue #600: prefer git-log-derived commit timestamps over filesystem
+    # mtime for BOTH source and generated artifacts. A fresh `git clone` (or
+    # several CI checkout actions) commonly sets a uniform mtime on every
+    # checked-out file, which makes a plain filesystem-mtime comparison an
+    # unreliable freshness signal — it can produce both false passes (all
+    # mtimes identical, "not older than") and false fails depending on
+    # checkout order. git_mtime() is unaffected by checkout mtime behavior
+    # since it reads the commit timestamp git itself recorded. Falls back
+    # to filesystem mtime only for paths git has no history for at all
+    # (e.g. a gitignored/never-committed build artifact) — otherwise every
+    # such artifact would incorrectly resolve to "missing".
+    return git_mtime(pattern) or newest_mtime(pattern)
+
 errors = []
 checked = 0
 for pair in pairs:
     source, generated = pair["source"], pair["generated"]
-    src_mtime = newest_mtime(source) or git_mtime(source)
-    gen_mtime = newest_mtime(generated)
+    src_mtime = resolve_mtime(source)
+    gen_mtime = resolve_mtime(generated)
     if src_mtime is None:
         print(f"[SKIP] {gate_name}: source not found: {source}")
         continue

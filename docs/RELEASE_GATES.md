@@ -24,10 +24,12 @@ ob ein Gate aktiv ist — das entscheidet jedes Gate-Script an seinem eigenen An
 <hooks_dir>/
   pre-release-check.sh          # Dispatcher (agent-meta-managed)
   release-gates/
+    .agent-meta-managed         # Allowlist Teil 1: eingebaute Gate-Dateinamen (agent-meta-managed)
+    .allowed-gates               # Allowlist Teil 2: projekteigene Gate-Dateinamen (sync.py fasst das NIE an)
     artifact-freshness.sh       # eingebaut (agent-meta-managed)
     docker-image-scan.sh        # eingebaut (agent-meta-managed)
     action-pin-validation.sh    # eingebaut (agent-meta-managed)
-    my-project-custom-check.sh  # projekteigen — sync.py fasst das NIE an
+    my-project-custom-check.sh  # projekteigen — sync.py fasst das NIE an, muss zusätzlich in .allowed-gates stehen (issue #598)
 ```
 
 (`<hooks_dir>` = `.claude/hooks` bei Claude, `.mammouth/hooks` bei Mammouth — der einzige aktuell
@@ -58,10 +60,31 @@ aktive Provider mit Hook-Unterstützung neben Claude, siehe `config/ai-providers
 
 ## Eigene Gates hinzufügen (der zentrale Erweiterungspunkt)
 
-Ein Projekt legt einfach eine eigene `.sh`-Datei direkt in `<hooks_dir>/release-gates/` ab —
+Ein Projekt legt eine eigene `.sh`-Datei direkt in `<hooks_dir>/release-gates/` ab —
 `sync.py` fasst projekteigene Dateien dort **nie** an (nicht im `release-gates/.agent-meta-managed`
-Index getrackt, exakt wie projekteigene Hooks über `--create-hook`). Der Dispatcher findet und
-führt sie automatisch mit aus, ganz ohne Framework-Änderung.
+Index getrackt, exakt wie projekteigene Hooks über `--create-hook`).
+
+**Allowlist-Pflicht (issue #598):** seit Version 3.0.0 des Dispatchers führt `pre-release-check.sh`
+NICHT mehr automatisch jede `.sh`-Datei aus, die im Verzeichnis liegt — das war ein
+Supply-Chain-Risiko (versehentlich abgelegte, per kompromittierter Dependency eingeschleuste oder
+über eine bösartige PR hinzugefügte Datei hätte sonst unkontrolliert im Release-Prozess mitgelaufen).
+Ein Gate-Script läuft nur, wenn sein Dateiname in einer der beiden Allowlist-Dateien steht:
+
+- `release-gates/.agent-meta-managed` — eingebaute Gates, von `sync.py` verwaltet.
+- `release-gates/.allowed-gates` — projekteigenes Manifest, **von `sync.py` nie angefasst**. Eine
+  Zeile pro erlaubtem Dateinamen, `#`-Kommentare und Leerzeilen werden ignoriert.
+
+Ein Skript in `release-gates/`, das in KEINER der beiden Dateien steht, wird mit `[SKIP] ... not on
+the release-gates allowlist` übersprungen — nicht als Fehlschlag gewertet, aber auch nicht
+ausgeführt. Um ein eigenes Gate zu aktivieren, zusätzlich zum Ablegen der `.sh`-Datei:
+
+```bash
+echo "no-todo-in-changelog.sh" >> .claude/hooks/release-gates/.allowed-gates
+```
+
+Danach findet und führt der Dispatcher es automatisch mit aus, weiterhin ganz ohne
+`sync.py`-Lauf oder Framework-Änderung — nur die eine zusätzliche Manifest-Zeile ist neu
+gegenüber früheren Versionen.
 
 **Vertrag für ein Gate-Script** (egal ob eingebaut oder projekteigen):
 
@@ -92,9 +115,9 @@ echo "[INFO] no-todo-in-changelog: OK"
 exit 0
 ```
 
-Kein Eintrag in `project.yaml` nötig, kein `sync.py`-Lauf nötig — die Datei liegt bereits am
-richtigen Ort und wird beim nächsten `bash .claude/hooks/pre-release-check.sh` automatisch
-mitgeführt.
+Kein Eintrag in `project.yaml` nötig, kein `sync.py`-Lauf nötig — Datei ablegen UND ihren Namen in
+`release-gates/.allowed-gates` eintragen (s. o.), dann wird sie beim nächsten
+`bash .claude/hooks/pre-release-check.sh` automatisch mitgeführt.
 
 ## Die drei eingebauten Gates
 
@@ -303,6 +326,13 @@ cd "${PROJECT_ROOT:-$PWD}" || exit 1
 [ "$PRE_RELEASE_GATE_ENABLED" = "true" ] || { echo "[SKIP] lighthouse-budget-check: disabled"; exit 0; }
 
 npx lighthouse-ci autorun --config=.lighthouserc.json
+```
+
+Zusätzlich einmalig in `.claude/hooks/release-gates/.allowed-gates` eintragen (issue #598 —
+sonst wird die Datei mit `[SKIP] ... not on the release-gates allowlist` übersprungen):
+
+```bash
+echo "lighthouse-budget-check.sh" >> .claude/hooks/release-gates/.allowed-gates
 ```
 
 Kein `Dockerfile` vorhanden → `docker-image-scan` überspringt sich automatisch (kein Setup nötig,

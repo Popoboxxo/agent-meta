@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: action-pin-validation
-# version: 1.0.0
+# version: 1.1.0
 # event: Manual
 # description: Pre-release gate — validates that every pinned GitHub Action ref (tag or full SHA) in .github/workflows/*.yml still exists upstream
 # enabled_by_default: false
@@ -11,7 +11,7 @@
 # self-skip (disabled, or prerequisites missing). Exit non-zero = fail,
 # blocks the release.
 
-set -u
+set -uo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 cd "$PROJECT_ROOT" || exit 1
@@ -59,7 +59,7 @@ while IFS= read -r pin; do
   repo="${repo_part#*/}"
   # actions/checkout-style repos can have subpaths (owner/repo/subdir) —
   # keep only owner/repo for the API call.
-  repo="$(echo "$repo" | cut -d/ -f1)"
+  repo="$(printf '%s' "$repo" | cut -d/ -f1)"
 
   if [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
     # Full SHA pin — verify the commit still exists upstream.

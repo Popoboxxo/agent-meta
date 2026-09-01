@@ -1,38 +1,36 @@
 #!/bin/bash
 # hook: lifecycle-check
-# version: 1.0.0
+# version: 1.1.0
 # event: PostToolUse
 # matcher: Bash
 # provider: Claude
 # description: Detects git lifecycle events (tag push, merge, version bump) and writes pending tasks to .claude/pending-tasks.md
 # enabled_by_default: false
 
+set -uo pipefail
+
 # Claude Code passes hook context as JSON on stdin.
 # PostToolUse hooks receive the tool result — exit code is ignored.
+#
+# Not a security boundary (informational automation only) — fails OPEN
+# (exit 0) if the shared helper lib or python3/python is unavailable,
+# same as before (issue #595 only hardens the two hooks that are actual
+# security controls: orchestrator-guard.sh and dod-push-check.sh).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null || exit 0
+hook_have_python || exit 0
 
-# python3 required for JSON parsing
-command -v python3 &>/dev/null || exit 0
-
-read -r -d '' _PARSE_HOOK_INPUT <<'PYEOF'
-import json, sys
-d = json.load(sys.stdin)
-r = d.get('tool_result', {})
-print(d.get('tool_name', ''))
-print(d.get('tool_input', {}).get('command', ''))
-print(r.get('exit_code', '0') if isinstance(r, dict) else '0')
-PYEOF
-
-_parsed=$(python3 -c "$_PARSE_HOOK_INPUT" 2>/dev/null)
-TOOL_NAME=$(printf '%s' "$_parsed" | sed -n '1p')
-COMMAND=$(printf '%s' "$_parsed" | sed -n '2p')
-EXIT_CODE=$(printf '%s' "$_parsed" | sed -n '3p')
+INPUT=$(cat)
+TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
+COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
+EXIT_CODE=$(hook_json_get "$INPUT" "tool_result.exit_code" "0")
 
 # Only intercept successful Bash tool calls
 [ "$TOOL_NAME" = "Bash" ] || exit 0
 [ "$EXIT_CODE" = "0" ] || exit 0
 
-# Locate lifecycle_check.py (relative to this hook's location or via AGENT_META_ROOT)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Locate lifecycle_check.py (relative to this hook's location, SCRIPT_DIR
+# already resolved above, or via AGENT_META_ROOT)
 LIFECYCLE_PY="$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/lifecycle_check.py"
 
 # Fallback: search for .agent-meta submodule from cwd
@@ -49,26 +47,26 @@ fi
 EVENT=""
 
 # on-release: git push with a tag (git push origin v1.2.3 or git push --tags)
-if echo "$COMMAND" | grep -qE 'git push' && \
-   echo "$COMMAND" | grep -qE '(--tags?|v[0-9]+\.[0-9]+\.[0-9]+)'; then
+if printf '%s' "$COMMAND" | grep -qE 'git push' && \
+   printf '%s' "$COMMAND" | grep -qE '(--tags?|v[0-9]+\.[0-9]+\.[0-9]+)'; then
   EVENT="on-release"
 
 # on-version-bump-*: commit message contains "bump version to X.Y.Z" or "chore: bump"
-elif echo "$COMMAND" | grep -qE 'git commit'; then
-  COMMIT_MSG=$(echo "$COMMAND" | grep -oP '(?<=-m ["\x27]).*(?=["\x27])' | head -1)
-  if echo "$COMMIT_MSG" | grep -qiE 'bump.*version|version.*bump|chore.*bump'; then
+elif printf '%s' "$COMMAND" | grep -qE 'git commit'; then
+  COMMIT_MSG=$(printf '%s' "$COMMAND" | grep -oP '(?<=-m ["\x27]).*(?=["\x27])' | head -1)
+  if printf '%s' "$COMMIT_MSG" | grep -qiE 'bump.*version|version.*bump|chore.*bump'; then
     # Detect patch/minor/major from version numbers in commit message
     # Heuristic: look for X.Y.Z pattern
-    VERSION=$(echo "$COMMIT_MSG" | grep -oP '\d+\.\d+\.\d+' | head -1)
+    VERSION=$(printf '%s' "$COMMIT_MSG" | grep -oP '\d+\.\d+\.\d+' | head -1)
     if [ -n "$VERSION" ]; then
-      PATCH=$(echo "$VERSION" | cut -d. -f3)
-      MINOR=$(echo "$VERSION" | cut -d. -f2)
-      MAJOR=$(echo "$VERSION" | cut -d. -f1)
+      PATCH=$(printf '%s' "$VERSION" | cut -d. -f3)
+      MINOR=$(printf '%s' "$VERSION" | cut -d. -f2)
+      MAJOR=$(printf '%s' "$VERSION" | cut -d. -f1)
       # Check if previous tag exists to determine bump type
       PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
       if [ -n "$PREV_TAG" ]; then
-        PREV_MAJOR=$(echo "$PREV_TAG" | cut -d. -f1)
-        PREV_MINOR=$(echo "$PREV_TAG" | cut -d. -f2)
+        PREV_MAJOR=$(printf '%s' "$PREV_TAG" | cut -d. -f1)
+        PREV_MINOR=$(printf '%s' "$PREV_TAG" | cut -d. -f2)
         if [ "$MAJOR" != "$PREV_MAJOR" ]; then
           EVENT="on-version-bump-major"
         elif [ "$MINOR" != "$PREV_MINOR" ]; then
@@ -83,11 +81,11 @@ elif echo "$COMMAND" | grep -qE 'git commit'; then
   fi
 
 # on-merge: git merge command or commit on main after a branch
-elif echo "$COMMAND" | grep -qE 'git merge|gh pr merge'; then
+elif printf '%s' "$COMMAND" | grep -qE 'git merge|gh pr merge'; then
   EVENT="on-merge"
 
 # on-commit: any successful git commit (broad catch — only fires if configured)
-elif echo "$COMMAND" | grep -qE 'git commit'; then
+elif printf '%s' "$COMMAND" | grep -qE 'git commit'; then
   EVENT="on-commit"
 fi
 

@@ -487,3 +487,94 @@ def test_extended_rce_config_keys_are_destructive(command, tmp_path):
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 2, f"stderr={result.stderr}"
     assert "user approval" in result.stderr
+
+
+# --- issue #595: fail CLOSED (not open) when python3/python is unavailable
+
+def test_fails_closed_without_python(tmp_path):
+    """Hiding python3/python from PATH must BLOCK the action (exit 2 with a
+    clear stderr reason) instead of silently allowing it through -- the
+    opposite of the pre-#595 behavior (`[ -z "$_PY" ] && exit 0`)."""
+    minimal_bin = tmp_path / "minimal-bin"
+    minimal_bin.mkdir()
+    for tool in ("bash", "cat", "dirname", "mkdir", "date", "printf", "tr",
+                 "head", "sed", "grep", "basename", "sh", "mv", "wc", "tail",
+                 "chmod"):
+        found = shutil.which(tool)
+        if found:
+            (minimal_bin / tool).symlink_to(found)
+
+    payload = _bash_payload("git status")
+    payload["cwd"] = tmp_path.as_posix()
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env={"PATH": str(minimal_bin)},
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "python" in result.stderr.lower()
+
+
+def test_fails_closed_without_lib_common(tmp_path):
+    """A deployment where hooks/lib/hook_common.sh is missing (e.g. a stale
+    hooks dir not re-synced since #601) must also fail closed, not silently
+    behave as if strict/destructive checks passed."""
+    isolated_hook = tmp_path / "orchestrator-guard.sh"
+    isolated_hook.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # No lib/ subdirectory next to it -- `source $SCRIPT_DIR/lib/hook_common.sh` must fail.
+    payload = _bash_payload("git status")
+    payload["cwd"] = tmp_path.as_posix()
+    result = subprocess.run(
+        [_BASH, str(isolated_hook)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "hook_common.sh" in result.stderr
+
+
+# --- issue #596: audit log redacts credentials + tightens permissions -----
+
+def test_audit_log_redacts_credentials_in_command(tmp_path):
+    command = "#agent-meta:agent=git\ngit clone https://user:sup3rSecr3t@example.com/repo.git"
+    _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+    content = audit_file.read_text(encoding="utf-8")
+    assert "sup3rSecr3t" not in content
+    assert "***:***@" in content
+
+
+def test_audit_log_permissions_are_owner_only(tmp_path):
+    command = "#agent-meta:agent=git\ngit status"
+    _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    audit_file = tmp_path / ".claude" / "hooks" / ".guard-audit.log"
+    assert oct(audit_file.stat().st_mode)[-3:] == "600"
+
+
+# --- issue #597: audit log rotation ---------------------------------------
+
+def test_audit_log_rotates_when_over_cap(tmp_path):
+    audit_dir = tmp_path / ".claude" / "hooks"
+    audit_dir.mkdir(parents=True)
+    audit_file = audit_dir / ".guard-audit.log"
+    audit_file.write_text(
+        "\n".join(f"old-line-{i}" for i in range(1, 2600)) + "\n", encoding="utf-8"
+    )
+    command = "#agent-meta:agent=git\ngit status"
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps({**_bash_payload(command), "cwd": tmp_path.as_posix()}),
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+    )
+    assert result.returncode == 0
+    lines = audit_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) <= 1000
+    assert "old-line-1\n" not in "\n".join(lines[:1])  # oldest entries gone
+    assert "git status" in lines[-1]
