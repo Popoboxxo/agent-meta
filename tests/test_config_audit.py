@@ -158,6 +158,66 @@ def test_orphaned_pipelines_loop_refs(meta_root: Path) -> None:
     assert orphans == {"secret-critic"}
 
 
+def _write_override(
+    tmp_path: Path,
+    name: str,
+    based_on_role: str,
+    based_on_version: str,
+) -> None:
+    _write(
+        tmp_path / "agents" / "2-platform" / f"{name}.md",
+        "---\n"
+        f"name: {name}\n"
+        "version: \"1.0.0\"\n"
+        f"description: \"{name} override (test).\"\n"
+        f"based-on: \"1-generic/{based_on_role}.md@{based_on_version}\"\n"
+        "---\n\n# override\n",
+    )
+
+
+def test_stale_platform_override_detects_major_version_diff(meta_root: Path) -> None:
+    # generic developer.md is 1.0.0 per _template() default; bump it to 4.0.1
+    # to mirror the real-world issue #560 scenario (override pinned @2.3.0).
+    _write(meta_root / "agents" / "1-generic" / "developer.md", _template("developer").replace('"1.0.0"', '"4.0.1"'))
+    _write_override(meta_root, "homeassistant-developer", "developer", "2.3.0")
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    stale = report.by_category("stale_platform_overrides")
+    assert len(stale) == 1
+    assert stale[0].role == "homeassistant-developer"
+    assert stale[0].severity == "warning"
+    assert "2 major version(s) behind" in stale[0].message
+
+
+def test_stale_platform_override_no_false_positive_same_major(meta_root: Path) -> None:
+    """A pinned major version equal to the current generic major (patch/minor
+    drift only) must not be reported -- only a 1+ major version gap is stale.
+    """
+    _write(meta_root / "agents" / "1-generic" / "developer.md", _template("developer").replace('"1.0.0"', '"4.0.1"'))
+    _write_override(meta_root, "sharkord-developer", "developer", "4.0.0")
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("stale_platform_overrides") == []
+
+
+def test_stale_platform_override_no_false_positive_matching_version(meta_root: Path) -> None:
+    _write_override(meta_root, "agent-meta-developer", "developer", "1.0.0")
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("stale_platform_overrides") == []
+
+
+def test_stale_platform_override_ignores_missing_generic_base(meta_root: Path) -> None:
+    """A based-on reference to a nonexistent generic template is a different
+    problem class (handled elsewhere) -- must not crash or be double-reported
+    here.
+    """
+    _write_override(meta_root, "ghost-override", "ghost-role-that-does-not-exist", "1.0.0")
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("stale_platform_overrides") == []
+
+
 def test_clean_config_has_no_issues(meta_root: Path) -> None:
     cfg = _config_path(meta_root, "roles:\n  - developer\n  - git\n")
     report = audit_config(meta_root, cfg)

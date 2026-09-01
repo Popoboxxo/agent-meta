@@ -906,6 +906,18 @@ def main():
         # contracts against the agent-meta sources themselves.
         consistency_errors = _run_consistency_checks(agent_meta_root)
 
+        # Config-audit staleness check (issue #560): full-replacement
+        # 2-platform overrides pin their generic base via `based-on:
+        # "1-generic/<role>.md@<version>"` but do not automatically inherit
+        # later changes to that base -- including security-relevant workflow
+        # steps. Warn loudly when the pin has fallen 1+ major versions behind
+        # the current generic template so drift can't silently accumulate.
+        _stale_overrides = audit_config(agent_meta_root, config_path).by_category(
+            "stale_platform_overrides"
+        )
+        for _stale in _stale_overrides:
+            log.warning(f"config-audit [P1] stale-override: {_stale.message}")
+
         from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
         from lib.consistency.report import print_report
         from lib.providers import load_providers_config as _load_pc

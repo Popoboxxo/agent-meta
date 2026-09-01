@@ -36,6 +36,17 @@ _AUTO_DISABLED_MARKER = "# AUTO-DISABLED"
 # Captures leading indentation (group "indent") and the role name (group "role").
 _ROLE_LINE_RE = re.compile(r"^(?P<indent>\s*)-\s+(?P<role>[A-Za-z0-9_-]+)\s*$")
 
+# Matches a `based-on:` frontmatter value, e.g. ``1-generic/developer.md@3.1.1``.
+# Captures the generic template stem (group "stem") and the pinned version
+# (group "version").
+_BASED_ON_RE = re.compile(
+    r"^1-generic/(?P<stem>[A-Za-z0-9_-]+)\.md@(?P<version>[\w.\-]+)$"
+)
+
+# Leading integer run of a semver-ish string, e.g. "4" from "4.0.1" or
+# "3.1.1-beta.2". Non-numeric/missing major segments return None.
+_MAJOR_VERSION_RE = re.compile(r"^(\d+)")
+
 
 @dataclass(frozen=True)
 class AuditIssue:
@@ -209,6 +220,25 @@ def _collect_based_on_roles(agent_meta_root: Path) -> set[str]:
     return get_based_on_role_names(agent_meta_root)
 
 
+def _major_version(version: object) -> int | None:
+    """Extract the leading major-version integer from a version string.
+
+    Returns None when ``version`` has no parseable leading integer (e.g. an
+    empty string or a non-numeric placeholder) so callers can skip comparison
+    instead of crashing.
+    """
+    match = _MAJOR_VERSION_RE.match(str(version).strip())
+    return int(match.group(1)) if match else None
+
+
+def _collect_platform_overrides(agent_meta_root: Path) -> list[Path]:
+    """Return all 2-platform override templates (underscore partials excluded)."""
+    platform_dir = agent_meta_root / "agents" / "2-platform"
+    if not platform_dir.is_dir():
+        return []
+    return sorted(p for p in platform_dir.glob("*.md") if not p.name.startswith("_"))
+
+
 def _collect_pipeline_role_refs(config: dict) -> set[str]:
     """Return every role referenced by a quality pipeline ``agent:`` field.
 
@@ -252,6 +282,9 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
           whose frontmatter has ``deprecated: true``.
         * ``orphaned_pipelines`` (warning): a quality pipeline references a role
           that is not part of the project's ``roles`` list.
+        * ``stale_platform_overrides`` (warning): a 2-platform override's
+          ``based-on: "1-generic/<role>.md@<version>"`` pin has fallen 1+
+          major versions behind the current generic template (issue #560).
 
     Args:
         agent_meta_root: Repository root containing ``agents/`` and ``config/``.
@@ -334,6 +367,55 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                 ),
             )
 
+    # --- 5. stale_platform_overrides ----------------------------------------
+    # Full-replacement 2-platform overrides pin the generic template they were
+    # copied from via `based-on: "1-generic/<role>.md@<version>"`. Unlike the
+    # `extends:`+`patches:` composition style, a full-replacement override does
+    # not automatically inherit changes to its generic base — including
+    # security-relevant workflow steps added later (issue #560). Flag any
+    # override whose pinned major version has fallen 1+ major versions behind
+    # the current generic template so the drift becomes visible instead of
+    # silently accumulating.
+    for override in _collect_platform_overrides(agent_meta_root):
+        frontmatter = _parse_frontmatter(override)
+        based_on = frontmatter.get("based-on", "")
+        if not isinstance(based_on, str) or not based_on:
+            continue
+        match = _BASED_ON_RE.match(based_on)
+        if not match:
+            continue
+        generic_stem = match.group("stem")
+        pinned_version = match.group("version")
+
+        generic_template = _template_path_for_role(agent_meta_root, generic_stem)
+        if not generic_template.exists():
+            # Missing base template is a different problem class entirely --
+            # not this check's concern.
+            continue
+        current_version = _parse_frontmatter(generic_template).get("version")
+        if not current_version:
+            continue
+
+        pinned_major = _major_version(pinned_version)
+        current_major = _major_version(current_version)
+        if pinned_major is None or current_major is None:
+            continue
+
+        major_diff = current_major - pinned_major
+        if major_diff >= 1:
+            report.add(
+                category="stale_platform_overrides",
+                severity="warning",
+                role=override.stem,
+                message=(
+                    f"Override '{override.name}' is based-on "
+                    f"{generic_stem}.md@{pinned_version}, but the generic "
+                    f"template is now at @{current_version} "
+                    f"({major_diff} major version(s) behind)"
+                ),
+                detail=str(override),
+            )
+
     return report
 
 
@@ -354,6 +436,7 @@ def format_report(report: AuditReport) -> str:
         ("roles_without_template", "Roles Without Template", "[ERROR]"),
         ("templates_without_default", "Templates Without Role-Default", "[INFO] "),
         ("orphaned_pipelines", "Orphaned Pipeline References", "[WARN] "),
+        ("stale_platform_overrides", "Stale Platform Overrides (based-on drift)", "[WARN] "),
     ]
 
     for category, title, tag in sections:
@@ -380,6 +463,7 @@ def report_to_dict(report: AuditReport) -> dict:
         "roles_without_template",
         "templates_without_default",
         "orphaned_pipelines",
+        "stale_platform_overrides",
     )
     grouped: dict[str, list[dict]] = {c: [] for c in categories}
     for issue in report.issues:
