@@ -52,7 +52,7 @@ from collections.abc import Iterable
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 try:
@@ -708,6 +708,90 @@ def _resolve_admin_token(
     return None
 
 
+class AuthService:
+    """Stateless token- and origin-verification for the admin HTTP endpoints.
+
+    Extracted from :class:`AdminRequestHandler` (issue #572). Holds the pure
+    authentication/authorization logic: it receives the already-extracted
+    request fields plus the configured expectations, raises :class:`AuthError`
+    / :class:`SecurityError` on failure and returns ``None`` on success. The
+    handler keeps thin ``_check_token`` / ``_check_origin`` wrappers that feed
+    it the per-request headers and the class-level server configuration, so the
+    HTTP layer stays free of auth business logic.
+    """
+
+    @staticmethod
+    def check_token(
+        *,
+        expected: str | None,
+        auth_header: str,
+        query: str,
+        allow_query_token: bool,
+    ) -> None:
+        """Verify the admin token when token auth is configured.
+
+        Accepts the token from ``Authorization: Bearer <token>``. The
+        ``?token=<token>`` query parameter is honoured **only** when
+        ``allow_query_token`` is ``True`` (the single opt-in is the SSE
+        ``/api/events`` endpoint, whose ``EventSource`` client cannot set
+        headers — issue #577). When ``expected`` is ``None`` no token is
+        configured (loopback-only mode) and the check is a no-op.
+
+        Raises :class:`AuthError` on mismatch or a missing token.
+        """
+        if expected is None:
+            return  # No token configured → no check needed (loopback-only mode)
+
+        if auth_header.startswith("Bearer "):
+            provided = auth_header[7:]  # len("Bearer ") == 7
+            if _verify_token(provided, expected):
+                return
+
+        if allow_query_token:
+            token_list = parse_qs(query).get("token", [])
+            if token_list and _verify_token(token_list[0], expected):
+                return
+
+        raise AuthError("invalid or missing admin token")
+
+    @staticmethod
+    def check_origin(
+        *,
+        origin: str | None,
+        host: str,
+        allowed_hosts: Iterable[str],
+        bind_host: str,
+        bind_port: int,
+    ) -> None:
+        """Reject mutating requests whose Origin/Host is not allow-listed.
+
+        Contract (issue #588):
+
+        - ``origin`` **present** (including the empty string): must equal one of
+          ``http://<allowed-host>:<bind-port>`` exactly; an empty string is
+          *present but invalid* and therefore rejected.
+        - ``origin`` **absent** (``None``): only the Host header is checked —
+          curl/wget and other non-browser CLI clients omit Origin and must stay
+          usable for local admin scripting.
+        - In both cases ``host`` must equal ``<allowed-host>:<bind-port>`` or the
+          actual ``<bind-host>:<bind-port>``. A missing/malformed Host header is
+          rejected.
+
+        Raises :class:`SecurityError` on any mismatch.
+        """
+        allowed = list(allowed_hosts)
+        if origin is not None:
+            allowed_origins = {f"http://{h}:{bind_port}" for h in allowed}
+            if origin not in allowed_origins:
+                raise SecurityError(f"origin not allowed: {origin!r}")
+
+        allowed_host_values = {f"{h}:{bind_port}" for h in allowed}
+        # Always allow the actual bind host (covers explicit ``--host``).
+        allowed_host_values.add(f"{bind_host}:{bind_port}")
+        if host not in allowed_host_values:
+            raise SecurityError(f"host header not allowed: {host!r}")
+
+
 def _warn_if_world_readable(path: Path) -> None:
     """Print a stderr warning if ``path`` is readable by group or other.
 
@@ -1170,6 +1254,234 @@ class ConfigWatcher(threading.Thread):
 # --------------------------------------------------------------------------- #
 
 
+def _generic_error_response(
+    exc: Exception, error_code: str = "ERR_INTERNAL"
+) -> tuple[int, dict[str, str]]:
+    """Log ``exc`` with full server-side detail and return a generic,
+    client-safe ``(status, body)`` pair.
+
+    Raw exception text (absolute file paths, internal variable/function names,
+    library-internal details) must never reach an HTTP client — it helps an
+    attacker map the server's filesystem and architecture (issue #581). The
+    stable ``error_code`` lets client-side handling distinguish failure modes
+    without any leaked detail. Shared by :meth:`AdminRequestHandler._handle_error`
+    and the extracted service classes (issue #572).
+    """
+    logger.error("%s: %s", error_code, exc, exc_info=True)
+    return 500, {"error": error_code, "message": "Internal server error"}
+
+
+class ServiceContext:
+    """Live view onto the shared collaborators an :class:`AdminRequestHandler`
+    exposes, handed to the extracted service classes (issue #572).
+
+    Attributes are read off the handler **class** on every access, so the
+    established unit-test seam — reassigning ``AdminRequestHandler.root`` /
+    ``.config_manager`` on a handler built via ``__new__`` — is always
+    reflected. This keeps the domain services free of any direct back-reference
+    into the HTTP handler for framework state.
+    """
+
+    def __init__(self, handler_cls: type) -> None:
+        self._handler_cls = handler_cls
+
+    @property
+    def root(self) -> Path:
+        return self._handler_cls.root
+
+    @property
+    def config_manager(self) -> ConfigManager:
+        return self._handler_cls.config_manager
+
+    @property
+    def mode(self) -> str:
+        return self._handler_cls.mode
+
+    def agent_meta_root(self) -> Path:
+        """Resolve the agent-meta framework root for lib helpers.
+
+        In super_admin mode the server root is the framework checkout; in
+        project_admin mode the framework sources live under ``.agent-meta/``.
+        """
+        root = self.root
+        if (root / "agents" / "1-generic").is_dir():
+            return root
+        submodule = root / ".agent-meta"
+        if (submodule / "agents" / "1-generic").is_dir():
+            return submodule
+        return root
+
+    def ensure_lib_on_path(self) -> None:
+        """Ensure ``scripts/lib`` is on ``sys.path`` for framework imports."""
+        lib = self.root / "scripts" / "lib"
+        if str(lib) not in sys.path:
+            sys.path.insert(0, str(lib))
+
+
+class AuditService:
+    """Consistency checks, config audit, external-tool drift and provider
+    (de)activation — the read-only/analysis business domain extracted from
+    :class:`AdminRequestHandler` (issue #572).
+
+    Methods return plain data (or raise) — the handler keeps thin wrappers that
+    format the HTTP response. Internal failure branches reuse
+    :func:`_generic_error_response` so no raw exception text leaks (issue #581).
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def run_consistency_check(self) -> dict:
+        """Run the overall repository consistency check and return JSON."""
+        import json
+        import subprocess
+        import sys
+        # Layout-aware resolution (issue #587): in project_admin (submodule)
+        # mode the script lives under ".agent-meta/scripts/", not the top-level
+        # "scripts/" — use the same resolution every other asset lookup uses.
+        check_script = resolve_asset(self._ctx.root, "scripts", "consistency-check.py")
+        try:
+            r = subprocess.run(  # noqa: PLW1510
+                [sys.executable, str(check_script), "--json"],
+                cwd=str(self._ctx.root),
+                capture_output=True,
+                text=True,
+            )
+            # consistency-check.py --json prints pure JSON to stdout regardless
+            # of exit code.
+            return json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return {
+                "error": "Failed to parse JSON output",
+                "output": r.stdout,
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_CONSISTENCY_CHECK")
+            return {
+                "error": body["error"],
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+
+    def run_config_audit(self) -> dict:
+        """Run the consistency audit over the current configuration."""
+        self._ctx.ensure_lib_on_path()
+        import dataclasses
+
+        from lib.config_audit import audit_config
+        project_config_path = self._ctx.root / ".meta-config" / "project.yaml"
+        report = audit_config(self._ctx.root, project_config_path)
+        return {
+            "has_issues": report.has_issues,
+            "errors": [dataclasses.asdict(i) for i in report.errors],
+            "warnings": [dataclasses.asdict(i) for i in report.warnings],
+            "issues": [dataclasses.asdict(i) for i in report.issues],
+        }
+
+    def apply_config_audit(self) -> dict:
+        """Apply safe fixes reported by the consistency audit."""
+        self._ctx.ensure_lib_on_path()
+        from lib.config_audit import apply_audit, audit_config
+        project_config_path = self._ctx.root / ".meta-config" / "project.yaml"
+        report = audit_config(self._ctx.root, project_config_path)
+        count = apply_audit(report, project_config_path)
+        return {"fixed": count}
+
+    def compute_injection_drift(self) -> dict:
+        """Return undeclared external-tool artifacts per active provider."""
+        project_root = self._ctx.root
+        try:
+            _ensure_scripts_on_path(project_root)
+            from lib.external_tools import scan_injection_drift  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
+
+            # agent_meta_root, NOT project_root: in project_admin (submodule)
+            # mode the framework's config/ai-providers.yaml and
+            # config/external-tools-registry.yaml live under .agent-meta/, not
+            # the project root — passing project_root there silently finds
+            # nothing and produces false-positive "undeclared artifact"
+            # findings for every legitimately registered tool/provider.
+            agent_meta_root = self._ctx.agent_meta_root()
+            project_config = self._ctx.config_manager.read("project")
+            provider_config = load_providers_config(agent_meta_root)
+            findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
+            return {"findings": findings}
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_INJECTION_DRIFT")
+            return body
+
+    def deactivation_status(self) -> dict:
+        """Return current provider deactivation status."""
+        root = self._ctx.root
+        try:
+            _ensure_scripts_on_path(root)
+            from lib.deactivation import get_deactivation_status  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
+
+            project_config = self._ctx.config_manager.read("project")
+            provider_config = load_providers_config(root)
+            return get_deactivation_status(root, project_config, provider_config)
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_DEACTIVATION_STATUS")
+            return body
+
+    def deactivate_providers(self, providers: list) -> dict:
+        """Deactivate ``providers`` (zip + remove their directories) and return
+        the result payload. Raises on failure — the caller formats the error."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.deactivation import (  # type: ignore[import]
+            deactivate_providers,
+            get_deactivation_status,
+        )
+        from lib.providers import load_providers_config  # type: ignore[import]
+
+        project_config = self._ctx.config_manager.read("project")
+        provider_config = load_providers_config(root)
+        results = deactivate_providers(
+            root, providers if providers else ["all"],
+            provider_config, project_config, _NullDeactivationLog(), dry_run=False,
+        )
+        return {
+            "success": True,
+            "results": results,
+            "status": get_deactivation_status(root, project_config, provider_config),
+        }
+
+    def activate_providers(self, providers: list) -> dict:
+        """Activate ``providers`` (restore from backup zips) and return the
+        result payload. Raises on failure — the caller formats the error."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.deactivation import (  # type: ignore[import]
+            activate_providers,
+            get_deactivation_status,
+        )
+        from lib.providers import load_providers_config  # type: ignore[import]
+
+        project_config = self._ctx.config_manager.read("project")
+        provider_config = load_providers_config(root)
+        results = activate_providers(
+            root, providers,
+            provider_config, project_config, _NullDeactivationLog(), dry_run=False,
+        )
+        return {
+            "success": True,
+            "results": results,
+            "status": get_deactivation_status(root, project_config, provider_config),
+        }
+
+
+class _NullDeactivationLog:
+    """Silent logger sink accepted by the ``lib.deactivation`` helpers."""
+
+    def info(self, *a: Any) -> None: ...
+    def warn(self, *a: Any) -> None: ...
+    def error(self, *a: Any) -> None: ...
+
+
 class AdminRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler — dispatches to GET/PUT/POST routes.
 
@@ -1266,9 +1578,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         short, stable ``error_code`` (e.g. ``"ERR_MODEL_FETCH"``) so client-side
         error handling / support requests can still distinguish failure modes
         without any leaked detail.
+
+        Thin wrapper over :func:`_generic_error_response` (issue #572) so the
+        handler and the extracted service classes share one implementation.
         """
-        logger.error("%s: %s", error_code, exc, exc_info=True)
-        return 500, {"error": error_code, "message": "Internal server error"}
+        return _generic_error_response(exc, error_code)
+
+    # ------------------------------------------------------------------ #
+    # Service wiring                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _service_context(self) -> ServiceContext:
+        """Build a :class:`ServiceContext` that reads this handler's shared
+        collaborators live (see ServiceContext for the live-read rationale)."""
+        return ServiceContext(self.__class__)
+
+    def _audit_service(self) -> AuditService:
+        return AuditService(self._service_context())
 
     # ------------------------------------------------------------------ #
     # CSRF / DNS-rebinding protection                                    #
@@ -1295,28 +1621,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         this is a no-op — the server is loopback-only and auth is not required.
 
         Raises AuthError on mismatch or missing token.
+
+        Thin HTTP wrapper: the verification logic lives in
+        :meth:`AuthService.check_token` (issue #572).
         """
-        expected = self.__class__.admin_token
-        if expected is None:
-            return  # No token configured → no check needed (loopback-only mode)
-
-        # Extract token from Authorization header
-        auth_header = self.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            provided = auth_header[7:]  # len("Bearer ") == 7
-            if _verify_token(provided, expected):
-                return
-
-        if allow_query_token:
-            # Extract token from query parameter — only reachable for the
-            # explicitly opted-in SSE endpoint, see docstring above.
-            parsed = urlparse(self.path)
-            query_params = parse_qs(parsed.query)
-            token_list = query_params.get("token", [])
-            if token_list and _verify_token(token_list[0], expected):
-                return
-
-        raise AuthError("invalid or missing admin token")
+        AuthService.check_token(
+            expected=self.__class__.admin_token,
+            auth_header=self.headers.get("Authorization", ""),
+            query=urlparse(getattr(self, "path", "")).query,
+            allow_query_token=allow_query_token,
+        )
 
     def _check_origin(self) -> None:
         """Reject mutating requests whose Origin/Host is not in the configured
@@ -1327,41 +1641,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
           header on the forged request will not match the bind ``host:port``,
           so the request is rejected (DNS-rebinding defence).
 
-        Contract (see issue #588):
-          - Origin header **present**: must match one of
-            ``http://<allowed-host>:<bind-port>`` exactly. An empty string is
-            treated as *present but invalid* (rejected), not as absent.
-          - Origin header **absent**: only the Host header is checked. This
-            is intentional — curl/wget and other non-browser CLI clients do
-            not send an Origin header, and this path must remain usable for
-            local admin scripting.
-          - In both cases the Host header must match ``<allowed-host>:<bind-port>``
-            (or the actual bind host:port). A missing/malformed Host header is
-            rejected.
+        See :meth:`AuthService.check_origin` for the full contract (issue #588);
+        this is a thin HTTP wrapper that feeds it the per-request headers and the
+        class-level server configuration (issue #572).
         """
-        expected_port = self.__class__.bind_port
-        expected_host = self.__class__.bind_host
-
-        origin = self.headers.get("Origin")
-        if origin is None:
-            # Same-origin form POSTs and CLI tools (curl) often omit Origin.
-            # We still require the Host header to match — see below.
-            pass
-        else:
-            allowed_origins = set()
-            for h in self.__class__.allowed_hosts:
-                allowed_origins.add(f"http://{h}:{expected_port}")
-            if origin not in allowed_origins:
-                raise SecurityError(f"origin not allowed: {origin!r}")
-
-        host = self.headers.get("Host", "")
-        allowed_hosts = set()
-        for h in self.__class__.allowed_hosts:
-            allowed_hosts.add(f"{h}:{expected_port}")
-        # Always allow the actual bind host (covers explicit ``--host``).
-        allowed_hosts.add(f"{expected_host}:{expected_port}")
-        if host not in allowed_hosts:
-            raise SecurityError(f"host header not allowed: {host!r}")
+        AuthService.check_origin(
+            origin=self.headers.get("Origin"),
+            host=self.headers.get("Host", ""),
+            allowed_hosts=self.__class__.allowed_hosts,
+            bind_host=self.__class__.bind_host,
+            bind_port=self.__class__.bind_port,
+        )
 
     # ------------------------------------------------------------------ #
     # Routing                                                            #
@@ -1502,161 +1792,253 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # GET routes                                                         #
     # ------------------------------------------------------------------ #
 
+    # ------------------------------------------------------------------ #
+    # Route tables                                                        #
+    #                                                                     #
+    # Each verb maps a normalized path (trailing slash stripped) to a     #
+    # self-responding handler-method NAME. Exact matches are resolved     #
+    # first, then the ordered prefix table (the path suffix after the     #
+    # prefix is passed to the handler). This preserves the exact          #
+    # evaluation order of the previous if-chains (issue #572): exact      #
+    # routes always win over prefixes, and the only path that matches     #
+    # both a prefix and would otherwise be an exact —                     #
+    # ``/api/config/submodule-protection`` — is intentionally NOT listed  #
+    # as an exact GET route so it keeps resolving through the generic     #
+    # ``/api/config/`` reader, exactly as the original chain did.         #
+    # Method names are resolved via ``getattr(self, name)`` at call time  #
+    # so monkeypatched/overridden instance methods still take effect.     #
+    # ------------------------------------------------------------------ #
+
+    _GET_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        "/": "_serve_ui",
+        "/favicon.png": "_serve_favicon",
+        "/api/health": "_route_get_health",
+        "/api/mode": "_route_get_mode",
+        "/api/project": "_route_get_project",
+        "/api/schema/project": "_route_get_schema_project",
+        "/api/help": "_route_get_help",
+        "/api/sync/status": "_route_get_sync_status",
+        "/api/agents/hierarchy": "_route_get_agents_hierarchy",
+        "/api/pipelines": "_route_get_pipelines",
+        "/api/reflection-pairs": "_route_get_reflection_pairs",
+        "/api/agents/templates": "_route_get_agents_templates",
+        "/api/events": "_stream_events",
+        "/api/subserver-status": "_route_get_subserver_status",
+        "/api/providers": "_route_get_providers",
+        "/api/platforms": "_route_get_platforms",
+        "/api/roles": "_route_get_roles",
+        "/api/config-audit": "_route_get_config_audit",
+        "/api/consistency-check": "_route_get_consistency_check",
+        "/api/external-tools/drift": "_route_get_external_tools_drift",
+        "/api/models": "_handle_get_models",
+        "/api/models/active": "_handle_get_models_active",
+        "/api/models-dev": "_handle_get_models_dev",
+        "/api/model-source": "_handle_get_model_source",
+        "/api/model-suggestions": "_handle_get_model_suggestions",
+        "/api/ai-providers": "_handle_get_ai_providers",
+        "/api/tier-presets": "_handle_get_tier_presets",
+        "/api/tier-presets/merged": "_handle_get_tier_presets_merged",
+        "/api/model-mapping": "_handle_get_model_mapping",
+        "/api/provider-deactivation/status": "_route_get_provider_deactivation_status",
+        "/api/backups": "_handle_get_backups",
+        "/api/submodule-protection": "_route_get_submodule_protection",
+        "/api/environments": "_route_get_environments",
+        "/api/environments/scripts": "_route_get_env_scripts",
+    }
+    _GET_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/config/", "_route_get_config"),
+        ("/api/pipelines/", "_route_get_single_pipeline"),
+        ("/api/reflection-pairs/", "_route_get_single_reflection_pair"),
+        ("/api/agent-template/", "_send_template"),
+    )
+
+    _PUT_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        # ``/api/submodule-protection`` and ``/api/config/project/section`` are
+        # exacts that must beat the generic ``/api/config/`` prefix — exact
+        # routes are resolved first, so this ordering is preserved.
+        "/api/submodule-protection": "_write_submodule_protection",
+        "/api/config/project/section": "_write_project_section",
+        "/api/pipelines": "_route_put_pipelines",
+        "/api/reflection-pairs": "_route_put_reflection_pairs",
+    }
+    _PUT_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/config/", "_route_put_config"),
+        ("/api/agent-template/", "_write_template"),
+        ("/api/pipelines/", "_route_put_single_pipeline"),
+        ("/api/reflection-pairs/", "_route_put_single_reflection_pair"),
+    )
+
+    _POST_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        "/api/sync/dry-run": "_route_post_sync_dry_run",
+        "/api/sync/run": "_route_post_sync_run",
+        "/api/sync/render-standalone": "_route_post_sync_render_standalone",
+        "/api/config-audit/apply": "_route_post_config_audit_apply",
+        "/api/models/update": "_handle_post_models_update",
+        "/api/models/clear-override": "_handle_post_models_clear_override",
+        "/api/models-dev/refresh": "_handle_post_models_dev_refresh",
+        "/api/models-dev/import": "_handle_post_models_dev_import",
+        "/api/model-source": "_handle_post_model_source",
+        "/api/model-source/batch": "_handle_post_model_source_batch",
+        "/api/model-inherit": "_handle_post_model_inherit",
+        "/api/models/exclude": "_handle_post_models_exclude",
+        "/api/models/disable": "_handle_post_models_disable",
+        "/api/models/enable": "_handle_post_models_enable",
+        "/api/pricing/update": "_handle_post_pricing_update",
+        "/api/pricing/reset": "_handle_post_pricing_reset",
+        "/api/ai-providers/update": "_handle_post_ai_providers_update",
+        "/api/tier-presets/update": "_handle_post_tier_presets_update",
+        "/api/reflection-pairs": "_route_post_reflection_pair",
+        "/api/provider-deactivation/deactivate": "_handle_deactivate_providers",
+        "/api/provider-deactivation/activate": "_handle_activate_providers",
+        "/api/backups/create": "_handle_create_backup",
+        "/api/backups/restore": "_handle_restore_backup",
+    }
+
+    _DELETE_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/pipelines/", "_route_delete_pipeline"),
+        ("/api/reflection-pairs/", "_route_delete_reflection_pair"),
+        ("/api/backups/", "_handle_delete_backup"),
+        ("/api/environments/", "_route_delete_environment"),
+    )
+
+    def _resolve_route(
+        self,
+        path: str,
+        exact: dict[str, str],
+        prefixes: tuple[tuple[str, str], ...],
+    ) -> Any:
+        """Return a zero-argument callable that serves ``path``, or ``None``.
+
+        Exact matches are tried first, then the ordered ``prefixes`` table; a
+        prefix handler receives the path suffix (the portion after the prefix)
+        as its single positional argument.
+        """
+        name = exact.get(path)
+        if name is not None:
+            return getattr(self, name)
+        for prefix, handler_name in prefixes:
+            if path.startswith(prefix):
+                suffix = path[len(prefix):]
+                method = getattr(self, handler_name)
+                return lambda: method(suffix)
+        return None
+
     def _dispatch_get(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._GET_EXACT_ROUTES, self._GET_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        if path == "/":
-            return self._serve_ui()
+    # ------------------------------------------------------------------ #
+    # GET route handlers (thin — read/format only, delegate the work)    #
+    # ------------------------------------------------------------------ #
 
-        if path == "/favicon.png":
-            favicon_path = resolve_asset(self.root, "docs", "ui", "favicon.png")
-            if favicon_path.exists():
-                return self._send_bytes(favicon_path.read_bytes(), "image/png")
-            self.send_response(404)
-            self.end_headers()
-            return
+    def _serve_favicon(self) -> None:
+        favicon_path = resolve_asset(self.root, "docs", "ui", "favicon.png")
+        if favicon_path.exists():
+            return self._send_bytes(favicon_path.read_bytes(), "image/png")
+        self.send_response(404)
+        self.end_headers()
 
-        if path == "/api/health":
-            return self._send_json({
-                "status": "ok",
-                "version": self.__class__.version,
-                "mode": self.__class__.mode,
-            })
+    def _route_get_health(self) -> None:
+        return self._send_json({
+            "status": "ok",
+            "version": self.__class__.version,
+            "mode": self.__class__.mode,
+        })
 
-        if path == "/api/mode":
-            payload: dict = {
-                "mode": self.__class__.mode,
-                "root": str(self.__class__.root),
-                "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
-            }
-            # In super_admin mode the project.yaml of the meta-repo is also
-            # available as the "target repo" view.  Signal this to the UI so
-            # it can render the combined dashboard.
-            if self.__class__.mode == "super_admin":
-                project_yaml = self.__class__.root / ".meta-config" / "project.yaml"
-                payload["project_admin_available"] = project_yaml.exists()
-            return self._send_json(payload)
+    def _route_get_mode(self) -> None:
+        payload: dict = {
+            "mode": self.__class__.mode,
+            "root": str(self.__class__.root),
+            "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
+        }
+        # In super_admin mode the project.yaml of the meta-repo is also
+        # available as the "target repo" view.  Signal this to the UI so
+        # it can render the combined dashboard.
+        if self.__class__.mode == "super_admin":
+            project_yaml = self.__class__.root / ".meta-config" / "project.yaml"
+            payload["project_admin_available"] = project_yaml.exists()
+        return self._send_json(payload)
 
-        if path == "/api/project":
-            project_data = self.__class__.config_manager.read("project").get("project", {})
-            return self._send_json({"project": {
-                "name": project_data.get("name", ""),
-                "version": project_data.get("version", ""),
-                "id-prefix": project_data.get("id-prefix", project_data.get("prefix", ""))
-            }})
+    def _route_get_project(self) -> None:
+        project_data = self.__class__.config_manager.read("project").get("project", {})
+        return self._send_json({"project": {
+            "name": project_data.get("name", ""),
+            "version": project_data.get("version", ""),
+            "id-prefix": project_data.get("id-prefix", project_data.get("prefix", ""))
+        }})
 
-        if path.startswith("/api/config/"):
-            key = path[len("/api/config/"):]
-            data = self.__class__.config_manager.read(key)
-            return self._send_json(data)
+    def _route_get_config(self, key: str) -> None:
+        data = self.__class__.config_manager.read(key)
+        return self._send_json(data)
 
-        if path == "/api/schema/project":
-            schema_path = self._find_schema_path()
-            if not schema_path.exists():
-                raise FileNotFoundError("project-config.schema.json")
-            self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
-            return
+    def _route_get_schema_project(self) -> None:
+        schema_path = self._find_schema_path()
+        if not schema_path.exists():
+            raise FileNotFoundError("project-config.schema.json")
+        self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
 
-        if path == "/api/help":
-            return self._send_json(self._get_help_docs())
+    def _route_get_help(self) -> None:
+        return self._send_json(self._get_help_docs())
 
-        if path == "/api/sync/status":
-            return self._send_json(self.__class__.sync_executor.status())
+    def _route_get_sync_status(self) -> None:
+        return self._send_json(self.__class__.sync_executor.status())
 
-        if path == "/api/agents/hierarchy":
-            return self._send_json(self._build_agent_hierarchy())
+    def _route_get_agents_hierarchy(self) -> None:
+        return self._send_json(self._build_agent_hierarchy())
 
-        if path == "/api/pipelines":
-            if "help" in (parsed.query or "").lower():
-                return self._send_json(self._pipeline_help())
-            return self._send_json(self._read_pipelines())
+    def _route_get_pipelines(self) -> None:
+        query = urlparse(self.path).query
+        if "help" in (query or "").lower():
+            return self._send_json(self._pipeline_help())
+        return self._send_json(self._read_pipelines())
 
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            return self._send_json(self._read_single_pipeline(name))
+    def _route_get_single_pipeline(self, name: str) -> None:
+        return self._send_json(self._read_single_pipeline(name))
 
-        if path == "/api/reflection-pairs":
-            return self._send_json(self._read_reflection_pairs())
+    def _route_get_reflection_pairs(self) -> None:
+        return self._send_json(self._read_reflection_pairs())
 
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            return self._send_json(self._read_reflection_pair(pair_id))
+    def _route_get_single_reflection_pair(self, pair_id: str) -> None:
+        return self._send_json(self._read_reflection_pair(pair_id))
 
-        if path == "/api/agents/templates":
-            return self._send_json(self._list_agent_templates())
+    def _route_get_agents_templates(self) -> None:
+        return self._send_json(self._list_agent_templates())
 
-        if path.startswith("/api/agent-template/"):
-            role = path[len("/api/agent-template/"):]
-            return self._send_template(role)
+    def _route_get_subserver_status(self) -> None:
+        return self._send_json(self.__class__.viz_manager.status())
 
-        if path == "/api/events":
-            return self._stream_events()
+    def _route_get_providers(self) -> None:
+        return self._send_json(self._list_providers())
 
-        if path == "/api/subserver-status":
-            return self._send_json(self.__class__.viz_manager.status())
+    def _route_get_platforms(self) -> None:
+        return self._send_json(self._list_platforms())
 
-        if path == "/api/providers":
-            return self._send_json(self._list_providers())
+    def _route_get_roles(self) -> None:
+        return self._send_json(self._list_roles())
 
-        if path == "/api/platforms":
-            return self._send_json(self._list_platforms())
+    def _route_get_config_audit(self) -> None:
+        return self._send_json(self._run_config_audit())
 
-        if path == "/api/roles":
-            return self._send_json(self._list_roles())
+    def _route_get_consistency_check(self) -> None:
+        return self._send_json(self._run_consistency_check())
 
-        if path == "/api/config-audit":
-            return self._send_json(self._run_config_audit())
-            
-        if path == "/api/consistency-check":
-            return self._send_json(self._run_consistency_check())
+    def _route_get_external_tools_drift(self) -> None:
+        return self._send_json(self._compute_injection_drift())
 
-        if path == "/api/external-tools/drift":
-            return self._send_json(self._compute_injection_drift())
+    def _route_get_provider_deactivation_status(self) -> None:
+        return self._send_json(self._get_deactivation_status())
 
-        if path == "/api/models":
-            return self._handle_get_models()
+    def _route_get_submodule_protection(self) -> None:
+        return self._send_json(self._get_submodule_protection_status())
 
-        if path == "/api/models/active":
-            return self._handle_get_models_active()
+    def _route_get_environments(self) -> None:
+        return self._send_json(self._read_environments())
 
-        if path == "/api/models-dev":
-            return self._handle_get_models_dev()
-
-        if path == "/api/model-source":
-            return self._handle_get_model_source()
-
-        if path == "/api/model-suggestions":
-            return self._handle_get_model_suggestions()
-
-        if path == "/api/ai-providers":
-            return self._handle_get_ai_providers()
-
-        if path == "/api/tier-presets":
-            return self._handle_get_tier_presets()
-
-        if path == "/api/tier-presets/merged":
-            return self._handle_get_tier_presets_merged()
-
-        if path == "/api/model-mapping":
-            return self._handle_get_model_mapping()
-
-        if path == "/api/provider-deactivation/status":
-            return self._send_json(self._get_deactivation_status())
-
-        if path == "/api/backups":
-            return self._handle_get_backups()
-
-        if path in ("/api/submodule-protection", "/api/config/submodule-protection"):
-            return self._send_json(self._get_submodule_protection_status())
-
-        if path == "/api/environments":
-            return self._send_json(self._read_environments())
-
-        if path == "/api/environments/scripts":
-            return self._send_json(self._read_env_scripts())
-
-        raise FileNotFoundError(path)
+    def _route_get_env_scripts(self) -> None:
+        return self._send_json(self._read_env_scripts())
 
     def _write_submodule_protection(self) -> None:
         body = self._read_body()
@@ -1710,195 +2092,122 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _dispatch_delete(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, {}, self._DELETE_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            return self._send_json(self._delete_pipeline(name))
+    def _route_delete_pipeline(self, name: str) -> None:
+        return self._send_json(self._delete_pipeline(name))
 
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            return self._send_json(self._delete_reflection_pair(pair_id))
+    def _route_delete_reflection_pair(self, pair_id: str) -> None:
+        return self._send_json(self._delete_reflection_pair(pair_id))
 
-        if path.startswith("/api/backups/"):
-            archive_name = path[len("/api/backups/"):]
-            return self._handle_delete_backup(archive_name)
-
-        if path.startswith("/api/environments/"):
-            name = path[len("/api/environments/"):]
-            return self._send_json(self._delete_environment(name))
-
-        raise FileNotFoundError(path)
+    def _route_delete_environment(self, name: str) -> None:
+        return self._send_json(self._delete_environment(name))
 
     # ------------------------------------------------------------------ #
     # PUT routes                                                         #
     # ------------------------------------------------------------------ #
 
     def _dispatch_put(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._PUT_EXACT_ROUTES, self._PUT_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        # Partial update of a single top-level section of project.yaml. Must be
-        # matched BEFORE the generic /api/config/ handler (which would treat
-        # "project/section" as a config key).
-        if path == "/api/submodule-protection":
-            return self._write_submodule_protection()
+    def _route_put_config(self, key: str) -> None:
+        body = self._read_body()
+        if body is None:
+            raise ValueError("empty body")
+        if key == "project":
+            existing = self.__class__.config_manager.read("project")
+            self._deep_merge(existing, body)
+            result = self.__class__.config_manager.write("project", existing)
+        else:
+            result = self.__class__.config_manager.write(key, body)
+        return self._send_json(result)
 
-        if path == "/api/config/project/section":
-            return self._write_project_section()
+    def _route_put_pipelines(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict) or "pipelines" not in body:
+            raise ValueError("expected JSON body with 'pipelines' field")
+        pipelines = body["pipelines"]
+        if not isinstance(pipelines, dict):
+            raise ValueError("'pipelines' must be an object")
+        result = self._write_pipelines(pipelines)
+        return self._send_json(result)
 
-        if path.startswith("/api/config/"):
-            key = path[len("/api/config/"):]
-            body = self._read_body()
-            if body is None:
-                raise ValueError("empty body")
-            if key == "project":
-                existing = self.__class__.config_manager.read("project")
-                self._deep_merge(existing, body)
-                result = self.__class__.config_manager.write("project", existing)
-            else:
-                result = self.__class__.config_manager.write(key, body)
-            return self._send_json(result)
+    def _route_put_single_pipeline(self, name: str) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with pipeline object")
+        result = self._write_single_pipeline(name, body)
+        return self._send_json(result)
 
-        if path.startswith("/api/agent-template/"):
-            role = path[len("/api/agent-template/"):]
-            return self._write_template(role)
+    def _route_put_reflection_pairs(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict) or "reflection_pairs" not in body:
+            raise ValueError("expected JSON body with 'reflection_pairs' field")
+        pairs = body["reflection_pairs"]
+        if not isinstance(pairs, list):
+            raise ValueError("'reflection_pairs' must be a list")
+        result = self._write_reflection_pairs(pairs)
+        return self._send_json(result)
 
-        if path == "/api/pipelines":
-            body = self._read_body()
-            if not isinstance(body, dict) or "pipelines" not in body:
-                raise ValueError("expected JSON body with 'pipelines' field")
-            pipelines = body["pipelines"]
-            if not isinstance(pipelines, dict):
-                raise ValueError("'pipelines' must be an object")
-            result = self._write_pipelines(pipelines)
-            return self._send_json(result)
-
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with pipeline object")
-            result = self._write_single_pipeline(name, body)
-            return self._send_json(result)
-
-        if path == "/api/reflection-pairs":
-            body = self._read_body()
-            if not isinstance(body, dict) or "reflection_pairs" not in body:
-                raise ValueError("expected JSON body with 'reflection_pairs' field")
-            pairs = body["reflection_pairs"]
-            if not isinstance(pairs, list):
-                raise ValueError("'reflection_pairs' must be a list")
-            result = self._write_reflection_pairs(pairs)
-            return self._send_json(result)
-
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with reflection pair object")
-            result = self._write_reflection_pair(pair_id, body)
-            return self._send_json(result)
-
-
-        raise FileNotFoundError(path)
+    def _route_put_single_reflection_pair(self, pair_id: str) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with reflection pair object")
+        result = self._write_reflection_pair(pair_id, body)
+        return self._send_json(result)
 
     # ------------------------------------------------------------------ #
     # POST routes                                                        #
     # ------------------------------------------------------------------ #
 
     def _dispatch_post(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
-
-        if path == "/api/sync/dry-run":
-            return self._send_json(self.__class__.sync_executor.dry_run())
-
-        if path == "/api/sync/run":
-            return self._send_json(self.__class__.sync_executor.run())
-
-        if path == "/api/sync/render-standalone":
-            return self._send_json(self.__class__.sync_executor.render_standalone())
-
-        if path == "/api/config-audit/apply":
-            return self._send_json(self._apply_config_audit())
-
-        if path == "/api/models/update":
-            return self._handle_post_models_update()
-
-        if path == "/api/models/clear-override":
-            return self._handle_post_models_clear_override()
-
-        if path == "/api/models-dev/refresh":
-            return self._handle_post_models_dev_refresh()
-
-        if path == "/api/models-dev/import":
-            return self._handle_post_models_dev_import()
-
-        if path == "/api/model-source":
-            return self._handle_post_model_source()
-
-        if path == "/api/model-source/batch":
-            return self._handle_post_model_source_batch()
-
-        if path == "/api/model-inherit":
-            return self._handle_post_model_inherit()
-
-        if path == "/api/models/exclude":
-            return self._handle_post_models_exclude()
-
-        if path == "/api/models/disable":
-            return self._handle_post_models_disable()
-
-        if path == "/api/models/enable":
-            return self._handle_post_models_enable()
-
-        if path == "/api/pricing/update":
-            return self._handle_post_pricing_update()
-
-        if path == "/api/pricing/reset":
-            return self._handle_post_pricing_reset()
-
-        if path == "/api/ai-providers/update":
-            return self._handle_post_ai_providers_update()
-
-        if path == "/api/tier-presets/update":
-            return self._handle_post_tier_presets_update()
-
-        if path == "/api/reflection-pairs":
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with reflection pair object")
-            for field in ("id", "generator", "critic"):
-                value = body.get(field)
-                if not isinstance(value, str) or not value.strip():
-                    raise ValueError("id, generator and critic are required")
-            pair_id = self._ensure_pair_id(body)
-            result = self._write_reflection_pair(pair_id, body)
-            return self._send_json(result)
-
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._POST_EXACT_ROUTES, ())
+        if handler is not None:
+            return handler()
 
         # Individual subserver control: /api/subserver/{name}/{action}
-        # name in {viz, mcp}, action in {start, stop, restart}.
+        # name in {viz, mcp}, action in {start, stop, restart}. This is a
+        # parametric route with its own whitelist validation, kept as an
+        # explicit matcher rather than a table entry.
         subserver = self._match_subserver_route(path)
         if subserver is not None:
             name, action = subserver
             return self._handle_subserver_action(name, action)
 
-        if path == "/api/provider-deactivation/deactivate":
-            return self._handle_deactivate_providers()
-
-        if path == "/api/provider-deactivation/activate":
-            return self._handle_activate_providers()
-
-        if path == "/api/backups/create":
-            return self._handle_create_backup()
-
-        if path == "/api/backups/restore":
-            return self._handle_restore_backup()
-
         raise FileNotFoundError(path)
+
+    def _route_post_sync_dry_run(self) -> None:
+        return self._send_json(self.__class__.sync_executor.dry_run())
+
+    def _route_post_sync_run(self) -> None:
+        return self._send_json(self.__class__.sync_executor.run())
+
+    def _route_post_sync_render_standalone(self) -> None:
+        return self._send_json(self.__class__.sync_executor.render_standalone())
+
+    def _route_post_config_audit_apply(self) -> None:
+        return self._send_json(self._apply_config_audit())
+
+    def _route_post_reflection_pair(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with reflection pair object")
+        for field in ("id", "generator", "critic"):
+            value = body.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("id, generator and critic are required")
+        pair_id = self._ensure_pair_id(body)
+        result = self._write_reflection_pair(pair_id, body)
+        return self._send_json(result)
 
     @staticmethod
     def _match_subserver_route(path: str) -> tuple[str, str] | None:
@@ -3191,16 +3500,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _agent_meta_root(self) -> Path:
         """Resolve the agent-meta framework root for lib helpers.
 
-        In super_admin mode the server root is the framework checkout. In
-        project_admin mode the framework sources live under ``.agent-meta/``.
+        Delegates to :meth:`ServiceContext.agent_meta_root` (issue #572) so the
+        handler and the extracted services share one resolution.
         """
-        root = self.__class__.root
-        if (root / "agents" / "1-generic").is_dir():
-            return root
-        submodule = root / ".agent-meta"
-        if (submodule / "agents" / "1-generic").is_dir():
-            return submodule
-        return root
+        return self._service_context().agent_meta_root()
 
     def _handle_get_model_mapping(self) -> None:
         """Return a matrix of role → resolved model ID for every provider.
@@ -4241,63 +4544,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return help_map
 
     def _run_consistency_check(self) -> dict:
-        """Run the overall repository consistency check and return JSON."""
-        import json
-        import subprocess
-        import sys
-        # Was hardcoded as the relative "scripts/consistency-check.py", which
-        # only resolves in super_admin mode. In project_admin (submodule)
-        # mode the script actually lives under ".agent-meta/scripts/" — use
-        # the same layout-aware resolution every other asset lookup in this
-        # file uses instead of a second, inconsistent hardcoded path (#587).
-        check_script = resolve_asset(self.__class__.root, "scripts", "consistency-check.py")
-        try:
-            r = subprocess.run(  # noqa: PLW1510
-                [sys.executable, str(check_script), "--json"],
-                cwd=str(self.__class__.root),
-                capture_output=True,
-                text=True
-            )
-            # consistency-check.py --json prints pure JSON to stdout regardless of exit code
-            return json.loads(r.stdout)
-        except json.JSONDecodeError:
-            return {
-                "error": "Failed to parse JSON output",
-                "output": r.stdout,
-                "findings": [],
-                "summary": {"total": 0, "errors": 0, "warnings": 0}
-            }
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_CONSISTENCY_CHECK")
-            return {
-                "error": body["error"],
-                "findings": [],
-                "summary": {"total": 0, "errors": 0, "warnings": 0}
-            }
+        """Delegates to :meth:`AuditService.run_consistency_check` (issue #572)."""
+        return self._audit_service().run_consistency_check()
 
     def _run_config_audit(self) -> dict:
-        """Run the consistency audit over the current configuration."""
-        self._ensure_lib_on_path()
-        import dataclasses
-
-        from lib.config_audit import audit_config
-        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
-        report = audit_config(self.__class__.root, project_config_path)
-        return {
-            "has_issues": report.has_issues,
-            "errors": [dataclasses.asdict(i) for i in report.errors],
-            "warnings": [dataclasses.asdict(i) for i in report.warnings],
-            "issues": [dataclasses.asdict(i) for i in report.issues],
-        }
+        """Delegates to :meth:`AuditService.run_config_audit` (issue #572)."""
+        return self._audit_service().run_config_audit()
 
     def _apply_config_audit(self) -> dict:
-        """Apply safe fixes reported by the consistency audit."""
-        self._ensure_lib_on_path()
-        from lib.config_audit import apply_audit, audit_config
-        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
-        report = audit_config(self.__class__.root, project_config_path)
-        count = apply_audit(report, project_config_path)
-        return {"fixed": count}
+        """Delegates to :meth:`AuditService.apply_config_audit` (issue #572)."""
+        return self._audit_service().apply_config_audit()
 
     def _send_template(self, role: str) -> None:
         """Send a generated agent template as plain text."""
@@ -4413,46 +4669,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _compute_injection_drift(self) -> dict:
-        """Return undeclared external-tool artifacts per active provider."""
-        project_root = self.__class__.root
-        try:
-            _ensure_scripts_on_path(project_root)
-            from lib.external_tools import scan_injection_drift  # type: ignore[import]
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            # agent_meta_root, NOT project_root: in project_admin (submodule)
-            # mode the framework's config/ai-providers.yaml and
-            # config/external-tools-registry.yaml live under .agent-meta/,
-            # not the project root — passing project_root there silently
-            # finds nothing and produces false-positive "undeclared artifact"
-            # findings for every legitimately registered tool/provider.
-            agent_meta_root = self._agent_meta_root()
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(agent_meta_root)
-            findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
-            return {"findings": findings}
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_INJECTION_DRIFT")
-            return body
+        """Delegates to :meth:`AuditService.compute_injection_drift` (issue #572)."""
+        return self._audit_service().compute_injection_drift()
 
     # ------------------------------------------------------------------ #
     # Provider deactivation handlers                                      #
     # ------------------------------------------------------------------ #
 
     def _get_deactivation_status(self) -> dict:
-        """Return current provider deactivation status."""
-        root = self.__class__.root
-        try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import get_deactivation_status  # type: ignore[import]
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-            return get_deactivation_status(root, project_config, provider_config)
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_DEACTIVATION_STATUS")
-            return body
+        """Delegates to :meth:`AuditService.deactivation_status` (issue #572)."""
+        return self._audit_service().deactivation_status()
 
     def _get_submodule_protection_status(self) -> dict:
         """Return Submodule Protection status (Framework Default vs Project Override)."""
@@ -4541,77 +4767,33 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return {"ok": True, "deleted": name, "result": result}
 
     def _handle_deactivate_providers(self) -> None:
-        """Deactivate providers: zip and remove their directories."""
-        root = self.__class__.root
+        """Deactivate providers: zip and remove their directories.
+
+        HTTP glue only — the work lives in
+        :meth:`AuditService.deactivate_providers` (issue #572).
+        """
         body = self._read_body() or {}
         providers = body.get("providers", [])
         if not isinstance(providers, list):
             providers = []
-
         try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import (  # type: ignore[import]
-                deactivate_providers,
-                get_deactivation_status,
-            )
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
-            results = deactivate_providers(
-                root, providers if providers else ["all"],
-                provider_config, project_config, log, dry_run=False,
-            )
-            return self._send_json({
-                "success": True,
-                "results": results,
-                "status": get_deactivation_status(root, project_config, provider_config),
-            })
+            return self._send_json(self._audit_service().deactivate_providers(providers))
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_DEACTIVATE_PROVIDERS")
             return self._send_json(body, status=status)
 
     def _handle_activate_providers(self) -> None:
-        """Activate providers: restore from backup zips."""
-        root = self.__class__.root
+        """Activate providers: restore from backup zips.
+
+        HTTP glue only — the work lives in
+        :meth:`AuditService.activate_providers` (issue #572).
+        """
         body = self._read_body() or {}
         providers = body.get("providers", [])
         if not isinstance(providers, list):
             providers = []
-
         try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import (  # type: ignore[import]
-                activate_providers,
-                get_deactivation_status,
-            )
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
-            results = activate_providers(
-                root, providers,
-                provider_config, project_config, log, dry_run=False,
-            )
-            return self._send_json({
-                "success": True,
-                "results": results,
-                "status": get_deactivation_status(root, project_config, provider_config),
-            })
+            return self._send_json(self._audit_service().activate_providers(providers))
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_ACTIVATE_PROVIDERS")
             return self._send_json(body, status=status)

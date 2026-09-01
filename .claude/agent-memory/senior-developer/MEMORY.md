@@ -9,3 +9,5 @@
 - [Tier-Resolution Silent-Empty](tier-resolution-missing-key-silent-empty.md) — resolve_model gibt "" zurück wenn Tier-Key im aktiven Preset fehlt; neue Tiers in ALLE Presets + Provider-Blöcke eintragen
 - [Multi-Provider 3-File-Invariante](multi-provider-three-file-invariant.md) — Provider aus ai-providers.yaml muss auch in capabilities/bootstrap/delegation-syntax stehen, sonst Silent-Downgrade (PAL_* gestrippt); Copilot = konservatives Referenz-Pattern
 - [Neuer _BLOCK-Platzhalter: 2 versteckte Kopplungen](new-block-placeholder-coupling.md) — build_variables _BLOCK-Var braucht auch Eintrag in consistency/placeholders.py _BUILTIN_VARS + standalone.py Fallback
+- [Admin-Server God-Object-Split (#572)](admin-server-god-object-split.md) — Delegation Pflicht (Tests binden an Handler-Methoden+Class-Attrs); route-table+AuthService+AuditService+ServiceContext done, Rest offen
+- [Admin-Server Test-Run Gotcha](admin-server-test-run-gotcha.md) — Tests brauchen -p no:homeassistant (OpenSSL `lib` kollidiert mit scripts/lib); full ~6.5min, admin-only ~0.4s
