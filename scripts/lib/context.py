@@ -7,6 +7,12 @@ from pathlib import Path
 
 from .io import content_hash, safe_path
 from .log import SyncLog
+from .variables import (
+    _orch_mode_flags,
+    _resolve_orch_mode,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 from .context_templates.builder import TemplateBuilder
 
 SNIPPETS_DIR = "snippets"
@@ -335,7 +341,6 @@ def _update_managed_html_block(
     initializes itself alongside the pre-existing content rather than never
     initializing at all.
     """
-    from .config import substitute
 
     existing = target_path.read_text(encoding="utf-8")
     managed_pattern = re.compile(
@@ -361,7 +366,6 @@ def _update_managed_html_block(
             "{{AGENT_HINTS}}\n"
             "<!-- agent-meta:managed-end -->"
         )
-        from .config import substitute
         new_managed = substitute(new_managed, render_vars, "inline fallback", log)
 
     # For AGENTS.md, also inject dynamic content into the managed block:
@@ -446,7 +450,6 @@ def _sync_managed_block_context(
     template_path = agent_meta_root / template_name if template_name else None
     
     from .agents import build_agent_hints
-    from .config import _resolve_orch_mode
     orch_config = config.get("orchestrator", {})
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
@@ -765,7 +768,6 @@ def _init_provider_settings_json(
     dry_run: bool,
 ) -> None:
     """Create provider settings skeleton once if it does not exist yet."""
-    from .config import substitute
 
     settings_file = pc.get("settings_file")
     if not settings_file:
@@ -975,12 +977,6 @@ def _build_managed_block(
     provider_config: dict | None = None,
     project_root: Path | None = None,
 ) -> str:
-    from .config import (
-        _orch_mode_flags,
-        _resolve_orch_mode,
-        strip_inactive_conditional_blocks,
-        substitute,
-    )
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules
     from .agents import build_knowledge_engine_hints
@@ -1212,7 +1208,6 @@ def init_settings_local_json(
     These files are gitignored and intended for personal / machine-local
     overrides. Created once on --init or first sync — never overwritten.
     """
-    from .config import substitute
 
     pc = provider_config or {}
     active = providers if providers is not None else list(pc.keys())
@@ -1388,7 +1383,6 @@ def only_variables(
     provider_config: dict | None = None,
 ):
     """Substitute {{VARIABLE}} placeholders in existing provider context files."""
-    from .config import substitute
 
     pc = provider_config or {}
     active = providers if providers is not None else list(pc.keys())
@@ -1446,7 +1440,6 @@ def sync_prompts_for_continue(
         extract_frontmatter_field,
         target_filename,
     )
-    from .config import strip_inactive_conditional_blocks, substitute
     from .providers import resolve_provider_options
     from .roles import build_role_map
 

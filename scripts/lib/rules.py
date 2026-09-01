@@ -6,6 +6,12 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .variables import (
+    _orch_mode_flags,
+    _resolve_orch_mode,
+    strip_inactive_conditional_blocks,
+    substitute,
+)
 from .skill_channel import (
     cleanup_stale_skill_channel_rules,
     provider_supports_skill_channel,
@@ -174,12 +180,6 @@ def sync_rules(
     channel: skill rules share <skills_dir>/.agent-meta-managed with the external-skill
     sync (scripts/lib/skills.py) via merge-mode writes — see skill_channel.py.
     """
-    from .config import (
-        _orch_mode_flags,
-        _resolve_orch_mode,
-        strip_inactive_conditional_blocks,
-        substitute,
-    )
     from .platform import substitute_platform
 
     pc = (provider_config or {}).get(provider, {})
