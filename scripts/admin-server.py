@@ -52,7 +52,7 @@ from collections.abc import Iterable
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 try:
@@ -708,6 +708,90 @@ def _resolve_admin_token(
     return None
 
 
+class AuthService:
+    """Stateless token- and origin-verification for the admin HTTP endpoints.
+
+    Extracted from :class:`AdminRequestHandler` (issue #572). Holds the pure
+    authentication/authorization logic: it receives the already-extracted
+    request fields plus the configured expectations, raises :class:`AuthError`
+    / :class:`SecurityError` on failure and returns ``None`` on success. The
+    handler keeps thin ``_check_token`` / ``_check_origin`` wrappers that feed
+    it the per-request headers and the class-level server configuration, so the
+    HTTP layer stays free of auth business logic.
+    """
+
+    @staticmethod
+    def check_token(
+        *,
+        expected: str | None,
+        auth_header: str,
+        query: str,
+        allow_query_token: bool,
+    ) -> None:
+        """Verify the admin token when token auth is configured.
+
+        Accepts the token from ``Authorization: Bearer <token>``. The
+        ``?token=<token>`` query parameter is honoured **only** when
+        ``allow_query_token`` is ``True`` (the single opt-in is the SSE
+        ``/api/events`` endpoint, whose ``EventSource`` client cannot set
+        headers — issue #577). When ``expected`` is ``None`` no token is
+        configured (loopback-only mode) and the check is a no-op.
+
+        Raises :class:`AuthError` on mismatch or a missing token.
+        """
+        if expected is None:
+            return  # No token configured → no check needed (loopback-only mode)
+
+        if auth_header.startswith("Bearer "):
+            provided = auth_header[7:]  # len("Bearer ") == 7
+            if _verify_token(provided, expected):
+                return
+
+        if allow_query_token:
+            token_list = parse_qs(query).get("token", [])
+            if token_list and _verify_token(token_list[0], expected):
+                return
+
+        raise AuthError("invalid or missing admin token")
+
+    @staticmethod
+    def check_origin(
+        *,
+        origin: str | None,
+        host: str,
+        allowed_hosts: Iterable[str],
+        bind_host: str,
+        bind_port: int,
+    ) -> None:
+        """Reject mutating requests whose Origin/Host is not allow-listed.
+
+        Contract (issue #588):
+
+        - ``origin`` **present** (including the empty string): must equal one of
+          ``http://<allowed-host>:<bind-port>`` exactly; an empty string is
+          *present but invalid* and therefore rejected.
+        - ``origin`` **absent** (``None``): only the Host header is checked —
+          curl/wget and other non-browser CLI clients omit Origin and must stay
+          usable for local admin scripting.
+        - In both cases ``host`` must equal ``<allowed-host>:<bind-port>`` or the
+          actual ``<bind-host>:<bind-port>``. A missing/malformed Host header is
+          rejected.
+
+        Raises :class:`SecurityError` on any mismatch.
+        """
+        allowed = list(allowed_hosts)
+        if origin is not None:
+            allowed_origins = {f"http://{h}:{bind_port}" for h in allowed}
+            if origin not in allowed_origins:
+                raise SecurityError(f"origin not allowed: {origin!r}")
+
+        allowed_host_values = {f"{h}:{bind_port}" for h in allowed}
+        # Always allow the actual bind host (covers explicit ``--host``).
+        allowed_host_values.add(f"{bind_host}:{bind_port}")
+        if host not in allowed_host_values:
+            raise SecurityError(f"host header not allowed: {host!r}")
+
+
 def _warn_if_world_readable(path: Path) -> None:
     """Print a stderr warning if ``path`` is readable by group or other.
 
@@ -1170,6 +1254,1627 @@ class ConfigWatcher(threading.Thread):
 # --------------------------------------------------------------------------- #
 
 
+def _generic_error_response(
+    exc: Exception, error_code: str = "ERR_INTERNAL"
+) -> tuple[int, dict[str, str]]:
+    """Log ``exc`` with full server-side detail and return a generic,
+    client-safe ``(status, body)`` pair.
+
+    Raw exception text (absolute file paths, internal variable/function names,
+    library-internal details) must never reach an HTTP client — it helps an
+    attacker map the server's filesystem and architecture (issue #581). The
+    stable ``error_code`` lets client-side handling distinguish failure modes
+    without any leaked detail. Shared by :meth:`AdminRequestHandler._handle_error`
+    and the extracted service classes (issue #572).
+    """
+    logger.error("%s: %s", error_code, exc, exc_info=True)
+    return 500, {"error": error_code, "message": "Internal server error"}
+
+
+class ServiceContext:
+    """Live view onto the shared collaborators an :class:`AdminRequestHandler`
+    exposes, handed to the extracted service classes (issue #572).
+
+    Attributes are read off the handler **class** on every access, so the
+    established unit-test seam — reassigning ``AdminRequestHandler.root`` /
+    ``.config_manager`` on a handler built via ``__new__`` — is always
+    reflected. This keeps the domain services free of any direct back-reference
+    into the HTTP handler for framework state.
+    """
+
+    def __init__(self, handler_cls: type, handler: AdminRequestHandler | None = None) -> None:
+        self._handler_cls = handler_cls
+        self._handler = handler
+
+    @property
+    def handler(self) -> AdminRequestHandler | None:
+        """The live handler instance, when a service was built for one request.
+
+        Services route calls to methods that unit tests monkeypatch on the
+        handler *instance* (notably ``_load_models_dev_data``, the models.dev
+        cache/network seam) through this reference so those mocks still take
+        effect after the logic moved into a service (issue #572)."""
+        return self._handler
+
+    @property
+    def handler_cls(self) -> type:
+        """The AdminRequestHandler class itself — used by :class:`ModelsService`
+        as the store for its process-wide models.dev cache (the attributes the
+        unit tests seed and reset directly)."""
+        return self._handler_cls
+
+    @property
+    def root(self) -> Path:
+        return self._handler_cls.root
+
+    @property
+    def config_manager(self) -> ConfigManager:
+        return self._handler_cls.config_manager
+
+    @property
+    def mode(self) -> str:
+        return self._handler_cls.mode
+
+    @property
+    def version(self) -> str:
+        return self._handler_cls.version
+
+    def agent_meta_root(self) -> Path:
+        """Resolve the agent-meta framework root for lib helpers.
+
+        In super_admin mode the server root is the framework checkout; in
+        project_admin mode the framework sources live under ``.agent-meta/``.
+        """
+        root = self.root
+        if (root / "agents" / "1-generic").is_dir():
+            return root
+        submodule = root / ".agent-meta"
+        if (submodule / "agents" / "1-generic").is_dir():
+            return submodule
+        return root
+
+    def ensure_lib_on_path(self) -> None:
+        """Ensure ``scripts/lib`` is on ``sys.path`` for framework imports."""
+        lib = self.root / "scripts" / "lib"
+        if str(lib) not in sys.path:
+            sys.path.insert(0, str(lib))
+
+    def role_defaults_path(self) -> Path:
+        """Resolve ``config/role-defaults.yaml`` for either layout — shared by
+        the template, pipeline and reflection services."""
+        return resolve_asset(self.root, "config", "role-defaults.yaml")
+
+
+class AuditService:
+    """Consistency checks, config audit, external-tool drift and provider
+    (de)activation — the read-only/analysis business domain extracted from
+    :class:`AdminRequestHandler` (issue #572).
+
+    Methods return plain data (or raise) — the handler keeps thin wrappers that
+    format the HTTP response. Internal failure branches reuse
+    :func:`_generic_error_response` so no raw exception text leaks (issue #581).
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def run_consistency_check(self) -> dict:
+        """Run the overall repository consistency check and return JSON."""
+        import json
+        import subprocess
+        import sys
+        # Layout-aware resolution (issue #587): in project_admin (submodule)
+        # mode the script lives under ".agent-meta/scripts/", not the top-level
+        # "scripts/" — use the same resolution every other asset lookup uses.
+        check_script = resolve_asset(self._ctx.root, "scripts", "consistency-check.py")
+        try:
+            r = subprocess.run(  # noqa: PLW1510
+                [sys.executable, str(check_script), "--json"],
+                cwd=str(self._ctx.root),
+                capture_output=True,
+                text=True,
+            )
+            # consistency-check.py --json prints pure JSON to stdout regardless
+            # of exit code.
+            return json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return {
+                "error": "Failed to parse JSON output",
+                "output": r.stdout,
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_CONSISTENCY_CHECK")
+            return {
+                "error": body["error"],
+                "findings": [],
+                "summary": {"total": 0, "errors": 0, "warnings": 0},
+            }
+
+    def run_config_audit(self) -> dict:
+        """Run the consistency audit over the current configuration."""
+        self._ctx.ensure_lib_on_path()
+        import dataclasses
+
+        from lib.config_audit import audit_config
+        project_config_path = self._ctx.root / ".meta-config" / "project.yaml"
+        report = audit_config(self._ctx.root, project_config_path)
+        return {
+            "has_issues": report.has_issues,
+            "errors": [dataclasses.asdict(i) for i in report.errors],
+            "warnings": [dataclasses.asdict(i) for i in report.warnings],
+            "issues": [dataclasses.asdict(i) for i in report.issues],
+        }
+
+    def apply_config_audit(self) -> dict:
+        """Apply safe fixes reported by the consistency audit."""
+        self._ctx.ensure_lib_on_path()
+        from lib.config_audit import apply_audit, audit_config
+        project_config_path = self._ctx.root / ".meta-config" / "project.yaml"
+        report = audit_config(self._ctx.root, project_config_path)
+        count = apply_audit(report, project_config_path)
+        return {"fixed": count}
+
+    def compute_injection_drift(self) -> dict:
+        """Return undeclared external-tool artifacts per active provider."""
+        project_root = self._ctx.root
+        try:
+            _ensure_scripts_on_path(project_root)
+            from lib.external_tools import scan_injection_drift  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
+
+            # agent_meta_root, NOT project_root: in project_admin (submodule)
+            # mode the framework's config/ai-providers.yaml and
+            # config/external-tools-registry.yaml live under .agent-meta/, not
+            # the project root — passing project_root there silently finds
+            # nothing and produces false-positive "undeclared artifact"
+            # findings for every legitimately registered tool/provider.
+            agent_meta_root = self._ctx.agent_meta_root()
+            project_config = self._ctx.config_manager.read("project")
+            provider_config = load_providers_config(agent_meta_root)
+            findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
+            return {"findings": findings}
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_INJECTION_DRIFT")
+            return body
+
+    def deactivation_status(self) -> dict:
+        """Return current provider deactivation status."""
+        root = self._ctx.root
+        try:
+            _ensure_scripts_on_path(root)
+            from lib.deactivation import get_deactivation_status  # type: ignore[import]
+            from lib.providers import load_providers_config  # type: ignore[import]
+
+            project_config = self._ctx.config_manager.read("project")
+            provider_config = load_providers_config(root)
+            return get_deactivation_status(root, project_config, provider_config)
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_DEACTIVATION_STATUS")
+            return body
+
+    def deactivate_providers(self, providers: list) -> dict:
+        """Deactivate ``providers`` (zip + remove their directories) and return
+        the result payload. Raises on failure — the caller formats the error."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.deactivation import (  # type: ignore[import]
+            deactivate_providers,
+            get_deactivation_status,
+        )
+        from lib.providers import load_providers_config  # type: ignore[import]
+
+        project_config = self._ctx.config_manager.read("project")
+        provider_config = load_providers_config(root)
+        results = deactivate_providers(
+            root, providers if providers else ["all"],
+            provider_config, project_config, _NullDeactivationLog(), dry_run=False,
+        )
+        return {
+            "success": True,
+            "results": results,
+            "status": get_deactivation_status(root, project_config, provider_config),
+        }
+
+    def activate_providers(self, providers: list) -> dict:
+        """Activate ``providers`` (restore from backup zips) and return the
+        result payload. Raises on failure — the caller formats the error."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.deactivation import (  # type: ignore[import]
+            activate_providers,
+            get_deactivation_status,
+        )
+        from lib.providers import load_providers_config  # type: ignore[import]
+
+        project_config = self._ctx.config_manager.read("project")
+        provider_config = load_providers_config(root)
+        results = activate_providers(
+            root, providers,
+            provider_config, project_config, _NullDeactivationLog(), dry_run=False,
+        )
+        return {
+            "success": True,
+            "results": results,
+            "status": get_deactivation_status(root, project_config, provider_config),
+        }
+
+
+class _NullDeactivationLog:
+    """Silent logger sink accepted by the ``lib.deactivation`` helpers."""
+
+    def info(self, *a: Any) -> None: ...
+    def warn(self, *a: Any) -> None: ...
+    def error(self, *a: Any) -> None: ...
+
+
+class TemplateService:
+    """Agent-template discovery, resolution, reading and writing — the template
+    business domain extracted from :class:`AdminRequestHandler` (issue #572).
+
+    Methods return plain data (or raise) and the handler keeps thin wrappers
+    that format the HTTP response.
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def find_schema_path(self) -> Path:
+        return resolve_asset(self._ctx.root, "config", "project-config.schema.json")
+
+    def template_path(self, role: str) -> Path | None:
+        """Resolve the template path sync.py would actually use for this role.
+
+        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
+        sync.py itself uses (1-generic < 2-platform < 3-project, scoped to this
+        project's own active ``platforms`` list, in list order). Globbing all of
+        ``agents/2-platform/*.md`` instead would let an unrelated but
+        same-named platform override (e.g. ``sharkord-developer.md``) be loaded
+        AND saved in filesystem order — see the original method's history.
+        """
+        if not role or any(c in role for c in ("/", "\\", "..")):
+            raise SecurityError(f"invalid role name: {role!r}")
+        safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
+        if safe != role:
+            raise SecurityError(f"invalid role name: {role!r}")
+        agent_meta_root = self._ctx.agent_meta_root()
+        candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
+        try:
+            project_root = self._ctx.root
+            _ensure_scripts_on_path(project_root)
+            from lib.agents import collect_sources  # type: ignore[import]
+            project_config = self._ctx.config_manager.read("project") or {}
+            active_platforms = project_config.get("platforms", [])
+            overrides, _ = collect_sources(agent_meta_root, active_platforms)
+            resolved = overrides.get(role)
+            if resolved is not None:
+                return resolved
+        except Exception:  # noqa: BLE001
+            # Fall through to the plain generic-template path — better to edit
+            # the generic base than to error out of the Templates page.
+            pass
+        return candidate
+
+    def read_template_description(self, role: str) -> str:
+        """Read the ``description`` from a generated template's frontmatter."""
+        try:
+            path = self.template_path(role)
+        except SecurityError:
+            return ""
+        if not path or not path.exists():
+            return ""
+        with path.open("r", encoding="utf-8") as fh:
+            text = fh.read()
+        if not text.startswith("---"):
+            return ""
+        try:
+            _, front, _ = text.split("---", 2)
+            front_data = yaml.safe_load(front) or {}
+            desc = front_data.get("description")
+            if isinstance(desc, str):
+                return desc.strip()
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return ""
+
+    def list_agent_templates(self) -> dict:
+        """Return the agent templates available for generation (top-level
+        ``agents/1-generic`` first, then the submodule layout)."""
+        templates_dir = resolve_asset(self._ctx.root, "agents", "1-generic")
+        if not templates_dir.is_dir():
+            return {"templates": [], "available": False}
+        names = sorted(
+            p.stem for p in templates_dir.glob("*.md")
+            if p.is_file() and not p.name.startswith("_")
+        )
+        return {"templates": names, "available": True}
+
+    def build_agent_hierarchy(self) -> dict:
+        """Derive a lightweight role hierarchy from ``config/role-defaults.yaml``.
+
+        Falls back to an empty list when the file is missing (project-admin mode
+        without super-admin configs). Each role entry carries name/tier/model/
+        memory/parallel/permission_mode, a never-empty ``description`` (falls
+        back to the template frontmatter) and ``targets`` (delegation targets).
+        """
+        role_defaults_path = self._ctx.role_defaults_path()
+        roles: list[dict] = []
+
+        if role_defaults_path.exists():
+            with role_defaults_path.open("r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh) or {}
+            raw = data.get("roles") or data
+            if isinstance(raw, dict):
+                for name, attrs in raw.items():
+                    if not isinstance(attrs, dict):
+                        continue
+                    handoff = attrs.get("handoff") or {}
+                    targets_raw = handoff.get("target_roles") if isinstance(handoff, dict) else None
+                    targets: list[str] = []
+                    if isinstance(targets_raw, list):
+                        targets = [str(t) for t in targets_raw if isinstance(t, str) and t]
+
+                    description = attrs.get("description") or ""
+                    if not description:
+                        description = self.read_template_description(name)
+                    if not description:
+                        description = f"{name} agent (no description)"
+
+                    roles.append({
+                        "name": name,
+                        "tier": (attrs.get("workflow_tier")
+                                 or attrs.get("tier")
+                                 or attrs.get("workflow-tier")
+                                 or "optional"),
+                        "model": attrs.get("model"),
+                        "memory": attrs.get("memory"),
+                        "parallel": bool(attrs.get("parallel", False)),
+                        "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
+                        "description": description,
+                        "targets": targets,
+                        "group": attrs.get("group"),
+                    })
+        return {"roles": roles, "count": len(roles)}
+
+    def write_template(self, role: str, body: Any) -> dict:
+        """Validate and atomically write a template back to disk, returning the
+        result payload. Raises ValueError/FileNotFoundError for the handler to
+        map to 400/404."""
+        if body is None:
+            raise ValueError("empty body")
+        # Frontend sends JSON ``{"content": "..."}``; a bare string body is
+        # tolerated for backward compatibility with plain-text clients.
+        if isinstance(body, dict):
+            content = body.get("content")
+        elif isinstance(body, str):
+            content = body
+        else:
+            content = None
+        if not isinstance(content, str):
+            raise ValueError("expected 'content' field with template text")  # noqa: TRY004
+        path = self.template_path(role)
+        if not path:
+            raise FileNotFoundError(f"template not found: {role}")
+        cm = self._ctx.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, path)
+        return {
+            "status": "saved",
+            "role": role,
+            "backup": backup,
+            "bytes": len(content.encode("utf-8")),
+        }
+
+
+class RoleDefaultsEditor:
+    """Formatting-preserving editor for ``config/role-defaults.yaml``, shared by
+    :class:`PipelineService` and :class:`ReflectionService` (issue #572).
+
+    ``update_section`` replaces a single top-level section in place with a
+    fine-grained, child-aware edit so untouched inner keys, list items and
+    comments keep their original formatting; only new/changed children are
+    re-serialised. ``load`` returns the parsed document (``{}`` when absent).
+    """
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def load(self) -> dict:
+        """Return the parsed role-defaults document, or ``{}`` if missing/blank."""
+        path = self._ctx.role_defaults_path()
+        if not path.exists():
+            return {}
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _indent_yaml_dump(value: Any, indent: int) -> list[str]:
+        """Dump ``value`` to YAML and prefix every line with ``indent`` spaces."""
+        raw = yaml.dump(
+            value,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        if not raw.endswith("\n"):
+            raw += "\n"
+        out: list[str] = []
+        for line in raw.splitlines(keepends=True):
+            if line == "\n":
+                out.append("\n")
+            else:
+                out.append(" " * indent + line)
+        return out
+    @staticmethod
+    def _format_yaml_list_item(item: Any, indent: int, value_indent: int) -> list[str]:
+        """Format a list item (``- key: value``) preserving nested indentation.
+
+        ``indent`` is the column of the ``-`` marker; ``value_indent`` is the
+        column used for the item's body lines.
+        """
+        lines = RoleDefaultsEditor._indent_yaml_dump(item, value_indent)
+        if not lines:
+            return [(" " * indent) + "- \n"]
+        # The first dumped line already has ``value_indent`` spaces; replace
+        # them with the list marker at ``indent``.
+        first_content = lines[0][value_indent:]
+        lines[0] = (" " * indent) + "- " + first_content
+        return lines
+    @staticmethod
+    def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
+        """Return the indentation used for a child mapping/list body.
+
+        Falls back to ``base_indent + 2`` when the body is empty.
+        """
+        for line in body_lines:
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                continue
+            indent = len(line) - len(stripped)
+            if indent > base_indent:
+                return indent
+        return base_indent + 2
+    @staticmethod
+    def _trailing_blank_lines(lines: list[str]) -> list[str]:
+        """Return only the trailing blank/whitespace lines of a block."""
+        last = -1
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip() not in ("", "\n"):
+                last = i
+                break
+        if last == -1:
+            return lines[:]
+        return lines[last + 1 :]
+    @staticmethod
+    def _extract_list_item_id(lines: list[str]) -> str | None:
+        """Parse a single YAML list item and return its ``id`` field, if any."""
+        try:
+            data = yaml.safe_load("".join(lines))
+            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+                return data[0].get("id")
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return None
+    @staticmethod
+    def _split_dict_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level mapping keys inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and not stripped.startswith("-") and ":" in stripped:
+                key_name = stripped.split(":", 1)[0]
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind < base_indent:
+                        break
+                    if ind == base_indent and not l.lstrip().startswith("-"):
+                        break
+                    i += 1
+                children.append({"type": "dict", "key": key_name, "start": start, "end": i})
+            else:
+                i += 1
+        return children
+    @staticmethod
+    def _split_list_children(body_lines: list[str], base_indent: int) -> list[dict]:
+        """Locate top-level list items inside a section body."""
+        children: list[dict] = []
+        i = 0
+        n = len(body_lines)
+        while i < n:
+            line = body_lines[i]
+            stripped = line.lstrip()
+            if stripped in ("", "\n"):
+                i += 1
+                continue
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+            if indent == base_indent and stripped.startswith("- "):
+                start = i
+                i += 1
+                while i < n:
+                    l = body_lines[i]
+                    if l.strip() in ("", "\n"):
+                        i += 1
+                        continue
+                    ind = len(l) - len(l.lstrip())
+                    if ind <= base_indent:
+                        break
+                    i += 1
+                children.append({"start": start, "end": i})
+            else:
+                i += 1
+        return children
+    @staticmethod
+    def _splice_appended_children(
+        new_lines: list[str], tail: list[str], appended_new: list[str]
+    ) -> None:
+        """Attach freshly appended children to ``new_lines`` in-place.
+
+        New children are spliced in *after* the existing content but *before*
+        ``tail`` — the trailing blank/comment lines that were captured with the
+        section body but usually head the *following* top-level section (e.g.
+        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
+        Placing new keys after that tail would glue them onto the comment line
+        (the section-body regex drops the final newline before the next key),
+        silently commenting the new key out. Newline boundaries are enforced so
+        a new key can never land on the same physical line as a trailing comment.
+
+        When there are no new children the tail is appended verbatim, preserving
+        the exact byte layout of update-only and delete writes.
+        """
+        if not appended_new:
+            new_lines.extend(tail)
+            return
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines[-1] = new_lines[-1] + "\n"
+        new_lines.extend(appended_new)
+        if tail:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines[-1] = new_lines[-1] + "\n"
+            new_lines.extend(tail)
+    def _build_role_defaults_section_body(
+        self, key: str, value: Any, body_lines: list[str]
+    ) -> str:
+        """Rebuild the body of a top-level ``role-defaults.yaml`` section.
+
+        Dict sections (e.g. ``quality_pipelines``) are edited child-by-child.
+        Children whose parsed value equals the new value keep their original
+        formatting; only changed or new children are re-serialised. List
+        sections with an ``id`` field (e.g. ``reflection_pairs``) are matched
+        by id using the same rule. Comments and blank lines that are not part
+        of a child block are preserved unchanged.
+        """
+        base_indent = 2
+        value_indent = self._infer_child_value_indent(body_lines, base_indent)
+
+        def _scalar_dump(v: Any) -> str:
+            return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
+
+        def _build_dict_child(k: str, v: Any, child: dict | None) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if isinstance(v, (dict, list)):
+                    header = body_lines[child["start"]]
+                    child_value_indent = self._infer_child_value_indent(
+                        body_lines[child["start"] + 1 : child["end"]], base_indent
+                    )
+                    value_lines = self._indent_yaml_dump(v, child_value_indent)
+                    return [header] + value_lines + trailing
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n"
+                    ] + trailing
+            else:
+                if isinstance(v, (dict, list)):
+                    header = " " * base_indent + k + ":\n"
+                    value_lines = self._indent_yaml_dump(v, value_indent)
+                    return [header] + value_lines + ["\n"]
+                else:
+                    return [
+                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n",
+                        "\n",
+                    ]
+
+        def _build_list_child(item: dict, child: dict | None) -> list[str]:
+            if child:
+                trailing = self._trailing_blank_lines(
+                    body_lines[child["start"] : child["end"]]
+                )
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + trailing
+            else:
+                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
+                return value_lines + ["\n"]
+
+        def _assigned_indices(children: list[dict]) -> set[int]:
+            indices: set[int] = set()
+            for child in children:
+                indices.update(range(child["start"], child["end"]))
+            return indices
+
+        if isinstance(value, dict):
+            children = self._split_dict_children(body_lines, base_indent)
+            old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
+            # Line indices that belong to deleted children must be skipped so
+            # that deleting a pipeline actually removes it from the written YAML.
+            deleted_indices: set[int] = set()
+            for old_key, old_child in old_by_key.items():
+                if old_key not in value:
+                    deleted_indices.update(range(old_child["start"], old_child["end"]))
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for k, v in value.items():
+                child = old_by_key.get(k)
+                if child:
+                    new_lines.extend(
+                        body_lines[i]
+                        for i in range(pos, child["start"])
+                        if i not in deleted_indices
+                    )
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed.get(k) if isinstance(parsed, dict) else None
+                    except Exception:  # noqa: BLE001
+                        old_value = None
+                    if old_value == v:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_dict_child(k, v, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_dict_child(k, v, None))
+            tail = [
+                body_lines[i]
+                for i in range(pos, len(body_lines))
+                if i not in deleted_indices
+            ]
+            self._splice_appended_children(new_lines, tail, appended_new)
+            return "".join(new_lines)
+
+        if isinstance(value, list) and key == "reflection_pairs":
+            children = self._split_list_children(body_lines, base_indent)
+            old_by_id: dict[str, dict] = {}
+            for child in children:
+                item_id = self._extract_list_item_id(
+                    body_lines[child["start"] : child["end"]]
+                )
+                if item_id:
+                    old_by_id[item_id] = child
+
+            new_lines: list[str] = []
+            pos = 0
+            appended_new: list[str] = []
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                item_id = item.get("id")
+                child = old_by_id.get(item_id) if item_id else None
+                if child:
+                    new_lines.extend(body_lines[pos : child["start"]])
+                    old_block = body_lines[child["start"] : child["end"]]
+                    try:
+                        parsed = yaml.safe_load("".join(old_block))
+                        old_value = parsed[0] if isinstance(parsed, list) and parsed else None
+                    except Exception:  # noqa: BLE001
+                        old_value = None
+                    if old_value == item:
+                        new_lines.extend(old_block)
+                    else:
+                        new_lines.extend(_build_list_child(item, child))
+                    pos = child["end"]
+                else:
+                    appended_new.extend(_build_list_child(item, None))
+            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
+            return "".join(new_lines)
+
+        # Fallback for any other shape: replace the whole body with a fresh dump.
+        snippet = yaml.dump(
+            {key: value},
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+        lines = snippet.splitlines(keepends=True)
+        if lines and lines[0].startswith(key + ":"):
+            return "".join(lines[1:])
+        return snippet
+
+    def update_section(self, key: str, value: Any) -> dict:
+        """Replace one top-level section of ``role-defaults.yaml`` in-place.
+
+        Uses a fine-grained, child-aware edit so that untouched inner keys,
+        list items, and comments keep their original formatting. Only new or
+        changed children are re-serialised with PyYAML. Falls back to a full
+        block dump when the section is missing or its structure is unexpected.
+        Backup + atomic-replace rules mirror :class:`ConfigManager`.
+        """
+        import re
+
+        path = self._ctx.role_defaults_path()
+        original_text = path.read_text(encoding="utf-8") if path.exists() else ""
+        text = original_text.replace("\r\n", "\n")
+
+        # Skip the actual write if the parsed content is unchanged.
+        try:
+            parsed_original = yaml.safe_load(original_text) or {}
+        except Exception:  # noqa: BLE001
+            parsed_original = {}
+        if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
+            return {
+                "status": "unchanged",
+                "key": key,
+                "path": str(path.relative_to(self._ctx.root)),
+                "backup": None,
+            }
+
+        block_re = re.compile(
+            rf"^{re.escape(key)}:\s*(?:\n|$)"
+            rf"(?P<body>.*?)"
+            rf"(?=\n^[A-Za-z0-9_\-]+:\s*(?:\n|$)|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        match = block_re.search(text)
+        if not match:
+            snippet = yaml.dump(
+                {key: value},
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            new_text = text.rstrip("\n") + "\n\n" + snippet
+        else:
+            section_start = match.start()
+            section_end = match.end()
+            header = text[section_start : match.start("body")]
+            body_lines = match.group("body").splitlines(keepends=True)
+            new_body = self._build_role_defaults_section_body(key, value, body_lines)
+            new_text = text[:section_start] + header + new_body + text[section_end:]
+
+        cm = self._ctx.config_manager
+        if path.exists():
+            backup = cm._backup(path)
+            cm._prune_backups(path)
+        else:
+            backup = None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, path)
+        return {
+            "status": "saved",
+            "key": key,
+            "path": str(path.relative_to(self._ctx.root)),
+            "backup": backup,
+        }
+
+
+class PipelineService:
+    """Quality-pipeline CRUD + help, backed by :class:`RoleDefaultsEditor`
+    (issue #572)."""
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+        self._editor = RoleDefaultsEditor(ctx)
+
+    def read_pipelines(self) -> dict:
+        """Return the ``quality_pipelines`` block in a stable envelope shape."""
+        pipelines = self._editor.load().get("quality_pipelines") or {}
+        if not isinstance(pipelines, dict):
+            pipelines = {}
+        return {"pipelines": pipelines}
+
+    def read_single_pipeline(self, name: str) -> dict:
+        """Return a single pipeline by name or raise."""
+        pipelines = self.read_pipelines().get("pipelines", {})
+        if name not in pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        return {"pipeline": pipelines[name]}
+
+    def write_pipelines(self, pipelines: dict) -> dict:
+        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``."""
+        return self._editor.update_section("quality_pipelines", pipelines)
+
+    def write_single_pipeline(self, name: str, pipeline: dict) -> dict:
+        """Create or update a single pipeline by name."""
+        all_pipelines = self.read_pipelines().get("pipelines", {})
+        all_pipelines[name] = pipeline
+        result = self.write_pipelines(all_pipelines)
+        result["pipeline"] = pipeline
+        result["name"] = name
+        return result
+
+    def delete_pipeline(self, name: str) -> dict:
+        """Delete a single pipeline by name."""
+        all_pipelines = self.read_pipelines().get("pipelines", {})
+        if name not in all_pipelines:
+            raise FileNotFoundError(f"pipeline not found: {name}")
+        del all_pipelines[name]
+        result = self.write_pipelines(all_pipelines)
+        result["deleted"] = name
+        return result
+
+    def pipeline_help(self) -> dict:
+        """Return comprehensive help documentation for the pipelines API."""
+        pipeline_names = list(self.read_pipelines().get("pipelines", {}).keys())
+        return {
+            "help": {
+                "title": "Quality Pipelines API",
+                "version": self._ctx.version,
+                "description": (
+                    "Quality Pipelines define multi-stage workflows for agent orchestration. "
+                    "Each pipeline consists of sequential, parallel, loop, or conditional stages "
+                    "that delegate work to specific agents."
+                ),
+                "endpoints": {
+                    "GET /api/pipelines": {
+                        "description": "List all pipelines with their full stage definitions.",
+                        "response": '{"pipelines": {"<name>": {...}}}',
+                    },
+                    "GET /api/pipelines?help": {
+                        "description": "Show this help documentation.",
+                        "response": '{"help": {...}}',
+                    },
+                    "GET /api/pipelines/<name>": {
+                        "description": "Get a single pipeline by name.",
+                        "response": '{"pipeline": {...}}',
+                        "example": f"/api/pipelines/{pipeline_names[0]}" if pipeline_names else "/api/pipelines/standard-feature",
+                    },
+                    "PUT /api/pipelines": {
+                        "description": "Replace ALL pipelines (whole-file replace with backup).",
+                        "body": '{"pipelines": {"<name>": {...}}}',
+                        "warning": "This replaces the entire quality_pipelines block. Use with care.",
+                    },
+                    "PUT /api/pipelines/<name>": {
+                        "description": "Create or update a single pipeline by name.",
+                        "body": '{"description": "...", "stages": [...], "on_error": "..."}',
+                    },
+                    "DELETE /api/pipelines/<name>": {
+                        "description": "Delete a single pipeline by name.",
+                        "response": '{"deleted": "<name>"}',
+                    },
+                },
+                "pipeline_structure": {
+                    "description": "string — human-readable description of the pipeline",
+                    "on_error": "enum: escalate_to_orchestrator | skip | abort | retry",
+                    "stages": [
+                        {
+                            "id": "string — unique stage identifier within the pipeline",
+                            "agent": "string — role name of the agent to delegate to",
+                            "task": "string — task description for the agent",
+                            "mode": "enum: sequential | parallel_group | fanout | loop | conditional | agent_decision",
+                            "loop": {
+                                "description": "Only required when mode=loop",
+                                "generator": "string — agent that produces output",
+                                "critic": "string — agent that reviews output",
+                                "max_iterations": "integer — loop limit (default 3)",
+                            },
+                            "condition": {
+                                "description": "Only required when mode=conditional",
+                                "type": "agent_decision",
+                                "agent": "string — agent making the decision",
+                            },
+                            "parallel_group": {
+                                "description": "Only required when mode=parallel_group",
+                                "items": [{"agent": "string", "task": "string"}],
+                            },
+                        }
+                    ],
+                },
+                "stage_modes_explained": {
+                    "sequential": "Run one agent after another in sequence.",
+                    "parallel_group": "Run multiple agents in parallel (fixed list).",
+                    "fanout": "Split work across N independent instances of the same agent.",
+                    "loop": "Generator→Critic loop for iterative refinement (e.g. implement→review).",
+                    "conditional": "Agent decides which path to take next.",
+                    "agent_decision": "Similar to conditional — agent makes a programmatic decision.",
+                },
+                "available_pipelines": pipeline_names,
+            },
+        }
+
+
+class ReflectionService:
+    """Reflection-pair CRUD, backed by :class:`RoleDefaultsEditor` (issue #572)."""
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+        self._editor = RoleDefaultsEditor(ctx)
+
+    def read_reflection_pairs(self) -> dict:
+        """Return the ``reflection_pairs`` block (always a list, empty if absent)."""
+        pairs = self._editor.load().get("reflection_pairs") or []
+        if not isinstance(pairs, list):
+            pairs = []
+        return {"reflection_pairs": pairs}
+
+    def read_reflection_pair(self, pair_id: str) -> dict:
+        """Return a single reflection pair by ``id`` or raise."""
+        for pair in self.read_reflection_pairs().get("reflection_pairs", []):
+            if isinstance(pair, dict) and pair.get("id") == pair_id:
+                return {"reflection_pair": pair}
+        raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+
+    def write_reflection_pairs(self, pairs: list) -> dict:
+        """Replace ONLY the ``reflection_pairs`` key in ``role-defaults.yaml``."""
+        result = self._editor.update_section("reflection_pairs", pairs)
+        result["reflection_pairs"] = pairs
+        result["count"] = len(pairs)
+        return result
+
+    def ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
+        """Return a valid id for a reflection pair, generating one if missing."""
+        if pair_id:
+            pair["id"] = pair_id
+            return pair_id
+        if not pair.get("id"):
+            existing = self.read_reflection_pairs().get("reflection_pairs", [])
+            base = pair.get("generator", "pair") + "-" + pair.get("critic", "critic")
+            idx = 1
+            candidate = f"{base}-{idx}"
+            old_ids = {p.get("id") for p in existing if isinstance(p, dict)}
+            while candidate in old_ids:
+                idx += 1
+                candidate = f"{base}-{idx}"
+            pair["id"] = candidate
+        return pair["id"]
+
+    def write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
+        """Create or update a single reflection pair by id."""
+        self.ensure_pair_id(pair, pair_id)
+        pairs = self.read_reflection_pairs().get("reflection_pairs", [])
+        found = False
+        for i, existing in enumerate(pairs):
+            if isinstance(existing, dict) and existing.get("id") == pair_id:
+                pairs[i] = pair
+                found = True
+                break
+        if not found:
+            pairs.append(pair)
+        result = self.write_reflection_pairs(pairs)
+        result["reflection_pair"] = pair
+        return result
+
+    def delete_reflection_pair(self, pair_id: str) -> dict:
+        """Delete a single reflection pair by id."""
+        pairs = self.read_reflection_pairs().get("reflection_pairs", [])
+        new_pairs = [p for p in pairs if not (isinstance(p, dict) and p.get("id") == pair_id)]
+        if len(new_pairs) == len(pairs):
+            raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+        result = self.write_reflection_pairs(new_pairs)
+        result["deleted"] = pair_id
+        return result
+
+class ModelsService:
+    """Model registry + pricing overlay + curation, the models.dev catalog
+    (SDK snapshot / live API with class-level caching), provider/tier model
+    resolution and suggestions — the model business domain extracted from
+    :class:`AdminRequestHandler` (issue #572).
+
+    The models.dev cache stays on the handler class (``ctx.handler_cls``):
+    it is process-wide state the unit tests seed and reset directly, and the
+    ``_MODELS_DEV_ERROR_TTL_SECONDS`` constant likewise lives on the handler.
+    """
+
+    # Overlay provider keys with no real models.dev catalog entry; kept in
+    # sync with ``REGISTRY_ONLY`` in ``docs/ui/admin-ui.html``.
+    CURATED_ONLY_PROVIDER_KEYS: ClassVar[set[str]] = {"mammouth", "continue"}
+
+    def __init__(self, ctx: ServiceContext) -> None:
+        self._ctx = ctx
+
+    def _curation_root(self) -> Path:
+        """Return the project root that owns ``config/model-curation.yaml``.
+
+        Mirrors the layout-resolution used elsewhere in this handler: prefers
+        the top-level checkout (``<root>/config/``) and falls back to the
+        submodule layout (``<root>/.agent-meta/config/``) when the framework
+        is embedded in a target repo.
+        """
+        # ``resolve_asset(root, "config")`` selects the layout by the presence of
+        # the ``config/`` directory; its parent is the framework root that
+        # ``load_curation``/``save_curation`` expect.
+        return resolve_asset(self._ctx.root, "config").parent
+    def _load_curation(self) -> dict:
+        """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
+
+        The import is performed lazily (and ``sys.path`` is extended on demand)
+        to mirror the pattern used by ``_load_viz_config`` at module level:
+        the admin server must keep starting even when the ``lib`` package is
+        not on ``sys.path`` at process boot.
+        """
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.curation import load_curation  # type: ignore[import]
+        curation = load_curation(str(self._curation_root()))
+        # ``load_curation`` already normalises shape; ensure keys exist for
+        # downstream callers regardless of any future schema changes.
+        curation.setdefault("blacklist", [])
+        curation.setdefault("disabled", [])
+        return curation
+    def _save_curation(self, curation: dict) -> None:
+        """Persist a curation document via ``scripts.lib.curation.save_curation``."""
+        root = self._ctx.root
+        _ensure_scripts_on_path(root)
+        from lib.curation import save_curation  # type: ignore[import]
+        save_curation(str(self._curation_root()), curation)
+    def _collect_models(self) -> list[dict]:
+        """Resolve the model registry + pricing overlay + curation into the
+        enriched ``models`` list that powers both ``/api/models`` and
+        ``/api/models/active``.
+
+        Each entry exposes the legacy pricing fields (``input_cost``,
+        ``output_cost``, ``cost_factor`` …) plus the new curation flags:
+
+        * ``enabled``     — ``True`` unless the id is in ``curation.disabled``.
+        * ``blacklisted`` — always ``False`` here. Blacklisted ids are filtered
+          out during registry generation, so a blacklisted model never reaches
+          this code path; the field is included for response-shape stability.
+        """
+        # Resolve the config dir once (submodule-aware) so registry + overlay
+        # always share the same layout, even when either file is absent.
+        config_dir = resolve_asset(self._ctx.root, "config")
+        registry_path = config_dir / "generated" / "model-registry.json"
+        pricing_path = config_dir / "pricing-overlay.yaml"
+
+        override_registry = Path(self._ctx.root) / ".meta-config" / "generated" / "model-registry.json"
+        
+        models: list[dict] = []
+        if override_registry.exists():
+            models = json.loads(override_registry.read_text(encoding="utf-8")).get("models", [])
+        elif registry_path.exists():
+            models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
+
+        pricing: dict = {}
+        if pricing_path.exists():
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+
+        curation = self._load_curation()
+        # Tolerant comparison (see _normalized_model_id): curation entries
+        # written against older registry id formats must keep matching.
+        disabled_ids = {
+            _normalized_model_id(x) for x in curation.get("disabled", [])
+            if isinstance(x, str) and x
+        }
+
+        for m in models:
+            provider = m.get("provider", "")
+            model_id = m.get("id", "")
+            model_name = m.get("name") or model_id
+
+            api_input = m.get("input_cost_api", 0.0)
+            api_output = m.get("output_cost_api", 0.0)
+
+            provider_prices = prices.get(provider, {}) if isinstance(prices, dict) else {}
+            model_prices = provider_prices.get(model_id, {}) if isinstance(provider_prices, dict) else {}
+
+            overlay_input = model_prices.get("input") if isinstance(model_prices, dict) else None
+            overlay_output = model_prices.get("output") if isinstance(model_prices, dict) else None
+
+            input_cost = overlay_input if overlay_input is not None else api_input
+            output_cost = overlay_output if overlay_output is not None else api_output
+
+            input_source = "Overlay" if overlay_input is not None else "API"
+            output_source = "Overlay" if overlay_output is not None else "API"
+
+            # Blended cost per 1M tokens (30% input, 70% output)
+            cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
+
+            m["name"] = model_name
+            m["input_cost"] = input_cost
+            m["output_cost"] = output_cost
+            m["input_source"] = input_source
+            m["output_source"] = output_source
+            m["cost_factor"] = cost_factor
+            m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
+            m["enabled"] = _normalized_model_id(model_id) not in disabled_ids
+            # Blacklisted ids are filtered during discovery and never appear in
+            # the registry; surfaced models are therefore always non-blacklisted.
+            m["blacklisted"] = False
+
+        return models
+    def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
+        """Load the models.dev catalog payload (class-level cached).
+
+        Normal resolution order: fresh in-memory cache → SDK snapshot
+        (``node_modules/@opencode-ai/models``) → live models.dev API → stale
+        cache → short-TTL negative cache of the last total failure. An
+        explicit ``force_refresh`` (the UI's ↻ button) bypasses all caches
+        and reverses API/SDK precedence so a refresh actually reaches the
+        network even when a stale SDK snapshot exists.
+
+        A total failure returns ``{"source": "error", "error": <reason>,
+        "providers": {}, "models": {}}`` and is negative-cached for
+        ``_MODELS_DEV_ERROR_TTL_SECONDS`` so an unreachable network cannot
+        turn every request into a fresh 30 s blocking fetch attempt.
+        """
+        cls = self._ctx.handler_cls
+        now = time.time()
+
+        if not force_refresh:
+            cache = getattr(cls, '_models_dev_cache', None)
+            cache_ts = getattr(cls, '_models_dev_cache_ts', 0)
+            if cache and cache.get('source') == 'sdk':
+                return cache
+            if cache and cache.get('source') == 'api' and (now - cache_ts) < 3600:
+                return cache
+            error_cache = getattr(cls, '_models_dev_error', None)
+            if (isinstance(error_cache, tuple) and len(error_cache) == 2
+                    and (now - error_cache[1]) < self._ctx.handler_cls._MODELS_DEV_ERROR_TTL_SECONDS):
+                return error_cache[0]
+
+        if force_refresh:
+            # Explicit refresh: live data wins over the (potentially stale)
+            # bundled SDK snapshot; the snapshot is the offline fallback.
+            loaded = self._load_from_models_dev_api()
+            if not loaded:
+                loaded = self._load_from_sdk_snapshot()
+        else:
+            loaded = self._load_from_sdk_snapshot()
+            if not loaded:
+                loaded = self._load_from_models_dev_api()
+
+        if loaded:
+            cls._models_dev_cache = loaded
+            cls._models_dev_cache_ts = time.time()
+            if hasattr(cls, '_models_dev_error'):
+                delattr(cls, '_models_dev_error')
+            return loaded
+
+        # Total failure — serve any stale cache before reporting the error,
+        # and stamp it as the negative-cache entry so subsequent requests
+        # within the TTL re-serve the stale payload WITHOUT re-attempting the
+        # (up to 30 s blocking) fetch.
+        stale = getattr(cls, '_models_dev_cache', None)
+        if stale:
+            cls._models_dev_error = (stale, time.time())
+            return stale
+        detail = getattr(cls, '_models_dev_last_fetch_error', '') or 'No data available'
+        error_payload = {"source": "error", "error": detail, "providers": {}, "models": {}}
+        cls._models_dev_error = (error_payload, time.time())
+        return error_payload
+    def _load_from_sdk_snapshot(self) -> dict | None:
+        try:
+            snapshot_path = resolve_asset(self._ctx.root, "node_modules",
+                                          "@opencode-ai", "models", "dist", "snapshot.js")
+            if not snapshot_path.exists():
+                return None
+
+            content = snapshot_path.read_text(encoding="utf-8")
+            prefix = 'JSON.parse("'
+            start = content.find(prefix)
+            if start == -1:
+                return None
+            start += len(prefix)
+            # Find closing ") before \nexport
+            end = content.find('")' + '\nexport', start)
+            if end == -1:
+                # Fallback: find last ") before export
+                export_pos = content.find('\nexport const providers', start)
+                if export_pos == -1:
+                    return None
+                end = content.rfind('")', start, export_pos)
+                if end == -1:
+                    return None
+
+            json_str = content[start:end]
+            # Unescape JS string: \" → "  \\ → \
+            json_str = json_str.replace('\\\\', '\x00bs\x00')
+            json_str = json_str.replace('\\"', '"')
+            json_str = json_str.replace('\x00bs\x00', '\\')
+            data = json.loads(json_str)
+
+            generated_at = ""
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("export const generatedAt = "):
+                    quote_start = stripped.find('"')
+                    if quote_start != -1:
+                        quote_end = stripped.find('"', quote_start + 1)
+                        if quote_end != -1:
+                            generated_at = stripped[quote_start + 1:quote_end]
+                    break
+
+            return {
+                "source": "sdk",
+                "generated_at": generated_at,
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception as exc:  # noqa: BLE001
+            self._ctx.handler_cls._models_dev_last_fetch_error = f"SDK snapshot read failed: {exc}"
+            return None
+    def _load_from_models_dev_api(self) -> dict | None:
+        try:
+            from urllib.request import Request, urlopen
+
+            req = Request("https://models.dev/catalog.json",
+                          headers={"User-Agent": "agent-meta-admin/1.0"})
+            with urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            # Success — clear any stale failure reason so the error payload
+            # never reports an ancient message after a later recovery.
+            self._ctx.handler_cls._models_dev_last_fetch_error = ""
+            return {
+                "source": "api",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "providers": data.get("providers", {}),
+                "models": data.get("models", {}),
+            }
+        except Exception as exc:  # noqa: BLE001
+            # Record WHY the fetch failed so the error payload returned to the
+            # UI can explain itself instead of a bare "No data available".
+            self._ctx.handler_cls._models_dev_last_fetch_error = f"models.dev fetch failed: {exc}"
+            return None
+    def _apply_pricing_overlay(self, providers: dict) -> dict:
+        """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
+
+        Two behaviors, mirroring how ``_collect_models`` already merges the
+        overlay into the Legacy registry view:
+
+        * **Override** — if the overlay's provider key matches a real
+          models.dev provider id (e.g. ``anthropic``), matching model ids get
+          their ``cost.input``/``cost.output`` replaced by the overlay value.
+          Overridden models are tagged ``_costSource: "overlay"`` so the UI
+          can surface provenance.
+        * **Curated** — if the overlay's provider key is listed in
+          ``CURATED_ONLY_PROVIDER_KEYS`` (no real models.dev catalog entry,
+          e.g. Mammouth — a flat-fee multi-model gateway with no public
+          per-token pricing), a synthetic provider node is added with
+          ``source: "curated"`` so the models.dev live view can render it
+          with a provenance badge instead of the previous strikethrough
+          workaround.
+
+        Returns a new dict; ``providers`` is not mutated in place (the caller
+        may hold a reference to the cached models.dev payload).
+        """
+        config_dir = resolve_asset(self._ctx.root, "config")
+        pricing_path = config_dir / "pricing-overlay.yaml"
+        if not pricing_path.exists():
+            return providers
+
+        try:
+            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
+        except Exception:  # noqa: BLE001
+            return providers
+        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
+        if not isinstance(prices, dict):
+            return providers
+
+        merged = dict(providers)
+        for provider_key, provider_prices in prices.items():
+            if not isinstance(provider_prices, dict):
+                continue
+            model_entries = {
+                k: v for k, v in provider_prices.items()
+                if not k.startswith("_") and isinstance(v, dict)
+            }
+            if not model_entries:
+                continue
+
+            if provider_key in merged:
+                # Override path: real models.dev provider — patch matching models only.
+                provider_node = dict(merged[provider_key])
+                models = dict(provider_node.get("models", {}))
+                overlay_prefix = f"{provider_key}/"
+                for model_id, price in model_entries.items():
+                    # config/pricing-overlay.yaml key format is inconsistent
+                    # across providers: anthropic/gemini/mammouth use bare ids
+                    # matching models.dev directly, but opencode-go's ids are
+                    # prefixed with "opencode-go/" (that prefix IS the real,
+                    # runnable model id for this framework's `model:` config
+                    # field — model-registry.json's own `id` matches it, and
+                    # the legacy /models-legacy view resolves correctly off of
+                    # that). The live models.dev catalog itself only knows the
+                    # bare id, so try both before giving up — without this,
+                    # every opencode-go override silently no-ops and the UI
+                    # falls back to models.dev's own (inapplicable, since
+                    # opencode-go is a flat-fee gateway with no real per-token
+                    # cost) pricing guess instead of our curated $0 override.
+                    resolved_id = model_id if model_id in models else None
+                    if resolved_id is None and model_id.startswith(overlay_prefix):
+                        bare_id = model_id[len(overlay_prefix):]
+                        if bare_id in models:
+                            resolved_id = bare_id
+                    if resolved_id is None:
+                        continue
+                    model = dict(models[resolved_id])
+                    cost = dict(model.get("cost") or {})
+                    if price.get("input") is not None:
+                        cost["input"] = price["input"]
+                    if price.get("output") is not None:
+                        cost["output"] = price["output"]
+                    model["cost"] = cost
+                    model["_costSource"] = "overlay"
+                    models[resolved_id] = model
+                provider_node["models"] = models
+                merged[provider_key] = provider_node
+            elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
+                # Curated path: no real models.dev slug for this provider.
+                curated_models = {}
+                for model_id, price in model_entries.items():
+                    curated_models[model_id] = {
+                        "id": model_id,
+                        "name": price.get("name") or model_id,
+                        "cost": {"input": price.get("input"), "output": price.get("output")},
+                    }
+                merged[provider_key] = {
+                    "name": provider_prices.get("_name") or provider_key.capitalize(),
+                    "models": curated_models,
+                    "source": "curated",
+                }
+            # else: overlay key doesn't match a real provider and isn't on
+            # the curated allow-list — inert legacy data, ignored.
+        return merged
+    def _read_model_source_prefs(self) -> dict:
+        """Load the per-provider model-source map from ``project.yaml``.
+
+        Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
+        any entries whose value is not a recognised source. Missing/invalid
+        section yields ``{}`` (every provider then defaults to the central
+        ``default-model-source`` from ``config/ai-providers.yaml``, see
+        ``_default_model_source``).
+        """
+        project = self._ctx.config_manager.read("project") or {}
+        prefs = project.get("model-source-preference") if isinstance(project, dict) else None
+        if not isinstance(prefs, dict):
+            return {}
+        return {
+            str(k): v for k, v in prefs.items()
+            if isinstance(v, str) and v in VALID_MODEL_SOURCES
+        }
+    def _default_model_source(self) -> str:
+        """Read the framework-wide default model source from
+        ``config/ai-providers.yaml`` -> ``default-model-source``.
+
+        Falls back to ``_FALLBACK_MODEL_SOURCE`` when the file or key is
+        missing (older projects synced before this key existed) or the value
+        is not one of ``VALID_MODEL_SOURCES``.
+        """
+        try:
+            path = self._ai_providers_path()
+            if not path.exists():
+                return _FALLBACK_MODEL_SOURCE
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            value = data.get("default-model-source") if isinstance(data, dict) else None
+            if isinstance(value, str) and value in VALID_MODEL_SOURCES:
+                return value
+            return _FALLBACK_MODEL_SOURCE
+        except Exception:  # noqa: BLE001
+            return _FALLBACK_MODEL_SOURCE
+    def _resolve_model_source(self, provider_name: str) -> str:
+        """Resolve the effective source for ``provider_name`` (per-provider
+        override from ``project.yaml``, or the central default when unset)."""
+        return self._read_model_source_prefs().get(provider_name, self._default_model_source())
+    def _provider_model_tiers(self, provider_name: str) -> dict:
+        """Return the ``model-tiers`` map for ``provider_name`` from
+        ``ai-providers.yaml`` (``{}`` when absent)."""
+        path = self._ai_providers_path()
+        if not path.exists():
+            return {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        providers = data.get("providers") or {}
+        conf = providers.get(provider_name) or {} if isinstance(providers, dict) else {}
+        tiers = conf.get("model-tiers") or {} if isinstance(conf, dict) else {}
+        return tiers if isinstance(tiers, dict) else {}
+    def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
+        """Registry-sourced model suggestions for ``provider_name``.
+
+        The provider's tier values pin down which registry provider slug(s)
+        (e.g. ``opencode-go``, ``anthropic``) belong to this framework
+        provider, and only active (non-disabled) models for those slugs are
+        returned. When no slug can be inferred, ``[]`` is returned — the
+        previous behaviour of offering ALL active models flooded datalists
+        with cross-provider ids that would corrupt the config if selected
+        (e.g. Gemini's bare ``gemini-*`` tier ids do not exist in a registry
+        that only carries anthropic + opencode-go entries).
+        """
+        models = [m for m in self._collect_models() if m.get("enabled")]
+        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
+        registry_slugs: set = set()
+        for model_id in tier_vals:
+            if "/" in model_id:
+                prefix = model_id.split("/", 1)[0]
+                for m in models:
+                    if str(m.get("id", "")).startswith(prefix + "/"):
+                        registry_slugs.add(m.get("provider"))
+            else:
+                for m in models:
+                    if m.get("id") == model_id:
+                        registry_slugs.add(m.get("provider"))
+        if not registry_slugs:
+            return []
+        selected = [m for m in models if m.get("provider") in registry_slugs]
+        return [
+            {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
+            for m in selected
+        ]
+    def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
+        """Map every registry provider slug to the set of its registry ids.
+
+        Reads the SAME registry source ``_collect_models()`` uses (override
+        registry when present, framework registry otherwise), so ids resolved
+        through :meth:`_resolve_registry_model_id` always line up with the
+        ids ``_collect_models`` looks the pricing overlay up by.
+        """
+        out: dict[str, set[str]] = {}
+        try:
+            collected = self._collect_models()
+        except Exception:  # noqa: BLE001
+            return out
+        for m in collected:
+            provider = str(m.get("provider") or "")
+            model_id = str(m.get("id") or "")
+            if provider and model_id:
+                out.setdefault(provider, set()).add(model_id)
+        return out
+    def _resolve_registry_model_id(
+        self,
+        provider_slug: str,
+        raw_id: str,
+        ids_by_provider: dict[str, set[str]] | None = None,
+    ) -> str:
+        """Resolve the registry-conform id for a bare models.dev model id.
+
+        Registry id conventions are PER MODEL, not per provider: anthropic
+        carries bare canonical ids (``claude-opus-5``) AND namespaced
+        OpenRouter extras (``anthropic/claude-opus-4.8-fast``), while
+        opencode-go namespaces every id. Resolution order:
+
+        1. the bare id exists in the registry for this provider → bare;
+        2. the namespaced ``<slug>/<raw>`` id exists → namespaced;
+        3. neither exists (model not synced into the registry yet) →
+           namespaced only when EVERY registry id of this provider is
+           namespaced (unanimous convention), else bare — a not-yet-synced
+           opencode-go model stays runnable (``opencode-go/<raw>``) while a
+           mixed-convention provider (anthropic) defaults to the canonical
+           bare form.
+
+        No provider names are hardcoded; the convention is derived entirely
+        from the registry. Callers resolving many ids should pass
+        ``ids_by_provider`` (from :meth:`_registry_model_ids_by_provider`)
+        to avoid re-reading the registry per model. The resolved id is what
+        ``_collect_models()`` looks the pricing overlay up by and what
+        ``roles.py::_resolve_tier_to_model`` persists verbatim into the
+        ``model:`` frontmatter — both consumers need the exact registry id.
+        """
+        if ids_by_provider is None:
+            ids_by_provider = self._registry_model_ids_by_provider()
+        ids = ids_by_provider.get(provider_slug, set())
+        if raw_id in ids:
+            return raw_id
+        namespaced = f"{provider_slug}/{raw_id}"
+        if namespaced in ids:
+            return namespaced
+        fully_namespaced = bool(ids) and all(i.startswith(f"{provider_slug}/") for i in ids)
+        return namespaced if fully_namespaced else raw_id
+    def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
+        """models.dev-sourced model suggestions for ``provider_name``.
+
+        Returns ``[]`` for providers without a models.dev catalog slug.
+        Suggestion ids match the registry's PER-MODEL id convention (see
+        :meth:`_resolve_registry_model_id`): bare models.dev ids stay 1:1
+        where the registry is bare (anthropic, google, github-copilot) and
+        get the ``<slug>/`` prefix where the registry is namespaced
+        (currently opencode-go) — the value persisted on save (model-tiers /
+        tier-preset / provider-tier overrides) must be the runnable config
+        id, and ``roles.py::_resolve_tier_to_model`` passes it through
+        verbatim. The ``provider`` field always carries the models.dev slug
+        (e.g. ``opencode-go``) as namespace info for display.
+        """
+        slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
+        if not slug:
+            return []
+        data = (self._ctx.handler or self)._load_models_dev_data()
+        providers = self._apply_pricing_overlay(dict(data.get("providers", {})))
+        node = providers.get(slug)
+        if not isinstance(node, dict):
+            return []
+        ids_by_provider = self._registry_model_ids_by_provider()
+        out: list[dict] = []
+        for m in (node.get("models") or {}).values():
+            raw_id = m.get("id")
+            if not raw_id:
+                continue
+            suggestion_id = self._resolve_registry_model_id(slug, str(raw_id), ids_by_provider)
+            out.append({"id": suggestion_id, "name": m.get("name") or raw_id, "provider": slug})
+        return out
+    def _ai_providers_path(self) -> Path:
+        """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
+        return resolve_asset(self._ctx.root, "config", "ai-providers.yaml")
+    def _list_providers(self) -> list[dict]:
+        """Return the configured AI providers with their model tiers/aliases."""
+        path = self._ai_providers_path()
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        providers = data.get("providers") or {}
+        if not isinstance(providers, dict):
+            return []
+        out: list[dict] = []
+        for name, conf in providers.items():
+            if not isinstance(conf, dict):
+                continue
+            tiers = conf.get("model-tiers") or {}
+            aliases = conf.get("model-aliases") or {}
+            if not isinstance(tiers, dict):
+                tiers = {}
+            if not isinstance(aliases, dict):
+                aliases = {}
+            out.append({
+                "name": name,
+                "display_name": conf.get("display-name") or name,
+                "has_model_tiers": bool(tiers),
+                "model_tiers": tiers,
+                "model_aliases": aliases,
+            })
+        out.sort(key=lambda p: p["name"].lower())
+        return out
+    def _list_platforms(self) -> list[dict]:
+        """Return distinct platform prefixes derived from ``agents/2-platform/``."""
+        names: set[str] = {"agent-meta", "generic"}
+        known_roles = sorted(
+            (r["name"] for r in self._list_roles()),
+            key=len,
+            reverse=True,
+        )
+        platform_dir = resolve_asset(self._ctx.root, "agents", "2-platform")
+        if platform_dir.is_dir():
+            for entry in platform_dir.glob("*.md"):
+                stem = entry.stem
+                if "-" not in stem:
+                    continue
+                prefix = None
+                for role in known_roles:
+                    suffix = f"-{role}"
+                    if stem.endswith(suffix) and len(stem) > len(suffix):
+                        prefix = stem[: -len(suffix)]
+                        break
+                if prefix is None:
+                    prefix = stem.rsplit("-", 1)[0]
+                if prefix:
+                    names.add(prefix)
+        return [{"name": n} for n in sorted(names, key=str.lower)]
+    def _list_roles(self) -> list[dict]:
+        """Return the role names declared in ``role-defaults.yaml``."""
+        hierarchy = TemplateService(self._ctx).build_agent_hierarchy()
+        rolenames = sorted(
+            (r.get("name") for r in hierarchy.get("roles") or [] if r.get("name")),
+            key=str.lower,
+        )
+        return [{"name": n} for n in rolenames]
+
 class AdminRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler — dispatches to GET/PUT/POST routes.
 
@@ -1266,9 +2971,35 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         short, stable ``error_code`` (e.g. ``"ERR_MODEL_FETCH"``) so client-side
         error handling / support requests can still distinguish failure modes
         without any leaked detail.
+
+        Thin wrapper over :func:`_generic_error_response` (issue #572) so the
+        handler and the extracted service classes share one implementation.
         """
-        logger.error("%s: %s", error_code, exc, exc_info=True)
-        return 500, {"error": error_code, "message": "Internal server error"}
+        return _generic_error_response(exc, error_code)
+
+    # ------------------------------------------------------------------ #
+    # Service wiring                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _service_context(self) -> ServiceContext:
+        """Build a :class:`ServiceContext` that reads this handler's shared
+        collaborators live (see ServiceContext for the live-read rationale)."""
+        return ServiceContext(self.__class__, self)
+
+    def _audit_service(self) -> AuditService:
+        return AuditService(self._service_context())
+
+    def _template_service(self) -> TemplateService:
+        return TemplateService(self._service_context())
+
+    def _pipeline_service(self) -> PipelineService:
+        return PipelineService(self._service_context())
+
+    def _reflection_service(self) -> ReflectionService:
+        return ReflectionService(self._service_context())
+
+    def _models_service(self) -> ModelsService:
+        return ModelsService(self._service_context())
 
     # ------------------------------------------------------------------ #
     # CSRF / DNS-rebinding protection                                    #
@@ -1295,28 +3026,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         this is a no-op — the server is loopback-only and auth is not required.
 
         Raises AuthError on mismatch or missing token.
+
+        Thin HTTP wrapper: the verification logic lives in
+        :meth:`AuthService.check_token` (issue #572).
         """
-        expected = self.__class__.admin_token
-        if expected is None:
-            return  # No token configured → no check needed (loopback-only mode)
-
-        # Extract token from Authorization header
-        auth_header = self.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            provided = auth_header[7:]  # len("Bearer ") == 7
-            if _verify_token(provided, expected):
-                return
-
-        if allow_query_token:
-            # Extract token from query parameter — only reachable for the
-            # explicitly opted-in SSE endpoint, see docstring above.
-            parsed = urlparse(self.path)
-            query_params = parse_qs(parsed.query)
-            token_list = query_params.get("token", [])
-            if token_list and _verify_token(token_list[0], expected):
-                return
-
-        raise AuthError("invalid or missing admin token")
+        AuthService.check_token(
+            expected=self.__class__.admin_token,
+            auth_header=self.headers.get("Authorization", ""),
+            query=urlparse(getattr(self, "path", "")).query,
+            allow_query_token=allow_query_token,
+        )
 
     def _check_origin(self) -> None:
         """Reject mutating requests whose Origin/Host is not in the configured
@@ -1327,41 +3046,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
           header on the forged request will not match the bind ``host:port``,
           so the request is rejected (DNS-rebinding defence).
 
-        Contract (see issue #588):
-          - Origin header **present**: must match one of
-            ``http://<allowed-host>:<bind-port>`` exactly. An empty string is
-            treated as *present but invalid* (rejected), not as absent.
-          - Origin header **absent**: only the Host header is checked. This
-            is intentional — curl/wget and other non-browser CLI clients do
-            not send an Origin header, and this path must remain usable for
-            local admin scripting.
-          - In both cases the Host header must match ``<allowed-host>:<bind-port>``
-            (or the actual bind host:port). A missing/malformed Host header is
-            rejected.
+        See :meth:`AuthService.check_origin` for the full contract (issue #588);
+        this is a thin HTTP wrapper that feeds it the per-request headers and the
+        class-level server configuration (issue #572).
         """
-        expected_port = self.__class__.bind_port
-        expected_host = self.__class__.bind_host
-
-        origin = self.headers.get("Origin")
-        if origin is None:
-            # Same-origin form POSTs and CLI tools (curl) often omit Origin.
-            # We still require the Host header to match — see below.
-            pass
-        else:
-            allowed_origins = set()
-            for h in self.__class__.allowed_hosts:
-                allowed_origins.add(f"http://{h}:{expected_port}")
-            if origin not in allowed_origins:
-                raise SecurityError(f"origin not allowed: {origin!r}")
-
-        host = self.headers.get("Host", "")
-        allowed_hosts = set()
-        for h in self.__class__.allowed_hosts:
-            allowed_hosts.add(f"{h}:{expected_port}")
-        # Always allow the actual bind host (covers explicit ``--host``).
-        allowed_hosts.add(f"{expected_host}:{expected_port}")
-        if host not in allowed_hosts:
-            raise SecurityError(f"host header not allowed: {host!r}")
+        AuthService.check_origin(
+            origin=self.headers.get("Origin"),
+            host=self.headers.get("Host", ""),
+            allowed_hosts=self.__class__.allowed_hosts,
+            bind_host=self.__class__.bind_host,
+            bind_port=self.__class__.bind_port,
+        )
 
     # ------------------------------------------------------------------ #
     # Routing                                                            #
@@ -1502,161 +3197,253 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # GET routes                                                         #
     # ------------------------------------------------------------------ #
 
+    # ------------------------------------------------------------------ #
+    # Route tables                                                        #
+    #                                                                     #
+    # Each verb maps a normalized path (trailing slash stripped) to a     #
+    # self-responding handler-method NAME. Exact matches are resolved     #
+    # first, then the ordered prefix table (the path suffix after the     #
+    # prefix is passed to the handler). This preserves the exact          #
+    # evaluation order of the previous if-chains (issue #572): exact      #
+    # routes always win over prefixes, and the only path that matches     #
+    # both a prefix and would otherwise be an exact —                     #
+    # ``/api/config/submodule-protection`` — is intentionally NOT listed  #
+    # as an exact GET route so it keeps resolving through the generic     #
+    # ``/api/config/`` reader, exactly as the original chain did.         #
+    # Method names are resolved via ``getattr(self, name)`` at call time  #
+    # so monkeypatched/overridden instance methods still take effect.     #
+    # ------------------------------------------------------------------ #
+
+    _GET_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        "/": "_serve_ui",
+        "/favicon.png": "_serve_favicon",
+        "/api/health": "_route_get_health",
+        "/api/mode": "_route_get_mode",
+        "/api/project": "_route_get_project",
+        "/api/schema/project": "_route_get_schema_project",
+        "/api/help": "_route_get_help",
+        "/api/sync/status": "_route_get_sync_status",
+        "/api/agents/hierarchy": "_route_get_agents_hierarchy",
+        "/api/pipelines": "_route_get_pipelines",
+        "/api/reflection-pairs": "_route_get_reflection_pairs",
+        "/api/agents/templates": "_route_get_agents_templates",
+        "/api/events": "_stream_events",
+        "/api/subserver-status": "_route_get_subserver_status",
+        "/api/providers": "_route_get_providers",
+        "/api/platforms": "_route_get_platforms",
+        "/api/roles": "_route_get_roles",
+        "/api/config-audit": "_route_get_config_audit",
+        "/api/consistency-check": "_route_get_consistency_check",
+        "/api/external-tools/drift": "_route_get_external_tools_drift",
+        "/api/models": "_handle_get_models",
+        "/api/models/active": "_handle_get_models_active",
+        "/api/models-dev": "_handle_get_models_dev",
+        "/api/model-source": "_handle_get_model_source",
+        "/api/model-suggestions": "_handle_get_model_suggestions",
+        "/api/ai-providers": "_handle_get_ai_providers",
+        "/api/tier-presets": "_handle_get_tier_presets",
+        "/api/tier-presets/merged": "_handle_get_tier_presets_merged",
+        "/api/model-mapping": "_handle_get_model_mapping",
+        "/api/provider-deactivation/status": "_route_get_provider_deactivation_status",
+        "/api/backups": "_handle_get_backups",
+        "/api/submodule-protection": "_route_get_submodule_protection",
+        "/api/environments": "_route_get_environments",
+        "/api/environments/scripts": "_route_get_env_scripts",
+    }
+    _GET_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/config/", "_route_get_config"),
+        ("/api/pipelines/", "_route_get_single_pipeline"),
+        ("/api/reflection-pairs/", "_route_get_single_reflection_pair"),
+        ("/api/agent-template/", "_send_template"),
+    )
+
+    _PUT_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        # ``/api/submodule-protection`` and ``/api/config/project/section`` are
+        # exacts that must beat the generic ``/api/config/`` prefix — exact
+        # routes are resolved first, so this ordering is preserved.
+        "/api/submodule-protection": "_write_submodule_protection",
+        "/api/config/project/section": "_write_project_section",
+        "/api/pipelines": "_route_put_pipelines",
+        "/api/reflection-pairs": "_route_put_reflection_pairs",
+    }
+    _PUT_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/config/", "_route_put_config"),
+        ("/api/agent-template/", "_write_template"),
+        ("/api/pipelines/", "_route_put_single_pipeline"),
+        ("/api/reflection-pairs/", "_route_put_single_reflection_pair"),
+    )
+
+    _POST_EXACT_ROUTES: ClassVar[dict[str, str]] = {
+        "/api/sync/dry-run": "_route_post_sync_dry_run",
+        "/api/sync/run": "_route_post_sync_run",
+        "/api/sync/render-standalone": "_route_post_sync_render_standalone",
+        "/api/config-audit/apply": "_route_post_config_audit_apply",
+        "/api/models/update": "_handle_post_models_update",
+        "/api/models/clear-override": "_handle_post_models_clear_override",
+        "/api/models-dev/refresh": "_handle_post_models_dev_refresh",
+        "/api/models-dev/import": "_handle_post_models_dev_import",
+        "/api/model-source": "_handle_post_model_source",
+        "/api/model-source/batch": "_handle_post_model_source_batch",
+        "/api/model-inherit": "_handle_post_model_inherit",
+        "/api/models/exclude": "_handle_post_models_exclude",
+        "/api/models/disable": "_handle_post_models_disable",
+        "/api/models/enable": "_handle_post_models_enable",
+        "/api/pricing/update": "_handle_post_pricing_update",
+        "/api/pricing/reset": "_handle_post_pricing_reset",
+        "/api/ai-providers/update": "_handle_post_ai_providers_update",
+        "/api/tier-presets/update": "_handle_post_tier_presets_update",
+        "/api/reflection-pairs": "_route_post_reflection_pair",
+        "/api/provider-deactivation/deactivate": "_handle_deactivate_providers",
+        "/api/provider-deactivation/activate": "_handle_activate_providers",
+        "/api/backups/create": "_handle_create_backup",
+        "/api/backups/restore": "_handle_restore_backup",
+    }
+
+    _DELETE_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("/api/pipelines/", "_route_delete_pipeline"),
+        ("/api/reflection-pairs/", "_route_delete_reflection_pair"),
+        ("/api/backups/", "_handle_delete_backup"),
+        ("/api/environments/", "_route_delete_environment"),
+    )
+
+    def _resolve_route(
+        self,
+        path: str,
+        exact: dict[str, str],
+        prefixes: tuple[tuple[str, str], ...],
+    ) -> Any:
+        """Return a zero-argument callable that serves ``path``, or ``None``.
+
+        Exact matches are tried first, then the ordered ``prefixes`` table; a
+        prefix handler receives the path suffix (the portion after the prefix)
+        as its single positional argument.
+        """
+        name = exact.get(path)
+        if name is not None:
+            return getattr(self, name)
+        for prefix, handler_name in prefixes:
+            if path.startswith(prefix):
+                suffix = path[len(prefix):]
+                method = getattr(self, handler_name)
+                return lambda: method(suffix)
+        return None
+
     def _dispatch_get(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._GET_EXACT_ROUTES, self._GET_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        if path == "/":
-            return self._serve_ui()
+    # ------------------------------------------------------------------ #
+    # GET route handlers (thin — read/format only, delegate the work)    #
+    # ------------------------------------------------------------------ #
 
-        if path == "/favicon.png":
-            favicon_path = resolve_asset(self.root, "docs", "ui", "favicon.png")
-            if favicon_path.exists():
-                return self._send_bytes(favicon_path.read_bytes(), "image/png")
-            self.send_response(404)
-            self.end_headers()
-            return
+    def _serve_favicon(self) -> None:
+        favicon_path = resolve_asset(self.root, "docs", "ui", "favicon.png")
+        if favicon_path.exists():
+            return self._send_bytes(favicon_path.read_bytes(), "image/png")
+        self.send_response(404)
+        self.end_headers()
 
-        if path == "/api/health":
-            return self._send_json({
-                "status": "ok",
-                "version": self.__class__.version,
-                "mode": self.__class__.mode,
-            })
+    def _route_get_health(self) -> None:
+        return self._send_json({
+            "status": "ok",
+            "version": self.__class__.version,
+            "mode": self.__class__.mode,
+        })
 
-        if path == "/api/mode":
-            payload: dict = {
-                "mode": self.__class__.mode,
-                "root": str(self.__class__.root),
-                "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
-            }
-            # In super_admin mode the project.yaml of the meta-repo is also
-            # available as the "target repo" view.  Signal this to the UI so
-            # it can render the combined dashboard.
-            if self.__class__.mode == "super_admin":
-                project_yaml = self.__class__.root / ".meta-config" / "project.yaml"
-                payload["project_admin_available"] = project_yaml.exists()
-            return self._send_json(payload)
+    def _route_get_mode(self) -> None:
+        payload: dict = {
+            "mode": self.__class__.mode,
+            "root": str(self.__class__.root),
+            "allowed_keys": sorted(self.__class__.config_manager._allowed_keys().keys()),
+        }
+        # In super_admin mode the project.yaml of the meta-repo is also
+        # available as the "target repo" view.  Signal this to the UI so
+        # it can render the combined dashboard.
+        if self.__class__.mode == "super_admin":
+            project_yaml = self.__class__.root / ".meta-config" / "project.yaml"
+            payload["project_admin_available"] = project_yaml.exists()
+        return self._send_json(payload)
 
-        if path == "/api/project":
-            project_data = self.__class__.config_manager.read("project").get("project", {})
-            return self._send_json({"project": {
-                "name": project_data.get("name", ""),
-                "version": project_data.get("version", ""),
-                "id-prefix": project_data.get("id-prefix", project_data.get("prefix", ""))
-            }})
+    def _route_get_project(self) -> None:
+        project_data = self.__class__.config_manager.read("project").get("project", {})
+        return self._send_json({"project": {
+            "name": project_data.get("name", ""),
+            "version": project_data.get("version", ""),
+            "id-prefix": project_data.get("id-prefix", project_data.get("prefix", ""))
+        }})
 
-        if path.startswith("/api/config/"):
-            key = path[len("/api/config/"):]
-            data = self.__class__.config_manager.read(key)
-            return self._send_json(data)
+    def _route_get_config(self, key: str) -> None:
+        data = self.__class__.config_manager.read(key)
+        return self._send_json(data)
 
-        if path == "/api/schema/project":
-            schema_path = self._find_schema_path()
-            if not schema_path.exists():
-                raise FileNotFoundError("project-config.schema.json")
-            self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
-            return
+    def _route_get_schema_project(self) -> None:
+        schema_path = self._find_schema_path()
+        if not schema_path.exists():
+            raise FileNotFoundError("project-config.schema.json")
+        self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
 
-        if path == "/api/help":
-            return self._send_json(self._get_help_docs())
+    def _route_get_help(self) -> None:
+        return self._send_json(self._get_help_docs())
 
-        if path == "/api/sync/status":
-            return self._send_json(self.__class__.sync_executor.status())
+    def _route_get_sync_status(self) -> None:
+        return self._send_json(self.__class__.sync_executor.status())
 
-        if path == "/api/agents/hierarchy":
-            return self._send_json(self._build_agent_hierarchy())
+    def _route_get_agents_hierarchy(self) -> None:
+        return self._send_json(self._build_agent_hierarchy())
 
-        if path == "/api/pipelines":
-            if "help" in (parsed.query or "").lower():
-                return self._send_json(self._pipeline_help())
-            return self._send_json(self._read_pipelines())
+    def _route_get_pipelines(self) -> None:
+        query = urlparse(self.path).query
+        if "help" in (query or "").lower():
+            return self._send_json(self._pipeline_help())
+        return self._send_json(self._read_pipelines())
 
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            return self._send_json(self._read_single_pipeline(name))
+    def _route_get_single_pipeline(self, name: str) -> None:
+        return self._send_json(self._read_single_pipeline(name))
 
-        if path == "/api/reflection-pairs":
-            return self._send_json(self._read_reflection_pairs())
+    def _route_get_reflection_pairs(self) -> None:
+        return self._send_json(self._read_reflection_pairs())
 
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            return self._send_json(self._read_reflection_pair(pair_id))
+    def _route_get_single_reflection_pair(self, pair_id: str) -> None:
+        return self._send_json(self._read_reflection_pair(pair_id))
 
-        if path == "/api/agents/templates":
-            return self._send_json(self._list_agent_templates())
+    def _route_get_agents_templates(self) -> None:
+        return self._send_json(self._list_agent_templates())
 
-        if path.startswith("/api/agent-template/"):
-            role = path[len("/api/agent-template/"):]
-            return self._send_template(role)
+    def _route_get_subserver_status(self) -> None:
+        return self._send_json(self.__class__.viz_manager.status())
 
-        if path == "/api/events":
-            return self._stream_events()
+    def _route_get_providers(self) -> None:
+        return self._send_json(self._list_providers())
 
-        if path == "/api/subserver-status":
-            return self._send_json(self.__class__.viz_manager.status())
+    def _route_get_platforms(self) -> None:
+        return self._send_json(self._list_platforms())
 
-        if path == "/api/providers":
-            return self._send_json(self._list_providers())
+    def _route_get_roles(self) -> None:
+        return self._send_json(self._list_roles())
 
-        if path == "/api/platforms":
-            return self._send_json(self._list_platforms())
+    def _route_get_config_audit(self) -> None:
+        return self._send_json(self._run_config_audit())
 
-        if path == "/api/roles":
-            return self._send_json(self._list_roles())
+    def _route_get_consistency_check(self) -> None:
+        return self._send_json(self._run_consistency_check())
 
-        if path == "/api/config-audit":
-            return self._send_json(self._run_config_audit())
-            
-        if path == "/api/consistency-check":
-            return self._send_json(self._run_consistency_check())
+    def _route_get_external_tools_drift(self) -> None:
+        return self._send_json(self._compute_injection_drift())
 
-        if path == "/api/external-tools/drift":
-            return self._send_json(self._compute_injection_drift())
+    def _route_get_provider_deactivation_status(self) -> None:
+        return self._send_json(self._get_deactivation_status())
 
-        if path == "/api/models":
-            return self._handle_get_models()
+    def _route_get_submodule_protection(self) -> None:
+        return self._send_json(self._get_submodule_protection_status())
 
-        if path == "/api/models/active":
-            return self._handle_get_models_active()
+    def _route_get_environments(self) -> None:
+        return self._send_json(self._read_environments())
 
-        if path == "/api/models-dev":
-            return self._handle_get_models_dev()
-
-        if path == "/api/model-source":
-            return self._handle_get_model_source()
-
-        if path == "/api/model-suggestions":
-            return self._handle_get_model_suggestions()
-
-        if path == "/api/ai-providers":
-            return self._handle_get_ai_providers()
-
-        if path == "/api/tier-presets":
-            return self._handle_get_tier_presets()
-
-        if path == "/api/tier-presets/merged":
-            return self._handle_get_tier_presets_merged()
-
-        if path == "/api/model-mapping":
-            return self._handle_get_model_mapping()
-
-        if path == "/api/provider-deactivation/status":
-            return self._send_json(self._get_deactivation_status())
-
-        if path == "/api/backups":
-            return self._handle_get_backups()
-
-        if path in ("/api/submodule-protection", "/api/config/submodule-protection"):
-            return self._send_json(self._get_submodule_protection_status())
-
-        if path == "/api/environments":
-            return self._send_json(self._read_environments())
-
-        if path == "/api/environments/scripts":
-            return self._send_json(self._read_env_scripts())
-
-        raise FileNotFoundError(path)
+    def _route_get_env_scripts(self) -> None:
+        return self._send_json(self._read_env_scripts())
 
     def _write_submodule_protection(self) -> None:
         body = self._read_body()
@@ -1710,195 +3497,122 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _dispatch_delete(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, {}, self._DELETE_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            return self._send_json(self._delete_pipeline(name))
+    def _route_delete_pipeline(self, name: str) -> None:
+        return self._send_json(self._delete_pipeline(name))
 
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            return self._send_json(self._delete_reflection_pair(pair_id))
+    def _route_delete_reflection_pair(self, pair_id: str) -> None:
+        return self._send_json(self._delete_reflection_pair(pair_id))
 
-        if path.startswith("/api/backups/"):
-            archive_name = path[len("/api/backups/"):]
-            return self._handle_delete_backup(archive_name)
-
-        if path.startswith("/api/environments/"):
-            name = path[len("/api/environments/"):]
-            return self._send_json(self._delete_environment(name))
-
-        raise FileNotFoundError(path)
+    def _route_delete_environment(self, name: str) -> None:
+        return self._send_json(self._delete_environment(name))
 
     # ------------------------------------------------------------------ #
     # PUT routes                                                         #
     # ------------------------------------------------------------------ #
 
     def _dispatch_put(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._PUT_EXACT_ROUTES, self._PUT_PREFIX_ROUTES)
+        if handler is None:
+            raise FileNotFoundError(path)
+        return handler()
 
-        # Partial update of a single top-level section of project.yaml. Must be
-        # matched BEFORE the generic /api/config/ handler (which would treat
-        # "project/section" as a config key).
-        if path == "/api/submodule-protection":
-            return self._write_submodule_protection()
+    def _route_put_config(self, key: str) -> None:
+        body = self._read_body()
+        if body is None:
+            raise ValueError("empty body")
+        if key == "project":
+            existing = self.__class__.config_manager.read("project")
+            self._deep_merge(existing, body)
+            result = self.__class__.config_manager.write("project", existing)
+        else:
+            result = self.__class__.config_manager.write(key, body)
+        return self._send_json(result)
 
-        if path == "/api/config/project/section":
-            return self._write_project_section()
+    def _route_put_pipelines(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict) or "pipelines" not in body:
+            raise ValueError("expected JSON body with 'pipelines' field")
+        pipelines = body["pipelines"]
+        if not isinstance(pipelines, dict):
+            raise ValueError("'pipelines' must be an object")
+        result = self._write_pipelines(pipelines)
+        return self._send_json(result)
 
-        if path.startswith("/api/config/"):
-            key = path[len("/api/config/"):]
-            body = self._read_body()
-            if body is None:
-                raise ValueError("empty body")
-            if key == "project":
-                existing = self.__class__.config_manager.read("project")
-                self._deep_merge(existing, body)
-                result = self.__class__.config_manager.write("project", existing)
-            else:
-                result = self.__class__.config_manager.write(key, body)
-            return self._send_json(result)
+    def _route_put_single_pipeline(self, name: str) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with pipeline object")
+        result = self._write_single_pipeline(name, body)
+        return self._send_json(result)
 
-        if path.startswith("/api/agent-template/"):
-            role = path[len("/api/agent-template/"):]
-            return self._write_template(role)
+    def _route_put_reflection_pairs(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict) or "reflection_pairs" not in body:
+            raise ValueError("expected JSON body with 'reflection_pairs' field")
+        pairs = body["reflection_pairs"]
+        if not isinstance(pairs, list):
+            raise ValueError("'reflection_pairs' must be a list")
+        result = self._write_reflection_pairs(pairs)
+        return self._send_json(result)
 
-        if path == "/api/pipelines":
-            body = self._read_body()
-            if not isinstance(body, dict) or "pipelines" not in body:
-                raise ValueError("expected JSON body with 'pipelines' field")
-            pipelines = body["pipelines"]
-            if not isinstance(pipelines, dict):
-                raise ValueError("'pipelines' must be an object")
-            result = self._write_pipelines(pipelines)
-            return self._send_json(result)
-
-        if path.startswith("/api/pipelines/"):
-            name = path[len("/api/pipelines/"):]
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with pipeline object")
-            result = self._write_single_pipeline(name, body)
-            return self._send_json(result)
-
-        if path == "/api/reflection-pairs":
-            body = self._read_body()
-            if not isinstance(body, dict) or "reflection_pairs" not in body:
-                raise ValueError("expected JSON body with 'reflection_pairs' field")
-            pairs = body["reflection_pairs"]
-            if not isinstance(pairs, list):
-                raise ValueError("'reflection_pairs' must be a list")
-            result = self._write_reflection_pairs(pairs)
-            return self._send_json(result)
-
-        if path.startswith("/api/reflection-pairs/"):
-            pair_id = path[len("/api/reflection-pairs/"):]
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with reflection pair object")
-            result = self._write_reflection_pair(pair_id, body)
-            return self._send_json(result)
-
-
-        raise FileNotFoundError(path)
+    def _route_put_single_reflection_pair(self, pair_id: str) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with reflection pair object")
+        result = self._write_reflection_pair(pair_id, body)
+        return self._send_json(result)
 
     # ------------------------------------------------------------------ #
     # POST routes                                                        #
     # ------------------------------------------------------------------ #
 
     def _dispatch_post(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
-
-        if path == "/api/sync/dry-run":
-            return self._send_json(self.__class__.sync_executor.dry_run())
-
-        if path == "/api/sync/run":
-            return self._send_json(self.__class__.sync_executor.run())
-
-        if path == "/api/sync/render-standalone":
-            return self._send_json(self.__class__.sync_executor.render_standalone())
-
-        if path == "/api/config-audit/apply":
-            return self._send_json(self._apply_config_audit())
-
-        if path == "/api/models/update":
-            return self._handle_post_models_update()
-
-        if path == "/api/models/clear-override":
-            return self._handle_post_models_clear_override()
-
-        if path == "/api/models-dev/refresh":
-            return self._handle_post_models_dev_refresh()
-
-        if path == "/api/models-dev/import":
-            return self._handle_post_models_dev_import()
-
-        if path == "/api/model-source":
-            return self._handle_post_model_source()
-
-        if path == "/api/model-source/batch":
-            return self._handle_post_model_source_batch()
-
-        if path == "/api/model-inherit":
-            return self._handle_post_model_inherit()
-
-        if path == "/api/models/exclude":
-            return self._handle_post_models_exclude()
-
-        if path == "/api/models/disable":
-            return self._handle_post_models_disable()
-
-        if path == "/api/models/enable":
-            return self._handle_post_models_enable()
-
-        if path == "/api/pricing/update":
-            return self._handle_post_pricing_update()
-
-        if path == "/api/pricing/reset":
-            return self._handle_post_pricing_reset()
-
-        if path == "/api/ai-providers/update":
-            return self._handle_post_ai_providers_update()
-
-        if path == "/api/tier-presets/update":
-            return self._handle_post_tier_presets_update()
-
-        if path == "/api/reflection-pairs":
-            body = self._read_body()
-            if not isinstance(body, dict):
-                raise ValueError("expected JSON body with reflection pair object")
-            for field in ("id", "generator", "critic"):
-                value = body.get(field)
-                if not isinstance(value, str) or not value.strip():
-                    raise ValueError("id, generator and critic are required")
-            pair_id = self._ensure_pair_id(body)
-            result = self._write_reflection_pair(pair_id, body)
-            return self._send_json(result)
-
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        handler = self._resolve_route(path, self._POST_EXACT_ROUTES, ())
+        if handler is not None:
+            return handler()
 
         # Individual subserver control: /api/subserver/{name}/{action}
-        # name in {viz, mcp}, action in {start, stop, restart}.
+        # name in {viz, mcp}, action in {start, stop, restart}. This is a
+        # parametric route with its own whitelist validation, kept as an
+        # explicit matcher rather than a table entry.
         subserver = self._match_subserver_route(path)
         if subserver is not None:
             name, action = subserver
             return self._handle_subserver_action(name, action)
 
-        if path == "/api/provider-deactivation/deactivate":
-            return self._handle_deactivate_providers()
-
-        if path == "/api/provider-deactivation/activate":
-            return self._handle_activate_providers()
-
-        if path == "/api/backups/create":
-            return self._handle_create_backup()
-
-        if path == "/api/backups/restore":
-            return self._handle_restore_backup()
-
         raise FileNotFoundError(path)
+
+    def _route_post_sync_dry_run(self) -> None:
+        return self._send_json(self.__class__.sync_executor.dry_run())
+
+    def _route_post_sync_run(self) -> None:
+        return self._send_json(self.__class__.sync_executor.run())
+
+    def _route_post_sync_render_standalone(self) -> None:
+        return self._send_json(self.__class__.sync_executor.render_standalone())
+
+    def _route_post_config_audit_apply(self) -> None:
+        return self._send_json(self._apply_config_audit())
+
+    def _route_post_reflection_pair(self) -> None:
+        body = self._read_body()
+        if not isinstance(body, dict):
+            raise ValueError("expected JSON body with reflection pair object")
+        for field in ("id", "generator", "critic"):
+            value = body.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("id, generator and critic are required")
+        pair_id = self._ensure_pair_id(body)
+        result = self._write_reflection_pair(pair_id, body)
+        return self._send_json(result)
 
     @staticmethod
     def _match_subserver_route(path: str) -> tuple[str, str] | None:
@@ -1930,119 +3644,20 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         })
 
     def _curation_root(self) -> Path:
-        """Return the project root that owns ``config/model-curation.yaml``.
-
-        Mirrors the layout-resolution used elsewhere in this handler: prefers
-        the top-level checkout (``<root>/config/``) and falls back to the
-        submodule layout (``<root>/.agent-meta/config/``) when the framework
-        is embedded in a target repo.
-        """
-        # ``resolve_asset(root, "config")`` selects the layout by the presence of
-        # the ``config/`` directory; its parent is the framework root that
-        # ``load_curation``/``save_curation`` expect.
-        return resolve_asset(self.__class__.root, "config").parent
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._curation_root()
 
     def _load_curation(self) -> dict:
-        """Load ``config/model-curation.yaml`` via ``scripts.lib.curation``.
-
-        The import is performed lazily (and ``sys.path`` is extended on demand)
-        to mirror the pattern used by ``_load_viz_config`` at module level:
-        the admin server must keep starting even when the ``lib`` package is
-        not on ``sys.path`` at process boot.
-        """
-        root = self.__class__.root
-        _ensure_scripts_on_path(root)
-        from lib.curation import load_curation  # type: ignore[import]
-        curation = load_curation(str(self._curation_root()))
-        # ``load_curation`` already normalises shape; ensure keys exist for
-        # downstream callers regardless of any future schema changes.
-        curation.setdefault("blacklist", [])
-        curation.setdefault("disabled", [])
-        return curation
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_curation()
 
     def _save_curation(self, curation: dict) -> None:
-        """Persist a curation document via ``scripts.lib.curation.save_curation``."""
-        root = self.__class__.root
-        _ensure_scripts_on_path(root)
-        from lib.curation import save_curation  # type: ignore[import]
-        save_curation(str(self._curation_root()), curation)
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._save_curation(curation)
 
     def _collect_models(self) -> list[dict]:
-        """Resolve the model registry + pricing overlay + curation into the
-        enriched ``models`` list that powers both ``/api/models`` and
-        ``/api/models/active``.
-
-        Each entry exposes the legacy pricing fields (``input_cost``,
-        ``output_cost``, ``cost_factor`` …) plus the new curation flags:
-
-        * ``enabled``     — ``True`` unless the id is in ``curation.disabled``.
-        * ``blacklisted`` — always ``False`` here. Blacklisted ids are filtered
-          out during registry generation, so a blacklisted model never reaches
-          this code path; the field is included for response-shape stability.
-        """
-        # Resolve the config dir once (submodule-aware) so registry + overlay
-        # always share the same layout, even when either file is absent.
-        config_dir = resolve_asset(self.__class__.root, "config")
-        registry_path = config_dir / "generated" / "model-registry.json"
-        pricing_path = config_dir / "pricing-overlay.yaml"
-
-        override_registry = Path(self.__class__.root) / ".meta-config" / "generated" / "model-registry.json"
-        
-        models: list[dict] = []
-        if override_registry.exists():
-            models = json.loads(override_registry.read_text(encoding="utf-8")).get("models", [])
-        elif registry_path.exists():
-            models = json.loads(registry_path.read_text(encoding="utf-8")).get("models", [])
-
-        pricing: dict = {}
-        if pricing_path.exists():
-            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
-        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
-
-        curation = self._load_curation()
-        # Tolerant comparison (see _normalized_model_id): curation entries
-        # written against older registry id formats must keep matching.
-        disabled_ids = {
-            _normalized_model_id(x) for x in curation.get("disabled", [])
-            if isinstance(x, str) and x
-        }
-
-        for m in models:
-            provider = m.get("provider", "")
-            model_id = m.get("id", "")
-            model_name = m.get("name") or model_id
-
-            api_input = m.get("input_cost_api", 0.0)
-            api_output = m.get("output_cost_api", 0.0)
-
-            provider_prices = prices.get(provider, {}) if isinstance(prices, dict) else {}
-            model_prices = provider_prices.get(model_id, {}) if isinstance(provider_prices, dict) else {}
-
-            overlay_input = model_prices.get("input") if isinstance(model_prices, dict) else None
-            overlay_output = model_prices.get("output") if isinstance(model_prices, dict) else None
-
-            input_cost = overlay_input if overlay_input is not None else api_input
-            output_cost = overlay_output if overlay_output is not None else api_output
-
-            input_source = "Overlay" if overlay_input is not None else "API"
-            output_source = "Overlay" if overlay_output is not None else "API"
-
-            # Blended cost per 1M tokens (30% input, 70% output)
-            cost_factor = round((input_cost * 0.3) + (output_cost * 0.7), 2)
-
-            m["name"] = model_name
-            m["input_cost"] = input_cost
-            m["output_cost"] = output_cost
-            m["input_source"] = input_source
-            m["output_source"] = output_source
-            m["cost_factor"] = cost_factor
-            m["source_url"] = provider_prices.get("_url", "") if isinstance(provider_prices, dict) else ""
-            m["enabled"] = _normalized_model_id(model_id) not in disabled_ids
-            # Blacklisted ids are filtered during discovery and never appear in
-            # the registry; surfaced models are therefore always non-blacklisted.
-            m["blacklisted"] = False
-
-        return models
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._collect_models()
 
     def _handle_get_models(self) -> None:
         """Return all registered models with curation + pricing metadata."""
@@ -2073,65 +3688,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
-        """Load the models.dev catalog payload (class-level cached).
-
-        Normal resolution order: fresh in-memory cache → SDK snapshot
-        (``node_modules/@opencode-ai/models``) → live models.dev API → stale
-        cache → short-TTL negative cache of the last total failure. An
-        explicit ``force_refresh`` (the UI's ↻ button) bypasses all caches
-        and reverses API/SDK precedence so a refresh actually reaches the
-        network even when a stale SDK snapshot exists.
-
-        A total failure returns ``{"source": "error", "error": <reason>,
-        "providers": {}, "models": {}}`` and is negative-cached for
-        ``_MODELS_DEV_ERROR_TTL_SECONDS`` so an unreachable network cannot
-        turn every request into a fresh 30 s blocking fetch attempt.
-        """
-        cls = self.__class__
-        now = time.time()
-
-        if not force_refresh:
-            cache = getattr(cls, '_models_dev_cache', None)
-            cache_ts = getattr(cls, '_models_dev_cache_ts', 0)
-            if cache and cache.get('source') == 'sdk':
-                return cache
-            if cache and cache.get('source') == 'api' and (now - cache_ts) < 3600:
-                return cache
-            error_cache = getattr(cls, '_models_dev_error', None)
-            if (isinstance(error_cache, tuple) and len(error_cache) == 2
-                    and (now - error_cache[1]) < self._MODELS_DEV_ERROR_TTL_SECONDS):
-                return error_cache[0]
-
-        if force_refresh:
-            # Explicit refresh: live data wins over the (potentially stale)
-            # bundled SDK snapshot; the snapshot is the offline fallback.
-            loaded = self._load_from_models_dev_api()
-            if not loaded:
-                loaded = self._load_from_sdk_snapshot()
-        else:
-            loaded = self._load_from_sdk_snapshot()
-            if not loaded:
-                loaded = self._load_from_models_dev_api()
-
-        if loaded:
-            cls._models_dev_cache = loaded
-            cls._models_dev_cache_ts = time.time()
-            if hasattr(cls, '_models_dev_error'):
-                delattr(cls, '_models_dev_error')
-            return loaded
-
-        # Total failure — serve any stale cache before reporting the error,
-        # and stamp it as the negative-cache entry so subsequent requests
-        # within the TTL re-serve the stale payload WITHOUT re-attempting the
-        # (up to 30 s blocking) fetch.
-        stale = getattr(cls, '_models_dev_cache', None)
-        if stale:
-            cls._models_dev_error = (stale, time.time())
-            return stale
-        detail = getattr(cls, '_models_dev_last_fetch_error', '') or 'No data available'
-        error_payload = {"source": "error", "error": detail, "providers": {}, "models": {}}
-        cls._models_dev_error = (error_payload, time.time())
-        return error_payload
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_models_dev_data(force_refresh)
 
     # Negative-cache TTL for a total models.dev load failure (seconds). Keeps
     # an unreachable network from re-attempting a 30 s-timeout fetch on every
@@ -2139,190 +3697,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     _MODELS_DEV_ERROR_TTL_SECONDS = 60.0
 
     def _load_from_sdk_snapshot(self) -> dict | None:
-        try:
-            snapshot_path = resolve_asset(self.__class__.root, "node_modules",
-                                          "@opencode-ai", "models", "dist", "snapshot.js")
-            if not snapshot_path.exists():
-                return None
-
-            content = snapshot_path.read_text(encoding="utf-8")
-            prefix = 'JSON.parse("'
-            start = content.find(prefix)
-            if start == -1:
-                return None
-            start += len(prefix)
-            # Find closing ") before \nexport
-            end = content.find('")' + '\nexport', start)
-            if end == -1:
-                # Fallback: find last ") before export
-                export_pos = content.find('\nexport const providers', start)
-                if export_pos == -1:
-                    return None
-                end = content.rfind('")', start, export_pos)
-                if end == -1:
-                    return None
-
-            json_str = content[start:end]
-            # Unescape JS string: \" → "  \\ → \
-            json_str = json_str.replace('\\\\', '\x00bs\x00')
-            json_str = json_str.replace('\\"', '"')
-            json_str = json_str.replace('\x00bs\x00', '\\')
-            data = json.loads(json_str)
-
-            generated_at = ""
-            for line in content.splitlines():
-                stripped = line.strip()
-                if stripped.startswith("export const generatedAt = "):
-                    quote_start = stripped.find('"')
-                    if quote_start != -1:
-                        quote_end = stripped.find('"', quote_start + 1)
-                        if quote_end != -1:
-                            generated_at = stripped[quote_start + 1:quote_end]
-                    break
-
-            return {
-                "source": "sdk",
-                "generated_at": generated_at,
-                "providers": data.get("providers", {}),
-                "models": data.get("models", {}),
-            }
-        except Exception as exc:  # noqa: BLE001
-            self.__class__._models_dev_last_fetch_error = f"SDK snapshot read failed: {exc}"
-            return None
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_from_sdk_snapshot()
 
     def _load_from_models_dev_api(self) -> dict | None:
-        try:
-            from urllib.request import Request, urlopen
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._load_from_models_dev_api()
 
-            req = Request("https://models.dev/catalog.json",
-                          headers={"User-Agent": "agent-meta-admin/1.0"})
-            with urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            # Success — clear any stale failure reason so the error payload
-            # never reports an ancient message after a later recovery.
-            self.__class__._models_dev_last_fetch_error = ""
-            return {
-                "source": "api",
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "providers": data.get("providers", {}),
-                "models": data.get("models", {}),
-            }
-        except Exception as exc:  # noqa: BLE001
-            # Record WHY the fetch failed so the error payload returned to the
-            # UI can explain itself instead of a bare "No data available".
-            self.__class__._models_dev_last_fetch_error = f"models.dev fetch failed: {exc}"
-            return None
-
-    # Provider keys in ``config/pricing-overlay.yaml`` that never have a real
-    # models.dev catalog entry (subscription/flat-fee gateways with no public
-    # per-token pricing). Mirrors ``REGISTRY_ONLY`` in
-    # ``docs/ui/admin-ui.html`` — keep both lists in sync. Any other overlay
-    # key that doesn't match a live models.dev provider id is treated as
-    # inert legacy data and ignored here (e.g. a naming mismatch), so we
-    # never fabricate a phantom provider for real catalog entries.
-    CURATED_ONLY_PROVIDER_KEYS = {"mammouth", "continue"}  # noqa: RUF012
 
     def _apply_pricing_overlay(self, providers: dict) -> dict:
-        """Merge ``config/pricing-overlay.yaml`` on top of models.dev provider data.
-
-        Two behaviors, mirroring how ``_collect_models`` already merges the
-        overlay into the Legacy registry view:
-
-        * **Override** — if the overlay's provider key matches a real
-          models.dev provider id (e.g. ``anthropic``), matching model ids get
-          their ``cost.input``/``cost.output`` replaced by the overlay value.
-          Overridden models are tagged ``_costSource: "overlay"`` so the UI
-          can surface provenance.
-        * **Curated** — if the overlay's provider key is listed in
-          ``CURATED_ONLY_PROVIDER_KEYS`` (no real models.dev catalog entry,
-          e.g. Mammouth — a flat-fee multi-model gateway with no public
-          per-token pricing), a synthetic provider node is added with
-          ``source: "curated"`` so the models.dev live view can render it
-          with a provenance badge instead of the previous strikethrough
-          workaround.
-
-        Returns a new dict; ``providers`` is not mutated in place (the caller
-        may hold a reference to the cached models.dev payload).
-        """
-        config_dir = resolve_asset(self.__class__.root, "config")
-        pricing_path = config_dir / "pricing-overlay.yaml"
-        if not pricing_path.exists():
-            return providers
-
-        try:
-            pricing = yaml.safe_load(pricing_path.read_text(encoding="utf-8")) or {}
-        except Exception:  # noqa: BLE001
-            return providers
-        prices = pricing.get("prices", {}) if isinstance(pricing, dict) else {}
-        if not isinstance(prices, dict):
-            return providers
-
-        merged = dict(providers)
-        for provider_key, provider_prices in prices.items():
-            if not isinstance(provider_prices, dict):
-                continue
-            model_entries = {
-                k: v for k, v in provider_prices.items()
-                if not k.startswith("_") and isinstance(v, dict)
-            }
-            if not model_entries:
-                continue
-
-            if provider_key in merged:
-                # Override path: real models.dev provider — patch matching models only.
-                provider_node = dict(merged[provider_key])
-                models = dict(provider_node.get("models", {}))
-                overlay_prefix = f"{provider_key}/"
-                for model_id, price in model_entries.items():
-                    # config/pricing-overlay.yaml key format is inconsistent
-                    # across providers: anthropic/gemini/mammouth use bare ids
-                    # matching models.dev directly, but opencode-go's ids are
-                    # prefixed with "opencode-go/" (that prefix IS the real,
-                    # runnable model id for this framework's `model:` config
-                    # field — model-registry.json's own `id` matches it, and
-                    # the legacy /models-legacy view resolves correctly off of
-                    # that). The live models.dev catalog itself only knows the
-                    # bare id, so try both before giving up — without this,
-                    # every opencode-go override silently no-ops and the UI
-                    # falls back to models.dev's own (inapplicable, since
-                    # opencode-go is a flat-fee gateway with no real per-token
-                    # cost) pricing guess instead of our curated $0 override.
-                    resolved_id = model_id if model_id in models else None
-                    if resolved_id is None and model_id.startswith(overlay_prefix):
-                        bare_id = model_id[len(overlay_prefix):]
-                        if bare_id in models:
-                            resolved_id = bare_id
-                    if resolved_id is None:
-                        continue
-                    model = dict(models[resolved_id])
-                    cost = dict(model.get("cost") or {})
-                    if price.get("input") is not None:
-                        cost["input"] = price["input"]
-                    if price.get("output") is not None:
-                        cost["output"] = price["output"]
-                    model["cost"] = cost
-                    model["_costSource"] = "overlay"
-                    models[resolved_id] = model
-                provider_node["models"] = models
-                merged[provider_key] = provider_node
-            elif provider_key in self.CURATED_ONLY_PROVIDER_KEYS:
-                # Curated path: no real models.dev slug for this provider.
-                curated_models = {}
-                for model_id, price in model_entries.items():
-                    curated_models[model_id] = {
-                        "id": model_id,
-                        "name": price.get("name") or model_id,
-                        "cost": {"input": price.get("input"), "output": price.get("output")},
-                    }
-                merged[provider_key] = {
-                    "name": provider_prices.get("_name") or provider_key.capitalize(),
-                    "models": curated_models,
-                    "source": "curated",
-                }
-            # else: overlay key doesn't match a real provider and isn't on
-            # the curated allow-list — inert legacy data, ignored.
-        return merged
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._apply_pricing_overlay(providers)
 
     def _handle_get_models_dev(self) -> None:
         try:
@@ -2666,185 +4051,36 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _read_model_source_prefs(self) -> dict:
-        """Load the per-provider model-source map from ``project.yaml``.
-
-        Returns a ``{provider_name: "registry"|"modelsdev"}`` dict, dropping
-        any entries whose value is not a recognised source. Missing/invalid
-        section yields ``{}`` (every provider then defaults to the central
-        ``default-model-source`` from ``config/ai-providers.yaml``, see
-        ``_default_model_source``).
-        """
-        project = self.__class__.config_manager.read("project") or {}
-        prefs = project.get("model-source-preference") if isinstance(project, dict) else None
-        if not isinstance(prefs, dict):
-            return {}
-        return {
-            str(k): v for k, v in prefs.items()
-            if isinstance(v, str) and v in VALID_MODEL_SOURCES
-        }
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._read_model_source_prefs()
 
     def _default_model_source(self) -> str:
-        """Read the framework-wide default model source from
-        ``config/ai-providers.yaml`` -> ``default-model-source``.
-
-        Falls back to ``_FALLBACK_MODEL_SOURCE`` when the file or key is
-        missing (older projects synced before this key existed) or the value
-        is not one of ``VALID_MODEL_SOURCES``.
-        """
-        try:
-            path = self._ai_providers_path()
-            if not path.exists():
-                return _FALLBACK_MODEL_SOURCE
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            value = data.get("default-model-source") if isinstance(data, dict) else None
-            if isinstance(value, str) and value in VALID_MODEL_SOURCES:
-                return value
-            return _FALLBACK_MODEL_SOURCE
-        except Exception:  # noqa: BLE001
-            return _FALLBACK_MODEL_SOURCE
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._default_model_source()
 
     def _resolve_model_source(self, provider_name: str) -> str:
-        """Resolve the effective source for ``provider_name`` (per-provider
-        override from ``project.yaml``, or the central default when unset)."""
-        return self._read_model_source_prefs().get(provider_name, self._default_model_source())
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._resolve_model_source(provider_name)
 
     def _provider_model_tiers(self, provider_name: str) -> dict:
-        """Return the ``model-tiers`` map for ``provider_name`` from
-        ``ai-providers.yaml`` (``{}`` when absent)."""
-        path = self._ai_providers_path()
-        if not path.exists():
-            return {}
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        providers = data.get("providers") or {}
-        conf = providers.get(provider_name) or {} if isinstance(providers, dict) else {}
-        tiers = conf.get("model-tiers") or {} if isinstance(conf, dict) else {}
-        return tiers if isinstance(tiers, dict) else {}
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._provider_model_tiers(provider_name)
 
     def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
-        """Registry-sourced model suggestions for ``provider_name``.
-
-        The provider's tier values pin down which registry provider slug(s)
-        (e.g. ``opencode-go``, ``anthropic``) belong to this framework
-        provider, and only active (non-disabled) models for those slugs are
-        returned. When no slug can be inferred, ``[]`` is returned — the
-        previous behaviour of offering ALL active models flooded datalists
-        with cross-provider ids that would corrupt the config if selected
-        (e.g. Gemini's bare ``gemini-*`` tier ids do not exist in a registry
-        that only carries anthropic + opencode-go entries).
-        """
-        models = [m for m in self._collect_models() if m.get("enabled")]
-        tier_vals = [str(v) for v in self._provider_model_tiers(provider_name).values() if v]
-        registry_slugs: set = set()
-        for model_id in tier_vals:
-            if "/" in model_id:
-                prefix = model_id.split("/", 1)[0]
-                for m in models:
-                    if str(m.get("id", "")).startswith(prefix + "/"):
-                        registry_slugs.add(m.get("provider"))
-            else:
-                for m in models:
-                    if m.get("id") == model_id:
-                        registry_slugs.add(m.get("provider"))
-        if not registry_slugs:
-            return []
-        selected = [m for m in models if m.get("provider") in registry_slugs]
-        return [
-            {"id": m.get("id"), "name": m.get("name") or m.get("id"), "provider": m.get("provider")}
-            for m in selected
-        ]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._suggestions_from_registry(provider_name)
 
     def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
-        """Map every registry provider slug to the set of its registry ids.
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._registry_model_ids_by_provider()
 
-        Reads the SAME registry source ``_collect_models()`` uses (override
-        registry when present, framework registry otherwise), so ids resolved
-        through :meth:`_resolve_registry_model_id` always line up with the
-        ids ``_collect_models`` looks the pricing overlay up by.
-        """
-        out: dict[str, set[str]] = {}
-        try:
-            collected = self._collect_models()
-        except Exception:  # noqa: BLE001
-            return out
-        for m in collected:
-            provider = str(m.get("provider") or "")
-            model_id = str(m.get("id") or "")
-            if provider and model_id:
-                out.setdefault(provider, set()).add(model_id)
-        return out
-
-    def _resolve_registry_model_id(
-        self,
-        provider_slug: str,
-        raw_id: str,
-        ids_by_provider: dict[str, set[str]] | None = None,
-    ) -> str:
-        """Resolve the registry-conform id for a bare models.dev model id.
-
-        Registry id conventions are PER MODEL, not per provider: anthropic
-        carries bare canonical ids (``claude-opus-5``) AND namespaced
-        OpenRouter extras (``anthropic/claude-opus-4.8-fast``), while
-        opencode-go namespaces every id. Resolution order:
-
-        1. the bare id exists in the registry for this provider → bare;
-        2. the namespaced ``<slug>/<raw>`` id exists → namespaced;
-        3. neither exists (model not synced into the registry yet) →
-           namespaced only when EVERY registry id of this provider is
-           namespaced (unanimous convention), else bare — a not-yet-synced
-           opencode-go model stays runnable (``opencode-go/<raw>``) while a
-           mixed-convention provider (anthropic) defaults to the canonical
-           bare form.
-
-        No provider names are hardcoded; the convention is derived entirely
-        from the registry. Callers resolving many ids should pass
-        ``ids_by_provider`` (from :meth:`_registry_model_ids_by_provider`)
-        to avoid re-reading the registry per model. The resolved id is what
-        ``_collect_models()`` looks the pricing overlay up by and what
-        ``roles.py::_resolve_tier_to_model`` persists verbatim into the
-        ``model:`` frontmatter — both consumers need the exact registry id.
-        """
-        if ids_by_provider is None:
-            ids_by_provider = self._registry_model_ids_by_provider()
-        ids = ids_by_provider.get(provider_slug, set())
-        if raw_id in ids:
-            return raw_id
-        namespaced = f"{provider_slug}/{raw_id}"
-        if namespaced in ids:
-            return namespaced
-        fully_namespaced = bool(ids) and all(i.startswith(f"{provider_slug}/") for i in ids)
-        return namespaced if fully_namespaced else raw_id
+    def _resolve_registry_model_id(self, provider_slug: str, raw_id: str, ids_by_provider: dict[str, set[str]] | None = None) -> str:
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._resolve_registry_model_id(provider_slug, raw_id, ids_by_provider)
 
     def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
-        """models.dev-sourced model suggestions for ``provider_name``.
-
-        Returns ``[]`` for providers without a models.dev catalog slug.
-        Suggestion ids match the registry's PER-MODEL id convention (see
-        :meth:`_resolve_registry_model_id`): bare models.dev ids stay 1:1
-        where the registry is bare (anthropic, google, github-copilot) and
-        get the ``<slug>/`` prefix where the registry is namespaced
-        (currently opencode-go) — the value persisted on save (model-tiers /
-        tier-preset / provider-tier overrides) must be the runnable config
-        id, and ``roles.py::_resolve_tier_to_model`` passes it through
-        verbatim. The ``provider`` field always carries the models.dev slug
-        (e.g. ``opencode-go``) as namespace info for display.
-        """
-        slug = PROVIDER_MODELSDEV_SLUGS.get(provider_name)
-        if not slug:
-            return []
-        data = self._load_models_dev_data()
-        providers = self._apply_pricing_overlay(dict(data.get("providers", {})))
-        node = providers.get(slug)
-        if not isinstance(node, dict):
-            return []
-        ids_by_provider = self._registry_model_ids_by_provider()
-        out: list[dict] = []
-        for m in (node.get("models") or {}).values():
-            raw_id = m.get("id")
-            if not raw_id:
-                continue
-            suggestion_id = self._resolve_registry_model_id(slug, str(raw_id), ids_by_provider)
-            out.append({"id": suggestion_id, "name": m.get("name") or raw_id, "provider": slug})
-        return out
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._suggestions_from_models_dev(provider_name)
 
     def _handle_get_model_source(self) -> None:
         """Return the central per-provider model-source map (single source of
@@ -3191,16 +4427,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     def _agent_meta_root(self) -> Path:
         """Resolve the agent-meta framework root for lib helpers.
 
-        In super_admin mode the server root is the framework checkout. In
-        project_admin mode the framework sources live under ``.agent-meta/``.
+        Delegates to :meth:`ServiceContext.agent_meta_root` (issue #572) so the
+        handler and the extracted services share one resolution.
         """
-        root = self.__class__.root
-        if (root / "agents" / "1-generic").is_dir():
-            return root
-        submodule = root / ".agent-meta"
-        if (submodule / "agents" / "1-generic").is_dir():
-            return submodule
-        return root
+        return self._service_context().agent_meta_root()
 
     def _handle_get_model_mapping(self) -> None:
         """Return a matrix of role → resolved model ID for every provider.
@@ -3324,647 +4554,68 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
 
     def _find_schema_path(self) -> Path:
-        return resolve_asset(self.__class__.root, "config", "project-config.schema.json")
+        """Delegates to :meth:`TemplateService.find_schema_path` (issue #572)."""
+        return self._template_service().find_schema_path()
 
     def _build_agent_hierarchy(self) -> dict:
-        """Derive a lightweight role hierarchy directly from
-        ``config/role-defaults.yaml``. Falls back to an empty list if the file
-        is missing (project-admin mode without super-admin configs).
-
-        Each role entry includes:
-          * ``name``, ``tier``, ``model``, ``memory``, ``parallel``,
-            ``permission_mode``
-          * ``description`` — never empty (falls back to template frontmatter
-            ``description`` field if the role-defaults entry is missing/empty)
-          * ``targets`` — list of delegation target role names from
-            ``handoff.target_roles`` (or ``[]`` if not declared)
-        """
-        role_defaults_path = self._role_defaults_path()
-        roles: list[dict] = []
-
-        if role_defaults_path.exists():
-            with role_defaults_path.open("r", encoding="utf-8") as fh:
-                data = yaml.safe_load(fh) or {}
-            raw = data.get("roles") or data
-            if isinstance(raw, dict):
-                for name, attrs in raw.items():
-                    if not isinstance(attrs, dict):
-                        continue
-                    handoff = attrs.get("handoff") or {}
-                    targets_raw = handoff.get("target_roles") if isinstance(handoff, dict) else None
-                    targets: list[str] = []
-                    if isinstance(targets_raw, list):
-                        targets = [str(t) for t in targets_raw if isinstance(t, str) and t]
-
-                    description = attrs.get("description") or ""
-                    if not description:
-                        description = self._read_template_description(name)
-                    if not description:
-                        description = f"{name} agent (no description)"
-
-                    roles.append({
-                        "name": name,
-                        "tier": (attrs.get("workflow_tier")
-                                 or attrs.get("tier")
-                                 or attrs.get("workflow-tier")
-                                 or "optional"),
-                        "model": attrs.get("model"),
-                        "memory": attrs.get("memory"),
-                        "parallel": bool(attrs.get("parallel", False)),
-                        "permission_mode": attrs.get("permissionMode") or attrs.get("permission_mode"),
-                        "description": description,
-                        "targets": targets,
-                        "group": attrs.get("group"),
-                    })
-        return {"roles": roles, "count": len(roles)}
+        """Delegates to :meth:`TemplateService.build_agent_hierarchy` (issue #572)."""
+        return self._template_service().build_agent_hierarchy()
 
     def _role_defaults_path(self) -> Path:
-        """Resolve the path to ``role-defaults.yaml`` for either layout."""
-        return resolve_asset(self.__class__.root, "config", "role-defaults.yaml")
+        """Resolve the path to ``role-defaults.yaml`` for either layout.
+
+        Delegates to :meth:`ServiceContext.role_defaults_path` (issue #572) —
+        the single resolver shared with the template/pipeline/reflection code.
+        """
+        return self._service_context().role_defaults_path()
 
     def _read_pipelines(self) -> dict:
-        """Return the ``quality_pipelines`` block from ``role-defaults.yaml``
-        in a stable envelope shape: ``{"pipelines": {...}}``. Returns an empty
-        dict if the file does not exist or the key is absent."""
-        path = self._role_defaults_path()
-        if not path.exists():
-            return {"pipelines": {}}
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        pipelines = data.get("quality_pipelines") or {}
-        if not isinstance(pipelines, dict):
-            pipelines = {}
-        return {"pipelines": pipelines}
+        """Delegates to :meth:`PipelineService.read_pipelines` (issue #572)."""
+        return self._pipeline_service().read_pipelines()
 
     def _read_single_pipeline(self, name: str) -> dict:
-        """Return a single pipeline by name or raise."""
-        pipelines = self._read_pipelines().get("pipelines", {})
-        if name not in pipelines:
-            raise FileNotFoundError(f"pipeline not found: {name}")
-        return {"pipeline": pipelines[name]}
-
-    @staticmethod
-    def _indent_yaml_dump(value: Any, indent: int) -> list[str]:
-        """Dump ``value`` to YAML and prefix every line with ``indent`` spaces."""
-        raw = yaml.dump(
-            value,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-        if not raw.endswith("\n"):
-            raw += "\n"
-        out: list[str] = []
-        for line in raw.splitlines(keepends=True):
-            if line == "\n":
-                out.append("\n")
-            else:
-                out.append(" " * indent + line)
-        return out
-
-    @staticmethod
-    def _format_yaml_list_item(item: Any, indent: int, value_indent: int) -> list[str]:
-        """Format a list item (``- key: value``) preserving nested indentation.
-
-        ``indent`` is the column of the ``-`` marker; ``value_indent`` is the
-        column used for the item's body lines.
-        """
-        lines = AdminRequestHandler._indent_yaml_dump(item, value_indent)
-        if not lines:
-            return [(" " * indent) + "- \n"]
-        # The first dumped line already has ``value_indent`` spaces; replace
-        # them with the list marker at ``indent``.
-        first_content = lines[0][value_indent:]
-        lines[0] = (" " * indent) + "- " + first_content
-        return lines
-
-    @staticmethod
-    def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
-        """Return the indentation used for a child mapping/list body.
-
-        Falls back to ``base_indent + 2`` when the body is empty.
-        """
-        for line in body_lines:
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                continue
-            indent = len(line) - len(stripped)
-            if indent > base_indent:
-                return indent
-        return base_indent + 2
-
-    @staticmethod
-    def _trailing_blank_lines(lines: list[str]) -> list[str]:
-        """Return only the trailing blank/whitespace lines of a block."""
-        last = -1
-        for i in range(len(lines) - 1, -1, -1):
-            if lines[i].strip() not in ("", "\n"):
-                last = i
-                break
-        if last == -1:
-            return lines[:]
-        return lines[last + 1 :]
-
-    @staticmethod
-    def _extract_list_item_id(lines: list[str]) -> str | None:
-        """Parse a single YAML list item and return its ``id`` field, if any."""
-        try:
-            data = yaml.safe_load("".join(lines))
-            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
-                return data[0].get("id")
-        except Exception:  # noqa: BLE001, S110
-            pass
-        return None
-
-    @staticmethod
-    def _split_dict_children(body_lines: list[str], base_indent: int) -> list[dict]:
-        """Locate top-level mapping keys inside a section body."""
-        children: list[dict] = []
-        i = 0
-        n = len(body_lines)
-        while i < n:
-            line = body_lines[i]
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                i += 1
-                continue
-            indent = len(line) - len(stripped)
-            if indent < base_indent:
-                break
-            if indent == base_indent and not stripped.startswith("-") and ":" in stripped:
-                key_name = stripped.split(":", 1)[0]
-                start = i
-                i += 1
-                while i < n:
-                    l = body_lines[i]
-                    if l.strip() in ("", "\n"):
-                        i += 1
-                        continue
-                    ind = len(l) - len(l.lstrip())
-                    if ind < base_indent:
-                        break
-                    if ind == base_indent and not l.lstrip().startswith("-"):
-                        break
-                    i += 1
-                children.append({"type": "dict", "key": key_name, "start": start, "end": i})
-            else:
-                i += 1
-        return children
-
-    @staticmethod
-    def _split_list_children(body_lines: list[str], base_indent: int) -> list[dict]:
-        """Locate top-level list items inside a section body."""
-        children: list[dict] = []
-        i = 0
-        n = len(body_lines)
-        while i < n:
-            line = body_lines[i]
-            stripped = line.lstrip()
-            if stripped in ("", "\n"):
-                i += 1
-                continue
-            indent = len(line) - len(stripped)
-            if indent < base_indent:
-                break
-            if indent == base_indent and stripped.startswith("- "):
-                start = i
-                i += 1
-                while i < n:
-                    l = body_lines[i]
-                    if l.strip() in ("", "\n"):
-                        i += 1
-                        continue
-                    ind = len(l) - len(l.lstrip())
-                    if ind <= base_indent:
-                        break
-                    i += 1
-                children.append({"start": start, "end": i})
-            else:
-                i += 1
-        return children
-
-    @staticmethod
-    def _splice_appended_children(
-        new_lines: list[str], tail: list[str], appended_new: list[str]
-    ) -> None:
-        """Attach freshly appended children to ``new_lines`` in-place.
-
-        New children are spliced in *after* the existing content but *before*
-        ``tail`` — the trailing blank/comment lines that were captured with the
-        section body but usually head the *following* top-level section (e.g.
-        the ``# SE cascade variables`` comment that precedes ``se_variables:``).
-        Placing new keys after that tail would glue them onto the comment line
-        (the section-body regex drops the final newline before the next key),
-        silently commenting the new key out. Newline boundaries are enforced so
-        a new key can never land on the same physical line as a trailing comment.
-
-        When there are no new children the tail is appended verbatim, preserving
-        the exact byte layout of update-only and delete writes.
-        """
-        if not appended_new:
-            new_lines.extend(tail)
-            return
-        if new_lines and not new_lines[-1].endswith("\n"):
-            new_lines[-1] = new_lines[-1] + "\n"
-        new_lines.extend(appended_new)
-        if tail:
-            if new_lines and not new_lines[-1].endswith("\n"):
-                new_lines[-1] = new_lines[-1] + "\n"
-            new_lines.extend(tail)
-
-    def _build_role_defaults_section_body(
-        self, key: str, value: Any, body_lines: list[str]
-    ) -> str:
-        """Rebuild the body of a top-level ``role-defaults.yaml`` section.
-
-        Dict sections (e.g. ``quality_pipelines``) are edited child-by-child.
-        Children whose parsed value equals the new value keep their original
-        formatting; only changed or new children are re-serialised. List
-        sections with an ``id`` field (e.g. ``reflection_pairs``) are matched
-        by id using the same rule. Comments and blank lines that are not part
-        of a child block are preserved unchanged.
-        """
-        base_indent = 2
-        value_indent = self._infer_child_value_indent(body_lines, base_indent)
-
-        def _scalar_dump(v: Any) -> str:
-            return yaml.dump(v, default_flow_style=True, allow_unicode=True).strip()
-
-        def _build_dict_child(k: str, v: Any, child: dict | None) -> list[str]:
-            if child:
-                trailing = self._trailing_blank_lines(
-                    body_lines[child["start"] : child["end"]]
-                )
-                if isinstance(v, (dict, list)):
-                    header = body_lines[child["start"]]
-                    child_value_indent = self._infer_child_value_indent(
-                        body_lines[child["start"] + 1 : child["end"]], base_indent
-                    )
-                    value_lines = self._indent_yaml_dump(v, child_value_indent)
-                    return [header] + value_lines + trailing
-                else:
-                    return [
-                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n"
-                    ] + trailing
-            else:
-                if isinstance(v, (dict, list)):
-                    header = " " * base_indent + k + ":\n"
-                    value_lines = self._indent_yaml_dump(v, value_indent)
-                    return [header] + value_lines + ["\n"]
-                else:
-                    return [
-                        " " * base_indent + k + ": " + _scalar_dump(v) + "\n",
-                        "\n",
-                    ]
-
-        def _build_list_child(item: dict, child: dict | None) -> list[str]:
-            if child:
-                trailing = self._trailing_blank_lines(
-                    body_lines[child["start"] : child["end"]]
-                )
-                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
-                return value_lines + trailing
-            else:
-                value_lines = self._format_yaml_list_item(item, base_indent, value_indent)
-                return value_lines + ["\n"]
-
-        def _assigned_indices(children: list[dict]) -> set[int]:
-            indices: set[int] = set()
-            for child in children:
-                indices.update(range(child["start"], child["end"]))
-            return indices
-
-        if isinstance(value, dict):
-            children = self._split_dict_children(body_lines, base_indent)
-            old_by_key = {c["key"]: c for c in children if c["type"] == "dict"}
-            # Line indices that belong to deleted children must be skipped so
-            # that deleting a pipeline actually removes it from the written YAML.
-            deleted_indices: set[int] = set()
-            for old_key, old_child in old_by_key.items():
-                if old_key not in value:
-                    deleted_indices.update(range(old_child["start"], old_child["end"]))
-            new_lines: list[str] = []
-            pos = 0
-            appended_new: list[str] = []
-            for k, v in value.items():
-                child = old_by_key.get(k)
-                if child:
-                    new_lines.extend(
-                        body_lines[i]
-                        for i in range(pos, child["start"])
-                        if i not in deleted_indices
-                    )
-                    old_block = body_lines[child["start"] : child["end"]]
-                    try:
-                        parsed = yaml.safe_load("".join(old_block))
-                        old_value = parsed.get(k) if isinstance(parsed, dict) else None
-                    except Exception:  # noqa: BLE001
-                        old_value = None
-                    if old_value == v:
-                        new_lines.extend(old_block)
-                    else:
-                        new_lines.extend(_build_dict_child(k, v, child))
-                    pos = child["end"]
-                else:
-                    appended_new.extend(_build_dict_child(k, v, None))
-            tail = [
-                body_lines[i]
-                for i in range(pos, len(body_lines))
-                if i not in deleted_indices
-            ]
-            self._splice_appended_children(new_lines, tail, appended_new)
-            return "".join(new_lines)
-
-        if isinstance(value, list) and key == "reflection_pairs":
-            children = self._split_list_children(body_lines, base_indent)
-            old_by_id: dict[str, dict] = {}
-            for child in children:
-                item_id = self._extract_list_item_id(
-                    body_lines[child["start"] : child["end"]]
-                )
-                if item_id:
-                    old_by_id[item_id] = child
-
-            new_lines: list[str] = []
-            pos = 0
-            appended_new: list[str] = []
-            for item in value:
-                if not isinstance(item, dict):
-                    continue
-                item_id = item.get("id")
-                child = old_by_id.get(item_id) if item_id else None
-                if child:
-                    new_lines.extend(body_lines[pos : child["start"]])
-                    old_block = body_lines[child["start"] : child["end"]]
-                    try:
-                        parsed = yaml.safe_load("".join(old_block))
-                        old_value = parsed[0] if isinstance(parsed, list) and parsed else None
-                    except Exception:  # noqa: BLE001
-                        old_value = None
-                    if old_value == item:
-                        new_lines.extend(old_block)
-                    else:
-                        new_lines.extend(_build_list_child(item, child))
-                    pos = child["end"]
-                else:
-                    appended_new.extend(_build_list_child(item, None))
-            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
-            return "".join(new_lines)
-
-        # Fallback for any other shape: replace the whole body with a fresh dump.
-        snippet = yaml.dump(
-            {key: value},
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-        lines = snippet.splitlines(keepends=True)
-        if lines and lines[0].startswith(key + ":"):
-            return "".join(lines[1:])
-        return snippet
-
-    def _update_role_defaults_section(self, key: str, value: Any) -> dict:
-        """Replace one top-level section of ``role-defaults.yaml`` in-place.
-
-        Uses a fine-grained, child-aware edit so that untouched inner keys,
-        list items, and comments keep their original formatting. Only new or
-        changed children are re-serialised with PyYAML. Falls back to a full
-        block dump when the section is missing or its structure is unexpected.
-        Backup + atomic-replace rules mirror :class:`ConfigManager`.
-        """
-        import re
-
-        path = self._role_defaults_path()
-        original_text = path.read_text(encoding="utf-8") if path.exists() else ""
-        text = original_text.replace("\r\n", "\n")
-
-        # Skip the actual write if the parsed content is unchanged.
-        try:
-            parsed_original = yaml.safe_load(original_text) or {}
-        except Exception:  # noqa: BLE001
-            parsed_original = {}
-        if isinstance(parsed_original, dict) and parsed_original.get(key) == value:
-            return {
-                "status": "unchanged",
-                "key": key,
-                "path": str(path.relative_to(self.root)),
-                "backup": None,
-            }
-
-        block_re = re.compile(
-            rf"^{re.escape(key)}:\s*(?:\n|$)"
-            rf"(?P<body>.*?)"
-            rf"(?=\n^[A-Za-z0-9_\-]+:\s*(?:\n|$)|\Z)",
-            re.MULTILINE | re.DOTALL,
-        )
-        match = block_re.search(text)
-        if not match:
-            snippet = yaml.dump(
-                {key: value},
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-            new_text = text.rstrip("\n") + "\n\n" + snippet
-        else:
-            section_start = match.start()
-            section_end = match.end()
-            header = text[section_start : match.start("body")]
-            body_lines = match.group("body").splitlines(keepends=True)
-            new_body = self._build_role_defaults_section_body(key, value, body_lines)
-            new_text = text[:section_start] + header + new_body + text[section_end:]
-
-        cm = self.__class__.config_manager
-        if path.exists():
-            backup = cm._backup(path)
-            cm._prune_backups(path)
-        else:
-            backup = None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(new_text, encoding="utf-8")
-        os.replace(tmp, path)
-        return {
-            "status": "saved",
-            "key": key,
-            "path": str(path.relative_to(self.root)),
-            "backup": backup,
-        }
+        """Delegates to :meth:`PipelineService.read_single_pipeline` (issue #572)."""
+        return self._pipeline_service().read_single_pipeline(name)
 
     def _write_pipelines(self, pipelines: dict) -> dict:
-        """Replace ONLY the ``quality_pipelines`` key in ``role-defaults.yaml``."""
-        return self._update_role_defaults_section("quality_pipelines", pipelines)
+        """Delegates to :meth:`PipelineService.write_pipelines` (issue #572)."""
+        return self._pipeline_service().write_pipelines(pipelines)
 
     def _write_single_pipeline(self, name: str, pipeline: dict) -> dict:
-        """Create or update a single pipeline by name."""
-        all_pipelines = self._read_pipelines().get("pipelines", {})
-        all_pipelines[name] = pipeline
-        result = self._write_pipelines(all_pipelines)
-        result["pipeline"] = pipeline
-        result["name"] = name
-        return result
+        """Delegates to :meth:`PipelineService.write_single_pipeline` (issue #572)."""
+        return self._pipeline_service().write_single_pipeline(name, pipeline)
 
     def _delete_pipeline(self, name: str) -> dict:
-        """Delete a single pipeline by name."""
-        all_pipelines = self._read_pipelines().get("pipelines", {})
-        if name not in all_pipelines:
-            raise FileNotFoundError(f"pipeline not found: {name}")
-        del all_pipelines[name]
-        result = self._write_pipelines(all_pipelines)
-        result["deleted"] = name
-        return result
-
-    def _write_reflection_pairs(self, pairs: list) -> dict:
-        """Replace ONLY the ``reflection_pairs`` key in ``role-defaults.yaml``."""
-        result = self._update_role_defaults_section("reflection_pairs", pairs)
-        result["reflection_pairs"] = pairs
-        result["count"] = len(pairs)
-        return result
+        """Delegates to :meth:`PipelineService.delete_pipeline` (issue #572)."""
+        return self._pipeline_service().delete_pipeline(name)
 
     def _pipeline_help(self) -> dict:
-        """Return comprehensive help documentation for the pipelines API."""
-        pipeline_names = list(self._read_pipelines().get("pipelines", {}).keys())
-        return {
-            "help": {
-                "title": "Quality Pipelines API",
-                "version": self.__class__.version,
-                "description": (
-                    "Quality Pipelines define multi-stage workflows for agent orchestration. "
-                    "Each pipeline consists of sequential, parallel, loop, or conditional stages "
-                    "that delegate work to specific agents."
-                ),
-                "endpoints": {
-                    "GET /api/pipelines": {
-                        "description": "List all pipelines with their full stage definitions.",
-                        "response": '{"pipelines": {"<name>": {...}}}',
-                    },
-                    "GET /api/pipelines?help": {
-                        "description": "Show this help documentation.",
-                        "response": '{"help": {...}}',
-                    },
-                    "GET /api/pipelines/<name>": {
-                        "description": "Get a single pipeline by name.",
-                        "response": '{"pipeline": {...}}',
-                        "example": f"/api/pipelines/{pipeline_names[0]}" if pipeline_names else "/api/pipelines/standard-feature",
-                    },
-                    "PUT /api/pipelines": {
-                        "description": "Replace ALL pipelines (whole-file replace with backup).",
-                        "body": '{"pipelines": {"<name>": {...}}}',
-                        "warning": "This replaces the entire quality_pipelines block. Use with care.",
-                    },
-                    "PUT /api/pipelines/<name>": {
-                        "description": "Create or update a single pipeline by name.",
-                        "body": '{"description": "...", "stages": [...], "on_error": "..."}',
-                    },
-                    "DELETE /api/pipelines/<name>": {
-                        "description": "Delete a single pipeline by name.",
-                        "response": '{"deleted": "<name>"}',
-                    },
-                },
-                "pipeline_structure": {
-                    "description": "string — human-readable description of the pipeline",
-                    "on_error": "enum: escalate_to_orchestrator | skip | abort | retry",
-                    "stages": [
-                        {
-                            "id": "string — unique stage identifier within the pipeline",
-                            "agent": "string — role name of the agent to delegate to",
-                            "task": "string — task description for the agent",
-                            "mode": "enum: sequential | parallel_group | fanout | loop | conditional | agent_decision",
-                            "loop": {
-                                "description": "Only required when mode=loop",
-                                "generator": "string — agent that produces output",
-                                "critic": "string — agent that reviews output",
-                                "max_iterations": "integer — loop limit (default 3)",
-                            },
-                            "condition": {
-                                "description": "Only required when mode=conditional",
-                                "type": "agent_decision",
-                                "agent": "string — agent making the decision",
-                            },
-                            "parallel_group": {
-                                "description": "Only required when mode=parallel_group",
-                                "items": [{"agent": "string", "task": "string"}],
-                            },
-                        }
-                    ],
-                },
-                "stage_modes_explained": {
-                    "sequential": "Run one agent after another in sequence.",
-                    "parallel_group": "Run multiple agents in parallel (fixed list).",
-                    "fanout": "Split work across N independent instances of the same agent.",
-                    "loop": "Generator→Critic loop for iterative refinement (e.g. implement→review).",
-                    "conditional": "Agent decides which path to take next.",
-                    "agent_decision": "Similar to conditional — agent makes a programmatic decision.",
-                },
-                "available_pipelines": pipeline_names,
-            },
-        }
+        """Delegates to :meth:`PipelineService.pipeline_help` (issue #572)."""
+        return self._pipeline_service().pipeline_help()
 
     def _read_reflection_pairs(self) -> dict:
-        """Return the ``reflection_pairs`` block from ``role-defaults.yaml``.
-
-        Envelope shape: ``{"reflection_pairs": [...]}``. The list is always
-        returned (empty if absent).
-        """
-        path = self._role_defaults_path()
-        if not path.exists():
-            return {"reflection_pairs": []}
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        pairs = data.get("reflection_pairs") or []
-        if not isinstance(pairs, list):
-            pairs = []
-        return {"reflection_pairs": pairs}
+        """Delegates to :meth:`ReflectionService.read_reflection_pairs` (issue #572)."""
+        return self._reflection_service().read_reflection_pairs()
 
     def _read_reflection_pair(self, pair_id: str) -> dict:
-        """Return a single reflection pair by ``id`` or raise."""
-        for pair in self._read_reflection_pairs().get("reflection_pairs", []):
-            if isinstance(pair, dict) and pair.get("id") == pair_id:
-                return {"reflection_pair": pair}
-        raise FileNotFoundError(f"reflection pair not found: {pair_id}")
+        """Delegates to :meth:`ReflectionService.read_reflection_pair` (issue #572)."""
+        return self._reflection_service().read_reflection_pair(pair_id)
+
+    def _write_reflection_pairs(self, pairs: list) -> dict:
+        """Delegates to :meth:`ReflectionService.write_reflection_pairs` (issue #572)."""
+        return self._reflection_service().write_reflection_pairs(pairs)
 
     def _ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
-        """Return a valid id for a reflection pair, generating one if missing."""
-        if pair_id:
-            pair["id"] = pair_id
-            return pair_id
-        if not pair.get("id"):
-            existing = self._read_reflection_pairs().get("reflection_pairs", [])
-            base = pair.get("generator", "pair") + "-" + pair.get("critic", "critic")
-            idx = 1
-            candidate = f"{base}-{idx}"
-            old_ids = {p.get("id") for p in existing if isinstance(p, dict)}
-            while candidate in old_ids:
-                idx += 1
-                candidate = f"{base}-{idx}"
-            pair["id"] = candidate
-        return pair["id"]
+        """Delegates to :meth:`ReflectionService.ensure_pair_id` (issue #572)."""
+        return self._reflection_service().ensure_pair_id(pair, pair_id)
 
     def _write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
-        """Create or update a single reflection pair by id."""
-        self._ensure_pair_id(pair, pair_id)
-        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
-        found = False
-        for i, existing in enumerate(pairs):
-            if isinstance(existing, dict) and existing.get("id") == pair_id:
-                pairs[i] = pair
-                found = True
-                break
-        if not found:
-            pairs.append(pair)
-        result = self._write_reflection_pairs(pairs)
-        result["reflection_pair"] = pair
-        return result
+        """Delegates to :meth:`ReflectionService.write_reflection_pair` (issue #572)."""
+        return self._reflection_service().write_reflection_pair(pair_id, pair)
 
     def _delete_reflection_pair(self, pair_id: str) -> dict:
-        """Delete a single reflection pair by id."""
-        pairs = self._read_reflection_pairs().get("reflection_pairs", [])
-        new_pairs = [p for p in pairs if not (isinstance(p, dict) and p.get("id") == pair_id)]
-        if len(new_pairs) == len(pairs):
-            raise FileNotFoundError(f"reflection pair not found: {pair_id}")
-        result = self._write_reflection_pairs(new_pairs)
-        result["deleted"] = pair_id
-        return result
+        """Delegates to :meth:`ReflectionService.delete_reflection_pair` (issue #572)."""
+        return self._reflection_service().delete_reflection_pair(pair_id)
 
 
     def _deep_merge(self, base: Any, override: Any) -> Any:
@@ -4080,112 +4731,25 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except SyncError as exc:
                 raise ValueError(str(exc)) from exc
 
-    def _read_template_description(self, role: str) -> str:
-        """Read the description from a generated agent template's frontmatter."""
-        try:
-            path = self._template_path(role)
-        except SecurityError:
-            return ""
-        if not path or not path.exists():
-            return ""
-        with path.open("r", encoding="utf-8") as fh:
-            text = fh.read()
-        if not text.startswith("---"):
-            return ""
-        try:
-            _, front, _ = text.split("---", 2)
-            front_data = yaml.safe_load(front) or {}
-            desc = front_data.get("description")
-            if isinstance(desc, str):
-                return desc.strip()
-        except Exception:  # noqa: BLE001, S110
-            pass
-        return ""
-
     def _list_agent_templates(self) -> dict:
-        """Return the list of agent templates available for generation.
-
-        Searches the top-level ``agents/1-generic`` first and falls back to the
-        submodule layout ``.agent-meta/agents/1-generic`` when agent-meta is
-        embedded in a target project.
-        """
-        templates_dir = resolve_asset(self.__class__.root, "agents", "1-generic")
-        if not templates_dir.is_dir():
-            return {"templates": [], "available": False}
-        names = sorted(
-            p.stem for p in templates_dir.glob("*.md")
-            if p.is_file() and not p.name.startswith("_")
-        )
-        return {"templates": names, "available": True}
+        """Delegates to :meth:`TemplateService.list_agent_templates` (issue #572)."""
+        return self._template_service().list_agent_templates()
 
     def _ai_providers_path(self) -> Path:
-        """Resolve the path to ``config/ai-providers.yaml`` for either layout."""
-        return resolve_asset(self.__class__.root, "config", "ai-providers.yaml")
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._ai_providers_path()
 
     def _list_providers(self) -> list[dict]:
-        """Return the configured AI providers with their model tiers/aliases."""
-        path = self._ai_providers_path()
-        if not path.exists():
-            return []
-        with path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
-        providers = data.get("providers") or {}
-        if not isinstance(providers, dict):
-            return []
-        out: list[dict] = []
-        for name, conf in providers.items():
-            if not isinstance(conf, dict):
-                continue
-            tiers = conf.get("model-tiers") or {}
-            aliases = conf.get("model-aliases") or {}
-            if not isinstance(tiers, dict):
-                tiers = {}
-            if not isinstance(aliases, dict):
-                aliases = {}
-            out.append({
-                "name": name,
-                "display_name": conf.get("display-name") or name,
-                "has_model_tiers": bool(tiers),
-                "model_tiers": tiers,
-                "model_aliases": aliases,
-            })
-        out.sort(key=lambda p: p["name"].lower())
-        return out
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_providers()
 
     def _list_platforms(self) -> list[dict]:
-        """Return distinct platform prefixes derived from ``agents/2-platform/``."""
-        names: set[str] = {"agent-meta", "generic"}
-        known_roles = sorted(
-            (r["name"] for r in self._list_roles()),
-            key=len,
-            reverse=True,
-        )
-        platform_dir = resolve_asset(self.__class__.root, "agents", "2-platform")
-        if platform_dir.is_dir():
-            for entry in platform_dir.glob("*.md"):
-                stem = entry.stem
-                if "-" not in stem:
-                    continue
-                prefix = None
-                for role in known_roles:
-                    suffix = f"-{role}"
-                    if stem.endswith(suffix) and len(stem) > len(suffix):
-                        prefix = stem[: -len(suffix)]
-                        break
-                if prefix is None:
-                    prefix = stem.rsplit("-", 1)[0]
-                if prefix:
-                    names.add(prefix)
-        return [{"name": n} for n in sorted(names, key=str.lower)]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_platforms()
 
     def _list_roles(self) -> list[dict]:
-        """Return the role names declared in ``role-defaults.yaml``."""
-        hierarchy = self._build_agent_hierarchy()
-        rolenames = sorted(
-            (r.get("name") for r in hierarchy.get("roles") or [] if r.get("name")),
-            key=str.lower,
-        )
-        return [{"name": n} for n in rolenames]
+        """Delegates to :class:`ModelsService` (issue #572)."""
+        return self._models_service()._list_roles()
 
     def _audit_paths(self) -> list[Path]:
         """Return the set of config/agent files to audit."""
@@ -4241,63 +4805,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return help_map
 
     def _run_consistency_check(self) -> dict:
-        """Run the overall repository consistency check and return JSON."""
-        import json
-        import subprocess
-        import sys
-        # Was hardcoded as the relative "scripts/consistency-check.py", which
-        # only resolves in super_admin mode. In project_admin (submodule)
-        # mode the script actually lives under ".agent-meta/scripts/" — use
-        # the same layout-aware resolution every other asset lookup in this
-        # file uses instead of a second, inconsistent hardcoded path (#587).
-        check_script = resolve_asset(self.__class__.root, "scripts", "consistency-check.py")
-        try:
-            r = subprocess.run(  # noqa: PLW1510
-                [sys.executable, str(check_script), "--json"],
-                cwd=str(self.__class__.root),
-                capture_output=True,
-                text=True
-            )
-            # consistency-check.py --json prints pure JSON to stdout regardless of exit code
-            return json.loads(r.stdout)
-        except json.JSONDecodeError:
-            return {
-                "error": "Failed to parse JSON output",
-                "output": r.stdout,
-                "findings": [],
-                "summary": {"total": 0, "errors": 0, "warnings": 0}
-            }
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_CONSISTENCY_CHECK")
-            return {
-                "error": body["error"],
-                "findings": [],
-                "summary": {"total": 0, "errors": 0, "warnings": 0}
-            }
+        """Delegates to :meth:`AuditService.run_consistency_check` (issue #572)."""
+        return self._audit_service().run_consistency_check()
 
     def _run_config_audit(self) -> dict:
-        """Run the consistency audit over the current configuration."""
-        self._ensure_lib_on_path()
-        import dataclasses
-
-        from lib.config_audit import audit_config
-        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
-        report = audit_config(self.__class__.root, project_config_path)
-        return {
-            "has_issues": report.has_issues,
-            "errors": [dataclasses.asdict(i) for i in report.errors],
-            "warnings": [dataclasses.asdict(i) for i in report.warnings],
-            "issues": [dataclasses.asdict(i) for i in report.issues],
-        }
+        """Delegates to :meth:`AuditService.run_config_audit` (issue #572)."""
+        return self._audit_service().run_config_audit()
 
     def _apply_config_audit(self) -> dict:
-        """Apply safe fixes reported by the consistency audit."""
-        self._ensure_lib_on_path()
-        from lib.config_audit import apply_audit, audit_config
-        project_config_path = self.__class__.root / ".meta-config" / "project.yaml"
-        report = audit_config(self.__class__.root, project_config_path)
-        count = apply_audit(report, project_config_path)
-        return {"fixed": count}
+        """Delegates to :meth:`AuditService.apply_config_audit` (issue #572)."""
+        return self._audit_service().apply_config_audit()
 
     def _send_template(self, role: str) -> None:
         """Send a generated agent template as plain text."""
@@ -4307,78 +4824,17 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return self._send_bytes(path.read_bytes(), "text/markdown; charset=utf-8")
 
     def _write_template(self, role: str) -> None:
-        """Write an agent template back to disk."""
+        """Write an agent template back to disk.
+
+        HTTP glue only — validation and the atomic write live in
+        :meth:`TemplateService.write_template` (issue #572).
+        """
         body = self._read_body()
-        if body is None:
-            raise ValueError("empty body")
-        # Frontend sends JSON: {"content": "..."}. Accept the parsed dict and
-        # extract the content field. A bare string body is tolerated for
-        # backward compatibility with plain-text clients.
-        if isinstance(body, dict):
-            content = body.get("content")
-        elif isinstance(body, str):
-            content = body
-        else:
-            content = None
-        if not isinstance(content, str):
-            raise ValueError("expected 'content' field with template text")  # noqa: TRY004
-        path = self._template_path(role)
-        if not path:
-            raise FileNotFoundError(f"template not found: {role}")
-        cm = self.__class__.config_manager
-        if path.exists():
-            backup = cm._backup(path)
-            cm._prune_backups(path)
-        else:
-            backup = None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(content, encoding="utf-8")
-        os.replace(tmp, path)
-        return self._send_json({
-            "status": "saved",
-            "role": role,
-            "backup": backup,
-            "bytes": len(content.encode("utf-8")),
-        })
+        return self._send_json(self._template_service().write_template(role, body))
 
     def _template_path(self, role: str) -> Path | None:
-        """Resolve the template path sync.py would actually use for this role.
-
-        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
-        sync.py itself uses (1-generic < 2-platform < 3-project, scoped to
-        this project's own active ``platforms`` list, in list order). A
-        previous version of this method globbed ALL of
-        ``agents/2-platform/*.md`` for any file ending in ``-{role}``,
-        regardless of whether that platform was even active for this
-        project — with several platforms shipping a same-named override
-        (e.g. ``sharkord-developer.md``, ``homeassistant-developer.md``,
-        ``agent-meta-developer.md``), the glob's filesystem-order-dependent
-        first match could silently load AND SAVE an unrelated platform's
-        file while telling the user "Loaded developer.md".
-        """
-        if not role or any(c in role for c in ("/", "\\", "..")):
-            raise SecurityError(f"invalid role name: {role!r}")
-        safe = "".join(ch for ch in role if ch.isalnum() or ch in ("-", "_"))
-        if safe != role:
-            raise SecurityError(f"invalid role name: {role!r}")
-        agent_meta_root = self._agent_meta_root()
-        candidate = agent_meta_root / "agents" / "1-generic" / f"{role}.md"
-        try:
-            project_root = self.__class__.root
-            _ensure_scripts_on_path(project_root)
-            from lib.agents import collect_sources  # type: ignore[import]
-            project_config = self.__class__.config_manager.read("project") or {}
-            active_platforms = project_config.get("platforms", [])
-            overrides, _ = collect_sources(agent_meta_root, active_platforms)
-            resolved = overrides.get(role)
-            if resolved is not None:
-                return resolved
-        except Exception:  # noqa: BLE001
-            # Fall through to the plain generic-template path — better to
-            # edit the generic base than to error out of the Templates page.
-            pass
-        return candidate
+        """Delegates to :meth:`TemplateService.template_path` (issue #572)."""
+        return self._template_service().template_path(role)
 
     def _stream_events(self) -> None:
         """SSE endpoint that streams configuration change events."""
@@ -4413,46 +4869,16 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------ #
 
     def _compute_injection_drift(self) -> dict:
-        """Return undeclared external-tool artifacts per active provider."""
-        project_root = self.__class__.root
-        try:
-            _ensure_scripts_on_path(project_root)
-            from lib.external_tools import scan_injection_drift  # type: ignore[import]
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            # agent_meta_root, NOT project_root: in project_admin (submodule)
-            # mode the framework's config/ai-providers.yaml and
-            # config/external-tools-registry.yaml live under .agent-meta/,
-            # not the project root — passing project_root there silently
-            # finds nothing and produces false-positive "undeclared artifact"
-            # findings for every legitimately registered tool/provider.
-            agent_meta_root = self._agent_meta_root()
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(agent_meta_root)
-            findings = scan_injection_drift(agent_meta_root, project_root, project_config, provider_config)
-            return {"findings": findings}
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_INJECTION_DRIFT")
-            return body
+        """Delegates to :meth:`AuditService.compute_injection_drift` (issue #572)."""
+        return self._audit_service().compute_injection_drift()
 
     # ------------------------------------------------------------------ #
     # Provider deactivation handlers                                      #
     # ------------------------------------------------------------------ #
 
     def _get_deactivation_status(self) -> dict:
-        """Return current provider deactivation status."""
-        root = self.__class__.root
-        try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import get_deactivation_status  # type: ignore[import]
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-            return get_deactivation_status(root, project_config, provider_config)
-        except Exception as exc:  # noqa: BLE001
-            _, body = self._handle_error(exc, "ERR_DEACTIVATION_STATUS")
-            return body
+        """Delegates to :meth:`AuditService.deactivation_status` (issue #572)."""
+        return self._audit_service().deactivation_status()
 
     def _get_submodule_protection_status(self) -> dict:
         """Return Submodule Protection status (Framework Default vs Project Override)."""
@@ -4541,77 +4967,33 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return {"ok": True, "deleted": name, "result": result}
 
     def _handle_deactivate_providers(self) -> None:
-        """Deactivate providers: zip and remove their directories."""
-        root = self.__class__.root
+        """Deactivate providers: zip and remove their directories.
+
+        HTTP glue only — the work lives in
+        :meth:`AuditService.deactivate_providers` (issue #572).
+        """
         body = self._read_body() or {}
         providers = body.get("providers", [])
         if not isinstance(providers, list):
             providers = []
-
         try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import (  # type: ignore[import]
-                deactivate_providers,
-                get_deactivation_status,
-            )
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
-            results = deactivate_providers(
-                root, providers if providers else ["all"],
-                provider_config, project_config, log, dry_run=False,
-            )
-            return self._send_json({
-                "success": True,
-                "results": results,
-                "status": get_deactivation_status(root, project_config, provider_config),
-            })
+            return self._send_json(self._audit_service().deactivate_providers(providers))
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_DEACTIVATE_PROVIDERS")
             return self._send_json(body, status=status)
 
     def _handle_activate_providers(self) -> None:
-        """Activate providers: restore from backup zips."""
-        root = self.__class__.root
+        """Activate providers: restore from backup zips.
+
+        HTTP glue only — the work lives in
+        :meth:`AuditService.activate_providers` (issue #572).
+        """
         body = self._read_body() or {}
         providers = body.get("providers", [])
         if not isinstance(providers, list):
             providers = []
-
         try:
-            _ensure_scripts_on_path(root)
-            from lib.deactivation import (  # type: ignore[import]
-                activate_providers,
-                get_deactivation_status,
-            )
-            from lib.providers import load_providers_config  # type: ignore[import]
-
-            project_config = self.__class__.config_manager.read("project")
-            provider_config = load_providers_config(root)
-
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
-            results = activate_providers(
-                root, providers,
-                provider_config, project_config, log, dry_run=False,
-            )
-            return self._send_json({
-                "success": True,
-                "results": results,
-                "status": get_deactivation_status(root, project_config, provider_config),
-            })
+            return self._send_json(self._audit_service().activate_providers(providers))
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_ACTIVATE_PROVIDERS")
             return self._send_json(body, status=status)
