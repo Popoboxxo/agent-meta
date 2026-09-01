@@ -1,7 +1,7 @@
 ---
 name: agent-meta-developer
-version: "1.0.5"
-based-on: "1-generic/developer.md@3.1.1"
+version: "2.0.0"
+based-on: "1-generic/developer.md@4.0.1"
 description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface."
 hint: "Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML)"
 prompt_mode: modern
@@ -37,9 +37,14 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 {{#if DEVELOPER_SNIPPETS_PATH_SET}}`{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.{{/if}}
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
 6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
-7. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
-8. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
-9. **Return:** result in `IResult` format (see `<output_contract>`).
+7. **Migration verification (mandatory when the task moves, renames, or re-derives existing roles/templates/config keys):** silent identity loss during a framework migration (e.g. a role name, template stem, `based-on` version pin or config key dropped instead of carried over) can be invisible in a diff and break every project that syncs the affected template. Before reporting done:
+   - Diff old→new over the stable key (role name, template filename, `{{%PLACEHOLDER%}}` name, config key), not just line-by-line file content.
+   - Every stable key from the source must appear in the target exactly once — 0 missing, 0 duplicates.
+   - A key that doesn't reappear is only acceptable if you can point to where it's now explicitly deprecated (e.g. `deprecated: true` in frontmatter) — "not found" alone is not acceptable, go find out why.
+   - State the check result explicitly in your report (counts checked, 0 mismatches found) — don't just assert the migration succeeded.
+8. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
+9. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
+10. **Return:** result in `IResult` format (see `<output_contract>`).
 </workflow>
 
 <context>
