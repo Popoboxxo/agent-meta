@@ -84,6 +84,15 @@ providers:
       sonnet: claude-sonnet-4-6
       opus:   claude-opus-4-8
       fable:  claude-fable-5
+    # Data-driven agent transform (issue #629). Claude supports all fields
+    # natively — model/memory/permissionMode injected, tools validated (kept),
+    # body left intact (Claude-specific lines are meaningful here).
+    agent-transform:
+      model: inject
+      model-note-flat: true
+      inject-memory: true
+      inject-permission-mode: true
+      tools: keep
 
   Gemini:
     agents_dir: .gemini/agents
@@ -136,6 +145,22 @@ providers:
       powerful: gemini-3.1-pro-high         # premium reasoning, complex coding
       max:      gemini-3.1-pro-high         # reserved for future Gemini Ultra
     model-aliases: {}
+    # Data-driven agent transform (issue #629). Gemini: provider-mapped model,
+    # tools filtered to native subset, sampling/memory/permissionMode stripped,
+    # Claude-specific body lines removed and a runtime-registration note added.
+    agent-transform:
+      model: inject
+      tools: filter
+      strip-fields:
+        - memory
+        - permissionMode
+        - temperature
+        - top_p
+        - top_k
+        - stop_sequences
+        - max_output_tokens
+      strip-claude-lines: true
+      body-note: gemini-registration
 
   Opencode:
     display-name: "OpenCode"
@@ -183,6 +208,14 @@ providers:
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
     orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
+    # Data-driven agent transform (issue #629). Opencode uses a native agent
+    # frontmatter schema (mode: subagent, permission block, provider/model-id
+    # model refs) built by _transform_frontmatter_for_opencode — selected via
+    # the frontmatter-mechanism key rather than an `if provider == 'Opencode'`
+    # branch. Model/temperature/max_tokens/steps are resolved and folded into
+    # that native frontmatter; tools are validated then mapped to permissions.
+    agent-transform:
+      frontmatter-mechanism: opencode-native
     # opencode model IDs — sourced from the Go catalog (opencode-go/).
     # Full list: https://opencode.ai/zen/go
     model-tiers:
@@ -241,6 +274,22 @@ providers:
     pending_tasks_file: .continue/pending-tasks.md
     extension_dir: .continue/3-project
     orchestrator_hint: "- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von Eurer Aufgabe ein."
+    # Data-driven agent transform (issue #629). Continue: model/memory/
+    # permissionMode injected (model may inherit main-chat via role-defaults
+    # fallback), alwaysApply pinned false, tools field removed (no frontmatter
+    # tools model), Claude-specific body lines stripped and standalone `---`
+    # sanitized to avoid breaking Continue's YAML parsing.
+    agent-transform:
+      model: inject
+      model-note-flat: true
+      model-inherit-fallback: true
+      inject-memory: true
+      inject-permission-mode: true
+      extra-fields:
+        alwaysApply: false
+      tools: remove
+      strip-claude-lines: true
+      body-sanitize-hr: true
 
   Copilot:
     agents_dir: .github/copilot/agents
@@ -272,6 +321,20 @@ providers:
     orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
     model-tiers: {}
     model-aliases: {}
+    # Data-driven agent transform (issue #629) — replaces the per-provider elif
+    # branch in provider_transform.py. Copilot uses IDE-configured models, so no
+    # model/memory/permission fields; sampling params and tools are stripped.
+    agent-transform:
+      strip-fields:
+        - memory
+        - permissionMode
+        - temperature
+        - top_p
+        - top_k
+        - stop_sequences
+        - max_output_tokens
+        - tools
+      strip-claude-lines: true
 
   Mammouth:
     agents_dir: .mammouth/agents
@@ -319,3 +382,18 @@ providers:
       sonnet: claude-sonnet-4-6
       opus:   claude-opus-4-8
       fable:  claude-fable-5
+    # Data-driven agent transform (issue #629). Mammouth Code supports model,
+    # permissionMode and tools; memory and sampling params are stripped.
+    agent-transform:
+      model: inject
+      model-note-flat: true
+      inject-permission-mode: true
+      tools: keep
+      strip-fields:
+        - memory
+        - temperature
+        - top_p
+        - top_k
+        - stop_sequences
+        - max_output_tokens
+      strip-claude-lines: true
