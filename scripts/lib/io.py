@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -140,11 +143,41 @@ def read_json_lenient(path: Path) -> dict | None:
         return None
 
 
+def write_atomic(path: Path, content: str, mode: str = "w") -> None:
+    """Write content to path atomically via temp file + os.replace() (#573).
+
+    A plain ``path.write_text()`` truncates the target file in place — a
+    process crash/kill/OS-interrupt mid-write leaves a corrupted (partial or
+    empty) file behind. This writes to a temp file in the same directory
+    (guaranteeing the same filesystem, required for ``os.replace`` to be
+    atomic) and only swaps it into place once the write has fully
+    succeeded and been flushed to disk. On any failure the original file
+    is left untouched and the temp file is cleaned up.
+
+    mode: "w" (text, default) or "wb" (binary).
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    binary = "b" in mode
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb" if binary else "w", **({} if binary else {"encoding": "utf-8"})) as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
 def _write_yaml(path: Path, data: dict) -> None:
     """Write data as YAML with consistent formatting."""
-    with path.open("w", encoding="utf-8") as f:
-        _yaml.dump(data, f, allow_unicode=True, default_flow_style=False,
-                   sort_keys=False, indent=2)
+    write_atomic(path, _yaml.dump(data, allow_unicode=True, default_flow_style=False,
+                                   sort_keys=False, indent=2))
 
 
 def content_hash(text: str) -> str:
@@ -168,6 +201,7 @@ def write_checked(
     allow_secrets: bool = False,
     config: dict | None = None,
     dry_run: bool = False,
+    verify_gitignored: bool = False,
 ) -> bool:
     """Write content to path unless it is already identical (incremental sync).
 
@@ -177,7 +211,12 @@ def write_checked(
     - allow_secrets=True: emits a warning only (use for gitignored local files).
 
     Set allow-committed-secrets: true in project.yaml to override for a project
-    (not recommended — prefer ${ENV_VAR} references in committed configs).
+    (not recommended — prefer ${ENV_VAR} references in committed configs). Note
+    this reuses allow_secrets=True for a *committed* file, which is why the
+    gitignore verification below is a separate, explicitly opted-in flag
+    rather than being implied by allow_secrets — the two "allow_secrets=True"
+    call sites mean different things (genuinely-local file vs. an explicit
+    committed-secrets override).
 
     config: optional project config dict — extends secret detection with
             security.secret-patterns from project.yaml.
@@ -187,6 +226,12 @@ def write_checked(
              written (content differs / missing), False when unchanged. This
              lets callers report accurate action/skip counts in dry-run mode
              (used by ``sync.py --dry-run --check`` for CI).
+
+    verify_gitignored: when True, warn (never block) if `path` is not actually
+             covered by .gitignore (#586) — use for files that are genuinely
+             expected to be local-only (e.g. secrets.local.yaml-derived
+             provider configs), not for the allow-committed-secrets override
+             above.
 
     Returns True when the file was written, False when skipped as unchanged.
     """
@@ -207,8 +252,37 @@ def write_checked(
             )
         for finding in findings:
             log.warning(f"potential secret in {rel_label}: {finding} — verify before committing")
-    path.write_text(content, encoding="utf-8")
+    if verify_gitignored:
+        # Informational only (#586): never blocks the write, since this is
+        # not a security boundary, just an early warning for a misconfigured
+        # provider ignore-file.
+        _warn_if_not_gitignored(path, rel_label, log)
+    write_atomic(path, content)
     return True
+
+
+def _warn_if_not_gitignored(path: Path, rel_label: str, log: "SyncLog") -> None:  # noqa: F821
+    """Warn when a file expected to be gitignored is not actually ignored (#586).
+
+    Fail-safe: any problem running git (not installed, not a repo, timeout)
+    is silently ignored — this check is informational, never a hard gate.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["git", "check-ignore", "-q", str(path)],
+            cwd=str(path.parent) if path.parent.exists() else str(Path.cwd()),
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+    if result.returncode == 1:
+        # 0 = ignored, 1 = not ignored, >1 = git error (no repo, bad options, ...)
+        log.warning(
+            f"{rel_label} looks like a local secrets file but is not covered by "
+            ".gitignore — verify it is excluded from version control."
+        )
 
 
 def safe_path(base: Path, *parts: str) -> Path:

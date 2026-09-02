@@ -32,35 +32,31 @@ from .log import SyncLog
 # Provider config generation helpers
 # ---------------------------------------------------------------------------
 
-def _subst(value: str, secrets: dict | None) -> str:
-    """Replace {{VAR}} placeholders.
+def _subst_with_placeholder(value: str, secrets: dict | None, placeholder) -> str:
+    """Replace {{VAR}} placeholders, shared by _subst() and _subst_opencode() (#586).
 
-    secrets=None  → ${VAR}  (committed config — env var reference, safe to commit)
-    secrets=dict  → actual value from dict, or ${VAR} if key absent/still empty
-                    (secrets_template.py pre-fills new keys as "" — those must
-                    keep falling back to the placeholder, not resolve to "")
+    secrets=None  → placeholder(var_name)  (committed config — env var reference, safe to commit)
+    secrets=dict  → actual value from dict, or placeholder(var_name) if key
+                    absent/still empty (secrets_template.py pre-fills new keys
+                    as "" — those must keep falling back to the placeholder,
+                    not resolve to "")
     """
     def _replace(m: re.Match) -> str:
         var_name = m.group(1)
         if secrets is not None and secrets.get(var_name):
             return str(secrets[var_name])
-        return f"${{{var_name}}}"
+        return placeholder(var_name)
     return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
+
+
+def _subst(value: str, secrets: dict | None) -> str:
+    """Replace {{VAR}} placeholders with ${VAR} (shell/committed-config syntax)."""
+    return _subst_with_placeholder(value, secrets, lambda var_name: f"${{{var_name}}}")
 
 
 def _subst_opencode(value: str, secrets: dict | None) -> str:
-    """Replace {{VAR}} placeholders with opencode {env:VAR} syntax.
-
-    secrets=None  → {env:VAR}  (committed config — env var reference)
-    secrets=dict  → actual value from dict, or {env:VAR} if key absent/still empty
-                    (see _subst — an unfilled "" placeholder must not resolve to "")
-    """
-    def _replace(m: re.Match) -> str:
-        var_name = m.group(1)
-        if secrets is not None and secrets.get(var_name):
-            return str(secrets[var_name])
-        return f"{{env:{var_name}}}"
-    return re.sub(r'\{\{([A-Z0-9_]+)\}\}', _replace, value)
+    """Replace {{VAR}} placeholders with opencode {env:VAR} syntax."""
+    return _subst_with_placeholder(value, secrets, lambda var_name: f"{{env:{var_name}}}")
 
 
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
@@ -157,6 +153,7 @@ def _update_json_config(
     dry_run: bool,
     allow_secrets: bool,
     config: dict | None = None,
+    verify_gitignored: bool = False,
 ) -> None:
     """Merge mcp_entries into a JSON settings file under mcp_key.
 
@@ -195,7 +192,8 @@ def _update_json_config(
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run):
+    if write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run,
+                      verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, f"mcp-registry → {mcp_key}")
     else:
         log.skip(rel, "unchanged")
@@ -208,6 +206,7 @@ def _update_continue_yaml_config(
     dry_run: bool,
     allow_secrets: bool,
     config: dict | None = None,
+    verify_gitignored: bool = False,
 ) -> None:
     """Merge mcpServers into a Continue config.yaml file.
 
@@ -256,7 +255,8 @@ def _update_continue_yaml_config(
 
     if not dry_run:
         path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run):
+    if write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run,
+                      verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, "mcp-registry → mcpServers")
     else:
         log.skip(rel, "unchanged")
@@ -372,8 +372,9 @@ def generate_provider_configs(
             fmt=fmt,
             log=log,
             dry_run=dry_run,
-            allow_secrets=True,  # local files are always gitignored
+            allow_secrets=True,  # local files are always meant to be gitignored
             config=config,
+            verify_gitignored=True,  # verify that assumption instead of trusting it (#586)
         )
 
 
@@ -385,14 +386,18 @@ def _write_provider_config(
     dry_run: bool,
     allow_secrets: bool,
     config: dict | None = None,
+    verify_gitignored: bool = False,
 ) -> None:
     """Dispatch to format-specific writer."""
     if fmt in ("claude-settings", "gemini-settings"):
-        _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config)
+        _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config,
+                             verify_gitignored=verify_gitignored)
     elif fmt == "opencode-json":
-        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config)
+        _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
+                             verify_gitignored=verify_gitignored)
     elif fmt == "continue-yaml":
-        _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config)
+        _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
+                                      verify_gitignored=verify_gitignored)
     else:
         log.warning(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
 

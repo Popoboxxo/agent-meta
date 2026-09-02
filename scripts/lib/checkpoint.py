@@ -5,10 +5,11 @@ Ermöglicht Resume nach Session-Unterbrechung.
 """
 from __future__ import annotations
 
-import json
 import time
 import uuid
 from pathlib import Path
+
+from .json_persistence import load_json_document, save_json_document
 
 CHECKPOINT_DIR = ".meta-viz/checkpoints"
 
@@ -76,14 +77,17 @@ class CheckpointStore:
         return self.checkpoint_dir / f"{session_id}.json"
 
     def save_checkpoint(self, session_id: str, checkpoint: Checkpoint) -> None:
-        """Append checkpoint to session file."""
+        """Append checkpoint to session file.
+
+        A corrupt existing session file (#576) is treated as an empty one —
+        the new checkpoint still gets saved instead of crashing the whole
+        orchestration on a single damaged file.
+        """
         self._ensure_dir()
         path = self._session_file(session_id)
 
-        checkpoints = []
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            checkpoints = data.get("checkpoints", [])
+        existing = load_json_document(path, default={})
+        checkpoints = existing.get("checkpoints", []) if isinstance(existing, dict) else []
 
         checkpoints.append(checkpoint.to_dict())
 
@@ -93,14 +97,11 @@ class CheckpointStore:
             "updated_at": time.time(),
             "checkpoints": checkpoints,
         }
-        path.write_text(json.dumps(session_data, indent=2), encoding="utf-8")
+        save_json_document(path, session_data)
 
     def load_session(self, session_id: str) -> dict | None:
-        """Load full session data."""
-        path = self._session_file(session_id)
-        if not path.exists():
-            return None
-        return json.loads(path.read_text(encoding="utf-8"))
+        """Load full session data. Returns None when missing or corrupt (#576)."""
+        return load_json_document(self._session_file(session_id), default=None)
 
     def get_last_checkpoint(self, session_id: str) -> Checkpoint | None:
         """Get the most recent checkpoint for a session."""
@@ -137,13 +138,19 @@ class CheckpointStore:
         return False
 
     def cleanup_old_sessions(self, max_age_seconds: float = 86400) -> int:
-        """Delete sessions older than max_age_seconds. Returns count of deleted sessions."""
+        """Delete sessions older than max_age_seconds. Returns count of deleted sessions.
+
+        A single corrupt session file (#576) is logged and skipped instead
+        of crashing the whole cleanup pass for every other session.
+        """
         if not self.checkpoint_dir.exists():
             return 0
         now = time.time()
         deleted = 0
         for path in self.checkpoint_dir.glob("*.json"):
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = load_json_document(path, default=None)
+            if data is None:
+                continue
             if now - data.get("updated_at", 0) > max_age_seconds:
                 path.unlink()
                 deleted += 1
