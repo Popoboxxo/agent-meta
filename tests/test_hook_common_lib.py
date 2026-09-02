@@ -10,6 +10,7 @@ subprocesses.
 
 Run: python -m pytest tests/test_hook_common_lib.py -v
 """
+from __future__ import annotations
 
 import os
 import shutil

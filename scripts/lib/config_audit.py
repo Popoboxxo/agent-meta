@@ -13,6 +13,7 @@ Design constraints:
     * :func:`apply_audit` is idempotent: lines already carrying the
       ``# AUTO-DISABLED`` marker are skipped on re-runs.
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
