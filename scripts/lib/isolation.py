@@ -55,7 +55,7 @@ def sync_provider_isolation(
         log.skip("provider-isolation", f"only {len(providers)} provider active — skipping")
         return
 
-    log.info("provider-isolation", f"generating isolation for: {', '.join(providers)}")  # noqa: PLE1205
+    log.note("provider-isolation", f"generating isolation for: {', '.join(providers)}")
 
     for provider in providers:
         pc = provider_config.get(provider, {})

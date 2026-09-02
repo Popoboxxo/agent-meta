@@ -2,9 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
+
+# Module-level logger for fail-soft branches that have no SyncLog instance in
+# scope (Issue #568) — DEBUG-level only, so troubleshooting information isn't
+# lost even though the error itself is deliberately non-fatal.
+_logger = logging.getLogger(__name__)
 
 KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
 DEFAULT_MAX_DEPTH = 4
@@ -383,12 +389,26 @@ def parse_plan_ref(plan_path: str) -> dict:
     if fm_match:
         try:
             import yaml
-            fm = yaml.safe_load(fm_match.group(1)) or {}
-            ps = fm.get("pipeline_stages")
-            if isinstance(ps, dict):
-                result["stages"] = {str(k): int(v) for k, v in ps.items()}
-        except Exception:
-            pass
+        except ImportError as e:
+            # PyYAML is an optional dependency project-wide (see e.g.
+            # lib/io.py::_YAML_AVAILABLE) — without it, the pipeline_stages
+            # frontmatter override is simply unavailable; result["stages"]
+            # stays at its already-initialized empty default.
+            _logger.debug("parse_plan_ref: PyYAML unavailable, skipping pipeline_stages frontmatter: %s", e)
+        else:
+            try:
+                fm = yaml.safe_load(fm_match.group(1)) or {}
+                ps = fm.get("pipeline_stages")
+                if isinstance(ps, dict):
+                    result["stages"] = {str(k): int(v) for k, v in ps.items()}
+            except (yaml.YAMLError, AttributeError, TypeError, ValueError) as e:
+                # An optional `pipeline_stages:` frontmatter override is nice-
+                # to-have only — malformed YAML (YAMLError), a non-mapping
+                # top-level value (AttributeError on fm.get), or a non-numeric
+                # stage value (TypeError/ValueError from int(v)) all fall back
+                # to the already-initialized empty result["stages"] rather
+                # than aborting plan-ref parsing entirely.
+                _logger.debug("parse_plan_ref: pipeline_stages frontmatter ignored for %s: %s: %s", plan_path, type(e).__name__, e)
 
     table_pattern = re.compile(
         r'^\|\s*(\d+)\s*\|\s*.+?\|\s*`?(\w[\w-]*)`?\s*\|',

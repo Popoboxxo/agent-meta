@@ -414,6 +414,22 @@ def _split_frontmatter(content: str) -> tuple[str, str]:
     body = content[end + 4:]        # everything after closing ---
     return fm_block, body
 
+def parse_frontmatter_file(path: Path) -> dict:
+    """Parse the YAML frontmatter block of a Markdown file directly from disk.
+
+    Canonical file-reading wrapper around `_parse_frontmatter_yaml` (Issue #571)
+    for callers that only have a `Path`, not already-loaded content (e.g.
+    config_audit.py's template inspection). Returns `{}` on any I/O error,
+    missing frontmatter, or YAML parse failure/unavailability — mirrors
+    `_parse_frontmatter_yaml`'s fail-soft contract so callers never need their
+    own try/except around this call.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    return _parse_frontmatter_yaml(text)
+
 def _parse_frontmatter_yaml(content: str) -> dict:
     """Parse YAML frontmatter into a dict. Returns {} on failure or missing yaml."""
     if not _YAML_AVAILABLE:

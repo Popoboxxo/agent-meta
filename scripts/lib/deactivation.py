@@ -195,11 +195,11 @@ def update_deactivation_config(
         }
 
     if dry_run:
-        log.info("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")  # noqa: PLE1205
+        log.note("deactivation-config", f"DRY-RUN: would write provider-deactivation config to {config_path.name}")
         return
 
     _write_yaml(config_path, config)
-    log.info("deactivation-config", f"updated provider-deactivation in {config_path.name}: "  # noqa: PLE1205
+    log.note("deactivation-config", f"updated provider-deactivation in {config_path.name}: "
              f"{', '.join(sorted(updated)) if updated else 'none (all active)'}")
 
 
@@ -236,16 +236,16 @@ def remove_provider_dir(
 
     target_dir = project_root / provider_root
     if not target_dir.exists():
-        log.info("deactivation", f"provider directory already removed: {provider_root}")  # noqa: PLE1205
+        log.note("deactivation", f"provider directory already removed: {provider_root}")
         return False
 
     if dry_run:
-        log.info("deactivation", f"DRY-RUN: would remove '{provider_root}'")  # noqa: PLE1205
+        log.note("deactivation", f"DRY-RUN: would remove '{provider_root}'")
         return True
 
     try:
         shutil.rmtree(target_dir)
-        log.info("deactivation", f"removed provider directory: {provider_root}")  # noqa: PLE1205
+        log.note("deactivation", f"removed provider directory: {provider_root}")
         return True
     except Exception as exc:  # noqa: BLE001
         log.error(f"deactivation: failed to remove '{provider_root}': {exc}")

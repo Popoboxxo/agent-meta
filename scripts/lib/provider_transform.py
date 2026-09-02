@@ -53,7 +53,7 @@ def _validate_tools_against_whitelist(
         if matches(t, whitelist):
             valid.append(t)
         elif matches(t, silent):
-            log.info(
+            log.note(
                 f"{provider}/{role}",
                 f"tool '{t}' not supported by {provider} — dropped by design",
             )
@@ -187,17 +187,17 @@ def transform_agent_content_for_provider(
                 role in po and not isinstance(po.get(role), dict)
             )
             src = 'project override' if is_override else 'meta default'
-            log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+            log.note(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
         memory = resolve_memory(role, config, agent_meta_root)
         content = inject_memory_field(content, memory)
         if memory:
             src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-            log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+            log.note(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
         permission_mode = resolve_permission_mode(role, config, agent_meta_root)
         content = inject_permission_mode_field(content, permission_mode)
         if permission_mode:
             src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-            log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+            log.note(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
         content = _update_frontmatter_dict(content, {"alwaysApply": False})
         # Continue has no frontmatter tools model — validate and remove template tools
         _continue_fm = _parse_frontmatter_yaml(content)
@@ -231,19 +231,19 @@ def transform_agent_content_for_provider(
                     role in po and not isinstance(po.get(role), dict)
                 )
                 src = 'project override' if is_override else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
 
             memory = resolve_memory(role, config, agent_meta_root)
             content = inject_memory_field(content, memory)
             if memory:
                 src = 'project override' if role in config.get('memory-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'memory: {memory} (from {src})')
 
             permission_mode = resolve_permission_mode(role, config, agent_meta_root)
             content = inject_permission_mode_field(content, permission_mode)
             if permission_mode:
                 src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
             # Validate tools against whitelist — log warnings but keep tools (Claude supports them natively)
             _claude_fm = _parse_frontmatter_yaml(content)
@@ -265,7 +265,7 @@ def transform_agent_content_for_provider(
                 po = config.get('model-overrides', {})
                 is_override = role in po.get('Gemini', {})
                 src = 'project override' if is_override else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
             # Map generic tool names to Gemini-native tools
             _gemini_fm = _parse_frontmatter_yaml(content)
             _gemini_tools = _gemini_fm.get('tools')
@@ -311,19 +311,19 @@ def transform_agent_content_for_provider(
                 po = config.get('model-overrides', {})
                 is_override = role in po.get('Opencode', {})
                 src = 'project override' if is_override else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
             temperature = resolve_temperature(role, config, agent_meta_root)
             if temperature:
                 src = 'project override' if role in config.get('temperature-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'temperature: {temperature} (from {src})')
             max_tokens = resolve_max_tokens(role, config, agent_meta_root)
             if max_tokens:
                 mt_src = 'project override' if role in config.get('max-tokens-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'max_tokens: {max_tokens} (from {mt_src})')
+                log.note(str(target_path.relative_to(project_root)), f'max_tokens: {max_tokens} (from {mt_src})')
             steps = resolve_steps(role, config, agent_meta_root)
             if steps:
                 src = 'project override' if role in config.get('steps-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'steps: {steps} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'steps: {steps} (from {src})')
             # Validate tools against provider whitelist before transformation
             _opencode_fm = _parse_frontmatter_yaml(content)
             _opencode_raw_tools = _opencode_fm.get('tools')
@@ -368,13 +368,13 @@ def transform_agent_content_for_provider(
                     role in po and not isinstance(po.get(role), dict)
                 )
                 src = 'project override' if is_override else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'model: {model} (from {src})')
 
             permission_mode = resolve_permission_mode(role, config, agent_meta_root)
             content = inject_permission_mode_field(content, permission_mode)
             if permission_mode:
                 src = 'project override' if role in config.get('permission-mode-overrides', {}) else 'meta default'
-                log.info(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
+                log.note(str(target_path.relative_to(project_root)), f'permissionMode: {permission_mode} (from {src})')
 
             _mammouth_fm = _parse_frontmatter_yaml(content)
             _mammouth_tools = _mammouth_fm.get('tools')

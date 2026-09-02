@@ -415,7 +415,7 @@ def fill_defaults(
         log.action(action, str(config_path.name), f"{field_name} = {json.dumps(val)}  # {description}")
 
     if not changed and not silent:
-        log.info("fill-defaults", "all structural fields already set — nothing to write")
+        log.note("fill-defaults", "all structural fields already set — nothing to write")
 
     # --- Warn about missing variable keys ---
     # Respect `silent` per the docstring ("only the summary line is logged for
@@ -515,24 +515,34 @@ def _load_se_variable_defaults(agent_meta_root: Path, warnings: list[str] | None
         return {}
 
 
-def build_variables(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> tuple[dict, list[str]]:
-    """Returns (variables_dict, pre_warnings).
+def _build_core_variables(
+    variables: dict, config: dict, agent_meta_root: Path, project_root: Path | None
+) -> list[str]:
+    """Populate project-identity, agent-table, user-config and REQ/context variables.
 
-    project_root is the consuming project's root (where .meta-config/ lives).
-    It differs from agent_meta_root whenever agent-meta is embedded as a
-    submodule (project_root/.agent-meta) rather than self-hosting (they're
-    the same directory, as in the agent-meta repo's own project.yaml).
-    Templates need this distinction — a hardcoded ".agent-meta/scripts/..."
-    prefix is only correct in the embedded case; see AGENT_META_REL_PATH.
+    Parameter contract:
+        variables: mutated in place — receives PREFIX/PROJECT_*/AGENT_META_*,
+            AGENT_TABLE/AGENT_HINTS, all user-defined `variables:` entries from
+            project.yaml (coerced to string), the `<VAR>_SET` optional-variable
+            flags, REQ_CATEGORIES(_LIST), PROJECT_GOAL/PROJECT_CONTEXT,
+            ARCHITECTURE/DEV_COMMANDS, MAX_PARALLEL_AGENTS and COMPACT_MODE.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for AGENT_TABLE/version lookups).
+        project_root: consuming project's root, or None when self-hosting.
+
+    Returns:
+        The `unmapped` warnings list created by `build_agent_table()` — the
+        single source of truth for role→agent mapping gaps, extended by later
+        variable groups (analysis/reflection/quality-pipelines) as they run.
+
+    Order dependency: must run before `_build_provider_variables()`, whose
+    AGENTS_DIR/AI_PROVIDER auto-injection checks `"AGENTS_DIR"`/`"AI_PROVIDER"
+    not in variables` — i.e. it must see the user `variables:` entries this
+    function loads first.
     """
     # Import here to avoid circular deps — agents module uses config module
     from .agents import build_agent_hints, build_agent_table
-    from .context_templates.builder import TemplateBuilder
-    from .delegation_table import get_active_agents_data
-    from .dod import resolve_dod
-    from .providers import load_providers_config, resolve_providers
 
-    variables = {}
     project = config.get("project", {})
     variables["PREFIX"]       = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
@@ -554,39 +564,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
 
-    # Build dynamic provider routing string
-    provider_config = load_providers_config(agent_meta_root)
-    providers = resolve_providers(config, provider_config)
-    
-    from collections import defaultdict
-    routing_groups = defaultdict(list)
-    agent_locations = []
-    
-    for p in providers:
-        if p in provider_config:
-            pc = provider_config[p]
-            cfile = pc.get("context_file")
-            if cfile:
-                routing_groups[cfile].append(p)
-            
-            # Collect agent locations for AGENTS.md
-            agents_dir = pc.get("agents_dir")
-            if agents_dir and cfile == "AGENTS.md":
-                display_name = pc.get("display-name", p)
-                agent_locations.append(f"- **{display_name}:** Agent files in `{agents_dir}/`. Invoke by name.")
-                
-    routing_hints = []
-    for cfile, p_list in routing_groups.items():
-        routing_hints.append(f"{', '.join(p_list)} -> {cfile}")
-        
-    variables["PROVIDER_ROUTING"] = "> **AI ROUTING:** " + " | ".join(routing_hints) if routing_hints else ""
-    variables["AGENT_LOCATIONS"] = "\n".join(agent_locations) if agent_locations else "Agent files in provider-specific directories."
-    # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
-    # Claude Code injects agent descriptions natively into the system prompt,
-    # so the table in CLAUDE.md would be a duplication — dropped for Claude only.
-    variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(
-        config, agent_meta_root, include_table=False
-    )
     # User variables may be YAML scalars (true, 20) — coerce to the string form
     # templates expect ("true"/"false" for {{#if}} blocks, str() otherwise).
     for key, value in (config.get("variables") or {}).items():
@@ -620,18 +597,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         variables["REQ_CATEGORIES"] = variables.get("REQ_CATEGORIES_LIST") or (
             "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen"
         )
-    # AGENTS_DIR: generated agents directory of the first active provider.
-    # Derived from provider config so multi-provider setups (Gemini, Opencode, …)
-    # don't inherit a Claude-specific path. Falls back to ".claude/agents" only
-    # when no provider resolves (e.g. all deactivated).
-    if "AGENTS_DIR" not in variables:
-        _pc_for_dir = load_providers_config(agent_meta_root)
-        _active_providers = resolve_providers(config, _pc_for_dir)
-        _first_provider = _active_providers[0] if _active_providers else None
-        variables["AGENTS_DIR"] = (
-            _pc_for_dir.get(_first_provider, {}).get("agents_dir", ".claude/agents")
-            if _first_provider else ".claude/agents"
-        )
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]
@@ -647,12 +612,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         variables["PROJECT_CONTEXT"] = variables.get("PROJECT_DESCRIPTION", "")
     variables.setdefault("ARCHITECTURE", "")
     variables.setdefault("DEV_COMMANDS", "")
-    # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
-    if "AI_PROVIDER" not in variables:
-        provider_config = load_providers_config(agent_meta_root)
-        variables["AI_PROVIDER"] = config.get("ai-provider", "") or ", ".join(
-            resolve_providers(config, provider_config)
-        )
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
     # COMPACT_MODE: boolean flag derived from context_file.mode (issue #540, C1).
@@ -669,7 +628,96 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         _context_file_cfg.get("mode") if isinstance(_context_file_cfg, dict) else None
     )
     variables["COMPACT_MODE"] = "true" if _context_mode == "compact" else "false"
-    # ORCHESTRATOR_MODE: auto-inject from orchestrator block in project.yaml
+    return unmapped
+
+
+def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
+    """Populate AI-provider routing/location variables.
+
+    Parameter contract:
+        variables: mutated in place — receives PROVIDER_ROUTING, AGENT_LOCATIONS,
+            AGENT_HINTS_CLAUDE, AGENTS_DIR and AI_PROVIDER.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for provider config lookup).
+
+    Order dependency: must run after `_build_core_variables()` — the
+    AGENTS_DIR/AI_PROVIDER auto-injection below only fires when the user
+    hasn't already set them via project.yaml's `variables:` block (loaded by
+    the core-variables step).
+    """
+    from .agents import build_agent_hints
+    from .providers import load_providers_config, resolve_providers
+
+    # Build dynamic provider routing string
+    provider_config = load_providers_config(agent_meta_root)
+    providers = resolve_providers(config, provider_config)
+
+    from collections import defaultdict
+    routing_groups = defaultdict(list)
+    agent_locations = []
+
+    for p in providers:
+        if p in provider_config:
+            pc = provider_config[p]
+            cfile = pc.get("context_file")
+            if cfile:
+                routing_groups[cfile].append(p)
+
+            # Collect agent locations for AGENTS.md
+            agents_dir = pc.get("agents_dir")
+            if agents_dir and cfile == "AGENTS.md":
+                display_name = pc.get("display-name", p)
+                agent_locations.append(f"- **{display_name}:** Agent files in `{agents_dir}/`. Invoke by name.")
+
+    routing_hints = []
+    for cfile, p_list in routing_groups.items():
+        routing_hints.append(f"{', '.join(p_list)} -> {cfile}")
+
+    variables["PROVIDER_ROUTING"] = "> **AI ROUTING:** " + " | ".join(routing_hints) if routing_hints else ""
+    variables["AGENT_LOCATIONS"] = "\n".join(agent_locations) if agent_locations else "Agent files in provider-specific directories."
+    # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
+    # Claude Code injects agent descriptions natively into the system prompt,
+    # so the table in CLAUDE.md would be a duplication — dropped for Claude only.
+    variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(
+        config, agent_meta_root, include_table=False
+    )
+    # AGENTS_DIR: generated agents directory of the first active provider.
+    # Derived from provider config so multi-provider setups (Gemini, Opencode, …)
+    # don't inherit a Claude-specific path. Falls back to ".claude/agents" only
+    # when no provider resolves (e.g. all deactivated).
+    if "AGENTS_DIR" not in variables:
+        _pc_for_dir = load_providers_config(agent_meta_root)
+        _active_providers = resolve_providers(config, _pc_for_dir)
+        _first_provider = _active_providers[0] if _active_providers else None
+        variables["AGENTS_DIR"] = (
+            _pc_for_dir.get(_first_provider, {}).get("agents_dir", ".claude/agents")
+            if _first_provider else ".claude/agents"
+        )
+    # AI_PROVIDER: auto-inject from top-level config field (not nested in variables)
+    if "AI_PROVIDER" not in variables:
+        provider_config = load_providers_config(agent_meta_root)
+        variables["AI_PROVIDER"] = config.get("ai-provider", "") or ", ".join(
+            resolve_providers(config, provider_config)
+        )
+
+
+def _build_orch_variables(
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path
+) -> None:
+    """Populate orchestrator/A2A/native-extensions/analysis flag variables.
+
+    Parameter contract:
+        variables: mutated in place — receives ORCHESTRATOR_*, ORCH_MODE_*,
+            A2A_*, DIRECT_DISPATCH_*, ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
+            CHECKPOINTING_ENABLED, NATIVE_EXTENSIONS_*, ANALYSIS_ENABLED,
+            FILE_AFFINITY_HINT, UNKNOWN_FALLBACK_*, A2A_HANDOFF_BLOCK and
+            ANTI_RECURSION_BLOCK.
+        unmapped: mutated in place — receives an `"analysis: <error>"` entry
+            when the optional AST-affinity analyzer raises unexpectedly.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for the direct-dispatch
+            template and the analysis module).
+    """
     orch_config = config.get("orchestrator", {})
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
@@ -749,6 +797,58 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         variables["UNKNOWN_FALLBACK_META_FEEDBACK"] = "true" if unknown_fallback.get("meta-feedback", True) else "false"
         variables["UNKNOWN_FALLBACK_MAIN_CHAT"] = "true" if unknown_fallback.get("main-chat", True) else "false"
         variables["UNKNOWN_FALLBACK_ASK_USER"] = "true" if unknown_fallback.get("ask-user", False) else "false"
+    # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
+    t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
+    variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
+    variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
+    # A2A_MAX_DEPTH: configurable maximum delegation depth before HARD REJECT.
+    # Read from orchestrator.delegation.max_depth (default: 10, range: 1-50).
+    _delegation_cfg = orch_config.get("delegation", {})
+    _max_depth = _delegation_cfg.get("max_depth", 10) if isinstance(_delegation_cfg, dict) else 10
+    if not isinstance(_max_depth, int) or isinstance(_max_depth, bool):
+        _max_depth = 10
+    _max_depth = max(1, min(50, _max_depth))  # clamp to valid range
+    variables["A2A_MAX_DEPTH"] = str(_max_depth)
+    # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
+    # Each block is either the real content or an empty string when the flag is off.
+    variables["A2A_HANDOFF_BLOCK"] = (
+        "A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: "
+        "IPayload (t, ctx, con, refs, pri, dep), "
+        "IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). "
+        f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
+        if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""
+    )
+    variables["ANTI_RECURSION_BLOCK"] = (
+        "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
+        "Nur tester/documenter/requirements/validator aus Kontext verweisen."
+    )
+
+
+def _build_platform_variables(
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path
+) -> None:
+    """Populate SE/Knowledge-Engine/role-toggle variables and the delegation table.
+
+    Parameter contract:
+        variables: mutated in place — receives SE_*, the SE cascade variables
+            (role-defaults.yaml `se_variables` defaults), KNOWLEDGE_*,
+            VALIDATOR_ENABLED, DEVELOPER_TIERS_ENABLED, EFFORT_ESTIMATOR_ENABLED,
+            WEB_PROJECT_ENABLED, `active_agents`, AGENT_DELEGATION_TABLE and
+            PROJECT_SPECIFIC_AGENTS.
+        unmapped: mutated in place — forwarded to `_load_se_variable_defaults()`
+            as its warnings sink (SE-variable load errors, audit #402).
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for role-defaults.yaml and the
+            agents-table template partial).
+
+    Order dependency: must run after the orchestrator/A2A variables (the
+    delegation table conditions on ORCH_MODE_*/ORCHESTRATOR_ENABLED) and
+    before `_build_dod_variables()`/quality-pipelines (the table only reflects
+    role/orchestrator flags known at this point, matching pre-#566 behavior).
+    """
+    from .context_templates.builder import TemplateBuilder
+    from .delegation_table import get_active_agents_data
+
     # SYSTEMS_ENGINEERING_ENABLED
     se_config = config.get("systems-engineering", {})
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
@@ -771,18 +871,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     variables["KNOWLEDGE_SCHEMA_PATH"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/schema.md"
     variables["KNOWLEDGE_WIKI_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/wiki"
     variables["KNOWLEDGE_SOURCES_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/sources"
-    # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
-    t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
-    variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
-    variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
-    # A2A_MAX_DEPTH: configurable maximum delegation depth before HARD REJECT.
-    # Read from orchestrator.delegation.max_depth (default: 10, range: 1-50).
-    _delegation_cfg = orch_config.get("delegation", {})
-    _max_depth = _delegation_cfg.get("max_depth", 10) if isinstance(_delegation_cfg, dict) else 10
-    if not isinstance(_max_depth, int) or isinstance(_max_depth, bool):
-        _max_depth = 10
-    _max_depth = max(1, min(50, _max_depth))  # clamp to valid range
-    variables["A2A_MAX_DEPTH"] = str(_max_depth)
     # VALIDATOR_ENABLED: auto-detect from project roles list
     variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
     # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)
@@ -820,6 +908,26 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     # PROJECT_SPECIFIC_AGENTS: placeholder for future project-specific agent table injection
     # Currently empty — will be populated when project-specific agent discovery is implemented
     variables["PROJECT_SPECIFIC_AGENTS"] = ""
+
+
+def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -> dict:
+    """Populate Definition-of-Done variables and return the resolved DoD dict.
+
+    Parameter contract:
+        variables: mutated in place — receives DOD_REQ_TRACEABILITY,
+            DOD_TESTS_REQUIRED, DOD_CODEBASE_OVERVIEW, DOD_SECURITY_AUDIT,
+            DOD_PRESET, DOD_SE_REQUIRED/OPTIONAL/RECOMMENDED/STRICT,
+            DOD_REQ_BLOCK and DOD_TESTS_BLOCK.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for dod-presets.yaml).
+
+    Returns:
+        The resolved DoD dict (`resolve_dod(config, agent_meta_root)`) —
+        reused by `_build_pipeline_variables()` for `build_pipeline_variables()`,
+        so DoD-preset resolution happens exactly once per `build_variables()` call.
+    """
+    from .dod import resolve_dod
+
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)
@@ -834,8 +942,43 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     variables["DOD_SE_OPTIONAL"]    = "true" if se_required == "false" else "false"
     variables["DOD_SE_RECOMMENDED"] = "true" if se_required == "recommended" else "false"
     variables["DOD_SE_STRICT"]      = "true" if se_required == "true" else "false"
-    # INTENT_ROUTING_TABLE is generated earlier
-    # variables["INTENT_ROUTING_TABLE"] = ""
+    # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
+    # Each block is either the real content or an empty string when the flag is off.
+    _dod_req = dod_resolved.get("req-traceability", True)
+    variables["DOD_REQ_BLOCK"] = (
+        "REQ-ID aus `REQUIREMENTS.md` prüfen — kein Commit ohne REQ-ID." if _dod_req else ""
+    )
+    _dod_tests = dod_resolved.get("tests-required", True)
+    variables["DOD_TESTS_BLOCK"] = (
+        "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
+    )
+    return dod_resolved
+
+
+def _build_pipeline_variables(
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path, dod_resolved: dict
+) -> dict:
+    """Populate reflection-loop and quality-pipeline variables.
+
+    Parameter contract:
+        variables: mutated in place — receives REFLECTION_PAIRS_ENABLED,
+            MAX_ITERATIONS, QUALITY_PIPELINES_ENABLED, the per-pipeline
+            variables from `build_pipeline_variables()`, PIPELINE_MATCH_TABLE
+            and default `PIPELINE_<NAME>_BLOCK`/`_ENABLED` fallbacks.
+        unmapped: mutated in place — receives `"reflection-pairs (fallback):
+            <error>"` / `"quality-pipelines: <error>"` entries on failure.
+        config: the loaded project.yaml dict (read-only).
+        agent_meta_root: agent-meta source root (for config/reflection-pairs.yaml
+            and config/quality-pipelines.yaml).
+        dod_resolved: the dict returned by `_build_dod_variables()` — reused
+            here so `build_pipeline_variables()` sees the same resolved DoD
+            preset without re-resolving it.
+
+    Returns:
+        The `effective` quality-pipelines dict (post-override, post-validation,
+        post-se-focus-filter) — reused by the INTENT_ROUTING_TABLE builder that
+        runs immediately after this function in `build_variables()`.
+    """
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
@@ -918,36 +1061,21 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
                 variables[enabled_key] = "false"
     except Exception as e:  # noqa: BLE001
         unmapped.append(f"quality-pipelines: {e}")
+    return effective
 
-    # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
-    # using the same `effective` quality-pipelines dict resolved above.
-    from .delegation_table import get_intent_routing_table
-    variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
-        agent_meta_root, config, variables, pipelines=effective
-    )
 
-    # Pre-resolved block variables for Modern Mode templates (no {{#if}} needed).
-    # Each block is either the real content or an empty string when the flag is off.
-    _dod_req = dod_resolved.get("req-traceability", True)
-    variables["DOD_REQ_BLOCK"] = (
-        "REQ-ID aus `REQUIREMENTS.md` prüfen — kein Commit ohne REQ-ID." if _dod_req else ""
-    )
-    _dod_tests = dod_resolved.get("tests-required", True)
-    variables["DOD_TESTS_BLOCK"] = (
-        "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
-    )
-    variables["A2A_HANDOFF_BLOCK"] = (
-        "A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml handoff.input_schema/output_schema zeigt auf eine echte Datei) — sonst normales Klartext-Delegationsformat: "
-        "IPayload (t, ctx, con, refs, pri, dep), "
-        "IEnvelope (protocol_version, handoff_id, source_agent, target_agent, schema_ref, payload). "
-        f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
-        if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""
-    )
-    variables["ANTI_RECURSION_BLOCK"] = (
-        "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
-        "Nur tester/documenter/requirements/validator aus Kontext verweisen."
-    )
+def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
+    """Populate variable blocks loaded verbatim from snippets/ files.
 
+    Parameter contract:
+        variables: mutated in place — receives SE_MODE_BLOCK, A2A_PROTOCOL_BLOCK,
+            CHECKPOINTING_BLOCK, QUALITY_PIPELINES_BLOCK (all from
+            snippets/orchestrator/), BROWSER_VERIFICATION_BLOCK and
+            LANGUAGE_BEST_PRACTICES_BLOCK (from snippets/developer/, with
+            `{{LANGUAGE}}` pre-resolved against `variables["LANGUAGE"]`), and
+            PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/).
+        agent_meta_root: agent-meta source root (snippet file location).
+    """
     # Orchestrator conditional blocks loaded from snippets (token optimization).
     # Each block is either the real conditional section or an empty string.
     _snippets_dir = agent_meta_root / "snippets" / "orchestrator"
@@ -1001,13 +1129,27 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         _pid_path.read_text(encoding="utf-8").rstrip("\n") if _pid_path.exists() else ""
     )
 
-    # Convention blocks (RELEASE_VERSIONING_BLOCK, RELEASE_CHANGELOG_BLOCK,
-    # GIT_ISSUE_NAMING_BLOCK): rendered from config/conventions-presets.yaml the
-    # same way the developer snippets above become {{VARIABLE}}s. A role-inactive
-    # domain sets NO variable at all (not even an empty string) — its template is
-    # not generated anyway (Konzept Abschnitt C). build_variables() has no SyncLog
-    # param, so a local one is used for the log.skip()/log.warning() calls here
-    # (log.warning still prints to stderr, so a malformed preset is visible).
+
+def _build_convention_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
+    """Populate release/issue convention-block variables.
+
+    Parameter contract:
+        variables: mutated in place — receives whichever
+            RELEASE_VERSIONING_BLOCK/RELEASE_CHANGELOG_BLOCK/
+            GIT_ISSUE_NAMING_BLOCK-style keys `render_convention_block()`
+            returns for the "release"/"issues" domains. A role-inactive domain
+            sets NO variable at all (not even an empty string) — its template
+            is not generated anyway (Konzept Abschnitt C).
+        config: the loaded project.yaml dict (read-only; reads `roles`).
+        agent_meta_root: agent-meta source root (for conventions-presets.yaml).
+
+    Convention blocks (RELEASE_VERSIONING_BLOCK, RELEASE_CHANGELOG_BLOCK,
+    GIT_ISSUE_NAMING_BLOCK): rendered from config/conventions-presets.yaml the
+    same way the developer snippets become {{VARIABLE}}s. build_variables() has
+    no SyncLog param, so a local one is used for the log.skip()/log.warning()
+    calls here (log.warning still prints to stderr, so a malformed preset is
+    visible).
+    """
     from .conventions import render_convention_block, resolve_conventions
 
     _conv_log = SyncLog()
@@ -1026,5 +1168,35 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         if _blocks:
             variables.update(_blocks)
 
-    return variables, unmapped
 
+def build_variables(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> tuple[dict, list[str]]:
+    """Returns (variables_dict, pre_warnings).
+
+    project_root is the consuming project's root (where .meta-config/ lives).
+    It differs from agent_meta_root whenever agent-meta is embedded as a
+    submodule (project_root/.agent-meta) rather than self-hosting (they're
+    the same directory, as in the agent-meta repo's own project.yaml).
+    Templates need this distinction — a hardcoded ".agent-meta/scripts/..."
+    prefix is only correct in the embedded case; see AGENT_META_REL_PATH.
+
+    Pure orchestration (Issue #566): each variable group is built by its own
+    `_build_*_variables()` sub-function (see their docstrings for the exact
+    parameter/mutation contract and any inter-group ordering constraints).
+    """
+    variables: dict = {}
+    unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
+    _build_provider_variables(variables, config, agent_meta_root)
+    _build_orch_variables(variables, unmapped, config, agent_meta_root)
+    _build_platform_variables(variables, unmapped, config, agent_meta_root)
+    dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
+    effective = _build_pipeline_variables(variables, unmapped, config, agent_meta_root, dod_resolved)
+    # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
+    # using the same `effective` quality-pipelines dict resolved above.
+    from .delegation_table import get_intent_routing_table
+    variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
+        agent_meta_root, config, variables, pipelines=effective
+    )
+    _build_snippet_variables(variables, agent_meta_root)
+    _build_convention_variables(variables, config, agent_meta_root)
+
+    return variables, unmapped

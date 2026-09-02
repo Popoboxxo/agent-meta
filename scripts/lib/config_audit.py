@@ -19,13 +19,18 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from .frontmatter import _YAML_AVAILABLE, parse_frontmatter_file
 from .roles import load_roles_config
 
+# `_YAML_AVAILABLE` is single-sourced from `.frontmatter` (Issue #571) so the
+# fallback-behavior decision is made in exactly one place project-wide. A
+# local `import yaml as _yaml` is still needed here for `_read_yaml()`, which
+# parses whole project.yaml documents rather than Markdown frontmatter blocks
+# (out of scope for the frontmatter-focused canonical module).
 try:
     import yaml as _yaml
-    _YAML_AVAILABLE = True
 except ImportError:
-    _YAML_AVAILABLE = False
+    _yaml = None
 
 
 # Marker written into disabled role lines — also used to detect already-disabled
@@ -145,33 +150,6 @@ def _read_yaml(path: Path) -> dict:
         return {}
     with path.open(encoding="utf-8") as f:
         return _yaml.safe_load(f) or {}
-
-
-def _parse_frontmatter(template_path: Path) -> dict:
-    """Parse the YAML frontmatter block of a Markdown agent template.
-
-    The frontmatter is the leading block delimited by ``---`` fences. Returns an
-    empty dict when no frontmatter is present or it cannot be parsed.
-    """
-    try:
-        text = template_path.read_text(encoding="utf-8")
-    except OSError:
-        return {}
-    if not text.startswith("---"):
-        return {}
-    # Split on the closing fence: text == "---\n<yaml>\n---\n<body>"
-    parts = text.split("\n---", 1)
-    if len(parts) < 2:
-        return {}
-    block = parts[0]
-    block = block.removeprefix("---")
-    if not _YAML_AVAILABLE:
-        return {}
-    try:
-        data = _yaml.safe_load(block)
-    except _yaml.YAMLError:
-        return {}
-    return data if isinstance(data, dict) else {}
 
 
 def _template_path_for_role(agent_meta_root: Path, role: str) -> Path:
@@ -327,7 +305,7 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                 detail=str(template),
             )
             continue
-        frontmatter = _parse_frontmatter(template)
+        frontmatter = parse_frontmatter_file(template)
         if frontmatter.get("deprecated") is True:
             report.add(
                 category="deprecated_roles",
@@ -377,7 +355,7 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
     # the current generic template so the drift becomes visible instead of
     # silently accumulating.
     for override in _collect_platform_overrides(agent_meta_root):
-        frontmatter = _parse_frontmatter(override)
+        frontmatter = parse_frontmatter_file(override)
         based_on = frontmatter.get("based-on", "")
         if not isinstance(based_on, str) or not based_on:
             continue
@@ -392,7 +370,7 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
             # Missing base template is a different problem class entirely --
             # not this check's concern.
             continue
-        current_version = _parse_frontmatter(generic_template).get("version")
+        current_version = parse_frontmatter_file(generic_template).get("version")
         if not current_version:
             continue
 

@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 
+from .frontmatter import _strip_frontmatter
 from .io import content_hash, safe_path
 from .log import SyncLog
 from .variables import (
@@ -210,7 +211,7 @@ def _regenerate_static_context(
     if not target_path.exists():
         return
     if not template_path or not template_path.exists():
-        log.info(rel_label, "no static template — skipping static regeneration")
+        log.note(rel_label, "no static template — skipping static regeneration")
         return
 
     fallback_partials = template_path.parent.parent / "context" / "partials"
@@ -227,7 +228,7 @@ def _regenerate_static_context(
         # the managed-block step later in this same sync run inserts the
         # marker (preserving this content verbatim), and the next sync will
         # then regenerate the static header/footer normally.
-        log.info(rel_label, "no managed block yet — static regeneration deferred until marker exists")
+        log.note(rel_label, "no managed block yet — static regeneration deferred until marker exists")
         return
 
     # The notes section is user-owned: carry it over verbatim and keep it out of
@@ -850,16 +851,6 @@ def _update_continue_config_managed_block(
             settings_path.write_text(updated, encoding="utf-8")
 
 
-def _strip_rule_frontmatter(content: str) -> str:
-    """Remove YAML frontmatter block from a rule file."""
-    if not content.startswith('---'):
-        return content
-    end = content.find('\n---', 3)
-    if end == -1:
-        return content
-    return content[end + 4:].lstrip('\n')
-
-
 def _extract_rule_compact_from_content(content: str, output_name: str, rel_source: str,
                                         provider: str = "Claude", has_native_rules: bool = True) -> str:
     """Extract title + 1-sentence summary from already-substituted rule content.
@@ -869,7 +860,7 @@ def _extract_rule_compact_from_content(content: str, output_name: str, rel_sourc
       - First non-empty paragraph (≤200 chars)
       - Pointer to full rule (provider-aware)
     """
-    body = _strip_rule_frontmatter(content).strip()
+    body = _strip_frontmatter(content).strip()
     if not body:
         return f"- **{output_name}** — siehe `{rel_source}`"
 
@@ -1560,7 +1551,7 @@ def sync_snippets_for_provider(
     pc = provider_config.get(provider, {})
     snippets_dir_rel = pc.get('snippets_dir')
     if not snippets_dir_rel:
-        log.info("snippets", f"skipped for {provider} — no snippets_dir configured")  # noqa: PLE1205
+        log.note("snippets", f"skipped for {provider} — no snippets_dir configured")
         return
 
     variables = config.get("variables", {})

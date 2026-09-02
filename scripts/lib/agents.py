@@ -40,6 +40,7 @@ from .frontmatter import (  # noqa: F401 (re-exported for callers/tests, Issue #
     inject_permission_mode_field,
     is_deprecated_template,
     load_provider_tools_config,
+    parse_frontmatter_file,
     role_from_platform_file,
     target_filename,
 )

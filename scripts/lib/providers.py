@@ -119,6 +119,29 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     return providers
 
 
+def resolve_context_filename(context_file: str, provider: str) -> str:
+    """Resolve the effective context filename for a provider.
+
+    Non-Claude providers that still resolve to the default "CLAUDE.md"
+    (i.e. they have no explicit `context_file` override in
+    config/ai-providers.yaml) fall back to "AGENTS.md" instead — e.g.
+    Opencode/Gemini-style providers share a generic context file rather
+    than a Claude-specific one.
+
+    Args:
+        context_file: The raw context filename, e.g. from
+            `provider_config[provider].get("context_file", f"{provider.upper()}.md")`.
+        provider: The provider name (e.g. "Claude", "Opencode").
+
+    Returns:
+        "AGENTS.md" if `context_file == "CLAUDE.md"` and `provider != "Claude"`,
+        otherwise `context_file` unchanged.
+    """
+    if context_file == "CLAUDE.md" and provider != "Claude":
+        return "AGENTS.md"
+    return context_file
+
+
 def resolve_provider_options(config: dict, provider: str) -> dict:
     """Return provider-specific options from config["provider-options"][provider].
 

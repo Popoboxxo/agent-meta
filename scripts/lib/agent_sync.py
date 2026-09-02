@@ -487,7 +487,7 @@ def sync_agents_for_provider(
             base_path = agent_meta_root / AGENTS_DIR / extends_base
             content = compose_agent(base_path, content, log)
             if provider == 'Claude':
-                log.info(
+                log.note(
                     str(target_path.relative_to(project_root)),
                     f'composed from {extends_base} + {source_path.name}',
                 )
@@ -570,7 +570,7 @@ def sync_agents_for_provider(
                 content = append_frontmatter_tools(content, mcp_tools)
                 if content != before:
                     servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
-                    log.info(str(target_path.relative_to(project_root)),
+                    log.note(str(target_path.relative_to(project_root)),
                              f'mcp tools: +{len(mcp_tools)} from {servers}')
 
         # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
@@ -674,4 +674,4 @@ def sync_agents_for_provider(
             result = bootstrap_engine.run_bootstrap(provider, target_dir, project_root)
             if result.get("status") == "success":
                 rel_target = str(target_dir.relative_to(project_root))
-                log.info(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")
+                log.note(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")

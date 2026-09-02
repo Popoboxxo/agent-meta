@@ -253,11 +253,11 @@ def create_backup(
     )
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would create backup '{archive_name}.zip'")  # noqa: PLE1205
-        log.info("backup", f"  providers: {', '.join(targets)}")  # noqa: PLE1205
-        log.info("backup", f"  config: {'yes' if extra_files else 'no'}")  # noqa: PLE1205
+        log.note("backup", f"DRY-RUN: would create backup '{archive_name}.zip'")
+        log.note("backup", f"  providers: {', '.join(targets)}")
+        log.note("backup", f"  config: {'yes' if extra_files else 'no'}")
         if label:
-            log.info("backup", f"  label: {label}")  # noqa: PLE1205
+            log.note("backup", f"  label: {label}")
         return {
             "success": True,
             "archive": _relative_path(zip_path, project_root),
@@ -297,7 +297,7 @@ def create_backup(
                 continue
             src_dir = project_root / root_dir
             if not src_dir.exists():
-                log.info("backup", f"provider directory not found, skipping: {root_dir}")  # noqa: PLE1205
+                log.note("backup", f"provider directory not found, skipping: {root_dir}")
                 manifest["providers"][provider]["backed_up"] = False
                 continue
 
@@ -323,7 +323,7 @@ def create_backup(
 
     zip_file = Path(created)
     size_mb = zip_file.stat().st_size / (1024 * 1024)
-    log.info("backup", f"created '{_relative_path(zip_file, project_root)}' "  # noqa: PLE1205
+    log.note("backup", f"created '{_relative_path(zip_file, project_root)}' "
              f"({round(size_mb, 2)} MB, {len(included)} providers)")
 
     # Apply retention
@@ -408,9 +408,14 @@ def restore_backup(
                         candidate = parts[0] + "/"
                         if candidate not in archive_providers:
                             archive_providers.append(candidate)
-                log.info("backup", f"inferred providers from archive: {archive_providers}")  # noqa: PLE1205
-        except Exception:  # noqa: BLE001, S110
-            pass
+                log.note("backup", f"inferred providers from archive: {archive_providers}")
+        except (OSError, zipfile.BadZipFile) as e:
+            # Best-effort inference only — this only narrows down which
+            # provider directories to restore when the manifest itself has
+            # no `providers` key (older/hand-crafted archives). A corrupt or
+            # unreadable zip surfaces later anyway when the actual restore
+            # step below tries to open the same archive_path.
+            log.debug("backup", f"could not infer providers from archive: {type(e).__name__}: {e}")  # noqa: PLE1205
 
     restore_targets = providers if providers else archive_providers
     if isinstance(restore_targets, list):
@@ -456,7 +461,7 @@ def restore_backup(
             continue
 
         if dry_run:
-            log.info("backup", f"DRY-RUN: would restore '{matching}' from archive")  # noqa: PLE1205
+            log.note("backup", f"DRY-RUN: would restore '{matching}' from archive")
             prov_result["restored"] = True
             result["provider_results"][target] = prov_result
             continue
@@ -471,7 +476,7 @@ def restore_backup(
                         continue
                     if member_parts[0].rstrip("/") == matching.rstrip("/"):
                         zf.extract(member, str(target_dir.parent))
-                log.info("backup", f"restored '{matching}' for provider '{target}'")  # noqa: PLE1205
+                log.note("backup", f"restored '{matching}' for provider '{target}'")
                 prov_result["restored"] = True
             result["provider_results"][target] = prov_result
         except Exception as exc:  # noqa: BLE001
@@ -490,9 +495,15 @@ def restore_backup(
                         with zf.open(project_yaml_in_archive) as src:
                             target_yaml.write_bytes(src.read())
                         result["config_restored"] = True
-                        log.info("backup", "restored project.yaml from backup")  # noqa: PLE1205
-        except Exception:  # noqa: BLE001, S110
-            pass
+                        log.note("backup", "restored project.yaml from backup")
+        except (OSError, zipfile.BadZipFile) as e:
+            # project.yaml restore is an optional add-on to the main provider
+            # restore already performed above (result["provider_results"]) —
+            # a corrupt archive or a write failure here (e.g. permission
+            # denied on .meta-config/) must not undo/fail the provider
+            # restore that already succeeded. Surfacing this specific
+            # failure in `result` is tracked separately (issue #583).
+            log.debug("backup", f"could not restore project.yaml: {type(e).__name__}: {e}")  # noqa: PLE1205
 
     return result
 
@@ -527,13 +538,13 @@ def delete_backup(
             return {"success": False, "error": f"archive not found: {archive_name}"}
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would delete '{_relative_path(archive_path, project_root)}'")  # noqa: PLE1205
+        log.note("backup", f"DRY-RUN: would delete '{_relative_path(archive_path, project_root)}'")
         return {"success": True, "deleted": _relative_path(archive_path, project_root), "dry_run": True}
 
     try:
         size_mb = archive_path.stat().st_size / (1024 * 1024)
         archive_path.unlink()
-        log.info("backup", f"deleted '{_relative_path(archive_path, project_root)}' "  # noqa: PLE1205
+        log.note("backup", f"deleted '{_relative_path(archive_path, project_root)}' "
                  f"({round(size_mb, 2)} MB)")
         return {"success": True, "deleted": _relative_path(archive_path, project_root),
                 "size_mb": round(size_mb, 2)}
@@ -582,9 +593,9 @@ def prune_backups(
             to_delete.append(archive)
 
     if dry_run:
-        log.info("backup", f"DRY-RUN: would prune {len(to_delete)} backup(s)")  # noqa: PLE1205
+        log.note("backup", f"DRY-RUN: would prune {len(to_delete)} backup(s)")
         for a in to_delete:
-            log.info("backup", f"  would delete: {a.name}")  # noqa: PLE1205
+            log.note("backup", f"  would delete: {a.name}")
         return {"success": True, "pruned": len(to_delete), "dry_run": True,
                 "files": [a.name for a in to_delete]}
 
@@ -597,7 +608,7 @@ def prune_backups(
             if mtime < cutoff:
                 archive.unlink()
                 age_deleted += 1
-                log.info("backup", f"pruned (age): {archive.name}")  # noqa: PLE1205
+                log.note("backup", f"pruned (age): {archive.name}")
         except OSError:
             continue
 
@@ -616,7 +627,7 @@ def _prune_backups(backup_dir: Path, max_backups: int, log: SyncLog) -> int:
         try:
             old.unlink()
             deleted += 1
-            log.info("backup", f"pruned (count): {old.name}")  # noqa: PLE1205
+            log.note("backup", f"pruned (count): {old.name}")
         except OSError:
             continue
     return deleted

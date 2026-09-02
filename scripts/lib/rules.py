@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .frontmatter import _split_frontmatter
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
 from .variables import (
@@ -97,16 +98,17 @@ def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
     """
     if content.startswith("---"):
         # Already has frontmatter — inject missing keys after opening ---
-        end = content.find("\n---", 3)
-        if end != -1:
-            fm = content[3:end]
-            addition = ""
-            if "alwaysApply" not in fm:
-                addition += "\nalwaysApply: false"
-            if description and "description" not in fm:
-                addition += f"\ndescription: {_yaml_quote(description)}"
-            if addition:
-                content = "---" + fm + addition + content[end:]
+        fm_block, body = _split_frontmatter(content)
+        if not fm_block:
+            return content
+        inner = fm_block[3:-4]  # strip surrounding '---'/'\n---' fences
+        addition = ""
+        if "alwaysApply" not in inner:
+            addition += "\nalwaysApply: false"
+        if description and "description" not in inner:
+            addition += f"\ndescription: {_yaml_quote(description)}"
+        if addition:
+            return "---" + inner + addition + "\n---" + body
         return content
     # No frontmatter — prepend minimal block
     fm_lines = ["alwaysApply: false"]
@@ -283,7 +285,7 @@ def sync_rules(
         if opts.get("alwaysApply") is False and provider in _ALWAYS_APPLY_PROVIDERS:
             description = resolve_skill_description(opts, source_content)
             source_content = _build_always_apply_frontmatter(source_content, description)
-            log.info(str(target_path.relative_to(project_root)),
+            log.note(str(target_path.relative_to(project_root)),
                      f"alwaysApply: false (rules-preset: '{config.get('rules-preset', 'default')}')")
 
         rel_out = str(target_path.relative_to(project_root))
