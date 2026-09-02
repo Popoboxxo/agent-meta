@@ -51,9 +51,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.agents import (
-    sync_agents_for_provider,
-)
+from lib.agent_sync import sync_agents_for_provider
 from lib.backup import (
     create_backup,
     delete_backup,
@@ -362,7 +360,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     log.note("test-repo", f"validating against: {test_repo_path}")
 
     # Perform a sync into the test repository
-    from lib.agents import sync_agents_for_provider
+    from lib.agent_sync import sync_agents_for_provider
     from lib.commands import sync_commands_for_provider
     from lib.config import build_variables
     from lib.context import sync_context_for_provider, sync_snippets_for_provider

@@ -77,7 +77,7 @@ def test_generate_initial_log_has_expected_sections():
 # _is_role_enabled() — knowledge- prefix branch
 # ---------------------------------------------------------------------------
 
-from scripts.lib.agents import _is_role_enabled
+from scripts.lib.frontmatter import _is_role_enabled
 
 
 def test_knowledge_role_enabled_when_config_true():

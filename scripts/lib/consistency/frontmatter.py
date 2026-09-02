@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 from .report import Finding, Severity
-from ..agents import _find_section_bounds
+from ..agent_sync import _find_section_bounds
 
 _SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
 _VALID_WORKFLOW_TIERS = {"required", "recommended", "optional"}

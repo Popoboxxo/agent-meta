@@ -18,7 +18,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .agents import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
+from .frontmatter import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
 from .config import (
     _orch_mode_flags,
     _resolve_orch_mode,

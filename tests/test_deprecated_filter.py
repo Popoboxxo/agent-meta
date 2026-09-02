@@ -15,7 +15,7 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.agents import is_deprecated_template
+from lib.frontmatter import is_deprecated_template
 
 # ---------------------------------------------------------------------------
 # is_deprecated_template — unit checks

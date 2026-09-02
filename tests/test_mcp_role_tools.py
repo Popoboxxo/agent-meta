@@ -18,10 +18,8 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-from lib.agents import (  # noqa: E402
-    append_frontmatter_tools,
-    resolve_mcp_tools_for_role,
-)
+from lib.agent_sync import resolve_mcp_tools_for_role  # noqa: E402
+from lib.frontmatter import append_frontmatter_tools  # noqa: E402
 from lib.roles import load_roles_config  # noqa: E402
 
 

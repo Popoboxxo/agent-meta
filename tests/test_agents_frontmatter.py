@@ -12,9 +12,9 @@ values preserved in an HTML comment so traceability/version-bump enforcement
 
 from pathlib import Path
 
-from scripts.lib.agents import (
+from scripts.lib.frontmatter import build_frontmatter
+from scripts.lib.provider_transform import (
     _transform_frontmatter_for_opencode,
-    build_frontmatter,
     transform_agent_content_for_provider,
 )
 from scripts.lib.log import SyncLog

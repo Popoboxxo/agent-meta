@@ -1,78 +1,19 @@
-"""Agent hint/table builders for context files + backward-compat re-exports.
+"""Agent hint/table builders for config/context files.
 
 The bulk of the former agents.py was split (Issue #561) into the neutral
 frontmatter layer, the provider_transform formatting layer and the agent_sync
-orchestration layer. This module keeps the config/context-facing hint builders
-(build_agent_hints/build_agent_table/build_knowledge_engine_hints) and
-re-exports every moved symbol so existing `from .agents import X` call sites
-(tests, sync.py, context.py, standalone.py, ...) keep working unchanged.
+orchestration layer. This module keeps only the config/context-facing hint
+builders (build_agent_hints/build_agent_table/build_knowledge_engine_hints).
 """
 from __future__ import annotations
 
-from pathlib import Path  # noqa: F401
+from pathlib import Path
 
-from .frontmatter import (  # noqa: F401 (re-exported for callers/tests, Issue #561)
-    _YAML_AVAILABLE,
-    AGENTS_DIR,
-    EXTERNAL_DIR,
-    EXT_SUFFIX,
-    GENERIC_DIR,
-    PLATFORM_DIR,
-    PROJECT_DIR,
-    PROVIDER_TOOLS_CONFIG,
-    SKILL_WRAPPER,
-    _insert_after_frontmatter,
+from .frontmatter import (
     _is_role_enabled,
-    _merge_frontmatter,
-    _parse_frontmatter_yaml,
-    _provider_tools_cache,
-    _remove_frontmatter_fields,
-    _split_frontmatter,
-    _strip_frontmatter,
-    _update_frontmatter_dict,
-    append_frontmatter_tools,
-    build_frontmatter,
     collect_sources,
-    ext_target_filename,
     extract_frontmatter_field,
-    inject_memory_field,
-    inject_model_field,
-    inject_permission_mode_field,
-    is_deprecated_template,
-    load_provider_tools_config,
-    parse_frontmatter_file,
-    role_from_platform_file,
     target_filename,
-)
-from .provider_transform import (  # noqa: F401 (re-exported for callers/tests, Issue #561)
-    _DEBUG_BLOCK_MARKER,
-    _DEBUG_BLOCK_TEMPLATE,
-    _inject_gemini_bootstrap,
-    _make_slim_body,
-    _make_xml_tag_name,
-    _map_claude_tools_to_gemini_tools,
-    _map_claude_tools_to_opencode_permissions,
-    _strip_claude_specific_lines,
-    _transform_frontmatter_for_opencode,
-    _validate_tools_against_whitelist,
-    inject_debug_block,
-    transform_agent_content_for_provider,
-    wrap_sections_in_xml,
-)
-from .agent_sync import (  # noqa: F401 (re-exported for callers/tests, Issue #561)
-    _CRITICAL_RULES,
-    _dominant_newline,
-    _extract_and_append_critical_footer,
-    _find_section_bounds,
-    _patch_append_after,
-    _patch_delete,
-    _patch_replace,
-    _tools_can_spawn,
-    apply_patch,
-    apply_path_rules,
-    compose_agent,
-    resolve_mcp_tools_for_role,
-    sync_agents_for_provider,
 )
 
 

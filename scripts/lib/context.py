@@ -1421,16 +1421,15 @@ def sync_prompts_for_continue(
     Works with any local LLM — no tool calling required.
     Slash-commands: /developer, /git, /orchestrator, ...
     """
-    from .agents import (
+    from .agent_sync import compose_agent
+    from .frontmatter import (
         AGENTS_DIR,
-        _make_slim_body,
-        _strip_claude_specific_lines,
         _strip_frontmatter,
         collect_sources,
-        compose_agent,
         extract_frontmatter_field,
         target_filename,
     )
+    from .provider_transform import _make_slim_body, _strip_claude_specific_lines
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
@@ -1546,7 +1545,7 @@ def sync_snippets_for_provider(
     variables) in the project config. Unknown snippet files are skipped.
     All referenced paths are resolved relative to agent-meta/snippets/.
     """
-    from .agents import extract_frontmatter_field
+    from .frontmatter import extract_frontmatter_field
 
     pc = provider_config.get(provider, {})
     snippets_dir_rel = pc.get('snippets_dir')

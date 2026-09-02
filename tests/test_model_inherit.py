@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.lib.agents import transform_agent_content_for_provider
+from scripts.lib.provider_transform import transform_agent_content_for_provider
 from scripts.lib.config import _validate_model_inheritance
 from scripts.lib.log import SyncLog
 from scripts.lib.providers import load_providers_config
