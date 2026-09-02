@@ -44,10 +44,26 @@ class ProviderTouchpoint:
     description: str
 
 
-# The 5 concrete touchpoints named in issue #625 -- deliberately not an
+# The concrete touchpoints named in issue #625 -- deliberately not an
 # exhaustive repo-wide scan (would risk false positives / scope creep; the
 # full inventory of known "doubled truths" is docs/plans/audit-2026-09-system
-# -concept.md §4.2(a), most of it follow-up work in #627).
+# -concept.md §4.2(a)).
+#
+# Issue #627 eliminated all 5 originally-listed literal Python maps in favor
+# of reading config/ai-providers.yaml directly. Four of them (pending_tasks,
+# provider_dirs, terminal_tool, valid_providers) simply vanished as source
+# constructs -- their chunk_pattern below no longer matches anything, so they
+# fall through the "silently skipped" path in find_missing_providers() and
+# stop producing findings on their own, no touchpoint removal needed.
+#
+# The 5th, isolation.py's sync_provider_isolation, could not be handled the
+# same way: the function itself still exists (it's the public API), so its
+# chunk_pattern still matches -- but the per-provider dispatch inside it was
+# converted from a literal `if provider == "Name"` chain to a config-key
+# lookup (config/ai-providers.yaml::isolation-mechanism), so the function
+# body no longer contains provider name literals at all. Left in place, this
+# touchpoint would misfire on every registered provider instead of none. Its
+# entry is therefore retired here rather than gamed with a decoy literal.
 PROVIDER_TOUCHPOINTS: tuple[ProviderTouchpoint, ...] = (
     ProviderTouchpoint(
         id="lifecycle_check.pending_tasks",
@@ -76,12 +92,6 @@ PROVIDER_TOUCHPOINTS: tuple[ProviderTouchpoint, ...] = (
         file="scripts/lib/setup.py",
         chunk_pattern=re.compile(r"valid_providers\s*=\s*\[(.*?)\]", re.S),
         description="setup.py wizard provider choices (valid_providers)",
-    ),
-    ProviderTouchpoint(
-        id="isolation.sync_provider_isolation",
-        file="scripts/lib/isolation.py",
-        chunk_pattern=re.compile(r"def sync_provider_isolation\((.*?)\n^def ", re.S | re.M),
-        description="isolation.py per-provider isolation branch (sync_provider_isolation)",
     ),
 )
 

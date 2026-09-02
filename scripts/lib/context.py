@@ -980,15 +980,6 @@ def _build_managed_block(
         if not all(provider_config[p].get("has_rules", False) for p in shared_users):
             has_native_rules = False
     
-    provider_dirs = {
-        "Claude": ".claude/agents",
-        "Opencode": ".opencode/agents",
-        "Gemini": ".gemini/agents",
-        "Continue": ".continue/agents",
-        "Copilot": ".github/copilot/agents",
-        "Mammouth": ".mammouth/agents",
-    }
-    
     local_vars = dict(variables)
     if provider_config and pc.get("context_file"):
         shared_users = [p for p, cfg in provider_config.items() if cfg.get("context_file") == pc.get("context_file")]
@@ -996,9 +987,9 @@ def _build_managed_block(
             dirs = [provider_config[p].get("agents_dir", f".{p.lower()}/agents") for p in shared_users]
             local_vars["AGENTS_DIR"] = " bzw. ".join(dirs)
         else:
-            local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
+            local_vars["AGENTS_DIR"] = pc.get("agents_dir", f".{provider.lower()}/agents")
     else:
-        local_vars["AGENTS_DIR"] = provider_dirs.get(provider, ".local/agents")
+        local_vars["AGENTS_DIR"] = pc.get("agents_dir", f".{provider.lower()}/agents")
 
     if len(shared_users) > 1:
         for p in shared_users:

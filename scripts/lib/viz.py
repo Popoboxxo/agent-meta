@@ -685,36 +685,30 @@ def get_gitignore_entries() -> list[str]:
     ]
 
 
-_PROVIDER_TERMINAL_TOOL: dict[str, str | None] = {
-    "Claude": "Bash",
-    "Gemini": "code_execution",
-    "Opencode": "bash",
-    "Continue": None,
-    "Copilot": None,
-    "Mammouth": "bash",
-}
-
-
 def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> str | None:
     """Return the terminal tool name for a provider.
-    
-    Reads from config/provider-tools.yaml if available, falls back to hardcoded defaults.
+
+    Reads from config/provider-tools.yaml if available (legacy override path),
+    falls back to config/ai-providers.yaml::bash_tool_name — the provider
+    config truth source (issue #627, no hardcoded Python map anymore).
     """
-    if agent_meta_root is not None:
-        try:
-            from .frontmatter import load_provider_tools_config
-            cfg = load_provider_tools_config(agent_meta_root)
-            terminal_map = cfg.get("terminal_tool", {})
-            if provider in terminal_map:
-                return terminal_map[provider]
-        except OSError as e:
-            # load_provider_tools_config() already fails soft (returns {} on
-            # its own I/O/YAML errors) — this only guards a directory-access
-            # error surfacing from the Path operations around it. Falling
-            # back to the hardcoded default map below is always safe: it's
-            # the same value used before config/provider-tools.yaml existed.
-            _logger.debug("terminal tool config lookup failed for provider=%s: %s: %s", provider, type(e).__name__, e)
-    return _PROVIDER_TERMINAL_TOOL.get(provider)
+    if agent_meta_root is None:
+        return None
+    try:
+        from .frontmatter import load_provider_tools_config
+        cfg = load_provider_tools_config(agent_meta_root)
+        terminal_map = cfg.get("terminal_tool", {})
+        if provider in terminal_map:
+            return terminal_map[provider]
+    except OSError as e:
+        # load_provider_tools_config() already fails soft (returns {} on
+        # its own I/O/YAML errors) — this only guards a directory-access
+        # error surfacing from the Path operations around it. Falling
+        # back to config/ai-providers.yaml below is always safe.
+        _logger.debug("terminal tool config lookup failed for provider=%s: %s: %s", provider, type(e).__name__, e)
+
+    from .providers import load_providers_config
+    return load_providers_config(agent_meta_root).get(provider, {}).get("bash_tool_name")
 
 
 def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:

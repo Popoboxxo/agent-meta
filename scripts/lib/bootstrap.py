@@ -49,9 +49,23 @@ class BootstrapEngine:
         return self.bootstrap_registry.get("bootstrap", {}).get(provider, {})
 
     def run_bootstrap(
-        self, provider: str, agents_dir: Path, project_root: Path | None = None
+        self,
+        provider: str,
+        agents_dir: Path,
+        project_root: Path | None = None,
+        *,
+        dry_run: bool = False,
+        log: Any = None,
+        context_file: str | None = None,
+        compact: bool = False,
+        agents_label: str | None = None,
     ) -> dict[str, Any]:
         """Execute provider-specific bootstrap actions.
+
+        The extra keyword-only args (dry_run/log/context_file/compact/
+        agents_label) only matter for the api-based mechanism (Gemini's
+        GEMINI.md injection) — config-based bootstrap (Continue) ignores
+        them, it has no dry-run gate or compact mode of its own.
 
         Returns a dict with results/instructions.
         """
@@ -62,7 +76,11 @@ class BootstrapEngine:
             return {"status": "skipped", "reason": f"{provider} needs no bootstrap"}
 
         if mechanism == "api-based":
-            return self._bootstrap_api_based(provider, agents_dir, config, project_root)
+            return self._bootstrap_api_based(
+                provider, agents_dir, config, project_root,
+                dry_run=dry_run, log=log, context_file=context_file,
+                compact=compact, agents_label=agents_label,
+            )
         elif mechanism == "config-based":
             return self._bootstrap_config_based(provider, agents_dir, config, project_root)
 
@@ -74,39 +92,71 @@ class BootstrapEngine:
         agents_dir: Path,
         config: dict[str, Any],
         project_root: Path | None,
+        *,
+        dry_run: bool = False,
+        log: Any = None,
+        context_file: str | None = None,
+        compact: bool = False,
+        agents_label: str | None = None,
     ) -> dict[str, Any]:
-        """Generate define_subagent instructions for API-based providers (Gemini)."""
-        agents = sorted(agents_dir.glob("*.md"))
-        instructions: list[dict[str, str]] = []
+        """Inject session-start bootstrap instructions into the provider's
+        context file (e.g. GEMINI.md) for API-based providers (Gemini).
 
-        for agent_file in agents:
-            name = agent_file.stem
-            content = agent_file.read_text()
+        Issue #628: moved here from provider_transform.py's bespoke
+        _inject_gemini_bootstrap so agent_sync.py has one unified bootstrap
+        call site (like Continue's config-based path already had) instead of
+        a special-cased direct call. Only handles the
+        "inject-bootstrap-instructions" action.
+        """
+        if config.get("action") != "inject-bootstrap-instructions":
+            return {"status": "skipped", "reason": f"unsupported action for {provider}: {config.get('action')}"}
 
-            description = self._extract_description(content)
+        if project_root is None:
+            return {"status": "error", "reason": "project_root required for api-based bootstrap"}
 
-            instructions.append(
-                {
-                    "agent": name,
-                    "define_call": (
-                        f'define_subagent(name="{name}", '
-                        f'description="{description}", '
-                        f'system_prompt="<content of {name}.md>")'
-                    ),
-                }
-            )
+        instructions = self.generate_gemini_bootstrap_instructions(
+            agents_dir, compact=compact, agents_label=agents_label or agents_dir.name
+        )
+        if not instructions:
+            return {"status": "skipped", "reason": "no agents found"}
 
-        return {
-            "status": "success",
-            "provider": provider,
-            "mechanism": "api-define_subagent",
-            "agent_count": len(instructions),
-            "instructions": instructions,
-            "summary": (
-                f"Bei Session-Beginn {len(instructions)} Agenten "
-                "via define_subagent registrieren."
-            ),
-        }
+        context_file = context_file or ".gemini/GEMINI.md"
+        # Path-traversal guard: context_file must resolve inside project_root.
+        resolved = (project_root / context_file).resolve()
+        root_resolved = project_root.resolve()
+        if root_resolved not in resolved.parents and resolved != root_resolved:
+            if log:
+                log.warning(f"{context_file} path escapes project root — skipping bootstrap injection")
+            return {"status": "error", "reason": "context_file escapes project_root"}
+
+        target_path = project_root / context_file
+        if not target_path.exists():
+            if log:
+                log.warning(f"{target_path.relative_to(project_root)!s} does not exist — cannot inject bootstrap instructions")
+            return {"status": "skipped", "reason": f"{context_file} does not exist"}
+
+        existing = target_path.read_text(encoding="utf-8")
+        marker_begin = "<!-- agent-meta:bootstrap-begin -->"
+        marker_end = "<!-- agent-meta:bootstrap-end -->"
+        block = f"{marker_begin}\n{instructions}\n{marker_end}"
+
+        if marker_begin in existing:
+            pattern = re.compile(re.escape(marker_begin) + ".*?" + re.escape(marker_end), re.DOTALL)
+            new_content = pattern.sub(block, existing, count=1)
+        else:
+            new_content = existing.rstrip("\n") + "\n\n" + block + "\n"
+
+        if new_content == existing:
+            if log:
+                log.skip(str(target_path.relative_to(project_root)), "bootstrap instructions unchanged")
+            return {"status": "skipped", "mechanism": "api-based", "reason": "bootstrap instructions unchanged"}
+
+        if log:
+            log.action("UPDATE", str(target_path.relative_to(project_root)), "bootstrap instructions")
+        if not dry_run:
+            target_path.write_text(new_content, encoding="utf-8")
+
+        return {"status": "success", "provider": provider, "mechanism": "api-based", "instructions": instructions}
 
     def _bootstrap_config_based(
         self,
@@ -166,13 +216,6 @@ class BootstrapEngine:
             "mechanism": "config-based",
             "reason": "config.yaml already up to date",
         }
-
-    def _extract_description(self, content: str) -> str:
-        """Extract agent description from frontmatter or fallback."""
-        for line in content.splitlines():
-            if line.startswith("description:"):
-                return line.split(":", 1)[1].strip().strip('"')
-        return "No description available"
 
     def generate_gemini_bootstrap_instructions(
         self, agents_dir: Path, compact: bool = False,

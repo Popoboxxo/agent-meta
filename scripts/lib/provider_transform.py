@@ -402,64 +402,6 @@ def transform_agent_content_for_provider(
         from .viz import inject_viz_prompt_block
     return content
 
-def _inject_gemini_bootstrap(
-    provider: str,
-    target_dir: Path,
-    agent_meta_root: Path,
-    project_root: Path,
-    pc: dict[str, str],
-    log: SyncLog,
-    dry_run: bool,
-    compact: bool = False,
-    agents_label: str = ".gemini/agents",
-) -> None:
-    from .bootstrap import BootstrapEngine
-
-    bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
-    bootstrap_config = bootstrap_engine.get_bootstrap_config(provider)
-
-    if bootstrap_config.get("action") != "inject-bootstrap-instructions":
-        return
-
-    bootstrap_instructions = bootstrap_engine.generate_gemini_bootstrap_instructions(
-        target_dir, compact=compact, agents_label=agents_label
-    )
-    if not bootstrap_instructions:
-        return
-
-    context_file = pc.get("context_file", ".gemini/GEMINI.md")
-    # Validate context_file does not escape project_root (path traversal guard)
-    resolved = (project_root / context_file).resolve()
-    if project_root.resolve() not in resolved.parents and resolved != project_root.resolve():
-        log.warning(f"{context_file} path escapes project root — skipping bootstrap injection")
-        return
-
-    gemini_md_path = project_root / context_file
-    if not gemini_md_path.exists():
-        log.warning(f"{gemini_md_path.relative_to(project_root)!s} does not exist — cannot inject bootstrap instructions")
-        return
-
-    existing = gemini_md_path.read_text(encoding="utf-8")
-    bootstrap_marker_begin = "<!-- agent-meta:bootstrap-begin -->"
-    bootstrap_marker_end = "<!-- agent-meta:bootstrap-end -->"
-    bootstrap_block = f"{bootstrap_marker_begin}\n{bootstrap_instructions}\n{bootstrap_marker_end}"
-
-    if bootstrap_marker_begin in existing:
-        pattern = re.compile(
-            re.escape(bootstrap_marker_begin) + ".*?" + re.escape(bootstrap_marker_end),
-            re.DOTALL,
-        )
-        new_content = pattern.sub(bootstrap_block, existing, count=1)
-    else:
-        new_content = existing.rstrip("\n") + "\n\n" + bootstrap_block + "\n"
-
-    if new_content != existing:
-        log.action("UPDATE", str(gemini_md_path.relative_to(project_root)), "bootstrap instructions")
-        if not dry_run:
-            gemini_md_path.write_text(new_content, encoding="utf-8")
-    else:
-        log.skip(str(gemini_md_path.relative_to(project_root)), "bootstrap instructions unchanged")
-
 _DEBUG_BLOCK_MARKER = "<!-- agent-meta:debug-mode -->"
 
 _DEBUG_BLOCK_TEMPLATE = """\

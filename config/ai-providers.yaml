@@ -29,6 +29,15 @@ providers:
     isolation-dirs:
       - .claude/
       - CLAUDE.md
+    # Mechanism key consumed by isolation.py's dispatch table (no literal
+    # `if provider == "Claude"` branch — see _ISOLATION_MECHANISM_HANDLERS).
+    isolation-mechanism: claude-settings-deny
+    # Human-readable name for isolation deny-messages (differs from the
+    # registry key "Claude" — see isolation.py::_isolation_display_name).
+    isolation-display-name: "Claude Code"
+    # Terminal (Bash/command-execution) tool name — used by viz.py's fallback
+    # CLI-logging hint. null means: no known terminal tool for this provider.
+    bash_tool_name: Bash
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
@@ -104,6 +113,9 @@ providers:
     settings_local_file: .gemini/settings.local.json
     isolation-dirs:
       - .gemini/
+    isolation-mechanism: gemini-toml-policy
+    isolation-display-name: "Gemini CLI"
+    bash_tool_name: code_execution
     gitignore_entries:
       - .gemini/settings.local.json
       - .gemini/pending-tasks.md
@@ -155,6 +167,8 @@ providers:
       - .opencode/
       - opencode.json
       - AGENTS.md
+    isolation-mechanism: opencode-permissions
+    bash_tool_name: bash
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
@@ -210,6 +224,8 @@ providers:
     settings_local_file: .continue/config.local.yaml
     isolation-dirs:
       - .continue/
+    isolation-mechanism: continue-soft-rule
+    bash_tool_name: null
     gitignore_entries:
       - .continue/config.local.yaml
       - .continue/pending-tasks.md
@@ -246,6 +262,7 @@ providers:
     checkpoint_dir: .meta-viz
     isolation-dirs:
       - .github/copilot/
+    bash_tool_name: null
     gitignore_entries: []
     mcp-config: {}
     skills_dir: .github/copilot/skills
@@ -282,6 +299,7 @@ providers:
     isolation-dirs:
       - .mammouth/
       - MAMMOUTH.md
+    bash_tool_name: bash
     gitignore_entries:
       - .mammouth/pending-tasks.md
     mcp-config: {}

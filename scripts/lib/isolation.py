@@ -58,8 +58,11 @@ def sync_provider_isolation(
     log.note("provider-isolation", f"generating isolation for: {', '.join(providers)}")
 
     for provider in providers:
-        # foreign_dirs = isolation-dirs of all OTHER active providers
+        # foreign_dirs = isolation-dirs of all OTHER active providers.
+        # dir_owner tracks which provider each dir belongs to (used for
+        # human-readable deny messages instead of guessing from the path).
         foreign_dirs: list[str] = []
+        dir_owner: dict[str, str] = {}
         for other in providers:
             if other == provider:
                 continue
@@ -67,19 +70,21 @@ def sync_provider_isolation(
             for d in other_pc.get("isolation-dirs", []):
                 if d not in foreign_dirs:
                     foreign_dirs.append(d)
+                    dir_owner[d] = other
 
         if not foreign_dirs:
             log.skip(f"provider-isolation/{provider}", "no foreign dirs found")
             continue
 
-        if provider == "Claude":
-            _sync_claude_isolation(project_root, foreign_dirs, log, dry_run)
-        elif provider == "Opencode":
-            _sync_opencode_isolation(project_root, foreign_dirs, log, dry_run)
-        elif provider == "Gemini":
-            _sync_gemini_isolation(project_root, foreign_dirs, log, dry_run)
-        elif provider == "Continue":
-            _sync_continue_isolation(project_root, foreign_dirs, log, dry_run)
+        # Which mechanism (if any) generates isolation for `provider` is a
+        # capability flag from config/ai-providers.yaml::isolation-mechanism,
+        # not a literal `if provider == "Name"` branch (issue #627) — a
+        # provider without the key (e.g. Copilot, Mammouth) simply has no
+        # isolation mechanism implemented yet.
+        mechanism = provider_config.get(provider, {}).get("isolation-mechanism")
+        handler = _ISOLATION_MECHANISM_HANDLERS.get(mechanism)
+        if handler:
+            handler(project_root, foreign_dirs, dir_owner, provider_config, log, dry_run)
         else:
             log.skip(f"provider-isolation/{provider}", "no isolation mechanism defined for this provider")
 
@@ -152,6 +157,8 @@ def _dir_to_glob(directory: str) -> str:
 def _sync_claude_isolation(
     project_root: Path,
     foreign_dirs: list[str],
+    dir_owner: dict[str, str],
+    provider_config: dict,
     log: SyncLog,
     dry_run: bool,
 ) -> None:
@@ -202,6 +209,8 @@ def _sync_claude_isolation(
 def _sync_opencode_isolation(
     project_root: Path,
     foreign_dirs: list[str],
+    dir_owner: dict[str, str],
+    provider_config: dict,
     log: SyncLog,
     dry_run: bool,
 ) -> None:
@@ -251,7 +260,21 @@ def _sync_opencode_isolation(
 # Gemini: TOML policy file .gemini/policies/provider-isolation.toml
 # ---------------------------------------------------------------------------
 
-def _build_gemini_toml_rule(directory: str, priority_offset: int) -> str:
+def _isolation_display_name(provider: str, provider_config: dict) -> str:
+    """Human-readable provider name for isolation deny-messages.
+
+    Sourced from config/ai-providers.yaml::isolation-display-name. Falls back
+    to the raw provider registry key when no override is configured — true
+    for e.g. Opencode/Continue, whose key already matches the desired label.
+    Replaces the former directory-substring guessing (issue #627): ownership
+    is already known by the caller, no need to re-derive it from the path.
+    """
+    if not provider:
+        return "another provider"
+    return provider_config.get(provider, {}).get("isolation-display-name", provider)
+
+
+def _build_gemini_toml_rule(directory: str, priority_offset: int, owner_provider: str, provider_config: dict) -> str:
     """Build a single [[rule]] TOML block for a foreign directory.
 
     Gemini policy rules match on tool argument patterns (regex on JSON-serialised
@@ -264,7 +287,7 @@ def _build_gemini_toml_rule(directory: str, priority_offset: int) -> str:
 
     # Build the deny message — strip trailing slash for readability
     display_dir = directory.rstrip("/")
-    provider_name = _guess_provider_name_from_dir(directory)
+    provider_name = _isolation_display_name(owner_provider, provider_config)
 
     priority = 900 + priority_offset
 
@@ -279,23 +302,11 @@ def _build_gemini_toml_rule(directory: str, priority_offset: int) -> str:
     return "\n".join(lines)
 
 
-def _guess_provider_name_from_dir(directory: str) -> str:
-    """Infer the owning provider name from the directory path."""
-    d = directory.lower().rstrip("/")
-    if ".claude" in d:
-        return "Claude Code"
-    if ".gemini" in d:
-        return "Gemini CLI"
-    if ".opencode" in d or "opencode" in d or "agents.md" in d:
-        return "Opencode"
-    if ".continue" in d:
-        return "Continue"
-    return "another provider"
-
-
 def _sync_gemini_isolation(
     project_root: Path,
     foreign_dirs: list[str],
+    dir_owner: dict[str, str],
+    provider_config: dict,
     log: SyncLog,
     dry_run: bool,
 ) -> None:
@@ -305,7 +316,7 @@ def _sync_gemini_isolation(
 
     rule_blocks = []
     for idx, d in enumerate(foreign_dirs):
-        rule_blocks.append(_build_gemini_toml_rule(d, idx))
+        rule_blocks.append(_build_gemini_toml_rule(d, idx, dir_owner.get(d, ""), provider_config))
 
     content_lines = [
         "# agent-meta managed — do not edit manually",
@@ -331,6 +342,8 @@ def _sync_gemini_isolation(
 def _sync_continue_isolation(
     project_root: Path,
     foreign_dirs: list[str],
+    dir_owner: dict[str, str],
+    provider_config: dict,
     log: SyncLog,
     dry_run: bool,
 ) -> None:
@@ -341,7 +354,7 @@ def _sync_continue_isolation(
     # Build list items grouped by provider
     dir_lines = []
     for d in foreign_dirs:
-        provider_name = _guess_provider_name_from_dir(d)
+        provider_name = _isolation_display_name(dir_owner.get(d, ""), provider_config)
         display = d.rstrip("/")
         dir_lines.append(f"- `{display}` — {provider_name} only")
 
@@ -367,3 +380,15 @@ def _sync_continue_isolation(
         log.action("WRITE", rel, f"provider-isolation ({len(foreign_dirs)} dir(s))")
     else:
         log.skip(rel, "provider-isolation unchanged")
+
+
+# ---------------------------------------------------------------------------
+# Mechanism dispatch table (config/ai-providers.yaml::isolation-mechanism -> handler)
+# ---------------------------------------------------------------------------
+
+_ISOLATION_MECHANISM_HANDLERS = {
+    "claude-settings-deny": _sync_claude_isolation,
+    "opencode-permissions": _sync_opencode_isolation,
+    "gemini-toml-policy": _sync_gemini_isolation,
+    "continue-soft-rule": _sync_continue_isolation,
+}
