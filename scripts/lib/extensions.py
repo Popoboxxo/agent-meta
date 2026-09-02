@@ -87,7 +87,7 @@ def create_extension(
     agent_meta_root: Path | None = None,
 ):
     """Create .claude/3-project/<prefix>-<role>-ext.md if it does not exist yet."""
-    from .agents import ext_target_filename
+    from .frontmatter import ext_target_filename
     from .roles import build_role_map
 
     if agent_meta_root is None:

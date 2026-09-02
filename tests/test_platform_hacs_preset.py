@@ -78,7 +78,8 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.agents import collect_sources, role_from_platform_file, sync_agents_for_provider
+from lib.agent_sync import sync_agents_for_provider
+from lib.frontmatter import collect_sources, role_from_platform_file
 from lib.commands import collect_command_sources
 from lib.config import build_variables, load_config
 from lib.hooks import collect_hook_sources

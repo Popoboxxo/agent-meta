@@ -328,7 +328,7 @@ def _render_context(mode: str, workdir: Path) -> str:
     if mode == "compact":
         # The bootstrap block lives in the AGENTS.md injected footer and is
         # written by the agents step (B6 wiring) — run it like sync.py does.
-        from lib.agents import sync_agents_for_provider
+        from lib.agent_sync import sync_agents_for_provider
 
         gemini_vars = {**variables, "PIPELINE_DETAILS_DIR": ".gemini/pipeline-details"}
         sync_agents_for_provider(

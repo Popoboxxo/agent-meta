@@ -27,10 +27,11 @@ import yaml
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADMIN_SERVER_PATH = _PROJECT_ROOT / "scripts" / "admin-server.py"
-# `lib.agents` (used by `_template_path`) is imported lazily, at call time, from
-# whatever `<test-root>/scripts` happens to be — tests that exercise it against
-# a throwaway temp root (which has no scripts/lib of its own) need the REAL
-# scripts/lib importable up front, not resolved through the fake root.
+# `lib.frontmatter` (used by `TemplateService.template_path`) is imported
+# lazily, at call time, from whatever `<test-root>/scripts` happens to be —
+# tests that exercise it against a throwaway temp root (which has no
+# scripts/lib of its own) need the REAL scripts/lib importable up front, not
+# resolved through the fake root.
 sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
 
 
@@ -253,9 +254,9 @@ class TestPathTraversalPrevention(unittest.TestCase):
 
 
 class TestTemplatePathSecurity(unittest.TestCase):
-    """``_template_path`` is the only place that maps user-controlled role
-    names to filesystem paths for agent templates; it must reject every form
-    of traversal/injection."""
+    """``TemplateService.template_path`` is the only place that maps
+    user-controlled role names to filesystem paths for agent templates; it
+    must reject every form of traversal/injection."""
 
     def _make_handler(self, root: Path):
         """Build a bare handler instance without actually serving a request."""
@@ -267,7 +268,7 @@ class TestTemplatePathSecurity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             handler = self._make_handler(Path(tmp))
             with self.assertRaises(admin_server.SecurityError):
-                handler._template_path("")
+                handler._template_service().template_path("")
 
     def test_rejects_traversal_segments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -276,7 +277,7 @@ class TestTemplatePathSecurity(unittest.TestCase):
                         "../../etc/passwd"):
                 with self.assertRaises(admin_server.SecurityError,
                                        msg=f"role={bad!r} should be rejected"):
-                    handler._template_path(bad)
+                    handler._template_service().template_path(bad)
 
     def test_rejects_slash_only_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -284,7 +285,7 @@ class TestTemplatePathSecurity(unittest.TestCase):
             for bad in ("/", "\\", "/etc"):
                 with self.assertRaises(admin_server.SecurityError,
                                        msg=f"role={bad!r} should be rejected"):
-                    handler._template_path(bad)
+                    handler._template_service().template_path(bad)
 
     def test_rejects_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -293,12 +294,12 @@ class TestTemplatePathSecurity(unittest.TestCase):
             for bad in ("foo bar", "foo.bar", "foo$bar", "foo;bar", "foo`bar"):
                 with self.assertRaises(admin_server.SecurityError,
                                        msg=f"role={bad!r} should be rejected"):
-                    handler._template_path(bad)
+                    handler._template_service().template_path(bad)
 
     def test_accepts_well_formed_role_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             handler = self._make_handler(Path(tmp))
-            path = handler._template_path("code-reviewer")
+            path = handler._template_service().template_path("code-reviewer")
             self.assertTrue(str(path).endswith(os.path.join("1-generic", "code-reviewer.md")))
 
     def test_resolves_override_only_from_active_platform(self) -> None:
@@ -325,7 +326,7 @@ class TestTemplatePathSecurity(unittest.TestCase):
                 read=mock.Mock(return_value={"platforms": ["agent-meta"]})
             )
             try:
-                path = handler._template_path("developer")
+                path = handler._template_service().template_path("developer")
             finally:
                 del admin_server.AdminRequestHandler.config_manager
             self.assertEqual(path.name, "agent-meta-developer.md")
@@ -345,7 +346,7 @@ class TestTemplatePathSecurity(unittest.TestCase):
                 read=mock.Mock(return_value={"platforms": []})
             )
             try:
-                path = handler._template_path("developer")
+                path = handler._template_service().template_path("developer")
             finally:
                 del admin_server.AdminRequestHandler.config_manager
             self.assertTrue(str(path).endswith(os.path.join("1-generic", "developer.md")))
@@ -392,7 +393,7 @@ class TestApplyPricingOverlay(unittest.TestCase):
                     },
                 },
             }
-            merged = handler._apply_pricing_overlay(providers)
+            merged = handler._models_service()._apply_pricing_overlay(providers)
             models = merged["opencode-go"]["models"]
             # Patched in place under the bare id — no duplicate prefixed key.
             self.assertEqual(set(models.keys()), {"minimax-m3"})
@@ -420,7 +421,7 @@ class TestApplyPricingOverlay(unittest.TestCase):
                     },
                 },
             }
-            merged = handler._apply_pricing_overlay(providers)
+            merged = handler._models_service()._apply_pricing_overlay(providers)
             model = merged["anthropic"]["models"]["claude-sonnet-4-6"]
             self.assertEqual(model["cost"], {"input": 3.0, "output": 15.0})
             self.assertEqual(model["_costSource"], "overlay")
@@ -444,7 +445,7 @@ class TestApplyPricingOverlay(unittest.TestCase):
                     },
                 },
             }
-            merged = handler._apply_pricing_overlay(providers)
+            merged = handler._models_service()._apply_pricing_overlay(providers)
             models = merged["opencode-go"]["models"]
             self.assertEqual(set(models.keys()), {"minimax-m3"})
             self.assertNotIn("_costSource", models["minimax-m3"])
@@ -972,7 +973,7 @@ class TestRunConsistencyCheckPathResolution(unittest.TestCase):
 
             fake_result = mock.Mock(stdout='{"findings": [], "summary": {}}', stderr="")
             with mock.patch("subprocess.run", return_value=fake_result) as run_mock:
-                result = handler._run_consistency_check()
+                result = handler._audit_service().run_consistency_check()
 
             self.assertEqual(result, {"findings": [], "summary": {}})
             invoked_args = run_mock.call_args[0][0]
@@ -994,7 +995,7 @@ class TestRunConsistencyCheckPathResolution(unittest.TestCase):
 
             fake_result = mock.Mock(stdout='{"findings": [], "summary": {}}', stderr="")
             with mock.patch("subprocess.run", return_value=fake_result) as run_mock:
-                result = handler._run_consistency_check()
+                result = handler._audit_service().run_consistency_check()
 
             self.assertEqual(result, {"findings": [], "summary": {}})
             invoked_args = run_mock.call_args[0][0]
@@ -1108,7 +1109,7 @@ class TestComputeInjectionDrift(unittest.TestCase):
             (root / ".meta-config" / "project.yaml").write_text("ai-providers: []\n", encoding="utf-8")
 
             handler = self._make_handler(root)
-            result = handler._compute_injection_drift()
+            result = handler._audit_service().compute_injection_drift()
 
             self.assertNotIn("error", result, result.get("error"))
             # "ZzzTestProvider" only exists in .agent-meta/config/ai-providers.yaml
@@ -1231,7 +1232,7 @@ class TestSuggestionsModelsDevPrefix(unittest.TestCase):
             handler._load_models_dev_data = mock.Mock(  # type: ignore[method-assign]
                 return_value=self._models_dev_payload())
 
-            models = handler._suggestions_from_models_dev("Opencode")
+            models = handler._models_service()._suggestions_from_models_dev("Opencode")
             self.assertEqual(
                 [m["id"] for m in models],
                 ["opencode-go/glm-5", "opencode-go/kimi-k3"],
@@ -1244,7 +1245,7 @@ class TestSuggestionsModelsDevPrefix(unittest.TestCase):
             handler._load_models_dev_data = mock.Mock(  # type: ignore[method-assign]
                 return_value=self._models_dev_payload())
 
-            models = handler._suggestions_from_models_dev("Claude")
+            models = handler._models_service()._suggestions_from_models_dev("Claude")
             self.assertEqual([m["id"] for m in models], ["claude-sonnet-4-6"])
 
     def test_prefix_convention_derived_from_registry_not_hardcoded(self) -> None:
@@ -1269,7 +1270,7 @@ class TestSuggestionsModelsDevPrefix(unittest.TestCase):
                     }}},
                     "models": {},
                 })
-            models = handler._suggestions_from_models_dev("Gemini")
+            models = handler._models_service()._suggestions_from_models_dev("Gemini")
             self.assertEqual(
                 [m["id"] for m in models],
                 ["google/gemini-x", "google/gemini-new"],
@@ -1351,7 +1352,7 @@ class TestMixedConventionRegistryResolution(unittest.TestCase):
             handler._load_models_dev_data = mock.Mock(  # type: ignore[method-assign]
                 return_value=self._mixed_models_dev_payload())
 
-            models = handler._suggestions_from_models_dev("Claude")
+            models = handler._models_service()._suggestions_from_models_dev("Claude")
             self.assertEqual(
                 [m["id"] for m in models],
                 ["claude-opus-5", "claude-opus-9"],
@@ -1367,7 +1368,7 @@ class TestMixedConventionRegistryResolution(unittest.TestCase):
             handler._load_models_dev_data = mock.Mock(  # type: ignore[method-assign]
                 return_value=self._mixed_models_dev_payload())
 
-            models = handler._suggestions_from_models_dev("Opencode")
+            models = handler._models_service()._suggestions_from_models_dev("Opencode")
             self.assertEqual(
                 [m["id"] for m in models],
                 ["opencode-go/glm-5", "opencode-go/glm-5.3"],
@@ -1395,7 +1396,7 @@ class TestMixedConventionRegistryResolution(unittest.TestCase):
             self.assertEqual(captured["payload"]["model_id"], "claude-opus-5")
 
             # The imported price MUST now surface on the registry row.
-            models = {m["id"]: m for m in handler._collect_models()}
+            models = {m["id"]: m for m in handler._models_service()._collect_models()}
             self.assertEqual(models["claude-opus-5"]["input_source"], "Overlay")
             self.assertEqual(models["claude-opus-5"]["input_cost"], 7.0)
             self.assertEqual(models["claude-opus-5"]["output_cost"], 35.0)
@@ -1607,7 +1608,7 @@ class TestCollectModelsDisabledNormalization(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             handler = self._make_handler_with_curation(root, disabled=["claude-opus-4-1"])
-            models = {m["id"]: m for m in handler._collect_models()}
+            models = {m["id"]: m for m in handler._models_service()._collect_models()}
             self.assertFalse(models["anthropic/claude-opus-4.1"]["enabled"])
             self.assertTrue(models["claude-sonnet-4-6"]["enabled"])
 
@@ -1616,7 +1617,7 @@ class TestCollectModelsDisabledNormalization(unittest.TestCase):
             root = Path(tmp)
             handler = self._make_handler_with_curation(
                 root, disabled=["anthropic/claude-opus-4.1"])
-            models = {m["id"]: m for m in handler._collect_models()}
+            models = {m["id"]: m for m in handler._models_service()._collect_models()}
             self.assertFalse(models["anthropic/claude-opus-4.1"]["enabled"])
 
 
@@ -1648,7 +1649,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             # Patch at the urllib layer (NOT the loader methods) so the real
             # error-recording path inside _load_from_models_dev_api runs.
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")):
-                first = handler._load_models_dev_data()
+                first = handler._models_service()._load_models_dev_data()
             self.assertEqual(first["source"], "error")
             self.assertIn("models.dev fetch failed", first["error"])
             self.assertIn("connection refused", first["error"])
@@ -1656,7 +1657,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
 
             # Within the TTL the failure is re-served without re-fetching.
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")) as urlopen_mock:
-                second = handler._load_models_dev_data()
+                second = handler._models_service()._load_models_dev_data()
             self.assertEqual(second, first)
             self.assertEqual(urlopen_mock.call_count, 0)
 
@@ -1664,7 +1665,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             error_ts = admin_server.AdminRequestHandler._models_dev_error[1]
             admin_server.AdminRequestHandler._models_dev_error = (first, error_ts - 3600)
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")) as urlopen_mock:
-                handler._load_models_dev_data()
+                handler._models_service()._load_models_dev_data()
             self.assertEqual(urlopen_mock.call_count, 1)
 
     def test_stale_cache_served_before_error(self) -> None:
@@ -1675,7 +1676,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             admin_server.AdminRequestHandler._models_dev_cache = stale_payload
             admin_server.AdminRequestHandler._models_dev_cache_ts = time.time() - 7200  # expired
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")) as urlopen_mock:
-                result = handler._load_models_dev_data()
+                result = handler._models_service()._load_models_dev_data()
             self.assertEqual(result, stale_payload)
             self.assertEqual(urlopen_mock.call_count, 1)
 
@@ -1683,7 +1684,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             # negative cache — otherwise every subsequent request re-attempts
             # the 30 s fetch instead of re-serving the stale payload.
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")) as urlopen_mock:
-                second = handler._load_models_dev_data()
+                second = handler._models_service()._load_models_dev_data()
             self.assertEqual(second, stale_payload)
             self.assertEqual(urlopen_mock.call_count, 0)
 
@@ -1691,7 +1692,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             error_ts = admin_server.AdminRequestHandler._models_dev_error[1]
             admin_server.AdminRequestHandler._models_dev_error = (second, error_ts - 3600)
             with mock.patch("urllib.request.urlopen", side_effect=OSError("connection refused")) as urlopen_mock:
-                handler._load_models_dev_data()
+                handler._models_service()._load_models_dev_data()
             self.assertEqual(urlopen_mock.call_count, 1)
 
     @staticmethod
@@ -1711,7 +1712,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
 
             # force_refresh=True must hit the live API...
             with mock.patch("urllib.request.urlopen", return_value=resp):
-                result = handler._load_models_dev_data(force_refresh=True)
+                result = handler._models_service()._load_models_dev_data(force_refresh=True)
             self.assertEqual(result["source"], "api")
 
             # ...while the normal load path keeps the documented SDK-primary
@@ -1728,7 +1729,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             # The API must stay out of the picture here — offline behaviour
             # (and no accidental network access from unit tests).
             with mock.patch("urllib.request.urlopen", side_effect=OSError("offline")):
-                normal = handler._load_models_dev_data()
+                normal = handler._models_service()._load_models_dev_data()
             self.assertEqual(normal["source"], "sdk")
             self.assertIn("sdk-only", normal["providers"])
 
@@ -1743,7 +1744,7 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
             resp = self._urlopen_response({"providers": {}, "models": {}})
 
             with mock.patch("urllib.request.urlopen", return_value=resp):
-                result = handler._load_models_dev_data()
+                result = handler._models_service()._load_models_dev_data()
             self.assertEqual(result["source"], "api")
             self.assertFalse(hasattr(admin_server.AdminRequestHandler, "_models_dev_error"))
 

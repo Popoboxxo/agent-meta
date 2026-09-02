@@ -1526,7 +1526,7 @@ class TemplateService:
     def template_path(self, role: str) -> Path | None:
         """Resolve the template path sync.py would actually use for this role.
 
-        Delegates to ``lib.agents.collect_sources`` — the SAME resolution
+        Delegates to ``lib.frontmatter.collect_sources`` — the SAME resolution
         sync.py itself uses (1-generic < 2-platform < 3-project, scoped to this
         project's own active ``platforms`` list, in list order). Globbing all of
         ``agents/2-platform/*.md`` instead would let an unrelated but
@@ -1543,7 +1543,7 @@ class TemplateService:
         try:
             project_root = self._ctx.root
             _ensure_scripts_on_path(project_root)
-            from lib.agents import collect_sources  # type: ignore[import]
+            from lib.frontmatter import collect_sources  # type: ignore[import]
             project_config = self._ctx.config_manager.read("project") or {}
             active_platforms = project_config.get("platforms", [])
             overrides, _ = collect_sources(agent_meta_root, active_platforms)
@@ -3380,7 +3380,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return self._send_json(data)
 
     def _route_get_schema_project(self) -> None:
-        schema_path = self._find_schema_path()
+        schema_path = self._template_service().find_schema_path()
         if not schema_path.exists():
             raise FileNotFoundError("project-config.schema.json")
         self._send_bytes(schema_path.read_bytes(), "application/json; charset=utf-8")
@@ -3392,49 +3392,49 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return self._send_json(self.__class__.sync_executor.status())
 
     def _route_get_agents_hierarchy(self) -> None:
-        return self._send_json(self._build_agent_hierarchy())
+        return self._send_json(self._template_service().build_agent_hierarchy())
 
     def _route_get_pipelines(self) -> None:
         query = urlparse(self.path).query
         if "help" in (query or "").lower():
-            return self._send_json(self._pipeline_help())
-        return self._send_json(self._read_pipelines())
+            return self._send_json(self._pipeline_service().pipeline_help())
+        return self._send_json(self._pipeline_service().read_pipelines())
 
     def _route_get_single_pipeline(self, name: str) -> None:
-        return self._send_json(self._read_single_pipeline(name))
+        return self._send_json(self._pipeline_service().read_single_pipeline(name))
 
     def _route_get_reflection_pairs(self) -> None:
-        return self._send_json(self._read_reflection_pairs())
+        return self._send_json(self._reflection_service().read_reflection_pairs())
 
     def _route_get_single_reflection_pair(self, pair_id: str) -> None:
-        return self._send_json(self._read_reflection_pair(pair_id))
+        return self._send_json(self._reflection_service().read_reflection_pair(pair_id))
 
     def _route_get_agents_templates(self) -> None:
-        return self._send_json(self._list_agent_templates())
+        return self._send_json(self._template_service().list_agent_templates())
 
     def _route_get_subserver_status(self) -> None:
         return self._send_json(self.__class__.viz_manager.status())
 
     def _route_get_providers(self) -> None:
-        return self._send_json(self._list_providers())
+        return self._send_json(self._models_service()._list_providers())
 
     def _route_get_platforms(self) -> None:
-        return self._send_json(self._list_platforms())
+        return self._send_json(self._models_service()._list_platforms())
 
     def _route_get_roles(self) -> None:
-        return self._send_json(self._list_roles())
+        return self._send_json(self._models_service()._list_roles())
 
     def _route_get_config_audit(self) -> None:
-        return self._send_json(self._run_config_audit())
+        return self._send_json(self._audit_service().run_config_audit())
 
     def _route_get_consistency_check(self) -> None:
-        return self._send_json(self._run_consistency_check())
+        return self._send_json(self._audit_service().run_consistency_check())
 
     def _route_get_external_tools_drift(self) -> None:
-        return self._send_json(self._compute_injection_drift())
+        return self._send_json(self._audit_service().compute_injection_drift())
 
     def _route_get_provider_deactivation_status(self) -> None:
-        return self._send_json(self._get_deactivation_status())
+        return self._send_json(self._audit_service().deactivation_status())
 
     def _route_get_submodule_protection(self) -> None:
         return self._send_json(self._get_submodule_protection_status())
@@ -3491,7 +3491,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         self.__class__.config_manager.write("project", project_config)
         return self._send_json({"status": "saved"})
 
-
     # ------------------------------------------------------------------ #
     # DELETE routes                                                      #
     # ------------------------------------------------------------------ #
@@ -3504,10 +3503,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return handler()
 
     def _route_delete_pipeline(self, name: str) -> None:
-        return self._send_json(self._delete_pipeline(name))
+        return self._send_json(self._pipeline_service().delete_pipeline(name))
 
     def _route_delete_reflection_pair(self, pair_id: str) -> None:
-        return self._send_json(self._delete_reflection_pair(pair_id))
+        return self._send_json(self._reflection_service().delete_reflection_pair(pair_id))
 
     def _route_delete_environment(self, name: str) -> None:
         return self._send_json(self._delete_environment(name))
@@ -3542,14 +3541,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         pipelines = body["pipelines"]
         if not isinstance(pipelines, dict):
             raise ValueError("'pipelines' must be an object")
-        result = self._write_pipelines(pipelines)
+        result = self._pipeline_service().write_pipelines(pipelines)
         return self._send_json(result)
 
     def _route_put_single_pipeline(self, name: str) -> None:
         body = self._read_body()
         if not isinstance(body, dict):
             raise ValueError("expected JSON body with pipeline object")
-        result = self._write_single_pipeline(name, body)
+        result = self._pipeline_service().write_single_pipeline(name, body)
         return self._send_json(result)
 
     def _route_put_reflection_pairs(self) -> None:
@@ -3559,14 +3558,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         pairs = body["reflection_pairs"]
         if not isinstance(pairs, list):
             raise ValueError("'reflection_pairs' must be a list")
-        result = self._write_reflection_pairs(pairs)
+        result = self._reflection_service().write_reflection_pairs(pairs)
         return self._send_json(result)
 
     def _route_put_single_reflection_pair(self, pair_id: str) -> None:
         body = self._read_body()
         if not isinstance(body, dict):
             raise ValueError("expected JSON body with reflection pair object")
-        result = self._write_reflection_pair(pair_id, body)
+        result = self._reflection_service().write_reflection_pair(pair_id, body)
         return self._send_json(result)
 
     # ------------------------------------------------------------------ #
@@ -3600,7 +3599,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         return self._send_json(self.__class__.sync_executor.render_standalone())
 
     def _route_post_config_audit_apply(self) -> None:
-        return self._send_json(self._apply_config_audit())
+        return self._send_json(self._audit_service().apply_config_audit())
 
     def _route_post_reflection_pair(self) -> None:
         body = self._read_body()
@@ -3610,8 +3609,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             value = body.get(field)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError("id, generator and critic are required")
-        pair_id = self._ensure_pair_id(body)
-        result = self._write_reflection_pair(pair_id, body)
+        pair_id = self._reflection_service().ensure_pair_id(body)
+        result = self._reflection_service().write_reflection_pair(pair_id, body)
         return self._send_json(result)
 
     @staticmethod
@@ -3643,26 +3642,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "status": vm.status(),
         })
 
-    def _curation_root(self) -> Path:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._curation_root()
-
-    def _load_curation(self) -> dict:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._load_curation()
-
-    def _save_curation(self, curation: dict) -> None:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._save_curation(curation)
-
-    def _collect_models(self) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._collect_models()
-
     def _handle_get_models(self) -> None:
         """Return all registered models with curation + pricing metadata."""
         try:
-            models = self._collect_models()
+            models = self._models_service()._collect_models()
             return self._send_json({"models": models})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_MODELS")
@@ -3677,7 +3660,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         ids disappear from selectable options without rebuilding the registry.
         """
         try:
-            models = [m for m in self._collect_models() if m.get("enabled")]
+            models = [m for m in self._models_service()._collect_models() if m.get("enabled")]
             return self._send_json({"models": models})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_MODELS_ACTIVE")
@@ -3687,33 +3670,27 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Models.dev integration (SDK primary, API fallback)                  #
     # ------------------------------------------------------------------ #
 
-    def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._load_models_dev_data(force_refresh)
-
     # Negative-cache TTL for a total models.dev load failure (seconds). Keeps
     # an unreachable network from re-attempting a 30 s-timeout fetch on every
     # single request while still retrying soon enough to recover on its own.
     _MODELS_DEV_ERROR_TTL_SECONDS = 60.0
 
-    def _load_from_sdk_snapshot(self) -> dict | None:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._load_from_sdk_snapshot()
+    def _load_models_dev_data(self, force_refresh: bool = False) -> dict:
+        """Delegates to :class:`ModelsService` (issue #572).
 
-    def _load_from_models_dev_api(self) -> dict | None:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._load_from_models_dev_api()
-
-
-    def _apply_pricing_overlay(self, providers: dict) -> dict:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._apply_pricing_overlay(providers)
+        Kept as a real method (not inlined at call sites) because
+        ``ModelsService._suggestions_from_models_dev`` routes through
+        ``self._ctx.handler`` so unit tests can monkeypatch this exact
+        instance method as their models.dev cache/network seam — see
+        :attr:`ServiceContext.handler`.
+        """
+        return self._models_service()._load_models_dev_data(force_refresh)
 
     def _handle_get_models_dev(self) -> None:
         try:
-            raw = self._load_models_dev_data()
+            raw = self._models_service()._load_models_dev_data()
             data = dict(raw)
-            providers = self._apply_pricing_overlay(dict(raw.get("providers", {})))
+            providers = self._models_service()._apply_pricing_overlay(dict(raw.get("providers", {})))
             # Optional: filter to specific providers via ?providers=a,b,c.
             # Applied AFTER the overlay merge so curated providers (and
             # overlay overrides) are resolved against the full catalog —
@@ -3743,7 +3720,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # snapshot, so pressing ↻ actually re-fetches even when a stale
             # bundled snapshot exists (the normal load path prefers the
             # snapshot by design — "SDK primary, API fallback").
-            return self._send_json(self._load_models_dev_data(force_refresh=True))
+            return self._send_json(self._models_service()._load_models_dev_data(force_refresh=True))
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_MODELS_DEV_REFRESH")
             return self._send_json(body, status=status)
@@ -3783,7 +3760,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # are bare, its OpenRouter extras are namespaced, and opencode-go
             # is namespaced throughout — a blanket per-provider rule would
             # make imported prices silently invisible in /api/models.
-            overlay_key = self._resolve_registry_model_id(provider_id, model_id)
+            overlay_key = self._models_service()._resolve_registry_model_id(provider_id, model_id)
             prov[overlay_key] = {"input": float(input_cost) if input_cost is not None else 0.0,
                                  "output": float(output_cost) if output_cost is not None else 0.0}
 
@@ -3884,7 +3861,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self._send_json({"error": str(exc)}, status=400)
 
-            curation = self._load_curation()
+            curation = self._models_service()._load_curation()
             blacklist = list(curation.get("blacklist", []))
             existing = set(blacklist)
             added = 0
@@ -3894,7 +3871,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     existing.add(model_id)
                     added += 1
             curation["blacklist"] = blacklist
-            self._save_curation(curation)
+            self._models_service()._save_curation(curation)
 
             return self._send_json({
                 "success": True,
@@ -3918,7 +3895,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self._send_json({"error": str(exc)}, status=400)
 
-            curation = self._load_curation()
+            curation = self._models_service()._load_curation()
             disabled = list(curation.get("disabled", []))
             existing = set(disabled)
             added = 0
@@ -3928,7 +3905,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     existing.add(model_id)
                     added += 1
             curation["disabled"] = disabled
-            self._save_curation(curation)
+            self._models_service()._save_curation(curation)
 
             return self._send_json({
                 "status": "ok",
@@ -3951,7 +3928,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self._send_json({"error": str(exc)}, status=400)
 
-            curation = self._load_curation()
+            curation = self._models_service()._load_curation()
             disabled = list(curation.get("disabled", []))
             to_remove = set(ids_to_enable)
             removed = 0
@@ -3962,7 +3939,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 else:
                     new_disabled.append(model_id)
             curation["disabled"] = new_disabled
-            self._save_curation(curation)
+            self._models_service()._save_curation(curation)
 
             return self._send_json({
                 "status": "ok",
@@ -4050,45 +4027,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
     # Centralized per-provider model-source preference                    #
     # ------------------------------------------------------------------ #
 
-    def _read_model_source_prefs(self) -> dict:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._read_model_source_prefs()
-
-    def _default_model_source(self) -> str:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._default_model_source()
-
-    def _resolve_model_source(self, provider_name: str) -> str:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._resolve_model_source(provider_name)
-
-    def _provider_model_tiers(self, provider_name: str) -> dict:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._provider_model_tiers(provider_name)
-
-    def _suggestions_from_registry(self, provider_name: str) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._suggestions_from_registry(provider_name)
-
-    def _registry_model_ids_by_provider(self) -> dict[str, set[str]]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._registry_model_ids_by_provider()
-
-    def _resolve_registry_model_id(self, provider_slug: str, raw_id: str, ids_by_provider: dict[str, set[str]] | None = None) -> str:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._resolve_registry_model_id(provider_slug, raw_id, ids_by_provider)
-
-    def _suggestions_from_models_dev(self, provider_name: str) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._suggestions_from_models_dev(provider_name)
-
     def _handle_get_model_source(self) -> None:
         """Return the central per-provider model-source map (single source of
         truth for every model dropdown/suggestion in the Admin UI)."""
         try:
             return self._send_json({
-                "preferences": self._read_model_source_prefs(),
-                "default": self._default_model_source(),
+                "preferences": self._models_service()._read_model_source_prefs(),
+                "default": self._models_service()._default_model_source(),
             })
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_MODEL_SOURCE")
@@ -4284,7 +4229,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             provider = (qs.get("provider", [""])[0] or "").strip()
             if not provider:
                 return self._send_json({"error": "provider query param required"}, status=400)
-            source = self._resolve_model_source(provider)
+            source = self._models_service()._resolve_model_source(provider)
             # Providers with no models.dev catalog slug (Mammouth, Continue)
             # are registry-only regardless of what's persisted in
             # ``model-source-preference`` -- a stale/manually-edited "modelsdev"
@@ -4292,7 +4237,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # ``PROVIDER_MODELSDEV_SLUGS``). Force registry and report the
             # honest, effective source back to the caller.
             if source == "modelsdev" and provider in PROVIDER_MODELSDEV_SLUGS:
-                models = self._suggestions_from_models_dev(provider)
+                models = self._models_service()._suggestions_from_models_dev(provider)
                 if not models:
                     # The models.dev catalog is unavailable (network failure,
                     # stale SDK snapshot) or has no models for this provider's
@@ -4303,10 +4248,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     # fail-over that REPLACES the result, never a mix of both
                     # catalogs in one response.
                     source = "registry"
-                    models = self._suggestions_from_registry(provider)
+                    models = self._models_service()._suggestions_from_registry(provider)
             else:
                 source = "registry"
-                models = self._suggestions_from_registry(provider)
+                models = self._models_service()._suggestions_from_registry(provider)
             return self._send_json({"provider": provider, "source": source, "models": models})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_MODEL_SUGGESTIONS")
@@ -4452,7 +4397,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             providers_cfg = raw_providers_cfg.get("providers") or {}
             providers = resolve_providers(project_config, providers_cfg)
 
-            hierarchy = self._build_agent_hierarchy()
+            hierarchy = self._template_service().build_agent_hierarchy()
             role_names = [r["name"] for r in hierarchy.get("roles", [])]
             project_roles = project_config.get("roles") or []
             if isinstance(project_roles, list):
@@ -4553,14 +4498,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             raise FileNotFoundError("docs/ui/admin-ui.html (UI bundle missing)")
         self._send_bytes(ui_path.read_bytes(), "text/html; charset=utf-8")
 
-    def _find_schema_path(self) -> Path:
-        """Delegates to :meth:`TemplateService.find_schema_path` (issue #572)."""
-        return self._template_service().find_schema_path()
-
-    def _build_agent_hierarchy(self) -> dict:
-        """Delegates to :meth:`TemplateService.build_agent_hierarchy` (issue #572)."""
-        return self._template_service().build_agent_hierarchy()
-
     def _role_defaults_path(self) -> Path:
         """Resolve the path to ``role-defaults.yaml`` for either layout.
 
@@ -4568,55 +4505,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         the single resolver shared with the template/pipeline/reflection code.
         """
         return self._service_context().role_defaults_path()
-
-    def _read_pipelines(self) -> dict:
-        """Delegates to :meth:`PipelineService.read_pipelines` (issue #572)."""
-        return self._pipeline_service().read_pipelines()
-
-    def _read_single_pipeline(self, name: str) -> dict:
-        """Delegates to :meth:`PipelineService.read_single_pipeline` (issue #572)."""
-        return self._pipeline_service().read_single_pipeline(name)
-
-    def _write_pipelines(self, pipelines: dict) -> dict:
-        """Delegates to :meth:`PipelineService.write_pipelines` (issue #572)."""
-        return self._pipeline_service().write_pipelines(pipelines)
-
-    def _write_single_pipeline(self, name: str, pipeline: dict) -> dict:
-        """Delegates to :meth:`PipelineService.write_single_pipeline` (issue #572)."""
-        return self._pipeline_service().write_single_pipeline(name, pipeline)
-
-    def _delete_pipeline(self, name: str) -> dict:
-        """Delegates to :meth:`PipelineService.delete_pipeline` (issue #572)."""
-        return self._pipeline_service().delete_pipeline(name)
-
-    def _pipeline_help(self) -> dict:
-        """Delegates to :meth:`PipelineService.pipeline_help` (issue #572)."""
-        return self._pipeline_service().pipeline_help()
-
-    def _read_reflection_pairs(self) -> dict:
-        """Delegates to :meth:`ReflectionService.read_reflection_pairs` (issue #572)."""
-        return self._reflection_service().read_reflection_pairs()
-
-    def _read_reflection_pair(self, pair_id: str) -> dict:
-        """Delegates to :meth:`ReflectionService.read_reflection_pair` (issue #572)."""
-        return self._reflection_service().read_reflection_pair(pair_id)
-
-    def _write_reflection_pairs(self, pairs: list) -> dict:
-        """Delegates to :meth:`ReflectionService.write_reflection_pairs` (issue #572)."""
-        return self._reflection_service().write_reflection_pairs(pairs)
-
-    def _ensure_pair_id(self, pair: dict, pair_id: str | None = None) -> str:
-        """Delegates to :meth:`ReflectionService.ensure_pair_id` (issue #572)."""
-        return self._reflection_service().ensure_pair_id(pair, pair_id)
-
-    def _write_reflection_pair(self, pair_id: str, pair: dict) -> dict:
-        """Delegates to :meth:`ReflectionService.write_reflection_pair` (issue #572)."""
-        return self._reflection_service().write_reflection_pair(pair_id, pair)
-
-    def _delete_reflection_pair(self, pair_id: str) -> dict:
-        """Delegates to :meth:`ReflectionService.delete_reflection_pair` (issue #572)."""
-        return self._reflection_service().delete_reflection_pair(pair_id)
-
 
     def _deep_merge(self, base: Any, override: Any) -> Any:
         """Recursively merge ``override`` into ``base``."""
@@ -4731,26 +4619,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             except SyncError as exc:
                 raise ValueError(str(exc)) from exc
 
-    def _list_agent_templates(self) -> dict:
-        """Delegates to :meth:`TemplateService.list_agent_templates` (issue #572)."""
-        return self._template_service().list_agent_templates()
-
-    def _ai_providers_path(self) -> Path:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._ai_providers_path()
-
-    def _list_providers(self) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._list_providers()
-
-    def _list_platforms(self) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._list_platforms()
-
-    def _list_roles(self) -> list[dict]:
-        """Delegates to :class:`ModelsService` (issue #572)."""
-        return self._models_service()._list_roles()
-
     def _audit_paths(self) -> list[Path]:
         """Return the set of config/agent files to audit."""
         paths = []
@@ -4804,21 +4672,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             
         return help_map
 
-    def _run_consistency_check(self) -> dict:
-        """Delegates to :meth:`AuditService.run_consistency_check` (issue #572)."""
-        return self._audit_service().run_consistency_check()
-
-    def _run_config_audit(self) -> dict:
-        """Delegates to :meth:`AuditService.run_config_audit` (issue #572)."""
-        return self._audit_service().run_config_audit()
-
-    def _apply_config_audit(self) -> dict:
-        """Delegates to :meth:`AuditService.apply_config_audit` (issue #572)."""
-        return self._audit_service().apply_config_audit()
-
     def _send_template(self, role: str) -> None:
         """Send a generated agent template as plain text."""
-        path = self._template_path(role)
+        path = self._template_service().template_path(role)
         if not path.exists():
             raise FileNotFoundError(f"agent template not found: {role}")
         return self._send_bytes(path.read_bytes(), "text/markdown; charset=utf-8")
@@ -4831,10 +4687,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         body = self._read_body()
         return self._send_json(self._template_service().write_template(role, body))
-
-    def _template_path(self, role: str) -> Path | None:
-        """Delegates to :meth:`TemplateService.template_path` (issue #572)."""
-        return self._template_service().template_path(role)
 
     def _stream_events(self) -> None:
         """SSE endpoint that streams configuration change events."""
@@ -4863,22 +4715,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             pass
         finally:
             watcher.unsubscribe(event_queue)
-
-    # ------------------------------------------------------------------ #
-    # External-tool injection governance                                  #
-    # ------------------------------------------------------------------ #
-
-    def _compute_injection_drift(self) -> dict:
-        """Delegates to :meth:`AuditService.compute_injection_drift` (issue #572)."""
-        return self._audit_service().compute_injection_drift()
-
-    # ------------------------------------------------------------------ #
-    # Provider deactivation handlers                                      #
-    # ------------------------------------------------------------------ #
-
-    def _get_deactivation_status(self) -> dict:
-        """Delegates to :meth:`AuditService.deactivation_status` (issue #572)."""
-        return self._audit_service().deactivation_status()
 
     def _get_submodule_protection_status(self) -> dict:
         """Return Submodule Protection status (Framework Default vs Project Override)."""
@@ -5100,7 +4936,6 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_DELETE_BACKUP")
             return self._send_json(body, status=status)
-
 
 class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
     """Threading HTTP server that marks request threads as daemons.
