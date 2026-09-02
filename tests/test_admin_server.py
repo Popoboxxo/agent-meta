@@ -453,6 +453,105 @@ class TestApplyPricingOverlay(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# reflection_pairs section editor (issue #611)                                #
+# --------------------------------------------------------------------------- #
+
+
+class TestReflectionPairsSectionEditorProducesValidYaml(unittest.TestCase):
+    """``RoleDefaultsEditor.update_section`` has separate code paths for
+    dict-based sections (e.g. ``quality_pipelines``) and list-based sections
+    (``reflection_pairs``). The list path assumed the same 2-space base
+    indent as the dict path, but PyYAML dumps a block sequence directly
+    under a top-level key at column 0 -- so no existing ``- id: ...`` marker
+    ever matched, every item was treated as new (and mis-indented by 2
+    spaces), and the untouched original body was duplicated verbatim after
+    it, producing invalid YAML (issue #611)."""
+
+    def _make_handler(self, root: Path) -> Any:
+        (root / "config").mkdir(parents=True, exist_ok=True)
+        source = _PROJECT_ROOT / "config" / "role-defaults.yaml"
+        (root / "config" / "role-defaults.yaml").write_text(
+            source.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.mode = "super_admin"
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, "super_admin"
+        )
+        return handler
+
+    def _role_defaults_text(self, root: Path) -> str:
+        return (root / "config" / "role-defaults.yaml").read_text(encoding="utf-8")
+
+    def test_appending_a_pair_produces_valid_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            svc = handler._reflection_service()
+            pairs = svc.read_reflection_pairs()["reflection_pairs"]
+            original_count = len(pairs)
+            pairs.append(
+                {
+                    "id": "new-test-pair",
+                    "generator": "developer",
+                    "critic": "code-reviewer",
+                    "max_iterations": 2,
+                }
+            )
+            svc.write_reflection_pairs(pairs)
+
+            text = self._role_defaults_text(root)
+            parsed = yaml.safe_load(text)  # raises on malformed YAML
+            self.assertEqual(len(parsed["reflection_pairs"]), original_count + 1)
+            self.assertEqual(parsed["reflection_pairs"][-1]["id"], "new-test-pair")
+            # The dash of a new item must sit at column 0, matching PyYAML's
+            # own convention for the existing entries (not indented by 2
+            # like a nested dict-section child).
+            self.assertIn("\n- id: new-test-pair\n", text)
+            self.assertNotIn("\n  - id: new-test-pair\n", text)
+            # quality_pipelines (dict section) must be untouched byte-for-byte.
+            self.assertEqual(
+                parsed["quality_pipelines"],
+                yaml.safe_load(
+                    (_PROJECT_ROOT / "config" / "role-defaults.yaml").read_text(
+                        encoding="utf-8"
+                    )
+                )["quality_pipelines"],
+            )
+
+    def test_updating_an_existing_pair_preserves_untouched_items(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            svc = handler._reflection_service()
+            pairs = svc.read_reflection_pairs()["reflection_pairs"]
+            for pair in pairs:
+                if pair["id"] == "se-architect-loop":
+                    pair["max_iterations"] = 5
+            svc.write_reflection_pairs(pairs)
+
+            parsed = yaml.safe_load(self._role_defaults_text(root))
+            updated = [p for p in parsed["reflection_pairs"] if p["id"] == "se-architect-loop"]
+            self.assertEqual(updated[0]["max_iterations"], 5)
+            self.assertEqual(len(parsed["reflection_pairs"]), len(pairs))
+
+    def test_deleting_a_pair_actually_removes_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            svc = handler._reflection_service()
+            pairs = svc.read_reflection_pairs()["reflection_pairs"]
+            remaining = [p for p in pairs if p["id"] != "se-requirements-loop"]
+            svc.write_reflection_pairs(remaining)
+
+            parsed = yaml.safe_load(self._role_defaults_text(root))
+            ids = [p["id"] for p in parsed["reflection_pairs"]]
+            self.assertNotIn("se-requirements-loop", ids)
+            self.assertEqual(len(ids), len(pairs) - 1)
+
+
+# --------------------------------------------------------------------------- #
 # Atomic-write cleanup                                                        #
 # --------------------------------------------------------------------------- #
 

@@ -13,21 +13,25 @@ from __future__ import annotations
 from pathlib import Path
 
 from .io import (
-    _deep_merge,
     _load_yaml_or_json,
     safe_path,
     write_checked,
 )
 from .log import SyncLog
+from .mcp_registry import (  # noqa: F401 (re-exported for callers/tests, issue #613)
+    MCP_REGISTRY_YAML,
+    SECRETS_LOCAL_FILE,
+    build_mcp_guardrails_list,
+    load_mcp_registry,
+    resolve_active_mcp_servers,
+)
 from .rule_index import (
     bootstrap_previously_managed,
     cleanup_stale_managed_files,
     write_managed_index,
 )
 
-MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
 MCP_RULE_PREFIX = "mcp-"
-SECRETS_LOCAL_FILE = ".meta-config/secrets.local.yaml"
 # Fallback rules directory for providers without an explicit rules_dir (Claude).
 # Mirrors rules.CLAUDE_RULES_DIR to keep MCP rule output aligned with sync_rules().
 DEFAULT_RULES_DIR = ".claude/rules"
@@ -35,99 +39,6 @@ DEFAULT_RULES_DIR = ".claude/rules"
 # from rules.py's ".agent-meta-managed" (which tracks the rules/ layer sources)
 # so the two independent write loops never fight over the same index file.
 MCP_MANAGED_INDEX_FILENAME = ".agent-meta-managed-mcp"
-
-
-# ---------------------------------------------------------------------------
-# Registry loading
-# ---------------------------------------------------------------------------
-
-def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project_root: Path | None = None) -> dict:
-    """Load config/mcp-registry.yaml and deep-merge with project-specific mcp-registry (if provided)."""
-    data, _ = _load_yaml_or_json(agent_meta_root / MCP_REGISTRY_YAML)
-    registry = {}
-    if data and isinstance(data, dict):
-        registry = data.get("mcp-servers", {})
-        if not isinstance(registry, dict):
-            registry = {}
-            
-    if project_root:
-        proj_data, _ = _load_yaml_or_json(project_root / ".meta-config" / "mcp-registry.yaml")
-        if proj_data and isinstance(proj_data, dict):
-            proj_servers = proj_data.get("mcp-servers", proj_data)
-            if isinstance(proj_servers, dict):
-                _deep_merge(registry, proj_servers)
-                
-    if config:
-        project_registry = config.get("mcp-registry", {})
-        if isinstance(project_registry, dict):
-            _deep_merge(registry, project_registry)
-            
-    return registry
-
-
-# ---------------------------------------------------------------------------
-# Server resolution
-# ---------------------------------------------------------------------------
-
-def resolve_active_mcp_servers(
-    config: dict, agent_meta_root: Path, project_root: Path | None = None,
-    registry: dict | None = None,
-) -> list[str]:
-    """Determine which MCP servers are active for this project.
-
-    Sources (merged, preserving order, no duplicates):
-      1. Explicit: config["mcp-servers"] list in project.yaml — always active
-      2. Implicit: platform bundles rules/2-platform/<platform>-mcp.yaml —
-         only active when the server's enabled-by-default flag is true (default: true)
-
-    Servers from bundles not in the explicit list are skipped when
-    enabled-by-default: false in mcp-registry.yaml.
-
-    registry: pass an already-loaded load_mcp_registry() result to skip
-    re-reading/re-parsing config/mcp-registry.yaml when the caller has one
-    on hand (e.g. sync.py's per-provider loop, which would otherwise reload
-    the same on-disk registry once per active provider).
-    """
-    if registry is None:
-        registry = load_mcp_registry(agent_meta_root, config, project_root)
-    explicit: set[str] = set(config.get("mcp-servers", []))
-    active: list[str] = list(config.get("mcp-servers", []))
-
-    platform_dir = agent_meta_root / "rules" / "2-platform"
-    for platform in config.get("platforms", []):
-        bundle_path = platform_dir / f"{platform}-mcp.yaml"
-        if not bundle_path.exists():
-            continue
-        data, _ = _load_yaml_or_json(bundle_path)
-        for server in (data or {}).get("mcp-servers", []):
-            if server in active:
-                continue
-            if server in explicit:
-                # already in active list (should not happen, but guard anyway)
-                continue
-            server_def = registry.get(server, {})
-            if server_def.get("enabled-by-default", True):
-                active.append(server)
-
-    return active
-
-
-def build_mcp_guardrails_list(registry: dict, active_servers: list[str]) -> str:
-    """Render the hard-prohibitions bullet list for rules/1-generic/mcp-guardrails.md.
-
-    Generated from each active server's tools.blocked (config/mcp-registry.yaml)
-    instead of being hand-copied — a server added/removed from the active list,
-    or a blocked-tools edit, is picked up on the next sync instead of silently
-    going stale in a hand-authored always-on guardrail file.
-    """
-    lines = [
-        f"- **{name}:** " + ", ".join(f"`{t}`" for t in blocked) + " — absolut verboten."
-        for name in sorted(active_servers)
-        if (blocked := (registry.get(name, {}).get("tools", {}).get("blocked", [])))
-    ]
-    if not lines:
-        return "- (keine aktiven MCP-Server mit gesperrten Tools)"
-    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -196,10 +107,10 @@ def _generate_rule_content(server_name: str, server_def: dict, compact: bool = F
 
 # ---------------------------------------------------------------------------
 # Provider config generation — see scripts/lib/mcp_provider_config.py
-# (split out to keep this module under the <=600-line convention; that
-# module imports load_mcp_registry/resolve_active_mcp_servers/
-# SECRETS_LOCAL_FILE from here only inside function bodies, so this
-# top-level import in the other direction is not a circular import).
+# (split out to keep this module under the <=600-line convention). That
+# module now imports load_mcp_registry/resolve_active_mcp_servers/
+# SECRETS_LOCAL_FILE from mcp_registry.py directly, not from here, so this
+# top-level import in the other direction cannot form a cycle (issue #613).
 # ---------------------------------------------------------------------------
 
 from .mcp_provider_config import (  # noqa: E402, F401 (re-exported for callers/tests)
