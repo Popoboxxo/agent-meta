@@ -1730,6 +1730,26 @@ class RoleDefaultsEditor:
         lines[0] = (" " * indent) + "- " + first_content
         return lines
     @staticmethod
+    def _infer_list_base_indent(body_lines: list[str]) -> int:
+        """Return the indentation column of ``- `` list markers in a section body.
+
+        Block sequences directly under a top-level mapping key are dumped by
+        PyYAML with the dash at column 0 (``key:\\n- item``), unlike nested
+        dict keys which sit at column 2 (``key:\\n  child: value``). List
+        sections therefore need their own base indent instead of the
+        dict-section default of 2 (issue #611) — using 2 there made
+        ``_split_list_children`` never match an existing ``- id: ...`` marker,
+        so every item was treated as new and duplicated onto the unchanged
+        original body. Falls back to 0 (PyYAML's own default) for an empty
+        or not-yet-existing section body.
+        """
+        for line in body_lines:
+            stripped = line.lstrip()
+            if stripped.startswith("- "):
+                return len(line) - len(stripped)
+        return 0
+
+    @staticmethod
     def _infer_child_value_indent(body_lines: list[str], base_indent: int) -> int:
         """Return the indentation used for a child mapping/list body.
 
@@ -1869,7 +1889,10 @@ class RoleDefaultsEditor:
         by id using the same rule. Comments and blank lines that are not part
         of a child block are preserved unchanged.
         """
-        base_indent = 2
+        is_list_section = isinstance(value, list) and key == "reflection_pairs"
+        base_indent = (
+            self._infer_list_base_indent(body_lines) if is_list_section else 2
+        )
         value_indent = self._infer_child_value_indent(body_lines, base_indent)
 
         def _scalar_dump(v: Any) -> str:
@@ -1970,6 +1993,21 @@ class RoleDefaultsEditor:
                 if item_id:
                     old_by_id[item_id] = child
 
+            # Mirrors the dict-section deletion handling above: an id that
+            # existed before but is absent from the new list must have its
+            # lines dropped, not just left unreferenced -- otherwise a
+            # deleted pair's block silently survives in the tail/gap slices
+            # below (issue #611 follow-up).
+            new_ids = {
+                item.get("id")
+                for item in value
+                if isinstance(item, dict) and item.get("id")
+            }
+            deleted_indices: set[int] = set()
+            for old_id, old_child in old_by_id.items():
+                if old_id not in new_ids:
+                    deleted_indices.update(range(old_child["start"], old_child["end"]))
+
             new_lines: list[str] = []
             pos = 0
             appended_new: list[str] = []
@@ -1979,7 +2017,11 @@ class RoleDefaultsEditor:
                 item_id = item.get("id")
                 child = old_by_id.get(item_id) if item_id else None
                 if child:
-                    new_lines.extend(body_lines[pos : child["start"]])
+                    new_lines.extend(
+                        body_lines[i]
+                        for i in range(pos, child["start"])
+                        if i not in deleted_indices
+                    )
                     old_block = body_lines[child["start"] : child["end"]]
                     try:
                         parsed = yaml.safe_load("".join(old_block))
@@ -1993,7 +2035,12 @@ class RoleDefaultsEditor:
                     pos = child["end"]
                 else:
                     appended_new.extend(_build_list_child(item, None))
-            self._splice_appended_children(new_lines, body_lines[pos:], appended_new)
+            tail = [
+                body_lines[i]
+                for i in range(pos, len(body_lines))
+                if i not in deleted_indices
+            ]
+            self._splice_appended_children(new_lines, tail, appended_new)
             return "".join(new_lines)
 
         # Fallback for any other shape: replace the whole body with a fresh dump.

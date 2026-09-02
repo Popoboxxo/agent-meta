@@ -317,7 +317,10 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
-    from .mcp import SECRETS_LOCAL_FILE, load_mcp_registry, resolve_active_mcp_servers
+    # Sourced from mcp_registry.py, not mcp.py, so this module never depends
+    # on mcp.py — that direction would recreate the mcp/mcp_provider_config/
+    # rules import cycle mcp_registry.py was extracted to break (#613).
+    from .mcp_registry import SECRETS_LOCAL_FILE, load_mcp_registry, resolve_active_mcp_servers
 
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
