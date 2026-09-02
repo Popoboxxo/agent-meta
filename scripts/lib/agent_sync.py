@@ -27,7 +27,6 @@ from .frontmatter import (
 from .io import safe_path, write_checked
 from .log import SyncLog
 from .provider_transform import (
-    _inject_gemini_bootstrap,
     inject_debug_block,
     transform_agent_content_for_provider,
     wrap_sections_in_xml,
@@ -657,21 +656,21 @@ def sync_agents_for_provider(
                 '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
             )
 
-    # Gemini Bootstrap: inject session-start instructions into GEMINI.md (Issue #277)
-    if provider == "Gemini":
-        _inject_gemini_bootstrap(
-            provider, target_dir, agent_meta_root, project_root, pc, log, dry_run,
-            compact=variables.get("COMPACT_MODE") == "true",
-            agents_label=pc.get('agents_dir', '.gemini/agents'),
-        )
-
-    # Continue Bootstrap: update .continue/config.yaml with agent entries (Issue #277)
-    if provider == "Continue":
+    # Provider Bootstrap: session-start agent registration for providers that
+    # need it (Gemini: inject GEMINI.md instructions; Continue: update
+    # .continue/config.yaml) — Issue #277, unified call site per #628: the
+    # mechanism/action dispatch lives entirely in BootstrapEngine, no more
+    # per-provider special-casing here.
+    if provider in ("Gemini", "Continue"):
         from .bootstrap import BootstrapEngine
         bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
-        bootstrap_config = bootstrap_engine.get_bootstrap_config(provider)
-        if bootstrap_config.get("action") == "update-config":
-            result = bootstrap_engine.run_bootstrap(provider, target_dir, project_root)
-            if result.get("status") == "success":
-                rel_target = str(target_dir.relative_to(project_root))
-                log.note(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")
+        result = bootstrap_engine.run_bootstrap(
+            provider, target_dir, project_root,
+            dry_run=dry_run, log=log,
+            context_file=pc.get("context_file"),
+            compact=variables.get("COMPACT_MODE") == "true",
+            agents_label=pc.get("agents_dir", f".{provider.lower()}/agents"),
+        )
+        if provider == "Continue" and result.get("status") == "success":
+            rel_target = str(target_dir.relative_to(project_root))
+            log.note(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")

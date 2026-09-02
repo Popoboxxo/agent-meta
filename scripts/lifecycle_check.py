@@ -13,6 +13,7 @@ tasks to .claude/pending-tasks.md.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,11 @@ try:
     _HAS_YAML = True
 except ImportError:
     _HAS_YAML = False
+
+# scripts/lifecycle_check.py -> scripts/ -> agent-meta root (sibling of config/).
+# Same layout in both self-hosting and submodule checkouts (see
+# hooks/1-generic/lifecycle-check.sh, which resolves this script the same way).
+AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
 
 # ---------------------------------------------------------------------------
@@ -58,13 +64,32 @@ PENDING_FOOTER = (
     "_Generiert von lifecycle-check.py — lösche diese Datei wenn alle Tasks erledigt sind._\n"
 )
 
-# Provider-specific pending-tasks paths (kept in sync with config/ai-providers.yaml)
-_PROVIDER_PENDING_FILES: dict[str, str] = {
-    "Claude":   ".claude/pending-tasks.md",
-    "Opencode": ".opencode/pending-tasks.md",
-    "Gemini":   ".gemini/pending-tasks.md",
-    "Continue": ".continue/pending-tasks.md",
-}
+# Regex-based provider-block scan of config/ai-providers.yaml -- deliberately
+# not a full YAML parse (PyYAML may be absent, see _HAS_YAML above) so the
+# provider -> pending_tasks_file lookup works in any bare Python 3.8+ env.
+# Mirrors scripts/measure_context.py's regex-scan approach for the same file.
+_PROVIDER_BLOCK_RE = re.compile(r"^  (\w+):\s*\n((?:    .+\n?)*)", re.MULTILINE)
+_PENDING_TASKS_FILE_RE = re.compile(r"^\s*pending_tasks_file:\s*([^\s#]+)", re.MULTILINE)
+
+_DEFAULT_PENDING_FILE = ".claude/pending-tasks.md"
+
+
+def _load_pending_files_map() -> dict[str, str]:
+    """Return provider -> pending_tasks_file, read from config/ai-providers.yaml.
+
+    config/ai-providers.yaml is the single source of truth for this path;
+    no hardcoded Python map is kept in sync manually anymore (issue #627).
+    """
+    path = AGENT_META_ROOT / "config" / "ai-providers.yaml"
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    result: dict[str, str] = {}
+    for name, block in _PROVIDER_BLOCK_RE.findall(text):
+        m = _PENDING_TASKS_FILE_RE.search(block)
+        if m:
+            result[name] = m.group(1).strip("\"'")
+    return result
 
 TRIGGER_LABELS = {
     "on-commit":              "Commit",
@@ -191,13 +216,14 @@ def main() -> None:
               f"got {type(providers).__name__} — skipping", file=sys.stderr)
         sys.exit(0)
 
+    pending_files = _load_pending_files_map()
     for provider in providers:
         if not isinstance(provider, str):
             # A nested mapping/list entry is unhashable — .get() would raise.
             print(f"lifecycle-check: ignoring non-string provider entry "
                   f"({type(provider).__name__})", file=sys.stderr)
             continue
-        pending_file = _PROVIDER_PENDING_FILES.get(provider, ".claude/pending-tasks.md")
+        pending_file = pending_files.get(provider, _DEFAULT_PENDING_FILE)
         write_pending_tasks(project_root, event, tasks, pending_file)
 
 

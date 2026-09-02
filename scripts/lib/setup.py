@@ -207,7 +207,8 @@ def run_setup_wizard(
 
     _section("2. AI Providers")
     print("  INFO: Select the AI providers you plan to use for your agents.")
-    valid_providers = ["Claude", "Gemini", "Continue", "Opencode", "Copilot", "Mammouth"]
+    from .providers import load_providers_config
+    valid_providers = list(load_providers_config(agent_meta_root).keys())
     providers_raw = _ask_list("Active AI Providers", default=["Claude"], choices=valid_providers)
     providers = [p for p in providers_raw if p in valid_providers]
     if not providers:

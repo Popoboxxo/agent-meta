@@ -51,8 +51,8 @@ def test_isolation_still_generates_deny_entries(tmp_path):
     project_root = tmp_path
     providers = ["Claude", "Opencode"]
     provider_config = {
-        "Claude": {"isolation-dirs": [".claude/"]},
-        "Opencode": {"isolation-dirs": ["opencode.json"]},
+        "Claude": {"isolation-dirs": [".claude/"], "isolation-mechanism": "claude-settings-deny"},
+        "Opencode": {"isolation-dirs": ["opencode.json"], "isolation-mechanism": "opencode-permissions"},
     }
     log = SyncLog()
     sync_provider_isolation(project_root, providers, provider_config, log, dry_run=False)
