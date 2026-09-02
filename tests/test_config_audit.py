@@ -336,6 +336,49 @@ def test_unpaired_closing_tag_scans_platform_overrides(meta_root: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# provider_registry_completeness (issue #625)
+# ---------------------------------------------------------------------------
+
+def _write_ai_providers(meta_root: Path, provider_names: list[str]) -> None:
+    body = "providers:\n" + "".join(f"  {name}: {{}}\n" for name in provider_names)
+    _write(meta_root / "config" / "ai-providers.yaml", body)
+
+
+def _write_lifecycle_check_stub(meta_root: Path, providers: list[str]) -> None:
+    """A minimal stand-in for scripts/lifecycle_check.py's pending-tasks map,
+    matching the exact construct shape the check's regex targets."""
+    entries = "".join(f'    "{p}": ".{p.lower()}/pending-tasks.md",\n' for p in providers)
+    _write(
+        meta_root / "scripts" / "lifecycle_check.py",
+        f"_PROVIDER_PENDING_FILES: dict[str, str] = {{\n{entries}}}\n",
+    )
+
+
+def test_provider_registry_completeness_detects_missing_provider(meta_root: Path) -> None:
+    _write_ai_providers(meta_root, ["Claude", "Ghost"])
+    _write_lifecycle_check_stub(meta_root, ["Claude"])  # "Ghost" missing
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+
+    report = audit_config(meta_root, cfg)
+    gaps = report.by_category("provider_registry_completeness")
+
+    assert len(gaps) == 1
+    assert gaps[0].role == "Ghost"
+    assert gaps[0].severity == "warning"
+    assert "_PROVIDER_PENDING_FILES" in gaps[0].message
+
+
+def test_provider_registry_completeness_no_false_positive_when_complete(meta_root: Path) -> None:
+    _write_ai_providers(meta_root, ["Claude", "Ghost"])
+    _write_lifecycle_check_stub(meta_root, ["Claude", "Ghost"])  # both present
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+
+    report = audit_config(meta_root, cfg)
+
+    assert report.by_category("provider_registry_completeness") == []
+
+
+# ---------------------------------------------------------------------------
 # apply_audit
 # ---------------------------------------------------------------------------
 

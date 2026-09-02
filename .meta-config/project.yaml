@@ -188,6 +188,9 @@ variables:
 
     - YAML Frontmatter in allen Agent-Templates
 
+    - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken,
+    nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
+
     '
   EXTRA_DONTS: '- KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
 

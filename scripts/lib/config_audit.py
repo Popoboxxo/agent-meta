@@ -1,28 +1,27 @@
 """Config audit: detect inconsistencies between project.yaml, role-defaults and templates.
 
-This module provides a read-only audit routine (:func:`audit_config`) plus a
-line-based remediation step (:func:`apply_audit`) that disables deprecated roles
-in ``.meta-config/project.yaml`` without destroying YAML comments.
+This module provides a read-only audit routine (:func:`audit_config`). The
+matching line-based remediation step (``apply_audit``, disables deprecated
+roles in ``.meta-config/project.yaml`` without destroying YAML comments) lives
+in :mod:`config_audit_apply` (split out to keep this module under the 600-line
+convention) and is re-exported here for backward compatibility.
 
 Design constraints:
     * No external Python dependencies beyond the stdlib + PyYAML (already used
       project-wide). YAML is only *read* via PyYAML — never re-dumped, since
       ``yaml.dump`` discards comments and reorders keys.
-    * :func:`apply_audit` edits the config file line-by-line so hand-written
-      comments survive untouched.
-    * :func:`apply_audit` is idempotent: lines already carrying the
-      ``# AUTO-DISABLED`` marker are skipped on re-runs.
 """
 from __future__ import annotations
 
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 
+from .config_audit_apply import apply_audit  # noqa: F401 -- re-exported, see below
+from .config_audit_providers import find_missing_providers
 from .frontmatter import _YAML_AVAILABLE, parse_frontmatter_file
-from .io import write_atomic
+from .providers import load_providers_config
 from .roles import load_roles_config
 
 # `_YAML_AVAILABLE` is single-sourced from `.frontmatter` (Issue #571) so the
@@ -35,14 +34,6 @@ try:
 except ImportError:
     _yaml = None
 
-
-# Marker written into disabled role lines — also used to detect already-disabled
-# lines for idempotency.
-_AUTO_DISABLED_MARKER = "# AUTO-DISABLED"
-
-# Matches a YAML list item inside the ``roles:`` block, e.g. ``  - developer``.
-# Captures leading indentation (group "indent") and the role name (group "role").
-_ROLE_LINE_RE = re.compile(r"^(?P<indent>\s*)-\s+(?P<role>[A-Za-z0-9_-]+)\s*$")
 
 # Matches a `based-on:` frontmatter value, e.g. ``1-generic/developer.md@3.1.1``.
 # Captures the generic template stem (group "stem") and the pinned version
@@ -350,6 +341,9 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         * ``tool_privilege_mismatch`` (warning): a role's ``<persona>``
           declares itself read-only but its frontmatter ``tools:`` list
           grants ``Write``/``Edit`` access (issue #575).
+        * ``provider_registry_completeness`` (warning): a provider registered
+          in ``config/ai-providers.yaml`` is missing from a known
+          provider-keyed Python enumeration in ``scripts/`` (issue #625).
 
     Args:
         agent_meta_root: Repository root containing ``agents/`` and ``config/``.
@@ -514,6 +508,19 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                 detail=str(template),
             )
 
+    # --- 8. provider_registry_completeness (issue #625) ---------------------
+    # WARN only: a provider can be legitimately excluded from a touchpoint;
+    # see config_audit_providers.py for the check itself and its rationale.
+    registered_providers = set(load_providers_config(agent_meta_root).keys())
+    for touchpoint, provider in find_missing_providers(agent_meta_root, registered_providers):
+        report.add(
+            category="provider_registry_completeness",
+            severity="warning",
+            role=provider,
+            message=f"Provider '{provider}' is missing from {touchpoint.description}",
+            detail=touchpoint.file,
+        )
+
     return report
 
 
@@ -537,6 +544,7 @@ def format_report(report: AuditReport) -> str:
         ("stale_platform_overrides", "Stale Platform Overrides (based-on drift)", "[WARN] "),
         ("unpaired_closing_tags", "Unpaired Closing Tags", "[ERROR]"),
         ("tool_privilege_mismatch", "Tool-Privilege Mismatches (read-only vs. Write/Edit)", "[WARN] "),
+        ("provider_registry_completeness", "Provider Registry Completeness (missing from a known enumeration)", "[WARN] "),
     ]
 
     for category, title, tag in sections:
@@ -566,6 +574,7 @@ def report_to_dict(report: AuditReport) -> dict:
         "stale_platform_overrides",
         "unpaired_closing_tags",
         "tool_privilege_mismatch",
+        "provider_registry_completeness",
     )
     grouped: dict[str, list[dict]] = {c: [] for c in categories}
     for issue in report.issues:
@@ -583,66 +592,4 @@ def report_to_dict(report: AuditReport) -> dict:
     }
 
 
-def apply_audit(report: AuditReport, project_config_path: Path) -> int:
-    """Comment out deprecated role lines in project.yaml (line-based, idempotent).
-
-    Only roles flagged under the ``deprecated_roles`` category are disabled.
-    Each matching ``  - <role>`` line is rewritten as::
-
-        # - <role>  # AUTO-DISABLED YYYY-MM-DD: deprecated
-
-    The file is read and written line-by-line so YAML comments are preserved.
-    Lines already carrying the ``# AUTO-DISABLED`` marker are skipped, making
-    repeated invocations a no-op.
-
-    Args:
-        report: The audit report whose deprecated roles should be disabled.
-        project_config_path: Path to ``.meta-config/project.yaml``.
-
-    Returns:
-        The number of lines that were changed.
-    """
-    deprecated = set(report.deprecated_roles)
-    if not deprecated:
-        return 0
-    if not project_config_path.exists():
-        return 0
-
-    text = project_config_path.read_text(encoding="utf-8")
-    # Preserve the original line endings split; keepends=True retains "\n".
-    lines = text.splitlines(keepends=True)
-    today = date.today().isoformat()  # noqa: DTZ011
-    changed = 0
-
-    for index, line in enumerate(lines):
-        # Idempotency: never touch lines we already disabled.
-        if _AUTO_DISABLED_MARKER in line:
-            continue
-        # Separate the line body from its trailing newline to rebuild cleanly.
-        stripped_newline = ""
-        body = line
-        if body.endswith("\r\n"):
-            stripped_newline = "\r\n"
-            body = body[:-2]
-        elif body.endswith("\n"):
-            stripped_newline = "\n"
-            body = body[:-1]
-
-        match = _ROLE_LINE_RE.match(body)
-        if not match:
-            continue
-        if match.group("role") not in deprecated:
-            continue
-
-        indent = match.group("indent")
-        role = match.group("role")
-        lines[index] = (
-            f"{indent}# - {role}  "
-            f"{_AUTO_DISABLED_MARKER} {today}: deprecated{stripped_newline}"
-        )
-        changed += 1
-
-    if changed:
-        write_atomic(project_config_path, "".join(lines))
-
-    return changed
+# apply_audit() lives in config_audit_apply.py, re-exported via the import above.

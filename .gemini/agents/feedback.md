@@ -1,6 +1,6 @@
 ---
 name: feedback
-version: 1.3.0
+version: 1.4.0
 description: Standardizes bug reports, feature requests, and improvement suggestions
   for the deployed project — categorized, prepared, and submitted directly as a GitHub
   issue.
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/feedback.md@1.3.0
+generated-from: 1-generic/feedback.md@1.4.0
 model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -113,5 +113,5 @@ LABELS: [bug, ...]
 
 **User proxy:** `main_chat`.
 
-**Language:** GitHub issue title + body → **always English** (external docs). Internal notes → user's language.
+**Language:** GitHub issue title + body → **english** (project convention, configurable via `conventions.issues.language` in `project.yaml` — default: english). Internal notes → user's language.
 </constraints>

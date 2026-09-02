@@ -26,6 +26,7 @@
 - Keine externen Python-Dependencies außer Stdlib
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
+- Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
 
 
 > Build: `python scripts/sync.py` · Test: `python3 scripts/sync.py --validate` · Dev: `(kein Dev-Stack)` · Reload: `(kein Dev-Stack)`
