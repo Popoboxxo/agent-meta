@@ -77,6 +77,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "PROMPT_INJECTION_DEFENSE_BLOCK",
     # Convention blocks (rendered from config/conventions-presets.yaml by build_variables)
     "RELEASE_VERSIONING_BLOCK", "RELEASE_CHANGELOG_BLOCK", "GIT_ISSUE_NAMING_BLOCK",
+    # Issue language for feedback-created GitHub issues (issue #579)
+    "ISSUE_LANGUAGE",
     # SE cascade variables (from role-defaults.yaml se_variables)
     "SE_MIN_DEPTH", "SE_MAX_DEPTH", "SE_MAX_CRITIC_ITERATIONS", "SE_MAX_PARALLEL_CELLS",
     "SE_MAX_CELLS", "cost_limit_eur",

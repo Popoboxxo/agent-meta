@@ -2,9 +2,10 @@
 
 ## STATUS
 
-**in-progress** — 43 Issues gruppiert/sequenziert, Entscheidungen getroffen, Wave-by-Wave-Umsetzung gestartet.
-Waves laufen **sequenziell** (ein Feature-Branch nach dem anderen) — dieses Repo hat kein Worktree-Isolation
-für Subagenten (`.claude/rules/no-worktree-isolation.md`), daher ist echte Parallel-Entwicklung auf mehreren
+**done** — 43 Issues gruppiert/sequenziert, Entscheidungen getroffen, alle 10 Waves umgesetzt
+(zuletzt Wave 10 / #579 — Issue-Sprach-Konfigurierbarkeit).
+Waves liefen **sequenziell** (ein Feature-Branch nach dem anderen) — dieses Repo hat kein Worktree-Isolation
+für Subagenten (`.claude/rules/no-worktree-isolation.md`), daher war echte Parallel-Entwicklung auf mehreren
 Branches im selben Checkout nicht möglich.
 
 ## Entscheidungen (User, 2026-08-31)

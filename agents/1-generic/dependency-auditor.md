@@ -1,6 +1,6 @@
 ---
 name: template-dependency-auditor
-version: "1.1.0"
+version: "1.2.0"
 description: "Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL matrix), version drift, outdated and deprecated packages. Categorizes dependency findings by risk and files them via the feedback agent — not application security."
 hint: "Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue"
 prompt_mode: modern
@@ -115,5 +115,5 @@ NEXT: [Feedback issue | Developer upgrade]
 
 **User proxy:** `main_chat`. Confirmations carry user authority.
 
-**Language:** findings → {{INTERNAL_DOCS_LANGUAGE}}. Issue text (via feedback) → English.
+**Language:** findings → {{INTERNAL_DOCS_LANGUAGE}}. Issue text (via feedback) → {{ISSUE_LANGUAGE}}.
 </constraints>

@@ -294,7 +294,7 @@ Rules Presets bundle collections of architectural and coding standards. These gl
 <!-- help-id: framework_defaults-conventions_presets -->
 <!-- last-updated: 2026-08-18 -->
 <!-- author: Agent Meta Admin -->
-Conventions Presets define naming and versioning conventions per domain (release versioning/changelog, issue naming). Each preset feeds the `RELEASE_VERSIONING_BLOCK`, `RELEASE_CHANGELOG_BLOCK` and `GIT_ISSUE_NAMING_BLOCK` placeholders in the release/git agent templates. Projects select one via `conventions-preset` and refine it with a `conventions:` override block.
+Conventions Presets define naming and versioning conventions per domain (release versioning/changelog, issue naming). Each preset feeds the `RELEASE_VERSIONING_BLOCK`, `RELEASE_CHANGELOG_BLOCK` and `GIT_ISSUE_NAMING_BLOCK` placeholders in the release/git agent templates. Projects select one via `conventions-preset` and refine it with a `conventions:` override block. The `issues.language` field (default: `english`) additionally feeds `ISSUE_LANGUAGE`, used by the `feedback` agent for the language of GitHub issues it creates for the project — override via `conventions.issues.language`. `meta-feedback` is unaffected and always creates issues in English.
 
 ### Provider Tier Mappings
 <!-- help-id: framework_defaults-tier_mappings -->

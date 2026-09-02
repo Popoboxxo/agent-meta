@@ -60,6 +60,12 @@ rules-preset: default
 # Conventions-Preset steuert Namens-/Versionierungs-Konventionen (release.md, git.md):
 conventions-preset: default  # oder: calver, conventional-strict — siehe config/conventions-presets.yaml
 
+# Einzelne Conventions überschreiben (optional) — z.B. Sprache für GitHub-Issues,
+# die der feedback-Agent für dieses Projekt erstellt (Default: english):
+# conventions:
+#   issues:
+#     language: deutsch
+
 # Einzelne DoD-Kriterien überschreiben (optional / DoD overrides)
 dod:
   req-traceability: true    # REQ-IDs in Commit-Messages & Doku erzwingen / Require REQ-IDs

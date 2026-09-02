@@ -618,7 +618,7 @@
     },
     "conventions": {
       "type": "object",
-      "description": "Override individual naming/versioning convention fields on top of the selected conventions-preset. Structure mirrors config/conventions-presets.yaml presets.<name> (release.versioning, release.changelog, issues.*).",
+      "description": "Override individual naming/versioning convention fields on top of the selected conventions-preset. Structure mirrors config/conventions-presets.yaml presets.<name> (release.versioning, release.changelog, issues.*). 'issues.language' (default: 'english') sets the language for GitHub issues the feedback agent creates for this project — free-form string, not enum-constrained, same as every other nested conventions field (e.g. 'deutsch', 'français'); meta-feedback is unaffected and always stays English.",
       "additionalProperties": true
     },
     "debug-mode": {

@@ -40,6 +40,13 @@ presets:
       labels:
         namespace: "type: {type}"
       closing_keywords: [Fixes, Closes, Resolves]
+      # Sprache für GitHub-Issue-Titel+Body, die der `feedback`-Agent für DIESES
+      # Projekt erstellt (nicht `meta-feedback` — der bleibt immer Englisch,
+      # siehe agents/1-generic/meta-feedback.md). Bewusst NICHT an
+      # applies_to_roles: [git] gekoppelt — ISSUE_LANGUAGE wird unconditional in
+      # _build_convention_variables() berechnet (config.py), weil sie vom
+      # `feedback`-Template referenziert wird, nicht vom `git`-Template (Issue #579).
+      language: english
 
   calver:
     # Für kontinuierlich deployte Services/SaaS ohne externe Library-Konsumenten:
