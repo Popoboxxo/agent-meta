@@ -2,16 +2,23 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .frontmatter import collect_sources, extract_frontmatter_field
-from .io import write_checked
+from .io import SyncError, write_checked
 from .log import SyncLog
 from .providers import load_providers_config
 from .roles import resolve_model
+
+# Module-level logger for best-effort/fail-soft branches below that have no
+# SyncLog instance in scope (Issue #568) — DEBUG-level only, never printed by
+# default, but available for troubleshooting without silently swallowing the
+# error type/message/context.
+_logger = logging.getLogger(__name__)
 
 # Delegation graph: role -> roles it may hand off to.
 # TODO: Derive dynamically from agent templates (agents/1-generic/*.md).
@@ -119,8 +126,12 @@ def _infer_tier(role: str, config: dict) -> str:
             roles = data.get("roles", {})
             role_cfg = roles.get(role, {})
             return role_cfg.get("workflow_tier", "optional")
-    except Exception:  # noqa: BLE001, S110
-        pass
+    except (OSError, SyncError) as e:
+        # role-defaults.yaml is a soft hint source for the mindmap only — a
+        # missing/unreadable file (OSError) or malformed YAML (SyncError, see
+        # io.py::_load_yaml_or_json) just falls back to the generic tier below
+        # rather than breaking visualization generation.
+        _logger.debug("workflow_tier inference failed for role=%s: %s: %s", role, type(e).__name__, e)
     return "optional"
 
 
@@ -461,12 +472,12 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not viz_cfg.get("enabled", False):
         return
 
-    log.info("viz", "generiere Agenten-Visualisierung...")  # noqa: PLE1205
+    log.note("viz", "generiere Agenten-Visualisierung...")
 
     # 1. Hierarchie aufbauen (mit Provider-Config für korrekte Model-Auflösung)
     provider_config = load_providers_config(agent_meta_root)
     agents = build_agent_hierarchy(agent_meta_root, project_root, config, provider_config)
-    log.info("viz", f"{len(agents)} Agenten gefunden")  # noqa: PLE1205
+    log.note("viz", f"{len(agents)} Agenten gefunden")
 
     # 2. Output-Pfade bestimmen
     output_dir = project_root / viz_cfg.get("output_dir", "docs")
@@ -478,7 +489,7 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not dry_run:
         write_checked(md_path, mermaid_md, log=log, rel_label="agent-mindmap.md")
     else:
-        log.info("viz", f"would write: {md_path}")  # noqa: PLE1205
+        log.note("viz", f"would write: {md_path}")
 
     # 4. Interaktives HTML
     html_path = output_dir / "agent-graph.html"
@@ -486,9 +497,9 @@ def generate_viz(agent_meta_root: Path, project_root: Path, config: dict, log: S
     if not dry_run:
         write_checked(html_path, html, log=log, rel_label="agent-graph.html")
     else:
-        log.info("viz", f"would write: {html_path}")  # noqa: PLE1205
+        log.note("viz", f"would write: {html_path}")
 
-    log.info("viz", f"generiert: {md_path.name}, {html_path.name}")  # noqa: PLE1205
+    log.note("viz", f"generiert: {md_path.name}, {html_path.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -612,8 +623,13 @@ def read_events(project_root: Path, session_id: str | None = None, since: dateti
                             events.append(ev)
                         except (json.JSONDecodeError, ValueError):
                             continue
-    except Exception:  # noqa: BLE001, S110
-        pass
+    except OSError as e:
+        # Best-effort read: the event log may be deleted/rotated/permission-
+        # denied concurrently with a live viz session (dashboard polling
+        # while sync.py or another process touches events.jsonl). Returning
+        # whatever was collected so far (possibly []) is safe — callers treat
+        # a short/empty result as "no events yet", never as an error signal.
+        _logger.debug("read_events: I/O error reading %s: %s: %s", path, type(e).__name__, e)
     return events
 
 
@@ -651,13 +667,13 @@ def cleanup_old_sessions(project_root: Path, retention_days: int = 7, log: SyncL
                     f.unlink()
                 removed += 1
                 if log:
-                    log.info("viz-cleanup", f"gelöscht: {f.name}")  # noqa: PLE1205
+                    log.note("viz-cleanup", f"gelöscht: {f.name}")
         except Exception as exc:  # noqa: BLE001
             if log:
                 log.warning(f"viz-cleanup: {exc}")
 
     if log and removed:
-        log.info("viz-cleanup", f"{removed} alte Session(s) entfernt")  # noqa: PLE1205
+        log.note("viz-cleanup", f"{removed} alte Session(s) entfernt")
 
 
 def get_gitignore_entries() -> list[str]:
@@ -691,8 +707,13 @@ def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> st
             terminal_map = cfg.get("terminal_tool", {})
             if provider in terminal_map:
                 return terminal_map[provider]
-        except Exception:  # noqa: BLE001, S110
-            pass
+        except OSError as e:
+            # load_provider_tools_config() already fails soft (returns {} on
+            # its own I/O/YAML errors) — this only guards a directory-access
+            # error surfacing from the Path operations around it. Falling
+            # back to the hardcoded default map below is always safe: it's
+            # the same value used before config/provider-tools.yaml existed.
+            _logger.debug("terminal tool config lookup failed for provider=%s: %s: %s", provider, type(e).__name__, e)
     return _PROVIDER_TERMINAL_TOOL.get(provider)
 
 

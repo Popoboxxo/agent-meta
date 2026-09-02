@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .frontmatter import _split_frontmatter
 from .io import safe_path, write_checked
 from .log import SyncLog
 
@@ -46,16 +47,14 @@ def collect_command_sources(agent_meta_root: Path, platforms: list[str]) -> list
 
 def _add_frontmatter_field(content: str, field: str, value: str) -> str:
     """Add a frontmatter field if the frontmatter block exists and the field is absent."""
-    if not content.startswith("---"):
+    fm_block, body = _split_frontmatter(content)
+    if not fm_block:
         return content
-    end = content.find("\n---", 3)
-    if end == -1:
-        return content
-    frontmatter = content[3:end]
-    if field in frontmatter:
+    inner = fm_block[3:-4]  # strip surrounding '---'/'\n---' fences
+    if field in inner:
         return content
     insertion = f"\n{field}: {value}"
-    return "---" + frontmatter + insertion + content[end:]
+    return "---" + inner + insertion + "\n---" + body
 
 
 def _md_to_toml(content: str, stem: str) -> str:

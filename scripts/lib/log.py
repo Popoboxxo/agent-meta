@@ -70,8 +70,14 @@ class SyncLog:
         """
         self.skipped.append(f"[SKIP]   {target:<50}  ({reason})")
 
-    def info(self, target: str, reason: str):
-        """Record an info message.
+    def note(self, target: str, reason: str):
+        """Record an info-level note about a target.
+
+        Renamed from `info()` (#574): the two-positional-argument signature
+        (target, reason) is not a `logging.info(msg, *args)`-style format
+        string call, which confused linters into flagging false-positive
+        `PLE1205` (too-many-args-for-format-string) findings at every call
+        site. `note()` avoids the stdlib-logging naming collision entirely.
 
         Args:
             target: Resource or operation name.

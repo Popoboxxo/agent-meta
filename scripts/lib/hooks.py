@@ -323,10 +323,10 @@ def sync_hooks(
                 "matcher": meta.get("matcher", ""),
                 "command": _hook_settings_command(output_name, hooks_dir_rel),
             })
-            log.info(str(target_path.relative_to(project_root)),
+            log.note(str(target_path.relative_to(project_root)),
                      f"registered in settings.json (event: {event})")
         else:
-            log.info(str(target_path.relative_to(project_root)),
+            log.note(str(target_path.relative_to(project_root)),
                      f"copied (not enabled) — add \"hooks\": {{\"{hook_stem}\": {{\"enabled\": true}}}} to activate")
 
     # Remove stale hook scripts

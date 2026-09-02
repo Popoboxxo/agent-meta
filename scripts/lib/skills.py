@@ -125,7 +125,7 @@ def check_pinned_commits(ext_config: dict, agent_meta_root: Path, log: SyncLog) 
         # get_skill_commit returns short hash — compare prefix
         if actual != "unknown" and not pinned.startswith(actual):
             if _is_ahead_of_pin(repo_dir, pinned):
-                log.info(
+                log.note(
                     local_path,
                     f"checkout {actual} is ahead of pinned_commit {pinned[:8]} — "
                     f"local bump kept, consider bumping the registry pin",
@@ -222,7 +222,7 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
     if is_project_admin:
         target_dir = project_root / local_path
         if target_dir.exists() and not any(target_dir.iterdir()):
-            log.info(local_path, f"Initializing existing skill submodule: {repo_url}")
+            log.note(local_path, f"Initializing existing skill submodule: {repo_url}")
             result = subprocess.run(["git", "submodule", "update", "--init", local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
                 stderr = result.stderr.decode('utf-8', errors='ignore').strip()
@@ -232,12 +232,12 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
                 )
                 return
         elif not target_dir.exists():
-            log.info(local_path, f"Adding skill submodule: {repo_url}")
+            log.note(local_path, f"Adding skill submodule: {repo_url}")
             result = subprocess.run(["git", "submodule", "add", "--depth", "1", repo_url, local_path], cwd=str(project_root), capture_output=True)
             if result.returncode != 0:
                 stderr = result.stderr.decode('utf-8', errors='ignore').strip()
                 if "is found locally" in stderr or "already exists" in stderr:
-                    log.info(local_path, f"Local git directory conflict for {local_path} — cleaning up and retrying with force")
+                    log.note(local_path, f"Local git directory conflict for {local_path} — cleaning up and retrying with force")
                     # Proper git cleanup: deinit, rm from index, remove config, then filesystem cleanup
                     subprocess.run(["git", "submodule", "deinit", "-f", local_path],
                                    cwd=str(project_root), capture_output=True)
@@ -273,7 +273,7 @@ def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str,
     else:
         target_dir = agent_meta_root / local_path
         if not target_dir.exists():
-            log.info(local_path, f"Dynamically cloning skill repo: {repo_url}")
+            log.note(local_path, f"Dynamically cloning skill repo: {repo_url}")
             result = subprocess.run(["git", "clone", "--no-recursive", "--depth", "1", repo_url, local_path], cwd=str(agent_meta_root), capture_output=True)
             if result.returncode != 0:
                 stderr = result.stderr.decode('utf-8', errors='ignore').strip()
@@ -311,7 +311,7 @@ def deinit_skill_repo(agent_meta_root: Path, project_root: Path, local_path: str
     if not target_dir.exists():
         return
 
-    log.info(local_path, f"Deinitializing unused skill repo: {local_path}")
+    log.note(local_path, f"Deinitializing unused skill repo: {local_path}")
     if not dry_run:
         if is_submodule:
             result = subprocess.run(
@@ -425,7 +425,7 @@ def sync_external_skills_for_provider(
         skill_target_dir = safe_path(skills_dir, skill_name)
 
         if not _skill_is_active(skill_name, skill_cfg, project_skills):
-            log.info(role_label, f"skill '{skill_name}' is not active — skipping")
+            log.note(role_label, f"skill '{skill_name}' is not active — skipping")
             if not dry_run:
                 if agent_target.exists():
                     agent_target.unlink()
