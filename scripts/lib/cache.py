@@ -1,6 +1,5 @@
 """Outcome-Cache für Orchestrator-Delegationen."""
 from __future__ import annotations
-import hashlib
 import time
 from pathlib import Path
 from typing import Any
@@ -10,12 +9,6 @@ from .json_persistence import load_json_document, save_json_document
 CACHE_FILE = ".meta-viz/delegation-cache.json"
 
 _EMPTY_CACHE = {"entries": {}, "stats": {"hits": 0, "misses": 0}}
-
-
-def cache_key(agent: str, prompt: str) -> str:
-    """SHA256-Hash aus Agent-Name und Prompt (erste 200 Zeichen)."""
-    raw = f"{agent}:{prompt[:200]}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def read(cache_path: str, key: str, ttl: int = 3600) -> Any | None:
