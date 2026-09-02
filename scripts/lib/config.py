@@ -1134,12 +1134,13 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     """Populate release/issue convention-block variables.
 
     Parameter contract:
-        variables: mutated in place — receives whichever
-            RELEASE_VERSIONING_BLOCK/RELEASE_CHANGELOG_BLOCK/
-            GIT_ISSUE_NAMING_BLOCK-style keys `render_convention_block()`
-            returns for the "release"/"issues" domains. A role-inactive domain
-            sets NO variable at all (not even an empty string) — its template
-            is not generated anyway (Konzept Abschnitt C).
+        variables: mutated in place — receives ISSUE_LANGUAGE (always set,
+            see below) plus whichever RELEASE_VERSIONING_BLOCK/
+            RELEASE_CHANGELOG_BLOCK/GIT_ISSUE_NAMING_BLOCK-style keys
+            `render_convention_block()` returns for the "release"/"issues"
+            domains. A role-inactive domain sets NO block variable at all
+            (not even an empty string) — its template is not generated
+            anyway (Konzept Abschnitt C).
         config: the loaded project.yaml dict (read-only; reads `roles`).
         agent_meta_root: agent-meta source root (for conventions-presets.yaml).
 
@@ -1149,6 +1150,10 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     no SyncLog param, so a local one is used for the log.skip()/log.warning()
     calls here (log.warning still prints to stderr, so a malformed preset is
     visible).
+
+    ISSUE_LANGUAGE (issue #579): the "issues" domain's `language` field, read
+    unconditionally (not role-gated like the block variables above) — see the
+    inline comment at its assignment for why.
     """
     from .conventions import render_convention_block, resolve_conventions
 
@@ -1160,6 +1165,20 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     except ValueError as _conv_exc:
         _conv_log.warning(f"conventions: {_conv_exc} — Konventions-Injektion übersprungen")
         _resolved_conventions = {}
+
+    # ISSUE_LANGUAGE (issue #579): language for GitHub issues the `feedback`
+    # agent creates for THIS project (meta-feedback stays hardcoded English —
+    # external community docs, out of scope). Read directly off the resolved
+    # "issues" domain instead of going through render_convention_block()'s
+    # role-gate: that gate is keyed to applies_to_roles: [git] (it exists for
+    # GIT_ISSUE_NAMING_BLOCK, consumed by git.md), but ISSUE_LANGUAGE is
+    # consumed by feedback.md — gating it to the 'git' role would make the
+    # placeholder go unresolved on a project with 'feedback' active but 'git'
+    # inactive. Always computed, defaults to "english" (unchanged behavior).
+    variables["ISSUE_LANGUAGE"] = (
+        (_resolved_conventions.get("issues") or {}).get("language") or "english"
+    )
+
     for _domain in ("release", "issues"):
         _domain_spec = _resolved_conventions.get(_domain)
         if not isinstance(_domain_spec, dict):

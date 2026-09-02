@@ -909,6 +909,7 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | `RELEASE_VERSIONING_BLOCK` | string | Versionierungs-Tabelle in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
 | `RELEASE_CHANGELOG_BLOCK` | string | CHANGELOG-Format-Codeblock in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
 | `GIT_ISSUE_NAMING_BLOCK` | string | Issue-Naming-Block in `git.md`, gerendert aus `config/conventions-presets.yaml` (Domain `issues`). Nicht gesetzt wenn `git` nicht aktiv |
+| `ISSUE_LANGUAGE` | string | Sprache für GitHub-Issues, die `feedback` für dieses Projekt erstellt (`feedback.md`, `dependency-auditor.md`). Aus `config/conventions-presets.yaml` (Domain `issues`, Feld `language`), überschreibbar via `conventions.issues.language` in `project.yaml`. Immer gesetzt (nicht rollen-gegated), Default `"english"`. `meta-feedback` bleibt unverändert immer Englisch (Issue #579) |
 
 **Flat-Mode-Flags (statt nested {{#if}}/{{else}}):**
 - Genau ein ORCH_MODE_*-Flag ist `true`, alle anderen `false`
