@@ -108,4 +108,3 @@ REVIEW_NOTES: [open points]
 
 **Language:** templates in English (multi-provider capable), reviewer communication in {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
-</output>

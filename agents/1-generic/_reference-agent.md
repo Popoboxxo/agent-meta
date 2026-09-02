@@ -172,4 +172,3 @@ NEXT:
 **Commits:** `<type>(REQ-xxx): <english imperative>`; first line <=72 characters.
 **Language:** User {{COMMUNICATION_LANGUAGE}} | External {{EXTERNAL_DOCS_LANGUAGE}} | Internal {{INTERNAL_DOCS_LANGUAGE}} | Code {{CODE_LANGUAGE}}. Rule `language.md`.
 </constraints>
-</output>

@@ -126,4 +126,3 @@ Delegation:
 
 **Language:** communication → Deutsch. Token names, code comments → Englisch.
 </constraints>
-</output>

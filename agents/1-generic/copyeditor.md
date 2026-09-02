@@ -136,4 +136,3 @@ NEXT: [Author review | proofreader pass if prerequisite missing | no further ste
 
 **Language:** report and findings → {{DOCS_LANGUAGE}}; suggestions preserve the source text's own language.
 </constraints>
-</output>

@@ -142,4 +142,3 @@ REPORT_FILE: [path]
 
 **Language:** code comments, commit messages, infrastructure descriptions → English.
 </constraints>
-</output>

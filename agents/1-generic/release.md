@@ -122,4 +122,3 @@ ARTIFACTS: [list of attached files]
 
 **Language:** CHANGELOG.md → {{DOCS_LANGUAGE}}.
 </constraints>
-</output>

@@ -107,4 +107,3 @@ NOTES: [print recommendations, material, settings]
 
 **Language:** OpenSCAD code in English, user communication in user language.
 </constraints>
-</output>

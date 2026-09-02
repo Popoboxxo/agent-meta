@@ -127,4 +127,3 @@ NEXT: [Review | Requirements (formal REQ) | ui-ux-designer]
 
 **Language:** backlog and stories → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
-</output>

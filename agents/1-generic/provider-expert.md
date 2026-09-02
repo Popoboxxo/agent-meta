@@ -96,4 +96,3 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 
 **Language:** communication in user language. Code snippets/config → English.
 </constraints>
-</output>

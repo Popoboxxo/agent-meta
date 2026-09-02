@@ -137,4 +137,3 @@ NEXT: [Hand off to requirements | Back to author | Escalate]
 
 **Language:** review findings in the language of the incoming concept, user communication in Deutsch.
 </constraints>
-</output>

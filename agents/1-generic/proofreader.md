@@ -129,4 +129,3 @@ NEXT: [Author review | copyeditor for a style pass | no further steps]
 
 **Language:** report and findings → {{DOCS_LANGUAGE}}; corrections preserve the source text's own language.
 </constraints>
-</output>

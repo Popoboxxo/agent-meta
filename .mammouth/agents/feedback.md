@@ -113,4 +113,3 @@ LABELS: [bug, ...]
 
 **Language:** GitHub issue title + body → **always English** (external docs). Internal notes → user's language.
 </constraints>
-</output>

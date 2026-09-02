@@ -101,4 +101,3 @@ NEXT: [recommended step: developer, feature, ...]
 
 **Language:** `docs/REQUIREMENTS.md` → Deutsch.
 </constraints>
-</output>

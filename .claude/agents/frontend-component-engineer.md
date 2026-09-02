@@ -117,4 +117,3 @@ Delegation:
 
 **Language:** Communication → Deutsch. Code comments and commit messages → Englisch.
 </constraints>
-</output>

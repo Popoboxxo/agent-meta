@@ -111,4 +111,3 @@ NOTES: [diagnostic results, recommendations]
 
 **Language:** code comments → English; diagnostic reports → user language.
 </constraints>
-</output>

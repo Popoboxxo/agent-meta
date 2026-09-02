@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 7.10.0
+version: 7.11.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -10,7 +10,7 @@ tools:
 - TodoWrite
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@7.10.0
+generated-from: 1-generic/orchestrator.md@7.11.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -148,8 +148,9 @@ Features mit >2 Dateien oder Architektur-Impact.
 | `junior-developer` | Solution obvious, ≤2 files |
 | `developer` | Standard, clear scope, ≤3 files |
 | `senior-developer` | Architecture impact, risk |
+| `principal-developer` | Last resort: `senior-developer` has failed 2+ times on the same task and returns `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer` — requires explicit escalation gate (task summary + failure log), `orchestrator_only`, never called directly by other agents |
 
-In doubt → higher tier. `ESCALATE` card → straight to `recommended_tier`. Max 1 escalation per task.
+In doubt → higher tier (below `principal-developer`). `ESCALATE` card → straight to `recommended_tier`. Max 1 escalation per task, except the explicit `senior-developer` → `principal-developer` last-resort gate.
 
 ## 5. Pre-delegation self-validation gate
 1. Agent fits the intent?
@@ -363,4 +364,3 @@ Verbotene `subagent_type`-Werte beim Dispatchen: `orchestrator`, `orchestrator-i
 
 **Language:** Documents → Englisch | details: Rule `language.md`
 </constraints>
-</output>

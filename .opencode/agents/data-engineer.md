@@ -156,4 +156,3 @@ NEXT: [Review | Developer implementation | Tests]
 
 **Language:** code comments + pipeline comments → Englisch.
 </constraints>
-</output>

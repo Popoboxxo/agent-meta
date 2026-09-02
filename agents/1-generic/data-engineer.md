@@ -142,4 +142,3 @@ NEXT: [Review | Developer implementation | Tests]
 
 **Language:** code comments + pipeline comments → {{CODE_LANGUAGE}}.
 </constraints>
-</output>

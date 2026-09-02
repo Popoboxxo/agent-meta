@@ -107,4 +107,3 @@ LABELS: [list]
 
 **Language:** issue title + body → **always English** (external community docs).
 </constraints>
-</output>
