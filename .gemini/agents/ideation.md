@@ -128,4 +128,3 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 
 **Language:** communication → Deutsch. Concept docs → project language.
 </constraints>
-</output>

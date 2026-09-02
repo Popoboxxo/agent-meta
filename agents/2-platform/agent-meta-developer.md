@@ -1,7 +1,7 @@
 ---
 name: agent-meta-developer
-version: "2.0.0"
-based-on: "1-generic/developer.md@4.0.1"
+version: "2.0.1"
+based-on: "1-generic/developer.md@4.0.2"
 description: "Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur, Rollen-Anlegen-Prozess und Sync-Interface."
 hint: "Feature-Implementierung und Bugfixes im agent-meta Framework (Python, Markdown, YAML)"
 prompt_mode: modern

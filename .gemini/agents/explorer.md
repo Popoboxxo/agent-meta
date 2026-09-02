@@ -97,4 +97,3 @@ The synchronous tool-result channel truncates large responses **silently**
 - Larger digests: return a structured summary (paths + one-liners) and
   offer `chunk k/n` continuation on request instead of dumping everything.
 </output-guard>
-</output>

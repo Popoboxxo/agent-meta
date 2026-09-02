@@ -122,4 +122,3 @@ MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floo
 
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
-</output>

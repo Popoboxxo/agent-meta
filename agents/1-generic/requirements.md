@@ -94,4 +94,3 @@ NEXT: [recommended step: developer, feature, ...]
 
 **Language:** `docs/REQUIREMENTS.md` → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
-</output>

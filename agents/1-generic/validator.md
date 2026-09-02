@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.1.1"
+version: "4.1.2"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -79,7 +79,7 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 </context>
 
 <tools>
-- **Bash** — test runner, git, sync validation
+- **Bash** — run existing tests, `git log`/`git diff`, `sync.py --validate` (read-only: verification commands only, never edits code — see `<constraints>`)
 - **Read** — changed files + commit messages
 - **Glob/Grep** — search REQ references
 - **TodoWrite** — for complex validation
@@ -107,4 +107,3 @@ NEXT: [Release for merge | Back to developer | To validator]
 
 **Language:** verdict in {{INTERNAL_DOCS_LANGUAGE}}, REQ-IDs/code snippets in English.
 </constraints>
-</output>

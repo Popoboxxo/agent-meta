@@ -121,4 +121,3 @@ NEXT: [Review | Developer change | Documenter (internal)]
 
 **Language:** external docs (README, API reference, release notes) → Englisch.
 </constraints>
-</output>

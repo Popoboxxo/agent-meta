@@ -16,6 +16,7 @@ Design constraints:
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -53,6 +54,22 @@ _BASED_ON_RE = re.compile(
 # Leading integer run of a semver-ish string, e.g. "4" from "4.0.1" or
 # "3.1.1-beta.2". Non-numeric/missing major segments return None.
 _MAJOR_VERSION_RE = re.compile(r"^(\d+)")
+
+# Extracts the content of a `<persona>...</persona>` block (DOTALL so the
+# persona's mission statement can span multiple lines).
+_PERSONA_BLOCK_RE = re.compile(r"<persona>(.*?)</persona>", re.S)
+
+# Tools that grant write access to the filesystem. A role whose persona
+# explicitly declares itself "read-only" must not carry either (issue #575).
+_WRITE_TOOLS = frozenset({"Write", "Edit"})
+
+# Matches a line that consists of *nothing but* an XML-ish tag, e.g.
+# ``<persona>`` or ``</output_contract>``. Deliberately anchored to the full
+# (stripped) line rather than scanning free text -- templates frequently
+# mention tag names inline in prose (`` `<context>` ``) or use tag-shaped
+# placeholders inside fenced output examples (``<list>``, ``<role>``), and a
+# substring scan would misreport those as real structural tags (issue #567).
+_STANDALONE_TAG_RE = re.compile(r"^(</?)([A-Za-z][A-Za-z0-9_-]*)>$")
 
 
 @dataclass(frozen=True)
@@ -219,6 +236,68 @@ def _collect_platform_overrides(agent_meta_root: Path) -> list[Path]:
     return sorted(p for p in platform_dir.glob("*.md") if not p.name.startswith("_"))
 
 
+def _find_unpaired_closing_tags(path: Path) -> list[str]:
+    """Return tag names with a standalone closing line but no matching open.
+
+    Only counts lines that are *exactly* a tag (see :data:`_STANDALONE_TAG_RE`)
+    so free-text mentions or placeholder examples never trigger a false
+    positive -- only a genuine orphaned closing tag (open count 0, close
+    count >= 1) is reported. This is one-directional by design: an unclosed
+    *opening* tag (e.g. a template placeholder like ``<list>``) is not this
+    check's concern (issue #567).
+    """
+    opens: Counter = Counter()
+    closes: Counter = Counter()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = _STANDALONE_TAG_RE.match(line.strip())
+        if not match:
+            continue
+        slash, name = match.groups()
+        if slash == "</":
+            closes[name] += 1
+        else:
+            opens[name] += 1
+    return sorted(name for name, count in closes.items() if count > opens.get(name, 0))
+
+
+def _find_tool_privilege_mismatch(path: Path) -> str | None:
+    """Return a mismatch message when a role declares itself read-only but
+    carries a write-capable tool (``Write``/``Edit``).
+
+    Scoped to the ``<persona>`` block only (not the whole file) -- "read-only"
+    shows up in many templates as a description of an *external* concept
+    (e.g. a CLI's read-only mode) rather than a claim about the agent's own
+    tool access; only the persona's self-description is authoritative here
+    (issue #575, decision: keep `Bash` on `validator`/`code-reviewer` per the
+    established "(read-only)" tools-bullet annotation convention -- this
+    check targets the stronger Write/Edit signal instead).
+    """
+    text = path.read_text(encoding="utf-8")
+    match = _PERSONA_BLOCK_RE.search(text)
+    if not match or not re.search(r"read-only", match.group(1), re.IGNORECASE):
+        return None
+    tools = parse_frontmatter_file(path).get("tools") or []
+    if not isinstance(tools, list):
+        return None
+    offending = sorted(_WRITE_TOOLS.intersection(tools))
+    if not offending:
+        return None
+    return (
+        f"declares itself read-only in <persona> but has write-capable "
+        f"tool(s): {', '.join(offending)}"
+    )
+
+
+def _collect_template_files(agent_meta_root: Path) -> list[Path]:
+    """Return all agent template Markdown files (1-generic + 2-platform)."""
+    files: list[Path] = []
+    for subdir in ("1-generic", "2-platform"):
+        directory = agent_meta_root / "agents" / subdir
+        if directory.is_dir():
+            files.extend(sorted(directory.glob("*.md")))
+    return files
+
+
 def _collect_pipeline_role_refs(config: dict) -> set[str]:
     """Return every role referenced by a quality pipeline ``agent:`` field.
 
@@ -265,6 +344,12 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         * ``stale_platform_overrides`` (warning): a 2-platform override's
           ``based-on: "1-generic/<role>.md@<version>"`` pin has fallen 1+
           major versions behind the current generic template (issue #560).
+        * ``unpaired_closing_tags`` (error): a template has a standalone
+          closing tag (e.g. ``</output>``) with no matching opening tag
+          anywhere in the file (issue #567).
+        * ``tool_privilege_mismatch`` (warning): a role's ``<persona>``
+          declares itself read-only but its frontmatter ``tools:`` list
+          grants ``Write``/``Edit`` access (issue #575).
 
     Args:
         agent_meta_root: Repository root containing ``agents/`` and ``config/``.
@@ -396,6 +481,39 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                 detail=str(override),
             )
 
+    # --- 6. unpaired_closing_tags -------------------------------------------
+    # Copy-paste artifacts (a trailing `</output>` with no `<output>` anywhere
+    # in the file) silently ship broken structural markup into every synced
+    # project (issue #567). Scoped to 1-generic + 2-platform since those are
+    # the only template layers maintained in this repo.
+    for template in _collect_template_files(agent_meta_root):
+        for tag in _find_unpaired_closing_tags(template):
+            report.add(
+                category="unpaired_closing_tags",
+                severity="error",
+                role=template.stem,
+                message=(
+                    f"Template '{template.name}' has an unpaired closing "
+                    f"tag </{tag}> with no matching <{tag}>"
+                ),
+                detail=str(template),
+            )
+
+    # --- 7. tool_privilege_mismatch -----------------------------------------
+    # Least-privilege drift: a role whose persona explicitly claims to be
+    # read-only must not silently gain Write/Edit access via a copy-pasted
+    # tools list (issue #575).
+    for template in _collect_template_files(agent_meta_root):
+        message = _find_tool_privilege_mismatch(template)
+        if message:
+            report.add(
+                category="tool_privilege_mismatch",
+                severity="warning",
+                role=template.stem,
+                message=f"Template '{template.name}' {message}",
+                detail=str(template),
+            )
+
     return report
 
 
@@ -417,6 +535,8 @@ def format_report(report: AuditReport) -> str:
         ("templates_without_default", "Templates Without Role-Default", "[INFO] "),
         ("orphaned_pipelines", "Orphaned Pipeline References", "[WARN] "),
         ("stale_platform_overrides", "Stale Platform Overrides (based-on drift)", "[WARN] "),
+        ("unpaired_closing_tags", "Unpaired Closing Tags", "[ERROR]"),
+        ("tool_privilege_mismatch", "Tool-Privilege Mismatches (read-only vs. Write/Edit)", "[WARN] "),
     ]
 
     for category, title, tag in sections:
@@ -444,6 +564,8 @@ def report_to_dict(report: AuditReport) -> dict:
         "templates_without_default",
         "orphaned_pipelines",
         "stale_platform_overrides",
+        "unpaired_closing_tags",
+        "tool_privilege_mismatch",
     )
     grouped: dict[str, list[dict]] = {c: [] for c in categories}
     for issue in report.issues:

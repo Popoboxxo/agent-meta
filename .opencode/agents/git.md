@@ -128,4 +128,3 @@ ARTIFACTS: [changed/new files]
 
 **Language:** commit messages → Englisch (typically English).
 </constraints>
-</output>

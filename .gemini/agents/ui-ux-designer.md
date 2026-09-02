@@ -107,4 +107,3 @@ ARTIFACTS: [files created]
 
 **Language:** UI specs, design system, mockup descriptions → English.
 </constraints>
-</output>

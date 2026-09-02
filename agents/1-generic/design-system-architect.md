@@ -118,4 +118,3 @@ Delegation:
 
 **Language:** communication → {{COMMUNICATION_LANGUAGE}}. Token names, code comments → {{CODE_LANGUAGE}}.
 </constraints>
-</output>

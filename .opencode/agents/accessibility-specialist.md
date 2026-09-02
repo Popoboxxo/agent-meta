@@ -144,4 +144,3 @@ NEXT: [Review | Developer fix | Documenter]
 
 **Language:** audit reports → Deutsch.
 </constraints>
-</output>

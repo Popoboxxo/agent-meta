@@ -142,4 +142,3 @@ NEXT: [Review | Developer feature work | Documenter]
 
 **Language:** code comments + commit messages → {{CODE_LANGUAGE}}.
 </constraints>
-</output>

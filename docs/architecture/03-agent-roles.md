@@ -40,6 +40,11 @@ graph TD
 | `intern-developer` | Easter-Egg/Gag-Agent. Übereifriger, ahnungsloser Intern — read-only, nie für echte Arbeit geroutet | — | nano |
 | `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase | sonnet |
 | `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR | sonnet |
+| `code-reviewer` | Gatekeeper für Code-Qualität: Clean Code, SOLID, Blast-Radius | Nach Implementierung | powerful |
+| `backend-reviewer` | Domain-Review Backend/Server-Code: API-Contracts, Silent Failures, Concurrency | Nach `code-reviewer`, backend-lastige Changes | balanced |
+| `database-reviewer` | Domain-Review Datenschicht: Migrationssicherheit, N+1, Injection, Indexing | Nach `code-reviewer`, DB-lastige Changes | balanced |
+| `frontend-reviewer` | Domain-Review Frontend-Code: Komponenten, State, SSR/Hydration, Render-Performance | Nach `code-reviewer`, frontend-lastige Changes | balanced |
+| `ui-reviewer` | Domain-Review UI-Konsistenz: Design-Token, Layout, Interaction States, i18n | Nach `code-reviewer`, UI-lastige Changes | balanced |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben | Neue Anforderungen | *(voll)* |
 | `ideation` | Neue Ideen explorieren, Vision schärfen | Ideen-Phase | *(voll)* |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README | Nach Implementierung | sonnet |
@@ -60,3 +65,20 @@ graph TD
 | `se-critic` | Quality Gate: Vollständigkeit, Konsistenz, Testbarkeit | SE-Audit | powerful |
 | `se-interface-mgr` | Interface-Verträge + Propagations-Map | SE-Interfaces | balanced |
 | `se-termination` | Leaf/Continue-Entscheidung pro Komponente | SE-Abschluss | fast |
+
+## Review-Pipeline (Code-Reviewer + Domain-Spezialisten)
+
+`code-reviewer` ist der generelle Gatekeeper (SOLID/Clean-Code/Blast-Radius) und läuft
+immer zuerst. Die vier Domain-Reviewer (`backend-reviewer`, `database-reviewer`,
+`frontend-reviewer`, `ui-reviewer`) sind **Spezialisten, die NACH dem code-reviewer-Pass**
+laufen — nur wenn ein Finding Domain-Tiefe jenseits von allgemeiner Code-Qualität braucht:
+
+```
+developer → code-reviewer → (Domain-Reviewer, falls nötig) → senior-developer
+```
+
+Routing ist bidirektional: jeder Domain-Reviewer verweist Findings außerhalb seiner
+eigenen Domain-Grenze (siehe `<context>` Boundaries im jeweiligen Template) zurück an
+`code-reviewer`. Alle vier Domain-Reviewer sind reine Read-only-Rollen (`Read`/`Glob`/`Grep`/
+`TodoWrite`, kein `Write`/`Edit`/`Bash`) — sie liefern strukturierte Findings
+(`rule_id`, `MERGE_SCORE`), fixen aber nie selbst.

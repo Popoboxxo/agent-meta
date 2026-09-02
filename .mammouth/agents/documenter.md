@@ -111,4 +111,3 @@ NOTES: [short summary of changes]
 
 **Language:** README → Englisch · internal docs → Deutsch.
 </constraints>
-</output>

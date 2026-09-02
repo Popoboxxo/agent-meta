@@ -95,4 +95,3 @@ Delegation:
 
 **Language:** Communication → {{COMMUNICATION_LANGUAGE}}. Code comments and commit messages → {{CODE_LANGUAGE}}.
 </constraints>
-</output>

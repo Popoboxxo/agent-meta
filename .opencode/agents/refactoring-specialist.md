@@ -156,4 +156,3 @@ NEXT: [Review | Developer feature work | Documenter]
 
 **Language:** code comments + commit messages → Englisch.
 </constraints>
-</output>

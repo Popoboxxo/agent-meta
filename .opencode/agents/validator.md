@@ -1,10 +1,10 @@
 ---
 name: validator
-version: 4.1.1
+version: 4.1.2
 description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions.
   Does NOT judge code quality — that''s code-reviewer.'
 prompt_mode: modern
-generated-from: 1-generic/validator.md@4.1.1
+generated-from: 1-generic/validator.md@4.1.2
 mode: subagent
 permission:
   bash: allow
@@ -63,7 +63,7 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 </context>
 
 <tools>
-- **Bash** — test runner, git, sync validation
+- **Bash** — run existing tests, `git log`/`git diff`, `sync.py --validate` (read-only: verification commands only, never edits code — see `<constraints>`)
 - **Read** — changed files + commit messages
 - **Glob/Grep** — search REQ references
 - **TodoWrite** — for complex validation
@@ -91,4 +91,3 @@ NEXT: [Release for merge | Back to developer | To validator]
 
 **Language:** verdict in Deutsch, REQ-IDs/code snippets in English.
 </constraints>
-</output>

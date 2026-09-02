@@ -130,4 +130,3 @@ WARNINGS: [if any]
 
 **Language:** code comments, commit messages, export metadata → English.
 </constraints>
-</output>

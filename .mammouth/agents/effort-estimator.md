@@ -95,4 +95,3 @@ Format: see `<output_contract>`. Confidence: high/medium/low + rationale.
 
 **Language:** communication in user's language, estimate output may be bilingual.
 </constraints>
-</output>

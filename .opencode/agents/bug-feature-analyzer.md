@@ -131,4 +131,3 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 
 **Language:** triage reports → Deutsch.
 </constraints>
-</output>

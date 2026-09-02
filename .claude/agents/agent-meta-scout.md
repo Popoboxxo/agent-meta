@@ -105,4 +105,3 @@ NEXT: [integration into agent-meta for each RECOMMENDED candidate]
 
 **Language:** recommendations → user's language (user output), repo references → English.
 </constraints>
-</output>

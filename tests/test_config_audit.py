@@ -275,6 +275,66 @@ def test_based_on_multi_instance_roles_excluded(meta_root: Path) -> None:
     assert missing == {"ghost-role"}
 
 
+def test_unpaired_closing_tag_detected(meta_root: Path) -> None:
+    # Copy-paste artifact from issue #567: a trailing `</output>` with no
+    # matching `<output>` anywhere in the file.
+    _write(
+        meta_root / "agents" / "1-generic" / "developer.md",
+        _template("developer") + "<persona>\ntext\n</persona>\n</output>\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n  - git\n")
+    report = audit_config(meta_root, cfg)
+    unpaired = report.by_category("unpaired_closing_tags")
+    assert len(unpaired) == 1
+    assert unpaired[0].role == "developer"
+    assert unpaired[0].severity == "error"
+    assert "</output>" in unpaired[0].message
+    assert "<output>" in unpaired[0].message
+
+
+def test_unpaired_closing_tag_ignores_balanced_tags(meta_root: Path) -> None:
+    _write(
+        meta_root / "agents" / "1-generic" / "developer.md",
+        _template("developer") + "<persona>\ntext\n</persona>\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n  - git\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("unpaired_closing_tags") == []
+
+
+def test_unpaired_closing_tag_ignores_inline_prose_and_placeholders(meta_root: Path) -> None:
+    # Inline mentions (`` `<context>` `` mid-sentence) and tag-shaped output
+    # placeholders (`<list>` as freeform example content) must never be
+    # mistaken for real structural tags -- only a standalone closing line
+    # with no standalone opening line anywhere is a genuine finding.
+    _write(
+        meta_root / "agents" / "1-generic" / "developer.md",
+        _template("developer") + (
+            "See `<context>` for details.\n"
+            "### Affected components\n"
+            "<list>\n"
+        ),
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n  - git\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("unpaired_closing_tags") == []
+
+
+def test_unpaired_closing_tag_scans_platform_overrides(meta_root: Path) -> None:
+    _write(
+        meta_root / "agents" / "2-platform" / "acme-developer.md",
+        "---\nname: acme-developer\nversion: \"1.0.0\"\n"
+        "description: \"ACME developer override.\"\n"
+        "based-on: \"1-generic/developer.md@1.0.0\"\n---\n\n"
+        "<persona>\ntext\n</persona>\n</output>\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n  - git\n")
+    report = audit_config(meta_root, cfg)
+    unpaired = report.by_category("unpaired_closing_tags")
+    assert len(unpaired) == 1
+    assert unpaired[0].role == "acme-developer"
+
+
 # ---------------------------------------------------------------------------
 # apply_audit
 # ---------------------------------------------------------------------------

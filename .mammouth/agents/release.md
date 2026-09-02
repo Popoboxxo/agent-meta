@@ -142,4 +142,3 @@ ARTIFACTS: [list of attached files]
 
 **Language:** CHANGELOG.md → Englisch.
 </constraints>
-</output>

@@ -125,4 +125,3 @@ ARTIFACTS: [changed/new files]
 
 **Language:** commit messages → {{CODE_LANGUAGE}} (typically English).
 </constraints>
-</output>

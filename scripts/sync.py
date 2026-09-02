@@ -1146,11 +1146,27 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # later changes to that base -- including security-relevant workflow
     # steps. Warn loudly when the pin has fallen 1+ major versions behind
     # the current generic template so drift can't silently accumulate.
-    _stale_overrides = audit_config(agent_meta_root, config_path).by_category(
-        "stale_platform_overrides"
-    )
+    _validate_audit_report = audit_config(agent_meta_root, config_path)
+    _stale_overrides = _validate_audit_report.by_category("stale_platform_overrides")
     for _stale in _stale_overrides:
         log.warning(f"config-audit [P1] stale-override: {_stale.message}")
+
+    # Unpaired closing tags (issue #567): a copy-paste artifact like a
+    # trailing `</output>` with no `<output>` anywhere in the file ships
+    # broken structural markup into every synced project. Treated as a hard
+    # validation error, same as the other consistency checks.
+    _unpaired_tags = _validate_audit_report.by_category("unpaired_closing_tags")
+    for _unpaired in _unpaired_tags:
+        log.warning(f"config-audit [ERROR] unpaired-closing-tag: {_unpaired.message}")
+    if _unpaired_tags:
+        consistency_errors += len(_unpaired_tags)
+
+    # Tool-privilege / role-name mismatch (issue #575): warns only, does not
+    # block validation -- a role claiming "read-only" in its persona but
+    # carrying Write/Edit is a smell worth a human look, not a hard failure.
+    _tool_mismatches = _validate_audit_report.by_category("tool_privilege_mismatch")
+    for _mismatch in _tool_mismatches:
+        log.warning(f"config-audit [WARN] tool-privilege-mismatch: {_mismatch.message}")
 
     from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
     from lib.consistency.report import print_report

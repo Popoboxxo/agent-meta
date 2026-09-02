@@ -156,4 +156,3 @@ NEXT: [Commit | More optimization | Blocked]
 
 **Language:** code comments, commit messages, performance reports → English.
 </constraints>
-</output>

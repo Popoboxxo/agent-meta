@@ -139,4 +139,3 @@ RECOMMENDATIONS: [count]
 
 **Language:** code comments, commit messages, API descriptions → English.
 </constraints>
-</output>
