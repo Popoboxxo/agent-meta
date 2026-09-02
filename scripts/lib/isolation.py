@@ -19,7 +19,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import read_json_lenient, safe_path, write_checked
+from .io import read_json_lenient, safe_path, write_atomic, write_checked
 from .log import SyncLog
 
 # Companion state files — store agent-meta tracking data outside tool JSON schemas.
@@ -58,9 +58,6 @@ def sync_provider_isolation(
     log.note("provider-isolation", f"generating isolation for: {', '.join(providers)}")
 
     for provider in providers:
-        pc = provider_config.get(provider, {})
-        pc.get("isolation-dirs", [])
-
         # foreign_dirs = isolation-dirs of all OTHER active providers
         foreign_dirs: list[str] = []
         for other in providers:
@@ -124,10 +121,9 @@ def _write_state(state_path: Path, managed_patterns: list[str], dry_run: bool) -
     """Write managed isolation patterns to a companion state file."""
     if dry_run:
         return
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
+    write_atomic(
+        state_path,
         json.dumps({"isolation-deny": managed_patterns}, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
     )
 
 

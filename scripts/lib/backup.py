@@ -116,9 +116,30 @@ def _build_manifest(
 
 
 def _archive_name(prefix: str = "agent-meta-backup") -> str:
-    """Generate a timestamped archive name."""
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")  # noqa: DTZ005
+    """Generate a timestamped archive name with microsecond precision (#582).
+
+    Second-only precision collided when multiple backups were created
+    within the same second (e.g. deactivating several providers back to
+    back), silently overwriting the earlier archive.
+    """
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")  # noqa: DTZ005
     return f"{prefix}_{ts}"
+
+
+def _unique_archive_name(backup_dir: Path, prefix: str = "agent-meta-backup") -> str:
+    """Return an archive name guaranteed not to already exist in backup_dir.
+
+    Microsecond precision alone makes collisions exceedingly rare, but a
+    defensive counter suffix still guards against coarse filesystem/clock
+    resolution instead of silently overwriting an existing backup (#582).
+    """
+    name = _archive_name(prefix)
+    if not (backup_dir / f"{name}.zip").exists():
+        return name
+    counter = 2
+    while (backup_dir / f"{name}_{counter}.zip").exists():
+        counter += 1
+    return f"{name}_{counter}"
 
 
 def _parse_archive_metadata(name: str) -> dict:
@@ -131,6 +152,22 @@ def _parse_archive_metadata(name: str) -> dict:
         result["timestamp"] = parts[1]
         result["provider"] = parts[2] if len(parts) > 2 else ""
     return result
+
+
+def _zip_directory(source_dir: Path, zip_path: Path) -> Path:
+    """Zip source_dir's contents into zip_path using only absolute paths.
+
+    ``shutil.make_archive(root_dir=...)`` internally does a transient
+    ``os.chdir(root_dir)`` for the duration of the call — a process-wide
+    side effect. Harmless for today's single-run CLI, but not safe if
+    backups ever run concurrently on separate threads (#586). Building the
+    zip directly with ``zipfile`` avoids touching the process CWD at all.
+    """
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(source_dir.rglob("*")):
+            if file_path.is_file():
+                zf.write(file_path, arcname=file_path.relative_to(source_dir).as_posix())
+    return zip_path
 
 
 def list_backups(
@@ -238,7 +275,7 @@ def create_backup(
     else:
         targets = [p for p in providers if p in provider_config]
 
-    archive_name = _archive_name()
+    archive_name = _unique_archive_name(backup_dir)
     zip_path = backup_dir / (archive_name + ".zip")
 
     # Build manifest
@@ -314,12 +351,7 @@ def create_backup(
         )
 
         # Create zip archive
-        created = shutil.make_archive(
-            str(zip_path.with_suffix("")),
-            "zip",
-            root_dir=str(tmp),
-            base_dir=".",
-        )
+        created = _zip_directory(tmp, zip_path)
 
     zip_file = Path(created)
     size_mb = zip_file.stat().st_size / (1024 * 1024)
@@ -479,8 +511,10 @@ def restore_backup(
                 log.note("backup", f"restored '{matching}' for provider '{target}'")
                 prov_result["restored"] = True
             result["provider_results"][target] = prov_result
-        except Exception as exc:  # noqa: BLE001
-            prov_result["error"] = str(exc)
+        except Exception as exc:  # noqa: BLE001 -- extraction can fail in many ways (zip/OS/path)
+            error = f"{type(exc).__name__}: {exc}"
+            log.warning(f"backup: failed to restore '{matching}' for provider '{target}': {error}")
+            prov_result["error"] = error
             result["provider_results"][target] = prov_result
 
     # Restore project.yaml if requested
@@ -501,9 +535,12 @@ def restore_backup(
             # restore already performed above (result["provider_results"]) —
             # a corrupt archive or a write failure here (e.g. permission
             # denied on .meta-config/) must not undo/fail the provider
-            # restore that already succeeded. Surfacing this specific
-            # failure in `result` is tracked separately (issue #583).
-            log.debug("backup", f"could not restore project.yaml: {type(e).__name__}: {e}")  # noqa: PLE1205
+            # restore that already succeeded. The failure is still surfaced
+            # to the caller via result["config_restore_error"] (#583) so it
+            # is not silently swallowed.
+            error = f"{type(e).__name__}: {e}"
+            log.error("backup", f"could not restore project.yaml: {error}")
+            result["config_restore_error"] = error
 
     return result
 

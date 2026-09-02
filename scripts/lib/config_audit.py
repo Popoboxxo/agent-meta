@@ -21,6 +21,7 @@ from datetime import date
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE, parse_frontmatter_file
+from .io import write_atomic
 from .roles import load_roles_config
 
 # `_YAML_AVAILABLE` is single-sourced from `.frontmatter` (Issue #571) so the
@@ -520,6 +521,6 @@ def apply_audit(report: AuditReport, project_config_path: Path) -> int:
         changed += 1
 
     if changed:
-        project_config_path.write_text("".join(lines), encoding="utf-8")
+        write_atomic(project_config_path, "".join(lines))
 
     return changed

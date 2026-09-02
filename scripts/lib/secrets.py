@@ -25,8 +25,13 @@ _SECRET_PATTERNS = [
     (r'(?i)password\s*[:=]\s*["\']?[a-zA-Z0-9_\-!@#$%^&*()+]{8,}', "Generic password assignment"),
     # Bearer tokens: JWT format (eyJ...) used by Home Assistant, Keycloak, etc.
     (r'eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}', "JWT / Bearer token"),
-    # InfluxDB tokens: long base64url strings (typically 86+ chars ending with ==)
-    (r'[a-zA-Z0-9_\-]{80,}={0,2}', "InfluxDB-style long token"),
+    # InfluxDB-style long tokens: disabled like the broad base64 pattern
+    # above (#586) -- `[a-zA-Z0-9_\-]{80,}` also matches long hashes,
+    # minified/bundled code and random base64 blobs with a very high false
+    # positive rate. Re-enable with a narrower pattern (fixed length +
+    # mandatory `==` padding, restricted to an actual assignment context)
+    # if InfluxDB token detection is needed again.
+    (r'[a-zA-Z0-9_\-]{80,}={0,2}', None),
 ]
 
 # Patterns that are clearly safe (variables, examples, placeholders)
