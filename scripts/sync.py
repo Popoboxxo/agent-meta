@@ -1168,6 +1168,14 @@ def _handle_validate(ctx: _SyncContext) -> None:
     for _mismatch in _tool_mismatches:
         log.warning(f"config-audit [WARN] tool-privilege-mismatch: {_mismatch.message}")
 
+    # Provider-registry completeness (issue #625): warns only when a
+    # registered provider is missing from a known provider-keyed Python
+    # enumeration in scripts/ -- a provider can legitimately be excluded from
+    # a given touchpoint, so this never blocks validation.
+    _provider_gaps = _validate_audit_report.by_category("provider_registry_completeness")
+    for _gap in _provider_gaps:
+        log.warning(f"config-audit [WARN] provider-registry-gap: {_gap.message}")
+
     from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
     from lib.consistency.report import print_report
     from lib.providers import load_providers_config as _load_pc

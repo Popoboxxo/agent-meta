@@ -1,6 +1,6 @@
 ---
 name: dependency-auditor
-version: 1.1.0
+version: 1.2.0
 description: 'Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL
   matrix), version drift, outdated and deprecated packages. Categorizes dependency
   findings by risk and files them via the feedback agent — not application security.'
@@ -14,7 +14,7 @@ tools:
 - Bash
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/dependency-auditor.md@1.1.0
+generated-from: 1-generic/dependency-auditor.md@1.2.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -127,5 +127,5 @@ NEXT: [Feedback issue | Developer upgrade]
 
 **User proxy:** `main_chat`. Confirmations carry user authority.
 
-**Language:** findings → Deutsch. Issue text (via feedback) → English.
+**Language:** findings → Deutsch. Issue text (via feedback) → english.
 </constraints>

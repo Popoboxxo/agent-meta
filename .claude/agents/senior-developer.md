@@ -95,6 +95,7 @@ Track failures per task (same task, blocked or reflection loop exhausted). On th
 - Keine externen Python-Dependencies außer Stdlib
 - Markdown-Dateien: GitHub Flavored Markdown
 - YAML Frontmatter in allen Agent-Templates
+- Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
 
 
 **Architecture:** agents/
