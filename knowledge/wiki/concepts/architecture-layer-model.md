@@ -2,10 +2,11 @@
 type: "Architecture"
 title: "Layer Model"
 description: "Rules werden von Claude Code automatisch in jeden Agenten-Kontext geladen — kein Read-Tool nötig. Ideal für Cross-Cutting-Policies (Security, Coding-Konventionen, Issue-Lifecycle)."
-tags: [architecture, status:active]
-timestamp: "2026-07-27"
+tags: [architecture, "status:active"]
+timestamp: "2026-09-03"
 resource: "../../sources/docs/architecture/01-layer-model.md"
 migrated_from: "docs/architecture/01-layer-model.md"
+migration_note: "Re-Ingest 2026-09-03 (Issue #651): Platform-Config-Abschnitt aus aktueller Quelle ergänzt (neu seit August-Roadmap), Rest unverändert korrekt."
 ---
 # Layer Model
 
@@ -54,6 +55,38 @@ Hooks werden **immer kopiert**, aber nur ausgeführt wenn `enabled: true` in `pr
   "dod-push-check": { "enabled": true }
 }
 ```
+
+## Platform-Config — `{{platform.*}}`-Substitution
+
+Die Layer 2 (2-platform)-Quelldateien für Agents **und** Rules können
+`{{platform.<platform>.<key>}}`-Platzhalter enthalten. Die Werte kommen aus zwei
+Quellen, die zu einem flachen Dictionary gemerged werden (Defaults zuerst,
+Projekt-Override gewinnt):
+
+```mermaid
+graph LR
+    D[platform-configs/&lt;platform&gt;.defaults.yaml<br/>agent-meta Root] -->|defaults| M[flache Keys<br/>platform.&lt;platform&gt;.&lt;key&gt;]
+    O[.claude/platform-config.yaml<br/>Projekt-Override] -->|wins| M
+    M -->|substituiert| A[agents/2-platform/*.md]
+    M -->|substituiert| R[rules/2-platform/*.md]
+```
+
+- **Defaults-Pfad:** `platform-configs/<platform>.defaults.yaml` im agent-meta-Root
+  (nicht `config/platforms/`). Fehlt die Datei für eine aktive Plattform → still
+  übersprungen (nicht jede Plattform braucht Defaults).
+- **Override-Pfad:** `.claude/platform-config.yaml` im Projekt (Ebene 3 im
+  [Config-Layout](../topics/config-layout.md)); geladen einmal für alle aktiven Plattformen.
+- **Flatten:** Verschachtelte YAML-Dicts unter `platform.<platform>:` werden zu
+  Dot-Notation-Keys flatten (z.B. `platform.hacs.custom_components_path`).
+- **Required-Empty-Konvention:** `""` = Pflichtfeld ohne funktionierenden Default →
+  `[WARN]` in `sync.log` bis das Projekt den Wert in `.claude/platform-config.yaml`
+  setzt. Non-empty = Working-Default.
+- **Substitutions-Semantik:** Ein definierter (auch leerer) Key wird substituiert —
+  leerer Pflichtfeld-Key → Leerstring + WARN. Ein in Defaults und Override
+  **undefinierter** Key bleibt als literaler `{{platform.*}}`-Platzhalter stehen (mit Warnung).
+
+Beispiel: `platforms: [hacs]` aktiviert den HACS-Preset
+(`platform-configs/hacs.defaults.yaml`).
 
 ### Conditional Hooks: viz-log
 

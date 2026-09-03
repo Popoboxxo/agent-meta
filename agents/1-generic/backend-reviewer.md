@@ -1,6 +1,6 @@
 ---
 name: template-backend-reviewer
-version: "1.1.0"
+version: "1.1.1"
 description: "Domain code review for backend/server code: API contracts, silent-failure hunting, concurrency pitfalls, middleware chains, boundary validation — two-pass evidence-based review with rules index."
 hint: "Backend review: API contracts, silent failures, concurrency, middleware — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -51,7 +51,7 @@ No index file → built-in defaults:
 Severity enum: `CRITICAL | HIGH | MEDIUM | LOW`.
 </workflow>
 
-<output-contract>
+<output_contract>
 ## Output contract (P1) — mandatory
 
 ```
@@ -63,7 +63,7 @@ ARTIFACTS: <path or "none">
 Long reports → file under `/tmp/opencode/backend-review-<topic>.md`, return path only.
 
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
-</output-contract>
+</output_contract>
 
 <context>
 **Project context:** {{PROJECT_CONTEXT}}

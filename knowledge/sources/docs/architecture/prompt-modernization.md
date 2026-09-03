@@ -1,27 +1,29 @@
-# Architektur: Prompt-Modernisierung (Three-Mode Design)
+# Architektur: Prompt-Modernisierung (XML-Struktur)
 
-> Status: **PoC** — Branch `feat/prompt-modernization-poc`
-> Konzept: `docs/concepts/active/se-und-prompt-modernisierung.md`
+> Status: **Aktiv** (Konsolidiert in v0.70.0)
 
 ---
 
 ## Übersicht
 
-agent-meta unterstützt drei Prompt-Rendering-Modi für Agenten-Templates:
+agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard für die regulären Rollen-Templates (der frühere "Dual-Tree"-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst).
 
-| Modus | Template-Quelle | Rendering | Ziel |
-|-------|----------------|-----------|------|
-| `legacy` | `agents/1-generic/` | unverändertes Markdown | Kompatibilität, alle Rollen |
-| `hybrid` | `agents/1-generic/` | Markdown → auto-XML-Wrap via `wrap_sections_in_xml()` | schrittweise Migration |
-| `modern` | `agents/1-generic-modern/` | natives 6-block XML | optimale LLM-Strukturierung |
+**Bewusste Ausnahme — SE-Kaskade:** Die ~13 `se-*.md`-Templates in `agents/1-generic/`
+(`se-developer`, `se-architect`, `se-critic`, `se-requirements` u.a.) folgen diesem Schema
+nicht — sie nutzen klassisches Markdown+Prosa ohne `<persona>`/`<workflow>`/`<output_contract>`-Blöcke
+und tragen kein `prompt_mode: modern`. Das ist keine Migrationslücke, sondern eine gezielte
+Trennung: die SE-Kaskade ist ein eigenständiges Sub-Framework mit eigenen, INCOSE-orientierten
+Konventionen (Details: `docs/architecture/07-se-cascade.md`). Sie ist aktuell zusätzlich per
+`quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert, unabhängig vom XML-Standard-Status.
+Eine Migration der SE-Templates auf das 6-Block-Schema ist nicht ausgeschlossen, aber nicht geplant.
 
 ---
 
-## 6-Block XML-Format (Modern Mode)
+## 6-Block XML-Format
 
-Alle Modern-Mode-Templates verwenden genau 6 XML-Blöcke in fester Reihenfolge:
+Alle Agenten-Templates (`agents/1-generic/*.md`) verwenden exakt 6 XML-Blöcke in fester Reihenfolge:
 
-```
+```xml
 <persona>       Rolle, Verhalten, Singleton-Regeln
 <workflow>      Schritt-für-Schritt-Prozess (nummeriert)
 <context>       Projektkontext, DoD-Flags, Agenten-Tabelle, Env-Vars
@@ -30,56 +32,13 @@ Alle Modern-Mode-Templates verwenden genau 6 XML-Blöcke in fester Reihenfolge:
 <constraints>   Harte Regeln — zuletzt (Recency Bias)
 ```
 
-**Recency Bias:** `<constraints>` steht absichtlich am Ende — LLMs befolgen letzte Instruktionen zuverlässiger.
-
----
-
-## Template-Verzeichnisstruktur
-
-```
-agents/
-  1-generic/              Legacy-Templates (unverändertes Markdown)
-  1-generic-modern/       Modern-Mode-Templates (native XML)
-    developer.md          v3.0.0
-    orchestrator.md       v6.0.0
-  2-platform/             Plattform-Overrides (extends: + patches:)
-  3-project/              Projekt-Overrides / Extensions
-```
-
----
-
-## Konfiguration (project.yaml)
-
-```yaml
-agent-prompts:
-  default: legacy          # Fallback für alle nicht-expliziten Rollen
-  modes:
-    developer: modern      # developer → 1-generic-modern/developer.md
-    orchestrator: modern   # orchestrator → 1-generic-modern/orchestrator.md
-```
-
----
-
-## Source-Resolution (`_resolve_agent_source()`)
-
-Beim Sync entscheidet `scripts/lib/agents.py` welches Template verwendet wird:
-
-```
-1. prompt_modes[role] == 'modern' → 1-generic-modern/<role>.md (wenn vorhanden)
-2. prompt_modes['default'] == 'modern' → 1-generic-modern/<role>.md (wenn vorhanden)
-3. Fallback → 1-generic/<role>.md
-```
-
-2-platform und 3-project Overrides greifen DANACH (nach der Source-Resolution):
-- `extends:` / `patches:` funktionieren nur gegen Legacy-Templates (Phase 1 + 2)
-- XML-Anchor-Support für Modern Templates ist Phase 2 (geplant)
+**Recency Bias:** `<constraints>` steht absichtlich am Ende — modernste LLMs (Claude 3.5, Gemini 1.5, GPT-4o) befolgen letzte Instruktionen in langen Prompts am zuverlässigsten.
 
 ---
 
 ## Pre-resolved Block-Variablen
 
-Modern-Mode-Templates verwenden KEINE `{{#if}}`-Bedingungen. Stattdessen werden
-Blöcke in `build_variables()` (config.py) pre-resolved:
+Um die Template-Größe zu minimieren und unnötige Tokens zu sparen, werden dynamische Blöcke im Backend (`scripts/lib/config.py`) "pre-resolved":
 
 | Variable | Inhalt wenn aktiv | Leer wenn |
 |----------|-------------------|-----------|
@@ -92,7 +51,7 @@ Blöcke in `build_variables()` (config.py) pre-resolved:
 
 ## TypeScript Interfaces (A2A Handoff Contracts)
 
-Vollständige Definitionen in `snippets/prompt-modernization/a2a-handoff-block.md`:
+Das A2A-Protokoll basiert auf strikten JSON-Typ-Definitionen:
 
 ```typescript
 interface IPayload { t, ctx?, con?, refs?, pri?, dep? }
@@ -104,48 +63,6 @@ interface IBatchPayload { batch: true, payload: IPayload[] }
 
 ---
 
-## Schema-Erweiterungen
+## Validierung
 
-`config/project-config.schema.json` (Draft-07) wurde erweitert um:
-
-- **`agent-prompts`**: `{default: enum, modes: {role: enum}}`
-- **`cascades`**: First-Class-Konzept für SE-Kaskaden (Phase 3+)
-- **`$defs/cascadeDefinition`**, **`$defs/cascadeStage`**
-
----
-
-## Validierungs-Tooling
-
-```bash
-# Alle Modern-Templates validieren (6-block + frontmatter)
-python scripts/validate-modern-templates.py --all --strict
-
-# Token-Vergleich legacy vs. modern
-python scripts/token-counter.py --role developer
-python scripts/token-counter.py --role orchestrator
-
-# Alle Templates zählen
-python scripts/token-counter.py --legacy --modern
-```
-
----
-
-## Phasenplan (Übersicht)
-
-| Phase | Inhalt | Status |
-|-------|--------|--------|
-| 1 (PoC) | developer + orchestrator in Modern Mode, Infra-Grundlage | **in Arbeit** |
-| 2 | XML-Anchor-Support für Composition, Hybrid-Mode verfeinern | geplant |
-| 3 | Cascades-Runtime, SE-Kaskaden über cascades-Config | geplant |
-| 4–6 | Weitere Rollen migrieren, Monitoring, GA | geplant |
-
-Detaillierter 6-Phasen-Plan → `docs/concepts/active/se-und-prompt-modernisierung.md`
-
----
-
-## Constraints (Phase 1)
-
-- Modern-Templates sind **keine** `extends:`/`patches:`-Targets (noch kein XML-Anchor-Support)
-- `1-generic-modern/` enthält **nur** provider-agnostische Templates (keine `.claude/`, `.gemini/`-Referenzen)
-- `prompt_mode: modern` im Frontmatter ist **Pflicht** — Validator prüft dies
-- Versionierung: Modern-Templates starten bei Major-Version ≥ 3
+Die XML-Struktur der Agenten wird automatisch bei jedem Run von `sync.py --validate` durch den Consistency-Check (`scripts/consistency-check.py`) sichergestellt.

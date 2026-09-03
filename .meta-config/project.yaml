@@ -304,6 +304,8 @@ analysis:
 quality-pipelines:
   overrides:
     se-cascade:
+      # Deaktiviert seit 2026-09-03 — bewusste Entscheidung, siehe Issue #652.
+      # Reaktivierung/Archivierung nur auf explizite Anfrage.
       enabled: false
   custom-pipelines: {}
 model-override-all: {}

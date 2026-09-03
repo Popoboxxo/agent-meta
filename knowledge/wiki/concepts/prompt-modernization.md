@@ -1,13 +1,36 @@
 ---
 type: "Concept"
 title: "Konzept: Prompt-Modernisierung durch Two-Mode-Prompt-Architektur"
-description: "Die aktuellen Agenten-Templates in agent-meta/agents/1-generic/ sind überwiegend als narrative Markdown-Dokumente verfasst. Die systematische Evaluierung aller 55 generischen..."
-tags: [concept, status:planned]
+description: "HISTORISCH/SUPERSEDED (Re-Ingest 2026-09-03): Der hier geplante Legacy/Hybrid/Modern-Dreiklang (1-generic-modern/, agent-prompts-Config, prompt-modes.yaml) wurde nie so gebaut..."
+tags: [concept, "status:superseded"]
 timestamp: "2026-07-27"
 resource: "../../sources/docs/concepts/planned/prompt-modernization.md"
 migrated_from: "docs/concepts/planned/prompt-modernization.md"
 migration_note: "3 Versionen gefunden (docs/architecture/, docs/concepts/active/, docs/concepts/planned/). planned-Version gewaehlt als massgebliche Seite (umfangreichste/aktuellste, 1949 Zeilen). Andere Versionen als Sources abgelegt, keine eigenen Wiki-Seiten."
 ---
+
+> **STATUS-UPDATE (Re-Ingest 2026-09-03): SUPERSEDED — nicht so umgesetzt.**
+> Dieses Konzept plant einen Legacy/Hybrid/Modern-Dreiklang (`agents/1-generic-modern/`,
+> `agent-prompts`-Config in `project.yaml`, zentrale `config/prompt-modes.yaml`,
+> `_resolve_agent_source()`, diverse `scripts/validate-modern-templates.py` u.a. Tools).
+> **Realität per Stand 2026-09-03** (siehe `docs/architecture/prompt-modernization.md`,
+> Quelle: `knowledge/sources/docs/architecture/prompt-modernization.md`): agent-meta hat sich
+> stattdessen für **einen einzigen Standard** entschieden — alle `agents/1-generic/*.md`
+> nutzen nativ das 6-Block-XML-Format ("Konsolidiert in v0.70.0"). Es gibt kein
+> `1-generic-modern/`-Verzeichnis, kein Legacy/Hybrid/Modern-Config-Schema und kein
+> `prompt-modes.yaml`. Der frühere Dual-Tree-Ansatz wurde vollständig aufgelöst statt
+> parallel als drei Modi weiterbetrieben. Ausnahme laut Audit vom 2026-09-03
+> (`docs/plans/audit-2026-09-detailed-system-audit.md`): die ~13 `se-*.md`-Rollen der
+> (deaktivierten) SE-Kaskade nutzen weiterhin klassisches Markdown statt XML — dort noch
+> nicht dokumentiert als bewusste Ausnahme.
+>
+> Der Rest dieser Seite bleibt als **historisches Planungsdokument** erhalten (Konzept-Entwurf
+> v2.1, 2026-06-29) — für die Nachvollziehbarkeit, welche Alternativen erwogen wurden und warum
+> sich das Team am Ende für die einfachere Ein-Standard-Lösung entschied. Für den aktuellen
+> Stand siehe [`architecture-prompt-modernization.md`](architecture-prompt-modernization.md).
+
+---
+
 # Konzept: Prompt-Modernisierung durch Two-Mode-Prompt-Architektur
 
 > Status: **Konzept-Entwurf v2.1 — überarbeitet nach Machbarkeits-Analyse** | 2026-06-29

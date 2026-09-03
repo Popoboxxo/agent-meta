@@ -2,13 +2,24 @@
 type: "Concept"
 title: "Architektur: Provider-agnostische Subagent-Spawn-Restriction (Singleton-Orchestrator)"
 description: "Der heutige sync.py-Lauf generiert für Worker-Agents Provider-Frontmatter, die Subagent-Spawns technisch erlaubt statt sie zu unterbinden. Konkret:"
-tags: [concept, status:active]
-timestamp: "2026-07-27"
+tags: [concept, "status:active"]
+timestamp: "2026-09-03"
 resource: "../../sources/docs/concepts/active/singleton-orchestrator-architecture.md"
 migrated_from: "docs/concepts/active/singleton-orchestrator-architecture.md"
-migration_note: "planned-Version inhaltlich abweichend — als historische Referenz in knowledge/sources/ abgelegt, keine eigene Wiki-Seite."
+migration_note: "planned-Version inhaltlich abweichend — als historische Referenz in knowledge/sources/ abgelegt, keine eigene Wiki-Seite. Re-Ingest 2026-09-03 (Issue #651): Status-Hinweis zu provider-agnostischer Implementierung ergänzt."
 ---
 # Architektur: Provider-agnostische Subagent-Spawn-Restriction (Singleton-Orchestrator)
+
+> **Hinweis (Re-Ingest 2026-09-03):** Die Kern-Architekturentscheidung dieser Seite (genau EIN
+> Orchestrator, Worker dürfen keinen dispatchen) ist weiterhin gültig. Die unten gezeigten
+> `if provider == "..."`/`elif provider == "..."`-Code-Beispiele beschreiben jedoch den
+> Implementierungsstand von 2026-06-30 und sind seit der Provider-Agnostik-Kampagne
+> (Waves A–D, #625–#638, abgeschlossen 2026-09-03) überholt: `provider_transform.py` nutzt
+> inzwischen einen datengetriebenen `_apply_agent_transform()`-Dispatcher statt einer
+> 6-way-`elif`-Kette, und `if provider == "Name"`-Branching in Syncer-Code ist per Lint-Regel
+> + Credo verboten (siehe `provider-agnostic`-Skill). Das fachliche Ergebnis (welches
+> Permission-Frontmatter pro Provider generiert wird) bleibt unverändert — nur der
+> Code-*Mechanismus* dahinter hat sich geändert.
 
 > Status: **Aktiv — Body-Constraint Phase implementiert (2026-06-30)**
 > Erweitert: `prompt-modernization.md` (Sektion 16.5 / geplant)

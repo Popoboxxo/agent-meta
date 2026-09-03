@@ -1,6 +1,6 @@
 ---
 name: template-ui-reviewer
-version: "1.1.0"
+version: "1.1.1"
 description: "Domain review for UI consistency and UX completeness: design-token conformance, layout/breakpoints, interaction states, i18n readiness — two-pass evidence-based review; delegates WCAG depth to accessibility-specialist."
 hint: "UI review: design tokens, layout consistency, loading/error/empty states, i18n readiness"
 prompt_mode: modern
@@ -50,7 +50,7 @@ No index file → built-in defaults:
 Severity enum: `CRITICAL | HIGH | MEDIUM | LOW`.
 </workflow>
 
-<output-contract>
+<output_contract>
 ## Output contract (P1) — mandatory
 
 ```
@@ -62,7 +62,7 @@ ARTIFACTS: <path or "none">
 Long reports → file under `/tmp/opencode/ui-review-<topic>.md`, return path only.
 
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
-</output-contract>
+</output_contract>
 
 <context>
 **Project context:** {{PROJECT_CONTEXT}}

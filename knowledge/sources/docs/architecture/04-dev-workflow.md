@@ -33,47 +33,19 @@ sequenceDiagram
     ORC-->>User: feature complete
 ```
 
-## Workflow B: Neues Feature (via feature-Agent)
+## Workflow B: Neues Feature (via feature-lifecycle Pipeline)
 
-Der `feature`-Agent ist ein **Shortcut** — er führt denselben Lifecycle wie Workflow A durch,
-aber als eigenständiger Workflow-Agent mit festem 8-Schritt-Prozess inkl. Branch + PR.
+Die `feature-lifecycle`-Pipeline ist ein **Shortcut** — sie deckt denselben Lifecycle wie Workflow A ab,
+aber als deklarative Pipeline-Definition (`config/role-defaults.yaml`, engine: `scripts/lib/pipelines.py`)
+mit festem Stage-Ablauf inkl. Branch + PR, statt über eigenständige Agent-Tool-Delegation.
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant FEA as feature
-    participant GIT as git
-    participant REQ as requirements
-    participant TST as tester
-    participant DEV as developer
-    participant VAL as validator
-    participant DOC as documenter
+Stages: `branch → requirement (conditional: req-traceability) → tests (conditional: tests-required) → implement (plan-driven) → verify (conditional: tests-required) → validate-and-document (parallel: validator + documenter) → commit`.
 
-    User->>FEA: "ich will Feature X bauen"
-    FEA->>GIT: create branch feat/X
-    GIT-->>FEA: branch created
-    FEA->>REQ: assign REQ-ID
-    REQ-->>FEA: REQ-042
-    FEA->>TST: write tests TDD red
-    TST-->>FEA: tests written
-    FEA->>DEV: implement TDD green
-    DEV-->>FEA: code done
-    FEA->>TST: run tests verify
-    TST-->>FEA: tests green
-    FEA->>VAL: DoD check
-    VAL-->>FEA: DoD passed
-    FEA->>DOC: update docs (optional)
-    DOC-->>FEA: docs updated
-    FEA->>GIT: commit + push + PR
-    GIT-->>FEA: PR created
-    FEA-->>User: REQ-042 done, PR link
-```
-
-## Wann feature, wann orchestrator?
+## Wann feature-lifecycle, wann orchestrator?
 
 | Situation | Agent |
 |-----------|-------|
-| Neues Feature von Null, mit Branch + PR | `feature` |
+| Neues Feature von Null, mit Branch + PR | `feature-lifecycle` Pipeline |
 | Bugfix, Refactoring, Ad-hoc-Aufgaben | `orchestrator` |
 | Mehrere unabhängige Tasks in einer Session | `orchestrator` |
-| Strukturierter TDD-Lifecycle erzwungen | `feature` |
+| Strukturierter TDD-Lifecycle erzwungen | `feature-lifecycle` Pipeline |

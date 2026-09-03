@@ -201,5 +201,5 @@ Default `english`, `feedback.md` liest den Wert; `meta-feedback.md` bleibt fest 
 
 ## ARTIFACTS
 
-- Diese Datei: `docs/plans/audit-2026-08-refactoring-roadmap.md`
+- Diese Datei: `docs/plans/archive/audit-2026-08-refactoring-roadmap.md`
 - Quell-Issues: `Popoboxxo/agent-meta#551`, `#560–#602`

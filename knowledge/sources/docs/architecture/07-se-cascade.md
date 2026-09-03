@@ -4,6 +4,13 @@
 
 ---
 
+> **Status (Stand 2026-09-03):** Die SE-Cascade ist vollständig implementiert (Rollen, Runner, Doku), aber
+> per `.meta-config/project.yaml` → `quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert.
+> Das ist eine bewusste, aktuelle Entscheidung (siehe Issue #652) — kein vergessenes oder totes Feature.
+> Reaktivierung/Archivierung nur auf explizite Anfrage.
+
+---
+
 ## Übersicht
 
 Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit drei Floors:
@@ -383,7 +390,7 @@ variables:
 
 ## A2A-Handoff-Protokoll für die SE-Kaskade
 
-> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/a2a-best-practice-analysis.md`
+> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/archive/2026-06-a2a-best-practice-analysis.md`
 
 ### A2A als EINZIGES Format
 

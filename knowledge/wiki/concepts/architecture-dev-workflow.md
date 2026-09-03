@@ -1,15 +1,16 @@
 ---
 type: "Architecture"
 title: "Development Workflow"
-description: "Der feature-Agent ist ein Shortcut — er führt denselben Lifecycle wie Workflow A durch, aber als eigenständiger Workflow-Agent mit festem 8-Schritt-Prozess inkl. Branch + PR."
-tags: [architecture, status:active]
-timestamp: "2026-07-27"
+description: "Die feature-lifecycle-Pipeline ist ein Shortcut — sie deckt denselben Lifecycle wie Workflow A ab, aber als deklarative Pipeline-Definition mit festem Stage-Ablauf inkl. Branch + PR."
+tags: [architecture, "status:active"]
+timestamp: "2026-09-03"
 resource: "../../sources/docs/architecture/04-dev-workflow.md"
 migrated_from: "docs/architecture/04-dev-workflow.md"
+migration_note: "Re-Ingest 2026-09-03 (Issue #651): vollständig aus aktueller Quelle resynct — der frühere eigenständige 'feature'-Agent (8-Schritt-Workflow-Agent) wurde durch die deklarative 'feature-lifecycle'-Pipeline ersetzt (config/role-defaults.yaml, engine: scripts/lib/pipelines.py)."
 ---
 # Development Workflow
 
-> [Back to Architecture Overview](../../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogInNlcXVlbmNlRGlhZ3JhbVxuICAgIGFjdG9yIFVzZXJcbiAgICBwYXJ0aWNpcGFudCBPUkMgYXMgb3JjaGVzdHJhdG9yXG4gICAgcGFydGljaXBhbnQgUkVRIGFzIHJlcXVpcmVtZW50c1xuICAgIHBhcnRpY2lwYW50IFRTVCBhcyB0ZXN0ZXJcbiAgICBwYXJ0aWNpcGFudCBERVYgYXMgZGV2ZWxvcGVyXG4gICAgcGFydGljaXBhbnQgVkFMIGFzIHZhbGlkYXRvclxuICAgIHBhcnRpY2lwYW50IERPQyBhcyBkb2N1bWVudGVyXG4gICAgcGFydGljaXBhbnQgR0lUIGFzIGdpdFxuICAgIFVzZXItPj5PUkM6IG5ldyBmZWF0dXJlIHJlcXVlc3RcbiAgICBPUkMtPj5SRVE6IGFzc2lnbiBSRVEtSURcbiAgICBSRVEtLT4-T1JDOiBSRVEtMDQyIGRvbmVcbiAgICBPUkMtPj5UU1Q6IHdyaXRlIHRlc3RzIFRERCByZWRcbiAgICBUU1QtLT4-T1JDOiB0ZXN0cyB3cml0dGVuXG4gICAgT1JDLT4-REVWOiBpbXBsZW1lbnRcbiAgICBERVYtLT4-T1JDOiBjb2RlIGRvbmVcbiAgICBPUkMtPj5UU1Q6IHJ1biB0ZXN0c1xuICAgIFRTVC0tPj5PUkM6IHRlc3RzIGdyZWVuXG4gICAgT1JDLT4-VkFMOiBEb0QgY2hlY2tcbiAgICBWQUwtLT4-T1JDOiBEb0QgcGFzc2VkXG4gICAgT1JDLT4-RE9DOiB1cGRhdGUgZG9jc1xuICAgIERPQy0tPj5PUkM6IGRvY3MgdXBkYXRlZFxuICAgIE9SQy0-PkdJVDogY29tbWl0IGFuZCBwdXNoXG4gICAgR0lULS0-Pk9SQzogY29tbWl0dGVkXG4gICAgT1JDLS0-PlVzZXI6IGZlYXR1cmUgY29tcGxldGUiLCAibWVybWFpZCI6IHsidGhlbWUiOiAiZGVmYXVsdCJ9fQ)
+> [Back to Architecture Overview](../../../ARCHITECTURE.md)
 
 ## Workflow A: Neues Feature (via orchestrator)
 
@@ -42,47 +43,24 @@ sequenceDiagram
     ORC-->>User: feature complete
 ```
 
-## Workflow B: Neues Feature (via feature-Agent)
+## Workflow B: Neues Feature (via feature-lifecycle Pipeline)
 
-Der `feature`-Agent ist ein **Shortcut** — er führt denselben Lifecycle wie Workflow A durch,
-aber als eigenständiger Workflow-Agent mit festem 8-Schritt-Prozess inkl. Branch + PR.
+Die `feature-lifecycle`-Pipeline ist ein **Shortcut** — sie deckt denselben Lifecycle wie Workflow A ab,
+aber als deklarative Pipeline-Definition (`config/role-defaults.yaml`, engine: `scripts/lib/pipelines.py`)
+mit festem Stage-Ablauf inkl. Branch + PR, statt über eigenständige Agent-Tool-Delegation.
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant FEA as feature
-    participant GIT as git
-    participant REQ as requirements
-    participant TST as tester
-    participant DEV as developer
-    participant VAL as validator
-    participant DOC as documenter
+Stages: `branch → requirement (conditional: req-traceability) → tests (conditional: tests-required) → implement (plan-driven) → verify (conditional: tests-required) → validate-and-document (parallel: validator + documenter) → commit`.
 
-    User->>FEA: "ich will Feature X bauen"
-    FEA->>GIT: create branch feat/X
-    GIT-->>FEA: branch created
-    FEA->>REQ: assign REQ-ID
-    REQ-->>FEA: REQ-042
-    FEA->>TST: write tests TDD red
-    TST-->>FEA: tests written
-    FEA->>DEV: implement TDD green
-    DEV-->>FEA: code done
-    FEA->>TST: run tests verify
-    TST-->>FEA: tests green
-    FEA->>VAL: DoD check
-    VAL-->>FEA: DoD passed
-    FEA->>DOC: update docs (optional)
-    DOC-->>FEA: docs updated
-    FEA->>GIT: commit + push + PR
-    GIT-->>FEA: PR created
-    FEA-->>User: REQ-042 done, PR link
-```
+> **Historie:** Vor der August-Refactoring-Roadmap gab es einen eigenständigen `feature`-Agent
+> mit hartem 8-Schritt-Prozess (Branch → REQ → Tests → Implement → Verify → DoD → Docs → Commit/PR).
+> Dieser wurde durch die deklarative `feature-lifecycle`-Pipeline abgelöst — gleicher Lifecycle,
+> aber als Config statt eigener Agent-Rolle.
 
-## Wann feature, wann orchestrator?
+## Wann feature-lifecycle, wann orchestrator?
 
 | Situation | Agent |
 |-----------|-------|
-| Neues Feature von Null, mit Branch + PR | `feature` |
+| Neues Feature von Null, mit Branch + PR | `feature-lifecycle` Pipeline |
 | Bugfix, Refactoring, Ad-hoc-Aufgaben | `orchestrator` |
 | Mehrere unabhängige Tasks in einer Session | `orchestrator` |
-| Strukturierter TDD-Lifecycle erzwungen | `feature` |
+| Strukturierter TDD-Lifecycle erzwungen | `feature-lifecycle` Pipeline |

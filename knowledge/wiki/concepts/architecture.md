@@ -2,12 +2,22 @@
 type: "Architecture"
 title: "agent-meta — Architecture Overview"
 description: "Die SE-Agenten-Kaskade ist ein fraktales, rekursives System das Stakeholder-Anforderungen durch eine 6-stufige Black-Box → White-Box-Zerlegung in implementierbare Komponenten..."
-tags: [architecture, status:active]
-timestamp: "2026-07-27"
+tags: [architecture, "status:stale-upstream"]
+timestamp: "2026-09-03"
 resource: "../../sources/ARCHITECTURE.full.md"
 migrated_from: "ARCHITECTURE.full.md"
+migration_note: "Re-Ingest 2026-09-03 (Issue #651): Source-Snapshot aktualisiert, Inhalt der Quelldatei selbst ist seit 2026-06-07 im Wesentlichen unverändert (Repo-Version-Header per 2026-09-03: 0.92.0, aber 'content last substantively reviewed: 2026-07-20', selbst-eingestandene Staleness). Repo-Struktur-Diagramm unten (agent-meta.schema.json, roles.config.yaml, external-skills.config.yaml) ist daher veraltet — siehe architecture-sync-flow.md für die aktuelle Config-Struktur (.meta-config/project.yaml + config/*.yaml). Fix ist Aufgabe des documenter-Agenten, nicht dieser Re-Ingest."
 ---
 # agent-meta — Architecture Overview
+
+> **Hinweis (Re-Ingest 2026-09-03):** Die Quelldatei `ARCHITECTURE.full.md` gesteht selbst ein,
+> seit 2026-07-20 nicht mehr substanziell überprüft worden zu sein ("predates several releases;
+> a full architecture re-review is due"). Das Repo-Struktur-Diagramm unten (u.a.
+> `agent-meta.schema.json`, `roles.config.yaml`, `external-skills.config.yaml`) spiegelt daher
+> **nicht** die aktuelle Config-Struktur wider (`.meta-config/project.yaml` + `config/*.yaml`,
+> siehe `architecture-sync-flow.md`). Diese Seite bleibt als Rohkopie erhalten; die aktuellen
+> Fakten stehen in den einzelnen `architecture-*.md`-Seiten, die aus den aktuell gepflegten
+> `docs/architecture/*.md`-Dateien resynct wurden.
 
 > Version: **0.57.1** — last updated: 2026-06-07
 

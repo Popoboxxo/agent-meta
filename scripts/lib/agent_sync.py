@@ -243,10 +243,14 @@ def _find_section_bounds(lines: list[str], anchor: str) -> tuple[int, int] | Non
         open_tag = f"<{tag}>"
         close_tag = f"</{tag}>"
         start_idx = None
+        # Match only standalone tag lines (tag alone on its line), so inline
+        # mentions like "(see `<context>`)" in prose never anchor a section.
+        # Mirrors config_audit._STANDALONE_TAG_RE semantics.
         for i, line in enumerate(lines):
-            if start_idx is None and open_tag in line:
+            stripped = line.strip()
+            if start_idx is None and stripped == open_tag:
                 start_idx = i
-            elif start_idx is not None and close_tag in line:
+            elif start_idx is not None and stripped == close_tag:
                 return (start_idx, i + 1)
         return None  # tag not found or unclosed
 

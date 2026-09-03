@@ -459,8 +459,17 @@ def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     # Parse base frontmatter
     base_fm = _parse_frontmatter_yaml(base_content)
 
-    # Merge: base first, then override wins
-    merged = {**base_fm, **override_fm}
+    # Merge honouring the override's declared field order: an override
+    # redeclares the fields it cares about in a deliberate order (matching the
+    # pre-composition full-replacement file), so the composed output must follow
+    # that order. Base-only fields (inherited, not redeclared) are appended
+    # afterwards in base order. Override values always win.
+    merged = {}
+    for key, value in override_fm.items():
+        merged[key] = value
+    for key, value in base_fm.items():
+        if key not in merged:
+            merged[key] = value
 
     # Strip composition-only keys from the output frontmatter
     for key in ("extends", "patches"):

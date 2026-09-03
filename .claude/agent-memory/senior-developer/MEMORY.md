@@ -1,5 +1,6 @@
 # Memory Index
 
+- [#643 2-platform extends migration](issue-643-platform-extends-migration.md) — DONE: 5 migrated / 8 skipped; needed 2 engine fixes (standalone XML anchor + override-order merge); NOT committed
 - [Wave C: provider_transform data-driven (#629)](wave-c-provider-transform-data-driven-629.md) — DONE: 6-way elif → agent-transform YAML spec; all 6 providers byte-identical, suite green, NOT committed
 
 - [Model-ID Canonical Source](model-id-canonical-source.md) — platform.claude.com is authoritative; fix/admin-ui-model-sync partially ported (dc5205b), merge will conflict

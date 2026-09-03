@@ -1,5 +1,508 @@
 # Changelog
 
+## [0.101.0-beta.4] — 2026-09-03
+
+### Changed
+- **August-Refactoring-Roadmap** (10 waves, #563–#615 et al.): `sync.py`'s `main()`
+  if/elif chain replaced by a `_dispatch()` table over `_SyncContext`/`_handle_*`
+  handlers; oversized `scripts/lib` modules split along service boundaries
+  (Template/Pipeline/Reflection/Models services, Auth/Audit services + route
+  tables); several latent import cycles resolved; `admin-server.py`'s
+  `RoleDefaultsEditor` (#611) fixed and generalized (clean list/dict-helper
+  split, not just patched for the two original repro cases); persistence
+  robustness batch (#573, #576, #580, #582, #583, #586, #566, #568, #571,
+  #574, #578).
+- **Provider-Agnostik-Kampagne** (Waves A–D, #625–#638): new
+  `provider-agnostic` lint rule + credo forbidding `if provider == "Name"`
+  branching in syncer code (#625, #626); provider truth-source duplication
+  eliminated across `scripts/lib` (#627, #628); `provider_transform.py`'s
+  6-way provider `elif` replaced by a data-driven `_apply_agent_transform()`
+  dispatcher (#629); hook-protocol gating, provider self-health checks and a
+  Claude self-lockout fix (#630–#633).
+
+## [0.101.0-beta.3] — 2026-08-27
+
+### Changed
+- **Build and version sync** (#latest): rebuilt agent templates via sync.py.
+
+## [0.101.0-beta.2] — 2026-08-26
+
+### Fixed
+- **Admin UI usability and documentation improvements** (#545): enhanced user experience
+  and updated documentation for the Admin interface.
+- **Admin UI critical bugfixes** (#545): resolved agent template resolution bug, fixed
+  pricing overlay display for opencode-go models, corrected conventions-overrides rendering,
+  and added missing confirmation dialogs.
+
+## [0.101.0-beta.1] — 2026-08-26
+
+### Added
+- **Context-file compression** (#540, #543): automatic `context_file` density control via
+  `context_file.mode: compact` — instruction-preserving compression that keeps stack,
+  build and entry-point values inline while collapsing overviews to pointers. Reduces
+  context footprint by ~40–50% for large code bases. Configurable per project via
+  `project.yaml` `context_file.mode` or toggle via Admin-UI.
+
+### Fixed
+- **Routing evaluation gate hardening** (#537, #538, #539): three CI routing-eval test
+  failures from stale Anthropic model IDs and missing intent-routable-signal edge cases.
+  All eval test paths now use `models.list()` for live model discovery instead of
+  hardcoded IDs; added negative test cases for router confusion scenarios.
+
+## [0.100.0] — 2026-08-23
+
+### Added
+- **HACS platform preset** (`feat/hacs-platform`): five `2-platform` agent overrides that
+  extend the generic agents via composition and inject HACS-specific rules — `hacs-developer`
+  (manifest/hacs.json hygiene, Coordinator/Store architecture, Config/Options-Flow, CI,
+  release discipline, debugging checklist), `hacs-code-reviewer` (10-gate checklist),
+  `hacs-tester` (HA-free pytest via fake-package, logic-first then E2E),
+  `hacs-devops-engineer` (`hacs/action` + `hassfest` CI from day one, release triad),
+  `hacs-release` (tag↔manifest sync, `VERSION` only with migrator).
+
+## [0.99.0] — 2026-08-22
+
+### Added
+- **Review-Agent Fleet** (#530, #531): four domain reviewers (`frontend-reviewer`,
+  `backend-reviewer`, `database-reviewer`, `ui-reviewer`) plus `security-auditor` v2.0.0
+  refactor onto the fleet contract — rules-index-driven two-pass reviews with evidence
+  schema (rule_id + CWE/OWASP mapping + snippet + fix), ≥80% confidence gate and
+  MERGE_SCORE. Ships default rules indexes (`config/review-rules/*.yaml`), the reviewer
+  routing matrix (`config/routing/reviewers.yaml`) and explicit model tiers per role.
+  Concept and design principles P1–P6: `docs/concepts/planned/review-agent-fleet.md`.
+
+## [0.98.0] — 2026-08-22
+
+### Added
+- **`model-inherit-main-chat` super-override mode** (#524, #525): second super-override
+  alongside `model-override-all` — all agents inherit the main-chat model instead of a
+  fixed model ID (empty `model:` field). Hard per-provider exclusivity against
+  `model-override-all` with fail-fast validation (exit 1). Wired through sync resolution
+  (`scripts/lib/roles.py`, `scripts/lib/config.py`, `scripts/lib/agents.py`), project.yaml
+  schema, Admin-UI toggle and `POST /api/model-inherit` endpoint (provider whitelist),
+  template §8b.2 (`agent-meta-manager` v1.13.x) and skill documentation.
+- `model-override-all` reversible provider blast (#522): pin every agent of a provider to
+  one model via a single project.yaml key (promo/cap mechanism).
+- Configurable naming/release convention profiles (#520, #521): per-project commit,
+  branch and release naming conventions.
+
+### Fixed
+- Review findings for the inherit mode (#525): Continue provider now honors
+  inherit-main-chat instead of falling back to role-defaults; admin endpoint validates
+  provider keys (400/409 on unknown values); warning on silently ignored per-role
+  `model-overrides` under active inherit; corrected conflict-handling note in the
+  manager template; negative test coverage for the Continue fallback path.
+- Bug batch (#519): preserve user content in CLAUDE.md "Own Notes" section, stale
+  skill-repo submodule pin reverted by sync, design-limits documentation.
+
+## [0.97.0] — 2026-08-16
+
+### Fixed
+- `hooks/1-generic/orchestrator-guard.sh` (v2.2.0 → v2.3.0): two related BASH_CMD-parsing
+  robustness bugs. `statements()` didn't split on newlines (#508) — a multi-line read-only
+  command with no `&&`/`;`/`|` between the lines stayed one statement, and `shlex.split()`
+  then flattened both lines into a single token stream, so the second line's tokens could be
+  misread as positional args to the first line's `git` subcommand (e.g. `git branch
+  --show-current` followed by `git status --short` looked like a branch-create mutation) —
+  false-positive block. The sentinel-based agent-identity check used `head -n1` on the raw
+  command (#503) — a `BASH_CMD` starting with a leading blank line before the
+  `#agent-meta:agent=<name>` sentinel made `head -n1` grab the empty first line instead,
+  missing the sentinel and incorrectly blocking a legitimate delegated mutation. Both fixed;
+  2 new parametrized cases added to `tests/test_orchestrator_guard_hook.py` (30 total).
+- Provider frontmatter fields (`version`, `prompt_mode`, `generated-from`) generated by
+  `sync.py` rejected outright by some providers/validation layers with a strict
+  agent-definition schema — e.g. a Console Go validator in front of an Opencode-shaped agent
+  schema (#505). New opt-in `strip_fields` support in `build_frontmatter()` and
+  `_transform_frontmatter_for_opencode()` (`scripts/lib/agents.py`), configured per project
+  via the existing `provider-options` block in `.meta-config/project.yaml` (same mechanism
+  Continue's `generate-prompts`/`prompt-mode` already use — no agent-meta core change needed
+  per consumer provider quirk):
+  ```yaml
+  provider-options:
+    Opencode:
+      frontmatter-strip-fields: [version, prompt_mode, generated-from]
+  ```
+  Stripped values are preserved in an `<!-- agent-meta-provenance: ... -->` HTML comment
+  right after the frontmatter, so traceability/version-bump enforcement (Hard Invariant #2)
+  survives. Default (unset) is unchanged for every provider — fully backward compatible.
+  See `docs/providers/multi-provider.md#troubleshooting`. 9 new tests
+  (`tests/test_agents_frontmatter.py`).
+- Intent-routing keyword `Recherche` in the `concept-development` pipeline's
+  `signal_keywords` (`config/role-defaults.yaml`) was semantically too broad and
+  intermittently misclassified plain "how does X work?" questions about existing behavior as
+  `concept-development` instead of `none` (#498, ~2/3 in a promptfoo routing eval — see
+  `tests/routing-llm-eval/catalog.manual.yaml::neg-03`). Narrowed to
+  `Architektur-Recherche`. `tests/routing-llm-eval/catalog.generated.yaml` regenerated
+  (`python scripts/gen_routing_llm_eval_catalog.py`).
+
+### Added
+- Approval gates for quality pipeline stages (`scripts/lib/pipelines.py`): new optional
+  `approval_default` (pipeline-level) and `requires_approval` (stage-level, overrides the
+  pipeline default) fields in `config/role-defaults.yaml` / `.meta-config/project.yaml`
+  overrides. When effectively `true` for a stage, the generated pipeline block gets an
+  explicit "wait for user confirmation before this stage starts" instruction, provider-
+  independent, purely instructive like the rest of the pipeline notation. Neither field
+  set means `false` — no shipped base pipeline sets them, so existing generated output is
+  unchanged. Lets projects require sign-off on a planner-produced plan (or any other stage)
+  before it drives execution, e.g. via a `feature-lifecycle` `implement`-stage override.
+  See `docs/guides/quality-pipelines.md#approval-gates-abnahme`.
+- `design-system-architect` and `frontend-component-engineer` agent roles
+  (`agents/1-generic/`): closes the gap between `ui-ux-designer`'s design-system schema
+  and generic `developer` implementation. `design-system-architect` translates a schema
+  into real token artifacts (primitive/semantic/component layers, color-harmony +
+  design-time contrast gate, spacing/breakpoint methodology, component-variant contracts,
+  motion tokens) — explicitly not a WCAG verdict, that stays with `accessibility-specialist`.
+  `frontend-component-engineer` builds production components from screen spec + token/
+  variant contract (props contract, mandatory loading/error/empty/success state matrix,
+  accessibility baseline, motion/responsive implementation from tokens, test scaffold).
+  Registered in `config/role-defaults.yaml` (handoff chain: `ui-ux-designer` ->
+  `design-system-architect` -> `frontend-component-engineer` -> `accessibility-specialist`/
+  `code-reviewer`/`tester`) and added to `feature-lifecycle`'s `implement`-stage
+  `allowed_agents`. See `docs/concepts/planned/ui-expert-agents.md`.
+- Pipeline stage-detail rendering now reaches generated agents (previously dead code):
+  new `{{PIPELINE_DETAIL_BLOCKS}}` in `agents/1-generic/orchestrator.md` (full inline
+  detail for the `ORCH_MODE_STRICT`/`ADVISORY` subagent) and, for the always-loaded
+  main-chat mode, a lean `{{PIPELINE_DETAILS_DIR}}` pointer in `use-orchestrator.md` —
+  one `<pipeline-name>.md` stage-detail file per active pipeline (`scripts/lib/pipelines.py`
+  `sync_pipeline_detail_files()`), read on demand instead of inlined, so the always-on
+  token cost stays a single routing-table line. Also fixes `check_plan_producer_coupling()`
+  never running in production (`build_variables()` was calling `validate_pipelines()`
+  without `roles_config`) and a crash it would have hit on malformed `stages` data.
+- Lean, token-saving pipeline stage-detail visibility for `main-chat` orchestrator mode:
+  new `{{PIPELINE_DETAILS_DIR}}` placeholder in `rules/1-generic/use-orchestrator.md`
+  (always-loaded) points at a new `sync_pipeline_detail_files()` (`scripts/lib/pipelines.py`)
+  output — one `<pipeline-name>.md` stage-detail file per active pipeline, written per
+  provider (derived from `agents_dir`'s sibling, e.g. `.claude/pipeline-details/`, correct
+  even for non-standard nesting like Copilot's `.github/copilot/agents`), with stale-file
+  cleanup via the same managed-index pattern as `mcp.py`/`external_tools.py`. `main_chat`
+  reads the relevant file only once it actually routes to that pipeline — the always-on
+  routing table grows by exactly one instruction line regardless of pipeline count, instead
+  of inlining every pipeline's full stage detail (`{{PIPELINE_DETAIL_BLOCKS}}`, still used
+  as-is for the `strict`/`advisory` `orchestrator` subagent template). Computed centrally
+  in `sync.py`'s per-provider loop so it also reaches providers without a native rules_dir
+  (e.g. Opencode), whose rules content is embedded into the context file instead. Registered
+  as a known first-party artifact in `external_tools_drift.py` so it isn't flagged as
+  undeclared injection drift.
+
+## [0.96.0] — 2026-08-15
+
+### Added
+- Token-efficiency lazy-rules mechanism: a fresh token measurement (tiktoken cl100k as
+  proxy) showed the `rules-preset: silent` mechanism was actually *worse* than `default`
+  on Claude Code (9.421 vs. 9.358 tokens always-on) because `alwaysApply: false` is a
+  Cursor/Continue frontmatter convention Claude Code silently ignores — `.claude/rules/*.md`
+  is always loaded in full regardless. The only real Claude Code lazy-load channel is
+  `.claude/skills/<name>/SKILL.md` (only `name` + `description` land in the system prompt,
+  the body loads on demand via `Read`, available to every generated agent since all 50 have
+  the `Read` tool even without the `Skill` tool). New `channel: skill` rule-option
+  (`config/rules-presets.yaml`) routes a rule to `<skills_dir>/<rule-stem>/SKILL.md` instead
+  of `<rules_dir>/<rule-stem>.md`, restricted to Claude + Opencode (`scripts/lib/skill_channel.py`,
+  new shared module also used by `scripts/lib/mcp.py` and `scripts/lib/external_tools.py` so
+  MCP- and external-tool-generated rules can opt in too); other providers keep the plain
+  rules_dir file unchanged. New `lazy` preset moves 15 situational rules (sync-interface,
+  architecture, conventions, submodule-protection, a2a-delegation-gates, python-conventions,
+  issue-lifecycle, lifecycle-tasks, session-conclusion, provider-agnostic, mcp-reqogniloom,
+  mcp-honcho, mcp-playwright, mcp-viz-logger, tool-graphify) to the skill channel; a new
+  always-on `rules/1-generic/mcp-guardrails.md` keeps the hard MCP tool prohibitions
+  (honcho/reqogniloom/playwright) visible without the full tool-list detail, and a new
+  always-on `rules/1-generic/use-lazy-rules.md` indexes all 15 skill paths. `_ALWAYS_APPLY_PROVIDERS`
+  in `scripts/lib/rules.py` dropped Claude (verified no-op there) — only Continue honors
+  `alwaysApply: false`, and it now also gets a `description:` in the injected frontmatter
+  (previously missing, which silently prevented Continue's own lazy-loading from working).
+  This repo dogfoods the new preset (`rules-preset: lazy`); measured always-on budget after
+  the switch: see CI/verification notes.
+- Stale-cleanup for `mcp-<server>.md` / `tool-<name>.md` rule files (`scripts/lib/mcp.py`,
+  `scripts/lib/external_tools.py`): both write loops previously had no cleanup path when a
+  server/tool was deactivated or removed from its registry, unlike `rules.py::sync_rules()`'s
+  `previously_managed`/`now_managed` diff — the orphaned rule file just stayed on disk
+  forever (e.g. `mcp-reqflow.md`, still present in `.claude/rules/` and `.gemini/rules/`
+  from a server no longer referenced anywhere). Both now maintain their own
+  `.agent-meta-managed-mcp` / `.agent-meta-managed-tools` sidecar index (new shared helpers
+  in `scripts/lib/rule_index.py`) and delete stale files on the next sync; a content-marker
+  check on the first-run bootstrap glob avoids false-positive sweeps of unrelated
+  same-prefixed files (e.g. the new `mcp-guardrails.md`).
+- Intent-routing table in `use-orchestrator.md` (`scripts/lib/delegation_table.py`) now
+  lists only pipeline rows — per-agent routing rows were pure duplication of each active
+  agent's name + description already shown in the system prompt (Claude/Opencode), and
+  pipelines aren't represented there. A compact `**Tiers**` summary line (required/
+  recommended agent names, computed from `role-defaults.yaml` at sync time) replaces the
+  removed rows so tier coverage stays visible at a glance.
+- External Dev-Tool Registry (`config/external-tools-registry.yaml`): known locally-installed CLI dev-tools (e.g. `graphify`) can now contribute a rule-doc section (`.claude/rules/tool-<name>.md`, or embedded into `AGENTS.md`'s managed block for providers without a native rules dir) and hook wiring (`hooks/0-external/*.sh`), rendered deterministically by `sync.py` from a maintainer-curated, version-controlled registry entry — instead of the tool hand-editing generated files at runtime (which happened this session: `graphify`'s self-installer directly appended a section to `CLAUDE.md` and added hook entries to `.claude/settings.json`, violating the "CLAUDE.md is auto-generated, never hand-edit" invariant). New `scripts/lib/external_tools.py` mirrors the existing MCP-registry pipeline (`scripts/lib/mcp.py`); activation is dict-based (`external-tools: { <name>: { enabled: true|false } }` in `.meta-config/project.yaml`, flat-array shorthand still supported) so a framework-default-on tool can be explicitly disabled per project, not just additively enabled — mirrors `external-skills`' activation format rather than `mcp-servers`' flat allowlist. New Admin UI panel ("External Tools") reuses the existing generic `renderOverridePanel()`/`PUT /api/config/project/section` pattern. Shipped with one real, dogfooded entry (`graphify`, rule-content only — its hooks stay opt-in/disabled by default in this repo).
+- External-tool injection governance (`permitted-injections` allowlist): a provider-agnostic, default-deny whitelist for file/directory artifacts that locally-installed tools (e.g., graphify) write beyond curated rule-content and hooks. New `permitted-injections` field in `config/external-tools-registry.yaml` entries declares which skills, hooks, rules, config files or other paths a tool may inject — a declaration covers all active providers unless overridden by `provider-skip`. Injections are resolved to concrete filesystem paths per provider (`skills_dir/`, `hooks_dir/`, `rules_dir/`, literal path for config/other). New `scan_injection_drift()` in `scripts/lib/external_tools_drift.py` runs on every `sync.py` invocation, scanning each provider's infrastructure root for undeclared artifacts and rendering `.claude/rules/external-tools-drift.md` (and equivalents per provider) with findings when drift is detected — only as a warning/visibility tool (never blocking, never auto-deleting). Admin UI additions: `GET /api/external-tools/drift` endpoint reports drift findings, new permitted-injections editor in the External Tools panel accepts `kind` (skill/hook/rule/config/other), `name` or `path`, and description per entry, and a drift-found warning banner displays at the panel top when findings exist. Fixes the graphify incident where rule files generated into the skill-channel and a hand-edited backup file went completely undeclared and undetected until manual code review.
+
+### Fixed
+- Mammouth was a silently degraded "second-class" provider: fully defined in `config/ai-providers.yaml` but absent from `config/provider-capabilities.yaml`, `config/provider-bootstrap.yaml` and `config/delegation-syntax.yaml`. Because consumers fall back to an empty dict for unlisted providers, every `PAL_*` delegation placeholder was silently stripped from generated Mammouth agents and `subagent_dispatch`/`bootstrap_required` defaulted to `false` with no explanation. Added Mammouth to all three files with conservative capability values modeled on Copilot (another lean provider) and backed by evidence from `ai-providers.yaml` (`has_hooks: true`, file-based `agents_dir`); `PAL_*` placeholders now substitute correctly instead of being stripped.
+- `docs/providers/multi-provider.md` was stale: described Gemini's generated context file as `.gemini/GEMINI.md` when the pipeline actually generates `AGENTS.md` (Gemini CLI's native, agent-meta-unmanaged `GEMINI.md` hierarchy is now documented separately as a distinct concept); Copilot and Mammouth — both fully defined in `ai-providers.yaml` — were undocumented; template paths referenced the old `howto/` location instead of `templates/configs/`; incorrectly claimed Gemini has no rules system (it has `.gemini/rules/`, `has_rules: true`).
+- `scripts/lib/providers.py::load_providers_config()`'s minimal fallback (used only when `ai-providers.yaml` is entirely missing) hardcoded a stale, partial Claude entry lacking `capabilities`, `model-tiers`, `model-aliases`, `has_commands` and other now-required fields — downstream code expecting the full schema would have received partial data in that edge case. Fallback now mirrors the current schema.
+- Dead code `sync_agents()` in `scripts/lib/agents.py` removed (#462): superseded entirely by `sync_agents_for_provider()`; repo-wide grep confirmed zero remaining callers.
+- `_collect_role_defaults()` in `scripts/lib/config_audit.py` replaced with the canonical `load_roles_config()` from `scripts/lib/roles.py` (#480): the private duplicate lacked `load_roles_config()`'s `_`-prefix filtering and legacy-path fallback; no behavior change in the current role set.
+- Repeated local `import zipfile` statements in `scripts/lib/backup.py` consolidated to a single module-level import (#466).
+- Repeated local `TemplateBuilder` imports in `scripts/lib/context.py` (7 call sites) consolidated to a single module-level import (#469): verified no circular-import risk (`context_templates/builder.py` only imports stdlib).
+- `substitute()` in `scripts/lib/config.py` gained an optional `strict: bool = False` parameter (#477): when `True`, an unknown placeholder now raises `SyncError` (name + `source_label`) instead of silently warning. Default behavior is unchanged; no existing call site was switched to strict mode yet, since several rely on partially-populated variables for conditional template blocks.
+- Missing docstrings added to `SyncLog` (`scripts/lib/log.py`, 11 members) and `TemplateBuilder` (`scripts/lib/context_templates/builder.py`, 7 members) (#484).
+- `config/provider-tools.yaml`: `terminal_tool` section was missing a `Mammouth: bash` entry present in every other provider and already asserted as a hardcoded fallback in `scripts/lib/viz.py` — config now matches the code-level default.
+- Stale-cleanup (MCP/external-tools) now runs even when active server/tool list drops to zero: `generate_mcp_artifacts()`/`generate_external_tool_artifacts()` previously early-returned before reaching cleanup-phase when the active list became empty — deactivating the *last* MCP server or external tool orphaned its rule file forever, with the same early-return firing on every subsequent sync. Also fixed `write_managed_index()` which had the identical bug, silently skipping index writes for empty `now_managed` sets and leaving stale entries in the index even after orphaned disk files were correctly deleted.
+- Project-root threading in embedded-rules MCP/tool loading: `load_mcp_registry()`/`resolve_active_mcp_servers()`/`load_external_tools_registry()`/`resolve_active_external_tools()` calls in the embedded-rules block for providers without native rules dirs (e.g., Opencode) previously lacked a project_root parameter, silently dropping project-level `.meta-config/mcp-registry.yaml` / `.meta-config/external-tools-registry.yaml` overrides (e.g., a server disabled per-project).
+- Injection-drift scan endpoint root resolution in submodule mode: `_compute_injection_drift()` passed raw project-root into `scan_injection_drift()` instead of resolving it via `_agent_meta_root()` — in submodule mode, framework config lives under `.agent-meta/`, and the bug silently fell back to a Claude-only stub provider config, producing false-positive undeclared-artifact findings for every legitimately registered tool.
+- Unreachable Opencode removed from `skill_channel.py` PROVIDERS set: every call site that would exercise `channel: skill` for Opencode is gated behind `has_rules` (false for Opencode by design — rules embed into AGENTS.md), making it dead code. Narrowed PROVIDERS to Claude only and corrected the matching doc comment in `config/rules-presets.yaml`.
+- MCP guardrails governance: `mcp-guardrails.md` (always-on rule listing hard tool prohibitions) was hand-maintained and could silently drift from `config/mcp-registry.yaml` — added `build_mcp_guardrails_list()` in `scripts/lib/mcp.py` and wired it through a new `{{MCP_GUARDRAILS_LIST}}` placeholder, substituted dynamically in both native-rules and embedded-rules contexts so it always reflects the live registry instead of a maintainer-curated bullet list.
+- Config cascade in `add_skill()` now uses shared `lib.io._load_yaml_or_json()` instead of hand-rolling its own yaml/json fallback — the shared helper enforces proper `SyncError` handling for malformed config, whereas the local version raised unhandled, opaque exceptions.
+
+### Changed
+- Refactored: extracted shared `_deep_merge()` and `_normalize_enabled_config()` helpers to `scripts/lib/io.py` — the two were duplicated verbatim between mcp.py and external_tools.py, and a near-identical normalization pair duplicated across external_tools.py, skills.py, and agents.py. All five call sites now import from the shared location, eliminating silent divergence risk.
+- Perf: eliminated redundant MCP/tool registry reloads within single sync passes — `resolve_active_mcp_servers()`/`resolve_active_external_tools()` each reloaded the full registry from disk even when the caller had just loaded it moments earlier (e.g., `generate_mcp_artifacts()` → `load_mcp_registry()` → `resolve_active_mcp_servers()` reloading). Added optional `registry` parameters to both resolver functions and threaded the already-loaded registry through all internal call sites, eliminating avoidable disk I/O and YAML-parse cost across mcp.py, external_tools.py, context.py, rules.py, agents.py, and external_tools_drift.py.
+
+## [0.95.1] — 2026-08-12
+
+### Added
+- MCP toolset propagation into agent frontmatter (#467): a role opts into MCP servers via `mcp-servers:` in `config/role-defaults.yaml` (project override: `mcp-role-overrides.<role>` in `project.yaml`, new schema entry), and `sync.py` binds the server's `tools.allowed` entries as `mcp__<server>__<tool>` into the generated Claude agent frontmatter. Only servers active for the project contribute; `tools.blocked` never leaks in. `e2e-tester` now opts into `playwright` — previously the role was documented as browser-capable in `.claude/rules/mcp-playwright.md` while its generated frontmatter listed base tools only, so every browser delegation failed structurally. New `resolve_mcp_tools_for_role()` and `append_frontmatter_tools()` in `scripts/lib/agents.py`, plus consistency tests catching future rule/frontmatter drift.
+- `docs/guides/mcp/playwright-setup.md`: activation, browser install, role opt-in and troubleshooting.
+
+### Fixed
+- Orchestrator-guard block reason was lost (#396): on exit 2 the harness feeds *stderr* back to the model and ignores stdout, but the hook wrote its guard message to stdout — every block surfaced as a bare `hook error: No stderr output` instead of the explanation, which read as a non-deterministic hook failure. All blocking-path messages now go to stderr (`hooks/1-generic/orchestrator-guard.sh` v2.1.0 → v2.2.0), covered by two new regression tests.
+- Playwright MCP no longer requires root (#470): `config/mcp-registry.yaml` pins `--browser chromium`. The server's default `chrome` channel expects a system-wide Google Chrome at `/opt/google/chrome`, and its installer calls `sudo` — unavailable in CI runners and sandboxes. Chromium ships with Playwright (`npx playwright install chromium`).
+- `_load_yaml_or_json()` crashed the whole sync on a malformed config (#461): `yaml.safe_load` and `json.load` are now wrapped and raise `SyncError` with the offending path, and a non-mapping root (top-level list/scalar) is rejected with a readable message instead of surfacing as `AttributeError: 'list' object has no attribute 'get'` in whichever caller happened to run first.
+- `read_json_lenient()` silently corrupted JSONC files (#474): the inline-comment regex excluded quotes, so any line whose *string value* contained `//` (a URL, a regex, a path) was truncated, JSON parsing failed and the entire config was silently dropped. Replaced with `strip_jsonc_comments()`, a single-pass scanner that tracks string state and escapes, and preserves line structure so parse-error line numbers stay usable.
+- `lifecycle_check.py` raised unhandled tracebacks inside git hooks (#475): `--project-root` as the last argument no longer IndexErrors, and a mapping- or nested-shaped `ai-providers:` no longer passes an unhashable dict into `.get()` — mapping form uses its keys, non-string entries are skipped with a warning.
+- Dead statement in `scripts/lib/mcp.py::_update_json_config` (#464): the abandoned path expression is now the intended assignment and moved to where `rel` is defined, so sibling configs (`.vscode/mcp.json` vs `.cursor/mcp.json`) stay distinguishable in `sync.log` instead of both logging as `mcp.json`.
+- Misleading re-export import in `scripts/lib/viz.py` (#471): `_load_yaml_or_json` is imported from `.io`, its actual definition site, instead of relying on `.config` transitively re-exporting it.
+- `validate_envelope()` documented as dormant by design (#460): the docstring now states explicitly that it is a manually-invokable utility with no interception point (the orchestrator dispatches through the provider's `Agent`/`Task` call, and `orchestrator-guard.sh` sees only `Write`/`Edit`/`Bash`), so the depth and self-handoff limits in `.claude/rules/a2a-delegation-gates.md` are model-followed conventions, not enforced barriers — and must not be cited as evidence of enforcement.
+- Test command uses python3 explicitly (`scripts/sync.py`): corrected `TEST_COMMAND` reference from `python` to `python3` for compatibility with environments that only have `python3` in PATH.
+- Admin-server lifecycle subcommands (`scripts/admin-server.py`): `start`/`stop`/`status`/`restart` are now implemented (were documented in `/admin` skill but unwired). `start` launches detached with PID tracking in `.meta-viz/.admin-server-pid` and logging to `.meta-viz/admin-server.log`; backward compatible (no subcommand retains blocking mode).
+
+## [0.95.0] — 2026-08-11
+
+### Added
+- Planner-pipeline integration: new `parse_plan_ref()` and `validate_plan_ref()` in `scripts/lib/pipelines.py` parse plan markdown files (frontmatter `pipeline_stages:` mapping plus fallback steps table) and validate them against a pipeline's plan-driven stage constraints — plan file existence, stage mapping, agent allow-list. New `check_plan_producer_coupling()` warns when a pipeline has plan-driven stages but no role declares `produces.plan.pipeline` (and vice versa: producers pointing at non-existent or non-plan-driven pipelines). `validate_pipelines()` gained an optional `roles_config` parameter to run these checks.
+- Orchestrator plan-driven gate (`agents/1-generic/orchestrator.md` v7.7.1 → v7.8.0): if the matched pipeline has `plan-driven` stages (e.g. `feature-lifecycle` → `implement`) and no plan exists, the orchestrator must delegate to `planner` first and only start the pipeline with `payload.plan_ref` — no more silent fallback-agent runs for features with >2 files or architecture impact. Plan-driven stage generation in `_generate_pipeline_block()` now emits explicit pre-delegation validation steps (plan_ref path check, `pipeline_stages` frontmatter check, allowed-agent check, fallback + error documentation).
+- Planner frontmatter convention (`agents/1-generic/planner.md` v1.0.1 → v1.0.2): plans created for plan-driven pipelines must include a `pipeline_stages:` frontmatter field mapping stage IDs to step numbers. `config/role-defaults.yaml` declares the planner as `produces.plan.pipeline: feature-lifecycle` (ref_key `plan_ref`, stage `implement`) and adds the trigger keywords "plane", "Plan erstellen", "Umsetzungsplan erstellen", "Implementierungsplan".
+- Delegation-table ghost-entries fix (`scripts/lib/delegation_table.py`): the active-roles filter now applies to all workflow tiers, not only `optional` — tiers like `core` no longer produce ghost rows for inactive roles.
+- rtk-for-opencode plugin installed and configured (`.opencode/rtk-config.json`, `opencode.json`): token-filtered command output for shell tool calls.
+
+### Fixed
+- Admin-server crash on missing project.yaml (`scripts/admin-server.py`): `_load_viz_config()` returned defaults immediately when `.meta-config/project.yaml` does not exist (previously raised SystemExit); new `_load_admin_ui_config()` provides the same fallback for the admin-ui section. Test constant renamed `ALLOWED_HOSTS` → `DEFAULT_ALLOWED_HOSTS`.
+- Admin-server remote auth hardening: token authentication via `--token` CLI flag, `ADMIN_UI_TOKEN` env var, or `admin-ui.token`/`admin-ui.token-file` in project.yaml (priority CLI > env > config > file), verified with constant-time `hmac.compare_digest` from `Authorization: Bearer` header or `?token=` query parameter; unauthorized requests get HTTP 401 with `WWW-Authenticate: Bearer`. Remote bind-host now allowed when token auth is configured — without a token the server stays loopback-only.
+- Admin-server CSRF/DNS-rebinding protection now honors `admin-ui.allowed-hosts` (default: loopback only) for both Origin and Host header checks; `admin-ui.bind-host` is configurable in `.meta-config/project.yaml` (schema entries added to `config/project-config.schema.json`).
+- Sync drift fix (`scripts/lib/rules.py`): `speech-mode.md` is owned by the speech/ layer, not the rules hierarchy — excluded from stale-cleanup so it is no longer deleted and recreated on every sync (infinite drift).
+- Sync drift fix (`scripts/lib/context.py`): `PLATFORM_*` flags are now set for all providers sharing the context file, not just the primary provider.
+- External pin: `external/awesome-claude-code` checked out to pinned commit `3d8bde25`.
+- Generated files re-synced (CLAUDE.md, AGENTS.md, agent-meta-manager.md ×3 providers).
+
+### Changed
+- Changelog and version documentation updates; `knowledge/wiki/plans/am-fix-planner-pipeline-ghost-entries.md` and `am-issue-456-remote-admin-auth.md` added as implementation plan records.
+
+## [0.94.0] — 2026-08-09
+
+### Added
+- Standalone agent personas: all 67 eligible generic agent roles now render pre-built, fully self-contained versions in `standalone/agents/` usable without Python or `sync.py` — paste the entire file directly into any AI chat as a system prompt. Identity/project-context placeholders resolve to explicit "ask the user" instructions; multi-agent/orchestration placeholders resolve to empty, matching disabled behavior. Conditional-flag rendering bugs (ORCH_MODE_*, DOD_SE_*, A2A_PROTOCOL_ENABLED, KNOWLEDGE_ENGINE_ENABLED, DIRECT_DISPATCH_ENABLED) fixed across full role coverage; `write_standalone_files()` removes stale files for roles that later become ineligible.
+
+### Fixed
+- Bilingual persona documentation: `standalone/README.md` now interleaves English and German text paragraph-by-paragraph instead of separate top/bottom sections; added dedicated "Beschreibung (DE)" column to the role table sourced from `config/role-defaults.yaml`.
+
+## [0.93.0] — 2026-08-08
+
+### Added
+- Two new optional generic agent roles: `proofreader` (correctness-only pass — spelling, grammar, punctuation, every finding tied to a stated rule) and `copyeditor` (style, sentence structure, repetition, throughline, content consistency — advisory, every suggestion names its reasoning). Both default to a categorized markdown findings report next to the reviewed file rather than a silent in-place rewrite.
+- `standalone/` — pre-rendered, fully self-contained English copies of a pilot set of 8 generic agent personas (`developer`, `senior-developer`, `documenter`, `technical-writer`, `requirements`, `tester`, `proofreader`, `copyeditor`), usable without Python or `sync.py`: paste the whole file as a system prompt in any chat AI. Identity/project-context placeholders resolve to explicit "ask the user" instructions rather than invented values; multi-agent/orchestration placeholders (A2A, DoD gates, extensions) resolve to empty, matching how they already behave when disabled in a real project. New `scripts/lib/standalone.py` module, `sync.py --render-standalone` (combine with `--check` for a CI drift gate), and an Admin UI "Render standalone agents" button on the Sync page.
+
+### Changed
+- Admin UI, Phase 3 Task 19 (optional, lowest priority in the consistency remediation plan): introduced a `--space-1` (4px) through `--space-6` (32px) CSS custom-property scale in `:root` and migrated 246 spacing declarations (`margin`/`padding`/`gap` and their directional variants, across both the static `<style>` block and inline `el()` styles) onto it. Values already on the 4px grid map directly; off-grid audit values round to the nearest step, ties rounding up (`6px→8px`, `10px→12px`, `14px→16px`, `18px→16px`, `20px→24px`). Deliberately left untouched: multi-value shorthand declarations (e.g. `padding: 18px 20px`, where a blind substitution risked silently corrupting one of the two values) and sub-grid fine-tuning values (`1px`–`3px`, `5px` — hairline/alignment adjustments, not spacing-grid values). No visual change intended; live-verified across Dashboard, MCP Servers, Pipelines, and Roles.
+
+### Fixed
+- Admin UI, Phase 3 (Tasks 15-18) of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`): the two structural design-decision tasks, implemented.
+  - **KV editors (Tasks 15-16):** compared all 3 key/value-style editors against the plan's own criteria before touching anything. The plan assumed `addKVRow` (Provider Options) was missing the #319 rename-collision fix that `renderDictEditor` (MCP Env-Vars/Headers) already had — it wasn't; an earlier, unrelated PR (#426) had already fixed it, with its own passing regression test. The real, previously undiscovered gap was in a third editor the plan didn't recognize as "one of the 3": the Environment Variables page's Add/Edit modal had no rename-collision guard at all, silently overwriting an existing variable if renamed (or created) to a name already in use. Decision: `renderDictEditor` and `addKVRow` are genuinely the same kind of editor (arbitrary key → string|bool) and merge into one — `renderDictEditor` gained an `opts.allowBool` flag for `addKVRow`'s type selector, `addKVRow` and its manual `<table>` markup are gone. The Environment Variables modal stays separate (a fixed-schema record editor, not a generic dict), but gets the missing collision guard as its own targeted fix. Delete glyph unified on `×` (was `10/12` sites before, now `12/12`).
+  - **Destructive-action confirmations (Tasks 17-18):** all 14 native `confirm()` dialogs (which break out of the app's dark theme) replaced with a new `confirmDestructive()` helper built on the existing `showModal()` component — except the router's unsaved-changes navigation guard, a synchronous `hashchange` interceptor that can't cleanly become async without a bigger navigation-flow change. The generic dict editor's own row-delete additionally had *zero* confirmation before this (unlike every other destructive action in the file) — now guarded too, except for empty just-added placeholder rows where there's nothing to lose. While converting the reflection-pairs delete button, found and removed 43 lines of dead code: an entire duplicate copy of `viewPipelines`' `showPipelineHelp()` function, accidentally pasted mid-statement inside `viewReflectionPairs`' delete handler, never called from there.
+
+### Fixed
+- Admin UI, Phase 2 (Tasks 9-13) of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`, #444): component-level consolidation with no behavior change.
+  - **Colors (Task 9):** 12 hardcoded hex colors across 7 call sites consolidated onto the existing `--accent-red`/`--accent-green`/`--accent-yellow` CSS variables instead of ad hoc near-duplicate shades (e.g. the Read-Only banner used `#d97706` for its text but a `#f59e0b`-derived rgba for its own background/border — now internally consistent too). Two `severityColor()` duplicates and a model Enable/Disable toggle referenced `var(--accent-yellow, #c9a227)`-style fallbacks for a variable that's always defined in `:root` — dead code, simplified to the plain `var()` form. The Provider Deactivation ACTIVE/DEACTIVATED badge's bespoke `#335533`/`#ff9999`-style pairs now reuse the same `--accent-red`/`--accent-green` + rgba-tint pattern already used by `.btn-danger` elsewhere; its "(no directory)"/"No backups" empty-state text (`#aa8866`) now uses `var(--text-muted)`.
+  - **Tables (Task 10):** 2 of 3 flagged inline-styled matrix tables (Rules Presets, project Rules Overrides) unified onto the existing `data-table` CSS class after confirming it's a real, distinct grid style for matrix-shaped data — not a dead class like `roles-table` was in Phase 1; the third (the Provider-Options KV editor's own table) is left for Phase 3's planned consolidation of that editor.
+  - **Empty states (Task 11):** 7 "No X found/configured/defined" placeholders styled as `class="muted"` (a generic, ~90-call-site text utility) or classless moved to the file's actual empty-state convention, the dashed-border `class="empty"` box already used at 16 other call sites.
+  - **Card renderers (Task 12):** `viewProjectMcpOverrides`'s and `viewProjectSkillsOverrides`'s ~180-line near-duplicate panel renderers (identical header/badges/toggle/info-box/action-box, only the readonly/edit body content differed) consolidated into a shared `renderOverridePanel(opts)` taking the type-specific body as callbacks — net -42 lines.
+  - **XSS-policy gaps (Task 13):** two matrix-table row renderers built a `<tr>` via `innerHTML` with a config-derived rule name interpolated directly in, violating the file's own documented "no innerHTML" policy (its whole point is that `el()`'s text nodes never decode/execute markup). Converted both to real `el()` construction, including their icon legends (HTML entities → literal Unicode characters in text-node position, same fix class as Phase 0's em-dash bug — one `title` attribute entity was already rendering literally, now fixed too).
+
+### Fixed
+- Admin UI, Phase 1 of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`, #442): the Backups table referenced a `roles-table` CSS class that was never defined anywhere in the file (rendered fully unstyled) and its Delete button used a non-existent `"btn small"` class instead of the established `btn-danger btn-sm` convention. Found and fixed a real regression from the A2A cleanup (#436): the Orchestrator settings page still had form controls (and one leftover variable reference that would have thrown on Save) for `orchestrator.handoff.*` keys already removed from `config/project-config.schema.json`. Humanized ~25 raw kebab-case config-key labels shown directly to users across the General, Providers & Platforms, Orchestrator, and Viz & Admin pages (e.g. `provider-isolation` → "Provider isolation"), and unified `title` attribute casing on destructive/informational controls.
+
+### Fixed
+- Admin UI, Phase 0 of the consistency remediation plan (`docs/superpowers/plans/2026-08-07-admin-ui-consistency.md`): the "Preset Matrix" heading on Rules Presets showed the literal text `&#8212;` instead of an em dash (HTML entity in a text-node position never decodes); a skill's version badge read "Recommended Tag" instead of "Recommended"; 6 "Loading…" placeholders were split between the ellipsis character and three literal dots, now unified on the ellipsis character.
+
+### Changed
+- A2A handoff concept simplified after a best-practice audit found most of `orchestrator.handoff.*` in `project.yaml` had no consumer anywhere (code or agent prompt): removed `validate-before-delegate`, `supersession-tracking`, `strict-validation`, `compact-mode`, `max_retries`, `human_approval_required`, `protocol_routing`, `token-budget` (only `protocol` remains; `config/project-config.schema.json`'s `handoff` block is now `additionalProperties: false` to stop this recurring). Removed the matching dead envelope fields from `schemas/a2a-handoff.schema.json` (`retry_count`, `max_retries`, `escalation`, `timeout_seconds`, `negotiated_format`) and 3 unreferenced schema `definitions`. Clarified in `snippets/orchestrator/a2a-protocol.md` and `A2A_HANDOFF_BLOCK` that a structured JSON envelope is only required for routes with a schema-backed contract (`role-defaults.yaml` `handoff.input_schema`/`output_schema` pointing at a real file) — everyday FANOUT/BARRIER delegation uses the existing plain-text format, previously undocumented and contradicting a "MUST" claim in the same snippet. `validate_envelope()` stays as a manually-invokable, now-tested utility (no automatic runtime interception point exists in this architecture). See `docs/concepts/a2a-best-practice-analysis-2026-08.md`.
+
+### Fixed
+- `AGENTS.md` grew by ~2 blank lines on every single `sync.py` run, forever — the "agents-managed" context template ends with a trailing newline after its closing `<!-- agent-meta:managed-end -->` marker, but the regex that locates the existing managed block never consumed any whitespace after that marker, so each substitution inserted one more newline into the untouched footer than the run before. Fixed by stripping the trailing newline from the replacement text before substitution, restoring a stable match/replace boundary. Cleaned up the ~80 already-accumulated blank lines in this repo's own `AGENTS.md`. New regression tests confirm 3 consecutive `sync.py` runs now produce byte-identical output (#434).
+
+### Fixed
+- Admin UI: the MCP server Env-Vars/Headers dict-editor and the Provider-Options KV editor silently corrupted data when a key was renamed to collide with an existing key in the same dict (one row would vanish, another's value silently overwritten) — both editors now reject the rename with a toast and revert the input. The dict-editor also silently dropped a row when its key field was cleared entirely; that's rejected the same way now (#432).
+- `DEVELOPER_SNIPPETS_PATH`, `TESTER_SNIPPETS_PATH`, `DEV_STACK_START`: optional variables left an unconditional raw `{{VAR}}` placeholder (or, once interpolated, a misleading trailing-slash path like `` `snippets/` if present``) in generated templates when unset. `build_variables()` now derives a `<VAR>_SET` boolean per var so the 13 referencing template lines across `developer.md`, `data-engineer.md`, `database-engineer.md`, `docker.md`, `junior-developer.md`, `principal-developer.md`, `refactoring-specialist.md`, `senior-developer.md`, `tester.md` and the `agent-meta`/`homeassistant`/`sharkord` platform developer overrides can wrap the whole clause in `{{#if <VAR>_SET}}...{{/if}}` and omit it cleanly (#425).
+
+## [0.92.0] — 2026-08-07
+
+### Added
+- New `planner` agent role: turns a concept, REQ, or bug into a concrete, ordered implementation plan with per-step agent assignment and measurable acceptance criteria (`agents/1-generic/planner.md`, `config/role-defaults.yaml`).
+- Pipeline engine: `dod_flag`/`payload_flag` conditional stages, `plan-driven` mode, `run_pipeline` composition with cycle/depth validation, provider activation filters — quality pipelines are now a fully declarative, composable primitive instead of hand-authored stage lists (`scripts/lib/pipelines.py`).
+- `feature-lifecycle` pipeline replaces the hardcoded `feature` agent: branch → REQ (conditional) → tests (conditional) → implement (plan-driven) → verify (conditional) → validate+document (parallel) → commit, driven entirely by `config/role-defaults.yaml`.
+- Pipeline `signal_keywords` now appear as rows in the generated intent-routing table alongside role `intent_keywords` (`scripts/lib/delegation_table.py`).
+- Mandatory "Migration verification" workflow step on `developer`: after any migration/rename/move of existing entities or IDs, diff old→new over the stable key, 0 missing/0 duplicates, "lost" keys only acceptable if demonstrably inactive — closes a real gap that let a stable `unique_id` silently regenerate during a large migration (#327).
+- `docs/analysis/402-systemaudit-kernziele.md`: full framework self-audit across 5 dimensions (role standardization, pipeline engine, provider-agnosticism, governance hooks, doc consistency) — 14 findings, all filed and resolved as issues #402–#415.
+
+### Fixed
+- **MCP server config for Claude now targets `.mcp.json`, not `settings.json`/`settings.local.json`** — Claude Code never reads a top-level `mcpServers` key from either settings file, only from `.mcp.json` at the project root. Every agent-meta-generated Claude project that activated an MCP server previously ended up with a fully inert, silently-broken integration (#388, #400). Includes a migration warning for projects with a leftover `mcpServers` key in the old location, and a self-heal for zero-byte existing config files that previously skipped injection with only a buried warning.
+- Silent `except Exception: pass` blocks in `build_variables()` that swallowed pipeline/reflection/SE config errors now surface through the existing warnings list instead of failing invisibly — this is what let a stale pipeline override in `.meta-config/project.yaml` silently break `PIPELINE_MATCH_TABLE` generation with zero diagnostic signal (#402).
+- `validate_pipelines()` now checks that a pipeline's `stages` field is actually a list before iterating, reporting a clean structural error instead of crashing with an unhandled `AttributeError` on a malformed override (#403).
+- `PROJECT_CONTEXT`/`ARCHITECTURE`/`DEV_COMMANDS` template variables — previously only ever set by the interactive `sync.py --setup` wizard with no fallback — now default sensibly (`PROJECT_CONTEXT` falls back to `PROJECT_DESCRIPTION`, the other two to an empty string) instead of leaking a literal `{{VAR}}` into generated agent templates for any project that skipped the wizard (#423).
+- Admin UI: renaming a key in the provider-options KV editor (`/project/providers`) now actually deletes the old key instead of leaving both old and new keys in the saved config as an orphaned duplicate (#319).
+- Admin UI: `sync.py --audit-config`'s "template without role-default" check no longer false-positives on `provider-expert.md`, an intentional `extends:`-only base template with no role of its own (#415).
+- `config_audit.py`'s `templates_without_default` check now has an explicit `WRAPPER_TEMPLATES` allowlist instead of silently flagging known base templates on every run.
+- Two governance-hook limits (soft agent-identity self-declaration, git-mutation regex parser gaps) and the A2A `max_depth` rule (model-enforced only, not technically enforced) are now documented in `a2a-delegation-gates.md`/`branch-guard.md` instead of only in the hook's own source comment (#404, #405).
+- `orchestrator.strict`'s no-op on non-hook-support providers (everything except Claude/Mammouth) is now called out in README's Provider Generation Matrix, not just in the `sync.py --validate` warning (#406).
+- `.meta-config/project.yaml`'s `model-overrides` nesting order fixed (`{Provider: {role: ...}}`, not `{role: {Provider: ...}}`) — the wrong order meant `resolve_model()` silently never applied several Gemini model overrides, always falling back to the tier-preset default (#410).
+- Removed orphaned, stale generated provider output (`.continue/`, `.mammouth/`, `.github/copilot/`) for providers no longer in this project's active `ai-providers` list; `.github/workflows/` (real CI config, not generated) was explicitly preserved (#407).
+- Doc drift sweep: README, `docs/guides/quality-pipelines.md`, `snippets/orchestrator/quality-pipelines.md`, `docs/architecture/04-dev-workflow.md` no longer reference the deleted `feature` role or the pre-rename `standard-feature` pipeline name (#408). README's "Agent Roster" table was also missing 7 real, active roles entirely (`accessibility-specialist`, `data-engineer`, `planner`, `product-manager`, `refactoring-specialist`, `sre-engineer`, `technical-writer`) and had a stale header count (51 → 69) and a pre-existing Provider Expert Agents miscount (5 → 6).
+- Deleted 2 of 3 flagged duplicate `docs/concepts/planned/*.md` files after verifying against the knowledge wiki's own migration notes that nothing is lost (#414); a third (`prompt-modernization.md`) was intentionally kept — despite the matching filename it is not a duplicate of its `active/` counterpart.
+- Added a synthetic end-to-end test for the `extends`+`patches` composition engine (`compose_agent()`), previously untested since no real 2-platform/3-project override in this repo uses it yet (#411).
+
+### Changed
+- `developer`'s intent-routing keywords no longer include the bare word `Feature` — it collided with the `feature` role's own keywords and caused mis-routing.
+- `sync.py --validate` now warns when `orchestrator.strict` is active for a provider with no PreToolUse hook support (currently: any provider except Claude and Mammouth).
+- `developer`'s dead `Agent` tool grant was removed — the role was already instructed to delegate via text reference only, never via tool call.
+- SE-role frontmatter naming exception (`se-<rolle>` without the `template-` prefix) documented in `rules/2-platform/agent-meta-conventions.md` instead of being an unexplained inconsistency (#412).
+
+### Known issues
+- `orchestrator-guard.sh`'s PreToolUse hook can hang non-deterministically on Windows/Git-Bash when spawning the native `python.exe` (~30–40% of invocations in reproduction testing) — surfaces to the harness as a raw "hook error" instead of the formatted guard message. Root cause identified (MSYS/Git-Bash pipe-to-native-exe unreliability), a first fix attempt made it worse and was reverted; not fixed in this release (#396).
+- Optional `*_SNIPPETS_PATH`/`DEV_STACK_START` template variables can still leak an unsubstituted `{{VAR}}` when unset, since the referencing templates interpolate them unconditionally instead of behind a `{{#if}}` guard — different root cause than the #423 fix above, tracked separately (#425).
+
+## [0.91.3] — 2026-08-01
+
+### Fixed
+- #392: fill_defaults() now respects the `silent` parameter to prevent duplicate variable warnings
+- #392: Skip reporting BUILTIN_VARS (AGENTS_DIR, PLUGIN_DIR_NAME, PRIMARY_IMAGE_TAG) as missing to eliminate false positives
+- #392: Add _rmtree_force() utility to handle Windows read-only .git/objects/pack files during skill cleanup
+- #392: Fix reqogniloom pinned_commit reference (was branch name 'main', now actual commit hash)
+
+### Changed
+- #393: Remove Continue provider support — sync.py no longer generates Continue-specific agent files
+
+## [0.91.2] — 2026-08-01
+
+### Fixed
+- #390: Fixed orchestrator-guard hook exemption for git subagent via self-declare sentinel `#agent-meta:agent=<name>` (PreToolUse payload missing `agent_name` field).
+- #390: Fixed Windows path interpolation bug in orchestrator-guard.sh causing backslash escape sequences to corrupt config file path.
+- #390: Fixed git-mutations regex to use token-aware parser instead of substring matching (eliminated false positives on `git merge-base`, `git check-ignore`).
+- #390: Fixed hook to read provider-specific `orchestrator.provider-overrides.<Provider>.mode` setting via `{{AGENT_META_PROVIDER}}` placeholder.
+
+## [0.90.2] — 2026-07-28
+
+### Fixed
+- #386: Fixed Admin UI toggle inversion for Skills/MCP panels
+- #381/#383: Fixed personal template path + added MCP governance embedding for Opencode
+- #382: Fixed external skill submodule deprovisioning (git rm + cleanup)
+- #387: Fixed missing opencode-go/ prefix for model IDs
+- #385: Added --no-recursive --depth 1 for skill submodule operations
+
+## [0.90.1] — 2026-07-27
+
+### Fixed
+- Fix: Context drift backups are no longer erroneously generated after datetime template evaluation.
+- Fix: Submodule inclusion for external skills fixed to use `git submodule add` in consumer projects instead of dynamic cloning, respecting the pinned commit natively.
+- Fix: Legacy MCP configs are preserved (user modifications like `alwaysAllow` and `env` blocks are no longer overwritten during sync).
+
+## [0.89.0] — 2026-07-27
+
+### Added
+- **Partials-Konzept für Context-Files**: Die Provider Context Files (`CLAUDE.md`, `AGENTS.md`, etc.) verwenden nun einen robusten TemplateBuilder und Partials (z.B. `{{> project-metadata }}`) zur dynamischen Generierung.
+- Migration der dynamischen Projekt-Metadaten vom statischen Header in den Managed-Block zur Vermeidung von unnötigen Backup-Merge-Konflikten bei der Config-Aktualisierung.
+
+### Removed
+- Unused `_load_claude_md_managed_template` Funktion in `context.py`.
+
+## [0.86.3] — 2026-07-26
+
+### Fixed
+- Fix: apply provider-specific frontmatter transformations to external skill wrappers to fix Opencode validation.
+
+## [0.86.2] — 2026-07-26
+
+### Fixed
+- Fix: properly skip all browser test modules if playwright is absent.
+
+## [0.86.1] — 2026-07-26
+
+### Fixed
+- Fix: `SyncLog` attribute error in external skills script.
+
+## [0.86.0] — 2026-07-26
+
+### Added
+- Feat: dynamic external skills fetching with project overrides.
+
+### Fixed
+- Fix: make playwright import lazy in conftest to prevent pytest collection failures.
+
+## [0.85.5] — 2026-07-26
+
+### Fixed
+- add shipsafe ignore files for false positive security warnings
+
+## [0.85.4] — 2026-07-26
+
+### Fixed
+- resolve remaining ruff linter warnings using noqa
+
+## [0.85.3] — 2026-07-26
+
+### Fixed
+- read agent-meta-version from project.yaml in admin ui
+
+## [0.85.2] — 2026-07-26
+
+### Fixed
+- Main-chat orchestrator bugfix merged to main
+
+## [0.85.1] - 2026-07-26
+
+### Fixed
+- Add internal-docs to UI dropdown and update README architecture
+
+## [0.85.0] - 2026-07-25
+
+### Added
+- Added ReqogniLoom & Honcho MCP registry project-config support.
+
+## [0.84.0] - 2026-07-25
+
+### Added
+- **Context Compaction V2 (Single-Tree XML Architecture)**: Replaced the dual-tree legacy (Markdown) vs modern (XML) structures with a single unified XML standard (`<project>`, `<roles>`, `<providers>`).
+- Live override capability: Submodule targets can now directly download updated model registries (`model-registry.json`) from GitHub via Admin UI ("Refresh via sync.py or GitHub override").
+
+### Fixed
+- Fixed case-sensitive filtering bug for providers in the models.dev live catalog.
+- Fixed models.dev test assertions to dynamically support removed `ai-providers` entries.
+
+### Removed
+- Removed legacy `1-generic-modern` dual-tree architecture and `scripts/validate-modern-templates.py`.
+
+## [0.83.0] - 2026-07-24
+
+### Added
+- **Knowledge Engine Framework**: Complete multi-phase implementation enabling structured knowledge capture, organization, and retrieval across projects.
+  - Phase A: Activation mechanism, `knowledge.py` bundle manager, schema/index/log generators, path variables injection.
+  - Phase B: 7 knowledge-worker agent templates (`knowledge-curator`, `knowledge-gardener`, `knowledge-indexer`, `knowledge-ingestor`, `knowledge-linter`, `knowledge-migrator`, `knowledge-querier`), conditional gating in delegation routing and intent tables, role-defaults entries.
+  - Phase C: AdminUI integration with domain presets (`research`, `personal`, `business`, `book`, `internal-docs`, `custom`), knowledge-engine section writes support.
+- **Native Extensions Whitelist**: Schema, validation, and Admin UI editor for managing provider-native extensions (plugins, hooks, skills) with explicit approval gates.
+- Knowledge wiki bundle scaffolding with OKF-compliant structure (schema.md, sources/, wiki/, index.md, log.md).
+
+### Fixed
+- Test suite corrections for conditional block substitution.
+- Knowledge schema rendering for bundle path variables.
+
+### Changed
+- `config/project-config.schema.json`: added `knowledge-engine` and `orchestrator.native-extensions` schema sections.
+- `scripts/sync.py` and `scripts/lib/config.py`: Knowledge Engine activation and variables injection.
+- Admin UI: new `/api/knowledge/*` endpoints for Knowledge Engine domain presets and content management.
+- `rules/use-orchestrator.md`: gated knowledge-* agent roles behind knowledge-engine.enabled flag.
+
 ## [0.82.0] - 2026-07-23
 
 ### Added
@@ -19,7 +522,7 @@
 ## [0.81.0] - 2026-07-22
 
 ### Added
-- Optional, self-hostable `reqflow` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqFlow's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqflow-setup.md`, secrets template entries `MCP_REQFLOW_URL` / `MCP_REQFLOW_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
+- Optional, self-hostable `reqogniloom` MCP server registered in `config/mcp-registry.yaml` (`enabled-by-default: false`): exposes ReqogniLoom's requirement/architecture/test/traceability/ADR/risk/issue/glossary/AI-derivation tools over SSE with `X-API-Key` auth; administrative/destructive namespaces (`admin.*`, `user.*`, `permissions.*`, `audit.*`, `events.*`, `workspace.close`/`.reactivate`/`.delete`) are blocked. Setup guide at `docs/guides/mcp/reqogniloom-setup.md`, secrets template entries `MCP_REQOGNILOOM_URL` / `MCP_REQOGNILOOM_API_KEY` in `templates/configs/mcp-secrets.local-template.yaml`.
 - Optional `role-group` field on agent roles, with a corresponding filter control in the Admin UI (`config/role-defaults.yaml`, `docs/ui/admin-ui.html`).
 - Codeberg added as a supported Git platform (`config/project-config.schema.json`, `howto/setup/first-steps.md`, `scripts/lib/setup.py`).
 
