@@ -2,6 +2,7 @@
 
 import os
 import sys
+from functools import lru_cache
 
 try:
     import yaml
@@ -21,8 +22,13 @@ def _require_yaml() -> None:
         sys.exit(1)
 
 
+@lru_cache(maxsize=None)
 def load_reflection_pairs(config_dir=None):
-    """Load reflection pairs from role-defaults.yaml."""
+    """Load reflection pairs from role-defaults.yaml.
+
+    Cached per ``config_dir`` (process lifetime) — read-only framework config
+    (#553 perf hotspot: re-parsed on every build_variables() call otherwise).
+    """
     _require_yaml()
     if config_dir is None:
         config_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'config')

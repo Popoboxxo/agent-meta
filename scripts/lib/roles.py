@@ -1,6 +1,7 @@
 """Roles config loading and model/memory/permissionMode resolution."""
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -20,7 +21,12 @@ _TIER_SEQUENCE = ["nano", "fast", "balanced", "powerful", "max", "ultra"]
 # Legacy Claude aliases — resolved only when no provider context is available
 _CLAUDE_ALIASES = {"haiku", "sonnet", "opus"}
 
+@lru_cache(maxsize=None)
 def load_tier_presets(agent_meta_root: Path) -> dict:
+    # ponytail: process-lifetime cache — file is framework config, never
+    # rewritten mid-run, and every caller only reads the result (never
+    # mutates it in place). Cuts ~316 redundant yaml.safe_load() calls per
+    # full multi-provider render down to one per unique root (issue #553).
     presets_path = agent_meta_root / "config" / "tier-presets.yaml"
     data, _ = _load_yaml_or_json(presets_path)
     return data or {}
@@ -33,8 +39,15 @@ def _upgrade_tier(tier: str, steps: int) -> str:
     return _TIER_SEQUENCE[new_idx]
 
 
+@lru_cache(maxsize=None)
 def load_roles_config(agent_meta_root: Path) -> dict:
-    """Load config/role-defaults.yaml with fallback to legacy paths."""
+    """Load config/role-defaults.yaml with fallback to legacy paths.
+
+    Cached per ``agent_meta_root`` (process lifetime): the file is read-only
+    framework config within a sync run and every caller only reads the
+    returned dict (see #553 — this loader was re-parsed dozens of times per
+    render, dominating wall time in multi-provider integration tests).
+    """
     data, _ = _load_yaml_or_json(
         agent_meta_root / ROLES_CONFIG,
         agent_meta_root / _ROLES_CONFIG_LEGACY,
