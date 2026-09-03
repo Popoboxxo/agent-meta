@@ -80,7 +80,7 @@ def _is_docstring(node: ast.stmt | None) -> bool:
 def _has_union_annotation(tree: ast.Module) -> bool:
     annotations: list[ast.expr] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.returns is not None:
                 annotations.append(node.returns)
             args = node.args
