@@ -97,7 +97,8 @@ from lib.external_tools import (
     render_injection_drift_artifacts,
     scan_injection_drift,
 )
-from lib.hooks import create_hook, sync_hook_lib, sync_hooks, sync_release_gates
+from lib.hook_plugins import sync_hook_lib, sync_release_gates
+from lib.hooks import create_hook, sync_hooks
 from lib.io import SyncError, safe_path, write_checked
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import generate_initial_index, generate_initial_log, generate_schema
@@ -166,9 +167,10 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
     """
     entries: list[str] = []
     project_skills = config.get("external-skills", {})
-    providers = config.get("ai-providers", config.get("ai-provider", ["Claude"]))
-    if isinstance(providers, str):
-        providers = [providers]
+    # Reuses resolve_providers() (issue #631) instead of duplicating its
+    # ai-providers/ai-provider/["Claude"]-fallback logic here — filter_deactivated=False
+    # matches this function's prior behavior (it never filtered deactivated providers).
+    providers = resolve_providers(config, provider_config, filter_deactivated=False)
 
     for skill_name, skill_project_cfg in project_skills.items():
         if not skill_project_cfg.get("gitignore", False):
@@ -365,7 +367,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.config import build_variables
     from lib.context import sync_context_for_provider, sync_snippets_for_provider
     from lib.dod import resolve_release_gates
-    from lib.hooks import sync_hook_lib, sync_hooks, sync_release_gates
+    from lib.hook_plugins import sync_hook_lib, sync_release_gates
+    from lib.hooks import sync_hooks
     from lib.providers import load_providers_config, resolve_providers
     from lib.rules import sync_rules, sync_speech_mode
     from lib.skills import sync_external_skills_for_provider
@@ -1176,12 +1179,18 @@ def _handle_validate(ctx: _SyncContext) -> None:
     for _gap in _provider_gaps:
         log.warning(f"config-audit [WARN] provider-registry-gap: {_gap.message}")
 
+    from lib.consistency.hook_drift import check_stale_deployed_hooks
     from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
     from lib.consistency.report import print_report
     from lib.providers import load_providers_config as _load_pc
 
     _provider_config = _load_pc(agent_meta_root)
     _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
+    # Deployed-hook version drift (issue #630): warns when a project's
+    # .claude/hooks/*.sh (or another provider's hooks_dir) has fallen behind
+    # the current hooks/1-generic/ source -- sibling check to
+    # stale_platform_overrides above, for hooks instead of agent templates.
+    _strict_findings += check_stale_deployed_hooks(project_root, agent_meta_root, config, _provider_config)
     if _strict_findings:
         print_report(_strict_findings, project_root, changed_only=False)
 
@@ -1336,7 +1345,7 @@ def _handle_sync(ctx: _SyncContext) -> None:
         if prov == "providers": continue
         if is_provider_active(config, prov):
             pc = provider_config.get(prov, {})
-            c_file = resolve_context_filename(pc.get("context_file", f"{prov.upper()}.md"), prov)
+            c_file = resolve_context_filename(pc.get("context_file", f"{prov.upper()}.md"), prov, pc)
             active_context_files.add(c_file)
 
     for prov in all_known_providers:
@@ -1346,7 +1355,7 @@ def _handle_sync(ctx: _SyncContext) -> None:
 
             # Default paths if missing from config
             a_dir = pc.get("agents_dir", f".{prov.lower()}/agents")
-            c_file = resolve_context_filename(pc.get("context_file", f"{prov.upper()}.md"), prov)
+            c_file = resolve_context_filename(pc.get("context_file", f"{prov.upper()}.md"), prov, pc)
 
             agents_dir = project_root / a_dir
             context_file = project_root / c_file
@@ -1361,10 +1370,13 @@ def _handle_sync(ctx: _SyncContext) -> None:
                 if not args.dry_run:
                     context_file.unlink()
 
-            # Cleanup parent provider directory if empty
-            prov_dir_name = f".{prov.lower()}"
-            if prov == "Copilot":
-                prov_dir_name = ".github/copilot"
+            # Cleanup parent provider directory if empty. Resolved from this
+            # provider's own isolation-dirs (config/ai-providers.yaml) instead
+            # of a hardcoded per-provider string exception (issue #631) — e.g.
+            # Copilot's ".github/copilot/" doesn't follow the ".<name>/"
+            # convention every other provider uses.
+            _isolation_dirs = pc.get("isolation-dirs") or [f".{prov.lower()}/"]
+            prov_dir_name = _isolation_dirs[0].rstrip("/")
             prov_dir = project_root / prov_dir_name
             if prov_dir.exists() and not args.dry_run:
                 import shutil
@@ -1460,6 +1472,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
             print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
             sys.exit(1)
         if pc.get("has_hooks", False):
+            # sync_hooks()/sync_hook_lib()/sync_release_gates() each check
+            # provider_hooks_supported(pc) internally (issue #630): with
+            # has_hooks: true but no verified hook_protocol, they deploy
+            # nothing new but still clean up any previously-deployed hooks.
             sync_hooks(agent_meta_root, project_root, config, log, args.dry_run,
                        provider=provider, provider_config=provider_config)
             sync_hook_lib(agent_meta_root, project_root, config, log, args.dry_run,

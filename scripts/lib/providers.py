@@ -28,8 +28,10 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 "agent_ext": ".md",
                 "context_file": "CLAUDE.md",
                 "context_template": "templates/configs/CLAUDE.project-template.md",
+                "has_dedicated_context_file": True,
                 "has_rules": True,
                 "has_hooks": True,
+                "hook_protocol": "claude-code-json",
                 "has_commands": True,
                 "has_settings": True,
                 "capabilities": [
@@ -86,7 +88,9 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     - "ai-providers": ["Claude", "Gemini"]  (new multi-provider)
     - "ai-provider":  "Claude"               (legacy, backward-compat)
 
-    Falls back to ["Claude"] if neither key is set.
+    Falls back to config["default-provider"] if neither key is set (issue #631)
+    -- itself defaulting to "Claude" for backward compatibility, but expressed
+    as an explicit, overridable config key instead of a hardcoded literal.
 
     When filter_deactivated is True (default), providers marked as deactivated in
     provider-deactivation config are excluded.
@@ -105,7 +109,8 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
             providers = [p]
 
     if not providers:
-        providers = ["Claude"]
+        default_provider = config.get("default-provider", "Claude")
+        providers = [default_provider] if default_provider in provider_config else ["Claude"]
 
     if filter_deactivated:
         dc = config.get("provider-deactivation", {})
@@ -119,27 +124,59 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     return providers
 
 
-def resolve_context_filename(context_file: str, provider: str) -> str:
+def resolve_context_filename(context_file: str, provider: str, pc: dict | None = None) -> str:
     """Resolve the effective context filename for a provider.
 
-    Non-Claude providers that still resolve to the default "CLAUDE.md"
-    (i.e. they have no explicit `context_file` override in
-    config/ai-providers.yaml) fall back to "AGENTS.md" instead — e.g.
-    Opencode/Gemini-style providers share a generic context file rather
-    than a Claude-specific one.
+    Providers that still resolve to the default "CLAUDE.md" (i.e. they have
+    no explicit `context_file` override in config/ai-providers.yaml) AND
+    don't have their own dedicated context file fall back to "AGENTS.md"
+    instead — e.g. Opencode/Gemini-style providers share a generic context
+    file rather than a Claude-specific one.
+
+    Driven by the `has_dedicated_context_file` capability flag (issue #631)
+    instead of a literal `provider != "Claude"` check -- Claude is the only
+    provider with that flag set today, but any future provider with its own
+    dedicated context-file handling (like Claude's sync_claude_md_static())
+    can opt in via config/ai-providers.yaml alone, no code change needed.
 
     Args:
         context_file: The raw context filename, e.g. from
             `provider_config[provider].get("context_file", f"{provider.upper()}.md")`.
-        provider: The provider name (e.g. "Claude", "Opencode").
+        provider: The provider name (e.g. "Claude", "Opencode"), used only
+            when `pc` is not supplied (falls back to `provider == "Claude"`
+            for callers that haven't been updated to pass `pc` yet).
+        pc: This provider's config/ai-providers.yaml entry, if available.
 
     Returns:
-        "AGENTS.md" if `context_file == "CLAUDE.md"` and `provider != "Claude"`,
-        otherwise `context_file` unchanged.
+        "AGENTS.md" if `context_file == "CLAUDE.md"` and the provider has no
+        dedicated context file, otherwise `context_file` unchanged.
     """
-    if context_file == "CLAUDE.md" and provider != "Claude":
+    has_dedicated = (
+        pc.get("has_dedicated_context_file", False) if pc is not None
+        else provider == "Claude"
+    )
+    if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file
+
+
+# Hook event/payload contracts sync.py knows how to mirror hook scripts for.
+# hooks/1-generic/*.sh are written against exactly one contract today (JSON on
+# stdin, PreToolUse/PostToolUse, exit-code-2-blocks) — see ai-providers.yaml's
+# `hook_protocol` field comment (issue #630).
+SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json"}
+
+
+def provider_hooks_supported(pc: dict) -> bool:
+    """Whether a provider's hooks should actually be synced/mirrored.
+
+    `has_hooks: true` alone only records that a hooks_dir/settings_file path
+    is configured for the provider — it does NOT mean the provider's hook
+    event/payload model is verified to match the contract hooks/1-generic/
+    scripts are written against. Only providers with a `hook_protocol` in
+    `SUPPORTED_HOOK_PROTOCOLS` get hooks mirrored (issue #630).
+    """
+    return bool(pc.get("has_hooks", False)) and pc.get("hook_protocol") in SUPPORTED_HOOK_PROTOCOLS
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:

@@ -42,6 +42,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
+_IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard-impl.sh"
 
 # On Windows, plain ["bash", ...] can resolve to System32\bash.exe (the WSL
 # launcher) instead of Git Bash, depending on CreateProcess search order
@@ -524,6 +525,11 @@ def test_fails_closed_without_lib_common(tmp_path):
     behave as if strict/destructive checks passed."""
     isolated_hook = tmp_path / "orchestrator-guard.sh"
     isolated_hook.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # The impl script must be present (issue #630 self-health wrapper split)
+    # so this test actually reaches hook_common.sh sourcing inside impl,
+    # instead of failing earlier on a missing impl script.
+    isolated_impl = tmp_path / "orchestrator-guard-impl.sh"
+    isolated_impl.write_text(_IMPL_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     # No lib/ subdirectory next to it -- `source $SCRIPT_DIR/lib/hook_common.sh` must fail.
     payload = _bash_payload("git status")
     payload["cwd"] = tmp_path.as_posix()
@@ -536,6 +542,93 @@ def test_fails_closed_without_lib_common(tmp_path):
     )
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "hook_common.sh" in result.stderr
+
+
+# --- issue #630: self-health wrapper carve-out ----------------------------
+# orchestrator-guard.sh (thin wrapper) syntax-checks orchestrator-guard-
+# impl.sh with `bash -n` before running it. If impl.sh is broken (e.g. an
+# unresolved merge-conflict marker), a narrow carve-out allows Write/Edit on
+# paths under the wrapper's own directory (so it can be repaired) while
+# every other call still fails closed.
+
+def _isolated_wrapper_with_broken_impl(tmp_path) -> Path:
+    """Deploy an isolated wrapper+broken-impl pair under <tmp_path>/.claude/hooks/,
+    mirroring the real deployment layout (hooks nested under the project root)
+    so "under the wrapper's own directory" vs. "elsewhere in the project" is a
+    meaningful distinction, not just any sibling of tmp_path itself."""
+    hooks_dir = tmp_path / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    isolated_hook = hooks_dir / "orchestrator-guard.sh"
+    isolated_hook.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    broken_impl = hooks_dir / "orchestrator-guard-impl.sh"
+    broken_impl.write_text(
+        "#!/bin/bash\n<<<<<<< HEAD\necho broken\n=======\necho conflict\n>>>>>>> branch\n",
+        encoding="utf-8",
+    )
+    return isolated_hook
+
+
+def test_broken_impl_blocks_bash_calls(tmp_path):
+    isolated_hook = _isolated_wrapper_with_broken_impl(tmp_path)
+    payload = _bash_payload("git status")
+    payload["cwd"] = tmp_path.as_posix()
+    result = subprocess.run(
+        [_BASH, str(isolated_hook)], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "syntax error" in result.stderr.lower()
+
+
+def test_broken_impl_allows_edit_under_own_hooks_dir(tmp_path):
+    isolated_hook = _isolated_wrapper_with_broken_impl(tmp_path)
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": str(isolated_hook.parent / "orchestrator-guard-impl.sh")},
+        "cwd": tmp_path.as_posix(),
+    }
+    result = subprocess.run(
+        [_BASH, str(isolated_hook)], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_broken_impl_still_blocks_edit_outside_hooks_dir(tmp_path):
+    isolated_hook = _isolated_wrapper_with_broken_impl(tmp_path)
+    # A project file OUTSIDE .claude/hooks/ (sibling of it, not nested under
+    # it) -- must stay blocked even while the impl script is broken.
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": str(tmp_path / "some-file.py")},
+        "cwd": tmp_path.as_posix(),
+    }
+    result = subprocess.run(
+        [_BASH, str(isolated_hook)], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_missing_impl_fails_closed(tmp_path):
+    isolated_hook = tmp_path / "orchestrator-guard.sh"
+    isolated_hook.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    # No orchestrator-guard-impl.sh at all.
+    result = subprocess.run(
+        [_BASH, str(isolated_hook)], input=json.dumps(_bash_payload("git status")),
+        capture_output=True, text=True, cwd=str(tmp_path),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "impl script" in result.stderr.lower()
+
+
+def test_valid_impl_still_enforces_normally():
+    """Sanity check: with a syntactically valid impl.sh (the real one), the
+    wrapper's `bash -n` pre-check passes and normal enforcement is unaffected
+    -- guards against the wrapper accidentally short-circuiting the happy
+    path."""
+    result = _run_hook(_bash_payload("echo test"))
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
 
 
 # --- issue #596: audit log redacts credentials + tightens permissions -----

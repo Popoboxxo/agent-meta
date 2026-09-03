@@ -2,6 +2,7 @@ dod-push-check.sh
 graphify-read-guard.sh
 graphify-search-guard.sh
 lifecycle-check.sh
+orchestrator-guard-impl.sh
 orchestrator-guard.sh
 pre-release-check.sh
 sync-on-config-change.sh

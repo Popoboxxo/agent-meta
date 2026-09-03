@@ -328,6 +328,7 @@ def _update_managed_html_block(
     dry_run: bool,
     agent_meta_root: Path,
     provider: str = "Claude",
+    pc: dict | None = None,
 ) -> None:
     """Update the HTML-style managed block in a context file.
 
@@ -351,7 +352,8 @@ def _update_managed_html_block(
     )
     rel = str(target_path.relative_to(project_root))
     render_vars = variables
-    if provider == "Claude" and "AGENT_HINTS_CLAUDE" in variables:
+    _has_dedicated = (pc or {}).get("has_dedicated_context_file", provider == "Claude")
+    if _has_dedicated and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
@@ -461,8 +463,15 @@ def _sync_managed_block_context(
         local_orch["mode"] = _orch_mode
         local_config["orchestrator"] = local_orch
 
+    # Driven by the `has_dedicated_context_file` capability flag (issue #631)
+    # instead of a literal `provider == "Claude"` check -- Claude is the only
+    # provider with dedicated context-file handling today (own static-header
+    # builder, own settings.json init path in sync.py), but a future provider
+    # can opt into the same treatment via config/ai-providers.yaml alone.
+    has_dedicated = pc.get("has_dedicated_context_file", False)
+
     variables = variables.copy()
-    if provider == "Claude":
+    if has_dedicated:
         variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(local_config, agent_meta_root, include_table=False)
     else:
         variables["AGENT_HINTS"] = build_agent_hints(local_config, agent_meta_root, include_table=True)
@@ -471,7 +480,7 @@ def _sync_managed_block_context(
     # main sync loop; this strategy only refreshes the managed block for Claude.
     # For every other managed-block provider we also regenerate the static header
     # here (same hash-drift detection), when a static template is configured.
-    if provider != "Claude":
+    if not has_dedicated:
         _ensure_context_file(
             project_root, agent_meta_root, target_path, template_path, variables, config,
             log, dry_run,
@@ -484,10 +493,10 @@ def _sync_managed_block_context(
                 rebuild_footer=True,
             )
     if target_path.exists():
-        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider)
+        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider, pc)
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
-    if provider != "Claude":
+    if not has_dedicated:
         _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
 
 

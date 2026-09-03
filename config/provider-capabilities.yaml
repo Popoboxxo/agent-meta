@@ -77,15 +77,18 @@ capabilities:
   # Conservative baseline — Mammouth is a CLI-first tool (Plan/Build modes) whose
   # native orchestration surface is undocumented. Only capabilities backed by
   # config/ai-providers.yaml are enabled; everything orchestration-specific stays
-  # false until verified. `hooks: true` is evidence-based: ai-providers.yaml sets
-  # has_hooks: true + hooks_dir (.mammouth/hooks), enforced by
-  # tests/test_provider_hooks_config.py.
+  # false until verified. `hooks: false` (issue #630): ai-providers.yaml sets
+  # has_hooks: true + hooks_dir (.mammouth/hooks) so config paths never collide
+  # with Claude's, but deliberately sets NO `hook_protocol` — whether Mammouth
+  # understands Claude Code's hook contract (JSON on stdin, PreToolUse/
+  # PostToolUse, exit-code-2-blocks) is unverified, so sync.py does not
+  # actually mirror hook scripts to it (see providers.py::provider_hooks_supported).
   Mammouth:
     subagent_dispatch: false
     parallel_execution: false
     file_based_agents: true
     text_mentions: true
-    hooks: true
+    hooks: false
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -94,4 +97,4 @@ capabilities:
     special_notes:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
       - "Keine native parallele Subagent-Ausführung — Delegation sequentiell/textbasiert."
-      - "Hooks werden unterstützt (.mammouth/hooks); MCP-Integration in ai-providers.yaml nicht konfiguriert."
+      - "Hooks-Pfade sind konfiguriert (.mammouth/hooks), aber ungespiegelt: kein verifiziertes hook_protocol (#630). MCP-Integration in ai-providers.yaml nicht konfiguriert."

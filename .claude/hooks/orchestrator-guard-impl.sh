@@ -1,14 +1,18 @@
 #!/bin/bash
-# hook: orchestrator-guard
-# version: 3.0.0
-# event: PreToolUse
-# matcher: ""
-# description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
-# enabled_by_default: true
+# version: 1.0.0
+# Real orchestrator-guard logic. NOT a standalone hook — invoked by
+# orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
+# the PreToolUse JSON payload to this script's stdin after syntax-checking
+# it. Do not register this file directly in settings.json (it has no
+# `# hook:`/`# event:` header on purpose, so scripts/lib/hooks.py never
+# registers it as its own hook entry).
+# The `# version:` line above IS still read by check_stale_deployed_hooks()
+# (scripts/lib/consistency/hook_drift.py, issue #630) so a project that
+# doesn't re-sync after this file changes gets a drift warning — bump it
+# whenever this file's logic changes, independent of the wrapper's version.
 
 set -uo pipefail
 
-# This hook is always active (enabled_by_default: true).
 # It self-checks whether orchestrator.strict mode is enabled in project.yaml.
 # If strict mode is off, the hook exits 0 immediately and imposes no overhead.
 #
@@ -71,21 +75,24 @@ set -uo pipefail
 #     `core.pager` / `core.editor` config keys are flagged as inherently
 #     destructive (arbitrary-command execution / RCE) regardless of the
 #     subcommand.
-# Known limitation (issue #592, deliberate — best-effort convention gate,
-# not a security boundary): command substitution and indirection such as
-# `$(...)`, backticks, `xargs`, or `eval` can still smuggle a git mutation
-# past the tokenizer, because the hook does not execute or fully parse the
-# shell. Closing this would require a real shell interpreter, which is
-# disproportionate for a convention tool; documented in
+# Known limitation (issue #592, deliberate — best-effort convention boundary,
+# not a security boundary; see .claude/rules/branch-guard.md#guard-terminologie
+# for the definition of both terms): command substitution and indirection
+# such as `$(...)`, backticks, `xargs`, or `eval` can still smuggle a git
+# mutation past the tokenizer, because the hook does not execute or fully
+# parse the shell. Closing this would require a real shell interpreter, which
+# is disproportionate for a convention tool; documented in
 # .claude/rules/branch-guard.md ("Bekannte Grenzen").
 
 INPUT=$(cat)
 
 # --- Shared helper lib + fail-closed python check (issue #595) ---------
-# This hook is a security boundary (blocks strict-mode/destructive/mutation
-# git calls) — unlike the informational/automation hooks in this repo, it
-# must NOT silently allow the action through just because a required
-# dependency is missing. Both a missing lib/hook_common.sh (deployment bug)
+# For THIS check (dependency availability) the hook acts as a security
+# boundary (blocks strict-mode/destructive/mutation git calls) — see
+# .claude/rules/branch-guard.md#guard-terminologie for the convention-vs-
+# security-boundary distinction — unlike the informational/automation hooks
+# in this repo, it must NOT silently allow the action through just because a
+# required dependency is missing. Both a missing lib/hook_common.sh (deployment bug)
 # and a missing python3/python interpreter (PATH manipulation) now fail
 # CLOSED (exit 2) instead of fail-open (exit 0).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -380,7 +387,7 @@ CONFIG_FILE="$PROJECT_ROOT/.meta-config/project.yaml"
 # stays the literal placeholder text only if this file was never synced
 # (e.g. run straight from hooks/1-generic/), which the lookup below
 # treats as "no provider override applies".
-AGENT_META_PROVIDER="Mammouth"
+AGENT_META_PROVIDER="Claude"
 
 if [ -f "$CONFIG_FILE" ]; then
   # CONFIG_FILE is passed as argv, never interpolated into the python

@@ -45,4 +45,51 @@ Body should include:
 - Links to official docs if known
 - Requested capabilities: agents_dir, context_file, has_rules, has_hooks, has_settings, model-tiers
 - Label: "enhancement", "new-provider"
+
+**Step 5 — Implement a genuinely new provider**
+
+Steps 3/4 cover activating an already-registered provider or filing an issue for one that
+isn't. This step is for actually implementing support for a new provider in the agent-meta
+codebase itself. Assumption: a simple, file-based provider (Markdown agents, own context
+file, no exotic settings format).
+
+As of this Wave (post #627/#628/#629), most former Python touchpoints were eliminated —
+provider differences now resolve through `config/ai-providers.yaml` and sister registries
+instead of hardcoded Python maps/`elif` chains. Do NOT re-add a Python branch for something
+already covered by YAML lookup (see `provider-agnostic` skill for the rule).
+
+**Required YAML config (always):**
+1. `config/ai-providers.yaml` — provider block (identity, paths, capabilities, model tiers,
+   gitignore/isolation dirs, `agents_dir`, `bash_tool_name`, `context_file`)
+2. `config/provider-capabilities.yaml` — orchestration-capability entry
+3. `config/provider-bootstrap.yaml` — bootstrap entry (`mechanism: file-based, action: none`
+   for a simple provider — routes through `BootstrapEngine`, no Python needed)
+4. `config/provider-tools.yaml` — tool whitelist (+ `terminal_tool` entry if the CLI name
+   differs from the provider name)
+5. `templates/configs/<Provider>.project-template.md` (+ a settings-template if the
+   provider needs a settings file)
+
+**Remaining code touchpoints (only if the provider genuinely needs something no existing
+config-key covers):**
+6. `scripts/lib/commands.py` (~line 124) — the provider-to-commands-dir dispatch is still a
+   4-way `if/elif` with `else: return` (silently no commands, no log line) — add a branch
+   here only if the provider supports native slash-commands with a directory convention not
+   yet expressible via a capability flag.
+7. `scripts/lib/mcp_provider_config.py` (`_write_provider_config`, ~line 395) — only if the
+   provider needs a genuinely new MCP settings file format (unknown format → warning + skip,
+   not silent).
+8. Hook adapter — only if `has_hooks: true` and the provider's hook event/payload model
+   differs from Claude Code's `PreToolUse`/`PostToolUse` JSON-on-stdin contract. No adapter
+   concept exists yet for this (tracked separately, see `hook_protocol` in
+   `config/ai-providers.yaml`) — treat a hooks-capable new provider as its own follow-up,
+   not a same-day addition.
+
+**Already eliminated — do NOT add these as new touchpoints:** a per-provider `agents_dir`
+map in `context.py`, a `pending_tasks` map in `lifecycle_check.py`, a bash-tool-name map in
+`viz.py`, a hardcoded `valid_providers` list in `setup.py` (now derived from the YAML
+registry keys), an isolation branch in `isolation.py`, the `provider_transform.py` `elif`
+chain, and the Gemini-specific bootstrap bypass in `agent_sync.py` — all now resolve through
+YAML config or `BootstrapEngine`. If you find yourself re-adding a `provider ==` Python
+branch for something already covered by these, stop — extend the YAML config instead
+(`provider_registry_completeness` lint rule + `provider-agnostic` skill are the guard-rail).
 """

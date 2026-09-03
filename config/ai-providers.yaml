@@ -4,8 +4,23 @@ providers:
     agent_ext: .md
     context_file: CLAUDE.md
     context_template: templates/configs/CLAUDE.project-template.md
+    # Claude is the only provider with its own dedicated context-file handling
+    # (sync_claude_md_static() in sync.py, AGENT_HINTS_CLAUDE variable in
+    # context.py) instead of sharing the generic AGENTS.md path every other
+    # provider uses. Expressed as a capability flag (issue #631) so
+    # resolve_context_filename()/context.py read a data lookup instead of a
+    # literal `provider == "Claude"` string check.
+    has_dedicated_context_file: true
     has_rules: true
     has_hooks: true
+    # hook_protocol: the hook event/payload contract a provider speaks. Every
+    # script in hooks/1-generic/ is written against Claude Code's own model
+    # (JSON on stdin, PreToolUse/PostToolUse events, exit-code-2-blocks,
+    # registration in settings.json). `has_hooks: true` alone only means "a
+    # hooks_dir/settings_file path is configured" — sync only actually mirrors
+    # hook scripts to a provider whose hook_protocol matches a known,
+    # implemented one (see providers.py::provider_hooks_supported, issue #630).
+    hook_protocol: claude-code-json
     has_commands: true
     has_settings: true
     capabilities:
@@ -344,6 +359,13 @@ providers:
     has_rules: true
     rules_dir: .mammouth/rules
     has_hooks: true
+    # hooks_dir/settings_file stay configured (path-collision test coverage,
+    # see tests/test_provider_hooks_config.py), but NO hook_protocol is set
+    # here deliberately: whether Mammouth actually understands Claude Code's
+    # hook contract is unverified (issue #630). Without a matching
+    # hook_protocol, provider_hooks_supported() (providers.py) skips actually
+    # mirroring hook scripts — set hook_protocol: claude-code-json once
+    # verified.
     hooks_dir: .mammouth/hooks
     has_commands: true
     has_settings: true
