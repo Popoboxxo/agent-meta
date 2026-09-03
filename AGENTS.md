@@ -140,7 +140,7 @@ Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #1
 
 # Lifecycle-Tasks
 
-Beim Start prüfen: existiert `.gemini/pending-tasks.md`?
+Beim Start prüfen: existiert `.gemini/pending-tasks.md bzw. .opencode/pending-tasks.md`?
 Falls ja und enthält `- [ ]`: User fragen ob delegiert werden soll.
 Nach Erledigung: löschen. Datei nicht committen.
 
@@ -503,7 +503,7 @@ Details (Smart Context Regeneration, `--check`, `context-hashes.json`, Provider-
 ---
 
 Details/Registrierung: `config/external-tools-registry.yaml`.
-Hook-Wrapper: `hooks/0-external/graphify-search-guard.sh`, `hooks/0-external/graphify-read-guard.sh` · Injektionen: `.gemini/skills/graphify` (skill)
+Hook-Wrapper: `hooks/0-external/graphify-search-guard.sh`, `hooks/0-external/graphify-read-guard.sh` · Injektionen: `.gemini/skills/graphify bzw. .opencode/skills/graphify` (skill)
 
 
 

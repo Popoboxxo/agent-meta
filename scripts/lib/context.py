@@ -983,34 +983,49 @@ def _build_managed_block(
     
     pc = (provider_config or {}).get(provider, {})
     has_native_rules = pc.get("has_rules", False)
-    
+
+    # Providers that render into the *same physical* context_file (currently
+    # only Opencode + Gemini, both sharing AGENTS.md). Every value below that
+    # is derived from a single provider's config (pc) must instead be derived
+    # from the union of shared_users -- otherwise the rendered managed block
+    # differs depending on which shared provider happens to sync last, and
+    # each sync overwrites the other's version forever (issue #638: infinite
+    # oscillation, permanent false "out of sync" on --check).
+    shared_users = [provider]
     if provider_config and pc.get("context_file"):
-        shared_users = [p for p, cfg in provider_config.items() if cfg.get("context_file") == pc.get("context_file")]
+        shared_users = [
+            p for p, cfg in provider_config.items()
+            if cfg.get("context_file") == pc.get("context_file")
+        ]
         if not all(provider_config[p].get("has_rules", False) for p in shared_users):
             has_native_rules = False
-    
+
+    def _shared(dir_key: str, default_fmt: str) -> str:
+        """Join a per-provider path field across all shared_users, deduped.
+
+        Falls back to the single current-provider value when the context file
+        is not shared (shared_users == [provider]) -- identical to the old
+        per-provider-only behaviour in that case.
+        """
+        values = [
+            provider_config[p].get(dir_key, default_fmt.format(p.lower()))
+            for p in shared_users
+        ] if provider_config else [pc.get(dir_key, default_fmt.format(provider.lower()))]
+        return " bzw. ".join(dict.fromkeys(values))
+
     local_vars = dict(variables)
-    if provider_config and pc.get("context_file"):
-        shared_users = [p for p, cfg in provider_config.items() if cfg.get("context_file") == pc.get("context_file")]
-        if len(shared_users) > 1:
-            dirs = [provider_config[p].get("agents_dir", f".{p.lower()}/agents") for p in shared_users]
-            local_vars["AGENTS_DIR"] = " bzw. ".join(dirs)
-        else:
-            local_vars["AGENTS_DIR"] = pc.get("agents_dir", f".{provider.lower()}/agents")
-    else:
-        local_vars["AGENTS_DIR"] = pc.get("agents_dir", f".{provider.lower()}/agents")
+    local_vars["AGENTS_DIR"] = _shared("agents_dir", ".{}/agents")
 
     if len(shared_users) > 1:
         for p in shared_users:
             local_vars[f"PLATFORM_{p.upper()}"] = True
-        
+
     local_vars["HAS_NATIVE_RULES"] = has_native_rules
     local_vars[f"PLATFORM_{provider.upper()}"] = True
-    local_vars["PENDING_TASKS_FILE"] = pc.get("pending_tasks_file", f".{provider.lower()}/pending-tasks.md")
-    
-    local_vars["EXTENSION_DIR"] = pc.get("extension_dir", f".{provider.lower()}/3-project")
-    local_vars["SNIPPETS_DIR"] = pc.get("snippets_dir", f".{provider.lower()}/snippets")
-    local_vars["SKILLS_DIR"] = pc.get("skills_dir", f".{provider.lower()}/skills")
+    local_vars["PENDING_TASKS_FILE"] = _shared("pending_tasks_file", ".{}/pending-tasks.md")
+    local_vars["EXTENSION_DIR"] = _shared("extension_dir", ".{}/3-project")
+    local_vars["SNIPPETS_DIR"] = _shared("snippets_dir", ".{}/snippets")
+    local_vars["SKILLS_DIR"] = _shared("skills_dir", ".{}/skills")
     local_vars["ORCHESTRATOR_INVOCATION_HINT"] = pc.get("orchestrator_hint", "")
     
     orch_config = config.get("orchestrator", {})
@@ -1041,11 +1056,18 @@ def _build_managed_block(
         mcp_active = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
         local_vars["MCP_GUARDRAILS_LIST"] = build_mcp_guardrails_list(mcp_registry, mcp_active)
 
+        def _opts_skip(opts: dict, p: str) -> bool:
+            prov_opt = opts.get(p.lower())
+            return prov_opt == "skip" or prov_opt is False
+
         for src_path, output_name in rule_sources:
             rule_stem = src_path.stem
             opts = rule_options.get(rule_stem, {})
-            prov_opt = opts.get(provider.lower())
-            if prov_opt == "skip" or prov_opt is False:
+            # For a shared context_file, a rule is dropped only when EVERY
+            # shared user opts out -- one provider's per-provider "skip" must
+            # not remove content another shared provider still needs from the
+            # same physical file (issue #638: union, not current-provider-only).
+            if all(_opts_skip(opts, p) for p in shared_users):
                 continue
             if opts.get("embed") is False:
                 continue
@@ -1085,12 +1107,20 @@ def _build_managed_block(
                 active_tools = resolve_active_external_tools(
                     config, agent_meta_root, project_root, registry=tool_registry,
                 )
+                shared_pcs = (
+                    [provider_config[p] for p in shared_users]
+                    if provider_config and len(shared_users) > 1 else None
+                )
                 for tool_name in active_tools:
                     tool_def = tool_registry.get(tool_name)
-                    if tool_def and provider not in tool_def.get("provider-skip", []):
+                    skip_list = tool_def.get("provider-skip", []) if tool_def else []
+                    # Same union rule as above: only drop the tool for a shared
+                    # context_file when every shared user opts out of it.
+                    if tool_def and not all(p in skip_list for p in shared_users):
                         embedded_rules.append(
                             {"content": _generate_tool_rule_content(
-                                tool_name, tool_def, pc, project_root, compact=_compact
+                                tool_name, tool_def, pc, project_root, compact=_compact,
+                                shared_pcs=shared_pcs,
                             )}
                         )
         except ImportError:
