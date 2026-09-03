@@ -1,15 +1,21 @@
 ---
 type: "Architecture"
 title: "SE-Agenten-Kaskade — Architektur-Detail"
-description: "Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit drei Floors: - Decomposition Floor — 5 aktive Agenten (se-requirements, se-architect,..."
-tags: [architecture, status:active]
-timestamp: "2026-07-27"
+description: "Die SE-Agenten-Kaskade ist vollständig implementiert (Rollen, Runner, Doku), aber seit 2026-09-03 per project.yaml deaktiviert (Issue #652) — bewusste, aktuelle Entscheidung, kein totes Feature."
+tags: [architecture, "status:disabled"]
+timestamp: "2026-09-03"
 resource: "../../sources/docs/architecture/07-se-cascade.md"
 migrated_from: "docs/architecture/07-se-cascade.md"
 ---
 # SE-Agenten-Kaskade — Architektur-Detail
 
 > [Back to Architecture Overview](../../../ARCHITECTURE.md)
+
+> **Status (Stand 2026-09-03, Re-Ingest):** Die SE-Cascade ist vollständig implementiert (Rollen, Runner, Doku), aber
+> per `.meta-config/project.yaml` → `quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert.
+> Das ist eine bewusste, aktuelle Entscheidung (siehe Issue #652) — kein vergessenes oder totes Feature.
+> Reaktivierung/Archivierung nur auf explizite Anfrage. Diese Seite beschreibt weiterhin die (deaktivierte)
+> Architektur unverändert korrekt — nur der Aktivierungsstatus hat sich geändert.
 
 ---
 
@@ -392,7 +398,7 @@ variables:
 
 ## A2A-Handoff-Protokoll für die SE-Kaskade
 
-> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/a2a-best-practice-analysis.md`
+> Referenz: `docs/concepts/a2a-handoff-protocol.md` (v2.0) | Schema: `schemas/a2a-handoff.schema.json` | Analyse: `docs/concepts/archive/2026-06-a2a-best-practice-analysis.md`
 
 ### A2A als EINZIGES Format
 

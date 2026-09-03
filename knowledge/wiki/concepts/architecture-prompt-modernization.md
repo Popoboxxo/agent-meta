@@ -1,21 +1,31 @@
+---
+type: "Architecture"
+title: "Architektur: Prompt-Modernisierung (XML-Struktur)"
+description: "agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard (der frühere Dual-Tree-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst)."
+tags: [architecture, "status:active"]
+timestamp: "2026-09-03"
+resource: "../../sources/docs/architecture/prompt-modernization.md"
+migrated_from: "docs/architecture/prompt-modernization.md"
+migration_note: "Re-Ingest 2026-09-03 (Issue #651): Neue Seite — spiegelt den tatsächlich umgesetzten, konsolidierten Ein-Standard-Zustand (docs/architecture/) wider, im Gegensatz zum historischen Legacy/Hybrid/Modern-Planungskonzept in concepts/prompt-modernization.md (dort als SUPERSEDED markiert)."
+---
 # Architektur: Prompt-Modernisierung (XML-Struktur)
 
+> [Back to Architecture Overview](../../../ARCHITECTURE.md)
+
 > Status: **Aktiv** (Konsolidiert in v0.70.0)
+>
+> Historisches Planungskonzept (Legacy/Hybrid/Modern-Dreiklang, nie so gebaut):
+> [`concepts/prompt-modernization.md`](prompt-modernization.md)
 
 ---
 
 ## Übersicht
 
-agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard für die regulären Rollen-Templates (der frühere "Dual-Tree"-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst).
+agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard (der frühere "Dual-Tree"-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst).
 
-**Bewusste Ausnahme — SE-Kaskade:** Die ~13 `se-*.md`-Templates in `agents/1-generic/`
-(`se-developer`, `se-architect`, `se-critic`, `se-requirements` u.a.) folgen diesem Schema
-nicht — sie nutzen klassisches Markdown+Prosa ohne `<persona>`/`<workflow>`/`<output_contract>`-Blöcke
-und tragen kein `prompt_mode: modern`. Das ist keine Migrationslücke, sondern eine gezielte
-Trennung: die SE-Kaskade ist ein eigenständiges Sub-Framework mit eigenen, INCOSE-orientierten
-Konventionen (Details: `docs/architecture/07-se-cascade.md`). Sie ist aktuell zusätzlich per
-`quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert, unabhängig vom XML-Standard-Status.
-Eine Migration der SE-Templates auf das 6-Block-Schema ist nicht ausgeschlossen, aber nicht geplant.
+> **Ausnahme (Audit-Fund 2026-09-03):** Die ~13 `se-*.md`-Rollen der SE-Kaskade (siehe
+> `architecture-se-cascade.md`, aktuell deaktiviert) nutzen weiterhin klassisches
+> Markdown+Prosa statt XML — bislang nicht als bewusste Ausnahme in dieser Seite dokumentiert.
 
 ---
 

@@ -1,12 +1,11 @@
 # Sync Flow
 
-> [Back to Architecture Overview](../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogImZsb3djaGFydCBURFxuICAgIENGR1thZ2VudC1tZXRhLmNvbmZpZy5qc29uXVxuICAgIEVDRkdbZXh0ZXJuYWwtc2tpbGxzLmNvbmZpZy5qc29uXVxuICAgIFNZTkNbc3luYy5weV1cbiAgICBzdWJncmFwaCBzb3VyY2VzIFthZ2VudC1tZXRhXVxuICAgICAgICBHMVsxLWdlbmVyaWMgYWdlbnRzXVxuICAgICAgICBHMlsyLXBsYXRmb3JtIGFnZW50c11cbiAgICAgICAgU05bc25pcHBldHNdXG4gICAgICAgIEVYW2V4dGVybmFsIFNLSUxMLm1kXVxuICAgICAgICBXUltza2lsbC13cmFwcGVyIHRlbXBsYXRlXVxuICAgIGVuZFxuICAgIHN1YmdyYXBoIHRhcmdldCBbdGFyZ2V0IHByb2plY3RdXG4gICAgICAgIEFHWy5jbGF1ZGUvYWdlbnRzLyBnZW5lcmF0ZWRdXG4gICAgICAgIFNLWy5jbGF1ZGUvc2tpbGxzLyBjb3BpZWRdXG4gICAgICAgIFNOQ1suY2xhdWRlL3NuaXBwZXRzLyBjb3BpZWRdXG4gICAgICAgIEVYVFsuY2xhdWRlLzMtcHJvamVjdC8gZXh0IGNyZWF0ZWQgb25jZV1cbiAgICAgICAgQ0xBW0NMQVVERS5tZCBtYW5hZ2VkIGJsb2NrIHVwZGF0ZWRdXG4gICAgZW5kXG4gICAgQ0ZHIC0tPiBTWU5DXG4gICAgRUNGRyAtLT4gU1lOQ1xuICAgIEcxIC0tPiBTWU5DXG4gICAgRzIgLS0-IFNZTkNcbiAgICBTTiAtLT4gU1lOQ1xuICAgIEVYIC0tPiBTWU5DXG4gICAgV1IgLS0-IFNZTkNcbiAgICBTWU5DIC0tPnxXUklURXwgQUdcbiAgICBTWU5DIC0tPnxDT1BZfCBTTkNcbiAgICBTWU5DIC0tPnxDT1BZfCBTS1xuICAgIFNZTkMgLS0-fENSRUFURSBvbmNlfCBFWFRcbiAgICBTWU5DIC0tPnxVUERBVEUgbWFuYWdlZCBibG9ja3wgQ0xBIiwgIm1lcm1haWQiOiB7InRoZW1lIjogImRlZmF1bHQifX0)
+> [Back to Architecture Overview](../../ARCHITECTURE.md)
 
 ```mermaid
 flowchart TD
-    CFG[agent-meta.config.yaml]
-    ECFG[external-skills.config.yaml]
-    RCFG[roles.config.yaml]
+    CFG[.meta-config/project.yaml]
+    RCFG[config/role-defaults.yaml + config/ai-providers.yaml + config/*.yaml]
     SYNC[sync.py]
 
     subgraph sources [agent-meta]
@@ -32,7 +31,6 @@ flowchart TD
     end
 
     CFG --> SYNC
-    ECFG --> SYNC
     RCFG --> SYNC
     G1 --> SYNC
     G2 --> SYNC
@@ -53,15 +51,32 @@ flowchart TD
     SYNC -->|CREATE once| SETL
 ```
 
-## Neue Features in v0.17.0
+## Aktueller Sync-Flow
 
-| Feature | Was sync.py tut |
-|---------|----------------|
-| **Rules** | `rules/1-generic/` + `rules/2-platform/` → `COPY` → `.claude/rules/` (Stale-Tracking via `.agent-meta-managed`) |
-| **Hooks** | `hooks/1-generic/` + `hooks/2-platform/` → `COPY` → `.claude/hooks/` + `MERGE` in `.claude/settings.json` |
-| **settings.local.json** | Einmalig angelegt als persönliches Skeleton (gitignored) |
-| **permissionMode** | Aus `roles.config.yaml` + `permission-mode-overrides` → injiziert in Agenten-Frontmatter |
-| **JSON Schema** | `agent-meta.schema.json` für Validation von `agent-meta.config.yaml` |
+`scripts/sync.py` ist reiner Entrypoint (Argparse + Dispatch), die eigentliche Logik
+liegt in `scripts/lib/`. Ablauf (grob):
+
+1. **Config laden:** `.meta-config/project.yaml` (Standardpfad; legacy `agent-meta.config.yaml`/`.json`
+   im Projekt-Root werden nur noch als Fallback erkannt) + Framework-Config aus `config/*.yaml`
+   (`ai-providers.yaml`, `role-defaults.yaml`, `dod-presets.yaml`, `rules-presets.yaml`,
+   `skills-registry.yaml` u.a.) über `lib/config.py::load_config`.
+2. **Kontext bauen:** `_build_context()` in `sync.py` erzeugt eine `_SyncContext` (aufgelöste
+   Provider, Variablen, Platforms, DoD/Rules-Presets) — gemeinsamer State für alle CLI-Modi.
+3. **Dispatch:** `_dispatch(ctx)` routet auf den passenden `_handle_*`-Handler
+   (`_handle_sync`, `_handle_validate`, `_handle_create_ext`, …) je nach CLI-Flag.
+4. **Provider-Iteration:** `_handle_sync` löst die aktiven Provider aus `ai-providers.yaml`
+   + Projekt-Config auf (`resolve_providers`) und rendert für jeden Provider die Agenten.
+5. **Template-Rendering:** `lib/agent_sync.py` liest `agents/1-generic/<rolle>.md`, wendet
+   `2-platform`-Overrides (`extends`+`patches` oder Full-Replacement) und
+   `.claude/3-project/<rolle>-ext.md`-Extensions an, substituiert `{{PLATZHALTER}}` und
+   schreibt das Ergebnis nach `.claude/agents/` (bzw. providerspezifisches Zielverzeichnis).
+6. **Nebenläufig:** Rules (`rules/1-generic`+`rules/2-platform` → `.claude/rules/`), Hooks
+   (`hooks/1-generic`+`hooks/2-platform` → `.claude/hooks/` + Merge in `.claude/settings.json`),
+   Snippets, Skills und der `CLAUDE.md`-Managed-Block werden im selben Lauf synchronisiert.
+
+`permissionMode` je Rolle stammt aus `config/role-defaults.yaml` (`permission_mode`-Feld)
+plus projektseitigen `permission-mode-overrides` in `.meta-config/project.yaml`, Validation
+läuft über `config/project-config.schema.json`.
 
 ## CLAUDE.md managed block
 

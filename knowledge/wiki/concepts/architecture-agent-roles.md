@@ -1,20 +1,20 @@
 ---
 type: "Architecture"
 title: "Agent Roles"
-description: "feature ist kein Ersatz für orchestrator, sondern ein Shortcut:"
-tags: [architecture, status:active]
-timestamp: "2026-07-27"
+description: "code-reviewer ist der generelle Gatekeeper (SOLID/Clean-Code/Blast-Radius) und läuft immer zuerst. Die vier Domain-Reviewer sind Spezialisten, die NACH dem code-reviewer-Pass laufen."
+tags: [architecture, "status:active"]
+timestamp: "2026-09-03"
 resource: "../../sources/docs/architecture/03-agent-roles.md"
 migrated_from: "docs/architecture/03-agent-roles.md"
+migration_note: "Re-Ingest 2026-09-03 (Issue #651): vollständig aus aktueller Quelle resynct — der frühere eigenständige 'feature'-Agent existiert nicht mehr, ersetzt durch die deklarative 'feature-lifecycle'-Pipeline (siehe architecture-dev-workflow.md). Domain-Reviewer-Rollen (backend/database/frontend/ui-reviewer) neu ergänzt."
 ---
 # Agent Roles
 
-> [Back to Architecture Overview](../../../ARCHITECTURE.md) &nbsp;|&nbsp; [Open in Mermaid Live Editor](https://mermaid.live/edit#base64:eyJjb2RlIjogImdyYXBoIFREXG4gICAgT1JDW29yY2hlc3RyYXRvcl1cbiAgICBGRUFbZmVhdHVyZV1cbiAgICBPUkMgLS0-IElERVtpZGVhdGlvbl1cbiAgICBPUkMgLS0-IFJFUVtyZXF1aXJlbWVudHNdXG4gICAgT1JDIC0tPiBERVZbZGV2ZWxvcGVyXVxuICAgIE9SQyAtLT4gVFNUW3Rlc3Rlcl1cbiAgICBPUkMgLS0-IFZBTFt2YWxpZGF0b3JdXG4gICAgT1JDIC0tPiBET0NbZG9jdW1lbnRlcl1cbiAgICBPUkMgLS0-IEdJVFtnaXRdXG4gICAgT1JDIC0tPiBSRUxbcmVsZWFzZV1cbiAgICBPUkMgLS0-IERPS1tkb2NrZXJdXG4gICAgT1JDIC0tPiBNRkJbbWV0YS1mZWVkYmFja11cbiAgICBPUkMgLS0-IEVYVFSWW2FnZW50LW1ldGEtbWFuYWdlcl1cbiAgICBPUkMgLS0-IEVYVFSWW2V4dGVybmFsIHNraWxsc11cbiAgICBGRUEgLS0-IEdJVFxuICAgIEZFQSAtLT4gUkVRXG4gICAgRkVBIC0tPiBUU1RcbiAgICBGRUEgLS0-IERFVlxuICAgIEZFQSAtLT4gVkFMXG4gICAgRkVBIC0tPiBET0NcbiAgICBGRUEgLS0-IEdJVCIsICJtZXJtYWlkIjogeyJ0aGVtZSI6ICJkZWZhdWx0In19)
+> [Back to Architecture Overview](../../../ARCHITECTURE.md)
 
 ```mermaid
 graph TD
     ORC[orchestrator]
-    FEA[feature]
     ORC --> IDE[ideation]
     ORC --> REQ[requirements]
     ORC --> DEV[developer]
@@ -36,20 +36,17 @@ graph TD
     SE_CRIT --> SE_IFM[se-interface-mgr]
     SE_IFM --> SE_TERM[se-termination]
     SE_TERM -->|continue| SE_ORCH
-    FEA --> GIT
-    FEA --> REQ
-    FEA --> TST
-    FEA --> DEV
-    FEA --> VAL
-    FEA --> DOC
 ```
+
+> **Hinweis (SE-Kaskade):** Der SE-Mode-Zweig im Diagramm existiert vollständig, ist aber
+> seit 2026-09-03 per `.meta-config/project.yaml` deaktiviert (Issue #652) — siehe
+> `architecture-se-cascade.md` für Details.
 
 ## Rollen-Übersicht
 
 | Agent | Zuständigkeit | Einstieg | Modell |
 |-------|--------------|---------|--------|
 | `orchestrator` | Einstiegspunkt — koordiniert alle anderen Agenten | Alle Entwicklungsaufgaben | *(voll)* |
-| `feature` | Vollständiger Feature-Lifecycle via Sub-Agent-Delegation | "Ich will ein neues Feature bauen" | *(voll)* |
 | `developer` | Feature-Implementierung und Bugfixes nach REQ-IDs | Implementierungsaufgaben | *(voll)* |
 | `junior-developer` | Triviale Fixes (1-2 Dateien, kein Architektur-Impact), eskaliert strukturiert | Kleine Änderungen | haiku |
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs | Architektur-Impact, Cross-Cutting | max |
@@ -57,6 +54,11 @@ graph TD
 | `intern-developer` | Easter-Egg/Gag-Agent. Übereifriger, ahnungsloser Intern — read-only, nie für echte Arbeit geroutet | — | nano |
 | `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase | sonnet |
 | `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR | sonnet |
+| `code-reviewer` | Gatekeeper für Code-Qualität: Clean Code, SOLID, Blast-Radius | Nach Implementierung | powerful |
+| `backend-reviewer` | Domain-Review Backend/Server-Code: API-Contracts, Silent Failures, Concurrency | Nach `code-reviewer`, backend-lastige Changes | balanced |
+| `database-reviewer` | Domain-Review Datenschicht: Migrationssicherheit, N+1, Injection, Indexing | Nach `code-reviewer`, DB-lastige Changes | balanced |
+| `frontend-reviewer` | Domain-Review Frontend-Code: Komponenten, State, SSR/Hydration, Render-Performance | Nach `code-reviewer`, frontend-lastige Changes | balanced |
+| `ui-reviewer` | Domain-Review UI-Konsistenz: Design-Token, Layout, Interaction States, i18n | Nach `code-reviewer`, UI-lastige Changes | balanced |
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben | Neue Anforderungen | *(voll)* |
 | `ideation` | Neue Ideen explorieren, Vision schärfen | Ideen-Phase | *(voll)* |
 | `documenter` | Doku pflegen: CODEBASE_OVERVIEW, ARCHITECTURE, README | Nach Implementierung | sonnet |
@@ -71,20 +73,34 @@ graph TD
 | `incident-responder` | Live-Incident-Koordination, RCA (5-Whys/Fishbone), Severity-Klassifikation, priorisierte Hotfixes | Aktive Incidents, Post-Mortem | powerful |
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift, CVE-Checks | Security-Reviews, Release-Vorbereitung | balanced |
 | `0-external skills` | Domänenspezifische Agenten aus Drittrepos | Spezialwissen | variiert |
-| `orchestrator (SE-Mode)` | Koordiniert 6-stufige rekursive SE-Kaskade | Systems-Engineering | balanced |
+| `orchestrator (SE-Mode)` | Koordiniert 6-stufige rekursive SE-Kaskade (deaktiviert, siehe Hinweis oben) | Systems-Engineering | balanced |
 | `se-requirements` | Stakeholder-Bedürfnisse → formale L1-Blackbox-REQs | SE-Start | balanced |
 | `se-architect` | Black-Box → White-Box (funktionale Dekomposition) | SE-Zerlegung | powerful |
 | `se-critic` | Quality Gate: Vollständigkeit, Konsistenz, Testbarkeit | SE-Audit | powerful |
 | `se-interface-mgr` | Interface-Verträge + Propagations-Map | SE-Interfaces | balanced |
 | `se-termination` | Leaf/Continue-Entscheidung pro Komponente | SE-Abschluss | fast |
 
-## feature vs. orchestrator
+## Review-Pipeline (Code-Reviewer + Domain-Spezialisten)
 
-`feature` ist kein Ersatz für `orchestrator`, sondern ein **Shortcut**:
+`code-reviewer` ist der generelle Gatekeeper (SOLID/Clean-Code/Blast-Radius) und läuft
+immer zuerst. Die vier Domain-Reviewer (`backend-reviewer`, `database-reviewer`,
+`frontend-reviewer`, `ui-reviewer`) sind **Spezialisten, die NACH dem code-reviewer-Pass**
+laufen — nur wenn ein Finding Domain-Tiefe jenseits von allgemeiner Code-Qualität braucht:
 
-| | `orchestrator` | `feature` |
-|--|----------------|-----------|
-| Scope | Alle Entwicklungsaufgaben | Nur neues Feature |
-| Delegation | Ad-hoc je nach Aufgabe | Fester 8-Schritt-Lifecycle |
-| TDD erzwungen | Empfohlen, aber optional | Ja — fest eingebaut |
-| Branch + PR | Optional | Immer |
+```
+developer → code-reviewer → (Domain-Reviewer, falls nötig) → senior-developer
+```
+
+Routing ist bidirektional: jeder Domain-Reviewer verweist Findings außerhalb seiner
+eigenen Domain-Grenze (siehe `<context>` Boundaries im jeweiligen Template) zurück an
+`code-reviewer`. Alle vier Domain-Reviewer sind reine Read-only-Rollen (`Read`/`Glob`/`Grep`/
+`TodoWrite`, kein `Write`/`Edit`/`Bash`) — sie liefern strukturierte Findings
+(`rule_id`, `MERGE_SCORE`), fixen aber nie selbst.
+
+## feature-lifecycle-Pipeline statt eigenständigem `feature`-Agent
+
+Frühere Wiki-Version beschrieb einen eigenständigen `feature`-Agent für den vollständigen
+Feature-Lifecycle. Dieser existiert nicht mehr als Agent — stattdessen gibt es die
+deklarative `feature-lifecycle`-Pipeline (`config/role-defaults.yaml`, Engine:
+`scripts/lib/pipelines.py`), siehe `architecture-dev-workflow.md` für den vollständigen
+Stage-Ablauf und die Abgrenzung zu `orchestrator`.
