@@ -213,8 +213,33 @@ def resolve_active_external_tools(
 # Rule content generation
 # ---------------------------------------------------------------------------
 
+def _resolve_injection_rel(entry: dict, pcs: list[dict], project_root: Path) -> str:
+    """Resolve one permitted-injections entry to a display path, or several.
+
+    ``pcs`` normally holds a single provider config. When the target rule
+    content is embedded once into a context_file shared by several providers
+    (e.g. AGENTS.md for Opencode+Gemini, issue #638), it holds one config per
+    shared provider instead, and every distinct resolved path is joined with
+    " bzw. " -- so the rendered content is identical no matter which shared
+    provider's sync run happens to build it (order-independent, no more
+    infinite --check oscillation from a single-provider path).
+    """
+    rels: list[str] = []
+    for pc in pcs:
+        resolved = resolve_injection_path(entry, pc, project_root)
+        rel = (
+            str(resolved.relative_to(project_root.resolve()))
+            if resolved.is_relative_to(project_root.resolve())
+            else str(resolved)
+        )
+        if rel not in rels:
+            rels.append(rel)
+    return " bzw. ".join(rels)
+
+
 def _generate_tool_rule_content(
-    name: str, tool_def: dict, pc: dict, project_root: Path, compact: bool = False
+    name: str, tool_def: dict, pc: dict, project_root: Path, compact: bool = False,
+    shared_pcs: list[dict] | None = None,
 ) -> str:
     """Build Markdown rule content for one external tool from its registry def.
 
@@ -222,7 +247,12 @@ def _generate_tool_rule_content(
     naming the hook wrappers and permitted injections (issue #540 B8). The
     full rule-content body is reference prose that stays discoverable via the
     registry/skill artifacts; native artifacts keep the full variant.
+
+    shared_pcs: pass the provider configs of every provider sharing the target
+    context_file (see _resolve_injection_rel) instead of relying on ``pc``
+    alone when this content is embedded into a shared file.
     """
+    pcs = shared_pcs or [pc]
     desc = (tool_def.get("description") or name).strip()
     lines: list[str] = [f"# External Tool: {name}", "", f"> {desc}", "", "---", ""]
 
@@ -234,15 +264,10 @@ def _generate_tool_rule_content(
             wrapped = ", ".join(f"`{EXTERNAL_HOOKS_DIR}/{stem}.sh`" for stem in hooks)
             pointers.append(f"Hook-Wrapper: {wrapped}")
         if isinstance(injections, list) and injections:
-            inj_parts = []
-            for entry in injections:
-                resolved = resolve_injection_path(entry, pc, project_root)
-                rel = (
-                    resolved.relative_to(project_root.resolve())
-                    if resolved.is_relative_to(project_root.resolve())
-                    else resolved
-                )
-                inj_parts.append(f"`{rel}` ({entry['kind']})")
+            inj_parts = [
+                f"`{_resolve_injection_rel(entry, pcs, project_root)}` ({entry['kind']})"
+                for entry in injections
+            ]
             if inj_parts:
                 pointers.append(f"Injektionen: {', '.join(inj_parts)}")
         lines.append("Details/Registrierung: `config/external-tools-registry.yaml`.")
@@ -264,8 +289,7 @@ def _generate_tool_rule_content(
     if isinstance(injections, list) and injections:
         lines += ["## Erlaubte Injektionen", ""]
         for entry in injections:
-            resolved = resolve_injection_path(entry, pc, project_root)
-            rel = resolved.relative_to(project_root.resolve()) if resolved.is_relative_to(project_root.resolve()) else resolved
+            rel = _resolve_injection_rel(entry, pcs, project_root)
             desc_suffix = f" — {entry['description']}" if entry.get("description") else ""
             lines.append(f"- `{rel}` ({entry['kind']}){desc_suffix}")
         lines.append("")
