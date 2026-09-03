@@ -4,6 +4,13 @@
 
 ---
 
+> **Status (Stand 2026-09-03):** Die SE-Cascade ist vollständig implementiert (Rollen, Runner, Doku), aber
+> per `.meta-config/project.yaml` → `quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert.
+> Das ist eine bewusste, aktuelle Entscheidung (siehe Issue #652) — kein vergessenes oder totes Feature.
+> Reaktivierung/Archivierung nur auf explizite Anfrage.
+
+---
+
 ## Übersicht
 
 Die SE-Agenten-Kaskade ist ein fraktales, rekursives Systems-Engineering-System mit drei Floors:
