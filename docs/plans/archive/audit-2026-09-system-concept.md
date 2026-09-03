@@ -165,5 +165,5 @@ Agent-Templates (`agents/*`), Systemdokumentation (`docs/*`), Admin-UI, Test-Sui
 
 ## ARTIFACTS
 
-- Diese Datei: `docs/plans/audit-2026-09-system-concept.md`
-- Bezug: `docs/plans/audit-2026-08-refactoring-roadmap.md` (abgeschlossen), `.claude/skills/provider-agnostic/SKILL.md`, `config/ai-providers.yaml`, `config/provider-capabilities.yaml`, `config/provider-bootstrap.yaml`, `scripts/lib/provider_transform.py`, `graphify-out/GRAPH_REPORT.md`
+- Diese Datei: `docs/plans/archive/audit-2026-09-system-concept.md`
+- Bezug: `docs/plans/archive/audit-2026-08-refactoring-roadmap.md` (abgeschlossen), `.claude/skills/provider-agnostic/SKILL.md`, `config/ai-providers.yaml`, `config/provider-capabilities.yaml`, `config/provider-bootstrap.yaml`, `scripts/lib/provider_transform.py`, `graphify-out/GRAPH_REPORT.md`

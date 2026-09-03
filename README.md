@@ -32,10 +32,10 @@
 >    - **Automated Default Init:** `python .agent-meta/scripts/sync.py --init`
 > 3. **Re-Sync After Config Changes:** Re-run `python .agent-meta/scripts/sync.py` whenever `.meta-config/project.yaml` is modified.
 
-[![Version](https://img.shields.io/badge/version-0.92.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.101.0--beta.4-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
-| **Date:** 2026-08-07
+| **Date:** 2026-09-03
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
@@ -70,7 +70,7 @@ graph TD
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.92.0 && cd ..
+cd .agent-meta && git checkout v0.101.0-beta.4 && cd ..
 
 # Install dependencies
 pip install -r .agent-meta/requirements.txt
@@ -674,7 +674,7 @@ docs/
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
 tests/                        # pytest suite (unit + tests/browser Playwright suite)
-VERSION                      # Current version (v0.92.0)
+VERSION                      # Current version (v0.101.0-beta.4)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```

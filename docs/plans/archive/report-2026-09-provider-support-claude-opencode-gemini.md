@@ -50,5 +50,5 @@ Der Shared-Context-Bug (OpenCode↔Gemini via `AGENTS.md`) ist neu entdeckt, noc
 
 ## ARTIFACTS
 
-- Diese Datei: `docs/plans/report-2026-09-provider-support-claude-opencode-gemini.md`
-- Bezug: `docs/plans/audit-2026-09-system-concept.md`, `config/ai-providers.yaml`, `scripts/lib/context.py:978-980`, `config/provider-bootstrap.yaml`
+- Diese Datei: `docs/plans/archive/report-2026-09-provider-support-claude-opencode-gemini.md`
+- Bezug: `docs/plans/archive/audit-2026-09-system-concept.md`, `config/ai-providers.yaml`, `scripts/lib/context.py:978-980`, `config/provider-bootstrap.yaml`

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.101.0-beta.4] — 2026-09-03
+
+### Changed
+- **August-Refactoring-Roadmap** (10 waves, #563–#615 et al.): `sync.py`'s `main()`
+  if/elif chain replaced by a `_dispatch()` table over `_SyncContext`/`_handle_*`
+  handlers; oversized `scripts/lib` modules split along service boundaries
+  (Template/Pipeline/Reflection/Models services, Auth/Audit services + route
+  tables); several latent import cycles resolved; `admin-server.py`'s
+  `RoleDefaultsEditor` (#611) fixed and generalized (clean list/dict-helper
+  split, not just patched for the two original repro cases); persistence
+  robustness batch (#573, #576, #580, #582, #583, #586, #566, #568, #571,
+  #574, #578).
+- **Provider-Agnostik-Kampagne** (Waves A–D, #625–#638): new
+  `provider-agnostic` lint rule + credo forbidding `if provider == "Name"`
+  branching in syncer code (#625, #626); provider truth-source duplication
+  eliminated across `scripts/lib` (#627, #628); `provider_transform.py`'s
+  6-way provider `elif` replaced by a data-driven `_apply_agent_transform()`
+  dispatcher (#629); hook-protocol gating, provider self-health checks and a
+  Claude self-lockout fix (#630–#633).
+
 ## [0.101.0-beta.3] — 2026-08-27
 
 ### Changed
