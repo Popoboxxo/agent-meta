@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+from functools import lru_cache
 from pathlib import Path
 
 # Module-level logger for fail-soft branches that have no SyncLog instance in
@@ -41,8 +42,13 @@ def _stage_requires_approval(stage: dict, pipeline: dict) -> bool:
     return bool(stage.get("requires_approval", pipeline.get("approval_default", False)))
 
 
+@lru_cache(maxsize=None)
 def load_quality_pipelines(agent_meta_root: str) -> dict:
-    """Load quality_pipelines from config/role-defaults.yaml."""
+    """Load quality_pipelines from config/role-defaults.yaml.
+
+    Cached per ``agent_meta_root`` (process lifetime) — read-only framework
+    config, re-parsed on every call otherwise (#553 perf hotspot).
+    """
     try:
         import yaml
     except ImportError:

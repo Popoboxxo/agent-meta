@@ -10,6 +10,7 @@ which is what keeps the scripts/lib dependency graph acyclic (Issue #565).
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -430,8 +431,15 @@ def parse_frontmatter_file(path: Path) -> dict:
         return {}
     return _parse_frontmatter_yaml(text)
 
+@lru_cache(maxsize=None)
 def _parse_frontmatter_yaml(content: str) -> dict:
-    """Parse YAML frontmatter into a dict. Returns {} on failure or missing yaml."""
+    """Parse YAML frontmatter into a dict. Returns {} on failure or missing yaml.
+
+    Pure function of ``content`` (a str) — cached per distinct content value
+    for the process lifetime. A full multi-provider sync/render re-reads the
+    same set of agent template files once per provider; this was ~290 redundant
+    YAML frontmatter parses per two-provider render before caching (#553).
+    """
     if not _YAML_AVAILABLE:
         return {}
     fm_block, _ = _split_frontmatter(content)

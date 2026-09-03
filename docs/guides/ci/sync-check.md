@@ -164,6 +164,28 @@ Wenn CI trotz `sync.py`-Lauf weiterhin fehlschlägt:
 2. Führe lokal aus: `git add .meta-config/context-hashes.json && git commit -m "fix: update hashes"`
 3. Push → CI sollte grün sein
 
+### `AttributeError: module 'lib' has no attribute 'GEN_EMAIL'` (pyOpenSSL/cryptography) beim lokalen `--check`
+
+**Kein Bug in `sync.py`** (Issue #554) — verifiziert: weder `scripts/sync.py` noch `scripts/lib/*.py`
+importieren `OpenSSL`/`cryptography`/`acme` an irgendeiner Stelle im `--check`-Pfad. Der Traceback
+kommt ausschließlich von einem inkompatiblen `pyOpenSSL`↔`cryptography`-Paar, das auf manchen
+Entwickler-Maschinen in `~/.local/lib/python3.x/site-packages` (User-Site, `pip install --user`)
+installiert ist — `/usr/bin/python3` bindet dieses Verzeichnis automatisch in `sys.path` ein, auch
+ohne `venv`/`PYTHONPATH`-Anpassung. Betrifft nur lokale Läufe; die echte GitHub-Actions-CI
+(`.github/workflows/validate.yml`) installiert in eine frische, isolierte Umgebung mit nur `pyyaml`
+und ist nicht betroffen.
+
+Fix auf betroffenen Maschinen (kein Framework-Fix möglich/nötig, da kein eigener Import):
+
+```bash
+# Option A: User-Site-Packages für diesen Lauf ignorieren
+PYTHONNOUSERSITE=1 python3 .agent-meta/scripts/sync.py --check
+
+# Option B: sauberes venv statt --user-Installs
+python3 -m venv .venv && .venv/bin/pip install pyyaml
+.venv/bin/python .agent-meta/scripts/sync.py --check
+```
+
 ---
 
 ## Empfehlungen
