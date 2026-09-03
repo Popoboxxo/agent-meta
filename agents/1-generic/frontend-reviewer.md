@@ -1,6 +1,6 @@
 ---
 name: template-frontend-reviewer
-version: "1.1.0"
+version: "1.1.1"
 description: "Domain code review for frontend code: component design, state management, SSR/hydration, browser APIs, render performance — two-pass evidence-based review with rules index."
 hint: "Frontend review: components, state, SSR/hydration, browser APIs — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -51,7 +51,7 @@ Each finding: `id · severity · file:line · rule_id · confidence · evidence(
 Severity enum: `CRITICAL | HIGH | MEDIUM | LOW`. No finding without file:line + snippet + concrete fix suggestion.
 </workflow>
 
-<output-contract>
+<output_contract>
 ## Output contract (P1) — mandatory
 
 Final response ALWAYS ends with exactly these three blocks:
@@ -65,7 +65,7 @@ ARTIFACTS: <report file path, or "none">
 Reports longer than ~100 lines → write full report to `/tmp/opencode/frontend-review-<topic>.md` and return only the path (return-channel truncation risk).
 
 MERGE_SCORE semantics (P5): start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
-</output-contract>
+</output_contract>
 
 <context>
 **Project context:** {{PROJECT_CONTEXT}}

@@ -6,7 +6,16 @@
 
 ## Übersicht
 
-agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard (der frühere "Dual-Tree"-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst).
+agent-meta verwendet für alle Agenten-Templates eine hochoptimierte 6-Block-XML-Architektur. Dies ist der alleinige Standard für die regulären Rollen-Templates (der frühere "Dual-Tree"-Ansatz mit Markdown-Legacy-Templates wurde vollständig aufgelöst).
+
+**Bewusste Ausnahme — SE-Kaskade:** Die ~13 `se-*.md`-Templates in `agents/1-generic/`
+(`se-developer`, `se-architect`, `se-critic`, `se-requirements` u.a.) folgen diesem Schema
+nicht — sie nutzen klassisches Markdown+Prosa ohne `<persona>`/`<workflow>`/`<output_contract>`-Blöcke
+und tragen kein `prompt_mode: modern`. Das ist keine Migrationslücke, sondern eine gezielte
+Trennung: die SE-Kaskade ist ein eigenständiges Sub-Framework mit eigenen, INCOSE-orientierten
+Konventionen (Details: `docs/architecture/07-se-cascade.md`). Sie ist aktuell zusätzlich per
+`quality-pipelines.overrides.se-cascade.enabled: false` deaktiviert, unabhängig vom XML-Standard-Status.
+Eine Migration der SE-Templates auf das 6-Block-Schema ist nicht ausgeschlossen, aber nicht geplant.
 
 ---
 
