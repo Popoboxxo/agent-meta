@@ -30,6 +30,18 @@
         "Mammouth"
       ]
     },
+    "default-provider": {
+      "type": "string",
+      "description": "Provider resolve_providers() falls back to when neither ai-provider nor ai-providers is set (issue #631). Defaults to 'Claude' for backward compatibility.",
+      "enum": [
+        "Claude",
+        "Gemini",
+        "Continue",
+        "Opencode",
+        "Copilot",
+        "Mammouth"
+      ]
+    },
     "ai-providers": {
       "type": "array",
       "description": "List of AI providers. Supports Claude, Gemini, Continue, Opencode, Copilot, Mammouth. Replaces the deprecated ai-provider string field. Backward-compatible: ai-provider (string) still works.",

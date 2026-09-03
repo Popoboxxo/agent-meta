@@ -19,7 +19,7 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from lib.hooks import sync_hook_lib  # noqa: E402
+from lib.hook_plugins import sync_hook_lib  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
 
 

@@ -90,7 +90,7 @@ def resolve_release_gates(config: dict, agent_meta_root: Path) -> dict[str, bool
     Returns a dict of gate-name -> bool for every name known to either
     source. A name absent from both (e.g. a project-authored custom gate
     with no project.yaml entry) is intentionally NOT included — callers
-    (scripts/lib/hooks.py::sync_release_gates()) fall back to that gate
+    (scripts/lib/hook_plugins.py::sync_release_gates()) fall back to that gate
     script's own `enabled_by_default` header in that case.
     """
     presets = load_dod_presets(agent_meta_root)

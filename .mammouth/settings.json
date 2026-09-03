@@ -1,14 +1,1 @@
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .mammouth/hooks/orchestrator-guard.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
+{}

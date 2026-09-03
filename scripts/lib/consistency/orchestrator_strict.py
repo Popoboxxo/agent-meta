@@ -2,11 +2,13 @@
 
 hooks/1-generic/orchestrator-guard.sh is the only runtime enforcement of
 orchestrator.strict -- and scripts/lib/hooks.py only wires PreToolUse hooks
-for providers whose config/ai-providers.yaml entry sets has_hooks: true
-(currently Claude, Mammouth). On every other active provider (Opencode,
-Gemini, Continue, Copilot as of this writing), orchestrator.strict is a
-silent no-op: the setting exists in .meta-config/project.yaml, but nothing
-enforces it. This mirrors the mode-resolution logic in
+for providers where providers_lib.provider_hooks_supported() is true, i.e.
+has_hooks: true AND a verified hook_protocol (currently Claude only --
+Mammouth has has_hooks: true but no verified hook_protocol, issue #630). On
+every other active provider (Opencode, Gemini, Continue, Copilot, Mammouth
+as of this writing), orchestrator.strict is a silent no-op: the setting
+exists in .meta-config/project.yaml, but nothing enforces it. This mirrors
+the mode-resolution logic in
 hooks/1-generic/orchestrator-guard.sh's resolve_mode() so the two stay in
 sync -- provider-overrides can legitimately narrow strict mode to a subset
 of providers.
@@ -58,15 +60,20 @@ def check_orchestrator_strict_hook_support(project_root: Path, config: dict,
         if not _resolve_effective_strict(orch, provider):
             continue
         pc = provider_config.get(provider, {})
-        if pc.get("has_hooks", False):
+        if providers_lib.provider_hooks_supported(pc):
             continue
+        reason = (
+            "has_hooks: false"
+            if not pc.get("has_hooks", False)
+            else "has_hooks: true but no verified hook_protocol, issue #630"
+        )
         findings.append(Finding(
             Severity.WARNING,
             "orchestrator-strict.no-hook-support",
             ".meta-config/project.yaml",
             f"orchestrator.strict is active for provider '{provider}', but this "
             f"provider has no PreToolUse hook wiring (config/ai-providers.yaml: "
-            f"has_hooks: false) -- the setting has no runtime effect there.",
+            f"{reason}) -- the setting has no runtime effect there.",
             f"Add a provider-overrides entry to scope strict mode to hook-capable "
             f"providers only, or accept that delegation is not enforced on '{provider}'.",
         ))

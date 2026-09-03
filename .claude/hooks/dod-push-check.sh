@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.0.0
+# version: 2.0.1
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
@@ -16,10 +16,12 @@ set -uo pipefail
 # (issue #593). stdout is used only for non-blocking progress/status text.
 
 # --- Shared helper lib + fail-closed python check (issue #595) ---------
-# This hook is a security boundary (Branch-Guard + DoD test gate) — it must
-# not silently allow a push through just because python3 went missing from
-# PATH (which could be as simple as a broken PATH, or as deliberate as an
-# attacker trying to disable the gate). Fail CLOSED instead.
+# This hook acts as a security boundary (Branch-Guard + DoD test gate) — see
+# .claude/rules/branch-guard.md#guard-terminologie for the convention-vs-
+# security-boundary distinction — it must not silently allow a push through
+# just because python3 went missing from PATH (which could be as simple as a
+# broken PATH, or as deliberate as an attacker trying to disable the gate).
+# Fail CLOSED instead.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null; then
   echo "DoD-Check: required helper $SCRIPT_DIR/lib/hook_common.sh is missing or unreadable." >&2
