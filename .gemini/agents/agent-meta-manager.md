@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.14.0
+version: 1.15.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -14,7 +14,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.14.0
+generated-from: 1-generic/agent-meta-manager.md@1.15.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -64,6 +64,7 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 | Change model tier | Affects cost and performance |
 | Enable/disable agent roles | Changes generated agents |
 | Change DoD preset | Project-wide quality requirements |
+| Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
 | Run `sync.py` | Overwrites generated files |
 | Fill values in `project.yaml` | Wrong values corrupt the project |
 | Upgrade to major version | Breaking changes |
@@ -234,6 +235,75 @@ Immediate rule: error observed → write an imperative rule → insert outside t
 ## 13. Configure SE cascade
 
 On request: extend `.meta-config/project.yaml` with an SE block. Explain the variables (`SE_MAX_DEPTH`, etc.). Confirmation required.
+
+## 14. Release conventions & automation
+
+Release naming/versioning and the GitHub-release step are config-driven, not
+hardcoded in `release.md` — driven by `config/conventions-presets.yaml` +
+`scripts/lib/conventions.py` (issue #521, extended by #518/#622).
+
+### 14a. Choose a versioning/naming preset
+
+```yaml
+# .meta-config/project.yaml
+conventions-preset: default   # or: calver | conventional-strict
+```
+
+| Preset | Fits | Versioning |
+|--------|------|------------|
+| `default` | Libraries/CLIs with downstream consumers (SemVer contract) | `vMAJOR.MINOR.PATCH` |
+| `calver` | Continuously deployed services/SaaS, no external consumers | `{year}.{month}.{patch}` |
+| `conventional-strict` | OSS packages with fully automated semantic-release-style flow | Conventional-Commit-driven, no manual REQ prefix |
+
+Individual fields can be overridden per project without switching the whole
+preset via a `conventions:` block (deep-merges over the preset — same
+precedence as `model-override-all`: project override > preset > `default`):
+
+```yaml
+conventions:
+  release:
+    versioning:
+      tag_format: "v{major}.{minor}.{patch}"
+```
+
+### 14b. Auto GitHub-release on tag push (opt-in)
+
+Default is OFF — enabling this is a behavior change (a hook starts
+auto-creating GitHub releases), so it belongs in the confirmation table below.
+
+```yaml
+conventions:
+  release:
+    github_release:
+      enabled: true                    # opt-in, default false
+      title_pattern: "{tag}"           # placeholders: {tag}, {version}
+      pre_release_suffixes: [alpha, beta, rc]
+```
+
+Mechanism: `hooks/1-generic/auto-github-release.sh` (PostToolUse) detects a
+`git push <remote> <tag>` matching the project's `versioning.tag_format` and
+runs `gh release create` automatically — idempotent (skips if a release
+already exists for the tag), never blocks the push (fail-open). `--prerelease`
+is set automatically when the tag carries one of `pre_release_suffixes`.
+Re-sync after changing this key so the hook picks up the new config.
+
+### 14c. Project-specific pre-release checklist (opt-in)
+
+Adds project-specific prose tasks to the release agent's pre-release
+checklist without touching `release.md` itself (renders into the existing
+`` placeholder — empty by default, byte-
+identical to today's output when unset):
+
+```yaml
+conventions:
+  release:
+    custom_checklist:
+      - {task: "Update Docker image tag", verification: "docker images | grep <tag>"}
+      - {task: "Notify #releases Slack channel", verification: "manual"}
+```
+
+Re-sync (`sync.py`) is required after any `conventions:` change — the release
+agent template only picks up the new blocks on regeneration.
 </workflow>
 
 <context>

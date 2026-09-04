@@ -1,3 +1,4 @@
+auto-github-release.sh
 dod-push-check.sh
 graphify-read-guard.sh
 graphify-search-guard.sh
