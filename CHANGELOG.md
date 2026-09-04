@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.101.0-beta.5] — 2026-09-04
+
+### Fixed
+- **Guard security hardening** (#590, #591, #602): three tokenizer/RCE guard fixes (subcommand-hiding, git-mutation detection, validation gaps).
+- **Config loader performance** (#553): added `@lru_cache` to five framework config read paths, reducing full test-suite duration from ~404s to ~146s (64% reduction).
+- **Environment issue documentation** (#554): documented and isolated environment-specific test behavior.
+
+### Changed
+- **Guard trade-off documentation** (#592): tokenizer-based mutation detection documented as convention boundary (fail-closed against accidental misuse, not deliberate bypass).
+
 ## [0.101.0-beta.4] — 2026-09-03
 
 ### Changed
