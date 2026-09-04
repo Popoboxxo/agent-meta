@@ -56,7 +56,7 @@ Check before every release:
 | Build created | `{{BUILD_COMMANDS}}` |
 | README/CODEBASE_OVERVIEW | Current |
 | git commit + tag + push | `git` agent |
-
+{{RELEASE_CUSTOM_CHECKLIST_BLOCK}}
 ## 2. Versioning
 
 {{RELEASE_VERSIONING_BLOCK}}

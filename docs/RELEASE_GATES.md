@@ -354,3 +354,73 @@ bash .claude/hooks/release-gates/docker-image-scan.sh
 # One-off-Override für genau dieses eine Gate:
 PRE_RELEASE_GATE_ENABLED=true bash .claude/hooks/release-gates/docker-image-scan.sh
 ```
+
+## Automatisches GitHub-Release nach Tag-Push (Issues #518/#622)
+
+Der `release`-Agent muss `gh release create` bisher als separaten, manuellen Schritt nach dem
+Tag-Push ausführen — wird der Schritt vergessen, existiert der Tag in `git`, aber kein
+GitHub-Release (Issue #622). Der Hook `auto-github-release.sh` (PostToolUse auf `Bash`) schließt
+diese Lücke **strukturell**: erkennt er einen `git push <remote> <tag>`, dessen Tag zum
+konfigurierten `versioning.tag_format` passt, erstellt er das passende GitHub-Release automatisch —
+der manuelle Schritt kann nicht mehr vergessen werden, weil er nicht mehr manuell ist.
+
+**Opt-in, additiv, kein Gate:** standardmäßig AUS. Der Hook blockiert den Push nie (immer Exit 0)
+und ist reine Nachbereitung eines bereits erfolgten Pushs. Aktivierung pro Projekt über die
+bestehende Conventions-Infrastruktur (`config/conventions-presets.yaml`, Issue #521):
+
+```yaml
+# .meta-config/project.yaml
+conventions:
+  release:
+    github_release:
+      enabled: true                    # opt-in — ohne dies passiert nichts
+      title_pattern: "{tag}"           # Platzhalter: {tag}, {version} (= {tag} ohne tag_format-Präfix)
+      pre_release_suffixes: [alpha, beta, rc]   # Tag-Suffix -> --prerelease
+```
+
+Zusätzlich muss der Hook in `settings.json` registriert sein:
+
+```yaml
+# .meta-config/project.yaml
+hooks:
+  auto-github-release:
+    enabled: true
+```
+
+**Verhalten:**
+- **Tag-Erkennung:** `versioning.tag_format` (z. B. `v{major}.{minor}.{patch}`) wird zu einem
+  Regex kompiliert — jedes `{...}` wird ein Versionssegment, literale Zeichen (`v`, `.`) bleiben
+  erhalten, und ein optionaler Pre-Release/Build-Anhang (`-beta.1`, `-rc.2`, `+build.5`) ist
+  erlaubt. So matcht `v{major}.{minor}.{patch}` sowohl `v1.2.3` als auch `v1.2.3-beta.1`, aber
+  nicht `feature-branch`.
+- **Pre-Release-Flag:** trägt der Tag ein `-<suffix>` aus `pre_release_suffixes` (z. B.
+  `v1.2.3-beta.4`), wird `gh release create --prerelease` aufgerufen; ein stabiler Tag (`v1.2.3`)
+  erhält kein `--prerelease`.
+- **Idempotenz:** existiert für den Tag bereits ein Release (`gh release view <tag>` = Exit 0),
+  passiert nichts (Log-Hinweis, kein Overwrite, kein Doppel-Release).
+- **Release-Notes:** der passende `CHANGELOG.md`-Abschnitt (`## [<version>] ...`) wird extrahiert;
+  fehlt er, wird ein generischer Text (`Release <tag>`) verwendet.
+- **Fail-open:** fehlen `gh`, python, oder die agent-meta-Quellen, oder ist die Conventions-Config
+  fehlerhaft → kein Release, kein Fehler.
+
+## Projekt-eigene Pre-Release-Checkliste
+
+Abschnitt „## 1. Pre-release checklist" in `release.md` hat eine feste Basis-Checkliste (Tests,
+DoD, CHANGELOG, Version, Build, Docs, git push). Ein Projekt kann **zusätzliche** eigene Punkte
+ergänzen — ebenfalls über den `conventions`-Block, gleicher Precedence-Mechanismus:
+
+```yaml
+# .meta-config/project.yaml
+conventions:
+  release:
+    custom_checklist:
+      - task: "Docker-Image-Tag aktualisieren"
+        verification: "`docker images | grep <tag>`"
+      - task: "Slack-Kanal benachrichtigen"
+        verification: "#releases"
+```
+
+Die Einträge erscheinen als zusätzliche Zeilen direkt unter der Basis-Checklisten-Tabelle
+(Platzhalter `{{RELEASE_CUSTOM_CHECKLIST_BLOCK}}` in `release.md`). Ist die Liste leer/nicht
+gesetzt, rendert der Block zu einem leeren String — die generierte `release.md` bleibt
+byte-identisch zu Projekten ohne diese Config.

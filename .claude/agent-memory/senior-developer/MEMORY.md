@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Auto-GitHub-Release + Custom-Checklist (#518/#622)](auto-github-release-and-custom-checklist-518-622.md) — DONE(not committed): PostToolUse-Hook + custom_checklist via conventions-preset; release.md byte-identity via Leerzeilen-Reuse
+- [Pytest Full-Suite Namespace-Packages](pytest-full-suite-namespace-packages.md) — full tests/ braucht -o consider_namespace_packages=true, sonst 30 scripts.lib collection-errors
 - [#643 2-platform extends migration](issue-643-platform-extends-migration.md) — DONE: 5 migrated / 8 skipped; needed 2 engine fixes (standalone XML anchor + override-order merge); NOT committed
 - [Wave C: provider_transform data-driven (#629)](wave-c-provider-transform-data-driven-629.md) — DONE: 6-way elif → agent-transform YAML spec; all 6 providers byte-identical, suite green, NOT committed
 
