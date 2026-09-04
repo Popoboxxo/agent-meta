@@ -94,3 +94,26 @@ def test_calver_versioning_block_differs_from_default(base_config):
     config["conventions-preset"] = "calver"
     variables = _build(config)
     assert variables["RELEASE_VERSIONING_BLOCK"] != EXPECTED_VERSIONING_BLOCK
+
+
+def test_default_custom_checklist_block_is_empty(base_config):
+    # No custom_checklist configured -> the block must render to "" so the
+    # generated release.md stays byte-identical (issue #518 follow-up).
+    config = copy.deepcopy(base_config)
+    config.pop("conventions-preset", None)
+    variables = _build(config)
+    assert variables["RELEASE_CUSTOM_CHECKLIST_BLOCK"] == ""
+
+
+def test_custom_checklist_block_renders_rows(base_config):
+    config = copy.deepcopy(base_config)
+    config.pop("conventions-preset", None)
+    config.setdefault("conventions", {}).setdefault("release", {})["custom_checklist"] = [
+        {"task": "Docker image tag updated", "verification": "`docker images | grep`"},
+        {"task": "Slack notified", "verification": "#releases channel"},
+    ]
+    variables = _build(config)
+    assert variables["RELEASE_CUSTOM_CHECKLIST_BLOCK"] == (
+        "| Docker image tag updated | `docker images | grep` |\n"
+        "| Slack notified | #releases channel |"
+    )

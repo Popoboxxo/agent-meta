@@ -32,6 +32,18 @@ presets:
         format: keep-a-changelog
         sections: [Added, Fixed, Changed, Removed]
         entry_prefix: "REQ-xxx: "   # bewusst unverändert ggü. heute (siehe Konzept Abschnitt 8)
+      # Opt-in GitHub-Release-Automatik (Issue #518/#622). Ausgewertet vom
+      # PostToolUse-Hook auto-github-release.sh nach einem `git push <tag>`,
+      # NICHT in release.md gerendert. enabled:false = kein Verhaltenswechsel
+      # für bestehende Projekte.
+      github_release:
+        enabled: false
+        title_pattern: "{tag}"                  # Platzhalter: {tag}, {version}
+        pre_release_suffixes: [alpha, beta, rc]  # Tag-Suffix -> --prerelease
+      # Projekt-eigene, zusätzliche Pre-Release-Checkliste (Issue #518-Follow-up).
+      # Liste von {task, verification}; leer -> RELEASE_CUSTOM_CHECKLIST_BLOCK
+      # rendert zu "" (byte-identisch zum Status quo).
+      custom_checklist: []
     issues:
       applies_to_roles: [git]
       # Vokabular wird 1:1 von commit-conventions.md übernommen, nicht neu erfunden.
@@ -64,6 +76,11 @@ presets:
         format: keep-a-changelog
         sections: [Added, Fixed, Changed, Removed]
         entry_prefix: ""
+      github_release:
+        enabled: false
+        title_pattern: "{tag}"
+        pre_release_suffixes: [alpha, beta, rc]
+      custom_checklist: []
     issues:
       applies_to_roles: [git]
       title_format: "{type}: {description}"
@@ -90,6 +107,11 @@ presets:
         format: angular
         sections: [Features, "Bug Fixes", "Performance Improvements", "Breaking Changes"]
         entry_prefix: ""
+      github_release:
+        enabled: false
+        title_pattern: "{tag}"
+        pre_release_suffixes: [alpha, beta, rc]
+      custom_checklist: []
     issues:
       applies_to_roles: [git]
       title_format: "{type}: {description}"

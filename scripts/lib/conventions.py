@@ -112,6 +112,7 @@ def render_convention_block(
         return {
             "RELEASE_VERSIONING_BLOCK": _render_release_versioning(spec),
             "RELEASE_CHANGELOG_BLOCK": _render_release_changelog(spec),
+            "RELEASE_CUSTOM_CHECKLIST_BLOCK": _render_release_custom_checklist(spec),
         }
     if domain == "issues":
         return {"GIT_ISSUE_NAMING_BLOCK": _render_git_issue_naming(spec)}
@@ -156,6 +157,26 @@ def _render_release_versioning(spec: dict) -> str:
             f"{_format_bump_example(bump, rule.get('example', ''))} |"
         )
     return "\n".join(lines)
+
+
+def _render_release_custom_checklist(spec: dict) -> str:
+    """Render spec['custom_checklist'] into extra rows for release.md's checklist.
+
+    Each entry is a {task, verification} pair, appended as additional
+    '| <task> | <verification> |' rows in the same format as the hardcoded
+    '## 1. Pre-release checklist' table. Returns "" (empty string, no header,
+    no dangling table) when the list is empty or absent — this keeps the
+    generated release.md byte-identical for projects without a custom_checklist
+    (migration invariant, see tests/test_conventions_migration_invariant.py).
+    Entries missing a 'verification' render an empty second cell.
+    """
+    entries = spec.get("custom_checklist", []) or []
+    rows = [
+        f"| {e.get('task', '')} | {e.get('verification', '')} |"
+        for e in entries
+        if isinstance(e, dict) and e.get("task")
+    ]
+    return "\n".join(rows)
 
 
 def _render_release_changelog(spec: dict) -> str:
