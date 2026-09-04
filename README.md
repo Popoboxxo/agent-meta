@@ -392,6 +392,34 @@ dod-preset: rapid-prototyping
 
 Or via slash command: `/set-preset`
 
+## Release Conventions (`config/conventions-presets.yaml`)
+
+Release versioning/naming and the pre-release checklist are config-driven, not hardcoded in the
+`release` agent template. Choose a preset in `.meta-config/project.yaml`:
+
+| Preset | Fits | Versioning |
+|--------|------|------------|
+| **default** | Libraries/CLIs with downstream consumers (SemVer contract) | `vMAJOR.MINOR.PATCH` |
+| **calver** | Continuously deployed services/SaaS, no external consumers | `{year}.{month}.{patch}` |
+| **conventional-strict** | OSS packages with a fully automated semantic-release-style flow | Conventional-Commit-driven |
+
+```yaml
+conventions-preset: default   # or: calver | conventional-strict
+```
+
+Individual fields (tag format, changelog format, etc.) can be overridden per project via a
+`conventions:` block without switching the whole preset. Two opt-in extras layer on top:
+
+- **Auto GitHub-release** (`conventions.release.github_release.enabled: true`) — the
+  `auto-github-release.sh` hook (see [Hooks](#hooks-7-hooks-propagated-to-all-providers)) creates
+  the GitHub release automatically on a matching tag push, with `--prerelease` on configured
+  suffixes (`alpha`/`beta`/`rc`). Default off — no behavior change unless enabled.
+- **Custom pre-release checklist** (`conventions.release.custom_checklist: [...]`) — a project can
+  add its own `{task, verification}` rows (e.g. "update Docker tag") to the release agent's
+  pre-release checklist without editing the generic template.
+
+See `docs/RELEASE_GATES.md` for the full config reference.
+
 ## Model Tiers & Tier Presets
 
 ### 5 Model Tiers
@@ -466,7 +494,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | **se-test-loop** | se-test-engineer | se-testreviewer | 3 |
 | **se-dev-review-loop** | se-developer | code-reviewer | 3 |
 
-## Hooks (6 hooks, propagated to all providers)
+## Hooks (7 hooks, propagated to all providers)
 
 | Hook | Trigger | Effect |
 |------|---------|--------|
@@ -476,6 +504,7 @@ Continue and Copilot: no per-agent model tiers (managed centrally).
 | `sync-on-config-change.sh` | PostToolUse | Triggers sync.py re-run when `.meta-config/project.yaml` changes (detects via Write/Edit tools) |
 | `viz-log.sh` | Events | Logs agent events to viz event file for dashboard tracking |
 | `pre-release-check.sh` | Manual (release agent) | Dispatcher for mechanized, plugin-style pre-release gates (runs every `*.sh` in its `release-gates/` subdirectory: 3 built-ins — artifact freshness, Docker base image CVE scan, GitHub Action pin validation — plus any project-authored custom gate) — see `docs/RELEASE_GATES.md` |
+| `auto-github-release.sh` | PostToolUse | Opt-in: detects a `git push <remote> <tag>` matching the project's configured tag format and auto-runs `gh release create` (idempotent, `--prerelease` on beta/rc suffixes, never blocks the push) — see [Release Conventions](#release-conventions--config-conventions-presetsyaml) |
 
 ## MCP Servers (7 servers)
 
