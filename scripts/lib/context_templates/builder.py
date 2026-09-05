@@ -98,7 +98,10 @@ class TemplateBuilder:
                     continue
                 rendered = inner_template
                 for k, v in item.items():
-                    rendered = re.sub(r'\{\{\s*' + re.escape(k) + r'\s*\}\}', str(v), rendered)
+                    # Function replacement: re.sub treats the return value
+                    # literally. A raw str replacement would interpret
+                    # backslashes as escapes and crash (issue #674).
+                    rendered = re.sub(r'\{\{\s*' + re.escape(k) + r'\s*\}\}', lambda m, val=str(v): val, rendered)
                 result.append(rendered)
             return "".join(result)
             
