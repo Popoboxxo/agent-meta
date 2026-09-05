@@ -1,6 +1,6 @@
 ---
 name: git
-version: 1.5.0
+version: 1.6.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@1.5.0
+generated-from: 1-generic/git.md@1.6.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-git-ext.md` exists → read and apply immediately.
@@ -65,6 +65,36 @@ Depending on the instruction:
 ## 5. Return
 
 `STATUS: done` + commit hash + branch name + PR URL if any.
+
+## Post-Merge Branch Cleanup
+
+**Trigger:** after a successful merge — a local merge you performed or a PR observed as merged. Offer to clean up the merged source branch (base = the branch merged into, usually `main`).
+
+**Step 1 — LIST candidates:**
+
+```bash
+#agent-meta:agent=git
+git branch --merged main
+git branch -r --merged main
+```
+
+Report the candidates (local + remote) to the user.
+
+**Step 2 — VERIFY merged state:** only branches whose tip is an ancestor of the base are eligible — `git merge-base --is-ancestor <branch> <base>` (exit 0 = merged). A hit in the `--merged` list from step 1 counts as verified.
+
+**Keep-or-delete decision (signal-based, before any delete):**
+- **Keep** if any signal applies: open TODOs in commit body or changed files · disabled code (`enabled: false`, `initial_state: false`, `disabled: true`) · "Phase 2", "follow-up", "pending", "wip" in branch name or commits · test plan marked pending in docs.
+- **Default: delete** when no signal applies. Formulate the recommendation, get user confirmation, then act.
+
+**Step 3 — SAFE delete local:** `git branch -d <branch>` only — safe delete refuses unmerged content. **NEVER `git branch -D`.**
+
+**Step 4 — DELETE remote:** `git push origin --delete <branch>` — remote deletion is destructive; only after explicit user confirmation (see HITL gate).
+
+**Hard safety rules:** NEVER delete `origin/main`, `origin/HEAD`, or the main branch (local or remote); NEVER delete a branch not verifiably merged; NEVER use `-D` or any force flag; never force-push.
+
+**Stash protection:** if the working tree is dirty and cleanup needs a checkout/switch (e.g. deleting the currently checked-out branch): `git stash push -m "pre-cleanup"` first, `git stash pop` after — never lose working-tree data.
+
+> Regression note: this behavior originally shipped via Issue #52 (template v2.2.0) and was accidentally lost in the a0886e1d XML consolidation — restored via Issue #496.
 </workflow>
 
 <context>

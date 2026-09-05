@@ -324,6 +324,32 @@ roles:
       - feedback
     short_desc: 'Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift
       und ...'
+  ai-security-guardian:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'KI-spezifische Sicherheitsrisiken: halluzinierte Dependencies (Slopsquatting),
+      fabrizierte IAM-Aktionen, unsichere AI-Defaults (Debug-Mode, permissive CORS,
+      Default-Credentials), bypassbare Bedingungslogik, Phantom-Endpoints und Leaked-Training-Data-Patterns
+      — read-only, komplementär zu security-auditor (OWASP) und dependency-auditor
+      (Supply-Chain).'
+    routing:
+      intent_keywords:
+      - AI code security
+      - vibe coding security
+      - halluzinierte Dependencies
+      - fake packages
+      - fabricated IAM
+      - insecure defaults
+      - brittle logic
+      - phantom endpoints
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: ai-security-audit-v1
+    short_desc: 'KI-spezifische Sicherheitsrisiken: halluzinierte Deps, fabrizierte
+      IAM, unsichere Defaults'
   agent-meta-scout:
     model: fast
     memory: local
@@ -353,6 +379,30 @@ roles:
       parallel: false
       orchestrator_only: false
     short_desc: Der ultimative Experte für Prompt-Engineering
+  prompt-governor:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Prompt-Governance: Prompts als Source Code behandeln — PromptBOM-Metadaten
+      (Model + Prompt + Parameter), append-only Audit-Trail, Provenance-Tracking,
+      Version-Drift-Erkennung und Banned-Unsafe-Prompting-Patterns (Skip Auth, Ignore
+      Security, Bypass Validation). Read-only auf Prompts; komplementär zu prompt-engineer
+      (Design).'
+    routing:
+      intent_keywords:
+      - Prompt Governance
+      - Prompt Audit
+      - PromptBOM
+      - Prompt Provenance
+      - banned prompt pattern
+      - Prompt Safety
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: prompt-governance-v1
+      target_roles:
+      - feedback
+    short_desc: 'Prompt-Governance: PromptBOM, Audit-Trail, Provenance, Banned-Patterns'
   agent-meta-manager:
     model: fast
     memory: ''
@@ -485,6 +535,8 @@ roles:
     handoff:
       input_contracts:
       - dependency-audit-v1
+      - prompt-governance-v1
+      - lifecycle-audit-v1
     short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub I...'
   bug-feature-analyzer:
@@ -974,6 +1026,30 @@ roles:
       - documenter
     short_desc: 'Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets,
       Capacity-...'
+  app-lifecycle-governor:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'App-Lifecycle-Governance: Ownership-Audit mit Orphan-Detection,
+      SLA-Validierung, Data-Classification-Checks (public/internal/confidential/restricted),
+      Lifecycle-Stage-Tracking (prototype → production → deprecated → archived) und
+      Deprecation-Plan-Prüfung — read-only, Findings als Empfehlungen via feedback.'
+    routing:
+      intent_keywords:
+      - App Ownership
+      - orphan app
+      - Lifecycle Management
+      - Deprecation Plan
+      - SLA Validation
+      - Data Classification
+      - App Inventory
+      parallel: true
+      orchestrator_only: false
+    handoff:
+      output_contract: lifecycle-audit-v1
+      target_roles:
+      - feedback
+    short_desc: 'App-Lifecycle-Governance: Ownership, SLA, Data-Classification, Deprecation'
   technical-writer:
     model: fast
     memory: project

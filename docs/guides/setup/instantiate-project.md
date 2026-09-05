@@ -241,6 +241,9 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/backend-reviewer.md` | `1-generic/backend-reviewer.md` (optional, Review-Agent-Fleet: API-Contracts, Silent Failures, Concurrency) |
 | `.claude/agents/database-reviewer.md` | `1-generic/database-reviewer.md` (optional, Review-Agent-Fleet: Migration-Safety, N+1, Injection, Transaktionen) |
 | `.claude/agents/ui-reviewer.md` | `1-generic/ui-reviewer.md` (optional, Review-Agent-Fleet: Design-Token, Layout-Konsistenz, Interaction-States) |
+| `.claude/agents/ai-security-guardian.md` | `1-generic/ai-security-guardian.md` (optional, KI-spezifische Sicherheitsrisiken: halluzinierte Deps, fabrizierte IAM, unsichere Defaults — komplementär zu security-auditor/dependency-auditor) |
+| `.claude/agents/prompt-governor.md` | `1-generic/prompt-governor.md` (optional, Prompt-Governance: PromptBOM, Audit-Trail, Provenance, Banned-Patterns) |
+| `.claude/agents/app-lifecycle-governor.md` | `1-generic/app-lifecycle-governor.md` (optional, App-Lifecycle: Ownership, SLA, Data-Classification, Deprecation-Plans) |
 
 ---
 

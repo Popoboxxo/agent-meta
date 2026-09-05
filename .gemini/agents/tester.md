@@ -1,6 +1,6 @@
 ---
 name: tester
-version: 2.1.4
+version: 2.2.0
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 hint: Write tests (TDD), run the test suite, ensure coverage
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/tester.md@2.1.4
+generated-from: 1-generic/tester.md@2.2.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -59,6 +59,21 @@ describe / class / suite: ModuleName
 - **No `any`** in test code
 - **No flaky tests**
 
+
+## 6. Container verification rules
+
+When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnostics MUST survive both success and failure (defensive logging):
+
+- **Never** `docker run --rm` for ad-hoc verification — on non-zero exit the container is gone before you can inspect it ("can not get logs from container which is dead or marked for removal").
+- **Canonical pattern:** named container WITHOUT `--rm`, capture output immediately, remove only afterwards:
+  ```
+  NAME=verify-$RANDOM
+  docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
+  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker rm "$NAME"                                # cleanup only after capture
+  ```
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- On failure, report the captured log path — the next agent needs those diagnostics.
 </workflow>
 
 <context>
