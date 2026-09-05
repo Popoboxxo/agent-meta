@@ -53,6 +53,15 @@ providers:
     # Terminal (Bash/command-execution) tool name — used by viz.py's fallback
     # CLI-logging hint. null means: no known terminal tool for this provider.
     bash_tool_name: Bash
+    # Provider-root directories for gitignore.ignore-provider-dirs (issue #557).
+    # When that project.yaml toggle is enabled, the managed .gitignore block
+    # ignores these WHOLE directories (with trailing slash) instead of listing
+    # provider-internal sub-paths. Explicit key wins; fallback derivation when
+    # missing: first dot-prefixed segment of agents_dir (here would yield
+    # .claude/ anyway). Repo-root files (CLAUDE.personal.md, sync.log, .mcp.json)
+    # are NOT affected — they keep their per-category gitignore behavior.
+    provider_root_dirs:
+      - .claude/
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
@@ -140,6 +149,10 @@ providers:
     isolation-mechanism: gemini-toml-policy
     isolation-display-name: "Gemini CLI"
     bash_tool_name: code_execution
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .gemini/
     gitignore_entries:
       - .gemini/settings.local.json
       - .gemini/pending-tasks.md
@@ -209,6 +222,11 @@ providers:
       - AGENTS.md
     isolation-mechanism: opencode-permissions
     bash_tool_name: bash
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation. opencode.json (repo root) is NOT a
+    # provider root and stays tracked unless gitignore.settings ignores it.
+    provider_root_dirs:
+      - .opencode/
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
@@ -274,6 +292,10 @@ providers:
       - .continue/
     isolation-mechanism: continue-soft-rule
     bash_tool_name: null
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .continue/
     gitignore_entries:
       - .continue/config.local.yaml
       - .continue/pending-tasks.md
@@ -327,6 +349,12 @@ providers:
     isolation-dirs:
       - .github/copilot/
     bash_tool_name: null
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Explicit
+    # (NOT derived): the agents_dir fallback would yield ".github/" — ignoring
+    # that whole directory would also exclude GitHub workflows etc. The
+    # provider root is ONLY the copilot subdirectory.
+    provider_root_dirs:
+      - .github/copilot/
     gitignore_entries: []
     mcp-config: {}
     skills_dir: .github/copilot/skills
@@ -385,6 +413,10 @@ providers:
       - .mammouth/
       - MAMMOUTH.md
     bash_tool_name: bash
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .mammouth/
     gitignore_entries:
       - .mammouth/pending-tasks.md
     mcp-config: {}
@@ -453,6 +485,13 @@ providers:
       - .codex/
       - AGENTS.md
     bash_tool_name: Bash        # V4 (2026-09-04): canonical hook/matcher name; apply_patch matches as Edit/Write alias
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Two roots:
+    # .codex/ plus repo-root .agents/ (skills_dir lives there). rules_dir
+    # "rules" (repo root) must NEVER become a provider root — it is a plain
+    # project directory shared with other tooling.
+    provider_root_dirs:
+      - .codex/
+      - .agents/
     gitignore_entries:
       - .codex/pending-tasks.md
     mcp-config:
@@ -511,6 +550,10 @@ providers:
       - .zcode/
       - AGENTS.md
     bash_tool_name: Bash        # V5 (2026-09-04): 9 built-ins + Agent dispatch, all 1:1 names
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .zcode/
     gitignore_entries:
       - .zcode/pending-tasks.md
     mcp-config:
@@ -565,6 +608,10 @@ providers:
       - .kimi-code/
       - AGENTS.md
     bash_tool_name: Bash        # V14 (2026-09-04): exact case-sensitive name, 4 doc sources
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .kimi-code/
     gitignore_entries:
       - .kimi-code/pending-tasks.md
     mcp-config:

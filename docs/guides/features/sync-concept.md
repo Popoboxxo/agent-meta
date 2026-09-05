@@ -356,6 +356,7 @@ gitignore:
   local: true       # Standard: persönliche Dateien sind gitignored (settings.local.json, CLAUDE.personal.md)
   generated: false  # Standard: generierte Dateien sind committed (agents/, rules/, hooks/)
   settings: false   # Standard: Settings-Dateien sind committed (settings.json, GEMINI.md)
+  ignore-provider-dirs: false  # ganze Provider-Verzeichnisse statt Sub-Pfaden gitignoren (issue #557)
 ```
 
 | Flag | Standard | `true` bedeutet |
@@ -363,6 +364,7 @@ gitignore:
 | `local` | `true` | `.claude/settings.local.json`, `CLAUDE.personal.md`, `sync.log` → gitignored |
 | `generated` | `false` | `agents/`, `rules/`, `hooks/`, `commands/` aller aktiven Provider → gitignored |
 | `settings` | `false` | `settings.json`, `GEMINI.md`, `config.yaml` der Provider → gitignored |
+| `ignore-provider-dirs` | `false` | Ganze Provider-Root-Verzeichnisse (`.claude/`, `.gemini/`, …) statt der provider-internen Sub-Pfade → gitignored |
 
 **Hinweis:** `CLAUDE.md` wird nie gitignored — sie enthält handgeschriebene Sektionen außerhalb des managed blocks.
 
@@ -370,6 +372,36 @@ gitignore:
 - Das Team sync.py bei jedem Checkout neu ausführt (CI/CD)
 - Diff-Noise bei Sync-Updates störend ist
 - Das Repo möglichst klein bleiben soll
+
+### `ignore-provider-dirs: true` — ganze Provider-Verzeichnisse (issue #557)
+
+Mit diesem Toggle erhält der managed block ganze Provider-Root-Verzeichnisse statt
+der provider-internen Sub-Path-Allowlist:
+
+- Pro aktivem Provider wird die Provider-Root (`.claude/`, `.gemini/`, `.opencode/`,
+  `.continue/`, `.github/copilot/`, `.mammouth/`, `.codex/` + `.agents/`, `.zcode/`,
+  `.kimi-code/`) gitignored. Die Wurzeln kommen aus `provider_root_dirs` in
+  `config/ai-providers.yaml` (Fallback: erstes dot-präfixiertes Pfadsegment von
+  `agents_dir`; Copilot/Codex brauchen deshalb den expliziten Key).
+- Redundante Sub-Pfade **innerhalb** einer ignorierten Wurzel (z.B.
+  `.claude/settings.local.json`, `.gemini/pending-tasks.md`, `.claude/agents/`)
+  werden aus der Berechnung herausgefiltert.
+- Repo-Root-Dateien bleiben unverändert: `sync.log`, `CLAUDE.personal.md`,
+  `AGENTS.personal.md`, `.mcp.json`, `opencode.json` folgen weiterhin ihren
+  Kategorien (`local`/`settings`); Top-Level-Context-Files (`CLAUDE.md`,
+  `AGENTS.md`, `MAMMOUTH.md`) werden nie pauschal ignoriert.
+- Nicht-Provider-Einträge (env-Scripts, MCP-Secrets-Dateien, Skill-Einträge)
+  bleiben unverändert.
+- `gitignore.exceptions` wirkt weiter — z.B. nimmt `exceptions: [".claude/"]`
+  die Claude-Root wieder aus dem Block heraus.
+- Codex-Besonderheit: `rules_dir: rules` liegt am Repo-Root und wird **nie** als
+  Provider-Root behandelt (nur über `gitignore.generated` steuerbar wie bisher).
+
+**Hinweis (Additiv-Verhalten):** Bei aktivem Claude wird der managed block bei
+jedem Sync exakt neu geschrieben — alte Sub-Pfad-Einträge fallen nach dem
+Einschalten beim nächsten Sync heraus. Ohne aktives Claude wird additiv
+ergänzt; dort bleiben bereits geschriebene Einträge erhalten (redundant,
+harmlos).
 
 ---
 

@@ -327,6 +327,11 @@ CLAUDE.personal.md
 # .continue/config.yaml  ← ggf. ignorieren wenn Secrets enthalten
 ```
 
+**Alternative (issue #557):** Mit `gitignore.ignore-provider-dirs: true` in
+`project.yaml` verwaltet der managed block ganze Provider-Verzeichnisse
+(`.claude/`, `.gemini/`, `.github/copilot/`, …) statt einzelner Sub-Pfade —
+Details siehe [sync-concept.md](../guides/features/sync-concept.md).
+
 ---
 
 ## Troubleshooting

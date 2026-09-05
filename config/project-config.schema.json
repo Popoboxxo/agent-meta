@@ -748,6 +748,11 @@
           "default": false,
           "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
         },
+        "ignore-provider-dirs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Issue #557: switch the agent-meta managed .gitignore block from the provider-internal sub-path allowlist to whole provider-root directories (e.g. .claude/, .gemini/, .github/copilot/), resolved per provider from config/ai-providers.yaml (provider_root_dirs key; fallback derivation: first dot-prefixed segment of agents_dir). Provider-internal entries from the local/generated/settings categories are filtered out as redundant. Repo-root files (sync.log, CLAUDE.personal.md, .mcp.json, opencode.json, top-level context files) keep their per-category behavior, as do non-provider entries (env scripts, MCP extras, skill entries). Default: false (sub-path allowlist, unchanged behavior). Note: the managed block is additive on non-exact sync paths — existing projects may keep previously written sub-path entries (harmless, redundant)."
+        },
         "custom_entries": {
           "type": "array",
           "description": "List of custom paths (files or directories) to add to the agent-meta managed .gitignore block.",

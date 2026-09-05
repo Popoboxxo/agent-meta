@@ -144,6 +144,10 @@ gitignore:
   local: true       # persönliche/lokale Dateien gitignoren (.claude/settings.local.json, sync.log, etc.)
   generated: false  # generierte Ordner (.claude/agents/, etc.) in .gitignore aufnehmen (false = im Git committen)
   settings: false   # Provider-Settings (settings.json, GEMINI.md, etc.) gitignoren
+  # Ganze Provider-Verzeichnisse (.claude/, .gemini/, ...) statt Sub-Pfaden gitignoren
+  # (issue #557). Redundante Sub-Pfade innerhalb der Wurzeln entfallen; Repo-Root-Dateien
+  # (sync.log, CLAUDE.personal.md, opencode.json) bleiben wie bisher.
+  ignore-provider-dirs: false
 
 # Generierte Provider-Contextfiles (CLAUDE.md, AGENTS.md, ...) steuern
 # / Control generated provider context files (issue #540):

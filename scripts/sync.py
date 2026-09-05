@@ -97,6 +97,11 @@ from lib.external_tools import (
     render_injection_drift_artifacts,
     scan_injection_drift,
 )
+from lib.gitignore import (
+    collect_provider_roots,
+    compute_base_gitignore_entries,
+    filter_redundant_provider_entries,
+)
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import create_hook, sync_hooks
 from lib.io import SyncError, safe_path, write_checked
@@ -1295,50 +1300,17 @@ def _handle_sync(ctx: _SyncContext) -> None:
     if platform_vars is not None:
         log.note("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
     is_claude = "Claude" in providers
-    claude_pc = provider_config.get("Claude", {})
     gitignore_cfg = config.get("gitignore", {})
-    base_gitignore_entries: list[str] = []
-    exceptions = gitignore_cfg.get("exceptions", [])
-    def _should_ignore(path: str, category_default: bool) -> bool:
-        return not category_default if path in exceptions else category_default
-
-    if is_claude:
-        cat_local = gitignore_cfg.get("local", True)
-        local_candidates = claude_pc.get("gitignore_entries", [
-            ".claude/settings.local.json",
-            ".claude/agent-memory-local/",
-            "CLAUDE.personal.md",
-            "sync.log",
-        ])
-        for _p in local_candidates:
-            if _should_ignore(_p, cat_local):
-                base_gitignore_entries.append(_p)
-
-        cat_gen = gitignore_cfg.get("generated", False)
-        for _prov in providers:
-            _pc = provider_config.get(_prov, {})
-            for _dir_key in ("agents_dir", "rules_dir", "hooks_dir"):
-                _d = _pc.get(_dir_key)
-                if _d and _should_ignore(_d + "/", cat_gen):
-                    base_gitignore_entries.append(_d + "/")
-            if _pc.get("has_commands") and _pc.get("commands_dir"):
-                _c = _pc["commands_dir"]
-                if _should_ignore(_c + "/", cat_gen):
-                    base_gitignore_entries.append(_c + "/")
-
-        cat_set = gitignore_cfg.get("settings", False)
-        for _prov in providers:
-            _pc = provider_config.get(_prov, {})
-            _sf = _pc.get("settings_file")
-            if _sf and _should_ignore(_sf, cat_set):
-                base_gitignore_entries.append(_sf)
-            _ctx = _pc.get("context_file")
-            if _ctx and _ctx != "CLAUDE.md" and _should_ignore(_ctx, cat_set):
-                base_gitignore_entries.append(_ctx)
-
-        custom_entries = gitignore_cfg.get("custom_entries", [])
-        if custom_entries:
-            base_gitignore_entries.extend(custom_entries)
+    # Base entries of the managed .gitignore block (local/generated/settings
+    # categories, custom entries and — when gitignore.ignore-provider-dirs is
+    # enabled — whole provider-root directories). Extracted to lib/gitignore.py
+    # for unit-testability (issue #557); Claude-gated exactly as before: without
+    # Claude only the additive per-provider path further below runs.
+    base_gitignore_entries: list[str] = (
+        compute_base_gitignore_entries(providers, provider_config, gitignore_cfg)
+        if is_claude
+        else []
+    )
     if is_claude:
         sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
         init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
@@ -1592,6 +1564,14 @@ def _handle_sync(ctx: _SyncContext) -> None:
         if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
             log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
         extra_provider_entries.extend(_pc.get("gitignore_entries", []))
+    # Toggle mode (issue #557): provider-internal entries are redundant once the
+    # whole provider root is ignored — drop them from the per-provider allowlist
+    # too. Repo-root entries (e.g. AGENTS.personal.md) pass through unchanged.
+    if gitignore_cfg.get("ignore-provider-dirs", False):
+        extra_provider_entries = filter_redundant_provider_entries(
+            extra_provider_entries,
+            collect_provider_roots(providers, provider_config),
+        )
     # Viz: add gitignore entries if viz mode is dynamic/full or viz is enabled
     viz_mode = args.viz_mode or viz_cfg.get("mode", "off")
     if viz_mode in ("dynamic", "full") or viz_cfg.get("enabled", False) or args.viz:
