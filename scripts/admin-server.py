@@ -202,20 +202,18 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "role-defaults":     "config/role-defaults.yaml",
     "ai-providers":      "config/ai-providers.yaml",
     "skills-registry":   "config/skills-registry.yaml",
-    "mcp-registry":      "config/mcp-registry.yaml",
-    "external-tools-registry": "config/external-tools-registry.yaml",
     "dod-presets":       "config/dod-presets.yaml",
     "rules-presets":     "config/rules-presets.yaml",
     "conventions-presets": "config/conventions-presets.yaml",
     "delegation-syntax": "config/delegation-syntax.yaml",
     "export":            "config/export.yaml",
+    "plugin-catalog":    "config/plugin-catalog.yaml",
 }
 
 # Always-available project configs.
 PROJECT_FILES: dict[str, str] = {
     "project": ".meta-config/project.yaml",
-    "project-mcp-registry": ".meta-config/mcp-registry.yaml",
-    "project-external-tools-registry": ".meta-config/external-tools-registry.yaml",
+    "project-plugin-catalog": ".meta-config/plugin-catalog.yaml",
 }
 
 
@@ -1426,7 +1424,7 @@ class AuditService:
 
             # agent_meta_root, NOT project_root: in project_admin (submodule)
             # mode the framework's config/ai-providers.yaml and
-            # config/external-tools-registry.yaml live under .agent-meta/, not
+            # config/plugin-catalog.yaml live under .agent-meta/, not
             # the project root — passing project_root there silently finds
             # nothing and produces false-positive "undeclared artifact"
             # findings for every legitimately registered tool/provider.
@@ -1452,6 +1450,26 @@ class AuditService:
             return get_deactivation_status(root, project_config, provider_config)
         except Exception as exc:  # noqa: BLE001
             _, body = _generic_error_response(exc, "ERR_DEACTIVATION_STATUS")
+            return body
+
+    def test_plugin(self, plugin_id: str) -> dict:
+        """Run the health check for one catalog plugin. Reuses the exact CLI
+        implementation (lib.plugin_test.run_plugin_test) — no duplicate logic."""
+        project_root = self._ctx.root
+        try:
+            _ensure_scripts_on_path(project_root)
+            from lib.io import _load_yaml_or_json  # type: ignore[import]
+            from lib.plugin_test import run_plugin_test  # type: ignore[import]
+            from lib.plugins import load_plugin_catalog  # type: ignore[import]
+            agent_meta_root = self._ctx.agent_meta_root()
+            catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, project_root=project_root)
+            plugin_def = catalog.get(plugin_id)
+            if not plugin_def:
+                return {"status": "UNKNOWN", "message": f"'{plugin_id}' not in catalog", "latency_ms": 0}
+            secrets, _ = _load_yaml_or_json(project_root / ".meta-config" / "secrets.local.yaml")
+            return run_plugin_test(plugin_id, plugin_def, secrets=secrets or {})
+        except Exception as exc:  # noqa: BLE001
+            _, body = _generic_error_response(exc, "ERR_PLUGIN_TEST")
             return body
 
     def deactivate_providers(self, providers: list) -> dict:
@@ -3573,6 +3591,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if body is None:
             raise ValueError("empty body")
+        # Per-project plugin overrides now flow through the plugin-catalog file
+        # (config/plugin-catalog.yaml + .meta-config/plugin-catalog.yaml) rather
+        # than the retired external-tools-registry project section — validate any
+        # permitted-injections here so a bad edit fails at write time (HTTP 400)
+        # instead of only surfacing as a SyncError on the next sync.py run.
+        if key in ("plugin-catalog", "project-plugin-catalog") and isinstance(body, dict):
+            self._validate_permitted_injections_overrides(body.get("plugins", {}))
         if key == "project":
             existing = self.__class__.config_manager.read("project")
             self._deep_merge(existing, body)
@@ -3634,6 +3659,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             name, action = subserver
             return self._handle_subserver_action(name, action)
 
+        plugin_id = self._match_plugin_test_route(path)
+        if plugin_id is not None:
+            return self._send_json(self._audit_service().test_plugin(plugin_id))
+
         raise FileNotFoundError(path)
 
     def _route_post_sync_dry_run(self) -> None:
@@ -3675,6 +3704,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if name in ("viz", "mcp") and action in ("start", "stop", "restart"):
             return name, action
         return None
+
+    @staticmethod
+    def _match_plugin_test_route(path: str) -> str | None:
+        """Return the plugin id if path is /api/plugins/<id>/test, else None."""
+        prefix, suffix = "/api/plugins/", "/test"
+        if not (path.startswith(prefix) and path.endswith(suffix)):
+            return None
+        plugin_id = path[len(prefix):-len(suffix)]
+        return plugin_id or None
 
     def _handle_subserver_action(self, name: str, action: str) -> None:
         """Dispatch a validated subserver control action to the VizManager and
@@ -4580,13 +4618,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "conventions", "conventions-preset",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
-            "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",
-            "external-tools", "external-tools-registry", "context_file",
+            "gitignore", "external-skills", "skills-registry",
+            "context_file", "plugins",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
-        if section == "external-tools-registry" and isinstance(data, dict):
-            self._validate_permitted_injections_overrides(data)
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
@@ -4644,12 +4680,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
-        """Reject a project-override write whose ``permitted-injections`` would
+        """Reject a plugin-override write whose ``permitted-injections`` would
         break the next ``sync.py`` run (schema-invalid kind/name/path combo).
 
         Without this, a bad edit in the Admin UI (e.g. switching an entry's
-        ``kind`` without migrating ``name``/``path``) silently persists to
-        ``project.yaml`` and only surfaces as a hard ``SyncError`` the next
+        ``kind`` without migrating ``name``/``path``) silently persists to the
+        plugin-catalog file and only surfaces as a hard ``SyncError`` the next
         time anything calls ``load_external_tools_registry`` — which is most
         sync operations, not just this panel.
         """

@@ -689,14 +689,14 @@ se-termination → (se-validator | se-verifier)). Maximal 5 Stufen Tiefe. Nur in
 ## Feature 6: MCP Server Management
 
 **Beschreibung:** agent-meta verwaltet MCP (Model Context Protocol) Server zentral via
-`config/mcp-registry.yaml`. sync.py generiert pro aktivem Server: (1) Rule-Dateien mit
+`config/plugin-catalog.yaml`. sync.py generiert pro aktivem Server: (1) Rule-Dateien mit
 Tool-Whitelist/Blacklist, (2) Provider-Konfiguration mit `${ENV_VAR}`-Referenzen,
 (3) Secrets-Template `.meta-config/secrets.local.yaml`, (4) .gitignore-Einträge.
 
 ### 6.1 MCP Server Management — Claude — Registry → Rule-Generierung
 
 **Voraussetzungen:**
-- `config/mcp-registry.yaml` existiert mit mindestens 1 Server (z.B. `home-assistant`, `influxdb`)
+- `config/plugin-catalog.yaml` existiert mit mindestens 1 `kind: mcp-server`-Eintrag (z.B. `home-assistant`, `influxdb`)
 - `.meta-config/project.yaml` hat `mcp-servers: [home-assistant]`
 
 **Schritte:**
@@ -710,7 +710,7 @@ Tool-Whitelist/Blacklist, (2) Provider-Konfiguration mit `${ENV_VAR}`-Referenzen
 
 **Erwartetes Ergebnis:**
 - MCP-Regel-Datei wird korrekt generiert
-- Tool-Whitelist und Blacklist aus mcp-registry.yaml werden übernommen
+- Tool-Whitelist und Blacklist aus plugin-catalog.yaml werden übernommen
 - Verbindungstyp (SSE/STDIO) wird dokumentiert
 - Datei wird als "nicht manuell bearbeiten" markiert
 

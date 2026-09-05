@@ -12,6 +12,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--dry-run` | Simulates the sync process without writing any files to disk. |
 | `--check` | Exits with code 1 if context files (`CLAUDE.md`, `AGENTS.md`) are out of sync, otherwise 0. (Crucial for CI/CD). |
 | `--validate` | Performs a full sync into a test repository. Results are in `sync.log`. |
+| `--test-plugin ID` | Runs the health check for one plugin from the plugin catalog and exits. |
 | `--render-standalone` | Renders fully self-contained, English-only copies of the pilot `1-generic` agent templates into `standalone/agents/` — no Python/`project.yaml` needed to use them. Combine with `--check` for a read-only CI drift gate. |
 | `--fill-defaults` | Writes missing configuration fields with default values into the `project.yaml`. |
 | `--setup` | Starts an interactive setup wizard for guided creation of the `project.yaml` and then runs `--init`. |

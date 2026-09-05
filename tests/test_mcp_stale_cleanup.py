@@ -25,9 +25,13 @@ def _write(path: Path, content: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _write_mcp_registry(agent_meta_root: Path, servers: dict) -> None:
+    # load_mcp_registry now sources from the unified config/plugin-catalog.yaml
+    # (kind: mcp-server slice) instead of the old config/mcp-registry.yaml —
+    # see scripts/lib/plugins.py.
+    plugins = {name: {**sdef, "kind": "mcp-server"} for name, sdef in servers.items()}
     _write(
-        agent_meta_root / "config" / "mcp-registry.yaml",
-        yaml.dump({"mcp-servers": servers}),
+        agent_meta_root / "config" / "plugin-catalog.yaml",
+        yaml.dump({"plugins": plugins}),
     )
 
 
@@ -181,9 +185,13 @@ def test_mcp_stale_cleanup_dry_run_does_not_delete(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _write_tools_registry(agent_meta_root: Path, tools: dict) -> None:
+    # load_external_tools_registry now sources from the unified
+    # config/plugin-catalog.yaml (kind: cli-tool slice) instead of the old
+    # config/external-tools-registry.yaml — see scripts/lib/plugins.py.
+    plugins = {name: {**tdef, "kind": "cli-tool"} for name, tdef in tools.items()}
     _write(
-        agent_meta_root / "config" / "external-tools-registry.yaml",
-        yaml.dump({"external-tools": tools}),
+        agent_meta_root / "config" / "plugin-catalog.yaml",
+        yaml.dump({"plugins": plugins}),
     )
 
 

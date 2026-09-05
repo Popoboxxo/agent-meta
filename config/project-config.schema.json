@@ -827,7 +827,7 @@
     },
     "mcp-servers": {
       "type": "array",
-      "description": "Explicitly activate MCP servers from config/mcp-registry.yaml. Servers listed here are always active, regardless of enabled-by-default. Additional servers may be added implicitly via platform bundles (rules/2-platform/<platform>-mcp.yaml) when enabled-by-default: true.",
+      "description": "DEPRECATED — legacy MCP-server activation list, read only for projects not yet migrated to the unified `plugins` block. Use `plugins` instead: MCP servers are the mcp-server kind of config/plugin-catalog.yaml. Servers listed here are always active; additional servers may be added implicitly via platform bundles (rules/2-platform/<platform>-mcp.yaml) when enabled-by-default: true.",
       "items": {
         "type": "string"
       },
@@ -835,7 +835,7 @@
     },
     "mcp-registry": {
       "type": "object",
-      "description": "Project-specific overrides or custom MCP server definitions. These are merged over the global mcp-registry.yaml defaults.",
+      "description": "DEPRECATED — no longer read. MCP-server definitions live in config/plugin-catalog.yaml (mcp-server kind); per-project overrides go in `.meta-config/plugin-catalog.yaml` or the inline `plugin-catalog` key. Retained only to document the (now unified) override shape.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
@@ -911,6 +911,173 @@
         }
       }
     },
+    "plugins": {
+      "description": "Unified activation of catalogued plugins (config/plugin-catalog.yaml) — both MCP servers (kind: mcp-server) and CLI tools (kind: cli-tool). Supersedes the legacy `mcp-servers` and `external-tools` keys. Accepts a flat list shorthand (['graphify'], alias for {enabled: true}) or a dict mapping plugin id to {enabled: bool}. An explicit enabled value always wins over the catalog enabled-by-default flag; MCP servers may additionally be activated implicitly via platform bundles.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9_-]+$": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Force-enable or force-disable this plugin, overriding the catalog enabled-by-default flag."
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "plugin-catalog": {
+      "type": "object",
+      "description": "Inline per-project overrides / custom definitions for the unified plugin catalog (config/plugin-catalog.yaml). Deep-merged over the framework catalog and the `.meta-config/plugin-catalog.yaml` project layer. Each entry is discriminated by `kind` (mcp-server or cli-tool) and follows the same shape as the framework catalog; only the fields you override need to be present. Prefer editing `.meta-config/plugin-catalog.yaml` (via the Admin UI Plugin Overrides panel) over inlining here.",
+      "properties": {
+        "plugins": {
+          "type": "object",
+          "description": "Map of plugin id to a (partial) plugin definition merged over the framework catalog.",
+          "patternProperties": {
+            "^[a-zA-Z0-9_-]+$": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "mcp-server",
+                    "cli-tool"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "enabled-by-default": {
+                  "type": "boolean"
+                },
+                "connection": {
+                  "type": "object",
+                  "description": "mcp-server only.",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "env": {
+                      "type": "object"
+                    },
+                    "headers": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "tools": {
+                  "type": "object",
+                  "description": "mcp-server only.",
+                  "properties": {
+                    "allowed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blocked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "secrets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "agent-hint": {
+                  "type": "string"
+                },
+                "rule-content": {
+                  "type": "string",
+                  "description": "cli-tool only."
+                },
+                "hooks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "cli-tool only."
+                },
+                "provider-skip": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "permitted-injections": {
+                  "type": "array",
+                  "description": "cli-tool only.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "skill",
+                          "hook",
+                          "rule",
+                          "config",
+                          "other"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "provider-isolation": {
       "type": "string",
       "enum": [
@@ -955,7 +1122,7 @@
       }
     },
     "external-tools": {
-      "description": "Opt-in activation of locally installed external CLI dev-tools defined in config/external-tools-registry.yaml. Accepts a flat list shorthand (['graphify'], alias for {enabled: true}) or a dict mapping tool name to {enabled: bool}. An explicit enabled value always wins over the registry enabled-by-default flag, so a tool can be force-enabled or force-disabled per project.",
+      "description": "DEPRECATED — legacy CLI-tool activation, read only for projects not yet migrated to the unified `plugins` block. Use `plugins` instead: CLI tools are the cli-tool kind of config/plugin-catalog.yaml. Accepts a flat list shorthand (['graphify'], alias for {enabled: true}) or a dict mapping tool name to {enabled: bool}; an explicit enabled value always wins over the catalog enabled-by-default flag.",
       "oneOf": [
         {
           "type": "array",
@@ -987,7 +1154,7 @@
     },
     "external-tools-registry": {
       "type": "object",
-      "description": "Project-specific overrides or custom external-tool definitions. Deep-merged over the global config/external-tools-registry.yaml defaults.",
+      "description": "DEPRECATED — no longer read. CLI-tool definitions live in config/plugin-catalog.yaml (cli-tool kind); per-project overrides go in `.meta-config/plugin-catalog.yaml` or the inline `plugin-catalog` key. Retained only to document the (now unified) override shape.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",

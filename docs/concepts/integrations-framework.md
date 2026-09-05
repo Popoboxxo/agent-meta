@@ -17,7 +17,7 @@ Als Tabelle:
 | Kategorie | Verwaltung | Konfiguration | Status |
 |-----------|-----------|---------------|--------|
 | Skills | Git-Submodul / Datei-Kopie | skills-registry.yaml | bestehend |
-| MCP-Server | manuell | mcp-registry.yaml | bestehend |
+| MCP-Server | manuell | plugin-catalog.yaml | bestehend |
 | Integrations | pip/uv-Paket | integrations-registry.yaml | NEU |
 
 Integrations sind die einzige Kategorie mit System-Side-Effects (Paketinstallation) → strikte Trennung deklarativ/imperativ.
@@ -31,7 +31,7 @@ Folgende Ansätze wurden evaluiert und verworfen:
 | Alternative | Verworfen weil |
 |---|---|
 | **semble als 0-external/Skill via Git-Submodul** | Paket-Lifecycle nicht abbildbar, Submodul-Struktur passt nicht zu pip-Installation; Skills sind für Code-Templates gedacht, nicht für verwaltete Binaries |
-| **Rein manuell in mcp-registry.yaml ohne Lifecycle-Management** | Init- und Index-Schritte nicht dokumentierbar; kein Two-Gate; keine reproduzierbare, automatisierbare Einrichtung |
+| **Rein manuell in plugin-catalog.yaml ohne Lifecycle-Management** | Init- und Index-Schritte nicht dokumentierbar; kein Two-Gate; keine reproduzierbare, automatisierbare Einrichtung |
 | **Install-Hook direkt in sync.py mit Opt-In** | Bricht Stdlib-only und side-effect-freies Design von sync.py (siehe Issue #255); würde sync für Anfänger zu komplex machen |
 
 ---

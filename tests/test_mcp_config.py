@@ -66,25 +66,31 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _write_mcp_catalog(agent_meta_root: Path, servers: dict) -> None:
+    # mcp_registry.load_mcp_registry now sources from the unified
+    # config/plugin-catalog.yaml (kind: mcp-server slice) instead of the old
+    # config/mcp-registry.yaml — see scripts/lib/plugins.py.
+    plugins = {name: {**sdef, "kind": "mcp-server"} for name, sdef in servers.items()}
+    _write(
+        agent_meta_root / "config" / "plugin-catalog.yaml",
+        yaml.dump({"version": "1.0.0", "plugins": plugins}),
+    )
+
+
 def test_generate_provider_configs_writes_resolved_secrets_to_mcp_json(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
 
-    _write(
-        agent_meta_root / "config" / "mcp-registry.yaml",
-        yaml.dump({
-            "mcp-servers": {
-                "example-server": {
-                    "description": "test server",
-                    "connection": {
-                        "type": "sse",
-                        "url": "{{EXAMPLE_URL}}",
-                        "headers": {"Authorization": "Bearer {{EXAMPLE_TOKEN}}"},
-                    },
-                }
-            }
-        }),
-    )
+    _write_mcp_catalog(agent_meta_root, {
+        "example-server": {
+            "description": "test server",
+            "connection": {
+                "type": "sse",
+                "url": "{{EXAMPLE_URL}}",
+                "headers": {"Authorization": "Bearer {{EXAMPLE_TOKEN}}"},
+            },
+        }
+    })
     _write(
         project_root / ".meta-config" / "secrets.local.yaml",
         yaml.dump({"EXAMPLE_URL": "https://real.example.com", "EXAMPLE_TOKEN": "sk-real-secret"}),
@@ -145,16 +151,11 @@ def test_generate_provider_configs_warns_about_leftover_mcp_servers_key(tmp_path
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
 
-    _write(
-        agent_meta_root / "config" / "mcp-registry.yaml",
-        yaml.dump({
-            "mcp-servers": {
-                "example-server": {
-                    "connection": {"type": "sse", "url": "{{EXAMPLE_URL}}"},
-                }
-            }
-        }),
-    )
+    _write_mcp_catalog(agent_meta_root, {
+        "example-server": {
+            "connection": {"type": "sse", "url": "{{EXAMPLE_URL}}"},
+        }
+    })
     # Simulate the pre-fix leftover in the old target file.
     _write(
         project_root / ".claude" / "settings.local.json",
@@ -312,28 +313,23 @@ def test_generate_provider_configs_codex_toml_wires_committed_file(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
 
-    _write(
-        agent_meta_root / "config" / "mcp-registry.yaml",
-        yaml.dump({
-            "mcp-servers": {
-                "search": {
-                    "connection": {
-                        "type": "sse",
-                        "url": "{{SEARCH_URL}}",
-                        "headers": {"Authorization": "Bearer {{SEARCH_TOKEN}}"},
-                    },
-                },
-                "local-fs": {
-                    "connection": {
-                        "type": "stdio",
-                        "command": "npx",
-                        "args": ["-y", "fs"],
-                        "env": {"API_KEY": "{{API_KEY}}"},
-                    },
-                },
-            }
-        }),
-    )
+    _write_mcp_catalog(agent_meta_root, {
+        "search": {
+            "connection": {
+                "type": "sse",
+                "url": "{{SEARCH_URL}}",
+                "headers": {"Authorization": "Bearer {{SEARCH_TOKEN}}"},
+            },
+        },
+        "local-fs": {
+            "connection": {
+                "type": "stdio",
+                "command": "npx",
+                "args": ["-y", "fs"],
+                "env": {"API_KEY": "{{API_KEY}}"},
+            },
+        },
+    })
 
     config = {"mcp-servers": ["search", "local-fs"], "platforms": []}
     provider_config = {

@@ -311,7 +311,7 @@ agent template only picks up the new blocks on regeneration.
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.101.0-beta.5 (2026-09-04)
+**Version info:** v0.101.0-beta.5 (2026-09-05)
 </context>
 
 <tools>

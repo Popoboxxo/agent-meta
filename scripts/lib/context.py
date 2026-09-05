@@ -8,6 +8,7 @@ from pathlib import Path
 from .frontmatter import _strip_frontmatter
 from .io import content_hash, safe_path
 from .log import SyncLog
+from .plugins import resolve_plugin_compact
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
@@ -1076,7 +1077,24 @@ def _build_managed_block(
         # knowledge hints render in the compressed, pointer-based variant.
         # Native rule artifacts (.claude/rules/*, skills) stay full — they are
         # lazy-loaded and not part of the always-on context footprint.
-        _compact = local_vars.get("COMPACT_MODE") == "true"
+        _global_compact = local_vars.get("COMPACT_MODE") == "true"
+        # shared_users is catalog-wide (every provider that declares this
+        # context_file anywhere in config/ai-providers.yaml, active or not --
+        # see _shares_context_with_embedded_rules), so it always contains
+        # ZCode/KimiCode for an AGENTS.md-based provider even when this
+        # project never activates them. Only a provider actually selected in
+        # this project's config can ever render (and thus lose content into)
+        # this physical file, so the lazy-channel check is scoped to the
+        # subset of shared_users this project actually activates.
+        if provider_config:
+            from .providers import resolve_providers
+            _active_providers = set(resolve_providers(config, provider_config))
+            _compact_pcs = [
+                provider_config[p] for p in shared_users if p in _active_providers
+            ] or [pc]
+        else:
+            _compact_pcs = [pc]
+        _compact = resolve_plugin_compact(_global_compact, _compact_pcs)
 
         # Loaded before the plain-rules loop (not with the per-server embedding
         # below) so MCP_GUARDRAILS_LIST is available for mcp-guardrails.md's
@@ -1108,9 +1126,12 @@ def _build_managed_block(
             rule_content = src_path.read_text(encoding="utf-8")
             rule_content = substitute(rule_content, local_vars, rel_source, log)
             rule_content = strip_inactive_conditional_blocks(rule_content, local_vars)
-            if _compact:
+            if _global_compact:
                 # Density-only compaction of the agent-meta platform rules whose
                 # OVERVIEW sections are discoverable elsewhere (#540 + #192 P2).
+                # Deliberately on the global flag, not the provider-aware
+                # `_compact` below -- this is agent-meta's own always-on rule
+                # density, not the plugin lazy-channel-loss bug (#638-adjacent).
                 rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
             embedded_rules.append({"content": rule_content})
         

@@ -1538,7 +1538,7 @@ def detect_target_repo(project_root, config):
 |-------|----------|
 | `config/dod-presets.yaml` | `knowledge-updated` Kriterium |
 | `config/export.yaml` | `knowledge-bundle` Export-Target |
-| `config/mcp-registry.yaml` | `qmd` MCP-Server-Eintrag |
+| `config/plugin-catalog.yaml` | `qmd` MCP-Server-Eintrag |
 
 ---
 

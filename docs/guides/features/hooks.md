@@ -38,7 +38,7 @@ Skript prüft Bedingung → exit 0 (allow) oder exit 2 (block)
 
 **Naming für 2-platform:** `<platform>-<thema>.sh` → Output: `<thema>.sh`
 
-**0-external auch für externe CLI-Tool-Wrapper:** Die `0-external/`-Schicht dient nicht nur Hooks aus externen Skill-Repos (via Git Submodule), sondern auch als Heimat für maintainer-authored Shell-Wrapper um lokal installierte CLI-Dev-Tools wie `graphify`. Diese Wrapper-Skripte verhindern dass Tools zur Laufzeit generierte Dateien selbst mutieren — stattdessen registrieren sie sich über einen von Hand kuratierten Eintrag in `config/external-tools-registry.yaml`, und `sync.py` rendert deren Hook-Wiring deterministisch. Beispiel: `hooks/0-external/graphify-search-guard.sh` leitet Bash/Grep-Aufrufe an die lokale `graphify`-Binary weiter (falls installiert) oder durchlässt sie mit `exit 0` als Fallback.
+**0-external auch für externe CLI-Tool-Wrapper:** Die `0-external/`-Schicht dient nicht nur Hooks aus externen Skill-Repos (via Git Submodule), sondern auch als Heimat für maintainer-authored Shell-Wrapper um lokal installierte CLI-Dev-Tools wie `graphify`. Diese Wrapper-Skripte verhindern dass Tools zur Laufzeit generierte Dateien selbst mutieren — stattdessen registrieren sie sich über einen von Hand kuratierten Eintrag in `config/plugin-catalog.yaml`, und `sync.py` rendert deren Hook-Wiring deterministisch. Beispiel: `hooks/0-external/graphify-search-guard.sh` leitet Bash/Grep-Aufrufe an die lokale `graphify`-Binary weiter (falls installiert) oder durchlässt sie mit `exit 0` als Fallback.
 
 ---
 

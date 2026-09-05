@@ -1,5 +1,5 @@
 """Regression test: the generic dict-editor (MCP server Env/Headers overrides
-in Project -> MCP Servers) must reject renaming a key to one that already
+in Project -> Plugin Overrides) must reject renaming a key to one that already
 exists in the same dict, instead of silently overwriting/losing the colliding
 entry's value.
 """
@@ -20,7 +20,7 @@ def test_header_rename_to_existing_key_is_rejected(browser_ctx):
     ctx, base = browser_ctx
     page = ctx.new_page()
     try:
-        page.goto(f"{base}/#/project/mcp-overrides")
+        page.goto(f"{base}/#/project/plugin-overrides")
         page.wait_for_load_state("networkidle")
 
         panel = page.locator(".panel").filter(has=page.get_by_role("heading", name="honcho", exact=True))
@@ -57,7 +57,7 @@ def test_header_rename_to_empty_key_is_rejected(browser_ctx):
     ctx, base = browser_ctx
     page = ctx.new_page()
     try:
-        page.goto(f"{base}/#/project/mcp-overrides")
+        page.goto(f"{base}/#/project/plugin-overrides")
         page.wait_for_load_state("networkidle")
 
         panel = page.locator(".panel").filter(has=page.get_by_role("heading", name="honcho", exact=True))

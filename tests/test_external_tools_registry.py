@@ -28,9 +28,13 @@ def _write(path: Path, content: str) -> None:
 
 
 def _write_framework_registry(agent_meta_root: Path, tools: dict) -> None:
+    # load_external_tools_registry now sources from the unified
+    # config/plugin-catalog.yaml (kind: cli-tool slice) instead of the old
+    # config/external-tools-registry.yaml — see scripts/lib/plugins.py.
+    plugins = {name: {**tdef, "kind": "cli-tool"} for name, tdef in tools.items()}
     _write(
-        agent_meta_root / "config" / "external-tools-registry.yaml",
-        yaml.dump({"version": "1.0.0", "external-tools": tools}),
+        agent_meta_root / "config" / "plugin-catalog.yaml",
+        yaml.dump({"version": "1.0.0", "plugins": plugins}),
     )
 
 
@@ -49,13 +53,13 @@ def test_load_registry_merges_three_sources(tmp_path):
             "rule-content": "framework body",
         }
     })
-    # Project-level registry file overrides the description.
+    # Project-level catalog override overrides the description.
     _write(
-        project_root / ".meta-config" / "external-tools-registry.yaml",
-        yaml.dump({"external-tools": {"graphify": {"description": "project-file desc"}}}),
+        project_root / ".meta-config" / "plugin-catalog.yaml",
+        yaml.dump({"plugins": {"graphify": {"description": "project-file desc"}}}),
     )
     # Inline project.yaml override wins over both for enabled-by-default.
-    config = {"external-tools-registry": {"graphify": {"enabled-by-default": True}}}
+    config = {"plugin-catalog": {"graphify": {"enabled-by-default": True}}}
 
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
 
@@ -478,7 +482,10 @@ def test_scan_injection_drift_skips_hook_and_rule_dirs_without_capability(tmp_pa
         "has_hooks": False,
         "has_rules": False,
     }}
-    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    # scan_injection_drift only scans providers CONFIGURED for the project
+    # (resolve_providers), so declare Opencode as this project's provider.
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Opencode"]}, provider_config)
     assert findings["Opencode"] == []
 
 
@@ -498,7 +505,10 @@ def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_setti
         "agents_dir": ".continue/agents",
         "settings_local_file": ".continue/config.local.yaml",
     }}
-    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    # scan_injection_drift only scans providers CONFIGURED for the project
+    # (resolve_providers), so declare Continue as this project's provider.
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Continue"]}, provider_config)
     assert findings["Continue"] == []
 
 
