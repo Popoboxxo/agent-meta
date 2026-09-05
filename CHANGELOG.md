@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Post-merge branch cleanup for the generic `git` agent** (#496): after a successful
+  merge, `template-git` (v1.5.0 → v1.6.0) now offers to clean up the merged source
+  branch — list merged candidates (local + remote), verify merged state
+  (`git merge-base --is-ancestor`), signal-based keep/delete decision (open TODOs,
+  disabled code, "Phase 2"/follow-up hints → keep; default delete) with user
+  confirmation, safe local delete (`git branch -d`, never `-D`), remote delete
+  (`git push origin --delete`) only after explicit user confirmation, hard safety
+  rules (never `origin/main`, `origin/HEAD`, unverified branches, force flags) and
+  stash protection for dirty working trees. Restores behavior lost in the a0886e1d
+  XML consolidation (originally delivered via Issue #52).
+
 ## [0.101.0-beta.5] — 2026-09-04
 
 ### Fixed
