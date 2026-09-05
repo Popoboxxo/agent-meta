@@ -623,12 +623,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 def _run_test_plugin(agent_meta_root: Path, project_root: Path, plugin_id: str) -> int:
     """Run the health check for one plugin from the catalog. Returns an exit code."""
     from lib.io import _load_yaml_or_json
-    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, project_root=project_root)
-    plugin_def = catalog.get(plugin_id)
-    if not plugin_def:
-        print(f"  !  '{plugin_id}' not in catalog ({', '.join(sorted(catalog)) or 'empty'})")
+    try:
+        catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, project_root=project_root)
+        plugin_def = catalog.get(plugin_id)
+        if not plugin_def:
+            print(f"  !  '{plugin_id}' not in catalog ({', '.join(sorted(catalog)) or 'empty'})")
+            return 1
+        secrets, _ = _load_yaml_or_json(project_root / ".meta-config" / "secrets.local.yaml")
+    except SyncError as exc:
+        print(f"  FAIL  {plugin_id}: {exc}")
         return 1
-    secrets, _ = _load_yaml_or_json(project_root / ".meta-config" / "secrets.local.yaml")
     res = run_plugin_test(plugin_id, plugin_def, secrets=secrets or {})
     print(f"  {res['status']}  {plugin_id}: {res['message']} ({res['latency_ms']}ms)")
     return 0 if res["status"] == "PASS" else 1

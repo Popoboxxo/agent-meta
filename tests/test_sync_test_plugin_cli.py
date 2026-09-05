@@ -29,3 +29,14 @@ def test_run_test_plugin_unknown_id(capsys):
     out = capsys.readouterr().out
     assert code == 1
     assert "not in catalog" in out.lower()
+
+
+def test_run_test_plugin_handles_malformed_catalog(monkeypatch, capsys):
+    def _raise(**kwargs):
+        raise sync.SyncError("Invalid YAML in 'plugin-catalog.yaml': broken")
+
+    monkeypatch.setattr(sync, "load_plugin_catalog", _raise)
+    code = sync._run_test_plugin(REPO_ROOT, REPO_ROOT, "graphify")
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "FAIL" in out and "graphify" in out
