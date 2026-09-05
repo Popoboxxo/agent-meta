@@ -1575,6 +1575,7 @@ function buildSidebar() {
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
+        { route: "/project/plugins", label: "Verfügbare Plugins", icon: "🧭" },
         { route: "/project/mcp-overrides", label: "MCP Servers", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
         { route: "/project/external-tools-overrides", label: "External Tools", icon: "🧰" },
@@ -2780,6 +2781,72 @@ async function viewProjectMcpOverrides() {
 
   return wrap;
 }
+
+async function viewAvailablePlugins() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Verfügbare Plugins"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Alle katalogisierten Plugins (MCP-Server + CLI-Tools). Aktivieren, testen, konfigurieren."]));
+
+  let catData, projData;
+  try {
+    catData = await api.get("/api/config/plugin-catalog").catch(() => ({ plugins: {} }));
+    projData = await api.get("/api/config/project");
+  } catch (err) {
+    wrap.appendChild(renderError(err));
+    return wrap;
+  }
+
+  const catalog = catData.plugins || {};
+  // unified activation set; tolerate legacy list-shorthand and dict form
+  const raw = projData.plugins;
+  const active = new Set(
+    Array.isArray(raw) ? raw
+      : Object.entries(raw || {}).filter(([, v]) => v && v.enabled).map(([k]) => k));
+  let dirty = false;
+  const markDirty = () => { dirty = true; router.setDirty(true); };
+
+  const list = el("div", { style: "display:flex; flex-direction:column; gap:var(--space-2);" });
+  Object.entries(catalog).sort().forEach(([id, def]) => {
+    const row = el("div", { class: "panel" });
+    row.appendChild(el("div", { style: "font-weight:bold;" }, [`${id}  (${def.kind || "?"})`]));
+    row.appendChild(el("div", { class: "help-text" }, [def.description || ""]));
+
+    const toggle = el("input", { type: "checkbox" });
+    toggle.checked = active.has(id);
+    toggle.onchange = () => { toggle.checked ? active.add(id) : active.delete(id); markDirty(); };
+    const tlabel = el("label", {}, [toggle, " Aktiviert"]);
+    row.appendChild(tlabel);
+
+    const testBtn = el("button", { class: "btn btn-sm" }, ["Test"]);
+    const result = el("span", { style: "margin-left:var(--space-2);" });
+    testBtn.onclick = async () => {
+      result.textContent = "…";
+      try {
+        const r = await api.post(`/api/plugins/${encodeURIComponent(id)}/test`, {});
+        result.textContent = `${r.status}: ${r.message} (${r.latency_ms}ms)`;
+      } catch (e) { result.textContent = e.message; }
+    };
+    row.appendChild(testBtn); row.appendChild(result);
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+
+  const save = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5);" },
+                 ["Aktivierung speichern"]);
+  save.onclick = async () => {
+    // persist as dict-with-enabled so an explicit deactivation survives too
+    const data = {}; Object.keys(catalog).forEach(id => { data[id] = { enabled: active.has(id) }; });
+    try {
+      await api.put("/api/config/project/section", { section: "plugins", data });
+      toast("Plugin-Aktivierung gespeichert", "success");
+      dirty = false; router.setDirty(false);
+    } catch (e) { toast(e.message, "error"); }
+  };
+  wrap.appendChild(save);
+  return wrap;
+}
+
 async function viewProjectSkillsOverrides() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — External Skills"]));
@@ -10030,6 +10097,7 @@ async function init() {
   router.register("/project/gitignore",       viewProjectGitignore);
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
   router.register("/project/mcp-overrides",    viewProjectMcpOverrides);
+  router.register("/project/plugins",          viewAvailablePlugins);
   router.register("/project/skills-overrides", viewProjectSkillsOverrides);
   router.register("/project/external-tools-overrides", viewProjectExternalToolsOverrides);
   // Backward-compat: keep the old route pointing at the raw editor.
