@@ -4,7 +4,7 @@
 # extend it via `based-on: "1-generic/provider-expert.md@<version>"` in
 # agents/2-platform/. No routing/intent_keywords of its own.
 name: template-provider-expert
-version: "1.1.1"
+version: "1.2.0"
 description: "Absolute analysis expert for an AI provider: how it works, configuration, best practices for optimally adapting agent-meta."
 hint: "Provider expert: how it works, configuration, best practices for optimal agent-meta adaptation"
 prompt_mode: modern
@@ -72,6 +72,10 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <1-2 sentence recommendation summary>
+ARTIFACTS: <persisted analysis path, empty if returned inline>
+
 ## Provider Analysis: [Platform]
 
 ### Findings

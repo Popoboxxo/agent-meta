@@ -1,12 +1,12 @@
 ---
 name: frontend-component-engineer
-version: 0.1.0
+version: 0.2.0
 description: Builds production-ready UI components from a screen spec (ui-ux-designer)
   plus a token/variant contract (design-system-architect) — props contract, mandatory
   state handling, and a built-in accessibility baseline. No design-system authoring,
   no WCAG audit.
 prompt_mode: modern
-generated-from: 1-generic/frontend-component-engineer.md@0.1.0
+generated-from: 1-generic/frontend-component-engineer.md@0.2.0
 mode: subagent
 permission:
   bash: allow
@@ -81,6 +81,7 @@ A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence component-build outcome>
 COMPONENTS: [components built]
 PROPS_CONTRACT: <path>
 STATE_COVERAGE: [components missing loading/error/empty/success, empty if none]

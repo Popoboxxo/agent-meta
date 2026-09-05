@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-migrator
-version: "1.0.0"
+version: "1.1.0"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
 tools:
@@ -79,7 +79,7 @@ Migrierte Wiki-Seiten folgen exakt dem gleichen OKF-Frontmatter-Schema wie alle 
 {{#if A2A_PROTOCOL_ENABLED}}
 ## A2A Handoff — Eingehende Tasks
 
-Tasks können als A2A-Envelope (JSON) ankommen. Dein `output_contract` ist `knowledge-migration-v1` (terminal — kein weiterer Automatik-Handoff außer den expliziten Delegationen in Phase 3).
+Tasks können als A2A-Envelope (JSON) ankommen. Dein Delegations-Payload ist `knowledge-migration-v1` (terminal — kein weiterer Automatik-Handoff außer den expliziten Delegationen in Phase 3).
 
 {{/if}}
 ## Don'ts
@@ -89,6 +89,14 @@ Tasks können als A2A-Envelope (JSON) ankommen. Dein `output_contract` ist `know
 - KEIN Verschieben — nur Kopieren, Originale bleiben immer erhalten
 - KEINE automatische Fortsetzung nach Phase 1 ohne Freigabe
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Migrationsstand und offene Punkte>
+ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

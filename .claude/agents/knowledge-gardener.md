@@ -1,6 +1,6 @@
 ---
 name: knowledge-gardener
-version: 1.0.0
+version: 1.1.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 hint: 'Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps'
@@ -9,7 +9,7 @@ tools:
 - Write
 - Edit
 - Glob
-generated-from: 1-generic/knowledge-gardener.md@1.0.0
+generated-from: 1-generic/knowledge-gardener.md@1.1.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -59,6 +59,14 @@ Tasks können als A2A-Envelope (JSON) ankommen, meist mit `knowledge-lint-v1` al
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: welche Wiki-Pflege durchgeführt wurde>
+ARTIFACTS: <geänderte Wiki-Seiten, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

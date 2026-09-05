@@ -1,6 +1,6 @@
 ---
 name: se-senior-developer
-version: 1.2.0
+version: 1.3.0
 description: Implements complex SE leaf nodes. Pre-analyzes interfaces before coding. Persists output.
 hint: "Complex SE leaf nodes: cross-cutting, boundary, security/performance-critical, 5+ interfaces."
 tools:
@@ -113,8 +113,9 @@ Kein Envelope → normal ausführen.
 **Output an Orchestrator:**
 ```
 STATUS: done|partial|failed|escalate
-SUMMARY: <1 Satz>
+RESULT: <1 Satz>
 FILES_CHANGED: <Liste>
+ARTIFACTS: <Step-Persistence-Dateien, sonst leer>
 ```
 
 ## Don'ts

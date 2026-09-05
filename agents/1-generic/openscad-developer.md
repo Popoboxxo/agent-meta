@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.1.3"
+version: "1.2.0"
 description: "Specialized developer for parametric 3D models in OpenSCAD. Render-Inspect-Refine loop via MCP, printability knowledge, tolerance management."
 hint: "Generate OpenSCAD code: parametric 3D models, render feedback, STL export, print optimization"
 prompt_mode: modern
@@ -89,10 +89,12 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: model outcome + dimension check>
 SCAD_FILE: <path>
 STL_FILE: <path>
 DIMENSIONS: [<length>, <width>, <height>] in mm
 ITERATIONS: <n>
+ARTIFACTS: <SCAD/STL file paths>
 NOTES: [print recommendations, material, settings]
 ```
 </output_contract>

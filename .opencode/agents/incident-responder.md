@@ -1,11 +1,11 @@
 ---
 name: incident-responder
-version: 1.1.0
+version: 1.2.0
 description: 'Live incident coordination: ingests logs and metrics, executes runbook
   steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2)
   and produces an RCA report plus a prioritized hotfix list under time pressure.'
 prompt_mode: modern
-generated-from: 1-generic/incident-responder.md@1.1.0
+generated-from: 1-generic/incident-responder.md@1.2.0
 mode: subagent
 permission:
   bash: allow
@@ -123,6 +123,7 @@ RESULT: <root cause + severity, 1 sentence>
 SEVERITY: <P0|P1|P2>
 RCA: <rca-report-v1 block>
 HOTFIXES: <prioritized list for developer>
+ARTIFACTS: <RCA report + hotfix file paths>
 NEXT: [Developer hotfix | Documenter post-mortem]
 ```
 </output_contract>

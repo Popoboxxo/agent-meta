@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.15.0"
+version: "1.16.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -325,8 +325,10 @@ agent template only picks up the new blocks on regeneration.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary of the meta change>
 ACTION: update-meta | upgrade-meta | create-rule | create-ext | create-command | add-skill
 FILES_CHANGED: [list]
+ARTIFACTS: [new files created, empty if none]
 NEXT: [recommended step for user]
 NOTES: [tradeoffs, warnings, confirmations]
 ```

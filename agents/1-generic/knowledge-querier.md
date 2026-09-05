@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-querier
-version: "1.0.1"
+version: "1.1.0"
 description: "Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten."
 hint: "Wiki-Fragen beantworten, Index-First, Synthese mit Citations"
 tools:
@@ -53,6 +53,14 @@ Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `
 - KEINE Antworten ohne Citations
 - KEIN File-Back ohne `file-back-results: true` Konfiguration
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Kernaussage der Antwort, Citations im Text>
+ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

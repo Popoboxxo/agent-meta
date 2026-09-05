@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-curator
-version: "1.0.0"
+version: "1.1.0"
 description: "Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung."
 hint: "Wiki-Strategie, Schema-Evolution, OKF-Compliance"
 tools:
@@ -62,7 +62,7 @@ Du schreibst keinen Code — deine Artefakte sind Schema-Anpassungen (`{{KNOWLED
 Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere aus `payload`: `t` (Hauptaufgabe), `ctx`, `con[]` (harte Constraints), `refs[]`, `pri`.
 Kein Envelope → normal ausführen.
 
-Dein `output_contract` ist `knowledge-spec-v1` — an `knowledge-ingestor` weiterreichen.
+Dein Delegations-Payload ist `knowledge-spec-v1` — an `knowledge-ingestor` weiterreichen.
 
 {{/if}}
 ## Don'ts
@@ -71,6 +71,14 @@ Dein `output_contract` ist `knowledge-spec-v1` — an `knowledge-ingestor` weite
 - KEINE Index-/Log-Pflege selbst übernehmen — das delegiert der `knowledge-ingestor` an `knowledge-indexer`
 - KEIN Schema ändern ohne Rücksprache mit dem Nutzer bei strukturellen Änderungen (neue Concept Types sind unkritisch, Entfernen bestehender Types nicht)
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: getroffene Schema-Entscheidung und Begründung>
+ARTIFACTS: <geänderte/neue Schema- und Wiki-Dateien, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

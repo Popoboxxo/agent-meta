@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.7.0
+version: 1.8.0
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -162,6 +162,14 @@ schema_version: "1.0.0"
 1. Write full output (frontmatter + JSON + decision summary) to a temporary file
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

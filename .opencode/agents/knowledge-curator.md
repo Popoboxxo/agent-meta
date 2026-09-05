@@ -1,9 +1,9 @@
 ---
 name: knowledge-curator
-version: 1.0.0
+version: 1.1.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
-generated-from: 1-generic/knowledge-curator.md@1.0.0
+generated-from: 1-generic/knowledge-curator.md@1.1.0
 mode: subagent
 permission:
   read: allow
@@ -61,7 +61,7 @@ Du schreibst keinen Code — deine Artefakte sind Schema-Anpassungen (`knowledge
 Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere aus `payload`: `t` (Hauptaufgabe), `ctx`, `con[]` (harte Constraints), `refs[]`, `pri`.
 Kein Envelope → normal ausführen.
 
-Dein `output_contract` ist `knowledge-spec-v1` — an `knowledge-ingestor` weiterreichen.
+Dein Delegations-Payload ist `knowledge-spec-v1` — an `knowledge-ingestor` weiterreichen.
 ## Don'ts
 
 - KEINE Wiki-Seiten selbst schreiben — das macht ausschließlich `knowledge-ingestor`
@@ -71,6 +71,14 @@ Dein `output_contract` ist `knowledge-spec-v1` — an `knowledge-ingestor` weite
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: getroffene Schema-Entscheidung und Begründung>
+ARTIFACTS: <geänderte/neue Schema- und Wiki-Dateien, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

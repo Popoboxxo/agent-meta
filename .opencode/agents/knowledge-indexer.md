@@ -1,9 +1,9 @@
 ---
 name: knowledge-indexer
-version: 1.0.0
+version: 1.1.0
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
-generated-from: 1-generic/knowledge-indexer.md@1.0.0
+generated-from: 1-generic/knowledge-indexer.md@1.1.0
 mode: subagent
 permission:
   read: allow
@@ -99,6 +99,14 @@ Tasks kommen ausschließlich als Delegation von `knowledge-ingestor`, `knowledge
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Katalog- und Log-Status nach dem Lauf>
+ARTIFACTS: <geänderte index.md-/log.md-Pfade, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-version: 1.4.0
+version: 1.5.0
 description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis,
   AI-origin analysis (VCAL), and REQ traceability in code paths.'
 hint: Checks code quality, blast radius, and Clean Code — not functional correctness
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/code-reviewer.md@1.4.0
+generated-from: 1-generic/code-reviewer.md@1.5.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -147,6 +147,7 @@ Reflection loop: `verdict: REVISE` + `iteration`/`max_iterations` + `correction_
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence review verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_RECOMMENDATIONS | CHANGES_REQUESTED | BLOCKED | REVISE
 BLAST_LEVEL: TRIVIAL | MODERATE | SIGNIFICANT | CRITICAL
 RATING: A | B | C | D | F

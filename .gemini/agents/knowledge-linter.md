@@ -1,6 +1,6 @@
 ---
 name: knowledge-linter
-version: 1.0.0
+version: 1.1.0
 description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte
   Links, fehlende OKF-Frontmatter, Index-Staleness.'
 hint: 'Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)'
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/knowledge-linter.md@1.0.0
+generated-from: 1-generic/knowledge-linter.md@1.1.0
 model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -52,7 +52,7 @@ Lint-Reports sind Markdown, ein Abschnitt pro Check-Kategorie mit Severity-Kennz
 ## A2A Handoff — Eingehende Tasks
 
 Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `con[]`, `refs[]`, `pri`.
-Dein `output_contract` ist `knowledge-lint-v1` — an `knowledge-gardener` (mechanische Findings) oder `knowledge-ingestor` (inhaltliche Findings) weiterreichen.
+Dein Delegations-Payload ist `knowledge-lint-v1` — an `knowledge-gardener` (mechanische Findings) oder `knowledge-ingestor` (inhaltliche Findings) weiterreichen.
 ## Don'ts
 
 - KEINE Findings selbst beheben — nur reporten und delegieren
@@ -62,6 +62,14 @@ Dein `output_contract` ist `knowledge-lint-v1` — an `knowledge-gardener` (mech
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Wiki-Gesundheitszustand und schwerwiegendster Befund>
+ARTIFACTS: <persistierte Lint-Report-Pfade, sonst leer>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

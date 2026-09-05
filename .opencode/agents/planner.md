@@ -1,10 +1,10 @@
 ---
 name: planner
-version: 1.0.2
+version: 1.1.0
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 prompt_mode: modern
-generated-from: 1-generic/planner.md@1.0.2
+generated-from: 1-generic/planner.md@1.1.0
 mode: subagent
 permission:
   read: allow
@@ -72,6 +72,10 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <plan title + step count in 1 sentence>
+ARTIFACTS: <persisted plan path>
+
 ## Plan: <title>
 
 **Source:** <REQ-ID | concept-<topic>.md | Bug-#NNN>

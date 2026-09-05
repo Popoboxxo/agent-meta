@@ -1,6 +1,6 @@
 ---
 name: feedback
-version: 1.4.0
+version: 1.5.0
 description: Standardizes bug reports, feature requests, and improvement suggestions
   for the deployed project — categorized, prepared, and submitted directly as a GitHub
   issue.
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/feedback.md@1.4.0
+generated-from: 1-generic/feedback.md@1.5.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -94,11 +94,13 @@ No separate confirmation step — prepare the issue, create it immediately. Conf
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1 sentence: issue created/updated + number>
 ISSUE_TYPE: bug|feat|improvement|docs|security|question
 ISSUE_NUMBER: <#>
 ISSUE_URL: <url>
 TITLE: <prefix> <description>
 LABELS: [bug, ...]
+ARTIFACTS: <ISSUE_URL + related files>
 ```
 </output_contract>
 

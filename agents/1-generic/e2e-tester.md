@@ -1,6 +1,6 @@
 ---
 name: template-e2e-tester
-version: "1.1.0"
+version: "1.2.0"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
@@ -108,10 +108,12 @@ Drive the browser exclusively through the **browser-automation MCP server**. Arb
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence test-run verdict>
 FLOWS_TESTED: [count + list]
 BUGS_FOUND: [count + list with flow:expected vs. observed]
 VISUAL_REGRESSIONS: [count + list with screenshot/snapshot ref]
 A11Y_VIOLATIONS: [count + list with severity]
+ARTIFACTS: <screenshots/snapshots/report paths>
 NEXT: [recommended next step]
 ```
 

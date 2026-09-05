@@ -1,6 +1,6 @@
 ---
 name: bug-feature-analyzer
-version: 1.1.4
+version: 1.2.0
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before
@@ -12,7 +12,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/bug-feature-analyzer.md@1.1.4
+generated-from: 1-generic/bug-feature-analyzer.md@1.2.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-bug-feature-analyzer-ext.md` exists → read and apply immediately.
@@ -94,6 +94,10 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <classification + confidence in 1 sentence, full triage report below>
+ARTIFACTS: <persisted triage report path, empty if returned inline>
+
 ## Triage Report
 **Issue:** <short title or reference>
 **Classification:** BUG | USER-ERROR | FEATURE | OUT-OF-SCOPE | UNCLEAR

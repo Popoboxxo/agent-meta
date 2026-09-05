@@ -1,6 +1,6 @@
 ---
 name: release
-version: 1.6.0
+version: 1.7.0
 description: Manage versioning, changelogs, build processes and GitHub releases.
 hint: Versioning, changelog, build artifact, create GitHub release
 prompt_mode: modern
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/release.md@1.6.0
+generated-from: 1-generic/release.md@1.7.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -119,6 +119,7 @@ Check before every release:
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence release outcome>
 VERSION: x.y.z
 TAG: vX.Y.Z
 RELEASE_URL: https://github.com/.../releases/tag/vX.Y.Z

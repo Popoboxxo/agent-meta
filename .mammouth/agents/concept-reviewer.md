@@ -1,6 +1,6 @@
 ---
 name: concept-reviewer
-version: 1.2.0
+version: 1.3.0
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Iterate'
@@ -12,7 +12,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.2.0
+generated-from: 1-generic/concept-reviewer.md@1.3.0
 model: claude-opus-4-8
 permissionMode: plan
 ---
@@ -123,6 +123,7 @@ Mature concepts go to `requirements`.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence review summary>
 VERDICT: APPROVED | REVISE | BLOCKED
 FINDINGS:
   critical: [count]
@@ -130,6 +131,7 @@ FINDINGS:
   minor: [count]
   info: [count]
 REPORT_FILE: [path]
+ARTIFACTS: <REPORT_FILE + any other files written>
 NEXT: [Hand off to requirements | Back to author | Escalate]
 ```
 </output_contract>

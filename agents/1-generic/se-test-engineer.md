@@ -1,6 +1,6 @@
 ---
 name: se-test-engineer
-version: 1.2.1
+version: 1.3.0
 description: Develops MBSE test models and designs integration tests (interaction
   of multiple SW units). Right wing of the V-model.
 hint: Use this agent to create model-based test models and integration test strategies
@@ -138,6 +138,14 @@ Wait for `approved` before test execution. On `rejected` → iterate using `corr
 ## REQ-Traceability
 Every scenario needs a `traces_to` field with the originating requirement ID. `coverage_summary` must report requirement coverage percentage.
 {{/if}}
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

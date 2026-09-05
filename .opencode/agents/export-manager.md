@@ -1,10 +1,10 @@
 ---
 name: export-manager
-version: 1.1.3
+version: 1.2.0
 description: Reads .meta-config/export.yaml and routes structured JSON payloads from
   specialist agents to the configured target (markdown, confluence, jira-xray, etc.).
 prompt_mode: modern
-generated-from: 1-generic/export-manager.md@1.1.3
+generated-from: 1-generic/export-manager.md@1.2.0
 mode: subagent
 permission:
   read: allow
@@ -105,10 +105,12 @@ Check `config/skills-registry.yaml` for export skills. On `external_targets` →
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence export outcome>
 REQUEST_ID: <EXP-YYYYMMDD-NNN>
 TARGET_USED: <target-name>
 TARGET_URL: <url or file path>
 RETRY_COUNT: <n>
+ARTIFACTS: <exported file path/URL>
 ERRORS: [if any]
 WARNINGS: [if any]
 ```

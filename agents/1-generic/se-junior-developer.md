@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.1.0
+version: 1.2.0
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -149,8 +149,9 @@ No envelope → execute the task normally.
 **Output (when returning to orchestrator):**
 ```
 STATUS: done|partial|failed|escalate
-SUMMARY: <one-sentence summary>
+RESULT: <one-sentence summary>
 FILES_CHANGED: <comma-separated list>
+ARTIFACTS: <step persistence files, empty if none>
 ```
 
 ## Don'ts

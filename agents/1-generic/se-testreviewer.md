@@ -1,6 +1,6 @@
 ---
 name: se-testreviewer
-version: 1.2.1
+version: 1.3.0
 description: Audits the test strategy. Checks for edge cases, boundary value analysis,
   equivalence class errors, and flakiness.
 hint: Use this agent to review and audit test models and integration test strategies
@@ -151,6 +151,14 @@ Iteriere auf dem Output von `se-test-engineer` bis alle Audit-Kriterien erfüllt
 ## REQ-Traceability
 Jedes Finding in `correction_hints` referenziert die betroffene Szenario-ID und die ursprüngliche REQ-ID die es nicht abdeckt.
 {{/if}}
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.2.0
+version: 1.3.0
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on
@@ -147,6 +147,14 @@ Work iteratively with `se-test-engineer` and `se-architect` output; report to `s
 ## REQ-Traceability
 `traceability` section reports exact coverage percentages. Every deviation references affected requirement ID(s). List orphaned requirements and implementations explicitly.
 {{/if}}
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <one-sentence result summary>
+ARTIFACTS: <persisted step/report files (see Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

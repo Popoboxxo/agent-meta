@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-gardener
-version: "1.0.0"
+version: "1.1.0"
 description: "Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren."
 hint: "Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps"
 tools:
@@ -58,6 +58,14 @@ Tasks können als A2A-Envelope (JSON) ankommen, meist mit `knowledge-lint-v1` al
 - KEINE neuen Fakten oder Zusammenfassungen hinzufügen — das ist `knowledge-ingestor`s Aufgabe
 - KEINE Stub-Vervollständigung ohne belastbare Quelle
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: welche Wiki-Pflege durchgeführt wurde>
+ARTIFACTS: <geänderte Wiki-Seiten, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

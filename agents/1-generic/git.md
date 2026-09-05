@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.6.0"
+version: "1.7.0"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -128,6 +128,7 @@ Report the candidates (local + remote) to the user.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence: what was committed/branched/pushed>
 COMMIT: <hash> | <short-message>
 BRANCH: <branch-name>
 PR_URL: <url> (if created)

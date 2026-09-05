@@ -1,11 +1,11 @@
 ---
 name: dependency-auditor
-version: 1.2.0
+version: 1.3.0
 description: 'Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL
   matrix), version drift, outdated and deprecated packages. Categorizes dependency
   findings by risk and files them via the feedback agent — not application security.'
 prompt_mode: modern
-generated-from: 1-generic/dependency-auditor.md@1.2.0
+generated-from: 1-generic/dependency-auditor.md@1.3.0
 mode: subagent
 permission:
   read: allow
@@ -108,6 +108,7 @@ A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml
 STATUS: done|partial|failed
 RESULT: <supply-chain summary, 1 sentence>
 FINDINGS: <dependency-audit-v1: categorized findings>
+ARTIFACTS: <audit report + SBOM paths, empty if returned inline>
 NEXT: [Feedback issue | Developer upgrade]
 ```
 </output_contract>

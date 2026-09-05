@@ -1,10 +1,10 @@
 ---
 name: bug-feature-analyzer
-version: 1.1.4
+version: 1.2.0
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 prompt_mode: modern
-generated-from: 1-generic/bug-feature-analyzer.md@1.1.4
+generated-from: 1-generic/bug-feature-analyzer.md@1.2.0
 mode: subagent
 permission:
   read: allow
@@ -93,6 +93,10 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <classification + confidence in 1 sentence, full triage report below>
+ARTIFACTS: <persisted triage report path, empty if returned inline>
+
 ## Triage Report
 **Issue:** <short title or reference>
 **Classification:** BUG | USER-ERROR | FEATURE | OUT-OF-SCOPE | UNCLEAR

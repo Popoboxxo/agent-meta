@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.2.0"
+version: "2.3.0"
 description: "Collect improvement suggestions for agent-meta and submit them as GitHub issues."
 hint: "Submit improvement suggestions for agent-meta as GitHub issues"
 prompt_mode: modern
@@ -84,11 +84,13 @@ Full body templates: `{{SNIPPETS_DIR}}/meta-feedback-templates.md`.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1 sentence: issue created + number>
 ISSUE_TYPE: bug|new-agent|new-command|new-skill|new-platform|new-speech|improvement|docs|design|feat
 ISSUE_NUMBER: <#>
 ISSUE_URL: <url>
 TITLE: <type>: <description>
 LABELS: [list]
+ARTIFACTS: <ISSUE_URL + related files>
 ```
 </output_contract>
 

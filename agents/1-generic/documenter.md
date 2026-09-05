@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.4.3"
+version: "1.5.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -92,8 +92,8 @@ Das Projekt nutzt eine Knowledge Engine (OKF-konform).
 <output_contract>
 ```
 STATUS: done|partial|failed
-UPDATED: [list of changed doc files]
-NEW_ARTIFACTS: [if new files created]
+RESULT: <1-2 sentence summary of documentation changes>
+ARTIFACTS: [changed + new doc files]
 NOTES: [short summary of changes]
 ```
 </output_contract>

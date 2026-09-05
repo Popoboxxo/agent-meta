@@ -1,6 +1,6 @@
 ---
 name: documenter
-version: 1.4.3
+version: 1.5.0
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/documenter.md@1.4.3
+generated-from: 1-generic/documenter.md@1.5.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -94,8 +94,8 @@ Das Projekt nutzt eine Knowledge Engine (OKF-konform).
 <output_contract>
 ```
 STATUS: done|partial|failed
-UPDATED: [list of changed doc files]
-NEW_ARTIFACTS: [if new files created]
+RESULT: <1-2 sentence summary of documentation changes>
+ARTIFACTS: [changed + new doc files]
 NOTES: [short summary of changes]
 ```
 </output_contract>

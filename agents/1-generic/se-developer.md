@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.1.0
+version: 1.2.0
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -163,8 +163,9 @@ No envelope → execute the task normally.
 **Output (when returning to orchestrator):**
 ```
 STATUS: done|partial|failed|escalate
-SUMMARY: <one-sentence summary>
+RESULT: <one-sentence summary>
 FILES_CHANGED: <comma-separated list>
+ARTIFACTS: <step persistence files, empty if none>
 ```
 
 ## Don'ts

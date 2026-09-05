@@ -1,10 +1,10 @@
 ---
 name: tester
-version: 2.2.0
+version: 2.3.0
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 prompt_mode: modern
-generated-from: 1-generic/tester.md@2.2.0
+generated-from: 1-generic/tester.md@2.3.0
 mode: subagent
 permission:
   bash: allow
@@ -99,11 +99,13 @@ When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnosti
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence test verdict>
 TESTS_WRITTEN: [count]
 TESTS_RUN: [count]
 PASSED: [count]
 FAILED: [count + list with file:test]
 COVERAGE: [if measured]
+ARTIFACTS: <new/changed test files + report paths>
 NEXT: [recommended next step]
 ```
 </output_contract>

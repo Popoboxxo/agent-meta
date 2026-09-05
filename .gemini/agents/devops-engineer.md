@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: 1.2.0
+version: 1.3.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   security best practices, staging validation, MTTG (commit-to-security-feedback)
   tracking, and environment classification.
@@ -13,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.2.0
+generated-from: 1-generic/devops-engineer.md@1.3.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -154,6 +154,7 @@ Full: `schemas/infra-report.schema.json`. Required fields: `infrastructure_type`
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: environment + security posture>
 INFRA_TYPE: <kubernetes|docker-compose|terraform>
 ENVIRONMENT: <dev|staging|production>
 ENVIRONMENT_CLASS: <internal|customer>
@@ -167,6 +168,7 @@ MTTG_SECURITY: <minutes>
 MTTG_REVIEW: <minutes>
 RECOMMENDATIONS: [count]
 REPORT_FILE: [path]
+ARTIFACTS: <REPORT_FILE + manifest/report paths>
 ```
 </output_contract>
 

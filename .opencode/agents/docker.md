@@ -1,10 +1,10 @@
 ---
 name: docker
-version: 1.4.4
+version: 1.5.0
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 prompt_mode: modern
-generated-from: 1-generic/docker.md@1.4.4
+generated-from: 1-generic/docker.md@1.5.0
 mode: subagent
 permission:
   bash: allow
@@ -90,6 +90,7 @@ Read `(kein Docker-Stack)` for the available stacks. Per stack: compose path, se
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence operation outcome>
 OPERATION: <start|stop|logs|build|diagnose|...>
 STACK: <name>
 CONTAINERS: [list + status]

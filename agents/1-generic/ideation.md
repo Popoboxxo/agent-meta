@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.8.0"
+version: "1.9.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -95,6 +95,10 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <concept name + maturity in 1 sentence>
+ARTIFACTS: <persisted concept file path, empty if returned inline>
+
 ## Ideation handoff
 **Concept name:** <topic>
 **Maturity:** raw | sketched | structured

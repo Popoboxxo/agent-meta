@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.7.0
+version: 1.8.0
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -164,6 +164,14 @@ schema_version: "1.0.0"
 1. Write full output (frontmatter + JSON + human-readable table) to a temporary file
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

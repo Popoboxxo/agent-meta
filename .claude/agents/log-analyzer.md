@@ -1,6 +1,6 @@
 ---
 name: log-analyzer
-version: 1.2.0
+version: 1.3.0
 description: 'Analyzes system and application logs: frequency clustering, severity
   classification (RFC 5424), root-cause hypotheses, and structured findings with delegation
   routing.'
@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/log-analyzer.md@1.2.0
+generated-from: 1-generic/log-analyzer.md@1.3.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -108,6 +108,10 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: total findings, highest severity, top pattern>
+ARTIFACTS: <persisted report path, empty if returned inline>
+
 ## Finding #N
 **Severity:** CRITICAL|HIGH|MEDIUM|LOW
 **Source:** <file:line or "copy-paste">

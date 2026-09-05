@@ -1,12 +1,12 @@
 ---
 name: design-system-architect
-version: 0.1.0
+version: 0.2.0
 description: 'Translates a UI design-system schema into real, project-bound design-token
   artifacts (CSS custom properties / Tailwind config) plus the underlying systematics:
   color-harmony rules, a design-time contrast gate, spacing/breakpoint methodology,
   component-variant contracts, and motion tokens.'
 prompt_mode: modern
-generated-from: 1-generic/design-system-architect.md@0.1.0
+generated-from: 1-generic/design-system-architect.md@0.2.0
 mode: subagent
 permission:
   read: allow
@@ -99,6 +99,7 @@ A2A-Envelopes nur für Routen mit schema-gebundenem Contract (role-defaults.yaml
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence design outcome: harmony model + contrast-gate result>
 TOKEN_FILES: [files written]
 VARIANT_CONTRACT: <path>
 HARMONY_MODEL: complementary|analogous|triadic|monochromatic

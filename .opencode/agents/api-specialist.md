@@ -1,10 +1,10 @@
 ---
 name: api-specialist
-version: 1.1.3
+version: 1.2.0
 description: API design, OpenAPI specifications, contract-first development. Creates
   and maintains API contracts.
 prompt_mode: modern
-generated-from: 1-generic/api-specialist.md@1.1.3
+generated-from: 1-generic/api-specialist.md@1.2.0
 mode: subagent
 permission:
   read: allow
@@ -114,12 +114,14 @@ Full: `schemas/api-spec-report.schema.json`. Required fields: `spec_file`, `spec
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: spec state + conformance verdict>
 SPEC_FILE: <path>
 PROTOCOL: REST | gRPC | GraphQL
 ENDPOINTS: [count]
 BREAKING_CHANGES: [count]
 CONFORMANCE: valid | drift | invalid
 RECOMMENDATIONS: [count]
+ARTIFACTS: <spec + supporting file paths>
 ```
 </output_contract>
 

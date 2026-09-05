@@ -1,6 +1,6 @@
 ---
 name: effort-estimator
-version: 1.0.3
+version: 1.1.0
 description: Estimates effort for development tasks based on task type and LLM capabilities.
 hint: Effort estimation for tasks — delegate here when the user asks about time/cost
 prompt_mode: modern
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/effort-estimator.md@1.0.3
+generated-from: 1-generic/effort-estimator.md@1.1.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -74,6 +74,10 @@ Format: see `<output_contract>`. Confidence: high/medium/low + rationale.
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <final estimate + confidence in 1 sentence, estimate table below>
+ARTIFACTS: <persisted estimate file path, empty if returned inline>
+
 ## Effort Estimate: [Task Name]
 - Task Type: [classified type]
 - Sub-tasks: [N]

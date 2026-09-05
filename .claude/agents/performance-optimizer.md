@@ -1,6 +1,6 @@
 ---
 name: performance-optimizer
-version: 1.2.0
+version: 1.3.0
 description: Data-driven identification and resolution of Big-O bottlenecks using
   profiling data, without functional changes.
 hint: Use this agent for performance analysis, Big-O optimization, and bottleneck
@@ -13,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/performance-optimizer.md@1.2.0
+generated-from: 1-generic/performance-optimizer.md@1.3.0
 model: claude-opus-4-8
 ---
 
@@ -134,12 +134,14 @@ Complements the Big-O focus — for user-facing web apps also measure:
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: measured improvement summary>
 REPORT_ID: <PERF-001>
 BOTTLENECKS: [count]
 OPTIMIZATIONS: [count]
 REGRESSION_TESTS: passed | failed
 IMPROVEMENT: [p50/p99/CPU reduction in %]
 REPORT_FILE: [path]
+ARTIFACTS: <REPORT_FILE + benchmark output paths>
 NEXT: [Commit | More optimization | Blocked]
 ```
 </output_contract>

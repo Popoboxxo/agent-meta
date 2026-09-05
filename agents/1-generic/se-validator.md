@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.2.0
+version: 1.3.0
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -187,6 +187,14 @@ schema_version: "1.0.0"
 1. Write full output (frontmatter + JSON) to a temporary file
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

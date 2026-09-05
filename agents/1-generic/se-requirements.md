@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 1.10.0
+version: 1.11.0
 description: Elicits stakeholder needs and captures multi-level requirements. Enforces architecture boundary via arch_impact flag.
 hint: Use this agent to clarify requirements and start the SE cascade.
 tools:
@@ -113,6 +113,14 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: an `se-orchestr
 **Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md`
 **Frontmatter:** `step: requirements`, `agent: se-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0`
 **Atomic write:** temp → rename → `.se-state.yaml` `last_completed_step` aktualisieren.
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren.

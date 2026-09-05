@@ -1,6 +1,6 @@
 ---
 name: template-log-analyzer
-version: "1.2.0"
+version: "1.3.0"
 description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), root-cause hypotheses, and structured findings with delegation routing."
 hint: "Log analysis: cluster errors, classify severity (RFC 5424), delegate findings as issues or tasks"
 prompt_mode: modern
@@ -103,6 +103,10 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: total findings, highest severity, top pattern>
+ARTIFACTS: <persisted report path, empty if returned inline>
+
 ## Finding #N
 **Severity:** CRITICAL|HIGH|MEDIUM|LOW
 **Source:** <file:line or "copy-paste">

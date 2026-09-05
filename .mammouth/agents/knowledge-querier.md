@@ -1,6 +1,6 @@
 ---
 name: knowledge-querier
-version: 1.0.1
+version: 1.1.0
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
 hint: Wiki-Fragen beantworten, Index-First, Synthese mit Citations
@@ -9,7 +9,7 @@ tools:
 - Write
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-querier.md@1.0.1
+generated-from: 1-generic/knowledge-querier.md@1.1.0
 model: claude-haiku-4-5-20251001
 ---
 # Knowledge Querier — agent-meta
@@ -53,6 +53,14 @@ Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Kernaussage der Antwort, Citations im Text>
+ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

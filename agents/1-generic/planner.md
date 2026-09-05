@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.0.2"
+version: "1.1.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -70,6 +70,10 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <plan title + step count in 1 sentence>
+ARTIFACTS: <persisted plan path>
+
 ## Plan: <title>
 
 **Source:** <REQ-ID | concept-<topic>.md | Bug-#NNN>

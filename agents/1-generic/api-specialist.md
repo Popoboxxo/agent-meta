@@ -1,6 +1,6 @@
 ---
 name: template-api-specialist
-version: "1.1.3"
+version: "1.2.0"
 description: "API design, OpenAPI specifications, contract-first development. Creates and maintains API contracts."
 hint: "Use this agent for API design, OpenAPI specifications, and contract-first development."
 prompt_mode: modern
@@ -115,12 +115,14 @@ Full: `schemas/api-spec-report.schema.json`. Required fields: `spec_file`, `spec
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: spec state + conformance verdict>
 SPEC_FILE: <path>
 PROTOCOL: REST | gRPC | GraphQL
 ENDPOINTS: [count]
 BREAKING_CHANGES: [count]
 CONFORMANCE: valid | drift | invalid
 RECOMMENDATIONS: [count]
+ARTIFACTS: <spec + supporting file paths>
 ```
 </output_contract>
 

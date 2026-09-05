@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.1.0"
+version: "1.2.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -80,7 +80,7 @@ Wiki-Seiten sind Markdown mit YAML-Frontmatter. Kein Code, keine ausführbaren A
 ## A2A Handoff — Eingehende Tasks
 
 Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `con[]`, `refs[]`, `pri`.
-Dein `output_contract` ist `knowledge-ingest-v1` — an `knowledge-indexer` weiterreichen.
+Dein Delegations-Payload ist `knowledge-ingest-v1` — an `knowledge-indexer` weiterreichen.
 
 {{/if}}
 ## Don'ts
@@ -91,6 +91,14 @@ Dein `output_contract` ist `knowledge-ingest-v1` — an `knowledge-indexer` weit
 - KEINE Widersprüche stillschweigend überschreiben — explizit vermerken
 - KEINE Sources in `{{KNOWLEDGE_SOURCES_DIR}}/` verändern — Sources sind immutable
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: was ingestiert wurde und welche Seiten neu/aktualisiert sind>
+ARTIFACTS: <erstellte/aktualisierte Wiki-Seiten, kommagetrennt>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

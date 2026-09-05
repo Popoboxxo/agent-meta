@@ -1,6 +1,6 @@
 ---
 name: template-ui-ux-designer
-version: "1.1.3"
+version: "1.2.0"
 description: "Creates UI specifications, mockups, and design systems. Maps REQ-IDs to UI elements."
 hint: "UI specification, mockup creation, and design-system definition — specifies, does not implement."
 prompt_mode: modern
@@ -84,6 +84,7 @@ Full JSON schema: `schemas/ui-spec.schema.json`. Required fields: `ui_spec_id`, 
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence design outcome>
 SCREENS: [count specified]
 DESIGN_SYSTEM: [component count]
 JOURNEYS: [count]

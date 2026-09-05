@@ -1,6 +1,6 @@
 ---
 name: template-incident-responder
-version: "1.1.0"
+version: "1.2.0"
 description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 prompt_mode: modern
@@ -112,6 +112,7 @@ RESULT: <root cause + severity, 1 sentence>
 SEVERITY: <P0|P1|P2>
 RCA: <rca-report-v1 block>
 HOTFIXES: <prioritized list for developer>
+ARTIFACTS: <RCA report + hotfix file paths>
 NEXT: [Developer hotfix | Documenter post-mortem]
 ```
 </output_contract>

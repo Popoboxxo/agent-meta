@@ -1,6 +1,6 @@
 ---
 name: agent-meta-scout
-version: 1.2.0
+version: 1.3.0
 description: Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows.
   Evaluates candidates and makes concrete extension proposals for agent-meta.
 hint: 'Scout the AI ecosystem: discover new skills, roles, rules, and patterns for
@@ -10,7 +10,7 @@ tools:
 - Read
 - WebFetch
 - WebSearch
-generated-from: 1-generic/agent-meta-scout.md@1.2.0
+generated-from: 1-generic/agent-meta-scout.md@1.3.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -88,11 +88,13 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence scouting verdict>
 SCOUTING_SCOPE: <which sources were searched>
 CANDIDATES_FOUND: [count]
 RECOMMENDED: [count + list]
 CONDITIONAL: [count + list]
 NOT_RECOMMENDED: [count + list]
+ARTIFACTS: <scouting report path if persisted, empty if returned inline>
 NEXT: [integration into agent-meta for each RECOMMENDED candidate]
 ```
 </output_contract>

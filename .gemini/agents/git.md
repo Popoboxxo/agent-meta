@@ -1,6 +1,6 @@
 ---
 name: git
-version: 1.6.0
+version: 1.7.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@1.6.0
+generated-from: 1-generic/git.md@1.7.0
 model: gemini-3.5-flash-medium
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -132,6 +132,7 @@ Report the candidates (local + remote) to the user.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence: what was committed/branched/pushed>
 COMMIT: <hash> | <short-message>
 BRANCH: <branch-name>
 PR_URL: <url> (if created)

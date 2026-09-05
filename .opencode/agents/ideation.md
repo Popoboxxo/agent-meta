@@ -1,10 +1,10 @@
 ---
 name: ideation
-version: 1.8.0
+version: 1.9.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 prompt_mode: modern
-generated-from: 1-generic/ideation.md@1.8.0
+generated-from: 1-generic/ideation.md@1.9.0
 mode: subagent
 permission:
   read: allow
@@ -97,6 +97,10 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <concept name + maturity in 1 sentence>
+ARTIFACTS: <persisted concept file path, empty if returned inline>
+
 ## Ideation handoff
 **Concept name:** <topic>
 **Maturity:** raw | sketched | structured

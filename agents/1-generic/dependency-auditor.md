@@ -1,6 +1,6 @@
 ---
 name: template-dependency-auditor
-version: "1.2.0"
+version: "1.3.0"
 description: "Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL matrix), version drift, outdated and deprecated packages. Categorizes dependency findings by risk and files them via the feedback agent — not application security."
 hint: "Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue"
 prompt_mode: modern
@@ -99,6 +99,7 @@ End with a **summary** — count per category, highest risk, top-3 actions.
 STATUS: done|partial|failed
 RESULT: <supply-chain summary, 1 sentence>
 FINDINGS: <dependency-audit-v1: categorized findings>
+ARTIFACTS: <audit report + SBOM paths, empty if returned inline>
 NEXT: [Feedback issue | Developer upgrade]
 ```
 </output_contract>

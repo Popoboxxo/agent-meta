@@ -1,10 +1,10 @@
 ---
 name: code-reviewer
-version: 1.4.0
+version: 1.5.0
 description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis,
   AI-origin analysis (VCAL), and REQ traceability in code paths.'
 prompt_mode: modern
-generated-from: 1-generic/code-reviewer.md@1.4.0
+generated-from: 1-generic/code-reviewer.md@1.5.0
 mode: subagent
 permission:
   read: allow
@@ -144,6 +144,7 @@ Reflection loop: `verdict: REVISE` + `iteration`/`max_iterations` + `correction_
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence review verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_RECOMMENDATIONS | CHANGES_REQUESTED | BLOCKED | REVISE
 BLAST_LEVEL: TRIVIAL | MODERATE | SIGNIFICANT | CRITICAL
 RATING: A | B | C | D | F

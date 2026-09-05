@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 1.8.0
+version: 1.9.0
 description: Audits requirements and architecture against generic laws. Enforces role boundaries.
 hint: Validate requirements before architecture; audit decompositions.
 tools:
@@ -87,6 +87,14 @@ Bei `approved` zusätzlich `...critic.final.md`.
 
 **Frontmatter:** `step: critic`, `agent: se-critic`, `review_target`, `iteration`, `status`, `timestamp`, `schema_version: 1.0.0`
 **Atomic write:** temp → rename iter-N → copy to final bei approval → `.se-state.yaml` aktualisieren.
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren.

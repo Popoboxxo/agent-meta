@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 1.8.0
+version: 1.9.0
 description: Designs system architecture via functional decomposition. Processes arch_trigger flags.
 hint: Design L1 and L2 architectures from requirements.
 tools:
@@ -97,6 +97,14 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: eskalieren.
 Bei approval: `...Architecture.final.md` (Kopie).
 **Frontmatter:** `step: architecture`, `agent: se-architect`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0`
 **Atomic write:** temp → rename → copy final → `.se-state.yaml` aktualisieren.
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren.

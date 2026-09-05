@@ -1,6 +1,6 @@
 ---
 name: template-frontend-component-engineer
-version: "0.1.0"
+version: "0.2.0"
 description: "Builds production-ready UI components from a screen spec (ui-ux-designer) plus a token/variant contract (design-system-architect) — props contract, mandatory state handling, and a built-in accessibility baseline. No design-system authoring, no WCAG audit."
 hint: "Screen-Spec + Token-/Variant-Contract → produktionsreife UI-Komponenten: Props-Contract, State-Matrix (loading/error/empty/success), A11y-Baseline (kein Audit), Motion aus Tokens, Mobile-first, Test-Grundgerüst."
 prompt_mode: modern
@@ -65,6 +65,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence component-build outcome>
 COMPONENTS: [components built]
 PROPS_CONTRACT: <path>
 STATE_COVERAGE: [components missing loading/error/empty/success, empty if none]

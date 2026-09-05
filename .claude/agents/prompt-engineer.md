@@ -1,6 +1,6 @@
 ---
 name: prompt-engineer
-version: 1.5.0
+version: 1.6.0
 description: The ultimate expert for prompt engineering. Designs, reviews, and optimizes
   agent definitions based on best practices (OpenAI, Lakera), with secure-prompting
   guidelines and banned-pattern awareness.
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - WebFetch
-generated-from: 1-generic/prompt-engineer.md@1.5.0
+generated-from: 1-generic/prompt-engineer.md@1.6.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -134,12 +134,14 @@ Context engineering: handoff contracts as APIs · APO (DSPy/TextGrad) · fewer o
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: change performed + savings>
 TEMPLATE: <path>
 CHANGES: [Major-Change / New-Section / Textfix]
 BEFORE_TOKENS: <n>
 AFTER_TOKENS: <n>
 SAVINGS: <pct>
 REVIEW_NOTES: [open points]
+ARTIFACTS: <changed template path>
 ```
 </output_contract>
 

@@ -1,6 +1,6 @@
 ---
 name: requirements
-version: 1.4.3
+version: 1.5.0
 description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/requirements.md@1.4.3
+generated-from: 1-generic/requirements.md@1.5.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-requirements-ext.md` exists → read and apply immediately.
@@ -81,9 +81,11 @@ On a changed requirement: identify affected files, tests, REQ dependencies.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: REQ state after this run>
 NEW_REQS: [REQ-001, REQ-002, ...] (if assigned)
 UPDATED: [changes to existing REQs]
 TRACEABILITY_MATRIX: [if created]
+ARTIFACTS: <REQUIREMENTS.md + traceability matrix paths>
 NEXT: [recommended step: developer, feature, ...]
 ```
 </output_contract>

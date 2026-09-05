@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.4.4"
+version: "1.5.0"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
@@ -90,6 +90,7 @@ Read `{{DOCKER_STACKS_OVERVIEW}}` for the available stacks. Per stack: compose p
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence operation outcome>
 OPERATION: <start|stop|logs|build|diagnose|...>
 STACK: <name>
 CONTAINERS: [list + status]

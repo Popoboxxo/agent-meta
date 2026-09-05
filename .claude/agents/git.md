@@ -1,6 +1,6 @@
 ---
 name: git
-version: 1.6.0
+version: 1.7.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
 tools:
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/git.md@1.6.0
+generated-from: 1-generic/git.md@1.7.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -131,6 +131,7 @@ Report the candidates (local + remote) to the user.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence: what was committed/branched/pushed>
 COMMIT: <hash> | <short-message>
 BRANCH: <branch-name>
 PR_URL: <url> (if created)

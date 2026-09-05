@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 1.2.0
+version: 1.3.0
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report.'
 hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
@@ -242,6 +242,14 @@ schema_version: "1.0.0"
 1. Write full output (frontmatter + JSON integration plan) to a temporary file
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+</output_contract>
 
 ## Anti-Recursion Guard
 

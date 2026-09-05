@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.2.0"
+version: "4.3.0"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -103,11 +103,13 @@ When validating behavior via ad-hoc container runs (e.g. `docker run`), diagnost
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_NOTES | REJECTED
 FINDINGS:
   - [file:line + REQ-xxx + severity]
 BLOCKERS: [list of merge-blocking issues]
 NOTES: [optional, helpful for implementer]
+ARTIFACTS: <persisted validation report path, empty if returned inline>
 NEXT: [Release for merge | Back to developer | To validator]
 ```
 </output_contract>
