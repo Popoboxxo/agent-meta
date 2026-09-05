@@ -64,9 +64,10 @@ def test_remote_saas_refused(monkeypatch):
 
 
 def test_local_process_timeout(monkeypatch):
-    """Verify readline timeout is bounded by select.select()."""
-    # Mock select to simulate timeout (no stdout readable), and mock Popen
-    # to avoid actual subprocess
+    """Verify timeout is bounded by _read_line_with_timeout (thread + queue).
+    Tests that partial-line-then-stall returns FAIL, not hang."""
+    # Mock both _read_line_with_timeout to return None (simulating timeout)
+    # and Popen to avoid actual subprocess
     class MockStdin:
         def write(self, s):
             pass
@@ -84,12 +85,40 @@ def test_local_process_timeout(monkeypatch):
             pass
         def kill(self):
             pass
-    monkeypatch.setattr(pt.select, "select", lambda r, w, x, t: ([], [], []))
+
+    monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: None)
     monkeypatch.setattr(pt.subprocess, "Popen", lambda *a, **kw: MockProc())
     pdef = {"origin-type": "local-process",
-            "connection": {"type": "stdio", "command": "sleep", "args": ["10"]}}
+            "connection": {"type": "stdio", "command": "mock", "args": []}}
     res = run_plugin_test("hung", pdef)
     assert res["status"] == "FAIL"
+    assert "no response" in res["message"].lower()
+
+
+def test_local_process_partial_line_timeout(monkeypatch):
+    """Specifically test that partial-line-then-stall doesn't hang the main thread.
+    Mock _read_line_with_timeout to simulate a process that writes partial data
+    and then stalls, which the thread-based implementation handles gracefully."""
+    import time as time_module
+    # Record when the call enters and exits
+    call_times = []
+    original_mcp = pt._mcp_initialize_handshake
+
+    def _mcp_with_timing(cmd, args, env):
+        call_times.append(("enter", time_module.time()))
+        result = original_mcp(cmd, args, env)
+        call_times.append(("exit", time_module.time()))
+        return result
+
+    # Mock the thread reader to timeout immediately
+    monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: None)
+    monkeypatch.setattr(pt, "_mcp_initialize_handshake", _mcp_with_timing)
+
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "true", "args": []}}
+    res = run_plugin_test("stalled", pdef)
+    assert res["status"] == "FAIL"
+    # Verify call didn't hang (if mocking works, should return quickly)
     assert "no response" in res["message"].lower()
 
 

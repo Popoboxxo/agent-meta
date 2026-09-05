@@ -7,10 +7,11 @@ mock them without real subprocess/network.
 from __future__ import annotations
 
 import json
+import queue
 import re
-import select
 import shutil
 import subprocess
+import threading
 import time
 import urllib.request
 
@@ -20,6 +21,27 @@ _TIMEOUT = 8
 
 def _resolve_secrets(text: str, secrets: dict) -> str:
     return _SECRET_RE.sub(lambda m: str(secrets.get(m.group(1), m.group(0))), text)
+
+
+def _read_line_with_timeout(stream, timeout: float) -> str | None:
+    """Read one line from stream with bounded timeout. Returns the line,
+    or None on timeout. Uses a daemon thread to avoid select() limitations
+    (only works on sockets on Windows, partial-line semantics on Unix).
+    The thread will unblock and exit once the stream is closed by the caller."""
+    q: queue.Queue = queue.Queue(maxsize=1)
+
+    def _reader():
+        try:
+            q.put(stream.readline())
+        except Exception:  # noqa: BLE001
+            q.put("")
+
+    t = threading.Thread(target=_reader, daemon=True)
+    t.start()
+    try:
+        return q.get(timeout=timeout)
+    except queue.Empty:
+        return None  # timed out; daemon thread left running but harmless
 
 
 def _run_version(binary: str) -> tuple[bool, str]:
@@ -34,7 +56,8 @@ def _run_version(binary: str) -> tuple[bool, str]:
 
 def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool, str]:
     """Start the stdio MCP process, send an `initialize` request, read one line,
-    terminate. Returns (ok, message). Bounded by _TIMEOUT to prevent hangs."""
+    terminate. Returns (ok, message). Bounded by _TIMEOUT to prevent hangs.
+    Uses _read_line_with_timeout for correct timeout semantics on all platforms."""
     proc = None
     try:
         proc = subprocess.Popen([command, *args], stdin=subprocess.PIPE,  # noqa: S603
@@ -45,11 +68,10 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
                                      "clientInfo": {"name": "agent-meta", "version": "1"}}})
         proc.stdin.write(req + "\n")
         proc.stdin.flush()
-        # Wait with timeout for stdout to be ready, prevent indefinite hang
-        readable, _, _ = select.select([proc.stdout], [], [], _TIMEOUT)
-        if not readable:
+        # Read one line with bounded timeout (works on all platforms, handles partial lines)
+        line = _read_line_with_timeout(proc.stdout, _TIMEOUT)
+        if line is None:
             return False, f"no response within {_TIMEOUT}s"
-        line = proc.stdout.readline()
         return ("result" in line or "jsonrpc" in line), "initialize responded"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
