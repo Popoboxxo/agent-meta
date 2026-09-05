@@ -31,6 +31,6 @@ def test_build_plugins_block_preserves_active_set():
 
 def test_agent_meta_project_yaml_is_migrated():
     import yaml
-    data = yaml.safe_load((REPO_ROOT / ".meta-config" / "project.yaml").read_text())
+    data = yaml.safe_load((REPO_ROOT / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
     assert "plugins" in data
     assert "mcp-servers" not in data and "external-tools" not in data

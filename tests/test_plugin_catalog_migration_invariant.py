@@ -18,8 +18,8 @@ from lib.mcp import _generate_rule_content  # noqa: E402
 from lib.plugins import load_plugin_catalog, plugins_of_kind  # noqa: E402
 
 _FIX = REPO_ROOT / "tests" / "fixtures" / "legacy-registries"
-_LEGACY_MCP = yaml.safe_load((_FIX / "mcp-registry.yaml").read_text())["mcp-servers"]
-_LEGACY_TOOLS = yaml.safe_load((_FIX / "external-tools-registry.yaml").read_text())["external-tools"]
+_LEGACY_MCP = yaml.safe_load((_FIX / "mcp-registry.yaml").read_text(encoding="utf-8"))["mcp-servers"]
+_LEGACY_TOOLS = yaml.safe_load((_FIX / "external-tools-registry.yaml").read_text(encoding="utf-8"))["external-tools"]
 
 # Keys the catalog adds on top of the legacy schema (ignored by all renderers).
 _ADDED_KEYS = {"kind", "origin-type", "availability-probe", "binary"}
