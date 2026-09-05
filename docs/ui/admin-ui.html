@@ -1669,7 +1669,7 @@ async function viewDashboard() {
   if (mode === "super_admin") {
     wrap.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, ["Super admin"]),
-      el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, mcp-registry, dod-presets, delegation-syntax, export) are editable."]),
+      el("p", {}, ["You're running inside the agent-meta framework repository. All super-admin configs (role-defaults, ai-providers, skills-registry, plugin-catalog, dod-presets, delegation-syntax, export) are editable."]),
       el("p", {}, ["Framework defaults (config/*.yaml) apply to all projects using this agent-meta instance."]),
     ]));
     // Target repo section — only when .meta-config/project.yaml exists
