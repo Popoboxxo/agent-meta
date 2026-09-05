@@ -115,7 +115,7 @@ from lib.pipelines import (
 )
 from lib.platform import load_platform_config
 from lib.plugin_test import run_plugin_test
-from lib.plugins import load_plugin_catalog
+from lib.plugins import load_plugin_catalog, probe_plugin_availability, resolve_active_plugins
 from lib.providers import (
     load_providers_config,
     resolve_context_filename,
@@ -188,6 +188,22 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
             if skills_dir:
                 entries.append(f"{skills_dir}/{skill_name}/")
     return entries
+
+
+def _probe_inactive_plugins(agent_meta_root: Path, project_root: Path, config: dict) -> list[str]:
+    """Sync-time availability probe (Layer 3 hint): catalog plugins that are
+    locally available (cheap, read-only probe) but not activated in this
+    project. Opt-out-free nudge -- never blocks or alters the sync itself."""
+    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
+    active = set(resolve_active_plugins(config, agent_meta_root, project_root, catalog=catalog))
+    lines: list[str] = []
+    for pid, pdef in catalog.items():
+        if pid in active:
+            continue
+        if probe_plugin_availability(pdef):
+            lines.append(f"  [HINWEIS] Plugin '{pid}' lokal verfügbar, aber nicht aktiviert "
+                         f"(--test-plugin {pid} zum Prüfen).")
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -1529,6 +1545,17 @@ def _handle_sync(ctx: _SyncContext) -> None:
     except SyncError as exc:
         print(f"\n  !!  External-tool injection drift scan aborted: {exc}", file=sys.stderr)
         sys.exit(1)
+    # Sync-time plugin availability probe (Layer 3 hint): informational-only
+    # nudge for catalog plugins that are locally available but not activated.
+    # Skipped in --check (CI) mode to keep drift-check output stable. Read-only
+    # (probe_plugin_availability only does shutil.which/HTTP HEAD) but wrapped
+    # like the other optional summary blocks -- must never break a sync.
+    if not args.check:
+        try:
+            for _hint in _probe_inactive_plugins(agent_meta_root, project_root, config):
+                print(_hint)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("plugin-probe", f"skipped: {type(exc).__name__}: {exc}")  # noqa: PLE1205
     # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
     try:
         sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)
