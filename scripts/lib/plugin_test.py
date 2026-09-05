@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import select
 import shutil
 import subprocess
 import time
@@ -33,7 +34,7 @@ def _run_version(binary: str) -> tuple[bool, str]:
 
 def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool, str]:
     """Start the stdio MCP process, send an `initialize` request, read one line,
-    terminate. Returns (ok, message)."""
+    terminate. Returns (ok, message). Bounded by _TIMEOUT to prevent hangs."""
     proc = None
     try:
         proc = subprocess.Popen([command, *args], stdin=subprocess.PIPE,  # noqa: S603
@@ -44,6 +45,10 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
                                      "clientInfo": {"name": "agent-meta", "version": "1"}}})
         proc.stdin.write(req + "\n")
         proc.stdin.flush()
+        # Wait with timeout for stdout to be ready, prevent indefinite hang
+        readable, _, _ = select.select([proc.stdout], [], [], _TIMEOUT)
+        if not readable:
+            return False, f"no response within {_TIMEOUT}s"
         line = proc.stdout.readline()
         return ("result" in line or "jsonrpc" in line), "initialize responded"
     except Exception as exc:  # noqa: BLE001
@@ -51,6 +56,11 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
     finally:
         if proc and proc.poll() is None:
             proc.terminate()
+            try:
+                proc.wait(timeout=_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
 def _http_probe(url: str, headers: dict) -> tuple[int, str]:
@@ -91,7 +101,8 @@ def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = Non
             code, _ = _http_probe(url, headers)
         except Exception as exc:  # noqa: BLE001 - refused/timeout/etc = not reachable
             return _result("FAIL", f"not reachable: {exc}", started)
-        reachable = code < 500 or code == 401
+        # Endpoint reachable if it responds with any status < 500 (incl. 401 auth errors)
+        reachable = code < 500
         return _result("PASS" if reachable else "FAIL", f"HTTP {code}", started)
 
     return _result("UNKNOWN", f"no test strategy for origin-type '{origin}'", started)

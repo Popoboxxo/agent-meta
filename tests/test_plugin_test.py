@@ -63,6 +63,36 @@ def test_remote_saas_refused(monkeypatch):
     assert res["status"] == "FAIL"
 
 
+def test_local_process_timeout(monkeypatch):
+    """Verify readline timeout is bounded by select.select()."""
+    # Mock select to simulate timeout (no stdout readable), and mock Popen
+    # to avoid actual subprocess
+    class MockStdin:
+        def write(self, s):
+            pass
+        def flush(self):
+            pass
+    class MockProc:
+        def __init__(self):
+            self.stdin = MockStdin()
+            self.stdout = None
+        def poll(self):
+            return None
+        def terminate(self):
+            pass
+        def wait(self, timeout=None):
+            pass
+        def kill(self):
+            pass
+    monkeypatch.setattr(pt.select, "select", lambda r, w, x, t: ([], [], []))
+    monkeypatch.setattr(pt.subprocess, "Popen", lambda *a, **kw: MockProc())
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "sleep", "args": ["10"]}}
+    res = run_plugin_test("hung", pdef)
+    assert res["status"] == "FAIL"
+    assert "no response" in res["message"].lower()
+
+
 def test_unknown_origin_type():
     res = run_plugin_test("mystery", {"origin-type": "quantum"})
     assert res["status"] == "UNKNOWN"
