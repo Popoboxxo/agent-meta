@@ -1,9 +1,9 @@
 ---
 name: concept-reviewer
-version: 1.1.0
+version: 1.2.0
 description: Use when a concept or design doc needs a structural review before requirements
-  — completeness, logic, assumptions, risks, feasibility.
-hint: 'Review concept/design doc: completeness, logic, risks, Approve/Iterate'
+  — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
+hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Iterate'
 prompt_mode: modern
 tools:
 - Read
@@ -12,7 +12,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.1.0
+generated-from: 1-generic/concept-reviewer.md@1.2.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -77,7 +77,21 @@ When acting as critic in a reflection loop (e.g. generator-critic for iterative 
 
 **Revision rules:** later iterations primarily check previous `correction_hints` · introduce no new dimensions that were irrelevant in R1 · last iteration: `APPROVED` or `BLOCKED`.
 
-## 6. Report template
+## 6. Threat-model checklist (4 questions)
+
+Applies when the concept describes a public or customer-facing feature — check
+the 4 questions (per rule `threat-model-4-questions.md`; internal apps
+simplified, 1–2 questions):
+
+1. **What are you building?** (data storage, auth, authorization, user origin)
+2. **What could go wrong?** (worst-case scenarios)
+3. **What do you do about it?**
+4. **What are the consequences?** (business impact, data loss, reputation)
+
+Unanswered questions → findings under dimension **Risks**. A public feature
+missing the 4 questions entirely → **major** finding.
+
+## 7. Report template
 
 Full: `.gemini/snippets/concept-review-report.md` (sync-generated). Sections: Scope · Findings by severity · Verdict + rationale.
 </workflow>

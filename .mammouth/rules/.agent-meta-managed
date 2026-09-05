@@ -12,9 +12,11 @@ mcp-guardrails.md
 no-worktree-isolation.md
 provider-agnostic.md
 python-conventions.md
+security-paved-roads.md
 session-conclusion.md
 speech-mode.md
 submodule-protection.md
 sync-interface.md
+threat-model-4-questions.md
 use-lazy-rules.md
 use-orchestrator.md

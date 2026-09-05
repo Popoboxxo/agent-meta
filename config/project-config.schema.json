@@ -590,6 +590,21 @@
           "description": "Require security audit before release. Default: false.",
           "default": false
         },
+        "ai-security-review": {
+          "type": "boolean",
+          "description": "Require AI-specific security review of AI-generated code (ai-security-guardian). Default: false.",
+          "default": false
+        },
+        "prompt-governance": {
+          "type": "boolean",
+          "description": "Require prompts to be governed as source code (prompt-governor). Default: false.",
+          "default": false
+        },
+        "lifecycle-ownership": {
+          "type": "boolean",
+          "description": "Require a named owner and deprecation plan for every app/service (app-lifecycle-governor). Default: false.",
+          "default": false
+        },
         "se-required": {
           "type": "string",
           "description": "SE cascade binding strength. 'false' = optional, 'recommended' = advised for complex features, 'true' = mandatory before any code. Default: false.",

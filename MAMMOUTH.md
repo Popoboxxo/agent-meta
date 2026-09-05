@@ -60,7 +60,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `bug-feature-analyzer` | Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation |
 | `claude-expert` | Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices |
 | `code-reviewer` | Checks code quality, blast radius, and Clean Code — not functional correctness (that's validator). |
-| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, Approve/Iterate |
+| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, threat model, Approve/Iterate |
 | `continue-expert` | Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices |
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `data-engineer` | Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer |

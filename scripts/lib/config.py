@@ -67,6 +67,9 @@ _DOD_FIELD_DEFAULTS: dict = {
     "tests-required": True,
     "codebase-overview": True,
     "security-audit": False,
+    "ai-security-review": False,
+    "prompt-governance": False,
+    "lifecycle-ownership": False,
     "se-required": "false",
 }
 
@@ -916,7 +919,9 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     Parameter contract:
         variables: mutated in place — receives DOD_REQ_TRACEABILITY,
             DOD_TESTS_REQUIRED, DOD_CODEBASE_OVERVIEW, DOD_SECURITY_AUDIT,
-            DOD_PRESET, DOD_SE_REQUIRED/OPTIONAL/RECOMMENDED/STRICT,
+            DOD_AI_SECURITY_REVIEW, DOD_PROMPT_GOVERNANCE,
+            DOD_LIFECYCLE_OWNERSHIP, DOD_PRESET,
+            DOD_SE_REQUIRED/OPTIONAL/RECOMMENDED/STRICT,
             DOD_REQ_BLOCK and DOD_TESTS_BLOCK.
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for dod-presets.yaml).
@@ -935,6 +940,9 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
     variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
+    variables["DOD_AI_SECURITY_REVIEW"] = "true" if dod_resolved.get("ai-security-review", False) else "false"
+    variables["DOD_PROMPT_GOVERNANCE"] = "true" if dod_resolved.get("prompt-governance", False) else "false"
+    variables["DOD_LIFECYCLE_OWNERSHIP"] = "true" if dod_resolved.get("lifecycle-ownership", False) else "false"
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
     # SE-Required mode: derive boolean flags from the se-required string field
     se_required = str(dod_resolved.get("se-required", "false")).lower()

@@ -1,8 +1,9 @@
 ---
 name: devops-engineer
-version: 1.1.3
+version: 1.2.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
-  and security best practices.
+  security best practices, staging validation, MTTG (commit-to-security-feedback)
+  tracking, and environment classification.
 hint: Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks.
 prompt_mode: modern
 tools:
@@ -12,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.1.3
+generated-from: 1-generic/devops-engineer.md@1.2.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -85,7 +86,38 @@ Full deployment manifest template: `.claude/snippets/k8s-deployment.yaml`. Examp
 | **Infrastructure** | Network policies default-deny. Image scanning. RBAC. Audit logging. |
 | **Pipeline** | Dependency scanning. Secret scanning. Signed artifacts. SBOM. |
 
-## 7. Workflow
+## 7. Staging validation
+
+Validate that every change reaches production through staging — never directly.
+
+| Check | Method |
+|-------|--------|
+| **Staging exists** | Scan staging configuration/deployment definitions |
+| **DB migrations staged** | Pipeline promotes database migrations staging → production (never direct-to-prod) |
+| **Config parity** | Diff staging vs. production configuration; drift is a finding |
+| **Bypass detection** | Flag deployments that go directly to production, skipping staging |
+
+## 8. MTTG tracking
+
+**Definition:** Time from code commit → first security feedback.
+
+| Milestone | Target |
+|-----------|--------|
+| **Commit → Lint feedback** | < 5 min |
+| **Commit → SAST feedback** | < 10 min |
+| **Commit → Security scan feedback** | < 30 min |
+| **Commit → Review feedback** | < 60 min |
+
+**Rationale:** If MTTG is tracked in hours or days, insecure code has already been merged, deployed, exposed and exploited.
+
+## 9. Environment classification
+
+| Environment | Required controls |
+|-------------|-------------------|
+| **Internal** (workforce) | Data masking, tailored logging, rollback controls |
+| **Customer** (production) | Full security stack, compliance, audit logging |
+
+## 10. Workflow
 
 | Phase | Steps |
 |-------|-------|
@@ -94,11 +126,11 @@ Full deployment manifest template: `.claude/snippets/k8s-deployment.yaml`. Examp
 | 3. Implementation | IaC modules · CI/CD · observability + security scans |
 | 4. Validation | Pipeline dry-run · IaC plan (drift/cost/security) · smoke tests |
 
-## 8. Output schema
+## 11. Output schema
 
 Full: `schemas/infra-report.schema.json`. Required fields: `infrastructure_type`, `environment`, `components[]`, `network_policies[]`, `ci_cd_pipeline`, `observability`, `security_findings[]`, `recommendations[]`.
 
-## 9. Branch-guard — infrastructure changes
+## 12. Branch-guard — infrastructure changes
 
 - **Never** commit IaC or CI/CD directly to `main`/`master`
 - Branch: `feat/infra-<description>` or `fix/infra-<description>`
@@ -123,9 +155,15 @@ Full: `schemas/infra-report.schema.json`. Required fields: `infrastructure_type`
 STATUS: done|partial|failed
 INFRA_TYPE: <kubernetes|docker-compose|terraform>
 ENVIRONMENT: <dev|staging|production>
+ENVIRONMENT_CLASS: <internal|customer>
 COMPONENTS: [count]
 NETWORK_POLICIES: [count]
 SECURITY_FINDINGS: [count]
+STAGING_FINDINGS: [count]
+MTTG_LINT: <minutes>
+MTTG_SAST: <minutes>
+MTTG_SECURITY: <minutes>
+MTTG_REVIEW: <minutes>
 RECOMMENDATIONS: [count]
 REPORT_FILE: [path]
 ```

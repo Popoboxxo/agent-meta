@@ -172,6 +172,36 @@ PEP8 einhalten. Type Hints (typing) verwenden. Docstrings für Klassen/Methoden 
 
 
 
+# Security Paved Roads
+
+Security wird als vorgeprüfte Paved-Road-Blöcke geliefert, nicht als DIY-Aufgabe:
+**invisible, consistent, embedded, non-optional** (Netflix Paved Roads / Golden Path).
+Ein Block ist ausgereift, sicherheitsgeprüft und wird identisch überall verwendet —
+niemand implementiert Security-Logik selbst neu.
+
+## Block-Katalog
+
+| Block | Abdeckt | Eigentümer-Agent |
+|-------|---------|------------------|
+| `auth-flow` | Authentifizierung (Login, Session, Token) | `security-auditor` |
+| `dependency-check` | SBOM + CVE-Scan der Abhängigkeiten | `dependency-auditor` |
+| `input-validation` | Eingabevalidierung (Schema, Sanitizing) | `security-auditor` |
+| `rate-limiting` | Rate-Limiting / Throttling | `devops-engineer` |
+| `cors-config` | CORS-Konfiguration | `security-auditor` |
+| `secret-scanning` | Secret-Scan (Leaks in Diffs, Commits, Logs) | `security-auditor` |
+
+## Enforcement
+
+- **Vor jedem Commit:** Secret-Scan über den Block `secret-scanning` ausführen.
+- **Vor jedem Deploy:** `dependency-check` (SBOM + CVE) ausführen.
+- **Für neue Features:** den `auth-flow`-Block nutzen statt Auth selbst zu bauen.
+
+DIY-Security ist eine Anti-Pattern: jede Variante erzeugt unbekannte Lücken.
+Abweichungen vom Block-Katalog werden als Review-Befund von `security-auditor`
+gemeldet, nicht als Eigenbau gerechtfertigt.
+
+
+
 # Session-Abschluss
 
 Delegate Session-Zusammenfassung an `documenter` am Ende großer Features, um CODEBASE_OVERVIEW.md aktuell zu halten.
@@ -186,6 +216,25 @@ Regeln für den Umgang mit allen Git-Submodulen (`.agent-meta/`, `external/*/`, 
 - **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden.
 - **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks.
 - **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden.
+
+
+
+# Threat Model — die 4 Fragen
+
+Vor jedem öffentlichen Release die 4 Fragen beantworten (Igor Andriushchenko,
+CISO Lovable):
+
+1. **Was baust du?** — Datenspeicherung, Auth, Autorisierung, woher kommen die User?
+2. **Was könnte schiefgehen?** — Worst-Case-Szenarien (Leak, Bypass, Datenverlust).
+3. **Was tust du dagegen?** — konkrete Gegenmaßnahme pro Risiko.
+4. **Was sind die Konsequenzen?** — Business-Impact, Datenverlust, Reputation.
+
+## Anwendung
+
+- `concept-reviewer` prüft die 4 Fragen in Design-Docs (Threat-Model-Checkliste).
+- `orchestrator` stellt die 4 Fragen vor Feature-Releases.
+- **Interne Apps:** vereinfacht — 1–2 Fragen reichen.
+- **Customer-facing Apps:** vollständig — alle 4 Fragen plus dokumentiertes Threat Model.
 
 
 
