@@ -1595,7 +1595,6 @@ function buildSidebar() {
         { route: "/config/role-defaults", label: "role-defaults", icon: "⍟", superOnly: true },
         { route: "/config/ai-providers", label: "ai-providers", icon: "☁", superOnly: true },
         { route: "/config/skills-registry", label: "Skills Registry", icon: "🧩", superOnly: true },
-        { route: "/config/mcp-registry", label: "MCP Registry", icon: "🔌" },
         { route: "/config/dod-presets", label: "dod presets", icon: "☑", superOnly: true },
         { route: "/config/rules-presets", label: "rules presets", icon: "⚖", superOnly: true },
         { route: "/config/conventions-presets", label: "conventions presets", icon: "🏷", superOnly: true },
@@ -2577,18 +2576,23 @@ async function viewProjectMcpOverrides() {
   wrap.appendChild(el("h1", {}, ["Project — MCP Servers"]));
   wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable Framework MCP servers for your project, or customize them specifically for this repository."]));
 
-  let projData, fwData;
+  let projData, catData;
   try {
     projData = await api.get("/api/config/project");
-    fwData = await api.get("/api/config/mcp-registry").catch(() => ({ "mcp-servers": {} }));
+    // Framework MCP-server definitions now live in the unified plugin
+    // catalog (config/plugin-catalog.yaml superseded config/mcp-registry.yaml,
+    // see plugin-catalog-unification) -- filter to the mcp-server kind to
+    // get the same shape the old "mcp-servers" map had.
+    catData = await api.get("/api/config/plugin-catalog").catch(() => ({ plugins: {} }));
   } catch (err) {
     wrap.appendChild(renderError(err));
     return wrap;
   }
-  
+
   const activeServers = new Set(projData["mcp-servers"] || []);
   const projOverrides = projData["mcp-registry"] || {};
-  const fwServers = fwData["mcp-servers"] || {};
+  const fwServers = Object.fromEntries(
+    Object.entries(catData.plugins || {}).filter(([, def]) => def && def.kind === "mcp-server"));
 
   let dirty = false;
   const markDirty = () => { dirty = true; router.setDirty(true); };
@@ -3035,10 +3039,15 @@ async function viewProjectExternalToolsOverrides() {
     // drift banner is a convenience, not a blocker for the panel.
   }
 
-  let projData, fwData;
+  let projData, catData;
   try {
     projData = await api.get("/api/config/project");
-    fwData = await api.get("/api/config/external-tools-registry").catch(() => ({ "external-tools": {} }));
+    // Framework external-tool definitions now live in the unified plugin
+    // catalog (config/plugin-catalog.yaml superseded
+    // config/external-tools-registry.yaml, see plugin-catalog-unification)
+    // -- filter to the cli-tool kind to get the same shape the old
+    // "external-tools" map had.
+    catData = await api.get("/api/config/plugin-catalog").catch(() => ({ plugins: {} }));
   } catch (err) {
     wrap.appendChild(renderError(err));
     return wrap;
@@ -3063,7 +3072,8 @@ async function viewProjectExternalToolsOverrides() {
     });
   }
   const projOverrides = projData["external-tools-registry"] || {};
-  const fwTools = fwData["external-tools"] || {};
+  const fwTools = Object.fromEntries(
+    Object.entries(catData.plugins || {}).filter(([, def]) => def && def.kind === "cli-tool"));
 
   let dirty = false;
   const markDirty = () => { dirty = true; router.setDirty(true); };
@@ -3307,171 +3317,6 @@ async function viewProjectExternalToolsOverrides() {
   };
   wrap.appendChild(saveBtn);
 
-  return wrap;
-}
-async function viewMcpRegistry() {
-  const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["mcp-registry.yaml"]));
-  
-  let fwData, projData;
-  try { fwData = await api.get("/api/config/mcp-registry").catch(() => ({ "mcp-servers": {} })); }
-  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
-  
-  try { projData = await api.get("/api/config/project-mcp-registry").catch(() => ({ "mcp-servers": {} })); }
-  catch (err) { projData = { "mcp-servers": {} }; }
-
-  fwData["mcp-servers"] = fwData["mcp-servers"] || {};
-  projData["mcp-servers"] = projData["mcp-servers"] || {};
-  
-  const fwServers = fwData["mcp-servers"];
-  const projServers = projData["mcp-servers"];
-
-  const fwTitle = el("h2", { style: "margin-top: var(--space-5);" }, ["Framework Defaults"]);
-  wrap.appendChild(fwTitle);
-  
-  const fwListContainer = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); opacity: 0.8;" });
-  wrap.appendChild(fwListContainer);
-
-  const renderSrvPanel = (id, srv, isReadOnly, onChange) => {
-    if (!srv || typeof srv !== "object") return el("div");
-    const panel = el("details", { class: "panel", style: isReadOnly ? "pointer-events: none; opacity: 0.8;" : "" });
-    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [
-      id,
-      isReadOnly ? el("span", { title: "Read-Only", style: "font-size: 0.85em; margin-left: var(--space-2);" }, ["🔒"]) : "",
-      el("span", { class: "muted", style: "margin-left:var(--space-2); font-weight:400;" }, [srv.description || ""]),
-    ]));
-
-    const dField = el("div", { class: "field" });
-    dField.appendChild(el("label", { class: "field-label" }, ["Description"]));
-    const dInp = el("input", { type: "text", value: srv.description || "", disabled: isReadOnly });
-    dInp.addEventListener("input", () => { srv.description = dInp.value; onChange(); });
-    dField.appendChild(dInp);
-    panel.appendChild(dField);
-
-    srv.connection = srv.connection || { type: "stdio" };
-    const tField = el("div", { class: "field" });
-    tField.appendChild(el("label", { class: "field-label" }, ["Transport"]));
-    const tSel = el("select", { disabled: isReadOnly });
-    for (const t of ["stdio", "http", "sse"]) {
-      const o = el("option", { value: t }, [t]);
-      if ((srv.connection.type || "stdio") === t) o.selected = true;
-      tSel.appendChild(o);
-    }
-    tSel.addEventListener("change", () => { srv.connection.type = tSel.value; onChange(); });
-    tField.appendChild(tSel);
-    panel.appendChild(tField);
-
-    const cField = el("div", { class: "field" });
-    cField.appendChild(el("label", { class: "field-label" }, ["Command / URL"]));
-    const cInp = el("input", { type: "text", disabled: isReadOnly });
-    cInp.value = srv.connection.command || srv.connection.url || "";
-    cInp.addEventListener("input", () => {
-      if (srv.connection.type === "stdio") srv.connection.command = cInp.value;
-      else srv.connection.url = cInp.value;
-      onChange();
-    });
-    cField.appendChild(cInp);
-    panel.appendChild(cField);
-
-    const eField = el("div", { class: "field" });
-    eField.appendChild(el("label", { class: "field-label" }, ["Enabled by default"]));
-    const eWrap = el("label", { class: "toggle" });
-    const eCb = el("input", { type: "checkbox", disabled: isReadOnly });
-    eCb.checked = !!srv["enabled-by-default"];
-    eCb.addEventListener("change", () => { srv["enabled-by-default"] = eCb.checked; onChange(); });
-    eWrap.appendChild(eCb); eWrap.appendChild(el("span", { class: "slider" }));
-    eField.appendChild(eWrap);
-    panel.appendChild(eField);
-
-    srv.tools = srv.tools || {};
-    const wlField = el("div", { class: "field" });
-    wlField.appendChild(el("label", { class: "field-label" }, ["Allowed tools (comma-separated)"]));
-    if (isReadOnly) {
-       wlField.appendChild(el("input", { type: "text", value: (srv.tools.allowed || []).join(", "), disabled: true }));
-    } else {
-       wlField.appendChild(tagEditor(srv.tools.allowed || [], v => { srv.tools.allowed = v; onChange(); }));
-    }
-    panel.appendChild(wlField);
-
-    const blField = el("div", { class: "field" });
-    blField.appendChild(el("label", { class: "field-label" }, ["Blocked tools (comma-separated)"]));
-    if (isReadOnly) {
-       blField.appendChild(el("input", { type: "text", value: (srv.tools.blocked || []).join(", "), disabled: true }));
-    } else {
-       blField.appendChild(tagEditor(srv.tools.blocked || [], v => { srv.tools.blocked = v; onChange(); }));
-    }
-    panel.appendChild(blField);
-
-    return panel;
-  };
-  
-  if (Object.keys(fwServers).length === 0) {
-    fwListContainer.appendChild(el("div", { class: "empty" }, ["No framework servers."]));
-  }
-  for (const [id, srv] of Object.entries(fwServers)) {
-    fwListContainer.appendChild(renderSrvPanel(id, srv, true, () => {}));
-  }
-
-  const projTitle = el("h2", { style: "margin-top: var(--space-6);" }, ["Project Overrides"]);
-  wrap.appendChild(projTitle);
-
-  const status = el("div", { class: "muted" }, [`${Object.keys(projServers).length} project servers`]);
-  wrap.appendChild(status);
-  const markDirty = () => {
-    status.textContent = "Unsaved changes.";
-    status.style.color = "var(--accent-yellow)";
-  };
-  
-  const save = async () => {
-    try {
-      await api.put("/api/config/project-mcp-registry", projData);
-      toast("mcp-registry saved", "success");
-      status.textContent = "Saved.";
-      status.style.color = "var(--accent-green)";
-    } catch (err) {
-      toast(`Save failed: ${err.message}`, "error");
-      status.textContent = `Save failed: ${err.message}`;
-      status.style.color = "var(--accent-red)";
-    }
-  };
-
-  const actions = el("div", { class: "btn-row" }, [
-    el("button", { class: "btn btn-primary", onclick: save }, ["Save Overrides"]),
-    el("button", { class: "btn", onclick: () => {
-      const name = prompt("New MCP server override name:");
-      if (!name) return;
-      projServers[name] = { connection: { type: "stdio", command: "npx" }, "enabled-by-default": true };
-      markDirty();
-      renderProjList();
-    }}, ["+ Add Override"])
-  ]);
-  wrap.appendChild(actions);
-
-  const projListContainer = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4);" });
-  wrap.appendChild(projListContainer);
-
-  const renderProjList = () => {
-    projListContainer.innerHTML = "";
-    if (Object.keys(projServers).length === 0) {
-      projListContainer.appendChild(el("div", { class: "empty" }, ["No project overrides."]));
-      return;
-    }
-    for (const [id, srv] of Object.entries(projServers)) {
-      const panel = renderSrvPanel(id, srv, false, markDirty);
-      // Add delete button
-      const delBtn = el("button", { class: "btn", style: "color: var(--accent-red); margin-top: var(--space-2);", onclick: () => {
-        confirmDestructive(`Delete override '${id}'?`, () => {
-          delete projServers[id];
-          markDirty();
-          renderProjList();
-        });
-      }}, ["Delete Server"]);
-      panel.appendChild(delBtn);
-      projListContainer.appendChild(panel);
-    }
-  };
-
-  renderProjList();
   return wrap;
 }
 
@@ -4786,7 +4631,7 @@ async function viewProjectKnowledgeEngine() {
     if (ke.search.engine !== "index-only") {
       searchPanel.appendChild(labeledTextField(
         "MCP server", ke.search["mcp-server"] || "", (v) => { ke.search["mcp-server"] = v; },
-        "Name of the MCP server (as registered in config/mcp-registry.yaml) that knowledge-querier should call for semantic/full-text search instead of scanning index.md directly.",
+        "Name of the MCP server (as registered in config/plugin-catalog.yaml) that knowledge-querier should call for semantic/full-text search instead of scanning index.md directly.",
       ));
     }
     contentWrap.appendChild(searchPanel);
@@ -10106,7 +9951,6 @@ async function init() {
   router.register("/config/role-defaults",     viewRoleDefaults);
   router.register("/config/ai-providers",      viewAIProviders);
   router.register("/config/skills-registry",   viewSkillsRegistry);
-  router.register("/config/mcp-registry",      viewMcpRegistry);
   router.register("/config/dod-presets",       viewDodPresets);
   router.register("/config/rules-presets",     viewRulesPresets);
   router.register("/config/conventions-presets", viewConventionsPresets);
@@ -10210,7 +10054,6 @@ init();
     "config/role-defaults": "framework_defaults-role_defaults",
     "config/ai-providers": "framework_defaults-ai_providers",
     "config/skills-registry": "framework_defaults-skills",
-    "config/mcp-registry": "framework_defaults-mcp_registry",
     "config/dod-presets": "framework_defaults-dod_presets",
     "config/rules-presets": "framework_defaults-rules_presets",
     "config/conventions-presets": "framework_defaults-conventions_presets",

@@ -202,8 +202,6 @@ SUPER_ADMIN_FILES: dict[str, str] = {
     "role-defaults":     "config/role-defaults.yaml",
     "ai-providers":      "config/ai-providers.yaml",
     "skills-registry":   "config/skills-registry.yaml",
-    "mcp-registry":      "config/mcp-registry.yaml",
-    "external-tools-registry": "config/external-tools-registry.yaml",
     "dod-presets":       "config/dod-presets.yaml",
     "rules-presets":     "config/rules-presets.yaml",
     "conventions-presets": "config/conventions-presets.yaml",
@@ -215,8 +213,6 @@ SUPER_ADMIN_FILES: dict[str, str] = {
 # Always-available project configs.
 PROJECT_FILES: dict[str, str] = {
     "project": ".meta-config/project.yaml",
-    "project-mcp-registry": ".meta-config/mcp-registry.yaml",
-    "project-external-tools-registry": ".meta-config/external-tools-registry.yaml",
     "project-plugin-catalog": ".meta-config/plugin-catalog.yaml",
 }
 
@@ -1428,7 +1424,7 @@ class AuditService:
 
             # agent_meta_root, NOT project_root: in project_admin (submodule)
             # mode the framework's config/ai-providers.yaml and
-            # config/external-tools-registry.yaml live under .agent-meta/, not
+            # config/plugin-catalog.yaml live under .agent-meta/, not
             # the project root — passing project_root there silently finds
             # nothing and produces false-positive "undeclared artifact"
             # findings for every legitimately registered tool/provider.

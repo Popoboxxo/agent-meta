@@ -2,7 +2,7 @@
 
 Honcho is a local memory and context server that provides persistent, cross-session
 memory for agents. This guide shows how to activate the `honcho` MCP server that ships
-in agent-meta's registry (`config/mcp-registry.yaml`).
+in agent-meta's registry (`config/plugin-catalog.yaml`).
 
 > Honcho is **not** enabled by default (`enabled-by-default: false`). Activation is a
 > deliberate, per-project opt-in.

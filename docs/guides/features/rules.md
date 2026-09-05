@@ -60,8 +60,8 @@ Ein `sharkord-security.md` in `2-platform/` ersetzt `security.md` aus `1-generic
 **Stale-Cleanup:** sync.py führt Index-Dateien zur Verfolgung von generierten Rules:
 
 - `.claude/rules/.agent-meta-managed` — für reguläre Rules aus `rules/1-generic/` und `rules/2-platform/`
-- `.claude/rules/.agent-meta-managed-mcp` — für MCP-Server-Rules (automatisch aus `config/mcp-registry.yaml` generiert)
-- `.claude/rules/.agent-meta-managed-tools` — für External-Tool-Rules (automatisch aus `config/external-tools-registry.yaml` generiert)
+- `.claude/rules/.agent-meta-managed-mcp` — für MCP-Server-Rules (automatisch aus `config/plugin-catalog.yaml` generiert)
+- `.claude/rules/.agent-meta-managed-tools` — für External-Tool-Rules (automatisch aus `config/plugin-catalog.yaml` generiert)
 
 Rules die in einer dieser Indizes gelistet sind, aber nicht mehr in den agent-meta-Quellen existieren (z.B. weil ein MCP-Server deaktiviert oder ein Tool entfernt wurde), werden beim nächsten Sync **automatisch gelöscht**. Projekt-eigene Rules (nicht in den Indizes) werden niemals gelöscht.
 

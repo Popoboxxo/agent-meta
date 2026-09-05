@@ -6,7 +6,7 @@ und sichere Secrets-Handhabung über alle Provider hinweg.
 ## Konzept in 30 Sekunden
 
 ```
-config/mcp-registry.yaml          ← Globaler Katalog (was gibt es?)
+config/plugin-catalog.yaml        ← Globaler Katalog (was gibt es?)
   +
 project.yaml: mcp-servers: [...]  ← Projekt-Aktivierung (was nutzt dieses Projekt?)
   oder: platforms: [homeassistant] ← Implizit via Platform-Bundle
@@ -96,7 +96,7 @@ sync.py generiert automatisch:
 
 ## Neuen MCP-Server hinzufügen
 
-1. Eintrag in `config/mcp-registry.yaml` anlegen (description, tools, connection, secrets)
+1. Eintrag in `config/plugin-catalog.yaml` anlegen (`kind: mcp-server`; description, tools, connection, secrets)
 2. Optional: In Platform-Bundle `rules/2-platform/<platform>-mcp.yaml` referenzieren
 3. `sync.py` ausführen — Regel-Dateien und gitignore-Einträge werden automatisch generiert
 
@@ -147,7 +147,7 @@ Token rotieren wenn unsicher ob er in Git-History gelandet ist!
 
 ## Referenzen
 
-- `config/mcp-registry.yaml` — Globaler Server-Katalog
+- `config/plugin-catalog.yaml` — Globaler Server-Katalog
 - `rules/2-platform/homeassistant-mcp.yaml` — HA-Platform-Bundle
 - `rules/2-platform/_wf-ha-mcp-local.md` — Konfig-Beispiele für alle Provider
 - `howto/configs/mcp-secrets.local-template.yaml` — Secrets-Template

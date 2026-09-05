@@ -16,7 +16,7 @@ Danach `python scripts/sync.py` ausführen. Der Sync trägt den Server in die
 Provider-Configs ein (`.mcp.json` u.a.) und bindet die freigegebenen Tools als
 `mcp__playwright__<tool>` ins Frontmatter von `.claude/agents/e2e-tester.md`.
 
-> `playwright` hat `enabled-by-default: false` in `config/mcp-registry.yaml` —
+> `playwright` hat `enabled-by-default: false` in `config/plugin-catalog.yaml` —
 > ohne den expliziten Eintrag oben bleibt der Server inaktiv und der
 > `e2e-tester` bekommt keine Browser-Tools.
 
@@ -37,7 +37,7 @@ Sandboxes ohne Root schlägt das fehl. Die Registry setzt deshalb fest
 `--browser chromium`; dieser Build wird von Playwright selbst mitgeliefert und
 ohne Root installiert.
 
-Siehe `config/mcp-registry.yaml` → `playwright.connection.args`.
+Siehe `config/plugin-catalog.yaml` → `playwright.connection.args`.
 
 ## Welche Rollen bekommen die Tools
 

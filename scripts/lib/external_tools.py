@@ -30,7 +30,6 @@ from .log import SyncLog
 from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
 
-EXTERNAL_TOOLS_REGISTRY_YAML = "config/external-tools-registry.yaml"
 TOOL_RULE_PREFIX = "tool-"
 EXTERNAL_HOOKS_DIR = "hooks/0-external"
 # Fallback rules directory for providers without an explicit rules_dir (Claude).

@@ -19,7 +19,6 @@ from .io import (
 )
 from .log import SyncLog
 from .mcp_registry import (  # noqa: F401 (re-exported for callers/tests, issue #613)
-    MCP_REGISTRY_YAML,
     SECRETS_LOCAL_FILE,
     build_mcp_guardrails_list,
     load_mcp_registry,

@@ -2,7 +2,7 @@ description = "Guided setup to activate an MCP server in this project"
 prompt = """
 Activate an MCP server for this project. {{args}}
 
-1. Read `.agent-meta/config/mcp-registry.yaml` and `.meta-config/project.yaml`.
+1. Read `.agent-meta/config/plugin-catalog.yaml` (mcp-server entries) and `.meta-config/project.yaml`.
 2. If {{args}} empty/invalid, list available servers and ask.
 3. Show required secrets; wait until `.meta-config/secrets.local.yaml` is updated.
 4. Add the server to `mcp-servers:` in `.meta-config/project.yaml`.

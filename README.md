@@ -325,7 +325,7 @@ python scripts/sync.py --add-skill <repo-url> --skill-name <name> --role <role>
 
 ## External Dev-Tool Integrations
 
-Locally installed CLI development tools (e.g., `graphify` for architecture analysis) can contribute rules and hooks to agent-meta via a curated registry. Rather than allowing tools to self-mutate generated files like `CLAUDE.md` or `settings.json` (which violates framework invariants), external tools are registered in `config/external-tools-registry.yaml`. Each tool entry includes:
+Locally installed CLI development tools (e.g., `graphify` for architecture analysis) can contribute rules and hooks to agent-meta via a curated registry. Rather than allowing tools to self-mutate generated files like `CLAUDE.md` or `settings.json` (which violates framework invariants), external tools are registered in `config/plugin-catalog.yaml` (as `kind: cli-tool` entries). Each tool entry includes:
 
 - **Rule content:** Markdown instructions (bundled into `.claude/rules/tool-<name>.md` or embedded in `AGENTS.md` for Opencode)
 - **Hook wiring:** References to maintainer-authored shell wrapper scripts under `hooks/0-external/` that guard or augment tool operations
@@ -661,7 +661,7 @@ config/
   dod-presets.yaml           # 6 DoD presets
   tier-presets.yaml          # 5 tier presets (cheap, normal, advanced, expensive, expensive as hell)
   ai-providers.yaml          # 6 provider configs (Claude, Gemini, Opencode, Continue, Copilot, Mammouth)
-  mcp-registry.yaml          # 7 MCP server configs
+  plugin-catalog.yaml        # Unified MCP-server + CLI-tool catalog
   generated/
     model-registry.json      # Cached model registry (currently ~44 curated entries; grows with --update-models)
   model-curation.yaml        # Model visibility: blacklist and disabled lists

@@ -19,7 +19,6 @@ from pathlib import Path
 from .io import _deep_merge, _load_yaml_or_json
 from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 
-MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
 SECRETS_LOCAL_FILE = ".meta-config/secrets.local.yaml"
 
 

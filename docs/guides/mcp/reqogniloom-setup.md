@@ -1,6 +1,6 @@
 # ReqogniLoom MCP Setup
 
-ReqogniLoom ist eine selbst gehostete Requirements-Engineering-Plattform (Anforderungen, Architektur, Tests, Traceability, ADRs, Risiken, Issues, Glossar, KI-gestützte Ableitungen). Dieser Leitfaden zeigt, wie der `reqogniloom` MCP-Server, der in der Registry von agent-meta (`config/mcp-registry.yaml`) enthalten ist, aktiviert wird.
+ReqogniLoom ist eine selbst gehostete Requirements-Engineering-Plattform (Anforderungen, Architektur, Tests, Traceability, ADRs, Risiken, Issues, Glossar, KI-gestützte Ableitungen). Dieser Leitfaden zeigt, wie der `reqogniloom` MCP-Server, der in der Registry von agent-meta (`config/plugin-catalog.yaml`) enthalten ist, aktiviert wird.
 
 > ReqogniLoom ist standardmäßig **nicht** aktiviert (`enabled-by-default: false`). Die Aktivierung ist eine bewusste, projektspezifische Entscheidung (Opt-in).
 
