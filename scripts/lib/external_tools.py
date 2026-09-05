@@ -27,6 +27,7 @@ from pathlib import Path
 
 from .io import SyncError, _deep_merge, _load_yaml_or_json, _normalize_enabled_config, safe_path, write_checked
 from .log import SyncLog
+from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
 
 EXTERNAL_TOOLS_REGISTRY_YAML = "config/external-tools-registry.yaml"
@@ -130,26 +131,8 @@ def load_external_tools_registry(
 
     Returns a flat {tool_name: tool_def} dict.
     """
-    data, _ = _load_yaml_or_json(agent_meta_root / EXTERNAL_TOOLS_REGISTRY_YAML)
-    registry: dict = {}
-    if data and isinstance(data, dict):
-        registry = data.get("external-tools", {})
-        if not isinstance(registry, dict):
-            registry = {}
-
-    if project_root:
-        proj_data, _ = _load_yaml_or_json(
-            project_root / ".meta-config" / "external-tools-registry.yaml"
-        )
-        if proj_data and isinstance(proj_data, dict):
-            proj_tools = proj_data.get("external-tools", proj_data)
-            if isinstance(proj_tools, dict):
-                _deep_merge(registry, proj_tools)
-
-    if config:
-        inline_registry = config.get("external-tools-registry", {})
-        if isinstance(inline_registry, dict):
-            _deep_merge(registry, inline_registry)
+    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
+    registry = plugins_of_kind(catalog, "cli-tool")
 
     for tool_name, tool_def in registry.items():
         if isinstance(tool_def, dict) and "permitted-injections" in tool_def:
@@ -198,7 +181,10 @@ def resolve_active_external_tools(
     """
     if registry is None:
         registry = load_external_tools_registry(agent_meta_root, config, project_root)
-    project_tools = _normalize_enabled_config((config or {}).get("external-tools", {}))
+    if (config or {}).get("plugins") is not None:
+        project_tools = _activation_from_config(config)
+    else:
+        project_tools = _normalize_enabled_config((config or {}).get("external-tools", {}))
 
     active: list[str] = []
     for name, tool_def in registry.items():

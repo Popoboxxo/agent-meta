@@ -10,6 +10,8 @@ Covers the three public functions:
 import sys
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -36,9 +38,15 @@ mcp-servers:
 
 
 def _write_registry(agent_meta_root: Path, body: str = _BASE_REGISTRY) -> None:
+    # load_mcp_registry now sources from the unified config/plugin-catalog.yaml
+    # (kind: mcp-server slice) instead of the old config/mcp-registry.yaml —
+    # see scripts/lib/plugins.py. `body` keeps its old mcp-servers: shape for
+    # readability/diff-minimality; only the on-disk translation changed.
     d = agent_meta_root / "config"
     d.mkdir(parents=True, exist_ok=True)
-    (d / "mcp-registry.yaml").write_text(body, encoding="utf-8")
+    servers = (yaml.safe_load(body) or {}).get("mcp-servers", {})
+    plugins = {name: {**(sdef or {}), "kind": "mcp-server"} for name, sdef in servers.items()}
+    (d / "plugin-catalog.yaml").write_text(yaml.dump({"plugins": plugins}), encoding="utf-8")
 
 
 # --- load_mcp_registry -------------------------------------------------------
@@ -58,8 +66,8 @@ def test_load_mcp_registry_merges_project_override(tmp_path):
     _write_registry(tmp_path)
     project_root = tmp_path / "project"
     (project_root / ".meta-config").mkdir(parents=True)
-    (project_root / ".meta-config" / "mcp-registry.yaml").write_text(
-        "mcp-servers:\n  honcho:\n    enabled-by-default: false\n", encoding="utf-8",
+    (project_root / ".meta-config" / "plugin-catalog.yaml").write_text(
+        "plugins:\n  honcho:\n    enabled-by-default: false\n", encoding="utf-8",
     )
 
     registry = load_mcp_registry(tmp_path, project_root=project_root)
@@ -71,7 +79,7 @@ def test_load_mcp_registry_merges_project_override(tmp_path):
 
 def test_load_mcp_registry_merges_config_override(tmp_path):
     _write_registry(tmp_path)
-    config = {"mcp-registry": {"honcho": {"tools": {"blocked": ["only_this_one"]}}}}
+    config = {"plugin-catalog": {"honcho": {"tools": {"blocked": ["only_this_one"]}}}}
 
     registry = load_mcp_registry(tmp_path, config=config)
 

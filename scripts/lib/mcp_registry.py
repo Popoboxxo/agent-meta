@@ -17,33 +17,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from .io import _deep_merge, _load_yaml_or_json
+from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 
 MCP_REGISTRY_YAML = "config/mcp-registry.yaml"
 SECRETS_LOCAL_FILE = ".meta-config/secrets.local.yaml"
 
 
 def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project_root: Path | None = None) -> dict:
-    """Load config/mcp-registry.yaml and deep-merge with project-specific mcp-registry (if provided)."""
-    data, _ = _load_yaml_or_json(agent_meta_root / MCP_REGISTRY_YAML)
-    registry = {}
-    if data and isinstance(data, dict):
-        registry = data.get("mcp-servers", {})
-        if not isinstance(registry, dict):
-            registry = {}
-
-    if project_root:
-        proj_data, _ = _load_yaml_or_json(project_root / ".meta-config" / "mcp-registry.yaml")
-        if proj_data and isinstance(proj_data, dict):
-            proj_servers = proj_data.get("mcp-servers", proj_data)
-            if isinstance(proj_servers, dict):
-                _deep_merge(registry, proj_servers)
-
-    if config:
-        project_registry = config.get("mcp-registry", {})
-        if isinstance(project_registry, dict):
-            _deep_merge(registry, project_registry)
-
-    return registry
+    """Return the mcp-server slice of the unified plugin catalog (same shape as
+    the old config/mcp-registry.yaml `mcp-servers` map)."""
+    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
+    return plugins_of_kind(catalog, "mcp-server")
 
 
 def resolve_active_mcp_servers(
@@ -67,8 +51,14 @@ def resolve_active_mcp_servers(
     """
     if registry is None:
         registry = load_mcp_registry(agent_meta_root, config, project_root)
-    explicit: set[str] = set(config.get("mcp-servers", []))
-    active: list[str] = list(config.get("mcp-servers", []))
+    if config.get("plugins") is not None:
+        activation = _activation_from_config(config)
+        ordered = [pid for pid, v in activation.items()
+                   if v.get("enabled") and pid in registry]
+    else:
+        ordered = list(config.get("mcp-servers", []))
+    explicit: set[str] = set(ordered)
+    active: list[str] = list(ordered)
 
     platform_dir = agent_meta_root / "rules" / "2-platform"
     for platform in config.get("platforms", []):
