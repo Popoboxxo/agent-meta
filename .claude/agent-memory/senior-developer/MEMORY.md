@@ -12,6 +12,7 @@
 - [Orchestrator-Table Check False-Positive](orchestrator-table-check-false-positive.md) — crossrefs.orchestrator-table-incomplete ist Placeholder-bedingter False-Positive; NICHT durch Edit an orchestrator.md fixen
 - [Reflection-Overrides Dead Code](reflection-overrides-deadcode.md) — reflection-pairs.overrides wirken NICHT (reflection.py nicht in config.py verdrahtet); quality-pipelines.overrides wirken dagegen
 - [Tier-Resolution Silent-Empty](tier-resolution-missing-key-silent-empty.md) — resolve_model gibt "" zurück wenn Tier-Key im aktiven Preset fehlt; neue Tiers in ALLE Presets + Provider-Blöcke eintragen
+- [Shared context_file Strategy-Konvergenz (#638-Lücke)](shared-context-file-strategy-convergence.md) — Provider mit gleicher context_file müssen EINE Render-Strategie nutzen; Dispatch-Guard _shares_context_with_embedded_rules ergänzt #638-Union-Logik
 - [Multi-Provider 3-File-Invariante](multi-provider-three-file-invariant.md) — Provider aus ai-providers.yaml muss auch in capabilities/bootstrap/delegation-syntax stehen, sonst Silent-Downgrade (PAL_* gestrippt); Copilot = konservatives Referenz-Pattern
 - [Neuer _BLOCK-Platzhalter: 2 versteckte Kopplungen](new-block-placeholder-coupling.md) — build_variables _BLOCK-Var braucht auch Eintrag in consistency/placeholders.py _BUILTIN_VARS + standalone.py Fallback
 - [Admin-Server God-Object-Split (#572)](admin-server-god-object-split.md) — DONE: alle 6 Services (Auth/Audit/Template/Pipeline/Reflection/Models) + RoleDefaultsEditor + ServiceContext; Delegation-Pattern, Tests unverändert grün

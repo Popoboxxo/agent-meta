@@ -731,6 +731,33 @@ def _sync_continue_context(
                 settings_path.write_text(yaml_content, encoding="utf-8")
 
 
+def _shares_context_with_embedded_rules(
+    provider: str, pc: dict, provider_config: dict
+) -> bool:
+    """True if this provider's context_file is also rendered by an embedded-rules provider.
+
+    Multiple providers can point `context_file` at the same physical file (e.g.
+    Opencode/Gemini/Codex/ZCode/KimiCode all share AGENTS.md). That file can hold
+    only ONE managed block, so every sharer must render byte-identical content —
+    otherwise a lone `--check` reports a permanent, unfixable false "out of sync"
+    (issue #638). The embedded-rules strategy is a strict superset of the plain
+    managed-block strategy (it additionally inlines the rule bodies), so when any
+    sharer uses `context-embedded-rules`, ALL sharers must use it too. This keeps
+    the choice generic: it depends on the shared-file capability set, not on any
+    hardcoded provider name, so a future provider that joins the shared file
+    converges automatically.
+    """
+    context_file = pc.get("context_file")
+    if not context_file:
+        return False
+    return any(
+        p != provider
+        and cfg.get("context_file") == context_file
+        and "context-embedded-rules" in cfg.get("capabilities", [])
+        for p, cfg in provider_config.items()
+    )
+
+
 def sync_context_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -745,6 +772,8 @@ def sync_context_for_provider(
 
     Dispatch is capability-driven:
       - context-embedded-rules → Opencode strategy
+      - shares a context_file with an embedded-rules provider → Opencode strategy
+        (the shared physical file must converge to one managed block, #638)
       - provider == Continue   → Continue strategy (managed block + config.yaml comment)
       - context-managed-block  → generic HTML managed-block strategy
     """
@@ -752,7 +781,9 @@ def sync_context_for_provider(
     if not pc:
         return
 
-    if _has_capability(pc, "context-embedded-rules"):
+    if _has_capability(pc, "context-embedded-rules") or _shares_context_with_embedded_rules(
+        provider, pc, provider_config
+    ):
         _sync_opencode_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config,
