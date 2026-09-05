@@ -114,6 +114,8 @@ from lib.pipelines import (
     sync_pipeline_detail_files,
 )
 from lib.platform import load_platform_config
+from lib.plugin_test import run_plugin_test
+from lib.plugins import load_plugin_catalog
 from lib.providers import (
     load_providers_config,
     resolve_context_filename,
@@ -526,6 +528,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
                              "optionally overridden by AGENT_META_TEST_REPO env var. "
                              "Performs a full sync into the test repo and checks sync.log for errors.")
+    parser.add_argument("--test-plugin", metavar="ID", default=None,
+                        help="Run the health check for one plugin from the catalog and exit.")
     parser.add_argument("--render-standalone", action="store_true",
                         help="Render fully self-contained, English-only copies of every "
                              "1-generic agent template into standalone/agents/ — no Python/"
@@ -616,6 +620,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_test_plugin(agent_meta_root: Path, project_root: Path, plugin_id: str) -> int:
+    """Run the health check for one plugin from the catalog. Returns an exit code."""
+    from lib.io import _load_yaml_or_json
+    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, project_root=project_root)
+    plugin_def = catalog.get(plugin_id)
+    if not plugin_def:
+        print(f"  !  '{plugin_id}' not in catalog ({', '.join(sorted(catalog)) or 'empty'})")
+        return 1
+    secrets, _ = _load_yaml_or_json(project_root / ".meta-config" / "secrets.local.yaml")
+    res = run_plugin_test(plugin_id, plugin_def, secrets=secrets or {})
+    print(f"  {res['status']}  {plugin_id}: {res['message']} ({res['latency_ms']}ms)")
+    return 0 if res["status"] == "PASS" else 1
+
+
 def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     """Run the pre-config CLI modes and build the shared sync context.
 
@@ -629,6 +647,9 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
         invalidate(CACHE_FILE)
         print("Outcome cache cleared.")
         return None
+
+    if args.test_plugin:
+        sys.exit(_run_test_plugin(agent_meta_root, Path.cwd(), args.test_plugin))
 
     if args.update_models:
         from lib.model_discovery import discover_models
