@@ -44,12 +44,15 @@ knowledge-engine:
   schema-language: auto
 platforms:
 - agent-meta
-mcp-servers:
-- honcho
-- playwright
-- reqogniloom
-external-tools:
-- graphify
+plugins:
+  honcho:
+    enabled: true
+  playwright:
+    enabled: true
+  reqogniloom:
+    enabled: true
+  graphify:
+    enabled: true
 roles:
 - orchestrator
 - developer
