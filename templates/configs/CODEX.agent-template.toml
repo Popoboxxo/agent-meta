@@ -1,0 +1,43 @@
+# agent-meta generated file — do not edit manually.
+# generated-from: 1-generic/orchestrator.md@0.101.0
+# version: 0.101.0
+
+# Reference shape of a generated Codex agent file (.codex/agents/<name>.toml).
+# Codex auto-loads every *.toml in .codex/agents/ — no registration step.
+# This file documents the output of the `codex-toml` frontmatter-mechanism
+# (scripts/lib/agent_toml.py); the generated counterpart of this example is
+# byte-identical apart from the documentation comments below.
+
+# Agent name — must match the file stem (<name>.toml).
+name = "orchestrator"
+
+# One-line responsibility summary (from the template frontmatter,
+# {{PROJECT_NAME}} already substituted).
+description = "Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten."
+
+# Resolved model ID (agent-transform: model: inject) — tier mapping from the
+# Codex `model-tiers` table in config/ai-providers.yaml (orchestrator runs on
+# tier `balanced` → gpt-5.3-codex-spark).
+# Omitted entirely when model resolution is empty (inherit main-chat model).
+model = "gpt-5.3-codex-spark"
+
+# Static extra fields from agent-transform: extra-fields — the per-agent
+# sandbox posture (Codex writes outside the workspace only with this set).
+sandbox_mode = "workspace-write"
+
+# The required body field (V7: developer_instructions, NOT instructions).
+# Carries the full Markdown prompt body; Claude-specific lines (e.g.
+# "> **Extension:** .claude/3-project/...") are already stripped by the
+# transform. Rendered as a TOML multi-line basic string: the newline right
+# after the opening delimiter is trimmed by TOML, so the body round-trips
+# byte-for-byte.
+developer_instructions = """
+# Orchestrator
+
+Du bist der Einstiegspunkt für alle Entwicklungsaufgaben.
+"""
+
+# agent-meta bookkeeping (version, generated-from) has no native frontmatter
+# fields in the Codex agent TOML schema — it is preserved as the comment
+# header at the top of this file instead, so traceability/version-bump
+# enforcement (Hard Invariant #2) survives the format switch.

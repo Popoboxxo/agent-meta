@@ -140,7 +140,7 @@ Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #1
 
 # Lifecycle-Tasks
 
-Beim Start prüfen: existiert `.gemini/pending-tasks.md bzw. .opencode/pending-tasks.md`?
+Beim Start prüfen: existiert `.gemini/pending-tasks.md bzw. .opencode/pending-tasks.md bzw. .codex/pending-tasks.md bzw. .zcode/pending-tasks.md bzw. .kimi-code/pending-tasks.md`?
 Falls ja und enthält `- [ ]`: User fragen ob delegiert werden soll.
 Nach Erledigung: löschen. Datei nicht committen.
 
@@ -277,7 +277,7 @@ Details (Schichten-Modell, Composition-Syntax, Platzhalter-Escape): `docs/archit
 
 ## Hard Invariants
 
-1. `.gemini/agents bzw. .opencode/agents` is generated output — never edit manually. Make changes in `agents/` or `.meta-config/project.yaml`.
+1. `.gemini/agents bzw. .opencode/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents` is generated output — never edit manually. Make changes in `agents/` or `.meta-config/project.yaml`.
 2. Bump agent version in frontmatter on every content change:
    - Major (`X.0.0`): renamed variable, changed behavior, new mandatory section
    - Minor (`x.Y.0`): new optional section, expanded scope
@@ -306,7 +306,7 @@ Referenz-Implementierung — dem folgen, keinen neuen `elif` hinzufügen.
 
 # agent-meta — sync.py Interface
 
-`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.gemini/agents bzw. .opencode/agents` schreiben.
+`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.gemini/agents bzw. .opencode/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents` schreiben.
 
 Vollständige Referenz (Flags, sync.log, Modulstruktur):
 → `.agent-meta/agents/1-generic/_wf-sync-interface.md`
@@ -503,14 +503,14 @@ Details (Smart Context Regeneration, `--check`, `context-hashes.json`, Provider-
 ---
 
 Details/Registrierung: `config/external-tools-registry.yaml`.
-Hook-Wrapper: `hooks/0-external/graphify-search-guard.sh`, `hooks/0-external/graphify-read-guard.sh` · Injektionen: `.gemini/skills/graphify bzw. .opencode/skills/graphify` (skill)
+Hook-Wrapper: `hooks/0-external/graphify-search-guard.sh`, `hooks/0-external/graphify-read-guard.sh` · Injektionen: `.gemini/skills/graphify bzw. .opencode/skills/graphify bzw. .agents/skills/graphify bzw. .zcode/skills/graphify bzw. .kimi-code/skills/graphify` (skill)
 
 
 
 
 
 ## Agent Directory
-> Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
+> Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents`.
 
 | Agent | Core Capabilities |
 |-------|-------------------|

@@ -523,7 +523,8 @@ def test_540_d3b_opencode_compact_embeds_rules_inline_rather_than_separating(
 #   3. has_rules:false Opencode embeds those rules in the COMPACT variant.
 # ---------------------------------------------------------------------------
 
-_ALL_PROVIDERS = ("Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth")
+_ALL_PROVIDERS = ("Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
+                  "Codex", "ZCode", "KimiCode")
 _LEFTOVER_MARKERS = ("{{#if", "{{else}}", "{{/if}}", "{{#each", "{{/each}}",
                      "{{#unless", "{{/unless}}", "{{>")
 # OVERVIEW section headings dropped from the three platform rules in compact

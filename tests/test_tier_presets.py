@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scripts.lib.roles import resolve_model
 
 # Root of the agent-meta repo (parent of tests/)
@@ -195,4 +197,67 @@ def test_provider_tier_override_beats_preset_tiers() -> None:
     )
     assert model == override_model, (
         f"provider-tier-overrides must beat preset tiers: expected {override_model!r}, got {model!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Codex/ZCode/KimiCode — Normal preset provider entries (2026-09 onboarding)
+#
+# tier-presets.yaml documents the known gap: without a Normal.providers entry,
+# a new provider silently falls back to the preset's Claude-centric global
+# curve and generated agents would carry claude-* model IDs. These tests pin
+# the per-provider entries via the real configs (roles without project
+# overrides: developer = balanced, junior-developer = fast).
+# ---------------------------------------------------------------------------
+
+_NEW_PROVIDER_MODEL_EXPECTATIONS = {
+    "Codex": {"balanced": "gpt-5.3-codex-spark", "fast": "gpt-5.4"},
+    "ZCode": {"balanced": "glm-5.3", "fast": "glm-5.3-flash"},
+    "KimiCode": {"balanced": "kimi-k2.7-code", "fast": "kimi-k2.6"},
+}
+
+
+def _resolve_for_provider(role: str, preset: str, provider: str) -> str:
+    """Helper: resolve a role's model for a non-Claude provider with a preset."""
+    return resolve_model(
+        role=role,
+        project_config={"tier-preset": preset},
+        agent_meta_root=REPO_ROOT,
+        provider=provider,
+        provider_config=_PROVIDER_CONFIG,
+    )
+
+
+@pytest.mark.parametrize("provider", sorted(_NEW_PROVIDER_MODEL_EXPECTATIONS))
+def test_new_providers_normal_preset_resolves_provider_models(provider: str) -> None:
+    """Normal preset must map balanced/fast onto the provider's own model IDs,
+    not the global Claude-centric fallback curve."""
+    expected = _NEW_PROVIDER_MODEL_EXPECTATIONS[provider]
+    # developer has model: balanced (role-defaults.yaml), no project override.
+    balanced = _resolve_for_provider("developer", "Normal", provider)
+    assert balanced == expected["balanced"], (
+        f"{provider}: Normal preset balanced should be {expected['balanced']!r}, got {balanced!r} "
+        f"(missing Normal.providers entry falls back to the global claude-* curve)"
+    )
+    # junior-developer has model: fast (role-defaults.yaml), no project override.
+    fast = _resolve_for_provider("junior-developer", "Normal", provider)
+    assert fast == expected["fast"], (
+        f"{provider}: Normal preset fast should be {expected['fast']!r}, got {fast!r}"
+    )
+
+
+@pytest.mark.parametrize("provider", sorted(_NEW_PROVIDER_MODEL_EXPECTATIONS))
+def test_new_providers_normal_tiers_match_provider_registry(provider: str) -> None:
+    """Normal.providers[<provider>].tiers must stay a 1:1 mirror of the
+    provider's model-tiers table in ai-providers.yaml (the config comment
+    declares exactly that intent)."""
+    import yaml
+
+    with (REPO_ROOT / "config" / "tier-presets.yaml").open(encoding="utf-8") as f:
+        presets = yaml.safe_load(f)
+    provider_tiers = presets["Normal"]["providers"][provider]["tiers"]
+    registry_tiers = _PROVIDER_CONFIG[provider]["model-tiers"]
+    assert provider_tiers == registry_tiers, (
+        f"{provider}: Normal.providers tiers drifted from ai-providers.yaml model-tiers: "
+        f"{provider_tiers!r} != {registry_tiers!r}"
     )

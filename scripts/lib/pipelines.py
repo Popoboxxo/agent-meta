@@ -13,7 +13,7 @@ from pathlib import Path
 # lost even though the error itself is deliberately non-fatal.
 _logger = logging.getLogger(__name__)
 
-KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
+KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth", "Codex", "ZCode", "KimiCode")
 DEFAULT_MAX_DEPTH = 4
 
 

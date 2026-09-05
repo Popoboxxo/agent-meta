@@ -98,3 +98,77 @@ capabilities:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
       - "Keine native parallele Subagent-Ausführung — Delegation sequentiell/textbasiert."
       - "Hooks-Pfade sind konfiguriert (.mammouth/hooks), aber ungespiegelt: kein verifiziertes hook_protocol (#630). MCP-Integration in ai-providers.yaml nicht konfiguriert."
+
+  # Codex (OpenAI Codex CLI) — orchestration surface verified against the
+  # official docs (V1/V4/V7/V8, 2026-09-04); dispatch/orchestration values are
+  # verified-on. Restrained values and their verification dependency:
+  # `hooks: false` is a MIRROR gate, not a capability gap — the Codex hook
+  # payload contract IS verified (V1: stdin JSON, sync blocking, hooks.json +
+  # inline [hooks], 12 Claude-identical event names) but NOT 1:1
+  # Claude-compatible (continue/stopReason/suppressOutput unsupported for
+  # PreToolUse/PermissionRequest; non-hash-trusted hooks are skipped until an
+  # interactive /hooks review), so ai-providers.yaml sets no hook_protocol and
+  # sync.py does not mirror hook scripts (#630 pattern, see
+  # providers.py::provider_hooks_supported).
+  Codex:
+    subagent_dispatch: true
+    parallel_execution: true          # multi_agent feature flag stable default-on, agents.enabled default true (V7)
+    file_based_agents: true           # .codex/agents/*.toml auto-loaded as config layers, personal + project-scoped, no registration step (V7)
+    text_mentions: false
+    hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
+    native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
+    structured_handoff: true
+    handoff_format: "json"
+    handoff_envelope_support: true
+    description: "Dateibasierte TOML-Agenten (.codex/agents/*.toml) mit nativem spawn_agent-Dispatch und stable-default-on multi_agent-Fanout."
+    special_notes:
+      - "Agenten sind TOML-Dateien mit name/description/sandbox_mode/model/developer_instructions (Pflichtfeld: developer_instructions, V7)."
+      - "Hooks: 12 Events mit Claude-identischen Namen, aber Payload-Deviations (continue/stopReason/suppressOutput nicht unterstützt) + Hash-Trust-Review — daher kein hook_protocol (#630-Muster)."
+      - "Kein settings.json — Projekt-Konfiguration lebt in .codex/config.toml."
+
+  # ZCode (zcode.z.ai) — verification state V2/V5/V9/V17/V18 (2026-09-04).
+  # Restrained values and their verification dependency: parallel execution is
+  # NOT enabled because backgrounding (run_in_background / autoBackgroundMs) is
+  # not a verified parallel-subagent contract; project-level hooks are
+  # completely ignored by the harness (V2: config_project_hooks_ignored); the
+  # yaml_text_block handoff stays conservative until json support is verified.
+  ZCode:
+    subagent_dispatch: true           # native Agent-Toolcalls (V17)
+    parallel_execution: false         # backgrounding (run_in_background / autoBackgroundMs) ≠ verified parallel subagent contract
+    file_based_agents: true           # REVISED per V18: user-level ~/.zcode/agents/*.md auto-load is verified; workspace-level auto-load = P6 real-repo-test; plugin route verified
+    text_mentions: false
+    hooks: false                      # project-level hooks are completely ignored by the harness (V2)
+    native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
+    structured_handoff: true
+    handoff_format: "yaml_text_block" # conservative until json support verified
+    handoff_envelope_support: false
+    bootstrap_required: true          # workspace-level .zcode/agents/ consumption via bootstrap injection (Gemini posture, plan §5.8)
+    description: "Agent-Orchestrierung via Agent-Toolcall (Legacy-Alias Task), dateibasierte Agent-Definitionen mit Bootstrap-Injection ins Workspace-AGENTS.md."
+    special_notes:
+      - "AGENTS.md: nur user-global + Workspace-Level — kein Child-Dir-Merging, kein @import."
+      - "Agent-Definitionen werden als Dateien generiert (.zcode/agents/*.md, Definition-Store) und via Bootstrap-Injection konsumiert; Workspace-Auto-Load = P6 real-repo-test (V18)."
+      - "Dispatch-Tool: Agent (Legacy-Alias Task, V17); Hintergrund via run_in_background / subagents.autoBackgroundMs."
+      - "model.main/model.lite Keys sind nicht dokumentiert (V9) — Modelle leben UI-verwaltet in ~/.zcode/v2/config.json; Per-Rollen-Modelle via model-Frontmatter in den Agent-Dateien."
+
+  # Kimi Code (Moonshot AI Kimi Code CLI) — verification state V10/V11/V14/V16
+  # (2026-09-04). Restrained values and their verification dependency: hooks
+  # exist (20 events) but are only documented via user-level ~/.kimi-code/
+  # config.toml [[hooks]] — no project-level hook generation surface, so no
+  # mirror (#630 pattern).
+  KimiCode:
+    subagent_dispatch: true           # built-in coder/explore/plan + custom agents (V16)
+    parallel_execution: true          # AgentSwarm fan-out with documented contract, up to 128 items (V16)
+    file_based_agents: true           # Option A determined (V10): plain Markdown + YAML frontmatter, auto-discovery (project .kimi-code/agents/ > user > plugin > built-in)
+    text_mentions: false
+    hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
+    native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
+    structured_handoff: true
+    handoff_format: "yaml_text_block"
+    handoff_envelope_support: false
+    description: "Custom Agents als Markdown+YAML-Frontmatter mit Auto-Discovery; Dispatch via Agent und AgentSwarm-Fanout (bis 128 Items)."
+    special_notes:
+      - "AGENTS.md: Projekt-Root + Subdirs auto-geladen (nearest-wins, wie Codex); global ~/.kimi-code/AGENTS.md."
+      - "Registry-Key KimiCode bleibt eindeutig gegen die Opencode-Modell-Aliase kimi/kimi-code."
+      - "Pfade systematisch .kimi-code/ — NIEMALS .agents/ (Cross-Tool-Konvention, V10-Warnung)."
+      - "KIMI_* Env-Vars sind Runtime-Harness-Themen — out of sync.py scope."
+      - "Hooks nur user-level config.toml ([[hooks]]-Array, 20 Events, V11) — keine Projekt-Hook-Generierung."

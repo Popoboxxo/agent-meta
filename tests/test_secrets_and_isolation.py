@@ -62,6 +62,44 @@ def test_isolation_still_generates_deny_entries(tmp_path):
     assert "**/opencode.json" in settings.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("provider,own_dirs", [
+    ("KimiCode", [".kimi-code/", "AGENTS.md"]),
+    ("Codex", [".codex/", "AGENTS.md"]),
+    ("ZCode", [".zcode/", "AGENTS.md"]),
+])
+def test_isolation_provider_without_mechanism_is_skipped(tmp_path, provider, own_dirs):
+    # Plan §10 P3: providers whose registry entry has isolation-dirs but NO
+    # isolation-mechanism yet (KimiCode/Codex/ZCode) must be skipped
+    # gracefully — no crash, no provider-side artifacts — while the OTHER
+    # provider (Claude, via claude-settings-deny) still blocks their dirs.
+    from lib.isolation import sync_provider_isolation
+
+    project_root = tmp_path
+    providers = ["Claude", provider]
+    provider_config = {
+        "Claude": {"isolation-dirs": [".claude/"], "isolation-mechanism": "claude-settings-deny"},
+        provider: {"isolation-dirs": list(own_dirs)},  # no isolation-mechanism
+    }
+    log = SyncLog()
+    sync_provider_isolation(project_root, providers, provider_config, log, dry_run=False)
+
+    # Claude gained deny entries for the foreign (provider-owned) dirs,
+    # using the same dir→glob mapping the existing deny-entry test asserts.
+    settings = (project_root / ".claude" / "settings.json")
+    assert settings.exists()
+    settings_text = settings.read_text(encoding="utf-8")
+    for d in own_dirs:
+        expected_glob = d + "**" if d.endswith("/") else f"**/{d}"
+        assert expected_glob in settings_text
+
+    # The provider itself is skipped with the documented reason and no
+    # provider-side isolation artifacts were written.
+    assert any(
+        "no isolation mechanism defined for this provider" in s for s in log.skipped
+    ), log.skipped
+    assert not (project_root / own_dirs[0]).exists()
+
+
 # ---------------------------------------------------------------------------
 # #586 point 1 -- gitignore verification for allow_secrets writes
 # ---------------------------------------------------------------------------

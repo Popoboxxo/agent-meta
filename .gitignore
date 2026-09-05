@@ -1,6 +1,7 @@
 *.pyc
 __pycache__/
 .claude/settings.local.json
+.continue/config.local.yaml
 .input/
 .local/
 CLAUDE.personal.md

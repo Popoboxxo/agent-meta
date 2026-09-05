@@ -27,6 +27,7 @@ from .io import (
     write_checked,
 )
 from .log import SyncLog
+from .toml_writer import dumps as _toml_dumps
 
 # ---------------------------------------------------------------------------
 # Provider config generation helpers
@@ -145,6 +146,60 @@ def _read_json_lenient(path: Path) -> dict | None:
     return read_json_lenient(path)
 
 
+def _config_rel_label(path: Path) -> str:
+    """Log label for a provider config file: include the containing directory
+    when there is one, so sibling configs (.vscode/mcp.json vs .cursor/mcp.json)
+    stay distinguishable in sync.log instead of both reading as "mcp.json".
+    """
+    rel = str(path.name)
+    if path.parent.name:
+        rel = str(path.relative_to(path.parent.parent))
+    return rel
+
+
+def _read_existing_json_dict(path: Path, rel: str, log: SyncLog) -> dict | None:
+    """Read an existing JSON provider config, tolerating empty/unparseable files.
+
+    Returns {} when the file is missing or zero-byte (a zero-byte file is
+    invalid JSON but not a real conflict — self-heal to {} instead of silently
+    skipping the injection, audit #400 Secondary Finding A), the parsed dict
+    otherwise, and None when the content is not a JSON object (a warning has
+    already been emitted — the caller must skip to avoid data loss).
+    """
+    if path.exists() and path.stat().st_size > 0:
+        parsed = _read_json_lenient(path)
+        if not isinstance(parsed, dict):
+            log.warning(
+                f"mcp: could not parse '{rel}' as a JSON object — "
+                "MCP config not injected. Add mcpServers manually."
+            )
+            return None
+        return parsed
+    return {}
+
+
+def _write_json_config(
+    path: Path,
+    data: dict,
+    rel: str,
+    log: SyncLog,
+    dry_run: bool,
+    allow_secrets: bool,
+    config: dict | None,
+    verify_gitignored: bool,
+    log_label: str,
+) -> None:
+    """Serialize a provider config dict as clean JSON and write it via write_checked."""
+    content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    if not dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config,
+                     dry_run=dry_run, verify_gitignored=verify_gitignored):
+        log.action("WRITE", rel, log_label)
+    else:
+        log.skip(rel, "unchanged")
+
+
 def _update_json_config(
     path: Path,
     mcp_key: str,
@@ -160,43 +215,41 @@ def _update_json_config(
     Reads the existing file (if any), updates the MCP key, writes clean JSON.
     Warns and skips if the file cannot be parsed.
     """
-    # Log label: include the containing directory when there is one, so
-    # sibling configs (.vscode/mcp.json vs .cursor/mcp.json) stay
-    # distinguishable in sync.log instead of both reading as "mcp.json".
-    rel = str(path.name)
-    if path.parent.name:
-        rel = str(path.relative_to(path.parent.parent))
-
-    existing: dict = {}
-    if path.exists():
-        if path.stat().st_size == 0:
-            # A zero-byte file is invalid JSON but not a real conflict —
-            # self-heal to {} instead of silently skipping the injection
-            # (audit #400, Secondary Finding A).
-            existing = {}
-        else:
-            parsed = _read_json_lenient(path)
-            if parsed is None:
-                log.warning(
-                    f"mcp: could not parse '{rel}' as JSON/JSONC — "
-                    "MCP config not injected. Add mcpServers manually."
-                )
-                return
-            existing = parsed
+    rel = _config_rel_label(path)
+    existing = _read_existing_json_dict(path, rel, log)
+    if existing is None:
+        return
 
     # Bereinigung der Legacy-Keys wurde auf Wunsch des Users entfernt,
     # um manuelle Einträge in den Config-Dateien zu erhalten.
 
     existing[mcp_key] = mcp_entries
-    content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+    _write_json_config(path, existing, rel, log, dry_run, allow_secrets, config,
+                       verify_gitignored, f"mcp-registry → {mcp_key}")
 
-    if not dry_run:
-        path.parent.mkdir(parents=True, exist_ok=True)
-    if write_checked(path, content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run,
-                      verify_gitignored=verify_gitignored):
-        log.action("WRITE", rel, f"mcp-registry → {mcp_key}")
-    else:
-        log.skip(rel, "unchanged")
+
+def _update_zcode_json_config(
+    path: Path,
+    mcp_entries: dict,
+    log: SyncLog,
+    dry_run: bool,
+    allow_secrets: bool,
+    config: dict | None = None,
+    verify_gitignored: bool = False,
+) -> None:
+    """Merge mcp_entries into .zcode/config.json under the NESTED mcp.servers key.
+
+    ZCode reads workspace MCP servers from the nested `mcp.servers` key (V2),
+    not from a top-level key. All other keys in the file (user model config
+    etc.) are preserved; only `mcp.servers` is replaced wholesale.
+    """
+    rel = _config_rel_label(path)
+    existing = _read_existing_json_dict(path, rel, log)
+    if existing is None:
+        return
+    existing.setdefault("mcp", {})["servers"] = mcp_entries
+    _write_json_config(path, existing, rel, log, dry_run, allow_secrets, config,
+                       verify_gitignored, "mcp-registry → mcp.servers")
 
 
 def _update_continue_yaml_config(
@@ -258,6 +311,107 @@ def _update_continue_yaml_config(
     if write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config, dry_run=dry_run,
                       verify_gitignored=verify_gitignored):
         log.action("WRITE", rel, "mcp-registry → mcpServers")
+    else:
+        log.skip(rel, "unchanged")
+
+
+# Bearer-token env indirection (V8): the committed placeholder form
+# "Bearer ${VAR}" (the ${VAR} rendering of the registry's "Bearer {{VAR}}")
+# becomes a Codex-native bearer_token_env_var reference to the bare env var.
+_BEARER_PLACEHOLDER_RE = re.compile(r"^Bearer \$\{([A-Z0-9_]+)\}$")
+
+CODEX_TOML_BLOCK_BEGIN = "# agent-meta:mcp-begin"
+CODEX_TOML_BLOCK_END = "# agent-meta:mcp-end"
+
+
+def _adapt_entry_for_codex(entry: dict) -> dict:
+    """Adapt a generic MCP connection entry to Codex's config.toml schema.
+
+    Codex has no `type` discriminator in [mcp_servers.<name>] tables — stdio
+    vs. remote is implied by the presence of `command` vs. `url` — so the key
+    is dropped. A committed `Authorization: Bearer ${VAR}` header is replaced
+    by the native env-indirection key `bearer_token_env_var = "<VAR>"` (V8
+    strategy: Codex has no include/import mechanism for a secrets file, so
+    secrets are referenced through the environment instead). Any remaining
+    headers stay under `headers` unchanged — the exact remaining-header key
+    semantics Codex accepts are part of the P6 real-repo test (V8).
+    """
+    conn_type = entry.get("type", "")
+    adapted = {k: v for k, v in entry.items() if k != "type"}
+    if conn_type != "sse":
+        return adapted
+
+    headers = dict(adapted.pop("headers", None) or {})
+    match = _BEARER_PLACEHOLDER_RE.match(str(headers.get("Authorization", "")))
+    if match:
+        del headers["Authorization"]
+        adapted["bearer_token_env_var"] = match.group(1)
+    if headers:
+        adapted["headers"] = headers
+    return adapted
+
+
+def _update_codex_toml_config(
+    path: Path,
+    mcp_entries: dict,
+    log: SyncLog,
+    dry_run: bool,
+    allow_secrets: bool,
+    config: dict | None = None,
+    verify_gitignored: bool = False,
+) -> None:
+    """Inject a managed [mcp_servers.*] block into a Codex config.toml file.
+
+    Follows the managed-block pattern of _update_continue_yaml_config: the
+    generated MCP tables live between comment markers so subsequent syncs
+    replace them in place, while user content outside the block (model config,
+    profiles, ...) is never reordered or rewritten. Codex has no
+    include/import mechanism for a second TOML file (V8), so this committed
+    block is the only MCP surface and carries ${VAR} env references directly.
+    """
+    rel = _config_rel_label(path)
+
+    block_content = (
+        f"{CODEX_TOML_BLOCK_BEGIN}\n"
+        "# Generated by agent-meta — do not edit manually.\n"
+    )
+    if mcp_entries:
+        adapted = {name: _adapt_entry_for_codex(entry) for name, entry in mcp_entries.items()}
+        toml_block = _toml_dumps({"mcp_servers": adapted})
+        # toml_writer emits an empty [mcp_servers] parent-table header before
+        # the per-server sections; drop that leading line — each
+        # [mcp_servers.<name>] header implicitly creates the parent table,
+        # which keeps the block valid, tomllib-parseable TOML.
+        lines = toml_block.splitlines()
+        if lines and lines[0] == "[mcp_servers]":
+            lines = lines[1:]
+        block_content += "\n".join(lines) + "\n"
+    block_content += CODEX_TOML_BLOCK_END
+
+    if path.exists():
+        existing = path.read_text(encoding="utf-8")
+        block_re = re.compile(
+            rf"^{re.escape(CODEX_TOML_BLOCK_BEGIN)}.*?^{re.escape(CODEX_TOML_BLOCK_END)}",
+            re.MULTILINE | re.DOTALL,
+        )
+        if block_re.search(existing):
+            new_content = block_re.sub(block_content, existing, count=1)
+        else:
+            # TOML table headers at the end of the document are safe to
+            # append — no prior key/value line can be re-attributed to them.
+            new_content = existing.rstrip("\n") + "\n\n" + block_content + "\n"
+    else:
+        new_content = (
+            "# Codex project config — MCP block managed by agent-meta.\n\n"
+            + block_content
+            + "\n"
+        )
+
+    if not dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if write_checked(path, new_content, log, rel, allow_secrets=allow_secrets, config=config,
+                     dry_run=dry_run, verify_gitignored=verify_gitignored):
+        log.action("WRITE", rel, "mcp-registry → mcp_servers")
     else:
         log.skip(rel, "unchanged")
 
@@ -401,6 +555,12 @@ def _write_provider_config(
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
                                       verify_gitignored=verify_gitignored)
+    elif fmt == "codex-toml-mcp":
+        _update_codex_toml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
+                                  verify_gitignored=verify_gitignored)
+    elif fmt == "zcode-json":
+        _update_zcode_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
+                                  verify_gitignored=verify_gitignored)
     else:
         log.warning(f"mcp: unknown provider format '{fmt}' — skipping config generation for {path.name}")
 

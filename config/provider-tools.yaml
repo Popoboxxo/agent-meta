@@ -66,6 +66,62 @@ copilot:
   # GitHub Copilot has no frontmatter tools model. Tools are provided by the IDE.
   # The 'tools' field is removed during generation.
 
+codex:
+  # Codex built-in/matcher names (V4, 2026-09-04): Bash is the canonical
+  # hook/matcher name; apply_patch matches as the Edit/Write tool;
+  # spawn_agent is the subagent dispatch (matches under alias Agent).
+  # Internal names shell/exec_command are NOT whitelisted.
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - WebFetch
+  - WebSearch
+  - Agent
+  - mcp__*              # MCP tool prefix (wildcard)
+
+# Known-unsupported tools for Codex — dropped by design (INFO instead of WARNING).
+codex-silent:
+  - TodoWrite           # no verified todo tool in the Codex tool catalog
+
+zcode:
+  # ZCode built-ins (V5, 2026-09-04): 9 tools + Agent dispatch;
+  # MCP tools are addressed by their full mcp__<server>__<tool> name.
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Agent
+  - Task                # legacy alias of Agent (V17)
+  - mcp__*
+
+kimicode:
+  # Kimi Code built-in catalog (V14, 2026-09-04, exact case-sensitive names).
+  # Template-side alias names are kept valid here so generation stays
+  # warning-free; harness-native names noted per entry.
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - Bash
+  - WebSearch
+  - WebFetch            # template-side name — Kimi-native tool is FetchURL
+  - Agent               # single dispatch (prompt/description/subagent_type/resume/run_in_background)
+  - AgentSwarm          # fan-out dispatch (prompt_template + items, up to 128)
+  - mcp__*              # MCP tool prefix (wildcard)
+
+# Known-unsupported tools for Kimi Code — dropped by design (INFO instead of WARNING).
+kimicode-silent:
+  - TodoWrite           # Kimi-native name is TodoList
+
 # Terminal (Command-Execution) Tool per Provider
 # Used by viz.py inject_viz_prompt_block to name the correct tool in the fallback
 # Null means: no known terminal tool, use generic phrasing
@@ -76,3 +132,6 @@ terminal_tool:
   Continue: null
   Copilot: null
   Mammouth: bash
+  Codex: Bash
+  ZCode: Bash
+  KimiCode: Bash

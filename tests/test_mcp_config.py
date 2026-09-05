@@ -7,12 +7,21 @@ inert, silently-broken MCP integration.
 """
 
 import json
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from pathlib import Path
 
 import yaml
 
 from scripts.lib.log import SyncLog
 from scripts.lib.mcp import _update_json_config, build_mcp_guardrails_list, generate_provider_configs
+from scripts.lib.mcp_provider_config import (
+    _update_codex_toml_config,
+    _update_zcode_json_config,
+    _write_provider_config,
+)
 from scripts.lib.providers import load_providers_config
 
 
@@ -214,3 +223,226 @@ def test_build_mcp_guardrails_list_excludes_servers_without_blocked_tools():
 def test_build_mcp_guardrails_list_empty_when_no_active_server_has_blocked_tools():
     result = build_mcp_guardrails_list({}, [])
     assert result == "- (keine aktiven MCP-Server mit gesperrten Tools)"
+
+
+# ---------------------------------------------------------------------------
+# Codex (codex-toml-mcp), ZCode (zcode-json), KimiCode (claude-settings reuse)
+# ---------------------------------------------------------------------------
+
+def _codex_mcp_entries() -> dict:
+    """Committed-entry shape as produced by _build_connection_entry(secrets=None):
+    {{VAR}} already substituted to ${VAR}, plus the generic `type` discriminator.
+    """
+    return {
+        "filesystem": {
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/ws"],
+            "env": {"NODE_ENV": "${NODE_ENV}"},
+        },
+        "search": {
+            "type": "sse",
+            "url": "${SEARCH_URL}",
+            "headers": {"Authorization": "Bearer ${SEARCH_TOKEN}", "X-Custom": "${CUSTOM_VAL}"},
+        },
+    }
+
+
+def test_codex_toml_mcp_writer_golden(tmp_path):
+    path = tmp_path / ".codex" / "config.toml"
+    log = SyncLog()
+    entries = _codex_mcp_entries()
+
+    _update_codex_toml_config(path, entries, log, dry_run=False, allow_secrets=True)
+
+    content = path.read_text(encoding="utf-8")
+    # The emitted block must be valid TOML.
+    parsed = tomllib.loads(content)
+    assert "[mcp_servers.filesystem]" in content
+    assert "[mcp_servers.search]" in content
+
+    filesystem = parsed["mcp_servers"]["filesystem"]
+    assert filesystem["command"] == "npx"
+    assert filesystem["args"] == ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/ws"]
+    assert filesystem["env"] == {"NODE_ENV": "${NODE_ENV}"}  # ${VAR} placeholders preserved
+    assert "type" not in filesystem  # Codex has no type discriminator
+
+    search = parsed["mcp_servers"]["search"]
+    assert search["url"] == "${SEARCH_URL}"
+    # Bearer ${VAR} header → native bearer_token_env_var env indirection (V8).
+    assert search["bearer_token_env_var"] == "SEARCH_TOKEN"
+    assert "Authorization" not in search["headers"]
+    assert search["headers"]["X-Custom"] == "${CUSTOM_VAL}"
+    assert "type" not in search
+
+    # Idempotent: re-run on unchanged content → skip, file untouched.
+    log2 = SyncLog()
+    _update_codex_toml_config(path, entries, log2, dry_run=False, allow_secrets=True)
+    assert any("unchanged" in s for s in log2.skipped)
+    assert path.read_text(encoding="utf-8") == content
+
+
+def test_codex_toml_mcp_writer_preserves_user_content_and_replaces_block(tmp_path):
+    path = tmp_path / ".codex" / "config.toml"
+    _write(path, '# my hand-written profile\n[profile.full]\nmodel = "gpt-5.5"\n')
+    log = SyncLog()
+
+    _update_codex_toml_config(path, _codex_mcp_entries(), log, dry_run=False, allow_secrets=True)
+    first = path.read_text(encoding="utf-8")
+    # Block appended at the end — user content above it is untouched.
+    assert first.startswith('# my hand-written profile\n[profile.full]\nmodel = "gpt-5.5"\n\n')
+
+    # A changed server set replaces the managed block in place, keeping the
+    # user content byte-identical.
+    _update_codex_toml_config(
+        path, {"only": {"type": "stdio", "command": "uvx", "args": ["m"]}},
+        log, dry_run=False, allow_secrets=True,
+    )
+    second = path.read_text(encoding="utf-8")
+    assert second.startswith('# my hand-written profile\n[profile.full]\nmodel = "gpt-5.5"\n\n')
+    assert "[mcp_servers.only]" in second
+    assert "filesystem" not in second
+    assert "search" not in second
+    parsed = tomllib.loads(second)
+    assert set(parsed["mcp_servers"]) == {"only"}
+    assert parsed["profile"]["full"]["model"] == "gpt-5.5"
+
+
+def test_generate_provider_configs_codex_toml_wires_committed_file(tmp_path):
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+
+    _write(
+        agent_meta_root / "config" / "mcp-registry.yaml",
+        yaml.dump({
+            "mcp-servers": {
+                "search": {
+                    "connection": {
+                        "type": "sse",
+                        "url": "{{SEARCH_URL}}",
+                        "headers": {"Authorization": "Bearer {{SEARCH_TOKEN}}"},
+                    },
+                },
+                "local-fs": {
+                    "connection": {
+                        "type": "stdio",
+                        "command": "npx",
+                        "args": ["-y", "fs"],
+                        "env": {"API_KEY": "{{API_KEY}}"},
+                    },
+                },
+            }
+        }),
+    )
+
+    config = {"mcp-servers": ["search", "local-fs"], "platforms": []}
+    provider_config = {
+        "Codex": {
+            "mcp-config": {
+                "committed-file": ".codex/config.toml",
+                "format": "codex-toml-mcp",
+            }
+        }
+    }
+    log = SyncLog()
+
+    generate_provider_configs(
+        agent_meta_root, project_root, config, provider_config, log,
+        dry_run=False, provider="Codex",
+    )
+
+    toml_path = project_root / ".codex" / "config.toml"
+    assert toml_path.exists()
+    parsed = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    # {{VAR}} → ${VAR} committed substitution happened before rendering.
+    assert parsed["mcp_servers"]["search"]["url"] == "${SEARCH_URL}"
+    assert parsed["mcp_servers"]["search"]["bearer_token_env_var"] == "SEARCH_TOKEN"
+    assert "Authorization" not in parsed["mcp_servers"]["search"].get("headers", {})
+    assert parsed["mcp_servers"]["local-fs"]["command"] == "npx"
+    assert parsed["mcp_servers"]["local-fs"]["env"] == {"API_KEY": "${API_KEY}"}
+    # V8: Codex has no secrets-file — no local file may be generated.
+    assert not (project_root / ".codex" / "config.local.toml").exists()
+
+
+def test_codex_mcp_config_has_no_secrets_file():
+    # V8: Codex has no include/import mechanism for a second TOML file — a
+    # secrets-file entry would be dead config that is silently never read.
+    repo_root = Path(__file__).resolve().parents[1]
+    provider_config = load_providers_config(repo_root)
+    assert "secrets-file" not in provider_config["Codex"]["mcp-config"]
+    assert provider_config["Codex"]["mcp-config"]["format"] == "codex-toml-mcp"
+    assert provider_config["Codex"]["mcp-config"]["committed-file"] == ".codex/config.toml"
+
+
+def test_zcode_json_writer_creates_nested_mcp_servers(tmp_path):
+    path = tmp_path / ".zcode" / "config.json"
+    log = SyncLog()
+
+    _update_zcode_json_config(
+        path, {"srv": {"type": "sse", "url": "https://x"}}, log, dry_run=False, allow_secrets=True,
+    )
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written == {"mcp": {"servers": {"srv": {"type": "sse", "url": "https://x"}}}}
+
+
+def test_zcode_json_writer_merges_into_existing_config(tmp_path):
+    path = tmp_path / ".zcode" / "config.json"
+    _write(path, json.dumps({"model": {"main": "glm-5.3"}, "mcp": {"other": True}}))
+    log = SyncLog()
+
+    _update_zcode_json_config(
+        path, {"srv": {"type": "sse", "url": "https://x"}}, log, dry_run=False, allow_secrets=True,
+    )
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["mcp"]["servers"] == {"srv": {"type": "sse", "url": "https://x"}}
+    assert written["mcp"]["other"] is True  # unrelated keys under mcp preserved
+    assert written["model"] == {"main": "glm-5.3"}  # unrelated top-level keys preserved
+
+    # Re-run identical content → idempotent skip.
+    log2 = SyncLog()
+    _update_zcode_json_config(
+        path, {"srv": {"type": "sse", "url": "https://x"}}, log2, dry_run=False, allow_secrets=True,
+    )
+    assert any("unchanged" in s for s in log2.skipped)
+
+
+def test_kimicode_mcp_config_reuses_claude_settings_format():
+    # V13: Kimi Code reads the wire-identical {"mcpServers": ...} top-level
+    # key from .kimi-code/mcp.json — the claude-settings JSON branch is
+    # reused instead of a new format branch. No secrets-file (Kimi-native
+    # env indirection is a P6 detail).
+    repo_root = Path(__file__).resolve().parents[1]
+    provider_config = load_providers_config(repo_root)
+    mcp_cfg = provider_config["KimiCode"]["mcp-config"]
+    assert mcp_cfg["format"] == "claude-settings"
+    assert mcp_cfg["committed-file"] == ".kimi-code/mcp.json"
+    assert "secrets-file" not in mcp_cfg
+
+
+def test_write_provider_config_claude_settings_writes_kimicode_mcp_json(tmp_path):
+    # Functional reuse check: format claude-settings writes the mcpServers
+    # top-level key regardless of which provider directory the file lives in.
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "stdio", "command": "npx", "args": ["-y", "kimi-mcp"]}}
+
+    _write_provider_config(path, entries, "claude-settings", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["mcpServers"] == entries
+    assert any("mcpServers" in a for a in log.actions)
+
+
+def test_write_provider_config_warns_and_skips_unknown_format(tmp_path):
+    path = tmp_path / "config.unknown"
+    log = SyncLog()
+
+    _write_provider_config(
+        path, {"srv": {"type": "sse", "url": "https://x"}}, "mystery-format",
+        log, dry_run=False, allow_secrets=True,
+    )
+
+    assert not path.exists()
+    assert any("unknown provider format 'mystery-format'" in w for w in log.warnings)

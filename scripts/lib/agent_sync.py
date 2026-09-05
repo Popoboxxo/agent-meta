@@ -444,7 +444,7 @@ def sync_agents_for_provider(
     project_name = config.get('project', {}).get('name', 'unknown')
 
     for role, source_path in overrides.items():
-        filename = target_filename(role, role_map)
+        filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
         if not filename:
             if provider == 'Claude':
                 log.skip(str(source_path.name), 'role not in ROLE_MAP')
@@ -647,7 +647,21 @@ def sync_agents_for_provider(
                 if line.strip():
                     previously_managed.add(line.strip())
 
-        for existing_file in sorted(target_dir.glob('*.md')):
+        # Stale-file detection is ext-aware: a provider with a non-Markdown
+        # agent_ext (Codex: .toml) must have its leftover outputs pruned too,
+        # while the legacy *.md sweep keeps cleaning up files from before a
+        # provider switched its agent_ext. Both globs feed the same
+        # expected_filenames/managed-index check, which is ext-agnostic
+        # (it compares full filenames including the suffix).
+        agent_ext = pc.get('agent_ext', '.md')
+        glob_patterns = ['*.md']
+        if agent_ext != '.md':
+            glob_patterns.append(f'*{agent_ext}')
+        stale_candidates: set = set()
+        for pattern in glob_patterns:
+            stale_candidates.update(target_dir.glob(pattern))
+
+        for existing_file in sorted(stale_candidates):
             if existing_file.name not in expected_filenames:  # noqa: SIM102
                 if not managed_index.exists() or existing_file.name in previously_managed:
                     log.action('DELETE', str(existing_file.relative_to(project_root)),
@@ -660,14 +674,17 @@ def sync_agents_for_provider(
                 '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
             )
 
-    # Provider Bootstrap: session-start agent registration for providers that
-    # need it (Gemini: inject GEMINI.md instructions; Continue: update
+    # Provider Bootstrap: session-start agent registration for providers whose
+    # config/provider-bootstrap.yaml entry demands it (Gemini: inject generated
+    # instructions; ZCode: inject static instructions; Continue: update
     # .continue/config.yaml) — Issue #277, unified call site per #628: the
-    # mechanism/action dispatch lives entirely in BootstrapEngine, no more
-    # per-provider special-casing here.
-    if provider in ("Gemini", "Continue"):
-        from .bootstrap import BootstrapEngine
-        bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
+    # mechanism/action dispatch lives entirely in BootstrapEngine. The gate is
+    # registry-driven, not a provider-name literal (provider-agnostic policy:
+    # dispatch on config keys, never on `if provider == "Name"`).
+    from .bootstrap import BootstrapEngine
+    bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
+    bootstrap_cfg = bootstrap_engine.get_bootstrap_config(provider)
+    if bootstrap_cfg and bootstrap_cfg.get("action") != "none":
         result = bootstrap_engine.run_bootstrap(
             provider, target_dir, project_root,
             dry_run=dry_run, log=log,

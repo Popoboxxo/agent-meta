@@ -9,7 +9,7 @@ from scripts.lib.pipelines import (
 
 
 def test_known_providers_constant():
-    assert KNOWN_PROVIDERS == ("Claude", "Opencode", "Gemini", "Continue", "Mammouth")
+    assert KNOWN_PROVIDERS == ("Claude", "Opencode", "Gemini", "Continue", "Mammouth", "Codex", "ZCode", "KimiCode")
 
 
 def test_pipeline_active_for_provider_no_field_means_everywhere_active():

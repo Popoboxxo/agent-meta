@@ -1,4 +1,4 @@
-# Multi-Provider Support — Claude, Gemini, Opencode, Continue, Copilot, Mammouth
+# Multi-Provider Support — Claude, Gemini, Opencode, Continue, Copilot, Mammouth, Codex, ZCode, Kimi Code
 
 > Dieses Dokument beschreibt wie `sync.py` mehrere AI-Provider gleichzeitig bedienen kann
 > und was jeder Provider an Output erhält.
@@ -9,10 +9,10 @@
 
 `sync.py` generiert Provider-spezifischen Output aus denselben universellen Agent-Templates.
 Ein einziges `.meta-config/project.yaml` reicht, um Agenten-Dateien für Claude Code, Gemini CLI,
-Opencode, Continue, GitHub Copilot und Mammouth Code gleichzeitig zu erzeugen.
+Opencode, Continue, GitHub Copilot, Mammouth Code, Codex, ZCode und Kimi Code gleichzeitig zu erzeugen.
 
 ```json
-"ai-providers": ["Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth"]
+"ai-providers": ["Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth", "Codex", "ZCode", "KimiCode"]
 ```
 
 Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin unverändert.
@@ -37,10 +37,14 @@ Backward-compatible: `"ai-provider": "Claude"` (String) funktioniert weiterhin u
 | `Opencode` | `.opencode/agents/` | `.md` | `AGENTS.md` | Nativ (`description`, `mode: subagent`, `model: provider/id`) |
 | `Copilot` | `.github/copilot/agents/` | `.md` | `.github/copilot/COPILOT.md` | Reduziert (`name`, `description`) |
 | `Mammouth` | `.mammouth/agents/` | `.md` | `MAMMOUTH.md` | Reduziert (`model` only) |
+| `Codex` | `.codex/agents/` | `.toml` | `AGENTS.md` | TOML-Dokument (`name`, `description`, `model`, `sandbox_mode`, `developer_instructions`; Provenance als TOML-Kommentare) |
+| `ZCode` | `.zcode/agents/` | `.md` | `AGENTS.md` | Reduziert (`model`, kein `memory`/`permissionMode`/…) |
+| `KimiCode` | `.kimi-code/agents/` | `.md` | `AGENTS.md` | Reduziert (`model`, kein `memory`/`temperature`/…) |
 
-> **AGENTS.md ist geteilt:** `Gemini`, `Opencode` und (als Vorlage) `Mammouth` verwenden
-> alle das gemeinsame Template `templates/configs/AGENTS.project-template.md`. Gemini und
-> Opencode schreiben ihren managed block in dieselbe `AGENTS.md` im Projekt-Root — die Datei
+> **AGENTS.md ist geteilt:** `Gemini`, `Opencode`, `Mammouth` (als Vorlage), `Codex`,
+> `ZCode` und `KimiCode` verwenden alle das gemeinsame Template
+> `templates/configs/AGENTS.project-template.md`. Diese Provider schreiben ihren managed block
+> in dieselbe `AGENTS.md` im Projekt-Root — die Datei
 > ist bewusst provider-neutral (siehe Routing in `CLAUDE.md`: „Opencode, Gemini -> AGENTS.md").
 
 ### Claude Code
@@ -137,6 +141,52 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
 > `bootstrap_required`/`subagent_dispatch` defaulteten stumm auf `false`. Die Einträge machen
 > dieses Verhalten explizit statt implizit.
 
+### Codex (OpenAI Codex CLI)
+
+TOML-nativer Provider — Agenten als TOML-Dokumente mit nativem Dispatch (Details:
+`docs/providers/codex.md`).
+
+- `.codex/agents/*.toml` — generierte Agenten (`codex-toml`-Transform:
+  `name`/`description`/`model`/`sandbox_mode`/`developer_instructions`, auto-geladen)
+- `AGENTS.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert; geteilt
+  mit Gemini/Opencode/ZCode/KimiCode)
+- `rules/` — Rules im Projekt-Root (`has_rules: true`; `.rules`-Naming = offener P6-Check)
+- `.agents/skills/` — Skills-Kanal (Codex liest user → repo → directory)
+- Dispatch via native `spawn_agent`/`wait_agent`-Toolcalls, JSON-Handoff;
+  `.codex/hooks/` ist nur reserviert — **keine Hook-Spiegelung** (Payload-Deviations +
+  Hash-Trust-Review, #630-Muster); MCP in `.codex/config.toml`
+  (Format-Writer `codex-toml-mcp` landet mit dem P3-Commit, vorher warn+skip)
+
+### ZCode (zcode.z.ai)
+
+Offizieller Z.ai GLM-5.3-Harness (ADE) — Agent-Definitionen als Dateien, konsumiert
+via Bootstrap-Injection (Gemini-Postur; Details: `docs/providers/zcode.md`).
+
+- `.zcode/agents/*.md` — generierter Definition-Store (`model` pro Rolle injiziert:
+  `glm-5.3`/`glm-5.3-flash`); Workspace-Auto-Load = offener P6-Real-Repo-Test
+- `AGENTS.md` — managed block **plus Session-Start-Bootstrap-Block** (Roster-Registrierung
+  im Prompt — einziger weiterer Provider mit Bootstrap-Block neben Gemini)
+- `.zcode/config.json` — Workspace-Settings; MCP unter dem verschachtelten Key
+  `mcp.servers` (Format-Writer `zcode-json` landet mit dem P3-Commit, vorher warn+skip)
+- Dispatch via `Agent`-Toolcall (Legacy-Alias `Task`), Backgrounding statt verifizierter
+  Parallelität, YAML-Text-Block-Handoff; **keine Hooks** — Projekt-Hooks werden vom
+  Harness ignoriert (`config_project_hooks_ignored`)
+
+### Kimi Code (Moonshot AI)
+
+Markdown-first Provider mit Auto-Discovery — kein Session-Bootstrap nötig
+(Details: `docs/providers/kimi-code.md`).
+
+- `.kimi-code/agents/*.md` — generierte Agenten (Default-Transform-Pfad: `model: inject`
+  + Strip-Set; Auto-Discovery `explicit > project > extra dirs > user > plugin > built-in`)
+- `AGENTS.md` — Kontext-Datei (managed block, nearest-wins-Subdirs wie Codex)
+- `.kimi-code/mcp.json` — MCP (`mcpServers`-JSON, wire-identisch zum `claude-settings`-Branch
+  wiederverwendet; Secrets via `bearerTokenEnvVar`/`env`-Indirektion)
+- `.kimi-code/skills/` — Skills (`<name>/SKILL.md` oder flat `.md`)
+- Dispatch via `Agent` + `AgentSwarm`-Fan-out (bis 128 Items), YAML-Text-Block-Handoff;
+  Hooks (20 Events) nur user-level `~/.kimi-code/config.toml` `[[hooks]]` — keine
+  Projekt-Hook-Generierung; Pfade systematisch `.kimi-code/`, **nie `.agents/`**
+
 ---
 
 ## Konfiguration
@@ -169,8 +219,10 @@ Nur bekannte Provider werden verarbeitet. Unbekannte Werte werden stillschweigen
 
 **Hinweis:** Rules werden für alle Provider mit `has_rules: true` generiert (Claude →
 `.claude/rules/`, Gemini → `.gemini/rules/`, Continue → `.continue/rules/`, Copilot →
-`.github/copilot/rules/`, Mammouth → `.mammouth/rules/`; Opencode bettet Rules in `AGENTS.md`
-ein). Hooks werden für Provider mit `has_hooks: true` generiert (Claude, Gemini, Mammouth).
+`.github/copilot/rules/`, Mammouth → `.mammouth/rules/`, Codex → `rules/`; Opencode bettet
+Rules in `AGENTS.md` ein). Hooks werden für Provider mit `has_hooks: true` generiert
+(Claude, Gemini, Mammouth) — Codex reserviert lediglich `.codex/hooks/`, spiegelt aber keine
+Hooks (kein `hook_protocol`, #630-Muster).
 
 ---
 
@@ -182,11 +234,12 @@ ein). Hooks werden für Provider mit `has_hooks: true` generiert (Claude, Gemini
 - Managed block (`<!-- agent-meta:managed-begin/end -->`) wird bei **jedem sync** aktualisiert
 - Rest der Datei: manuell gepflegt, wird nie überschrieben
 
-### `AGENTS.md` (Gemini + Opencode)
+### `AGENTS.md` (Gemini, Opencode, Codex, ZCode, KimiCode; Vorlage für Mammouth)
 
 - Einmalig angelegt via `templates/configs/AGENTS.project-template.md`
 - Managed block wird bei **jedem sync** aktualisiert
-- Von Gemini und Opencode gemeinsam genutzt (provider-neutrale Kontext-Datei)
+- Von Gemini, Opencode, Codex, ZCode und KimiCode gemeinsam genutzt (provider-neutrale Kontext-Datei);
+  Mammouth nutzt dasselbe Template für seine `MAMMOUTH.md`
 - Kein `--init` nötig — wird beim ersten normalen sync angelegt
 - **Nicht** identisch mit Geminis nativem `GEMINI.md` (siehe Gemini-CLI-Hinweis oben)
 
@@ -220,10 +273,11 @@ Rule-Content aus `config/external-tools-registry.yaml` (z.B. für lokal installi
 | Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — | — |
 | Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` | ✅ `.opencode/commands/*.md` |
 
-> **Copilot & Mammouth** folgen demselben Grundmuster (Agenten + Kontext-Datei + Rules
-> überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot hat keine
-> Hooks/Commands/Settings; Mammouth hat Hooks (`.mammouth/hooks/`) und ein eigenes
-> `.mammouth/settings.json`. Details siehe die Provider-Abschnitte oben.
+> **Copilot, Mammouth, Codex, ZCode & KimiCode** folgen demselben Grundmuster (Agenten +
+> Kontext-Datei + Rules überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot
+> hat keine Hooks/Commands/Settings; Mammouth hat Hooks (`.mammouth/hooks/`) und ein eigenes
+> `.mammouth/settings.json`; Codex spiegelt keine Hooks und hat kein Settings-File; ZCode und
+> KimiCode generieren keine Rules/Commands/Hooks (siehe Provider-Abschnitte oben).
 
 ---
 
@@ -240,7 +294,7 @@ Agenten die aus der Rollen-Whitelist entfernt werden, werden beim nächsten sync
 
 ## Vorlagen anpassen
 
-### AGENTS.md anpassen (Gemini, Opencode, Mammouth-Vorlage)
+### AGENTS.md anpassen (Gemini, Opencode, Codex, ZCode, KimiCode, Mammouth-Vorlage)
 
 Bearbeite `templates/configs/AGENTS.project-template.md` im agent-meta-Repo.
 Der Inhalt außerhalb des managed blocks kann frei gestaltet werden.
